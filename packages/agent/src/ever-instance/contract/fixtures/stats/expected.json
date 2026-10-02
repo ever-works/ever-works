@@ -1,0 +1,114 @@
+{
+  "description": "Outcome of every statistics fixture at the ingest: status, problem code and errors[0].path. layer \"schema\" fixtures fail (or pass) JSON Schema validation alone; layer \"ingest\" fixtures need the ingest checks beyond the schema (body size, number syntax, duplicate keys). Provisional until the platform publishes its fixture set.",
+  "fixtures": {
+    "valid/gauzy.json": {
+      "status": 202,
+      "layer": "schema",
+      "reason": "the gauzy golden: every key is allow-listed"
+    },
+    "valid/teams.json": {
+      "status": 202,
+      "layer": "schema",
+      "reason": "the teams golden: every key is allow-listed"
+    },
+    "valid/works.json": {
+      "status": 202,
+      "layer": "schema",
+      "reason": "the works golden: every key is allow-listed"
+    },
+    "valid/rec.json": {
+      "status": 202,
+      "layer": "schema",
+      "reason": "the rec golden: every key is allow-listed"
+    },
+    "valid/traduora.json": {
+      "status": 202,
+      "layer": "schema",
+      "reason": "the traduora golden: every key is allow-listed"
+    },
+    "invalid/01-extra-field.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/tenant_name",
+      "layer": "schema",
+      "reason": "unknown key; the top-level object is closed"
+    },
+    "invalid/02-string-in-counts.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/counts/users",
+      "layer": "schema",
+      "reason": "counts are integers"
+    },
+    "invalid/03-per-record-array.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/aggregates/invoiced_minor/EUR",
+      "layer": "schema",
+      "reason": "amounts are one integer per currency per period"
+    },
+    "invalid/04-email-in-country.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/country",
+      "layer": "schema",
+      "reason": "country is two letters or ZZ"
+    },
+    "invalid/05-url-in-version.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/version",
+      "layer": "schema",
+      "reason": "version is major.minor.patch"
+    },
+    "invalid/06-decimal-amount.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/aggregates/invoiced_minor/EUR",
+      "layer": "schema",
+      "reason": "integers only"
+    },
+    "invalid/07-oversize.json": {
+      "status": 413,
+      "code": "validation_failed",
+      "path": "",
+      "layer": "ingest",
+      "reason": "the body is larger than 16 KiB"
+    },
+    "invalid/08-foreign-product-key.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/counts/works",
+      "layer": "schema",
+      "reason": "a Works key inside a Gauzy report"
+    },
+    "invalid/09-version-suffix.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/version",
+      "layer": "schema",
+      "reason": "a build suffix could name a company"
+    },
+    "invalid/10-open-map-key.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/aggregates/deployments_by_provider/acme-internal",
+      "layer": "schema",
+      "reason": "nested map keys come from a closed list"
+    },
+    "invalid/11-integral-float.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/aggregates/invoices",
+      "layer": "ingest",
+      "reason": "a number written with a fraction is not an integer on the wire"
+    },
+    "invalid/12-duplicate-key.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/country",
+      "layer": "ingest",
+      "reason": "a key may appear once"
+    }
+  }
+}

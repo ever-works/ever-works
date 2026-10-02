@@ -93,6 +93,11 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     'Environment',
+    // Anonymous usage statistics — the one instance row (identity + statistics
+    // key), the last 12 send attempts, and the one schedule/lease row.
+    'EverInstance',
+    'EverStatsLease',
+    'EverStatsReport',
     // APW-12 Ever ID — one connected (issuer, subject) identity per account.
     'ExternalIdentity',
     // Event-ingest spine — external tracker issue → platform Task mapping
