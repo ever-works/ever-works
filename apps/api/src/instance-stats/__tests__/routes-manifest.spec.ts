@@ -87,7 +87,7 @@ describe('instance statistics — route manifest', () => {
         if (process.env.UPDATE_ROUTES_MANIFEST === '1') {
             writeFileSync(
                 MANIFEST_PATH,
-                `${JSON.stringify({ ...committed, public: generated.public, routes: generated.routes }, null, 2)}\n`,
+                `${JSON.stringify({ ...committed, public: generated.public, routes: generated.routes }, null, 4)}\n`,
             );
             return;
         }
