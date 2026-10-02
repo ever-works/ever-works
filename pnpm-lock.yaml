@@ -297,6 +297,9 @@ importers:
       '@ever-works/aws-s3-plugin':
         specifier: workspace:*
         version: link:../../packages/plugins/aws-s3
+      '@ever-works/ever-stats-sink-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/ever-stats-sink
       '@ever-works/github-storage-plugin':
         specifier: workspace:*
         version: link:../../packages/plugins/github-storage

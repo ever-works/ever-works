@@ -35,15 +35,51 @@ export type StatsReportValidation =
     | { ok: false; errors: StatsReportValidationError[] };
 
 let compiled: ValidateFunction | null = null;
+const compiledByProduct = new Map<string, ValidateFunction>();
+
+function newAjv(): Ajv2020 {
+    // Strict mode: an unknown keyword or an ambiguous schema is a compile
+    // error, not a silently ignored rule.
+    return new Ajv2020({ strict: true, allErrors: true });
+}
 
 function validator(): ValidateFunction {
-    if (!compiled) {
-        // Strict mode: an unknown keyword or an ambiguous schema is a compile
-        // error, not a silently ignored rule.
-        const ajv = new Ajv2020({ strict: true, allErrors: true });
-        compiled = ajv.compile(EVER_STATS_V1_SCHEMA);
-    }
+    if (!compiled) compiled = newAjv().compile(EVER_STATS_V1_SCHEMA);
     return compiled;
+}
+
+type Branch = { properties?: { product?: { const?: unknown } } };
+
+/**
+ * The schema narrowed to ONE product's `oneOf` branch — used only to explain
+ * a refusal. The verdict always comes from the full schema; for a report whose
+ * `product` is one of the five, the full `oneOf` passes exactly when that
+ * product's branch passes (the others fail on the `product` constant), so the
+ * narrowed schema reports the same refusal without the other products' noise.
+ */
+function productValidator(product: unknown): ValidateFunction | null {
+    if (typeof product !== 'string') return null;
+    const cached = compiledByProduct.get(product);
+    if (cached) return cached;
+    const branches = (EVER_STATS_V1_SCHEMA.oneOf as Branch[] | undefined) ?? [];
+    const branch = branches.find((candidate) => candidate.properties?.product?.const === product);
+    if (!branch) return null;
+    const narrowed = { ...EVER_STATS_V1_SCHEMA, oneOf: [branch] };
+    const fn = newAjv().compile(narrowed);
+    compiledByProduct.set(product, fn);
+    return fn;
+}
+
+/**
+ * Compile another copy of a statistics schema with exactly the options the
+ * validator uses — for the schema meta-tests, which prove that weakening the
+ * schema would let a field through.
+ */
+export function compileStrictStatsSchema(
+    schema: Record<string, unknown>,
+): (value: unknown) => boolean {
+    const validate = newAjv().compile(schema);
+    return (value: unknown) => validate(value) === true;
 }
 
 /**
@@ -53,7 +89,15 @@ function validator(): ValidateFunction {
 export function validateStatsReport(report: unknown): StatsReportValidation {
     const validate = validator();
     if (validate(report)) return { ok: true };
-    return { ok: false, errors: toErrors(validate.errors ?? [], report) };
+    const product =
+        report && typeof report === 'object'
+            ? (report as { product?: unknown }).product
+            : undefined;
+    const narrowed = productValidator(product);
+    if (narrowed && !narrowed(report)) {
+        return { ok: false, errors: toErrors(narrowed.errors ?? []) };
+    }
+    return { ok: false, errors: toErrors(validate.errors ?? []) };
 }
 
 /**
@@ -84,27 +128,18 @@ export function validateStatsReportBody(body: Uint8Array | string): StatsReportV
 /**
  * Turn ajv's errors into the receiver's shape, most relevant first.
  *
- * The schema's per-product `oneOf` makes ajv report every branch; the branches
- * whose `product` constant did not match are noise, so their errors (the ones
- * raised inside another product's `$defs`), the `product` constant mismatches
- * and the `oneOf` summary are dropped.
+ * Errors come from the schema narrowed to the report's own product (see
+ * {@link productValidator}); the `product` constant mismatches and the `oneOf`
+ * summary are dropped, and duplicates (the same path and code raised by the
+ * generic and the per-product rule) are reported once.
  * For an unknown key the path names the key itself (`/tenant_name`).
  */
-function toErrors(raw: ErrorObject[], report: unknown): StatsReportValidationError[] {
-    const product =
-        report && typeof report === 'object'
-            ? (report as { product?: unknown }).product
-            : undefined;
-    const otherBranch = (schemaPath: string) => {
-        const match = schemaPath.match(/^#\/\$defs\/([a-z]+)\//);
-        return match !== null && match[1] !== product;
-    };
+function toErrors(raw: ErrorObject[]): StatsReportValidationError[] {
     const relevant = raw.filter(
         (error) =>
             !(error.keyword === 'const' && error.instancePath === '/product') &&
             error.keyword !== 'oneOf' &&
-            error.keyword !== 'if' &&
-            !otherBranch(error.schemaPath),
+            error.keyword !== 'if',
     );
     const pool = relevant.length > 0 ? relevant : raw;
     const seen = new Set<string>();
