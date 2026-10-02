@@ -1,7 +1,11 @@
 import { Injectable, ExecutionContext, UnauthorizedException, Inject } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { DELEGATED_READ_SCOPE } from '../decorators/delegated-read.decorator';
+import {
+    DELEGATED_READ_ORIGINS,
+    DELEGATED_READ_SCOPE,
+    type DelegatedReadOriginsResolver,
+} from '../decorators/delegated-read.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
 import { FleetRunCredentialService } from '@ever-works/agent/fleet';
@@ -12,6 +16,11 @@ import { AuthProvider } from '../providers/auth-provider.abstract';
 import { toHeaders } from '../providers/request-headers';
 import { NO_TOKEN_IN_QUERY, hasTokenInQuery, isEverIdPath } from './no-token-in-query.guard';
 import { EverIdHttpException } from '../services/ever-id-errors';
+import {
+    DelegatedReadOriginRefusedException,
+    isDelegatedOriginAllowed,
+    requestOrigin,
+} from './delegated-read-origin';
 import {
     EVER_ID_DELEGATION_VERIFIER,
     EVER_ID_SIGNED_OUT_PROBE,
@@ -195,6 +204,19 @@ export class AuthSessionGuard {
         if (delegatedScope) {
             const bearer = this.extractBearer(request);
             if (bearer && JWT_SHAPED_BEARER.test(bearer)) {
+                // APW-11 (FR-50, ACC-11-38) — a handler that names the browser
+                // origins a delegated token may come from refuses every other
+                // origin, and a missing one, BEFORE the token is read: no
+                // verification, no provider key fetch, no record of a read.
+                const allowedOrigins = this.reflector.getAllAndOverride<
+                    DelegatedReadOriginsResolver | undefined
+                >(DELEGATED_READ_ORIGINS, [context.getHandler(), context.getClass()]);
+                if (
+                    allowedOrigins &&
+                    !isDelegatedOriginAllowed(requestOrigin(request), allowedOrigins)
+                ) {
+                    throw new DelegatedReadOriginRefusedException();
+                }
                 const delegation = this.resolveDelegationService();
                 const principal = delegation
                     ? await delegation.authenticate(bearer, delegatedScope, {

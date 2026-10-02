@@ -458,7 +458,7 @@ so the filter runs in the API and never in the web.
 | Issuer                   | discovery `issuer` === `issuerUrl`; token `iss` === discovery issuer and ∈ `allowedIssuers`                                                          | FR-11, 12, 14 |
 | ID token audience        | `aud` ∋ `clientId`; `aud.length > 1` ⇒ `azp === clientId`                                                                                            | FR-11         |
 | ID token times           | `exp > now − skew`; `iat ≤ now + skew`; `iat ≥ now − 600`; connect: `auth_time ≥ now − 300 − skew`                                                   | FR-11, 25     |
-| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`                                                                  | FR-45         |
+| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`; `azp` ∈ `EVER_ID_TRUSTED_CLIENT_IDS` if set                     | FR-45         |
 | Access token (exchange)  | `aud` ∋ `apiAudience`; scope ∋ `ever-works:session`; `azp` ∈ `localClients[].clientId`; `iat ≥ now − 300`; `jti` unused 600 s                        | FR-40         |
 | Logout token             | `events` has `http://schemas.openid.net/event/backchannel-logout`; no `nonce`; `sid` or `sub`; `iat` within skew and ≥ now − 300; `jti` unused 600 s | FR-33         |
 | Keys                     | cache 600 s; unknown `kid` → refetch, cooldown 30 s; stale use ≤ 21,600 s since last good fetch                                                      | FR-13         |

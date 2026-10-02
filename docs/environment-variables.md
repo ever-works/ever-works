@@ -253,9 +253,15 @@ The [App Launcher](./features/app-launcher.md) is off by default on every instal
 | `EVER_WORKS_PLATFORM_CATALOG_REF`     | The branch, tag or 40-character commit SHA read from that repository.                                        | `string`                             | `main`                 | No       |
 | `EVER_WORKS_PLATFORM_CATALOG_ENV`     | Whose addresses the tiles use. Set it per deployment, or a stage installation shows production addresses.    | `production` \| `stage` \| `develop` | `production`           | No       |
 | `EVER_WORKS_PLATFORM_CATALOG_SELF_ID` | The catalog entry marked as the app you are in.                                                              | `string`                             | `ever-works`           | No       |
+| `EVER_WORKS_APP_LAUNCHER_ORIGINS`     | Origins another Ever app may read a person's launcher list from, with a delegated token.                     | `string`                             | --                     | No       |
+| `EVER_ID_TRUSTED_CLIENT_IDS`          | Optional: the Ever ID client ids such a delegated token must have been issued to.                            | `string`                             | --                     | No       |
 
 Where the web app has PostHog configured, the launcher also needs the `app-launcher` flag to resolve to `true` for the
 person; without PostHog, `EVER_WORKS_APP_LAUNCHER_ENABLED` alone decides.
+
+`EVER_WORKS_APP_LAUNCHER_ORIGINS` takes exact `https://` origins, comma-separated, at most 50: a delegated read from
+any other origin, or from none, is refused (`403`), and an invalid entry stops a production API from starting.
+`EVER_ID_TRUSTED_CLIENT_IDS` takes at most 5 client ids; unset, any client whose token verifies may read.
 
 ---
 

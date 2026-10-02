@@ -328,7 +328,10 @@ as the entry. **18 App Works rows are human-only** and must appear in §4's huma
 4. **APW-13's `tasks.md` has no OpenAPI or fragment task.** Neither `apps/api/src/openapi/__tests__/` nor a
    "fragment updated in the same PR" line exists ([`../APW-13-golden-paths/tasks.md`](./../APW-13-golden-paths/tasks.md)
    is silent on `openapi`, `swagger` and `fragment`). [`README.md`](./README.md) §2 and this document both
-   depend on that task existing.
+   depend on that task existing. **Update 2026-10-02:** the spec exists —
+   `apps/api/src/openapi/__tests__/app-works-contract.spec.ts` checks every fragment against the generated
+   document and every `x-mcp` against the whitelist; the per-epic "fragment updated in the same PR" task line
+   is still to be added.
 
 ---
 
@@ -452,4 +455,4 @@ No route string and no owner cell changes. The rows whose third cell is **not** 
 | **APW-10** | **assert every `api/admin/apps-tier/*` route is absent**; whitelist entries for `GET /api/me/apps-tier` and `GET /api/works/:id/apps-tier`                                                                                                                                     | §3.2                                                            |
 | **APW-11** | whitelist entries for `GET /api/me/apps` (delegated, `apps:read`), `PUT /api/me/apps/preferences` and `GET /api/app-launcher/platforms`                                                                                                                                        | §3.2                                                            |
 | **APW-12** | **assert none of `/api/auth/ever-id/*` is whitelisted** (session/client-credential surface, not an agent surface)                                                                                                                                                              | §3.2                                                            |
-| **APW-13** | one P0 task for `apps/api/src/openapi/__tests__/app-works-contract.spec.ts` — the fragment superset check **and** the `x-mcp` negative check (a `not-exposed` route has no tool)                                                                                               | makes §3 testable — the task does not exist today (§3.3 item 4) |
+| **APW-13** | one P0 task for `apps/api/src/openapi/__tests__/app-works-contract.spec.ts` — the fragment superset check **and** the `x-mcp` negative check (a `not-exposed` route has no tool)                                                                                               | makes §3 testable — the spec exists since 2026-10-02 (§3.3, #4) |
