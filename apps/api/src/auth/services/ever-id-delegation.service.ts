@@ -5,6 +5,7 @@ import { ExternalIdentityRepository, UserRepository } from '@ever-works/agent/da
 import { IdentityProviderFacadeService } from '@ever-works/agent/facades';
 import type { AuthenticatedUser, EverIdDelegationBinding } from '../types/auth.types';
 import { JWT_SHAPED_BEARER, type EverIdDelegationVerifier } from '../guards/ever-id-guard.tokens';
+import { resolveTrustedClientIds } from '../ever-id-trusted-clients';
 import { EverIdActivityService } from './ever-id-activity.service';
 import { everIdError } from './ever-id-errors';
 import { EVER_ID_TELEMETRY_EVENTS, EverIdTelemetryService } from './ever-id-telemetry.service';
@@ -22,7 +23,9 @@ export interface EverIdDelegatedPrincipal {
  *
  * The token is accepted only if its signature, issuer and audience verify, it
  * has not expired, its lifetime is at most 3,600 s (FR-45) and its subject is a
- * connected identity of an active account. A missing scope is `403
+ * connected identity of an active account. When the installation lists trusted
+ * clients (`EVER_ID_TRUSTED_CLIENT_IDS`), its authorised party must also be one
+ * of them (`ever-id-trusted-clients.ts`). A missing scope is `403
  * insufficientScope`; every other refusal is `null`, which the guard answers
  * with the plain 401 (FR-46). A delegated read never opens a session and never
  * updates the last sign-in time (FR-47); it records the reading app on the
@@ -34,13 +37,23 @@ export class EverIdDelegationService implements EverIdDelegationVerifier {
     private readonly logger = new Logger(EverIdDelegationService.name);
     private sampleCounter = 0;
 
+    /**
+     * `EVER_ID_TRUSTED_CLIENT_IDS`, read once at construction (boot), so a
+     * misconfigured production value fails the boot and a running process cannot
+     * change its rule without a restart. `undefined` = no `azp` rule (FR-45 as
+     * written); a list = the token's authorised party must be one of them.
+     */
+    private readonly trustedClientIds: readonly string[] | undefined;
+
     constructor(
         private readonly facade: IdentityProviderFacadeService,
         private readonly identities: ExternalIdentityRepository,
         private readonly users: UserRepository,
         private readonly activity: EverIdActivityService,
         private readonly telemetry: EverIdTelemetryService,
-    ) {}
+    ) {
+        this.trustedClientIds = resolveTrustedClientIds();
+    }
 
     async authenticate(
         token: string,
@@ -52,10 +65,16 @@ export class EverIdDelegationService implements EverIdDelegationVerifier {
 
         let claims: Awaited<ReturnType<IdentityProviderFacadeService['verifyAccessToken']>>;
         try {
-            claims = await this.facade.verifyAccessToken(token, {
+            const rules: Parameters<IdentityProviderFacadeService['verifyAccessToken']>[1] = {
                 requiredScopes: [scope],
                 maxLifetimeSeconds: EVER_ID_LIMITS.delegatedTokenMaxLifetimeSeconds,
-            });
+            };
+            if (this.trustedClientIds) {
+                // A token minted for any other client fails with
+                // `badAuthorizedParty`, which lands in the plain 401 below.
+                rules.allowedAuthorizedParties = [...this.trustedClientIds];
+            }
+            claims = await this.facade.verifyAccessToken(token, rules);
         } catch (error) {
             if (error instanceof IdentityTokenRejectedError && error.code === 'missingScope') {
                 this.sample('insufficientScope');

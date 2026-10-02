@@ -9,7 +9,15 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+    ApiBearerAuth,
+    ApiOperation,
+    ApiProperty,
+    ApiPropertyOptional,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Type, Transform } from 'class-transformer';
 import {
@@ -28,6 +36,7 @@ import {
     ValidateNested,
 } from 'class-validator';
 import {
+    APP_LAUNCHER_ENVIRONMENTS,
     APP_LAUNCHER_FILTER_MAX_LENGTH,
     APP_LAUNCHER_MAX_CHANGES_PER_SAVE,
     APP_LAUNCHER_MAX_ITEMS_RESPONSE,
@@ -51,7 +60,15 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { config } from '../config/constants';
 import { ScopeContextService } from '../scope/scope-context.service';
+import {
+    AppLauncherDelegatedRefusalDto,
+    AppLauncherListResponseDto,
+    AppLauncherPinLimitErrorDto,
+    AppLauncherPlatformsResponseDto,
+    AppLauncherSavePreferencesResponseDto,
+} from './dto/app-launcher-response.dto';
 import { AppLauncherEnabledGuard } from './guards/app-launcher-enabled.guard';
+import { launcherDelegatedOrigins } from './launcher-delegated-cors.middleware';
 import {
     DEFAULT_CATALOG_SELF_ID,
     PlatformCatalogService,
@@ -66,11 +83,19 @@ import {
  * §4.2 (the save), §4.3 (the public platform list) and §4.5 (the error
  * contract) are the normative sections this file implements.
  *
- *   | Route                             | Auth    | Throttle | Success | Off |
- *   | --------------------------------- | ------- | -------- | ------- | --- |
- *   | `GET  /api/me/apps`               | session | 60/min   | 200     | 404 |
- *   | `PUT  /api/me/apps/preferences`   | session | 30/min   | 200/422 | 404 |
- *   | `GET  /api/app-launcher/platforms`| public  | 120/min  | 200     | 404 |
+ *   | Route                             | Auth                  | Throttle | Success | Off |
+ *   | --------------------------------- | --------------------- | -------- | ------- | --- |
+ *   | `GET  /api/me/apps`               | session or delegated* | 60/min   | 200     | 404 |
+ *   | `PUT  /api/me/apps/preferences`   | session               | 30/min   | 200/422 | 404 |
+ *   | `GET  /api/app-launcher/platforms`| public                | 120/min  | 200     | 404 |
+ *
+ *   * A delegated Ever ID token with `apps:read`, from an allow-listed origin
+ *     only (APW-12 FR-44..FR-47, APW-11 FR-50); see `list` below.
+ *
+ * The published contract of these routes is
+ * `docs/specs/features/app-works/contracts/openapi/apw-11.openapi.yaml`; the
+ * response classes in `./dto/app-launcher-response.dto.ts` are what make the
+ * generated document a superset of it.
  *
  * ## What these controllers own, and what they deliberately do not
  *
@@ -181,10 +206,20 @@ export const APP_LAUNCHER_PUBLIC_ORIGIN = '*';
  * not declare is still a `400` — `?filter=cal` included.
  */
 export class ListAppLauncherQueryDto {
+    @ApiPropertyOptional({
+        enum: ['true', 'false'],
+        description: '`true` is the Manage apps view: hidden and not-live items too. Default `false`.',
+    })
     @IsOptional()
     @IsIn(['true', 'false'])
     includeHidden?: 'true' | 'false';
 
+    @ApiPropertyOptional({
+        type: 'integer',
+        minimum: 1,
+        maximum: APP_LAUNCHER_MAX_ITEMS_RESPONSE,
+        description: 'At most this many items. Default 200.',
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -192,6 +227,10 @@ export class ListAppLauncherQueryDto {
     @Max(APP_LAUNCHER_MAX_ITEMS_RESPONSE)
     limit?: number;
 
+    @ApiPropertyOptional({
+        maxLength: APP_LAUNCHER_FILTER_MAX_LENGTH,
+        description: 'Filters items by name, case- and accent-insensitively, before `limit` applies.',
+    })
     @IsOptional()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     @IsString()
@@ -208,18 +247,30 @@ export class ListAppLauncherQueryDto {
  * never send a rank the server has to trust (FR-62, plan §4.2:429-432).
  */
 export class AppLauncherPreferenceChangeDto implements AppLauncherPreferenceChange {
+    @ApiProperty({
+        pattern: APP_LAUNCHER_ITEM_KEY_PATTERN.source,
+        description: '`platform:<catalogId>` or `work:<uuid>`.',
+    })
     @IsString()
     @Matches(APP_LAUNCHER_ITEM_KEY_PATTERN)
     key: string;
 
+    @ApiPropertyOptional({ description: 'Show or hide the item. Absent keeps the stored value.' })
     @IsOptional()
     @IsBoolean()
     visible?: boolean;
 
+    @ApiPropertyOptional({ description: 'Pin or unpin the item. Absent keeps the stored value.' })
     @IsOptional()
     @IsBoolean()
     pinned?: boolean;
 
+    @ApiPropertyOptional({
+        type: 'integer',
+        minimum: 0,
+        maximum: APP_LAUNCHER_SORT_ORDER_MAX,
+        description: 'Position inside its section.',
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -235,6 +286,11 @@ export class AppLauncherPreferenceChangeDto implements AppLauncherPreferenceChan
  * success the person reads as **Saved**.
  */
 export class SaveAppLauncherPreferencesDto {
+    @ApiProperty({
+        type: [AppLauncherPreferenceChangeDto],
+        minItems: 1,
+        maxItems: APP_LAUNCHER_MAX_CHANGES_PER_SAVE,
+    })
     @IsArray()
     @ArrayMinSize(1)
     @ArrayMaxSize(APP_LAUNCHER_MAX_CHANGES_PER_SAVE)
@@ -277,20 +333,45 @@ export class AppLauncherController {
     @Throttle({ long: { limit: APP_LAUNCHER_READS_PER_MINUTE, ttl: 60_000 } })
     // APW-12 (Ever ID, FR-44..FR-47) — the ONE handler another Ever app may read
     // with a delegated `apps:read` token for the person; every other route
-    // answers such a token like an invalid credential.
-    @DelegatedRead('apps:read')
+    // answers such a token like an invalid credential. APW-11 FR-50: such a
+    // token is accepted only from a page on an `EVER_WORKS_APP_LAUNCHER_ORIGINS`
+    // origin; any other origin, or none, is `403 origin_not_allowed` before the
+    // token is read. Session callers are unaffected.
+    @DelegatedRead('apps:read', { allowedOrigins: launcherDelegatedOrigins })
     @ApiOperation({
         summary: 'List the App Launcher items for the signed-in person',
         description:
-            'The merged, ordered list of pinned items, Ever apps and the person’s own Works, with each tile’s address, chip, visibility and Manage-apps state resolved server-side. `includeHidden=true` is the Manage apps view: it also returns hidden and not-live items, up to `limit` (1..200); `q` filters them by name, case- and accent-insensitively, before that cap, and `meta.total` reports the eligible count the filter never changes.',
+            'The merged, ordered list of pinned items, Ever apps and the person’s own Works, with each tile’s address, chip, visibility and Manage-apps state resolved server-side. `includeHidden=true` is the Manage apps view: it also returns hidden and not-live items, up to `limit` (1..200); `q` filters them by name, case- and accent-insensitively, before that cap, and `meta.total` reports the eligible count the filter never changes. Another Ever app may call it from a browser page with a delegated Ever ID access token carrying `apps:read` (`Authorization: Bearer`, never in the URL, no cookies), from an origin the installation allows; such a call can only read.',
     })
-    @ApiResponse({ status: 200, description: 'The ordered list plus its `meta` facts.' })
+    @ApiResponse({
+        status: 200,
+        type: AppLauncherListResponseDto,
+        description: 'The ordered list plus its `meta` facts.',
+        headers: {
+            'Access-Control-Allow-Origin': {
+                description:
+                    'On a cross-origin call from an allowed origin: that origin. `Access-Control-Allow-Credentials` is never sent.',
+                schema: { type: 'string' },
+            },
+        },
+    })
     @ApiResponse({
         status: 400,
-        description: '`limit` outside 1..200, `q` longer than its cap, or an unknown query shape.',
+        description:
+            '`limit` outside 1..200, `q` longer than its cap, an unknown query shape, or a token in the query string (`token_in_query`).',
     })
-    @ApiResponse({ status: 401, description: 'No session.' })
+    @ApiResponse({
+        status: 401,
+        description: 'No session, or a delegated token that does not verify.',
+    })
+    @ApiResponse({
+        status: 403,
+        type: AppLauncherDelegatedRefusalDto,
+        description:
+            'A delegated read refused: `insufficient_scope` (no `apps:read`) or `origin_not_allowed` (no `Origin`, or one not on the allow-list).',
+    })
     @ApiResponse({ status: 404, description: 'The App Launcher is switched off.' })
+    @ApiResponse({ status: 429, description: 'More than 60 reads per minute.' })
     async list(
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListAppLauncherQueryDto,
@@ -330,17 +411,26 @@ export class AppLauncherController {
         description:
             'A merge patch per item: show/hide, pin/unpin and the explicit order of a section being reordered. Pinning past six items refuses the whole save with 422 and writes nothing; an unknown or inaccessible key is answered per item with `unknownItem`.',
     })
-    @ApiResponse({ status: 200, description: '`{ saved, rejected, items }` — the refreshed list.' })
+    @ApiResponse({
+        status: 200,
+        type: AppLauncherSavePreferencesResponseDto,
+        description: '`{ saved, rejected, items }` — the refreshed list.',
+    })
     @ApiResponse({
         status: 400,
         description: 'Bad key shape, order out of range, or 1..200 violated.',
     })
-    @ApiResponse({ status: 401, description: 'No session.' })
+    @ApiResponse({
+        status: 401,
+        description: 'No session. A delegated token is refused here like any invalid credential.',
+    })
     @ApiResponse({ status: 404, description: 'The App Launcher is switched off.' })
     @ApiResponse({
         status: 422,
+        type: AppLauncherPinLimitErrorDto,
         description: 'The pin limit would be exceeded: `{ code: "pinLimit", limit: 6 }`.',
     })
+    @ApiResponse({ status: 429, description: 'More than 30 saves per minute.' })
     async savePreferences(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: SaveAppLauncherPreferencesDto,
@@ -447,8 +537,30 @@ export class AppLauncherPlatformsController {
         description:
             'The runtime platform catalog for one environment — public data, cacheable for an hour, no credentials.',
     })
-    @ApiResponse({ status: 200, description: '`{ catalogVersion, environment, platforms }`.' })
+    @ApiQuery({
+        name: 'environment',
+        required: false,
+        enum: [...APP_LAUNCHER_ENVIRONMENTS],
+        description:
+            'Whose addresses to return. An unrecognised value is ignored and the installation default applies.',
+    })
+    @ApiResponse({
+        status: 200,
+        type: AppLauncherPlatformsResponseDto,
+        description: '`{ catalogVersion, environment, platforms }`.',
+        headers: {
+            'Cache-Control': {
+                description: 'Cacheable for an hour.',
+                schema: { type: 'string', example: APP_LAUNCHER_PLATFORMS_CACHE_CONTROL },
+            },
+            'Access-Control-Allow-Origin': {
+                description: 'Readable from any origin, without credentials.',
+                schema: { type: 'string', example: APP_LAUNCHER_PUBLIC_ORIGIN },
+            },
+        },
+    })
     @ApiResponse({ status: 404, description: 'The App Launcher is switched off.' })
+    @ApiResponse({ status: 429, description: 'More than 120 reads per minute.' })
     async list(@Query('environment') environment?: string): Promise<AppLauncherPlatformsResponse> {
         const catalog = await this.catalog.read(
             isAppLauncherEnvironment(environment) ? environment : undefined,
