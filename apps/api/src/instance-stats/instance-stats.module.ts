@@ -23,7 +23,7 @@ import {
 } from './instance-stats.tokens';
 
 /**
- * Anonymous usage statistics (Category A): one signed, schema-validated
+ * Anonymous usage statistics: one signed, schema-validated
  * `ever.stats.v1` report a day, with instance-wide counts, feature switches
  * and monthly aggregates — nothing that names a person or an organization.
  *

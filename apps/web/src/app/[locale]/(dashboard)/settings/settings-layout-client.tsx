@@ -24,6 +24,7 @@ import {
     MessagesSquare,
     Mail,
     LayoutGrid,
+    Globe,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -226,6 +227,15 @@ export function SettingsLayoutClient({
                     label: t('tabs.usageCredits'),
                     icon: BarChart3,
                     href: `${baseSettingsPath}/usage`,
+                },
+                // Ever Platform — anonymous usage statistics of this installation
+                // (what is sent, the last payload, the switch). Everyone sees the
+                // tab; only the platform admin sees the controls on the page.
+                {
+                    id: 'ever-platform',
+                    label: t('tabs.everPlatform'),
+                    icon: Globe,
+                    href: `${baseSettingsPath}/ever-platform`,
                 },
                 // The fleet tab is declared unconditionally above (keeping the
                 // "Fleet sits directly ABOVE Job Runtime" ordering comment true)
