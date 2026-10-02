@@ -46,7 +46,8 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        contains(fromJSON('["develop","stage","main"]'), github.event.workflow_run.head_branch))
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    # Rollout gate (<=15m) + setup + latency gate (<=10m) + suite (~8m).
+    timeout-minutes: 45
 
     steps:
       - name: Resolve target environment
@@ -142,6 +143,51 @@ jobs:
       - name: Install Playwright chromium
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
+
+      # The suite's budgets (90s per test, 60s for a signup to land) assume the
+      # environment answers at its normal speed. The rollout gate above proves
+      # the API serves the new SHA; it says nothing about latency. On 2026-10-01
+      # dev answered every request — API and web alike — 30-80s slowly for ~6
+      # minutes while the next merge's builds started on the shared cluster:
+      # `/register` took 70s to render and the register action 60s to redirect,
+      # so signup "failed" although it worked, and the retries a minute later
+      # passed. Wait that out here instead of reporting it as a product failure,
+      # and if it does not clear, fail with an error that names the real problem.
+      - name: Wait for the environment to answer at normal speed
+        env:
+          WEB: ${{ steps.target.outputs.web }}
+          API: ${{ steps.target.outputs.api }}
+        run: |
+          set -uo pipefail
+          UA='Mozilla/5.0 (compatible; ever-works-smoke)'
+
+          # One round = the API readiness probe plus the two server-rendered
+          # pages the signup tests open first, each answering 2xx/3xx within 15s.
+          round() {
+            local ok=0 url out
+            for url in "$API/api/health/ready" "$WEB/login" "$WEB/register"; do
+              out=$(curl -s -o /dev/null -A "$UA" --max-time 15 -w '%{http_code} %{time_total}' "$url") || true
+              echo "  $url -> ${out:-no answer}"
+              [[ "${out%% *}" =~ ^[23] ]] || ok=1
+            done
+            return "$ok"
+          }
+
+          # Up to ~10 min, needing 3 consecutive good rounds: one fast answer
+          # in the middle of a slow spell proves nothing.
+          deadline=$((SECONDS + 600))
+          streak=0
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if round; then streak=$((streak+1)); else streak=0; fi
+            if [ "$streak" -ge 3 ]; then
+              echo "environment answering at normal speed on 3/3 rounds"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::$WEB / $API never answered 2xx/3xx within 15s on 3 consecutive rounds in 10 minutes. Slow answers in the timings above mean the env is starved (check cluster CPU), not that the deploy is broken; 000s or 5xx mean it is down."
+          exit 1
 
       - name: Run the smoke suite
         working-directory: apps/web
