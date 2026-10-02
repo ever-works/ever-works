@@ -64,6 +64,18 @@ The launcher's list is served by the API, and more than one client can render it
 today, and other Ever clients through a delegated read. Your arrangement is the same list in each of them, because
 there is one place that stores it.
 
+Another Ever app reads the list for you with a short-lived Ever ID access token that carries one permission, to
+read your apps (`apps:read`). That read:
+
+- comes only from the web pages the installation lists in `EVER_WORKS_APP_LAUNCHER_ORIGINS`; a call from any
+  other page, or with no origin at all, is refused (`403`) before the token is even checked;
+- can be limited further to the apps the installation names in `EVER_ID_TRUSTED_CLIENT_IDS`;
+- carries no cookie and never puts the token in an address, and it can only read: pinning, hiding and ordering
+  need your own Ever Works session.
+
+The contract such an app builds against is published as an OpenAPI document,
+[`apw-11.openapi.yaml`](../specs/features/app-works/contracts/openapi/apw-11.openapi.yaml).
+
 ## What the launcher does not do
 
 - **It never signs you in.** A tile opens an address in a new tab. You may need to sign in to that app, and the
