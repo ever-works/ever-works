@@ -1,7 +1,7 @@
 {
   "description": "Byte-exact copies of the published anonymous statistics contract, taken from the public ever-connect-sdk repository at the commit below. Never edit these files: refresh them from a newer pinned commit and update this record. drift.spec.ts checks every hash.",
   "repository": "https://github.com/ever-co/ever-connect-sdk",
-  "commit": "6d43a9bed03eae7d5a4fe756bdf0adda6843f48a",
+  "commit": "2fd74dad9357a18471292f38012a5f5e4e6d2938",
   "contractsVersion": "1.0.0-rc.1",
   "schema": {
     "path": "ever.stats.v1.schema.data.json",
@@ -12,7 +12,7 @@
     {
       "path": "fixtures/stats/expected.json",
       "source": "contracts/fixtures/stats/expected.json",
-      "sha256": "09282ecf634cc0b06ef08a91a17e262f9c99b16d62407c42bb3149e11a530f10"
+      "sha256": "b86a1340ac9516c86353eb889d5e18e323e92c269042ba3be461169f481e669a"
     },
     {
       "path": "fixtures/stats/invalid/01-extra-field.json",
@@ -73,6 +73,11 @@
       "path": "fixtures/stats/invalid/12-duplicate-key.json",
       "source": "contracts/fixtures/stats/invalid/12-duplicate-key.json",
       "sha256": "dca4b8bbdf5a799f905a2cd8a49bafc2366d3e606d0ed606b278b8d594aa4d86"
+    },
+    {
+      "path": "fixtures/stats/invalid/13-sent-at-with-time.json",
+      "source": "contracts/fixtures/stats/invalid/13-sent-at-with-time.json",
+      "sha256": "8ae8e336fe9f9c488df79c4b27510d1ec7a7f02166352722c7d5729403f7e3f5"
     },
     {
       "path": "fixtures/stats/valid/gauzy.json",

@@ -100,12 +100,16 @@ export class EverStatsSinkPlugin implements IStatsSinkPlugin {
 			return failed(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network', null);
 		}
 
-		return mapAnswer(response.status, await readAnswer(response));
+		return mapAnswer(response.status, await readAnswer(response), response.headers.get('retry-after'));
 	}
 }
 
-/** Map an HTTP answer onto the closed result (status table of the published contract). */
-export function mapAnswer(status: number, answer: unknown): StatsSendResult {
+/**
+ * Map an HTTP answer onto the closed result (status table of the published contract): `202`
+ * sent; `429`/`5xx` failed (retried, honouring a `Retry-After` in seconds); everything else —
+ * a redirect included — rejected, and not retried until the module is upgraded.
+ */
+export function mapAnswer(status: number, answer: unknown, retryAfter: string | null = null): StatsSendResult {
 	const problem = (answer && typeof answer === 'object' ? answer : {}) as {
 		code?: unknown;
 		superseded?: unknown;
@@ -116,7 +120,7 @@ export function mapAnswer(status: number, answer: unknown): StatsSendResult {
 		if (problem.superseded === true) result.superseded = true;
 		return result;
 	}
-	if (status >= 300 && status < 400) return failed('redirect', status);
+	if (status >= 300 && status < 400) return failed('redirect', status, 'rejected');
 	if (status === 422) {
 		return {
 			status: 'rejected',
@@ -135,8 +139,12 @@ export function mapAnswer(status: number, answer: unknown): StatsSendResult {
 			'rejected'
 		);
 	}
-	if (status === 429) return failed('rate_limited', status);
-	if (status >= 500) return failed('server_error', status);
+	if (status === 429 || status >= 500) {
+		const result = failed(status === 429 ? 'rate_limited' : 'server_error', status);
+		const asked = retryAfter !== null && /^\d{1,6}$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : 0;
+		if (asked > 0) result.retryAfterS = asked;
+		return result;
+	}
 	return failed('http_error', status, 'rejected');
 }
 

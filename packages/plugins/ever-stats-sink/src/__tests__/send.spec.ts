@@ -112,7 +112,7 @@ describe('EverStatsSinkPlugin.send against a local receiver', () => {
 	it('does not follow a redirect', async () => {
 		answer = { status: 302, headers: { location: `${base}/elsewhere` } };
 		const result = await new EverStatsSinkPlugin().send(report(), { ...OPTIONS, baseUrl: base });
-		expect(result).toEqual({ status: 'failed', httpStatus: 302, errorCode: 'redirect' });
+		expect(result).toEqual({ status: 'rejected', httpStatus: 302, errorCode: 'redirect' });
 		expect(received.map((request) => request.url)).toEqual(['/v1/stats/reports']);
 	});
 });
@@ -173,9 +173,21 @@ describe('mapAnswer — the published status table', () => {
 		[500, null, { status: 'failed', httpStatus: 500, errorCode: 'server_error' }],
 		[503, null, { status: 'failed', httpStatus: 503, errorCode: 'server_error' }],
 		[404, null, { status: 'rejected', httpStatus: 404, errorCode: 'http_error' }],
-		[301, null, { status: 'failed', httpStatus: 301, errorCode: 'redirect' }]
+		[301, null, { status: 'rejected', httpStatus: 301, errorCode: 'redirect' }]
 	])('%s maps as published', (status, answer, expected) => {
 		expect(mapAnswer(status, answer)).toEqual(expected);
+	});
+
+	it('passes on a Retry-After in seconds for a rate limit or a server error, and ignores anything else', () => {
+		expect(mapAnswer(429, null, '7200')).toEqual({
+			status: 'failed',
+			httpStatus: 429,
+			errorCode: 'rate_limited',
+			retryAfterS: 7200
+		});
+		expect(mapAnswer(503, null, '60')).toMatchObject({ errorCode: 'server_error', retryAfterS: 60 });
+		expect(mapAnswer(429, null, 'Wed, 21 Oct 2026 07:28:00 GMT')).not.toHaveProperty('retryAfterS');
+		expect(mapAnswer(422, { errors: [] }, '60')).not.toHaveProperty('retryAfterS');
 	});
 
 	it('drops a refused field whose path is not a short string, and any free-text code', () => {

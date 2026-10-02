@@ -242,10 +242,14 @@ export class InstanceStatsSenderService {
         if (result.status === 'failed') {
             const failures = (schedule?.failures ?? 0) + 1;
             const step = INSTANCE_STATS_RETRY_LADDER_MS[failures - 1];
+            // A longer `Retry-After` from the receiver wins over the ladder.
+            const asked = (result.retryAfterS ?? 0) * 1000;
             await this.lease.updateSchedule({
                 failures,
                 nextSendAt:
-                    step !== undefined ? new Date(now.getTime() + step) : this.nextSlot(now),
+                    step !== undefined
+                        ? new Date(now.getTime() + Math.max(step, asked))
+                        : this.nextSlot(now),
             });
             return;
         }

@@ -1,5 +1,5 @@
 {
-  "description": "Outcome of every statistics fixture at the ingest: status, problem code and errors[0].path. layer \"schema\" fixtures fail (or pass) JSON Schema validation alone; layer \"ingest\" fixtures need the ingest checks beyond the schema (body size, number syntax, duplicate keys). Provisional until the platform publishes its fixture set.",
+  "description": "Outcome of every statistics fixture at the ingest of POST /v1/stats/reports when it is posted with a valid signature: the status, the problem code, errors[0].path and errors[0].code (error). layer \"schema\" fixtures fail (or pass) JSON Schema validation alone; layer \"ingest\" fixtures need the ingest checks beyond the schema (body size, number syntax, duplicate keys). The platform, the SDK and the product builders all read this file.",
   "fixtures": {
     "valid/gauzy.json": {
       "status": 202,
@@ -30,6 +30,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/tenant_name",
+      "error": "unknown_field",
       "layer": "schema",
       "reason": "unknown key; the top-level object is closed"
     },
@@ -37,6 +38,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/counts/users",
+      "error": "type",
       "layer": "schema",
       "reason": "counts are integers"
     },
@@ -44,6 +46,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/aggregates/invoiced_minor/EUR",
+      "error": "type",
       "layer": "schema",
       "reason": "amounts are one integer per currency per period"
     },
@@ -51,6 +54,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/country",
+      "error": "pattern",
       "layer": "schema",
       "reason": "country is two letters or ZZ"
     },
@@ -58,6 +62,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/version",
+      "error": "pattern",
       "layer": "schema",
       "reason": "version is major.minor.patch"
     },
@@ -65,6 +70,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/aggregates/invoiced_minor/EUR",
+      "error": "type",
       "layer": "schema",
       "reason": "integers only"
     },
@@ -72,6 +78,7 @@
       "status": 413,
       "code": "validation_failed",
       "path": "",
+      "error": "too_large",
       "layer": "ingest",
       "reason": "the body is larger than 16 KiB"
     },
@@ -79,6 +86,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/counts/works",
+      "error": "unknown_field",
       "layer": "schema",
       "reason": "a Works key inside a Gauzy report"
     },
@@ -86,6 +94,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/version",
+      "error": "pattern",
       "layer": "schema",
       "reason": "a build suffix could name a company"
     },
@@ -93,6 +102,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/aggregates/deployments_by_provider/acme-internal",
+      "error": "unknown_field",
       "layer": "schema",
       "reason": "nested map keys come from a closed list"
     },
@@ -100,6 +110,7 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/aggregates/invoices",
+      "error": "type",
       "layer": "ingest",
       "reason": "a number written with a fraction is not an integer on the wire"
     },
@@ -107,8 +118,17 @@
       "status": 422,
       "code": "schema_violation",
       "path": "/country",
+      "error": "duplicate_key",
       "layer": "ingest",
       "reason": "a key may appear once"
+    },
+    "invalid/13-sent-at-with-time.json": {
+      "status": 422,
+      "code": "schema_violation",
+      "path": "/sent_at",
+      "error": "pattern",
+      "layer": "schema",
+      "reason": "sent_at is a UTC date: a time of day could match a request log line"
     }
   }
 }

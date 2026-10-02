@@ -41,7 +41,7 @@ export const EVER_STATS_MAX_BODY_BYTES = 16_384;
  */
 export const EVER_STATS_V1_SOURCE = {
 	repository: 'https://github.com/ever-co/ever-connect-sdk',
-	commit: '6d43a9bed03eae7d5a4fe756bdf0adda6843f48a',
+	commit: '2fd74dad9357a18471292f38012a5f5e4e6d2938',
 	path: 'contracts/schemas/ever.stats.v1.json',
 	sha256: '0cd746f7dec75117a6b812b7a832f9ceca4c97a6ecf65d22d6967a6475efc6e5'
 } as const;
@@ -245,6 +245,8 @@ export interface StatsSendResult {
 	/** `202 {"superseded":true}`: an earlier report for the same period and day was replaced. */
 	superseded?: boolean;
 	errors?: StatsSendFieldError[];
+	/** A `Retry-After` the receiver asked for (seconds), on a `failed` send. */
+	retryAfterS?: number;
 }
 
 // ---------------------------------------------------------------------------
