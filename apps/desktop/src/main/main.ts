@@ -209,7 +209,9 @@ function bootstrap(): void {
 			command: api.command,
 			args: api.args,
 			cwd: api.cwd,
-			env: { ...env, ...api.env },
+			// The embedded API reports its anonymous usage statistics as a desktop
+			// installation (the operator's own env file can still say otherwise).
+			env: { EVER_INSTALL_SOURCE: 'desktop', ...env, ...api.env },
 			readyPattern: /Nest application successfully started|listening/i
 		});
 		manager.create({

@@ -2651,7 +2651,8 @@
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
-                "agentPlugins": "ปลั๊กอินเอเจนต์"
+                "agentPlugins": "ปลั๊กอินเอเจนต์",
+                "everPlatform": "Ever Platform"
             },
             "appLauncher": {
                 "intro": "เลือกสิ่งที่ตัวเรียกใช้แอปแสดงให้คุณเห็น เฉพาะคุณเท่านั้นที่เห็นตัวเลือกเหล่านี้",
@@ -4129,6 +4130,92 @@
                         "unchanged": "ไม่มีอะไรเปลี่ยนแปลง",
                         "invalid": "ค่าบางค่าไม่ได้รับการยอมรับ โปรดตรวจสอบแล้วลองอีกครั้ง",
                         "failed": "บันทึกการตั้งค่าไม่ได้ โปรดลองอีกครั้ง"
+                    }
+                }
+            },
+            "everPlatform": {
+                "title": "Ever Platform",
+                "statistics": {
+                    "title": "Anonymous usage statistics",
+                    "description": "Once a day this installation can send Ever Platform one small, signed report with counts (for example how many Works, agents and deployments it has), which features are switched on, its version and how it was installed. It never contains anything that identifies a person or an organization.",
+                    "offByConfiguration": "Anonymous usage statistics are switched off for this installation by its configuration (EVER_STATS_ENABLED=false). Nothing is sent.",
+                    "unavailable": "The anonymous usage statistics status could not be read right now.",
+                    "memberOn": "Anonymous usage statistics are on for this installation.",
+                    "memberOff": "Anonymous usage statistics are off for this installation.",
+                    "managedByOperator": "They are managed by the instance operator.",
+                    "notScheduled": "Not scheduled",
+                    "docsLink": "What is sent, and how to verify it",
+                    "toggle": {
+                        "label": "Send anonymous usage statistics",
+                        "helper": "Off: this installation makes no statistics request at all.",
+                        "turnedOn": "Anonymous usage statistics turned on",
+                        "turnedOff": "Anonymous usage statistics turned off"
+                    },
+                    "facts": {
+                        "state": "State",
+                        "nextSend": "Next report",
+                        "installSource": "Install source",
+                        "country": "Country",
+                        "endpoint": "Sent to",
+                        "instanceId": "Instance identifier"
+                    },
+                    "reasons": {
+                        "on": "On",
+                        "env": "Off (switched off by the configuration)",
+                        "ui": "Off (switched off here)",
+                        "cloud-managed": "On — managed by Ever Cloud",
+                        "sink_unavailable": "On, but the sender plugin is not available: nothing can be sent"
+                    },
+                    "sendNow": {
+                        "button": "Send now",
+                        "sent": "Report sent",
+                        "notSent": "The report was not delivered ({status}). See the last payload below.",
+                        "disabledOff": "Send now is unavailable while anonymous usage statistics are off."
+                    },
+                    "preview": {
+                        "button": "Show what would be sent",
+                        "title": "What is sent",
+                        "hint": "Built now from the current numbers. Nothing is sent by showing it."
+                    },
+                    "last": {
+                        "title": "Last payload",
+                        "none": "Nothing has been sent yet.",
+                        "summary": "{when} · {status} · HTTP {http} · {bytes} bytes",
+                        "error": "Reason: {code}.",
+                        "status": {
+                            "sent": "sent",
+                            "rejected": "refused by the receiver",
+                            "failed": "not delivered"
+                        }
+                    },
+                    "reset": {
+                        "button": "Reset instance identity",
+                        "confirmTitle": "Reset the instance identity?",
+                        "confirmBody": "This installation gets a new random identifier and a new statistics key, so future reports cannot be linked to past ones. Nothing else changes.",
+                        "cancel": "Cancel",
+                        "confirm": "Reset identity",
+                        "done": "Instance identity reset"
+                    },
+                    "neverIncluded": {
+                        "title": "Never included",
+                        "items": {
+                            "names": "Names of people or companies",
+                            "emails": "E-mail addresses",
+                            "addresses": "Postal addresses, IP addresses or host names",
+                            "identifiers": "Account, tenant, organization or Work identifiers",
+                            "content": "Contents of Works, documents, prompts or messages",
+                            "amounts": "Individual records or amounts",
+                            "text": "Any free text or URL",
+                            "location": "Precise location (only the country you declare, if any)"
+                        }
+                    },
+                    "errors": {
+                        "stats_disabled": "Anonymous usage statistics are switched off.",
+                        "rate_limited": "Send now can be used once every 10 minutes.",
+                        "send_in_progress": "A report is being sent right now. Try again in a moment.",
+                        "forbidden": "Only the platform administrator can do this.",
+                        "unavailable": "Anonymous usage statistics are switched off for this installation.",
+                        "failed": "Something went wrong. Please try again."
                     }
                 }
             }

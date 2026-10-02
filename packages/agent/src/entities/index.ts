@@ -254,3 +254,8 @@ export * from './work-build-preparation.entity';
 export * from './work-app-provisioning.entity';
 // APW-06 T17 — the per-App-Work runtime state row.
 export * from './work-app-runtime-state.entity';
+// Anonymous usage statistics — the instance identity row, the stored send
+// attempts (exact payloads) and the schedule/lease row.
+export * from './ever-instance.entity';
+export * from './ever-stats-report.entity';
+export * from './ever-stats-lease.entity';

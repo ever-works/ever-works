@@ -33,6 +33,7 @@ import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 import { AppRuntimeFacadeService } from './app-runtime.facade';
 import { AppDependencyFacadeService } from './app-dependency.facade';
 import { IdentityProviderFacadeService } from './identity-provider.facade';
+import { StatsSinkFacadeService } from './stats-sink.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -89,6 +90,11 @@ const FACADES = [
     // administrator's on/off switch. Depends on the global PluginRegistryService,
     // PluginRepository and PluginSettingsService, so it resolves in this module.
     IdentityProviderFacadeService,
+    // Anonymous usage statistics — the `stats-sink` facade: resolves the one
+    // delivery plugin named by `EVER_WORKS_STATS_SINK`. Depends only on the
+    // global PluginRegistryService; constructing it does nothing, and only the
+    // statistics module (absent when `EVER_STATS_ENABLED=false`) ever calls it.
+    StatsSinkFacadeService,
 ];
 
 /**

@@ -292,6 +292,10 @@
         "./upstream-pull-requests": {
             "types": "./dist/upstream-pull-requests/index.d.ts",
             "default": "./dist/upstream-pull-requests/index.js"
+        },
+        "./ever-instance": {
+            "types": "./dist/ever-instance/index.d.ts",
+            "default": "./dist/ever-instance/index.js"
         }
     },
     "scripts": {

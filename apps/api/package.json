@@ -91,6 +91,7 @@
     },
     "devDependencies": {
         "@ever-works/aws-s3-plugin": "workspace:*",
+        "@ever-works/ever-stats-sink-plugin": "workspace:*",
         "@ever-works/github-storage-plugin": "workspace:*",
         "@ever-works/minio-plugin": "workspace:*",
         "@ever-works/postgres-db-plugin": "workspace:*",
