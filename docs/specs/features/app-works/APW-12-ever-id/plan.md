@@ -452,18 +452,18 @@ so the filter runs in the API and never in the web.
 
 ### 4.3 Validation parameters (single source: `EVER_ID_LIMITS`)
 
-| Check                    | Rule                                                                                                                                                     | Spec          |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| Algorithms               | header `alg` ∈ `EVER_ID_SIGNING_ALGS`; `none` and `HS*` rejected before key lookup                                                                       | FR-11         |
-| Issuer                   | discovery `issuer` === `issuerUrl`; token `iss` === discovery issuer and ∈ `allowedIssuers`                                                              | FR-11, 12, 14 |
-| ID token audience        | `aud` ∋ `clientId`; `aud.length > 1` ⇒ `azp === clientId`                                                                                                | FR-11         |
-| ID token times           | `exp > now − skew`; `iat ≤ now + skew`; `iat ≥ now − 600`; connect: `auth_time ≥ now − 300 − skew`                                                       | FR-11, 25     |
-| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`; `azp` ∈ `EVER_ID_TRUSTED_CLIENT_IDS` when that optional list is set | FR-45         |
-| Access token (exchange)  | `aud` ∋ `apiAudience`; scope ∋ `ever-works:session`; `azp` ∈ `localClients[].clientId`; `iat ≥ now − 300`; `jti` unused 600 s                            | FR-40         |
-| Logout token             | `events` has `http://schemas.openid.net/event/backchannel-logout`; no `nonce`; `sid` or `sub`; `iat` within skew and ≥ now − 300; `jti` unused 600 s     | FR-33         |
-| Keys                     | cache 600 s; unknown `kid` → refetch, cooldown 30 s; stale use ≤ 21,600 s since last good fetch                                                          | FR-13         |
-| Discovery                | cache 3,600 s; issuer drift → plugin reports unavailable until `testConnection` passes                                                                   | FR-14         |
-| Outbound                 | 5,000 ms timeout; token endpoint no retry; discovery/JWKS one retry after 1,000 ms                                                                       | FR-15         |
+| Check                    | Rule                                                                                                                                                 | Spec          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Algorithms               | header `alg` ∈ `EVER_ID_SIGNING_ALGS`; `none` and `HS*` rejected before key lookup                                                                   | FR-11         |
+| Issuer                   | discovery `issuer` === `issuerUrl`; token `iss` === discovery issuer and ∈ `allowedIssuers`                                                          | FR-11, 12, 14 |
+| ID token audience        | `aud` ∋ `clientId`; `aud.length > 1` ⇒ `azp === clientId`                                                                                            | FR-11         |
+| ID token times           | `exp > now − skew`; `iat ≤ now + skew`; `iat ≥ now − 600`; connect: `auth_time ≥ now − 300 − skew`                                                   | FR-11, 25     |
+| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`; `azp` ∈ `EVER_ID_TRUSTED_CLIENT_IDS` if set                     | FR-45         |
+| Access token (exchange)  | `aud` ∋ `apiAudience`; scope ∋ `ever-works:session`; `azp` ∈ `localClients[].clientId`; `iat ≥ now − 300`; `jti` unused 600 s                        | FR-40         |
+| Logout token             | `events` has `http://schemas.openid.net/event/backchannel-logout`; no `nonce`; `sid` or `sub`; `iat` within skew and ≥ now − 300; `jti` unused 600 s | FR-33         |
+| Keys                     | cache 600 s; unknown `kid` → refetch, cooldown 30 s; stale use ≤ 21,600 s since last good fetch                                                      | FR-13         |
+| Discovery                | cache 3,600 s; issuer drift → plugin reports unavailable until `testConnection` passes                                                               | FR-14         |
+| Outbound                 | 5,000 ms timeout; token endpoint no retry; discovery/JWKS one retry after 1,000 ms                                                                   | FR-15         |
 
 ### 4.4 Facade — **new** `packages/agent/src/facades/identity-provider.facade.ts`
 

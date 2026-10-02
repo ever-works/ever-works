@@ -797,30 +797,30 @@ epics, and a camelCase i18n leaf per code. The existing `apps/api/src` literals 
 codes in the epic plans are the departure, not the convention. Codes are **append-only** — a code is never reused
 for a different situation and never removed; a renamed code keeps its old value as an alias in the web map.
 
-| Code                         | Status | Situation                                                                                                     | Owner  | i18n leaf                  |
-| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- | ------ | -------------------------- |
-| `app_works_disabled`         | 404    | App Works off at the API (§7/R-6)                                                                             | APW-01 | `appWorksDisabled`         |
-| `not_app_work`               | 404    | the Work exists but is not kind `app` (one code, all epics)                                                   | APW-01 | `notAppWork`               |
-| `app_runtime_unavailable`    | 503    | runtime target unreachable                                                                                    | APW-06 | `appRuntimeUnavailable`    |
-| `not_found`                  | 404    | the App Work does not exist or is another account's (R-36)                                                    | APW-01 | `notFound`                 |
-| `sync_in_progress`           | 409    | a sync is already running                                                                                     | APW-02 | `syncInProgress`           |
-| `retry_limit_reached`        | 429    | readiness retry cap (§7A)                                                                                     | APW-02 | `retryLimitReached`        |
-| `provisioning_unavailable`   | 422    | no runtime that can provision                                                                                 | APW-04 | `provisioningUnavailable`  |
-| `build_not_found`            | 404    | unknown build id                                                                                              | APW-05 | `buildNotFound`            |
-| `rebuild_rate_limited`       | 429    | rebuild cap (§7A)                                                                                             | APW-05 | `rebuildRateLimited`       |
-| `secure_storage_unavailable` | 503    | encrypted env store unavailable                                                                               | APW-07 | `secureStorageUnavailable` |
-| `confirmation_mismatch`      | 400    | typed `confirmSlug` does not match (R-32)                                                                     | APW-07 | `confirmationMismatch`     |
-| `active_proposal`            | 409    | an open upstream-PR proposal exists                                                                           | APW-09 | `activeProposal`           |
-| `rate_limited`               | 429    | any per-route throttle, `details.scope` names which (APW-09 §5)                                               | APW-09 | `rateLimited`              |
-| `quota_exceeded`             | 429    | a §7A cap, `details.cap` names which                                                                          | all    | `quotaExceeded`            |
-| `switch_off`                 | 503    | an R-30 operator switch is off                                                                                | all    | `switchOff`                |
-| `apps_tier_open_refused`     | 409    | the tier gate refuses this deployment                                                                         | APW-10 | `appsTierOpenRefused`      |
-| `quota_ceiling_exceeded`     | 429    | tenant quota ceiling                                                                                          | APW-10 | `quotaCeilingExceeded`     |
-| `ever_id_disabled`           | 404    | Ever ID plugin off (APW-12 §5.2)                                                                              | APW-12 | `everIdDisabled`           |
-| `transaction_invalid`        | 400    | bad/expired/replayed Ever ID transaction                                                                      | APW-12 | `transactionInvalid`       |
-| `token_in_query`             | 400    | a token in a query parameter (FR-17)                                                                          | APW-12 | `tokenInQuery`             |
-| `ever_id_signed_out`         | 401    | the session was ended by a sign-out notice (S6)                                                               | APW-12 | `signedOutByProvider`      |
-| `origin_not_allowed`         | 403    | a delegated read from a browser origin outside `EVER_WORKS_APP_LAUNCHER_ORIGINS`, or with no `Origin` (FR-50) | APW-11 | `originNotAllowed`         |
+| Code                         | Status | Situation                                                       | Owner  | i18n leaf                  |
+| ---------------------------- | ------ | --------------------------------------------------------------- | ------ | -------------------------- |
+| `app_works_disabled`         | 404    | App Works off at the API (§7/R-6)                               | APW-01 | `appWorksDisabled`         |
+| `not_app_work`               | 404    | the Work exists but is not kind `app` (one code, all epics)     | APW-01 | `notAppWork`               |
+| `app_runtime_unavailable`    | 503    | runtime target unreachable                                      | APW-06 | `appRuntimeUnavailable`    |
+| `not_found`                  | 404    | the App Work does not exist or is another account's (R-36)      | APW-01 | `notFound`                 |
+| `sync_in_progress`           | 409    | a sync is already running                                       | APW-02 | `syncInProgress`           |
+| `retry_limit_reached`        | 429    | readiness retry cap (§7A)                                       | APW-02 | `retryLimitReached`        |
+| `provisioning_unavailable`   | 422    | no runtime that can provision                                   | APW-04 | `provisioningUnavailable`  |
+| `build_not_found`            | 404    | unknown build id                                                | APW-05 | `buildNotFound`            |
+| `rebuild_rate_limited`       | 429    | rebuild cap (§7A)                                               | APW-05 | `rebuildRateLimited`       |
+| `secure_storage_unavailable` | 503    | encrypted env store unavailable                                 | APW-07 | `secureStorageUnavailable` |
+| `confirmation_mismatch`      | 400    | typed `confirmSlug` does not match (R-32)                       | APW-07 | `confirmationMismatch`     |
+| `active_proposal`            | 409    | an open upstream-PR proposal exists                             | APW-09 | `activeProposal`           |
+| `rate_limited`               | 429    | any per-route throttle, `details.scope` names which (APW-09 §5) | APW-09 | `rateLimited`              |
+| `quota_exceeded`             | 429    | a §7A cap, `details.cap` names which                            | all    | `quotaExceeded`            |
+| `switch_off`                 | 503    | an R-30 operator switch is off                                  | all    | `switchOff`                |
+| `apps_tier_open_refused`     | 409    | the tier gate refuses this deployment                           | APW-10 | `appsTierOpenRefused`      |
+| `quota_ceiling_exceeded`     | 429    | tenant quota ceiling                                            | APW-10 | `quotaCeilingExceeded`     |
+| `ever_id_disabled`           | 404    | Ever ID plugin off (APW-12 §5.2)                                | APW-12 | `everIdDisabled`           |
+| `transaction_invalid`        | 400    | bad/expired/replayed Ever ID transaction                        | APW-12 | `transactionInvalid`       |
+| `token_in_query`             | 400    | a token in a query parameter (FR-17)                            | APW-12 | `tokenInQuery`             |
+| `ever_id_signed_out`         | 401    | the session was ended by a sign-out notice (S6)                 | APW-12 | `signedOutByProvider`      |
+| `origin_not_allowed`         | 403    | a delegated read from an origin not on the allow-list (FR-50)   | APW-11 | `originNotAllowed`         |
 
 The existing snake_case literals already on `develop` (for example `gh_repo_access_denied`,
 `backup_not_found`) keep their values; the epic plans' camelCase codes (`provisioningUnavailable`,

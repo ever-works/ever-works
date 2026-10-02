@@ -499,16 +499,16 @@ beyond defaults), header `Cache-Control: public, max-age=3600, stale-while-reval
 
 ### 4.5 Error contract
 
-| Situation                                                                                                 | Status | Body                                                                                 |
-| --------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
-| Launcher switched off (`EVER_WORKS_APP_LAUNCHER_ENABLED ≠ 'true'`)                                        | `404`  | Nest default not-found                                                               |
-| > 200 changes, bad key shape, order out of range                                                          | `400`  | validation errors                                                                    |
-| Pin limit exceeded                                                                                        | `422`  | `{ code: 'pinLimit', limit: 6 }`                                                     |
-| Unknown / inaccessible item                                                                               | `200`  | `rejected: [{ key, reason: 'unknownItem' }]`                                         |
-| Hiding the current platform                                                                               | `200`  | `rejected: [{ key: 'platform:<selfId>', reason: 'cannotHideCurrent' }]`              |
-| Delegated token lacks `apps:read` (P2)                                                                    | `403`  | `{ code: 'insufficientScope' }` (raised by APW-12's guard)                           |
-| Delegated token from an origin outside `EVER_WORKS_APP_LAUNCHER_ORIGINS`, or with no `Origin` (P2, FR-50) | `403`  | `{ status: 'error', code: 'origin_not_allowed', message }`, before the token is read |
-| Delegated token on `PUT` (P2)                                                                             | `401`  | plain unauthorized — no `@DelegatedRead` metadata                                    |
+| Situation                                                          | Status | Body                                                                    |
+| ------------------------------------------------------------------ | ------ | ----------------------------------------------------------------------- |
+| Launcher switched off (`EVER_WORKS_APP_LAUNCHER_ENABLED ≠ 'true'`) | `404`  | Nest default not-found                                                  |
+| > 200 changes, bad key shape, order out of range                   | `400`  | validation errors                                                       |
+| Pin limit exceeded                                                 | `422`  | `{ code: 'pinLimit', limit: 6 }`                                        |
+| Unknown / inaccessible item                                        | `200`  | `rejected: [{ key, reason: 'unknownItem' }]`                            |
+| Hiding the current platform                                        | `200`  | `rejected: [{ key: 'platform:<selfId>', reason: 'cannotHideCurrent' }]` |
+| Delegated token lacks `apps:read` (P2)                             | `403`  | `{ code: 'insufficientScope' }` (raised by APW-12's guard)              |
+| Delegated token from an origin not on the list, or none (P2)       | `403`  | `{ status: 'error', code: 'origin_not_allowed', message }`              |
+| Delegated token on `PUT` (P2)                                      | `401`  | plain unauthorized — no `@DelegatedRead` metadata                       |
 
 ### 4.6 Address resolution (pure)
 
