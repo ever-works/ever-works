@@ -39,9 +39,7 @@ export class DelegatedReadOriginRefusedException extends HttpException {
 }
 
 /** The request's `Origin` header when it is a single non-empty string, else `null`. */
-export function requestOrigin(request: {
-    headers?: Record<string, unknown>;
-}): string | null {
+export function requestOrigin(request: { headers?: Record<string, unknown> }): string | null {
     const value = request.headers?.origin;
     return typeof value === 'string' && value.length > 0 ? value : null;
 }

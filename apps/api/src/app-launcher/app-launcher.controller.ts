@@ -208,7 +208,8 @@ export const APP_LAUNCHER_PUBLIC_ORIGIN = '*';
 export class ListAppLauncherQueryDto {
     @ApiPropertyOptional({
         enum: ['true', 'false'],
-        description: '`true` is the Manage apps view: hidden and not-live items too. Default `false`.',
+        description:
+            '`true` is the Manage apps view: hidden and not-live items too. Default `false`.',
     })
     @IsOptional()
     @IsIn(['true', 'false'])
@@ -229,7 +230,8 @@ export class ListAppLauncherQueryDto {
 
     @ApiPropertyOptional({
         maxLength: APP_LAUNCHER_FILTER_MAX_LENGTH,
-        description: 'Filters items by name, case- and accent-insensitively, before `limit` applies.',
+        description:
+            'Filters items by name, case- and accent-insensitively, before `limit` applies.',
     })
     @IsOptional()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
