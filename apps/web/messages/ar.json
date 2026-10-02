@@ -8962,6 +8962,7 @@
             "sectionWorks": "تطبيقاتك",
             "chipCurrent": "أنت هنا",
             "chipBeta": "Beta",
+            "chipSoon": "قريبًا",
             "chipDeploying": "جارٍ النشر",
             "chipLastDeployFailed": "فشل آخر نشر",
             "viewAll": "عرض الكل ({count})",

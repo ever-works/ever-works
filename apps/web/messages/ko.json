@@ -8963,6 +8963,7 @@
             "sectionWorks": "내 앱",
             "chipCurrent": "현재 위치",
             "chipBeta": "베타",
+            "chipSoon": "출시 예정",
             "chipDeploying": "배포 중",
             "chipLastDeployFailed": "마지막 배포 실패",
             "viewAll": "모두 보기 ({count})",

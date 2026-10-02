@@ -6,7 +6,7 @@ jest.mock('@ever-works/agent/cache', () => ({ CACHE_MANAGER: 'CACHE_MANAGER', Ca
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
-import { APP_LAUNCHER_ICON_MAX_BYTES } from '@ever-works/contracts';
+import { APP_LAUNCHER_ICON_MAX_BYTES, APP_LAUNCHER_PLATFORM_STATUSES } from '@ever-works/contracts';
 import type { Cache } from '@ever-works/agent/cache';
 import {
     PLATFORM_CATALOG_FAILURE_TTL_MS,
@@ -652,6 +652,117 @@ describe('APW-11 T8 — PlatformCatalogService', () => {
             ).toHaveLength(1);
         });
 
+        it('accepts a `soon` entry and keeps its status and address on the tile (FR-9)', async () => {
+            const logger = spyOnLogger();
+            const soon = {
+                ...fixtureEntry('valid'),
+                id: 'ever-soon',
+                name: 'Ever Soon',
+                icon: 'icons/ever-soon.svg',
+                order: 60,
+                status: 'soon',
+                urls: {
+                    production: 'https://soon.example.com',
+                    stage: 'https://soon.stage.example.com',
+                    develop: 'https://soon.dev.example.com',
+                },
+            };
+            const { service } = makeHarness({
+                server: installCatalogServer({
+                    catalog: catalogOf([fixtureEntry('valid'), soon]),
+                }),
+            });
+
+            const result = await service.read('production');
+            expect(keysOf(result.platforms)).toEqual([
+                'platform:ever-example',
+                'platform:ever-soon',
+            ]);
+            expect(
+                result.platforms.find((item) => item.key === 'platform:ever-soon'),
+            ).toMatchObject({
+                status: 'soon',
+                url: 'https://soon.example.com/',
+                host: 'soon.example.com',
+                manageState: 'listed',
+            });
+            expect(messagesContaining(logger.warn, 'app_launcher.item.omitted')).toEqual([]);
+            expect(service.telemetry().omitted).toEqual({
+                invalidEntry: 0,
+                unsafeUrl: 0,
+                overLimit: 0,
+            });
+        });
+
+        it('reads the TBD marker as no address for that environment and keeps the entry elsewhere (FR-10)', async () => {
+            const logger = spyOnLogger();
+            const partly = {
+                ...fixtureEntry('valid'),
+                id: 'ever-tbd-develop',
+                icon: 'icons/ever-tbd-develop.svg',
+                urls: {
+                    production: 'https://tbd-develop.example.com',
+                    stage: 'https://tbd-develop.stage.example.com',
+                    develop: 'TBD',
+                },
+            };
+            const { service } = makeHarness({
+                server: installCatalogServer({ catalog: catalogOf([partly]) }),
+            });
+
+            expect(keysOf((await service.read('production')).platforms)).toEqual([
+                'platform:ever-tbd-develop',
+            ]);
+            expect(
+                (await service.read('stage')).platforms.find(
+                    (item) => item.key === 'platform:ever-tbd-develop',
+                )?.url,
+            ).toBe('https://tbd-develop.stage.example.com/');
+            // The marker is never rendered and never sends anyone elsewhere.
+            expect((await service.read('develop')).platforms).toEqual([]);
+            expect(messagesContaining(logger.warn, 'app_launcher.item.omitted')).toEqual([]);
+            expect(service.telemetry().omitted.unsafeUrl).toBe(0);
+        });
+
+        it('keeps an entry whose every address is the TBD marker out of every environment, without dropping it as unsafe', async () => {
+            const logger = spyOnLogger();
+            const unaddressed = {
+                ...fixtureEntry('valid'),
+                id: 'ever-unaddressed',
+                icon: 'icons/ever-unaddressed.svg',
+                urls: { production: 'TBD', stage: 'TBD', develop: 'TBD' },
+            };
+            const { service } = makeHarness({
+                server: installCatalogServer({
+                    catalog: catalogOf([fixtureEntry('valid'), unaddressed]),
+                }),
+            });
+
+            for (const environment of ['production', 'stage', 'develop'] as const) {
+                expect(keysOf((await service.read(environment)).platforms)).toEqual([
+                    'platform:ever-example',
+                ]);
+            }
+            expect(messagesContaining(logger.warn, 'app_launcher.item.omitted')).toEqual([]);
+        });
+
+        it('matches the TBD marker exactly: any other value that is not a safe address still drops the entry', async () => {
+            const lookalikes = ['tbd', ' TBD ', 'TBD/', 'https://TBD'].map((value, index) => ({
+                ...fixtureEntry('valid'),
+                id: `ever-lookalike-${index + 1}`,
+                icon: `icons/ever-lookalike-${index + 1}.svg`,
+                urls: { production: 'https://lookalike.example.com', develop: value },
+            }));
+            const { service } = makeHarness({
+                server: installCatalogServer({ catalog: catalogOf(lookalikes) }),
+            });
+
+            const production = await service.read('production');
+            // `https://TBD` IS a well-formed https origin, so only the first three are refused.
+            expect(keysOf(production.platforms)).toEqual(['platform:ever-lookalike-4']);
+            expect(service.telemetry().omitted.unsafeUrl).toBe(3);
+        });
+
         it('drops an entry with an unknown url key rather than guessing its environment', async () => {
             const unknownEnvironment = {
                 ...fixtureEntry('valid'),
@@ -1236,7 +1347,7 @@ describe('APW-11 T8 — PlatformCatalogService', () => {
                 expect(item.host).toBe(new URL(item.url!).host);
                 expect(item.description!.length).toBeLessThanOrEqual(80);
                 expect(item.name.length).toBeLessThanOrEqual(40);
-                expect(item.status === 'available' || item.status === 'beta').toBe(true);
+                expect(APP_LAUNCHER_PLATFORM_STATUSES as readonly string[]).toContain(item.status);
                 expect(item.catalogOrder).toBe(item.order);
             }
         });

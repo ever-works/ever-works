@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ever Traduora">
+	<rect width="64" height="64" rx="14" fill="#1d4ed8" />
+	<path d="M26 16v26c0 4 2 6 6 6h6" fill="none" stroke="#eff6ff" stroke-width="6" stroke-linecap="round" />
+	<path d="M18 24h20" stroke="#eff6ff" stroke-width="6" stroke-linecap="round" />
+</svg>

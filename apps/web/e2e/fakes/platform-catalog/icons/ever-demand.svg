@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ever Demand">
+	<rect width="64" height="64" rx="14" fill="#3f3f46" />
+	<path d="M18 26h28l-3 18H21Z" fill="#f4f4f5" />
+	<path d="M25 26c0-5 3-8 7-8s7 3 7 8" fill="none" stroke="#f4f4f5" stroke-width="4" />
+</svg>

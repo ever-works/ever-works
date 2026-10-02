@@ -33,12 +33,19 @@
  *   - **The entry**: keys are closed (the published schema sets
  *     `additionalProperties: false`), `id` matches
  *     `^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$`, `name` ≤ 40, `description` ≤ 80,
- *     `order` an integer 0…9999, `status` one of `available | beta`, `icon` the
- *     path pattern `^icons/[a-z0-9-]+\.(svg|png)$`.
+ *     `order` an integer 0…9999, `status` one of `available | beta | soon`,
+ *     `icon` the path pattern `^icons/[a-z0-9-]+\.(svg|png)$`.
  *   - **Any address that fails the safety rule drops the whole entry**
  *     (reason `unsafeUrl`, FR-11/ACC-11-08). Dropping only the offending
  *     environment would let the same entry render from another environment and
  *     would hide a poisoned catalog from the reader's own log.
+ *   - **The literal `TBD` is not an address.** The published catalog
+ *     (`ever-works/platforms`, `schema/platforms.schema.json`) accepts it as the
+ *     marker for an address that has not been provided yet, and its validator
+ *     reports it as a warning, never as an error. The reader therefore treats
+ *     it as "no address for this environment" (FR-10): the entry is not shown
+ *     there and keeps every address it does carry. It is never parsed, never
+ *     rendered, and every other value still goes through the safety rule.
  *   - **The cap is positional** (FR-11): the catalog is truncated to
  *     {@link APP_LAUNCHER_CATALOG_MAX_ENTRIES} entries *before* validation, so
  *     the 25th entry is dropped as `overLimit` and an invalid entry at
@@ -78,6 +85,13 @@ export const CATALOG_REPO_RE = /^ever-works\/[a-z0-9-]+$/;
 
 /** The repository the catalog is read from when nothing is configured. */
 export const DEFAULT_CATALOG_REPO = 'ever-works/platforms';
+
+/**
+ * The published catalog's marker for an address that has not been provided yet
+ * (see the header): read as "no address for this environment", never as an
+ * unsafe address. Matched exactly, as the published schema's `const` is.
+ */
+export const CATALOG_ADDRESS_NOT_PROVIDED = 'TBD';
 
 /** The entry id pattern (published schema `$defs.platform.properties.id`). */
 export const PLATFORM_ID_RE = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
@@ -435,8 +449,13 @@ function parsePlatformEntry(candidate: unknown): EntryParseResult {
  * Validate an entry's `urls` map.
  *
  * `null` = refuse the entry as `invalidEntry` (an unknown environment key, or
- * no usable address at all — the published schema requires at least one);
+ * no environment key at all — the published schema requires them);
  * `'unsafe'` = refuse it as `unsafeUrl` (a declared address failed the rule).
+ *
+ * An environment whose value is {@link CATALOG_ADDRESS_NOT_PROVIDED} is left
+ * out of the result, exactly like an environment the entry does not declare
+ * (FR-10). An entry whose every address is that marker is kept with no
+ * address at all, so it is shown in no environment until one is provided.
  */
 function parseEntryUrls(
     raw: unknown,
@@ -455,7 +474,7 @@ function parseEntryUrls(
     const urls: Partial<Record<AppLauncherEnvironment, CatalogAddress>> = {};
     for (const environment of APP_LAUNCHER_ENVIRONMENTS) {
         const value = raw[environment];
-        if (value === undefined) {
+        if (value === undefined || value === CATALOG_ADDRESS_NOT_PROVIDED) {
             continue;
         }
         const safe = toSafeCatalogUrl(value);
@@ -465,7 +484,7 @@ function parseEntryUrls(
         urls[environment] = safe;
     }
 
-    return Object.keys(urls).length > 0 ? urls : null;
+    return urls;
 }
 
 /** FR-11's ordering: by `order`, ties broken by name. */

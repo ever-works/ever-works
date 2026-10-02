@@ -8962,6 +8962,7 @@
             "sectionWorks": "Вашите приложения",
             "chipCurrent": "Вие сте тук",
             "chipBeta": "Бета",
+            "chipSoon": "Скоро",
             "chipDeploying": "Разполага се",
             "chipLastDeployFailed": "Последното разполагане е неуспешно",
             "viewAll": "Виж всички ({count})",

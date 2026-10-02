@@ -8963,6 +8963,7 @@
             "sectionWorks": "แอปของคุณ",
             "chipCurrent": "คุณอยู่ที่นี่",
             "chipBeta": "เบต้า",
+            "chipSoon": "เร็ว ๆ นี้",
             "chipDeploying": "กำลังปรับใช้",
             "chipLastDeployFailed": "การปรับใช้ครั้งล่าสุดล้มเหลว",
             "viewAll": "ดูทั้งหมด ({count})",

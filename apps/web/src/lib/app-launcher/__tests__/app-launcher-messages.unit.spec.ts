@@ -38,6 +38,7 @@ const LAUNCHER_KEYS = [
     'sectionWorks',
     'chipCurrent',
     'chipBeta',
+    'chipSoon',
     'chipDeploying',
     'chipLastDeployFailed',
     'viewAll',

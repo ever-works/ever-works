@@ -261,6 +261,7 @@ export function AppLauncherButton() {
             sectionWorks: t('sectionWorks'),
             chipCurrent: t('chipCurrent'),
             chipBeta: t('chipBeta'),
+            chipSoon: t('chipSoon'),
             chipDeploying: t('chipDeploying'),
             chipLastDeployFailed: t('chipLastDeployFailed'),
             // FR-4's overflow line carries the registry's own total; the element

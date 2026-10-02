@@ -211,11 +211,11 @@ Every threshold below is a number on purpose.
 - **FR-8.** The list of Ever platforms is data read at runtime from a versioned platform catalog held
   outside the product code. The product contains the code that reads it, never the list.
 - **FR-9.** Each catalog entry carries a stable id, a display name, a one-line description of at most 80
-  characters, an icon, an ordering number, a status (`available` or `beta`) and one `https` address per
-  environment (`production`, `stage`, `develop`).
+  characters, an icon, an ordering number, a status (`available`, `beta` or `soon`) and one `https` address per
+  environment (`production`, `stage`, `develop`). A `soon` entry renders the chip **Soon** and is never a link.
 - **FR-10.** Ever Works shows the address for the environment it is itself running in. An entry without
-  an address for that environment is not shown — the launcher never sends a person from one environment
-  to another.
+  an address for that environment (or with the catalog's `TBD` marker there) is not shown — the launcher
+  never sends a person from one environment to another.
 - **FR-11.** Entries are ordered by their ordering number, then by name. At most 24 entries are read;
   entries past the 24th, entries that fail validation and entries with unknown status are dropped, and the
   drop is logged with the entry id only.

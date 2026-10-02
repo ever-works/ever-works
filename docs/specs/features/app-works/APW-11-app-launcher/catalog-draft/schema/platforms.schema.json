@@ -63,26 +63,31 @@
 					"description": "Sort key; ties break by name (APW-11 FR-11)."
 				},
 				"status": {
-					"enum": ["available", "beta"]
+					"enum": ["available", "beta", "soon"],
+					"description": "`soon` lists the platform with a Soon chip; its tile is never a link (APW-11 FR-9)."
 				},
 				"urls": {
 					"type": "object",
 					"additionalProperties": false,
 					"minProperties": 1,
-					"description": "One address per environment. All three keys are supported and each is optional: an entry without an address for the environment the installation is running in is simply not shown (APW-11 FR-10, ACC-11-05).",
+					"description": "One address per environment. All three keys are supported and each is optional: an entry without an address for the environment the installation is running in is simply not shown (APW-11 FR-10, ACC-11-05). An address that has not been provided yet may be the literal `TBD`, which the reader treats as no address for that environment.",
 					"properties": {
 						"production": {
-							"$ref": "#/$defs/httpsUrl"
+							"$ref": "#/$defs/address"
 						},
 						"stage": {
-							"$ref": "#/$defs/httpsUrl"
+							"$ref": "#/$defs/address"
 						},
 						"develop": {
-							"$ref": "#/$defs/httpsUrl"
+							"$ref": "#/$defs/address"
 						}
 					}
 				}
 			}
+		},
+		"address": {
+			"description": "An https address, or the literal `TBD` for one that has not been provided yet (a warning in CI, never an error; the reader shows no tile for that environment, APW-11 FR-10).",
+			"anyOf": [{ "$ref": "#/$defs/httpsUrl" }, { "const": "TBD" }]
 		},
 		"httpsUrl": {
 			"type": "string",

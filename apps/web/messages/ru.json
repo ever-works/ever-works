@@ -8963,6 +8963,7 @@
             "sectionWorks": "Ваши приложения",
             "chipCurrent": "Вы здесь",
             "chipBeta": "Бета",
+            "chipSoon": "Скоро",
             "chipDeploying": "Развёртывание",
             "chipLastDeployFailed": "Последнее развёртывание не удалось",
             "viewAll": "Показать все ({count})",

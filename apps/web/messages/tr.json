@@ -8963,6 +8963,7 @@
             "sectionWorks": "Uygulamalarınız",
             "chipCurrent": "Buradasınız",
             "chipBeta": "Beta",
+            "chipSoon": "Yakında",
             "chipDeploying": "Dağıtılıyor",
             "chipLastDeployFailed": "Son dağıtım başarısız",
             "viewAll": "Tümünü görüntüle ({count})",

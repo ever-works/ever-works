@@ -8963,6 +8963,7 @@
             "sectionWorks": "Ứng dụng của bạn",
             "chipCurrent": "Bạn đang ở đây",
             "chipBeta": "Beta",
+            "chipSoon": "Sắp ra mắt",
             "chipDeploying": "Đang triển khai",
             "chipLastDeployFailed": "Triển khai lần cuối thất bại",
             "viewAll": "Xem tất cả ({count})",

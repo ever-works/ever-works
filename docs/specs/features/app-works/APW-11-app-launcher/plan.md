@@ -260,7 +260,7 @@ export interface AppLauncherItem {
 	url: string | null; // https; null only when manageState !== 'listed'
 	host: string | null;
 	current?: boolean; // "You're here"
-	status?: 'available' | 'beta'; // platforms
+	status?: 'available' | 'beta' | 'soon'; // platforms
 	workKind?: string; // works
 	chip?: AppLauncherWorkChip;
 	visible: boolean;

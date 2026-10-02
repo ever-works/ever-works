@@ -8963,6 +8963,7 @@
             "sectionWorks": "你的应用",
             "chipCurrent": "你在这里",
             "chipBeta": "测试版",
+            "chipSoon": "即将推出",
             "chipDeploying": "部署中",
             "chipLastDeployFailed": "上次部署失败",
             "viewAll": "查看全部 ({count})",
