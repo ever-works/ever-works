@@ -43,8 +43,11 @@ export type AppLauncherWorkChip = 'deploying' | 'lastDeployFailed';
 /** Why an item is (not) in the panel, as **Manage apps** renders it (FR-27). */
 export type AppLauncherManageState = 'listed' | 'notLive' | 'exposureOff';
 
-/** A platform entry's status (FR-9). */
-export type AppLauncherPlatformStatus = 'available' | 'beta';
+/**
+ * A platform entry's status (FR-9). A `soon` platform renders the **Soon** chip
+ * and is never a link: the tile cannot be activated.
+ */
+export type AppLauncherPlatformStatus = 'available' | 'beta' | 'soon';
 
 /** S8's two buttons (FR-64). */
 export type AppLauncherEmptyAction = 'createAppWork' | 'goToWorks';
@@ -180,6 +183,8 @@ export interface LauncherStrings {
 	chipCurrent: string;
 	/** Chip on a `beta` catalog entry (FR-9). */
 	chipBeta: string;
+	/** Chip on a `soon` catalog entry, whose tile cannot be activated (FR-9). */
+	chipSoon: string;
 	/** Chip while the latest production deployment is unfinished (FR-18). */
 	chipDeploying: string;
 	/** Chip when the latest production deployment failed (FR-18). */

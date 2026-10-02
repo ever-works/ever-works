@@ -8963,6 +8963,7 @@
             "sectionWorks": "Ваші застосунки",
             "chipCurrent": "Ви тут",
             "chipBeta": "Бета",
+            "chipSoon": "Незабаром",
             "chipDeploying": "Розгортання",
             "chipLastDeployFailed": "Останнє розгортання не вдалося",
             "viewAll": "Переглянути всі ({count})",

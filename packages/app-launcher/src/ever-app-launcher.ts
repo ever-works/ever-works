@@ -155,6 +155,14 @@ export class EverAppLauncher extends LitElement {
 	_columns = PANEL_TILE_COLUMNS_MAX;
 	_activeIndex = 0;
 
+	/**
+	 * The tile that holds the grid's single tab stop in this render: the active
+	 * tile, or the first enabled one when the active tile is inert, so `Tab` can
+	 * always reach the grid (FR-40). Derived in `_renderSections`, never set
+	 * anywhere else.
+	 */
+	private _tabStop = -1;
+
 	private _observer: ResizeObserver | null = null;
 
 	// -----------------------------------------------------------------------
@@ -272,6 +280,7 @@ export class EverAppLauncher extends LitElement {
 	 */
 	private _renderSections(): TemplateResult {
 		const flat = this._tileItems();
+		this._tabStop = this._tabStopIndex(flat);
 		const pinned = this._itemsIn('pinned');
 		const platforms = this._itemsIn('platforms');
 		const works = this._itemsIn('works');
@@ -319,9 +328,9 @@ export class EverAppLauncher extends LitElement {
 		const strings = this._strings;
 		const chip = this._chipFor(item);
 		const isCurrent = this._isCurrent(item);
-		const inert = !isCurrent && safeLauncherUrl(item.url, { allowLocalhost: this.allowLocalhost }) === null;
-		// Roving tabindex (FR-40): exactly one tile is in the tab order.
-		const tabindex = inert ? -1 : position === this._activeIndex ? 0 : -1;
+		const inert = this._isInert(item);
+		// Roving tabindex (FR-40): exactly one tile is in the tab order, and never an inert one.
+		const tabindex = inert ? -1 : position === this._tabStop ? 0 : -1;
 		const icon = item.iconDataUri
 			? html`<span class="tile-icon" part="tile-icon" aria-hidden="true"
 					><img src=${item.iconDataUri} alt=""
@@ -331,7 +340,10 @@ export class EverAppLauncher extends LitElement {
 			<span class="tile-body">
 				<span class="tile-name">${item.name}</span>
 				${chip
-					? html`<span class="chip" part="chip" data-chip=${item.chip ?? (isCurrent ? 'current' : 'beta')}
+					? html`<span
+							class="chip"
+							part="chip"
+							data-chip=${item.chip ?? (isCurrent ? 'current' : (item.status ?? 'beta'))}
 							>${chip}</span
 						>`
 					: item.host
@@ -357,7 +369,8 @@ export class EverAppLauncher extends LitElement {
 			</button>`;
 		}
 
-		// An address FR-32 refuses is visible but inert — no link, no tab.
+		// An address FR-32 refuses, or a `soon` platform (FR-9), is visible but
+		// inert — no link, no tab, no `:item-activate`.
 		if (inert) {
 			return html`<div
 				class="tile"
@@ -515,6 +528,22 @@ export class EverAppLauncher extends LitElement {
 		return item.kind === 'platform' && this.current !== '' && item.key === `platform:${this.current}`;
 	}
 
+	/**
+	 * A tile that is listed but can never be activated: a `soon` platform
+	 * (FR-9), or an address FR-32 refuses. **You're here** is never inert.
+	 */
+	private _isInert(item: AppLauncherItem): boolean {
+		if (this._isCurrent(item)) return false;
+		return item.status === 'soon' || safeLauncherUrl(item.url, { allowLocalhost: this.allowLocalhost }) === null;
+	}
+
+	/** The render's tab stop: the active tile when it is enabled, else the first enabled tile, else none. */
+	private _tabStopIndex(flat: AppLauncherItem[]): number {
+		const active = flat[this._activeIndex];
+		if (active && !this._isInert(active)) return this._activeIndex;
+		return flat.findIndex((item) => !this._isInert(item));
+	}
+
 	private _isPinned(item: AppLauncherItem): boolean {
 		return item.pinned === true || item.section === 'pinned';
 	}
@@ -525,6 +554,7 @@ export class EverAppLauncher extends LitElement {
 		if (item.chip === 'deploying') return this._strings.chipDeploying;
 		if (item.chip === 'lastDeployFailed') return this._strings.chipLastDeployFailed;
 		if (item.status === 'beta') return this._strings.chipBeta;
+		if (item.status === 'soon') return this._strings.chipSoon;
 		return null;
 	}
 
@@ -613,16 +643,19 @@ export class EverAppLauncher extends LitElement {
 	private _focusTile(index: number, tiles: HTMLElement[] = this._tileElements()): void {
 		if (tiles.length === 0) return;
 		const target = Math.min(Math.max(index, 0), tiles.length - 1);
-		// The roving tabindex is moved here as well as in the template: a key
-		// press must leave the DOM consistent before the next render runs.
-		const previous = tiles[this._activeIndex];
-		if (previous && previous !== tiles[target] && previous.getAttribute('aria-disabled') !== 'true') {
-			previous.tabIndex = -1;
-		}
-		this._activeIndex = target;
 		const next = tiles[target];
-		// An inert tile (an address FR-32 refuses) never enters the tab order.
-		if (next.getAttribute('aria-disabled') !== 'true') next.tabIndex = 0;
+		// An inert tile (a `soon` platform, or an address FR-32 refuses) takes
+		// arrow-key focus but never the tab stop: the roving tabindex stays on
+		// the last enabled tile, so `Tab` can always come back to the grid.
+		if (next.getAttribute('aria-disabled') !== 'true') {
+			// The roving tabindex is moved here as well as in the template: a key
+			// press must leave the DOM consistent before the next render runs.
+			for (const tile of tiles) {
+				if (tile !== next && tile.tabIndex === 0) tile.tabIndex = -1;
+			}
+			this._activeIndex = target;
+			next.tabIndex = 0;
+		}
 		next.focus();
 	}
 
@@ -688,7 +721,13 @@ export class EverAppLauncher extends LitElement {
 			event.preventDefault();
 			return;
 		}
-		const current = this._activeInPanel() as HTMLElement | null;
+		let current = this._activeInPanel() as HTMLElement | null;
+		// Arrow keys may rest on an inert tile, which is no tab stop: step from
+		// the grid's own tab stop, so `Tab` leaves the grid and `Shift+Tab`
+		// comes back to it.
+		if (current && !focusables.includes(current) && current.classList.contains('tile')) {
+			current = this._tileElements().find((tile) => tile.tabIndex === 0) ?? current;
+		}
 		const index = current ? focusables.indexOf(current) : -1;
 		const step = event.shiftKey ? -1 : 1;
 		const next =

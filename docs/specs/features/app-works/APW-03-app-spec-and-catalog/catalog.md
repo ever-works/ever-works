@@ -15,8 +15,10 @@
 
 1. **Catalog data, not platform code** (ADR-014, D4). Adding an App Blueprint is a pull request to
    `ever-works/templates` and to its Blueprint repository — never a platform release.
-2. **Never a copy of the upstream source.** A Blueprint repository holds an App spec, a few overlay files
-   the upstream lacks, tests and documentation. CI enforces it (§6, C9).
+2. **Code-bearing or metadata-only, never an unreviewed copy** (D4). A **code-bearing** Blueprint repository is a
+   public fork of the original project with our metadata added; a **metadata-only** one holds an App spec, a few
+   overlay files the upstream lacks, tests and documentation, and points at the upstream for the source. A
+   metadata-only repository never carries files copied from the upstream; CI enforces it (§6, C9).
 3. **Pinned, not floating.** Every manifest entry pins its Blueprint to a tag **and** a 40-character
    commit sha. The platform applies the sha, never a branch.
 4. **Upstreams are data.** Upstream repository names and aliases in the manifest are matched against what a user

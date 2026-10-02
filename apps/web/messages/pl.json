@@ -8963,6 +8963,7 @@
             "sectionWorks": "Twoje aplikacje",
             "chipCurrent": "Jesteś tutaj",
             "chipBeta": "Beta",
+            "chipSoon": "Wkrótce",
             "chipDeploying": "Trwa wdrażanie",
             "chipLastDeployFailed": "Ostatnie wdrożenie nie powiodło się",
             "viewAll": "Zobacz wszystkie ({count})",

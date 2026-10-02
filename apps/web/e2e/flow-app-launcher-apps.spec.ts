@@ -157,6 +157,31 @@ const FILTER_PARAM = 'q';
 const MAX_WINDOW = 200;
 
 /**
+ * Whether the API reads the lane's checked-in catalog fixture
+ * (`e2e/fakes/platform-catalog/platforms.json`) — the variable the flags-on job sets for it.
+ * A stack that reads the real catalog is not asserted on by the fixture-shaped cases below.
+ */
+const USES_FIXTURE_CATALOG =
+    (process.env.EVER_WORKS_PLATFORM_CATALOG_BASE_URL ?? '').trim().length > 0;
+
+/**
+ * The lane fixture's Ever platforms, in catalog order (FR-11): the seven of the published
+ * catalog, each with a develop address because the lane reads develop.
+ */
+const LANE_PLATFORM_KEYS = [
+    'platform:ever-works',
+    'platform:ever-gauzy',
+    'platform:ever-teams',
+    'platform:ever-rec',
+    'platform:ever-traduora',
+    'platform:ever-demand',
+    'platform:app-ever-co',
+];
+
+/** The one `soon` entry of the fixture: listed with a Soon chip and never a link (FR-9). */
+const LANE_SOON_KEY = 'platform:ever-demand';
+
+/**
  * `APW_E2E_FLAGS_ON_LANE=1` marks the one job that exists to run this file
  * (`e2e-app-works-flags-on` in `.github/workflows/e2e.yml`). There a launcher switch that reads
  * off is a broken lane and fails; everywhere else it skips the file by name.
@@ -628,7 +653,7 @@ test('the lane carries the launcher and the non-production seed route (APW-11 T2
     //    entry behind it — that points at the launcher rather than at the stack. Keyed on the
     //    variable the lane sets for the API (`e2e.yml`, flags-on job); a stack that reads the
     //    real catalog is not asserted on here.
-    if ((process.env.EVER_WORKS_PLATFORM_CATALOG_BASE_URL ?? '').trim().length > 0) {
+    if (USES_FIXTURE_CATALOG) {
         const catalog = platforms.json as PlatformsList;
         expect(
             catalog.catalogVersion,
@@ -721,6 +746,19 @@ test('[ACC-E2E-12 · ACC-11-09] the read lists the live App Work with no setting
             catalog.platforms.some((entry) => entry.key === tile.key),
             `${tile.key} is in the launcher but not in the catalog read`,
         ).toBe(true);
+    }
+
+    // The lane's fixture mirrors the published catalog: seven Ever platforms in catalog order,
+    // Ever Demand among them as the one `soon` entry, still carrying its address (FR-9).
+    if (USES_FIXTURE_CATALOG && list.meta.environment === 'develop') {
+        expect(
+            platformTiles.map((item) => item.key),
+            'the seven Ever platforms of the catalog, in catalog order (FR-11)',
+        ).toEqual(LANE_PLATFORM_KEYS);
+        expect(
+            platformTiles.filter((item) => item.status === 'soon').map((item) => item.key),
+            'exactly one platform is marked Soon (FR-9)',
+        ).toEqual([LANE_SOON_KEY]);
     }
 
     // The App Work: by display name, with its live address, under `section: 'works'`.
@@ -1109,6 +1147,23 @@ test('[ACC-E2E-12 · FR-30–FR-32] every tile href equals the item url exactly,
         await expect(tileLink, 'the seeded Work is a tile in the panel').toBeVisible({
             timeout: 30_000,
         });
+
+        // The Ever platforms: all seven tiles, with Ever Demand as an inert Soon tile — no link,
+        // so it can never be activated (FR-9).
+        if (USES_FIXTURE_CATALOG) {
+            await expect(
+                page.locator('ever-app-launcher .tile[data-section="platforms"]'),
+                'the seven Ever platforms are tiles in the panel',
+            ).toHaveCount(LANE_PLATFORM_KEYS.length);
+            const soonTile = page.locator(`ever-app-launcher .tile[data-key="${LANE_SOON_KEY}"]`);
+            await expect(soonTile, 'Ever Demand is listed').toBeVisible();
+            await expect(soonTile, 'a Soon tile is inert').toHaveAttribute('aria-disabled', 'true');
+            await expect(soonTile.locator('.chip'), 'and carries the Soon chip').toHaveText('Soon');
+            await expect(
+                page.locator(`ever-app-launcher a.tile[data-key="${LANE_SOON_KEY}"]`),
+                'a Soon platform is never a link',
+            ).toHaveCount(0);
+        }
 
         // The tile by display name, with its live address.
         await expect(tileLink).toContainText(seeded.name);

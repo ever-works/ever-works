@@ -87,8 +87,8 @@ describe('the element types mirror the contracts (plan §6.1)', () => {
 				['listed', 'notLive', 'exposureOff'] satisfies ContractManageState[]
 			],
 			[
-				['available', 'beta'] satisfies AppLauncherPlatformStatus[],
-				['available', 'beta'] satisfies ContractPlatformStatus[]
+				['available', 'beta', 'soon'] satisfies AppLauncherPlatformStatus[],
+				['available', 'beta', 'soon'] satisfies ContractPlatformStatus[]
 			],
 			[
 				['createAppWork', 'goToWorks'] satisfies AppLauncherEmptyAction[],
