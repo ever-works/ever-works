@@ -1,6 +1,8 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type {
+    InstanceStatsManagedBy,
     InstanceStatsOperatorStatus,
+    InstanceStatsPublicStatus,
     InstanceStatsReason,
     InstanceStatsReportView,
     WorksStatsV1Report,
@@ -66,32 +68,41 @@ export class InstanceStatsService {
         @Optional() private readonly activity?: ActivityLogService,
     ) {}
 
-    /** What any signed-in person may know: whether statistics are on. */
-    async isEnabled(): Promise<boolean> {
+    /** What any signed-in person may know: whether statistics are on, and who manages them. */
+    async publicStatus(): Promise<InstanceStatsPublicStatus> {
         const instance = await this.identity.ensure();
-        return instance.statsEnabledUi;
+        return { enabled: instance.statsEnabledUi, managedBy: this.managedBy() };
+    }
+
+    /** Ever Cloud for an installation that declares itself `cloud`, the instance operator otherwise. */
+    managedBy(): InstanceStatsManagedBy {
+        return this.config.installSource === 'cloud' ? 'cloud' : 'operator';
     }
 
     async operatorStatus(): Promise<InstanceStatsOperatorStatus> {
         const instance = await this.identity.ensure();
-        const [schedule, last] = await Promise.all([
+        const [schedule, last, keyReadable] = await Promise.all([
             this.lease.schedule(),
             this.lease.lastReport(),
+            this.identity.isKeyReadable(),
         ]);
         const sinkAvailable = this.sink.isAvailable(this.config.sinkPluginId);
         const reason: InstanceStatsReason = !instance.statsEnabledUi
             ? 'ui'
-            : !sinkAvailable
-              ? 'sink_unavailable'
-              : this.config.installSource === 'cloud'
-                ? 'cloud-managed'
-                : 'on';
+            : !keyReadable
+              ? 'key_unreadable'
+              : !sinkAvailable
+                ? 'sink_unavailable'
+                : this.config.installSource === 'cloud'
+                  ? 'cloud-managed'
+                  : 'on';
         const lastManual = schedule?.lastManualSendAt?.getTime() ?? null;
         const nextManual =
             lastManual !== null ? lastManual + INSTANCE_STATS_SEND_NOW_INTERVAL_MS : null;
         return {
             operator: true,
             enabled: instance.statsEnabledUi,
+            managedBy: this.managedBy(),
             reason,
             uiEnabled: instance.statsEnabledUi,
             installSource: this.config.installSource,
@@ -104,6 +115,7 @@ export class InstanceStatsService {
                     ? schedule.nextSendAt.toISOString()
                     : null,
             sinkAvailable,
+            keyStoredEncrypted: this.identity.isKeyStoredWrapped(instance),
             lastReport: last ? withoutPayload(toView(last)) : null,
             sendNowAvailableAt:
                 nextManual !== null && nextManual > this.clock().getTime()

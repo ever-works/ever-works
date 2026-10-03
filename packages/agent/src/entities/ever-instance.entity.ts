@@ -11,9 +11,12 @@ export const EVER_INSTANCE_ROW_ID = 'self';
  *   deployment, never a person or an organization, and is sent as the report's
  *   `instance_id`.
  * - The **statistics key pair** (Ed25519) signs reports and nothing else. The
- *   public key travels with each report; the private key is stored only in its
- *   wrapped form (`statsPrivateKeyEncrypted`, the `enc::v1::` envelope of the
- *   plugin secret store) and never leaves the instance.
+ *   public key travels with each report; the private key never leaves the
+ *   instance. It is stored wrapped (`statsPrivateKeyEncrypted`, the `enc::v1::`
+ *   envelope of the plugin secret store) when `PLUGIN_SECRET_ENCRYPTION_KEY`
+ *   is set — a key stored before that is wrapped at the next boot — and as
+ *   plain PKCS#8 (base64) without it, which the module logs and the operator
+ *   page shows.
  * - The **connection key** columns are created empty for the separate
  *   Ever Platform connection module; nothing here writes them, and the two
  *   keys are never the same key, so a statistics series cannot be joined to a
@@ -38,7 +41,10 @@ export class EverInstance {
     @Column({ type: 'varchar', length: 64 })
     statsPublicKey: string;
 
-    /** The PKCS#8 private key, wrapped (`enc::v1::…`); never logged, never returned by the API. */
+    /**
+     * The PKCS#8 private key: wrapped (`enc::v1::…`) when `PLUGIN_SECRET_ENCRYPTION_KEY`
+     * is set, base64 otherwise; never logged, never returned by the API.
+     */
     @Column({ type: 'text' })
     statsPrivateKeyEncrypted: string;
 

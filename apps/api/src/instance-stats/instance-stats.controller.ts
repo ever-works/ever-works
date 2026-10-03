@@ -35,7 +35,7 @@ import {
  * Anonymous usage statistics — the operator routes behind Settings → Ever
  * Platform → Anonymous usage statistics.
  *
- *   GET  /api/instance-stats/status          any signed-in person: `{enabled}`;
+ *   GET  /api/instance-stats/status          any signed-in person: `{enabled, managedBy}`;
  *                                             the platform admin: the full status
  *   POST /api/instance-stats/preview         admin: what would be sent now
  *   GET  /api/instance-stats/last            admin: the exact last payload
@@ -65,12 +65,12 @@ export class InstanceStatsController {
     @Header('Cache-Control', 'no-store')
     @ApiOperation({
         summary:
-            'Whether this installation sends anonymous usage statistics. A platform admin also gets the reason, the next send, the endpoint and the last attempt; anyone else gets {enabled} only.',
+            'Whether this installation sends anonymous usage statistics and who manages them. A platform admin also gets the reason, the next send, the endpoint and the last attempt; anyone else gets {enabled, managedBy} only.',
     })
     async status(@CurrentUser() auth: AuthenticatedUser): Promise<InstanceStatsStatus> {
         const user = auth?.userId ? await this.users.findById(auth.userId) : null;
         if (user?.isPlatformAdmin === true) return this.stats.operatorStatus();
-        return { enabled: await this.stats.isEnabled() };
+        return this.stats.publicStatus();
     }
 
     @Post('preview')

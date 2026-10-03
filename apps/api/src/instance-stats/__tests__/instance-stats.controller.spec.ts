@@ -106,9 +106,9 @@ describe('InstanceStatsController', () => {
                 .send(body),
     });
 
-    it('answers {enabled} and nothing else to a member', async () => {
+    it('answers {enabled, managedBy} and nothing else to a member', async () => {
         const res = await as('member').get('/api/instance-stats/status').expect(200);
-        expect(res.body).toEqual({ enabled: true });
+        expect(res.body).toEqual({ enabled: true, managedBy: 'operator' });
         expect(res.headers['cache-control']).toBe('no-store');
     });
 
@@ -123,12 +123,23 @@ describe('InstanceStatsController', () => {
             country: 'ZZ',
             statsApiUrl: 'https://api.ever.co',
             sinkAvailable: true,
+            keyStoredEncrypted: false,
+            managedBy: 'operator',
             nextSendAt: '2026-10-16T08:00:00.000Z',
             lastReport: null,
         });
         expect(res.body.instanceId).toMatch(/^[0-9a-f-]{36}$/);
-        // Never the key, never the payload in the status.
-        expect(JSON.stringify(res.body)).not.toMatch(/key|payload/i);
+        // Never the key, never the payload in the status: the one key-related
+        // field is whether the key is stored encrypted.
+        const identity = (await harness.identity.get())!;
+        const body = JSON.stringify(res.body);
+        expect(body).not.toContain(identity.statsPublicKey);
+        expect(body).not.toContain(identity.statsPrivateKeyEncrypted);
+        expect(body).not.toContain(identity.statsKeyId);
+        expect(body).not.toMatch(/payload/i);
+        expect(Object.keys(res.body).filter((name) => /key/i.test(name))).toEqual([
+            'keyStoredEncrypted',
+        ]);
     });
 
     it.each([
@@ -224,6 +235,7 @@ describe('InstanceStatsController', () => {
         expect(status.body).toMatchObject({ enabled: false, reason: 'ui', nextSendAt: null });
         expect((await as('member').get('/api/instance-stats/status')).body).toEqual({
             enabled: false,
+            managedBy: 'operator',
         });
 
         const refused = await as('admin').post('/api/instance-stats/send-now').expect(409);
@@ -264,5 +276,17 @@ describe('InstanceStatsController', () => {
         expect(res.body.instanceId).not.toBe(before.instanceId);
         expect(res.body.resetCount).toBe(before.resetCount + 1);
         expect((await harness.identity.get())!.statsPublicKey).not.toBe(before.statsPublicKey);
+    });
+
+    it('names Ever Cloud as the manager of a cloud installation', async () => {
+        const cloud = createHarness(dataSource, {
+            env: { EVER_INSTALL_SOURCE: 'cloud' },
+            now: harness.clock.now,
+        });
+        expect(await cloud.service.publicStatus()).toEqual({ enabled: true, managedBy: 'cloud' });
+        expect(await cloud.service.operatorStatus()).toMatchObject({
+            managedBy: 'cloud',
+            reason: 'cloud-managed',
+        });
     });
 });

@@ -48,26 +48,23 @@ export const EVER_STATS_V1_SOURCE = {
 
 /**
  * Whether an `http:` statistics base URL is acceptable for `hostname`: only a
- * host that cannot be a public internet name — loopback, private / link-local
- * / unique-local literals, `*.localhost`, or a single-label name such as a
+ * host that cannot be a public internet name — loopback, private /
+ * unique-local literals, `*.localhost`, or a single-label name such as a
  * compose service (`mock-platform`). Every other host must be `https:`.
+ * Link-local addresses (`169.254.0.0/16`, `fe80::/10`) are refused: no
+ * statistics receiver lives there, and that range holds cloud metadata
+ * services.
  */
 export function isPrivateStatsHost(hostname: string): boolean {
 	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
 	if (host === 'localhost' || host.endsWith('.localhost')) return true;
 	if (host === '::1') return true;
-	if (/^f[cd][0-9a-f]{2}:/.test(host) || /^fe80:/.test(host)) return true;
+	if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
 	const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
 	if (ipv4) {
 		const a = Number(ipv4[1]);
 		const b = Number(ipv4[2]);
-		return (
-			a === 127 ||
-			a === 10 ||
-			(a === 172 && b >= 16 && b <= 31) ||
-			(a === 192 && b === 168) ||
-			(a === 169 && b === 254)
-		);
+		return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 	}
 	// A single-label name resolves only through a local resolver (compose or
 	// cluster service names); it can never be a public internet host.
@@ -227,7 +224,8 @@ export const STATS_SEND_ERROR_CODES = [
 	'invalid_url',
 	'redirect',
 	'sink_unavailable',
-	'build_failed'
+	'build_failed',
+	'key_unreadable'
 ] as const;
 export type StatsSendErrorCode = (typeof STATS_SEND_ERROR_CODES)[number];
 
@@ -255,17 +253,26 @@ export interface StatsSendResult {
 
 /**
  * Why statistics are (not) being sent: `on`, switched off by the operator in
- * Settings (`ui`), the sender plugin is not available (`sink_unavailable`), or
- * the instance is operated by Ever Cloud (`cloud-managed`, reported while on).
- * `env` (switched off by `EVER_STATS_ENABLED=false`) never reaches the API —
- * the module is not loaded, so its routes answer 404 — and is listed so the
- * page can name that state.
+ * Settings (`ui`), the statistics key cannot be read (`key_unreadable`: the
+ * encryption key it was stored with is missing or changed), the sender plugin
+ * is not available (`sink_unavailable`), or the instance is operated by Ever
+ * Cloud (`cloud-managed`, reported while on). `env` (switched off by
+ * `EVER_STATS_ENABLED=false`) never reaches the API — the module is not
+ * loaded, so its routes answer 404 — and is listed so the page can name that
+ * state.
  */
-export type InstanceStatsReason = 'on' | 'env' | 'ui' | 'cloud-managed' | 'sink_unavailable';
+export type InstanceStatsReason = 'on' | 'env' | 'ui' | 'cloud-managed' | 'key_unreadable' | 'sink_unavailable';
 
-/** What any signed-in person may read: whether statistics are on, nothing else. */
+/** Who holds the switch: Ever Cloud for a cloud installation, the instance operator otherwise. */
+export type InstanceStatsManagedBy = 'cloud' | 'operator';
+
+/**
+ * What any signed-in person may read: whether statistics are on and who
+ * manages them — nothing from any report.
+ */
 export interface InstanceStatsPublicStatus {
 	enabled: boolean;
+	managedBy: InstanceStatsManagedBy;
 }
 
 /** One stored send, as the operator sees it. `payload` is the exact body that was posted. */
@@ -296,6 +303,11 @@ export interface InstanceStatsOperatorStatus extends InstanceStatsPublicStatus {
 	/** ISO timestamp of the next scheduled send, or `null` while switched off. */
 	nextSendAt: string | null;
 	sinkAvailable: boolean;
+	/**
+	 * Whether the statistics private key is stored wrapped with
+	 * `PLUGIN_SECRET_ENCRYPTION_KEY`; `false` = stored unencrypted, set the key.
+	 */
+	keyStoredEncrypted: boolean;
 	lastReport: Omit<InstanceStatsReportView, 'payload'> | null;
 	/** ISO timestamp from which *Send now* is allowed again, or `null`. */
 	sendNowAvailableAt: string | null;

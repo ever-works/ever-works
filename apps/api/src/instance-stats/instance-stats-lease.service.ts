@@ -127,8 +127,16 @@ export class InstanceStatsLeaseService {
         await this.reports.delete({ attemptedAt: LessThan(oldestKept) });
     }
 
+    /**
+     * The newest attempt. On days 1-3 the month report and the closed month's
+     * `final` report share their time; the `final` one is sent second, so it
+     * wins the tie.
+     */
     async lastReport(): Promise<EverStatsReport | null> {
-        const [row] = await this.reports.find({ order: { attemptedAt: 'DESC' }, take: 1 });
+        const [row] = await this.reports.find({
+            order: { attemptedAt: 'DESC', final: 'DESC' },
+            take: 1,
+        });
         return row ?? null;
     }
 

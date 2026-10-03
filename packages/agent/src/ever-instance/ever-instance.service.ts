@@ -16,6 +16,22 @@ import { PluginSecretEncService } from '../plugins/services/plugin-secret-enc.se
 /** Emitted after the operator reset the instance identity (no payload beyond the new reset count). */
 export const EVER_INSTANCE_RESET_EVENT = 'ever-instance.reset';
 
+/** The prefix of a value wrapped with `PLUGIN_SECRET_ENCRYPTION_KEY` (`PluginSecretEncService`). */
+const WRAPPED_PREFIX = 'enc::v1::';
+
+/**
+ * The stored statistics key cannot be read: `PLUGIN_SECRET_ENCRYPTION_KEY`
+ * was removed or changed after the key was wrapped with it, or the stored
+ * value is damaged. Nothing can be signed until the key comes back or the
+ * operator resets the identity. The message names the condition only.
+ */
+export class EverInstanceKeyUnreadableError extends Error {
+    constructor() {
+        super('The statistics key of this installation cannot be read');
+        this.name = 'EverInstanceKeyUnreadableError';
+    }
+}
+
 /** The detached signature of one body, ready for the report headers. */
 export interface EverInstanceSignature {
     /** base64url (no padding) of the 64-byte Ed25519 signature. */
@@ -134,6 +150,40 @@ export class EverInstanceService {
         return next;
     }
 
+    /** Whether the stored private key is wrapped with `PLUGIN_SECRET_ENCRYPTION_KEY`. */
+    isKeyStoredWrapped(row: Pick<EverInstance, 'statsPrivateKeyEncrypted'>): boolean {
+        return row.statsPrivateKeyEncrypted.startsWith(WRAPPED_PREFIX);
+    }
+
+    /**
+     * Boot: wrap a key that was stored before `PLUGIN_SECRET_ENCRYPTION_KEY`
+     * was set (a value is otherwise rewritten only by a reset). Answers whether
+     * the stored key is wrapped now; `false` means no encryption key is
+     * configured, and the key stays as it is.
+     */
+    async wrapStoredKey(): Promise<boolean> {
+        const row = await this.ensure();
+        if (this.isKeyStoredWrapped(row)) return true;
+        if (!this.secrets.isEnabled()) return false;
+        await this.repository.update(
+            { id: EVER_INSTANCE_ROW_ID, statsKeyId: row.statsKeyId },
+            { statsPrivateKeyEncrypted: this.secrets.encryptValue(row.statsPrivateKeyEncrypted) },
+        );
+        this.logger.log('Wrapped the statistics key of this installation with the encryption key');
+        return this.isKeyStoredWrapped(await this.ensure());
+    }
+
+    /** Whether the statistics key can be read (and so a report signed) right now. */
+    async isKeyReadable(): Promise<boolean> {
+        try {
+            this.privateKey(await this.ensure());
+            return true;
+        } catch (error) {
+            if (error instanceof EverInstanceKeyUnreadableError) return false;
+            throw error;
+        }
+    }
+
     /** The operator switch in Settings. */
     async setStatsEnabledUi(enabled: boolean): Promise<EverInstance> {
         await this.ensure();
@@ -154,13 +204,17 @@ export class EverInstanceService {
 
     private privateKey(row: EverInstance): KeyObject {
         if (this.cachedKey && this.cachedKey.keyId === row.statsKeyId) return this.cachedKey.key;
-        const der = Buffer.from(this.secrets.decryptValue(row.statsPrivateKeyEncrypted), 'base64');
         let key: KeyObject;
         try {
+            const der = Buffer.from(
+                this.secrets.decryptValue(row.statsPrivateKeyEncrypted),
+                'base64',
+            );
             key = createPrivateKey({ key: der, format: 'der', type: 'pkcs8' });
         } catch {
-            // Never echo the stored value: name the condition only.
-            throw new Error('The statistics key of this installation cannot be read');
+            // A missing or changed PLUGIN_SECRET_ENCRYPTION_KEY, or a damaged
+            // value. Never echo the stored value: name the condition only.
+            throw new EverInstanceKeyUnreadableError();
         }
         this.cachedKey = { keyId: row.statsKeyId, key };
         return key;

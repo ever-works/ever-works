@@ -127,6 +127,10 @@ describe('InstanceStatsSenderService — schedule', () => {
             ['2026-11', false],
             ['2026-10', true],
         ]);
+        // Both attempts share their time: *Last payload* is the one sent last.
+        const last = await h.lease.lastReport();
+        expect(last?.final).toBe(true);
+        expect(last?.payload).toBe(Buffer.from(h.sink.calls[1].report.body).toString('utf8'));
 
         h.clock.now = (await h.lease.schedule())!.nextSendAt!;
         await h.sender.runDue();

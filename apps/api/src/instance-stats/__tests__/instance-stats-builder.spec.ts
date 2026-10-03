@@ -3,6 +3,7 @@ import { WORK_KINDS, WORKS_STATS_WORK_KIND_KEYS } from '@ever-works/contracts';
 import { validateStatsReport } from '@ever-works/agent/ever-instance';
 import {
     deploymentProviderKey,
+    foldDeploymentsByProvider,
     foldWorksByKind,
     knownWorkKindKeys,
     periodRange,
@@ -166,6 +167,22 @@ describe('instance-stats mapping', () => {
         expect(deploymentProviderKey('acme-internal')).toBe('other');
         expect(Object.keys(foldWorksByKind({ 'x-y': 2 }))).toEqual([...WORKS_STATS_WORK_KIND_KEYS]);
         expect(foldWorksByKind({ 'x-y': 2, z: 3 }).other).toBe(5);
+    });
+
+    it('folds a stored value named like an Object member under `other` too', () => {
+        for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+            expect(workKindKey(name)).toBe('other');
+            expect(deploymentProviderKey(name)).toBe('other');
+        }
+        // What the repository's grouping answers: an object with no prototype.
+        const grouped: Record<string, number> = Object.assign(Object.create(null), {
+            constructor: 2,
+            toString: 3,
+            vercel: 1,
+        });
+        const folded = foldDeploymentsByProvider(grouped);
+        expect(folded).toMatchObject({ vercel: 1, other: 5 });
+        expect(Object.values(folded).every((count) => Number.isInteger(count))).toBe(true);
     });
 
     it.each([

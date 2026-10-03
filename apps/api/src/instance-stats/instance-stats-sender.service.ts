@@ -2,7 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import type { StatsSendResult } from '@ever-works/contracts';
 import type { EverStatsLease } from '@ever-works/agent/entities';
-import { EverInstanceService } from '@ever-works/agent/ever-instance';
+import {
+    EverInstanceKeyUnreadableError,
+    EverInstanceService,
+} from '@ever-works/agent/ever-instance';
 import { StatsSinkFacadeService, StatsSinkUnavailableError } from '@ever-works/agent/facades';
 import { getBuildInfo } from '../health/build-info';
 import {
@@ -100,6 +103,13 @@ export class InstanceStatsSenderService {
         if (!this.config.enabled) throw new Error('ever-stats: switched off by EVER_STATS_ENABLED');
         const now = this.clock();
         const instance = await this.identity.ensure();
+        // A key stored before PLUGIN_SECRET_ENCRYPTION_KEY was set is wrapped now;
+        // without that key it stays unencrypted, which the operator must know.
+        if (!(await this.identity.wrapStoredKey())) {
+            this.logger.warn(
+                'ever-stats: key_stored_unencrypted (set PLUGIN_SECRET_ENCRYPTION_KEY)',
+            );
+        }
         const firstSendAt = new Date(
             instance.createdAt.getTime() + this.config.sendIntervalS * 1000,
         );
@@ -210,6 +220,14 @@ export class InstanceStatsSenderService {
                 // A report the schema refuses is never sent: machine tokens only.
                 this.logger.error(`ever-stats: build_failed ${error.message}`);
                 return { status: 'failed', httpStatus: null, errorCode: 'build_failed' };
+            }
+            if (error instanceof EverInstanceKeyUnreadableError) {
+                // Nothing can be signed: the retry ladder applies (not a log line
+                // every tick) until the key comes back or the identity is reset.
+                this.logger.error(
+                    'ever-stats: key_unreadable (restore PLUGIN_SECRET_ENCRYPTION_KEY or reset the identity)',
+                );
+                return { status: 'failed', httpStatus: null, errorCode: 'key_unreadable' };
             }
             throw error;
         }
