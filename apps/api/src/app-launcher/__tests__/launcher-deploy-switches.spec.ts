@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseAllDocuments } from 'yaml';
+import { parseLauncherOrigins } from '../launcher-delegated-cors.middleware';
 
 /**
  * APW-11 T31 — the App Launcher's operator switches, checked where they are
@@ -182,5 +183,66 @@ describe('APW-11 T31 — the launcher switches in the deploy manifests', () => {
         expect(text).toMatch(/^EVER_WORKS_PLATFORM_CATALOG_REF=main$/m);
         expect(text).toMatch(/^EVER_WORKS_PLATFORM_CATALOG_ENV=production$/m);
         expect(text).toMatch(/^EVER_WORKS_PLATFORM_CATALOG_SELF_ID=ever-works$/m);
+    });
+});
+
+/**
+ * APW-11 P2 (spec FR-50) — where another Ever app may read the launcher list from, per
+ * environment. The Ever Platform web app of each environment is the one cross-origin reader:
+ * `app-dev.ever.co` on dev; `app-stage.ever.co` on stage, plus `app-dev.ever.co`, which shares
+ * the stage identity tenant and so reads from the stage API; `app.ever.co` in production.
+ *
+ * Pinned exactly, because an origin that is not an exact `https://` origin stops a production
+ * API from booting (`resolveLauncherOrigins`), and an extra one widens who may read.
+ */
+describe('APW-11 P2 — the delegated-read origins and trusted clients in the deploy manifests', () => {
+    const ORIGINS: Record<string, string[]> = {
+        'k8s-manifest.dev.yaml': ['https://app-dev.ever.co'],
+        'k8s-manifest.stage.yaml': ['https://app-stage.ever.co', 'https://app-dev.ever.co'],
+        'k8s-manifest.prod.yaml': ['https://app.ever.co'],
+    };
+
+    it.each(MANIFESTS)('allows exactly the Ever Platform web app of $environment', ({ file }) => {
+        const value = envValue(
+            apiContainer(deploymentsIn(file)),
+            'EVER_WORKS_APP_LAUNCHER_ORIGINS',
+        );
+
+        expect(typeof value).toBe('string');
+        const parsed = parseLauncherOrigins(value as string);
+        expect(parsed.invalid).toEqual([]);
+        expect(parsed.tooMany).toBe(false);
+        expect(parsed.origins).toEqual(ORIGINS[file]);
+    });
+
+    it.each(MANIFESTS)(
+        'renders the trusted client ids of $file from the deploy environment, never a literal',
+        ({ file }) => {
+            const value = envValue(apiContainer(deploymentsIn(file)), 'EVER_ID_TRUSTED_CLIENT_IDS');
+
+            expect(value).toBe('$EVER_ID_TRUSTED_CLIENT_IDS');
+        },
+    );
+
+    it.each(MANIFESTS)('sets neither on any container but the API in $file', ({ file }) => {
+        const others = deploymentsIn(file)
+            .flatMap((deployment) => deployment.spec?.template?.spec?.containers ?? [])
+            .filter((container) => !container.name.startsWith('ever-works-api'));
+
+        expect(others.length).toBeGreaterThan(0);
+        for (const container of others) {
+            for (const name of ['EVER_WORKS_APP_LAUNCHER_ORIGINS', 'EVER_ID_TRUSTED_CLIENT_IDS']) {
+                expect(container.env?.some((entry) => entry.name === name) ?? false).toBe(false);
+            }
+        }
+    });
+
+    it('documents both in apps/api/.env.example, with the safe defaults', () => {
+        const text = readFileSync(join(repoRoot(), 'apps', 'api', '.env.example'), 'utf8');
+
+        // Empty: no origin may read with a delegated token until an operator lists one.
+        expect(text).toMatch(/^EVER_WORKS_APP_LAUNCHER_ORIGINS=\r?$/m);
+        // Commented out: unset keeps the default rule for delegated tokens.
+        expect(text).toMatch(/^# EVER_ID_TRUSTED_CLIENT_IDS=\r?$/m);
     });
 });

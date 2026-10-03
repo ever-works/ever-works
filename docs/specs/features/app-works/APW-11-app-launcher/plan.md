@@ -507,6 +507,7 @@ beyond defaults), header `Cache-Control: public, max-age=3600, stale-while-reval
 | Unknown / inaccessible item                                        | `200`  | `rejected: [{ key, reason: 'unknownItem' }]`                            |
 | Hiding the current platform                                        | `200`  | `rejected: [{ key: 'platform:<selfId>', reason: 'cannotHideCurrent' }]` |
 | Delegated token lacks `apps:read` (P2)                             | `403`  | `{ code: 'insufficientScope' }` (raised by APW-12's guard)              |
+| Delegated token from an origin not on the list, or none (P2)       | `403`  | `{ status: 'error', code: 'origin_not_allowed', message }`              |
 | Delegated token on `PUT` (P2)                                      | `401`  | plain unauthorized — no `@DelegatedRead` metadata                       |
 
 ### 4.6 Address resolution (pure)
@@ -577,6 +578,16 @@ regression `plan §10.1` pins with a test.
   (`'session' | 'api-key'`) already ships with AW-24, APW-12 appends only `'ever-id-delegated'`, and AW-24's
   `HumanActorGuard` (`apps/api/src/safety/guards/human-actor.guard.ts`, admits only `'session'`) refuses a delegated
   principal on every human-only route with no change.
+- **The server refuses an unlisted origin too (added 2026-10-02).** CORS only stops a browser from handing a
+  page the body; the API also refuses the call. The `GET` handler is marked
+  `@DelegatedRead('apps:read', { allowedOrigins: launcherDelegatedOrigins })`, so `AuthSessionGuard` answers a
+  delegated token whose `Origin` is absent or not on the list with `403 origin_not_allowed` **before** it
+  verifies the token: no provider key fetch, no Activity row, no last-used update. `launcherDelegatedOrigins()`
+  is the middleware's own `resolveLauncherOrigins()`, resolved once, so the two rules always name the same
+  origins. Session callers are untouched. The optional `EVER_ID_TRUSTED_CLIENT_IDS` (≤ 5) narrows delegated
+  tokens to those minted for the listed clients (`azp`); any other is answered `401` like an invalid
+  credential. The published contract is
+  [`../contracts/openapi/apw-11.openapi.yaml`](../contracts/openapi/apw-11.openapi.yaml).
 - Delegated responses are identical to session responses for the same person and scope `global` +
   the person's personal scope (P2 does not choose an Organization; Organization-scoped Works are listed
   per Organization in a later iteration — spec §9).

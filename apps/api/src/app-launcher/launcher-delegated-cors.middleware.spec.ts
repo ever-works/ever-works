@@ -4,6 +4,8 @@ import { AppLauncherModule } from './app-launcher.module';
 import {
     APP_LAUNCHER_MAX_ORIGINS,
     APP_LAUNCHER_ORIGINS_ENV,
+    forgetLauncherDelegatedOrigins,
+    launcherDelegatedOrigins,
     LauncherDelegatedCorsMiddleware,
     parseLauncherOrigins,
     resolveLauncherOrigins,
@@ -228,6 +230,42 @@ describe('boot validation (plan §4.7: invalid entries fail boot in production)'
 
     it('answers an empty list for an unset variable — an unconfigured launcher is readable by nobody', () => {
         expect(resolveLauncherOrigins(env({ NODE_ENV: 'production' }))).toEqual([]);
+    });
+});
+
+describe('launcherDelegatedOrigins — the same list for the server-side origin rule (FR-50)', () => {
+    const previous = process.env[APP_LAUNCHER_ORIGINS_ENV];
+
+    afterEach(() => {
+        if (previous === undefined) delete process.env[APP_LAUNCHER_ORIGINS_ENV];
+        else process.env[APP_LAUNCHER_ORIGINS_ENV] = previous;
+        forgetLauncherDelegatedOrigins();
+    });
+
+    it('answers exactly what resolveLauncherOrigins answers, so CORS and the 403 name the same origins', () => {
+        process.env[APP_LAUNCHER_ORIGINS_ENV] = `${ALLOWED}, ${OTHER_ALLOWED}`;
+        forgetLauncherDelegatedOrigins();
+
+        expect(launcherDelegatedOrigins()).toEqual(resolveLauncherOrigins());
+        expect(launcherDelegatedOrigins()).toEqual([ALLOWED, OTHER_ALLOWED]);
+        expect(Object.isFrozen(launcherDelegatedOrigins())).toBe(true);
+    });
+
+    it('resolves once per process: a later change of the variable needs a restart, as CORS does', () => {
+        process.env[APP_LAUNCHER_ORIGINS_ENV] = ALLOWED;
+        forgetLauncherDelegatedOrigins();
+        const first = launcherDelegatedOrigins();
+
+        process.env[APP_LAUNCHER_ORIGINS_ENV] = OTHER_ALLOWED;
+        expect(launcherDelegatedOrigins()).toBe(first);
+        expect(launcherDelegatedOrigins()).toEqual([ALLOWED]);
+    });
+
+    it('is empty for an unset variable — no origin may read with a delegated token', () => {
+        delete process.env[APP_LAUNCHER_ORIGINS_ENV];
+        forgetLauncherDelegatedOrigins();
+
+        expect(launcherDelegatedOrigins()).toEqual([]);
     });
 });
 

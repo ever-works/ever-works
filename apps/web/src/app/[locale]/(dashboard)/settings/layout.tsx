@@ -1,18 +1,22 @@
 import { getAuthFromRequest } from '@/lib/auth';
+import { instanceStatsAPI } from '@/lib/api/instance-stats';
 import { pluginsAPI, type SettingsMenuResponse } from '@/lib/api/plugins';
 import { isAppLauncherEnabled } from '@/lib/feature-flags/app-launcher';
 import { isFleetEnabled } from '@/lib/fleet-flags';
 import { SettingsLayoutClient } from './settings-layout-client';
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
-    let settingsMenu: SettingsMenuResponse | null = null;
-
-    try {
-        settingsMenu = await pluginsAPI.listForSettingsMenu();
-    } catch (error) {
-        // If the API fails, we'll just show static tabs without plugin categories
-        console.error('Failed to fetch settings menu:', error);
-    }
+    // The Ever Platform tab exists only where the API has the statistics
+    // module: with `EVER_STATS_ENABLED=false` its status route answers 404 and
+    // there is nothing to show — no tab, and the page itself answers 404.
+    const [settingsMenu, everPlatformEnabled] = await Promise.all([
+        pluginsAPI.listForSettingsMenu().catch((error: unknown): SettingsMenuResponse | null => {
+            // If the API fails, we'll just show static tabs without plugin categories
+            console.error('Failed to fetch settings menu:', error);
+            return null;
+        }),
+        instanceStatsAPI.isAvailable(),
+    ]);
 
     // APW-11 T16 — the App Launcher flag is resolved HERE, in the nested server
     // layout that renders the nav, and passed down as a prop.
@@ -51,6 +55,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
             settingsMenu={settingsMenu}
             fleetEnabled={isFleetEnabled()}
             appLauncherEnabled={appLauncherEnabled}
+            everPlatformEnabled={everPlatformEnabled}
         >
             {children}
         </SettingsLayoutClient>

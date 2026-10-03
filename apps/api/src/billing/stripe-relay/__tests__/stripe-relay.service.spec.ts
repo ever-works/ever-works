@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'crypto';
 import {
+    StripeRelayDeadLetterNotFoundError,
     StripeRelayNotConfiguredError,
     StripeRelayService,
     StripeRelaySignatureError,
@@ -7,10 +8,11 @@ import {
 } from '../stripe-relay.service';
 
 /**
- * The relay's job is ROUTING and RETRY CLASSIFICATION — getting either wrong
- * loses a customer's payment or replays it forever. These tests therefore assert
- * the decision for each real failure shape, and lead with the cases that must be
- * REFUSED rather than the happy path.
+ * The relay's job is ROUTING, RETRY CLASSIFICATION and — since audit CC05-06 —
+ * making sure nothing it could not deliver disappears. Getting any of these
+ * wrong loses a customer's payment or replays it forever. These tests
+ * therefore assert the decision for each real failure shape, and lead with the
+ * cases that must be REFUSED rather than the happy path.
  *
  * Stripe verification itself is delegated to the official SDK and is exercised
  * here only through the two boundaries the relay owns: fail-closed when
@@ -27,6 +29,15 @@ jest.mock('@ever-works/agent/services', () => ({
 }));
 jest.mock('@ever-works/agent/database', () => ({
     WorkRepository: class {},
+    StripeRelayDeadLetterRepository: class {},
+}));
+jest.mock('@ever-works/agent/entities', () => ({
+    StripeRelayDeadLetterResolution: {
+        STRIPE_RETRY: 'stripe-retry',
+        REPLAYED: 'replayed',
+        DISMISSED: 'dismissed',
+    },
+    StripeRelayDeadLetterStatus: { OPEN: 'open', RESOLVED: 'resolved' },
 }));
 jest.mock('@ever-works/agent/subscriptions', () => ({
     constructStripeEvent: jest.fn(),
@@ -44,10 +55,22 @@ const WORK_ID = 'work-123';
 const SECRET = 'per-work-secret';
 const SITE = 'https://directory.example.com';
 
+/** What the directory's `/api/stripe/platform-webhook` answers after dispatching. */
+const DISPATCHED = { received: true, type: 'subscription.created', dispatched: true };
+
+function siteResponse(status: number, body?: unknown) {
+    const text = body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body);
+    // A real WHATWG Response, so the relay's bounded stream read is exercised
+    // exactly as it runs against `fetch`.
+    return new Response(text === '' ? null : text, { status });
+}
+
 function makeService(overrides?: {
     work?: unknown;
     secret?: string | null;
     decryptThrows?: boolean;
+    deadLetterRow?: unknown;
+    recordFailureThrows?: boolean;
 }) {
     const workRepository = {
         findById: jest
@@ -64,14 +87,32 @@ function makeService(overrides?: {
             return overrides && 'secret' in overrides ? overrides.secret : SECRET;
         }),
     };
-    const service = new StripeRelayService(workRepository as never, secretService as never);
-    return { service, workRepository, secretService };
+    const deadLetters = {
+        findByEventId: jest.fn().mockResolvedValue(overrides?.deadLetterRow ?? null),
+        recordFailure: jest.fn(async (failure: unknown) => {
+            if (overrides?.recordFailureThrows) throw new Error('db down');
+            return failure;
+        }),
+        markResolved: jest.fn().mockResolvedValue(false),
+        countOpen: jest.fn().mockResolvedValue(0),
+    };
+    const service = new StripeRelayService(
+        workRepository as never,
+        secretService as never,
+        deadLetters as never,
+    );
+    return { service, workRepository, secretService, deadLetters };
 }
 
-const event = (id: string, object: Record<string, unknown>) => ({
+const event = (
+    id: string,
+    object: Record<string, unknown>,
+    extra: Record<string, unknown> = {},
+) => ({
     id,
     type: 'customer.subscription.created',
     data: { object },
+    ...extra,
 });
 
 describe('StripeRelayService', () => {
@@ -90,13 +131,14 @@ describe('StripeRelayService', () => {
     describe('refusals', () => {
         it('FAILS CLOSED when no relay signing secret is configured', async () => {
             delete process.env.STRIPE_RELAY_WEBHOOK_SECRET;
-            const { service } = makeService();
+            const { service, deadLetters } = makeService();
             await expect(service.handle('{}', 'sig')).rejects.toBeInstanceOf(
                 StripeRelayNotConfiguredError,
             );
-            // Never touched the payload or the network.
+            // Never touched the payload, the network or the dead-letter table.
             expect(constructStripeEvent).not.toHaveBeenCalled();
             expect(global.fetch).not.toHaveBeenCalled();
+            expect(deadLetters.recordFailure).not.toHaveBeenCalled();
         });
 
         it('rejects a delivery with no signature header', async () => {
@@ -107,14 +149,16 @@ describe('StripeRelayService', () => {
             expect(constructStripeEvent).not.toHaveBeenCalled();
         });
 
-        it('rejects a bad signature without echoing the SDK message', async () => {
+        it('rejects a bad signature without echoing the SDK message, and records nothing', async () => {
             (constructStripeEvent as jest.Mock).mockImplementation(() => {
                 throw new Error('No signatures found matching the expected signature for payload');
             });
-            const { service } = makeService();
+            const { service, deadLetters } = makeService();
             await expect(service.handle('{}', 'sig')).rejects.toThrow(
                 'Webhook signature verification failed',
             );
+            // An unverified body must never be stored for a later replay.
+            expect(deadLetters.recordFailure).not.toHaveBeenCalled();
         });
 
         it('refuses to sign for an SSRF-unsafe website, so the secret never leaves', async () => {
@@ -123,10 +167,14 @@ describe('StripeRelayService', () => {
             (constructStripeEvent as jest.Mock).mockReturnValue(
                 event('evt_1', { metadata: { work_id: WORK_ID } }),
             );
-            const { service } = makeService();
+            const { service, deadLetters } = makeService();
             const outcome = await service.handle('{}', 'sig');
             expect(outcome).toMatchObject({ status: 'unroutable', reason: 'ssrf_blocked' });
             expect(global.fetch).not.toHaveBeenCalled();
+            // Visible to an operator instead of a log line.
+            expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                expect.objectContaining({ disposition: 'unroutable', reason: 'ssrf_blocked' }),
+            );
         });
 
         it('fails closed when NODE_ENV is missing rather than treating it as local', async () => {
@@ -149,7 +197,7 @@ describe('StripeRelayService', () => {
         it('forwards to the owning directory with a signature over the RAW body', async () => {
             const raw = JSON.stringify(event('evt_2', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
-            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
             const { service } = makeService();
 
             const outcome = await service.handle(raw, 'sig');
@@ -176,7 +224,7 @@ describe('StripeRelayService', () => {
             delete process.env.EVER_WORKS_DOMAIN;
             const raw = JSON.stringify(event('evt_legacy', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
-            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
             const { service } = makeService({
                 work: {
                     id: WORK_ID,
@@ -200,7 +248,7 @@ describe('StripeRelayService', () => {
             (constructStripeEvent as jest.Mock).mockReturnValue(
                 event('evt_managed', { metadata: { work_id: WORK_ID } }),
             );
-            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
             const { service } = makeService({
                 work: {
                     id: WORK_ID,
@@ -223,7 +271,7 @@ describe('StripeRelayService', () => {
             (constructStripeEvent as jest.Mock).mockReturnValue(
                 event('evt_placeholder', { metadata: { work_id: WORK_ID } }),
             );
-            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
             const { service } = makeService({
                 work: {
                     id: WORK_ID,
@@ -245,7 +293,7 @@ describe('StripeRelayService', () => {
         it('binds the signature to the work id, so it cannot be replayed elsewhere', async () => {
             const raw = JSON.stringify(event('evt_3', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
-            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
             const { service } = makeService();
             await service.handle(raw, 'sig');
 
@@ -259,42 +307,73 @@ describe('StripeRelayService', () => {
             expect(init.headers.Authorization).not.toBe(`Bearer ${forAnotherWork}`);
         });
 
-        it.each([
-            ['no work_id at all', {}, 'no_work_id'],
-            ['a work that does not exist', { metadata: { work_id: 'ghost' } }, 'unknown_work'],
-        ])('is unroutable (not retried) for %s', async (_label, object, reason) => {
-            (constructStripeEvent as jest.Mock).mockReturnValue(event('evt_4', object));
-            const { service } = makeService(reason === 'unknown_work' ? { work: null } : undefined);
-            const outcome = await service.handle('{}', 'sig');
-            expect(outcome).toMatchObject({ status: 'unroutable', reason });
-            expect(global.fetch).not.toHaveBeenCalled();
-        });
-
-        it('is unroutable when the Work has no deployed website', async () => {
-            (constructStripeEvent as jest.Mock).mockReturnValue(
-                event('evt_5', { metadata: { work_id: WORK_ID } }),
-            );
-            const { service } = makeService({ work: { id: WORK_ID, website: null } });
+        it('acknowledges an event with no work_id WITHOUT dead-lettering it (platform-owned traffic)', async () => {
+            (constructStripeEvent as jest.Mock).mockReturnValue(event('evt_4', {}));
+            const { service, deadLetters, workRepository } = makeService();
             expect(await service.handle('{}', 'sig')).toMatchObject({
                 status: 'unroutable',
-                reason: 'not_deployed',
+                reason: 'no_work_id',
             });
+            expect(workRepository.findById).not.toHaveBeenCalled();
+            expect(global.fetch).not.toHaveBeenCalled();
+            // Most relay traffic is Gauzy / ever.co / platform events; storing
+            // each would bury the real dead letters.
+            expect(deadLetters.recordFailure).not.toHaveBeenCalled();
         });
 
-        it('is unroutable when the per-Work secret is missing or undecryptable', async () => {
+        it('acknowledges an unknown Work but dead-letters it for an operator', async () => {
             (constructStripeEvent as jest.Mock).mockReturnValue(
-                event('evt_6', { metadata: { work_id: WORK_ID } }),
+                event('evt_ghost', { metadata: { work_id: 'ghost' } }, { livemode: true }),
             );
-            expect(await makeService({ secret: null }).service.handle('{}', 'sig')).toMatchObject({
-                reason: 'not_provisioned',
+            const { service, deadLetters } = makeService({ work: null });
+            expect(await service.handle('{"raw":"ghost"}', 'sig')).toMatchObject({
+                status: 'unroutable',
+                reason: 'unknown_work',
             });
-            (constructStripeEvent as jest.Mock).mockReturnValue(
-                event('evt_7', { metadata: { work_id: WORK_ID } }),
+            expect(global.fetch).not.toHaveBeenCalled();
+            expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    eventId: 'evt_ghost',
+                    eventType: 'customer.subscription.created',
+                    workId: 'ghost',
+                    livemode: true,
+                    disposition: 'unroutable',
+                    reason: 'unknown_work',
+                    siteStatus: null,
+                    payload: '{"raw":"ghost"}',
+                }),
             );
-            expect(
-                await makeService({ decryptThrows: true }).service.handle('{}', 'sig'),
-            ).toMatchObject({ reason: 'secret_undecryptable' });
         });
+
+        it.each([
+            [
+                'the Work has no deployed website',
+                { work: { id: WORK_ID, website: null } },
+                'not_deployed',
+            ],
+            ['the per-Work secret was never provisioned', { secret: null }, 'not_provisioned'],
+            [
+                'the per-Work secret cannot be decrypted',
+                { decryptThrows: true },
+                'secret_undecryptable',
+            ],
+        ])(
+            'RETRIES and dead-letters when %s (a provisioning gap is fixable inside Stripe’s window)',
+            async (_label, overrides, reason) => {
+                (constructStripeEvent as jest.Mock).mockReturnValue(
+                    event('evt_gap', { metadata: { work_id: WORK_ID } }),
+                );
+                const { service, deadLetters } = makeService(overrides);
+                expect(await service.handle('{}', 'sig')).toMatchObject({
+                    status: 'retry',
+                    reason,
+                });
+                expect(global.fetch).not.toHaveBeenCalled();
+                expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                    expect.objectContaining({ disposition: 'retry', reason, workId: WORK_ID }),
+                );
+            },
+        );
     });
 
     describe('retry classification — what Stripe is told to do', () => {
@@ -307,26 +386,272 @@ describe('StripeRelayService', () => {
         it.each([
             [500, 'retry'],
             [502, 'retry'],
-            [401, 'retry'], // stale secret — a re-sync may fix it inside the window
-            [409, 'unroutable'], // our routing bug; retrying repeats it
             [503, 'retry'], // can come from ingress/site outage; status alone is not a trusted permanent signal
+            [401, 'retry'], // stale secret — a re-sync may fix it inside the window
+            [404, 'retry'], // missing ingress / tunnel rule (the 2026-08-23 rust-tools failure)
+            [403, 'retry'], // a WAF challenge in front of the site
+            [405, 'retry'],
+            [413, 'retry'], // an ingress body-size limit
+            [429, 'retry'],
+            [301, 'retry'], // a redirect we refuse to follow is a misconfiguration, not a delivery
+            [308, 'retry'],
+            [409, 'unroutable'], // our routing bug; retrying repeats it
             [400, 'unroutable'], // malformed body is not fixable by retrying
-            [200, 'forwarded'],
-        ])('site answers %i -> %s', async (siteStatus, expected) => {
-            (global.fetch as jest.Mock).mockResolvedValue({ status: siteStatus });
-            const { service } = makeService();
-            expect((await service.handle('{}', 'sig')).status).toBe(expected);
+        ])('site answers %i -> %s, and it is dead-lettered', async (siteStatus, expected) => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(siteStatus, { error: 'x' }));
+            const { service, deadLetters } = makeService();
+            const outcome = await service.handle('{}', 'sig');
+            expect(outcome.status).toBe(expected);
+            expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                expect.objectContaining({ disposition: expected, siteStatus }),
+            );
+            expect(deadLetters.markResolved).not.toHaveBeenCalled();
         });
+
+        it('treats a 2xx as delivered ONLY when the site confirms dispatch', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
+            const { service, deadLetters } = makeService();
+            expect(await service.handle('{}', 'sig')).toMatchObject({
+                status: 'forwarded',
+                siteStatus: 200,
+            });
+            expect(deadLetters.recordFailure).not.toHaveBeenCalled();
+        });
+
+        it('treats a site-side duplicate as delivered (it already ran the handler)', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(
+                siteResponse(200, { received: true, duplicate: true }),
+            );
+            const { service } = makeService();
+            expect((await service.handle('{}', 'sig')).status).toBe('forwarded');
+        });
+
+        it.each([
+            ['a bare 200 with no body', siteResponse(200)],
+            ['a 200 that received but did not dispatch', siteResponse(200, { received: true })],
+            [
+                'a 200 with dispatched:false',
+                siteResponse(200, { received: true, dispatched: false }),
+            ],
+            ['a 204', siteResponse(204)],
+            ['a 200 with an HTML body (a proxy page)', siteResponse(200, '<html>ok</html>')],
+            [
+                'a 200 whose body cannot be read',
+                new Response(
+                    new ReadableStream({
+                        pull(controller) {
+                            controller.error(new Error('reset'));
+                        },
+                    }),
+                    { status: 200 },
+                ),
+            ],
+            [
+                'a 200 whose body runs past the size limit, even if it would confirm',
+                siteResponse(200, JSON.stringify({ dispatched: true, pad: 'x'.repeat(70 * 1024) })),
+            ],
+        ])(
+            'RETRIES %s — a no-op receiver must never count as delivered',
+            async (_label, response) => {
+                (global.fetch as jest.Mock).mockResolvedValue(response);
+                const { service, deadLetters } = makeService();
+                expect(await service.handle('{}', 'sig')).toMatchObject({
+                    status: 'retry',
+                    reason: 'site_unconfirmed',
+                });
+                expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                    expect.objectContaining({ reason: 'site_unconfirmed' }),
+                );
+            },
+        );
 
         it('retries a network failure rather than dropping a paid event', async () => {
             (global.fetch as jest.Mock).mockRejectedValue(
                 new Error('connect ECONNREFUSED 10.0.0.1'),
             );
-            const { service } = makeService();
+            const { service, deadLetters } = makeService();
             expect(await service.handle('{}', 'sig')).toMatchObject({
                 status: 'retry',
                 reason: 'network',
             });
+            expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                expect.objectContaining({ reason: 'network', siteStatus: null }),
+            );
+        });
+    });
+
+    describe('dead letters', () => {
+        beforeEach(() => {
+            (constructStripeEvent as jest.Mock).mockReturnValue(
+                event('evt_dl', { metadata: { work_id: WORK_ID } }),
+            );
+        });
+
+        it('resolves an open dead letter when a later Stripe retry is delivered', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
+            const { service, deadLetters } = makeService();
+            deadLetters.markResolved.mockResolvedValue(true);
+
+            expect((await service.handle('{}', 'sig')).status).toBe('forwarded');
+            expect(deadLetters.markResolved).toHaveBeenCalledWith('evt_dl', 'stripe-retry');
+        });
+
+        it('keeps a delivery a delivery even if resolving the dead letter fails', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
+            const { service, deadLetters } = makeService();
+            deadLetters.markResolved.mockRejectedValue(new Error('db down'));
+
+            expect((await service.handle('{}', 'sig')).status).toBe('forwarded');
+        });
+
+        it('turns an unroutable event into a RETRY when its dead letter cannot be written', async () => {
+            // Neither delivered nor recorded: acknowledging would lose it for good.
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(409, { error: 'x' }));
+            const { service } = makeService({ recordFailureThrows: true });
+            expect(await service.handle('{}', 'sig')).toMatchObject({
+                status: 'retry',
+                reason: 'dead_letter_unavailable',
+            });
+        });
+
+        it('still retries a retryable event when its dead letter cannot be written', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(502));
+            const { service } = makeService({ recordFailureThrows: true });
+            expect((await service.handle('{}', 'sig')).status).toBe('retry');
+        });
+    });
+
+    describe('replay (operator tool)', () => {
+        const payload = JSON.stringify(
+            event('evt_replay', { metadata: { work_id: WORK_ID } }, { livemode: true }),
+        );
+        const openRow = { eventId: 'evt_replay', status: 'open', payload };
+
+        it('refuses an event it has no dead letter for', async () => {
+            const { service } = makeService();
+            await expect(service.replay('evt_nope')).rejects.toBeInstanceOf(
+                StripeRelayDeadLetterNotFoundError,
+            );
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
+        it('does nothing for a dead letter that is already resolved', async () => {
+            const { service } = makeService({
+                deadLetterRow: { ...openRow, status: 'resolved' },
+            });
+            expect(await service.replay('evt_replay')).toEqual({
+                status: 'already-resolved',
+                eventId: 'evt_replay',
+            });
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
+        it('forwards the STORED bytes verbatim and resolves the row as replayed', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(200, DISPATCHED));
+            const { service, deadLetters } = makeService({ deadLetterRow: openRow });
+
+            expect(await service.replay('evt_replay')).toMatchObject({
+                status: 'forwarded',
+                workId: WORK_ID,
+            });
+            const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+            expect(init.body).toBe(payload);
+            // The Stripe signature is not re-checked on a replay.
+            expect(constructStripeEvent).not.toHaveBeenCalled();
+            expect(deadLetters.markResolved).toHaveBeenCalledWith('evt_replay', 'replayed');
+        });
+
+        it('counts a failed replay as another attempt and reports why', async () => {
+            (global.fetch as jest.Mock).mockResolvedValue(siteResponse(404));
+            const { service, deadLetters } = makeService({ deadLetterRow: openRow });
+
+            expect(await service.replay('evt_replay')).toEqual({
+                status: 'failed',
+                eventId: 'evt_replay',
+                disposition: 'retry',
+                reason: 'site_404',
+            });
+            expect(deadLetters.recordFailure).toHaveBeenCalledWith(
+                expect.objectContaining({ eventId: 'evt_replay', reason: 'site_404', payload }),
+            );
+            expect(deadLetters.markResolved).not.toHaveBeenCalled();
+        });
+
+        it('refuses a stored payload that is not the event the row names', async () => {
+            const { service } = makeService({
+                deadLetterRow: { ...openRow, payload: JSON.stringify(event('evt_other', {})) },
+            });
+            expect(await service.replay('evt_replay')).toMatchObject({
+                status: 'failed',
+                reason: 'payload_mismatch',
+            });
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
+
+        it('refuses an unreadable stored payload', async () => {
+            const { service } = makeService({
+                deadLetterRow: { ...openRow, payload: '{not json' },
+            });
+            expect(await service.replay('evt_replay')).toMatchObject({
+                status: 'failed',
+                reason: 'payload_unreadable',
+            });
+        });
+    });
+
+    describe('dismiss', () => {
+        it('closes an existing dead letter as dismissed', async () => {
+            const { service, deadLetters } = makeService({
+                deadLetterRow: { eventId: 'evt_x', status: 'open', payload: '{}' },
+            });
+            deadLetters.markResolved.mockResolvedValue(true);
+            expect(await service.dismiss('evt_x')).toBe(true);
+            expect(deadLetters.markResolved).toHaveBeenCalledWith('evt_x', 'dismissed');
+        });
+
+        it('refuses an event it has no dead letter for', async () => {
+            const { service } = makeService();
+            await expect(service.dismiss('evt_nope')).rejects.toBeInstanceOf(
+                StripeRelayDeadLetterNotFoundError,
+            );
+        });
+    });
+
+    describe('health (alert hook)', () => {
+        const NOW = new Date('2026-09-28T12:00:00.000Z');
+
+        it('counts open dead letters older than a 60 minute grace by default', async () => {
+            delete process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES;
+            const { service, deadLetters } = makeService();
+            deadLetters.countOpen.mockResolvedValue(2);
+
+            expect(await service.openDeadLetterCount(NOW)).toBe(2);
+            expect(deadLetters.countOpen).toHaveBeenCalledWith(
+                new Date('2026-09-28T11:00:00.000Z'),
+            );
+        });
+
+        it('honours a configured grace, and ignores a nonsense one', async () => {
+            const { service, deadLetters } = makeService();
+            process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES = '0';
+            await service.openDeadLetterCount(NOW);
+            expect(deadLetters.countOpen).toHaveBeenLastCalledWith(NOW);
+
+            process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES = 'soon';
+            await service.openDeadLetterCount(NOW);
+            expect(deadLetters.countOpen).toHaveBeenLastCalledWith(
+                new Date('2026-09-28T11:00:00.000Z'),
+            );
+
+            // An empty or blank value is "unset", not zero minutes.
+            for (const blank of ['', '   ']) {
+                process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES = blank;
+                await service.openDeadLetterCount(NOW);
+                expect(deadLetters.countOpen).toHaveBeenLastCalledWith(
+                    new Date('2026-09-28T11:00:00.000Z'),
+                );
+            }
+            delete process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES;
         });
     });
 

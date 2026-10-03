@@ -17,6 +17,7 @@ import {
 	APP_LAUNCHER_MAX_ITEMS_RESPONSE,
 	APP_LAUNCHER_MAX_PREFERENCE_ROWS,
 	APP_LAUNCHER_NAME_MAX_LENGTH,
+	APP_LAUNCHER_ORIGIN_NOT_ALLOWED,
 	APP_LAUNCHER_PANEL_PLATFORMS_MAX,
 	APP_LAUNCHER_PANEL_WORKS_MAX,
 	APP_LAUNCHER_PIN_LIMIT,
@@ -32,6 +33,7 @@ import {
 	type AppLauncherItemKind,
 	type AppLauncherListResponse,
 	type AppLauncherManageState,
+	type AppLauncherOriginNotAllowedErrorBody,
 	type AppLauncherPinLimitErrorBody,
 	type AppLauncherPlatformStatus,
 	type AppLauncherPlatformsResponse,
@@ -436,6 +438,25 @@ describe('app-launcher — the eligible count and the filter cap (FR-63 spec.md:
 	});
 });
 
+describe('app-launcher — the delegated origin refusal (FR-50 spec.md:364-365, ACC-11-38)', () => {
+	it('is the snake_case wire code of CONTRACTS §12, never the camelCase i18n leaf', () => {
+		expect(APP_LAUNCHER_ORIGIN_NOT_ALLOWED).toBe('origin_not_allowed');
+		expect(APP_LAUNCHER_ORIGIN_NOT_ALLOWED).toMatch(/^[a-z]+(_[a-z]+)*$/);
+	});
+
+	it('types the 403 body in the platform error shape, with the literal code', () => {
+		const body: AppLauncherOriginNotAllowedErrorBody = {
+			status: 'error',
+			code: APP_LAUNCHER_ORIGIN_NOT_ALLOWED,
+			message: 'Delegated reads are not accepted from this origin.'
+		};
+		const pinCode: Equal<AppLauncherOriginNotAllowedErrorBody['code'], 'origin_not_allowed'> = true;
+
+		expect(pinCode).toBe(true);
+		expect(Object.keys(body)).toEqual(['status', 'code', 'message']);
+	});
+});
+
 describe('app-launcher — reachable from the package root (tasks.md:71-75, ACC-11-54 spec.md:682-683)', () => {
 	/**
 	 * Every RUNTIME name this module adds. The barrel's collision check
@@ -464,6 +485,7 @@ describe('app-launcher — reachable from the package root (tasks.md:71-75, ACC-
 		'APP_LAUNCHER_CLIENT_CACHE_MS',
 		'APP_LAUNCHER_NAME_MAX_LENGTH',
 		'APP_LAUNCHER_DESCRIPTION_MAX_LENGTH',
+		'APP_LAUNCHER_ORIGIN_NOT_ALLOWED',
 		'isAppLauncherEnvironment',
 		'appLauncherPinLimitExceeded'
 	];

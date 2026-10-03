@@ -13,6 +13,7 @@ import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
 import * as email from '../email/index.js';
+import * as everPlatform from '../ever-platform/index.js';
 import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
@@ -66,6 +67,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['digest', digest],
 	['domain', domain],
 	['email', email],
+	['ever-platform', everPlatform],
 	['feed', feed],
 	['fleet', fleet],
 	['form', form],
@@ -140,7 +142,11 @@ describe('src/index.ts — the package root barrel', () => {
 		// `export *`, not `export type *`, on purpose — it carries 524 runtime
 		// exports (closed-union arrays, limits, pure resolvers) that a type-only
 		// re-export would drop from the package root without any error here.
-		expect(exportLines).toBe(34);
+		// 35 is COUNTED the same way after the anonymous usage statistics module
+		// added the `ever-platform` area: develop stood at 34 areas and this change
+		// adds exactly one (`ever-platform`, re-exported from
+		// `src/ever-platform/index.ts`); re-counting the array gives 35.
+		expect(exportLines).toBe(35);
 	});
 
 	it('has no name exported by two different areas', () => {

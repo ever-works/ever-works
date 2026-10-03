@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  */
 
 const listForSettingsMenu = vi.fn();
+const isStatsAvailable = vi.fn();
 const isFleetEnabled = vi.fn();
 const isAppLauncherEnabled = vi.fn();
 const getAuthFromRequest = vi.fn();
@@ -24,6 +25,11 @@ const getAuthFromRequest = vi.fn();
 vi.mock('@/lib/api/plugins', () => ({
     pluginsAPI: {
         listForSettingsMenu: (...args: unknown[]) => listForSettingsMenu(...args),
+    },
+}));
+vi.mock('@/lib/api/instance-stats', () => ({
+    instanceStatsAPI: {
+        isAvailable: (...args: unknown[]) => isStatsAvailable(...args),
     },
 }));
 vi.mock('@/lib/fleet-flags', () => ({
@@ -46,6 +52,7 @@ import SettingsLayout from './layout';
 
 beforeEach(() => {
     listForSettingsMenu.mockReset().mockResolvedValue({ categories: [] });
+    isStatsAvailable.mockReset().mockResolvedValue(true);
     isFleetEnabled.mockReset().mockReturnValue(true);
     isAppLauncherEnabled.mockReset().mockResolvedValue(true);
     getAuthFromRequest.mockReset().mockResolvedValue({
@@ -108,5 +115,25 @@ describe('SettingsLayout — the App Launcher flag', () => {
         }>;
 
         expect(tree.props.appLauncherEnabled).toBe(true);
+    });
+});
+
+describe('SettingsLayout — the Ever Platform tab', () => {
+    it('passes everPlatformEnabled=true while the API has the statistics module', async () => {
+        const tree = (await SettingsLayout({ children: null })) as React.ReactElement<{
+            everPlatformEnabled?: boolean;
+        }>;
+        expect(tree.props.everPlatformEnabled).toBe(true);
+    });
+
+    it('passes everPlatformEnabled=false when the module is switched off (status 404)', async () => {
+        isStatsAvailable.mockResolvedValue(false);
+        const tree = (await SettingsLayout({ children: null })) as React.ReactElement<{
+            everPlatformEnabled?: boolean;
+            fleetEnabled?: boolean;
+        }>;
+        expect(tree.props.everPlatformEnabled).toBe(false);
+        // Control: the other flags still travel.
+        expect(tree.props.fleetEnabled).toBe(true);
     });
 });

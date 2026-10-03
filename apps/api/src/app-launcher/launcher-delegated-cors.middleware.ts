@@ -135,6 +135,33 @@ export function resolveLauncherOrigins(env: NodeJS.ProcessEnv = process.env): st
     return origins;
 }
 
+let memoisedOrigins: readonly string[] | undefined;
+
+/**
+ * The allow-list as the delegated read's origin rule reads it (APW-11 FR-50,
+ * ACC-11-38): `GET /api/me/apps` declares it through
+ * `@DelegatedRead('apps:read', { allowedOrigins: launcherDelegatedOrigins })`,
+ * and `AuthSessionGuard` refuses a delegated token from any other origin, or
+ * with none, with `403 origin_not_allowed` before the token is read.
+ *
+ * It is the same {@link resolveLauncherOrigins} this middleware applies, so the
+ * browser-side rule (no CORS headers) and the server-side rule (403) can never
+ * name different origins. Resolved once per process: production has already
+ * validated the value at boot (an invalid list stops the boot in the middleware's
+ * constructor), and changing the list takes a restart, as it does here.
+ */
+export function launcherDelegatedOrigins(): readonly string[] {
+    if (memoisedOrigins === undefined) {
+        memoisedOrigins = Object.freeze([...resolveLauncherOrigins()]);
+    }
+    return memoisedOrigins;
+}
+
+/** Test seam: forget the resolved list, so the next call reads the environment again. */
+export function forgetLauncherDelegatedOrigins(): void {
+    memoisedOrigins = undefined;
+}
+
 @Injectable()
 export class LauncherDelegatedCorsMiddleware implements NestMiddleware {
     private readonly origins: readonly string[];

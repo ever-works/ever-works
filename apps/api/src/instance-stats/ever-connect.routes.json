@@ -1,0 +1,40 @@
+{
+    "manifest": "ever-connect.routes.v1",
+    "product": "works",
+    "module": "instance-stats",
+    "description": "Routes of the anonymous usage statistics module. `public` lists routes that answer without a session and `inbound` lists requests Ever Platform makes to this installation: both are empty, because the module only sends. `routes` lists every route with the authentication it requires. Generated from the controller by routes-manifest.spec.ts (UPDATE_ROUTES_MANIFEST=1 rewrites it).",
+    "public": [],
+    "inbound": [],
+    "routes": [
+        {
+            "method": "GET",
+            "path": "/api/instance-stats/last",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/instance-stats/preview",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/instance-stats/reset-identity",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "POST",
+            "path": "/api/instance-stats/send-now",
+            "auth": "platform-admin"
+        },
+        {
+            "method": "GET",
+            "path": "/api/instance-stats/status",
+            "auth": "session"
+        },
+        {
+            "method": "PUT",
+            "path": "/api/instance-stats/toggle",
+            "auth": "platform-admin"
+        }
+    ]
+}

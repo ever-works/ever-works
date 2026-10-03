@@ -1,5 +1,9 @@
+// 🛑 MUST stay the first import: it loads `.env` into `process.env` before any
+// module below is evaluated. `ApiModule`'s decorator reads the environment when
+// it is imported (the statistics switch `EVER_STATS_ENABLED` among others), so
+// a `.env` loaded later is invisible to it. Pinned by `__tests__/load-env.spec.ts`.
+import './load-env';
 import { NestFactory } from '@nestjs/core';
-import { configDotenv } from 'dotenv';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -9,7 +13,6 @@ import { buildOpenApiConfig } from './openapi/openapi-document.config';
 import helmet from 'helmet';
 import { initSentry, initPostHog, PostHogLoggerService } from '@ever-works/monitoring';
 import { IncomingMessage, ServerResponse } from 'http';
-import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
 import { config as appConfig } from './config/constants';
@@ -17,8 +20,8 @@ import { config as agentConfig } from '@ever-works/agent/config';
 import { resolveTrustProxyHops } from './config/trust-proxy';
 
 async function bootstrap() {
-    // Load environment variables from .env file
-    configDotenv({ path: path.resolve(process.cwd(), '.env') });
+    // The `.env` file is already loaded: `./load-env` (the first import above)
+    // reads it before `ApiModule` is evaluated.
 
     // H-14: fail fast on a misconfigured AUTH_SECRET (missing or shorter
     // than 32 chars). The web tier's `setAuthAccessCookie` will refuse to

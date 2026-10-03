@@ -9,10 +9,14 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import type { ModuleRef, Reflector } from '@nestjs/core';
 import { AuthSessionGuard } from './auth-session.guard';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { DELEGATED_READ_SCOPE } from '../decorators/delegated-read.decorator';
+import {
+    DELEGATED_READ_ORIGINS,
+    DELEGATED_READ_SCOPE,
+} from '../decorators/delegated-read.decorator';
 import { NO_TOKEN_IN_QUERY } from './no-token-in-query.guard';
 import { EVER_ID_DELEGATION_VERIFIER, EVER_ID_SIGNED_OUT_PROBE } from './ever-id-guard.tokens';
 import { EverIdHttpException } from '../services/ever-id-errors';
+import { DelegatedReadOriginRefusedException } from './delegated-read-origin';
 
 /**
  * APW-12 (Ever ID) — the three additive branches of `AuthSessionGuard` (plan
@@ -183,6 +187,122 @@ describe('AuthSessionGuard — Ever ID branches', () => {
             await expect(
                 guard.canActivate(createContext({ headers: { authorization: `Bearer ${JWT}` } })),
             ).rejects.toBeInstanceOf(UnauthorizedException);
+        });
+    });
+
+    describe('where a delegated read may come from (APW-11 FR-50, ACC-11-38)', () => {
+        const ALLOWED = 'https://app-stage.ever.co';
+        const metadata = {
+            [DELEGATED_READ_SCOPE]: 'apps:read',
+            [DELEGATED_READ_ORIGINS]: () => [ALLOWED],
+        };
+        const principal = {
+            user: { userId: 'u1', authMethod: 'ever-id-delegated' },
+            binding: { identityId: 'i1', clientId: 'c1', scopes: ['apps:read'] },
+        };
+
+        it('refuses an unlisted origin with 403 origin_not_allowed before the token is read', async () => {
+            const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+            const { guard, authProvider } = createGuard({ metadata, delegation });
+
+            const refusal = guard.canActivate(
+                createContext({
+                    headers: { authorization: `Bearer ${JWT}`, origin: 'https://unlisted.example' },
+                }),
+            );
+
+            await expect(refusal).rejects.toBeInstanceOf(DelegatedReadOriginRefusedException);
+            await expect(refusal).rejects.toMatchObject({
+                status: 403,
+                response: { status: 'error', code: 'origin_not_allowed' },
+            });
+            expect(delegation.authenticate).not.toHaveBeenCalled();
+            expect(authProvider.authenticate).not.toHaveBeenCalled();
+        });
+
+        it('refuses a delegated call that carries no Origin at all', async () => {
+            const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+            const { guard } = createGuard({ metadata, delegation });
+
+            await expect(
+                guard.canActivate(createContext({ headers: { authorization: `Bearer ${JWT}` } })),
+            ).rejects.toMatchObject({ status: 403, response: { code: 'origin_not_allowed' } });
+            expect(delegation.authenticate).not.toHaveBeenCalled();
+        });
+
+        it('compares exactly: a longer host, another scheme and the opaque origin are refused', async () => {
+            for (const origin of [
+                `${ALLOWED}.attacker.example`,
+                'http://app-stage.ever.co',
+                'null',
+                `${ALLOWED}/`,
+            ]) {
+                const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+                const { guard } = createGuard({ metadata, delegation });
+                await expect(
+                    guard.canActivate(
+                        createContext({ headers: { authorization: `Bearer ${JWT}`, origin } }),
+                    ),
+                ).rejects.toBeInstanceOf(DelegatedReadOriginRefusedException);
+                expect(delegation.authenticate).not.toHaveBeenCalled();
+            }
+        });
+
+        it('verifies the token from a listed origin, exactly as before', async () => {
+            const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+            const { guard } = createGuard({ metadata, delegation });
+            const request: any = { headers: { authorization: `Bearer ${JWT}`, origin: ALLOWED } };
+
+            await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+            expect(delegation.authenticate).toHaveBeenCalledTimes(1);
+            expect(request.user).toEqual(principal.user);
+        });
+
+        it('fails closed when the list cannot be read', async () => {
+            const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+            const { guard } = createGuard({
+                metadata: {
+                    [DELEGATED_READ_SCOPE]: 'apps:read',
+                    [DELEGATED_READ_ORIGINS]: () => {
+                        throw new Error('unreadable');
+                    },
+                },
+                delegation,
+            });
+
+            await expect(
+                guard.canActivate(
+                    createContext({ headers: { authorization: `Bearer ${JWT}`, origin: ALLOWED } }),
+                ),
+            ).rejects.toBeInstanceOf(DelegatedReadOriginRefusedException);
+            expect(delegation.authenticate).not.toHaveBeenCalled();
+        });
+
+        it('never applies to a session bearer, from any origin or none', async () => {
+            const user = { userId: 'u1', iss: 'auth-runtime' };
+            for (const origin of [undefined, 'https://unlisted.example']) {
+                const { guard, delegation } = createGuard({ metadata, providerUser: user });
+                const headers: Record<string, string> = { authorization: 'Bearer opaque-session' };
+                if (origin) headers.origin = origin;
+                const request: any = { headers };
+
+                await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+                expect(request.user.authMethod).toBe('session');
+                expect(delegation!.authenticate).not.toHaveBeenCalled();
+            }
+        });
+
+        it('leaves a handler without the origin rule as it was: no Origin needed', async () => {
+            const delegation = { authenticate: jest.fn().mockResolvedValue(principal) };
+            const { guard } = createGuard({
+                metadata: { [DELEGATED_READ_SCOPE]: 'apps:read' },
+                delegation,
+            });
+
+            await expect(
+                guard.canActivate(createContext({ headers: { authorization: `Bearer ${JWT}` } })),
+            ).resolves.toBe(true);
+            expect(delegation.authenticate).toHaveBeenCalledTimes(1);
         });
     });
 

@@ -87,3 +87,7 @@ export * from './home/index.js';
 // existing refusals (stop flag, pauses, grants, caps, merge policy) now speak:
 // thirteen kinds of work, four rungs, seven rails in a published order.
 export * from './safety/index.js';
+// Anonymous usage statistics (`ever.stats.v1`) — header names, limits, the
+// closed key lists of a Works report, the signed report a `stats-sink`
+// provider receives, and the operator API's status shapes.
+export * from './ever-platform/index.js';

@@ -273,6 +273,25 @@ export interface AppLauncherPinLimitErrorBody {
 }
 
 /**
+ * The wire code of a delegated read refused for where it came from (FR-50
+ * spec.md:364-365, ACC-11-38 spec.md:638): the request carries a delegated
+ * token, and its `Origin` header is absent or not one of the installation's
+ * `EVER_WORKS_APP_LAUNCHER_ORIGINS`. Answered `403` before the token is read.
+ *
+ * snake_case on the wire like every error code (CONTRACTS §12); the camelCase
+ * `originNotAllowed` is only ever an i18n leaf. A host renders the refusal as
+ * the signed-out state (FR-48, FR-50).
+ */
+export const APP_LAUNCHER_ORIGIN_NOT_ALLOWED = 'origin_not_allowed' as const;
+
+/** The `403` body of {@link APP_LAUNCHER_ORIGIN_NOT_ALLOWED}, in the platform's error shape. */
+export interface AppLauncherOriginNotAllowedErrorBody {
+	status: 'error';
+	code: typeof APP_LAUNCHER_ORIGIN_NOT_ALLOWED;
+	message: string;
+}
+
+/**
  * `GET /api/app-launcher/platforms` — the public catalog read of FR-37
  * (spec.md:326-327), `plan.md:319-324` and §4.3. No credentials, no preference
  * fields beyond their defaults, cacheable for an hour.

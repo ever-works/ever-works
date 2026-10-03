@@ -82,6 +82,13 @@ export {
     type IdentityProviderHealth,
 } from './identity-provider.facade';
 
+// Stats Sink Facade (anonymous usage statistics)
+export {
+    StatsSinkFacadeService,
+    StatsSinkUnavailableError,
+    type StatsSinkUnavailableReason,
+} from './stats-sink.facade';
+
 // OAuth Facade
 export {
     OAuthFacadeService,

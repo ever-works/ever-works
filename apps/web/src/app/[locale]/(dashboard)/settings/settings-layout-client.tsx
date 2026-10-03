@@ -24,6 +24,7 @@ import {
     MessagesSquare,
     Mail,
     LayoutGrid,
+    Globe,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -54,6 +55,14 @@ interface SettingsLayoutClientProps {
      * it. A tab to a route that 404s is worse than no tab.
      */
     appLauncherEnabled?: boolean;
+    /**
+     * Whether the API has the anonymous usage statistics module, resolved on
+     * the server (`instanceStatsAPI.isAvailable`): `false` when its status
+     * route answers 404 (`EVER_STATS_ENABLED=false`), so a switched-off
+     * installation shows no tab for a feature that does not run. Defaults to
+     * true: only a definite 404 hides it.
+     */
+    everPlatformEnabled?: boolean;
 }
 
 interface StaticTab {
@@ -73,6 +82,8 @@ export function SettingsLayoutClient({
     fleetEnabled = true,
     // Default FALSE — the launcher fails closed (see the prop's contract).
     appLauncherEnabled = false,
+    // Default true: the tab is hidden only when the API answered 404.
+    everPlatformEnabled = true,
 }: SettingsLayoutClientProps) {
     const pathname = usePathname();
     const t = useTranslations('dashboard.settings');
@@ -227,6 +238,16 @@ export function SettingsLayoutClient({
                     icon: BarChart3,
                     href: `${baseSettingsPath}/usage`,
                 },
+                // Ever Platform — anonymous usage statistics of this installation
+                // (what is sent, the last payload, the switch). Everyone sees the
+                // tab while the API has the module; only the platform admin sees
+                // the controls on the page. Filtered below when it is absent.
+                {
+                    id: 'ever-platform',
+                    label: t('tabs.everPlatform'),
+                    icon: Globe,
+                    href: `${baseSettingsPath}/ever-platform`,
+                },
                 // The fleet tab is declared unconditionally above (keeping the
                 // "Fleet sits directly ABOVE Job Runtime" ordering comment true)
                 // and filtered here when the operator has turned Fleet off — the
@@ -239,9 +260,10 @@ export function SettingsLayoutClient({
             ].filter(
                 (tab) =>
                     (tab.id !== 'fleet' || fleetEnabled) &&
-                    (tab.id !== 'app-launcher' || appLauncherEnabled),
+                    (tab.id !== 'app-launcher' || appLauncherEnabled) &&
+                    (tab.id !== 'ever-platform' || everPlatformEnabled),
             ),
-        [t, fleetEnabled, appLauncherEnabled],
+        [t, fleetEnabled, appLauncherEnabled, everPlatformEnabled],
     );
 
     // Danger zone tab (always at bottom)

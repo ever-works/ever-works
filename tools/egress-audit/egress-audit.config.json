@@ -1,0 +1,24 @@
+{
+	"product": "works",
+	"compose": ["../../docker-compose.yml", "compose.egress-audit.yml"],
+	"project": "ever-audit-works",
+	"api_service": "ever-works-api",
+	"process_services": ["ever-works-api"],
+	"services": ["ever-works-api"],
+	"health_url": "http://ever-works-api:3100/api/health",
+	"health_timeout_s": 600,
+	"module_routes": ["/api/instance-stats/status", "/api/instance-stats/last"],
+	"adapter": "adapter.mjs",
+	"wait_s": 120,
+	"allowed_external_hosts": [],
+	"modes": {
+		"off_env_file": {
+			"description": "Statistics switched off ONLY in the API's .env file (mounted at the API's working directory), nothing about them in the container environment: the module is not loaded, no call, no Ever host looked up, every module route 404.",
+			"env": { "EVER_STATS_SEND_INTERVAL_S": "5" },
+			"mock": false,
+			"module_routes": "404",
+			"allowed_rows": [],
+			"required_rows": []
+		}
+	}
+}

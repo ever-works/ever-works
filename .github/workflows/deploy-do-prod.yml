@@ -234,6 +234,12 @@ jobs:
           AGENT_PLUGINS_STDIO: ${{ vars.AGENT_PLUGINS_STDIO }}
           AGENT_PLUGINS_DATA_DIR: ${{ vars.AGENT_PLUGINS_DATA_DIR }}
 
+          # App Launcher delegated reads: the identity provider client ids a delegated
+          # token must have been minted for (comma-separated, at most 5). An environment
+          # VARIABLE, not a secret: a client id is public. Unset renders empty, which
+          # keeps the default (any client whose token verifies).
+          EVER_ID_TRUSTED_CLIENT_IDS: ${{ vars.EVER_ID_TRUSTED_CLIENT_IDS }}
+
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version

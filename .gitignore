@@ -109,3 +109,7 @@ apps/desktop-node/release
 .ew-append-rows.json
 .tmp-verify.mjs
 .verify-*.txt
+
+# Egress audit (tools/egress-audit): the pinned harness checkout and the evidence of a run
+.egress-audit/
+egress-audit-artifacts/

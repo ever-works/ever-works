@@ -8,6 +8,10 @@ const sidebars: SidebarsConfig = {
 		'installation',
 		'development-workflow',
 		'environment-variables',
+		// Anonymous usage statistics — what an installation sends, what it never
+		// sends, how to switch it off and how to verify it. Next to the
+		// environment reference because both are about running an installation.
+		'ever-platform/anonymous-statistics',
 		'monorepo-structure',
 		{
 			type: 'category',

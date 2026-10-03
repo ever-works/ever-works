@@ -27,6 +27,8 @@ export * from './repositories/plan-entitlement.repository';
 export * from './repositories/billing-profile.repository';
 export * from './repositories/invoice.repository';
 export * from './repositories/licence-purchase.repository';
+// Shared Stripe webhook relay: events it could not deliver to a directory.
+export * from './repositories/stripe-relay-dead-letter.repository';
 // Streaming-terminal M9 / D1 — append-only terminal transcript chunks.
 export * from './repositories/terminal-transcript-chunk.repository';
 export * from './repositories/work-budget.repository';

@@ -1,0 +1,68 @@
+{
+	"name": "@ever-works/ever-stats-sink-plugin",
+	"version": "1.0.0",
+	"description": "Anonymous usage statistics sender for Ever Works: delivers the signed ever.stats.v1 report, byte for byte, to the statistics endpoint",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "ever-stats-sink",
+			"name": "Anonymous usage statistics sender",
+			"version": "1.0.0",
+			"category": "integration",
+			"capabilities": [
+				"stats-sink"
+			],
+			"description": "Delivers the anonymous usage statistics report of this installation (counts and feature switches only, signed with the installation's statistics key) to the statistics endpoint. Inert unless the statistics module calls it; opens no connection when loaded.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": true,
+			"systemPlugin": true,
+			"visibility": "hidden",
+			"distribution": "core"
+		}
+	}
+}

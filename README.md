@@ -236,6 +236,10 @@ Notes:
 
 - We recommend deploying to Kubernetes (k8s) for production workloads. See the `.deploy/` folder for our deployment configurations.
 
+### Anonymous usage statistics
+
+A self-hosted installation sends a small, signed, anonymous report once a day — and on days 1–3 of a month one more, for the month that just closed — with counts, monthly totals and feature switches only, never a name, an address, a URL or any of your content — so the maintainers can see which versions and features are in use. Switch it off with `EVER_STATS_ENABLED=false` (in `.env.compose` with Docker Compose, in `apps/api/.env` when you run the API from source, or in the container environment) or in **Settings → Ever Platform**, where you can also see every byte that was sent. See [Anonymous usage statistics](docs/ever-platform/anonymous-statistics.md).
+
 ## ☁️ One-Click Deploy
 
 [![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/ever-works/)
