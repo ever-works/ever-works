@@ -187,6 +187,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'SkillFile',
     'SkillTag',
     // ───────────────────────────
+    // Shared Stripe webhook relay: events it could not deliver to a directory.
+    'StripeRelayDeadLetter',
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──
     'Task',

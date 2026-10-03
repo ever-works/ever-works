@@ -145,6 +145,7 @@ import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { BillingProfile } from '../entities/billing-profile.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { LicencePurchase } from '../entities/licence-purchase.entity';
+import { StripeRelayDeadLetter } from '../entities/stripe-relay-dead-letter.entity';
 import { CreditMeterEvent } from '../entities/credit-meter-event.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
@@ -406,6 +407,9 @@ export const ENTITIES = [
     Invoice,
     LicencePurchase,
     CreditMeterEvent,
+    // Shared Stripe webhook relay: events it could not deliver to a
+    // directory, with the verbatim payload for an operator replay.
+    StripeRelayDeadLetter,
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
