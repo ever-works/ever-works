@@ -52,7 +52,7 @@ export enum StripeRelayDeadLetterResolution {
  *
  * NOTE: also registered in `database/_entities-inventory.ts` (no
  * `autoLoadEntities` in this repo). Migration:
- * `1791251000000-CreateStripeRelayDeadLetters`.
+ * `1792310000000-CreateStripeRelayDeadLetters`.
  */
 @Entity({ name: 'stripe_relay_dead_letters' })
 @Index('idx_stripe_relay_dead_letters_event', ['eventId'], { unique: true })

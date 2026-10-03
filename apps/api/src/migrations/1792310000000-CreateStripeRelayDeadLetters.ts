@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
  * the audit trail of paid events that went undelivered, and dropping them
  * would destroy the only record some of them have.
  */
-export class CreateStripeRelayDeadLetters1791251000000 implements MigrationInterface {
-    name = 'CreateStripeRelayDeadLetters1791251000000';
+export class CreateStripeRelayDeadLetters1792310000000 implements MigrationInterface {
+    name = 'CreateStripeRelayDeadLetters1792310000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable('stripe_relay_dead_letters')) return;

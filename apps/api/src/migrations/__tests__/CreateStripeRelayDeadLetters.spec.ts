@@ -1,9 +1,9 @@
 import { DataSource } from 'typeorm';
-import { CreateStripeRelayDeadLetters1791251000000 } from '../1791251000000-CreateStripeRelayDeadLetters';
+import { CreateStripeRelayDeadLetters1792310000000 } from '../1792310000000-CreateStripeRelayDeadLetters';
 
-describe('CreateStripeRelayDeadLetters1791251000000', () => {
+describe('CreateStripeRelayDeadLetters1792310000000', () => {
     let dataSource: DataSource;
-    const migration = new CreateStripeRelayDeadLetters1791251000000();
+    const migration = new CreateStripeRelayDeadLetters1792310000000();
 
     const insert = (id: string, eventId: string) =>
         dataSource.query(
