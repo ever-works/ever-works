@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import type { StatsSendResult } from '@ever-works/contracts';
 import type { EverStatsLease } from '@ever-works/agent/entities';
 import { EverInstanceService } from '@ever-works/agent/ever-instance';
@@ -32,13 +33,23 @@ const DAY_MS = 24 * HOUR_MS;
 export const INSTANCE_STATS_RETRY_LADDER_MS = [HOUR_MS, 4 * HOUR_MS, 12 * HOUR_MS] as const;
 /** A first boot that is overdue by more than a day sends 10 minutes after boot. */
 export const INSTANCE_STATS_OVERDUE_DELAY_MS = 10 * 60 * 1000;
+/**
+ * A refusal other than `422` (schema) or `409` (key) — a redirect, `401`,
+ * `403`, `404`, … — parks the module for this long, then it tries again. Such
+ * an answer says more about the endpoint than about the report (for example an
+ * ingest not open yet), so it must not silence an installation for good.
+ */
+export const INSTANCE_STATS_REJECTED_RETRY_MS = 7 * DAY_MS;
 /** *Send now* is allowed once per 10 minutes. */
 export const INSTANCE_STATS_SEND_NOW_INTERVAL_MS = 10 * 60 * 1000;
 /** Upper bound of one delivery. */
 export const INSTANCE_STATS_SEND_TIMEOUT_MS = 10_000;
 
-/** Why a run sent nothing. */
-export type InstanceStatsSkipReason = 'ui' | 'not_due' | 'parked' | 'lease_busy';
+/**
+ * Why a run sent nothing. `env`: `EVER_STATS_ENABLED` switches the module off
+ * (it should not even be loaded then; the sender refuses all the same).
+ */
+export type InstanceStatsSkipReason = 'env' | 'ui' | 'not_due' | 'parked' | 'lease_busy';
 
 export type InstanceStatsRunOutcome =
     | { ran: false; reason: InstanceStatsSkipReason }
@@ -57,9 +68,11 @@ export type InstanceStatsRunOutcome =
  * - **Schedule.** Once per UTC day at a second drawn at random for each report
  *   (never derived from the instance id), the first one a day after first
  *   boot. Days 1-3 of a month also deliver the closed previous month once
- *   (`final: true`). `failed` retries at +1 h, +4 h, +12 h, then the next day;
- *   `rejected` is not retried until the module version changes or the
- *   identity is reset.
+ *   (`final: true`). `failed` retries at +1 h, +4 h, +12 h, then the next day.
+ *   A report refused by the schema (`422`) or for its key (`409`) is not
+ *   retried until a release changes the product or the statistics module
+ *   version (or, for `409`, the identity is reset); any other refusal is
+ *   retried after {@link INSTANCE_STATS_REJECTED_RETRY_MS} (7 days).
  * - **No request when the sink cannot take it** (plugin missing, unusable
  *   base URL): the attempt is stored as `failed` and the ladder applies.
  */
@@ -84,6 +97,7 @@ export class InstanceStatsSenderService {
      * so long its send is overdue by more than a day sends 10 minutes after boot.
      */
     async initialise(): Promise<EverStatsLease> {
+        if (!this.config.enabled) throw new Error('ever-stats: switched off by EVER_STATS_ENABLED');
         const now = this.clock();
         const instance = await this.identity.ensure();
         const firstSendAt = new Date(
@@ -105,6 +119,7 @@ export class InstanceStatsSenderService {
 
     /** The scheduled path: send when due, and only then. */
     async runDue(): Promise<InstanceStatsRunOutcome> {
+        if (!this.config.enabled) return { ran: false, reason: 'env' };
         const instance = await this.identity.ensure();
         if (!instance.statsEnabledUi) return { ran: false, reason: 'ui' };
 
@@ -132,10 +147,13 @@ export class InstanceStatsSenderService {
      * switch and the 10-minute rate limit; the lease still applies.
      */
     async sendNow(): Promise<InstanceStatsRunOutcome> {
+        if (!this.config.enabled) return { ran: false, reason: 'env' };
         const now = this.clock();
-        await this.lease.updateSchedule({ lastManualSendAt: now });
         if (!(await this.lease.tryAcquire(now))) return { ran: false, reason: 'lease_busy' };
         try {
+            // Stamped only once this replica holds the lease: a refused (busy)
+            // *Send now* does not use up the operator's 10-minute window.
+            await this.lease.updateSchedule({ lastManualSendAt: now });
             const current = await this.lease.schedule();
             return { ran: true, results: await this.sendReports(now, current) };
         } finally {
@@ -253,11 +271,21 @@ export class InstanceStatsSenderService {
             });
             return;
         }
+        if (result.status === 'rejected' && !parksUntilRelease(result)) {
+            // Bounded: a redirect or an access refusal is tried again in 7 days.
+            await this.lease.updateSchedule({
+                failures: 0,
+                nextSendAt: this.nextSlot(
+                    new Date(now.getTime() + INSTANCE_STATS_REJECTED_RETRY_MS - DAY_MS),
+                ),
+                rejectedModuleVersion: null,
+            });
+            return;
+        }
         await this.lease.updateSchedule({
             failures: 0,
             nextSendAt: this.nextSlot(now),
-            rejectedModuleVersion:
-                result.status === 'rejected' ? INSTANCE_STATS_MODULE_VERSION : null,
+            rejectedModuleVersion: result.status === 'rejected' ? this.releaseMarker() : null,
         });
     }
 
@@ -266,18 +294,51 @@ export class InstanceStatsSenderService {
     }
 
     private isParked(schedule: EverStatsLease | null): boolean {
-        return schedule?.rejectedModuleVersion === INSTANCE_STATS_MODULE_VERSION;
+        return schedule?.rejectedModuleVersion === this.releaseMarker();
     }
 
     /**
-     * The next send: a second drawn uniformly at random in the next UTC day, or
-     * — with a test interval — simply `now + interval`.
+     * The release a `422`/`409` refusal is pinned to: the statistics module
+     * version AND the product version, so the next Works release (or a new
+     * module version) tries again. Stored in `rejectedModuleVersion`.
+     */
+    releaseMarker(): string {
+        return instanceStatsReleaseMarker(versionAndChannel(getBuildInfo().version).version);
+    }
+
+    /**
+     * The next send: a second drawn uniformly at random in the UTC day after
+     * `now` (for a daily interval; a longer one moves that day further out),
+     * or — with a test interval below a day — simply `now + interval`.
      */
     nextSlot(now: Date): Date {
-        if (this.config.sendIntervalS !== 86_400) {
+        if (this.config.sendIntervalS < 86_400) {
             return new Date(now.getTime() + this.config.sendIntervalS * 1000);
         }
-        const tomorrow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-        return new Date(tomorrow + this.random(86_400) * 1000);
+        const from = new Date(now.getTime() + (this.config.sendIntervalS - 86_400) * 1000);
+        const nextDay = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + 1);
+        return new Date(nextDay + this.random(86_400) * 1000);
     }
+}
+
+/**
+ * `422` (the schema refused the report) and `409` (another key holds the
+ * instance id) repeat for as long as the same code sends the same report, so
+ * they park until the release changes. Every other refusal is bounded.
+ */
+function parksUntilRelease(result: StatsSendResult): boolean {
+    return result.httpStatus === 422 || result.httpStatus === 409;
+}
+
+/**
+ * A 14-character token for (statistics module version, product version) —
+ * the width of the `rejectedModuleVersion` column. A marker written by an
+ * earlier release (or the bare module version an older build stored) never
+ * matches, so an upgrade always un-parks.
+ */
+export function instanceStatsReleaseMarker(productVersion: string): string {
+    return createHash('sha256')
+        .update(`${INSTANCE_STATS_MODULE_VERSION}|${productVersion}`)
+        .digest('hex')
+        .slice(0, 14);
 }
