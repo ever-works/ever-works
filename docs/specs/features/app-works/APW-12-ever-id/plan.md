@@ -458,7 +458,7 @@ so the filter runs in the API and never in the web.
 | Issuer                   | discovery `issuer` === `issuerUrl`; token `iss` === discovery issuer and ∈ `allowedIssuers`                                                          | FR-11, 12, 14 |
 | ID token audience        | `aud` ∋ `clientId`; `aud.length > 1` ⇒ `azp === clientId`                                                                                            | FR-11         |
 | ID token times           | `exp > now − skew`; `iat ≤ now + skew`; `iat ≥ now − 600`; connect: `auth_time ≥ now − 300 − skew`                                                   | FR-11, 25     |
-| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`                                                                  | FR-45         |
+| Access token (delegated) | `aud` ∋ `apiAudience`; scope ∋ `apps:read`; `exp − iat ≤ 3,600`; `exp > now − skew`; `azp` ∈ `EVER_ID_TRUSTED_CLIENT_IDS` if set                     | FR-45         |
 | Access token (exchange)  | `aud` ∋ `apiAudience`; scope ∋ `ever-works:session`; `azp` ∈ `localClients[].clientId`; `iat ≥ now − 300`; `jti` unused 600 s                        | FR-40         |
 | Logout token             | `events` has `http://schemas.openid.net/event/backchannel-logout`; no `nonce`; `sid` or `sub`; `iat` within skew and ≥ now − 300; `jti` unused 600 s | FR-33         |
 | Keys                     | cache 600 s; unknown `kid` → refetch, cooldown 30 s; stale use ≤ 21,600 s since last good fetch                                                      | FR-13         |
@@ -955,6 +955,11 @@ Rollout: dev → stage → production with the plugin disabled, then enabled for
 general.
 
 ### P2 — Ever Teams (spec FR-54…FR-58; [`cross-platform.md`](./cross-platform.md) §4)
+
+> **Design revised 2026-10-01.** Gauzy's side is one plugin, `packages/plugins/auth-zitadel`, loaded by the
+> environment variable `ZITADEL_ENABLED`, with its routes under `/api/auth/zitadel` and its link table
+> `zitadel_account`. Where a task below names a path in Gauzy core, `FEATURE_EVER_ID_*` or `external_identity`,
+> [`cross-platform.md`](./cross-platform.md) §4–§7 is the current design and wins.
 
 Work lands in `ever-co/ever-teams` and, server-side only and default-off, in `ever-co/ever-gauzy`'s API.
 

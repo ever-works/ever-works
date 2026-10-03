@@ -28,7 +28,7 @@ reader caches a successful read for one hour — APW-11 FR-12).
 | Icons ≤ 16 KB, `.svg` or `.png`, in `icons/`                       | Icons are inlined into the response; the cap keeps the panel payload small (FR-11, FR-46). |
 | No `<script`, `on…=`, `javascript:` or `<foreignObject>` in an SVG | An icon is data, never markup (FR-14).                                                     |
 | Name ≤ 40 characters, description ≤ 80 characters                  | The tile is 88 px high at three per row; longer text breaks the grid (spec §6.1).          |
-| `status` is `available` or `beta`                                  | Anything else is dropped by the reader (FR-11), so CI refuses it first.                    |
+| `status` is `available`, `beta` or `soon`                          | Anything else is dropped by the reader (FR-11), so CI refuses it first.                    |
 | The address belongs to this platform's own domain                  | A subdomain of another Ever product's domain is forbidden (README D10, R-16).              |
 
 ## Addresses per environment

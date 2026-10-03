@@ -489,6 +489,52 @@ describe('<ever-app-launcher>', () => {
 			expect(openSpy).not.toHaveBeenCalled();
 		});
 
+		it('renders a soon platform with a Soon chip, as an inert tile that is never activated (FR-9)', async () => {
+			const demand = item({
+				key: 'platform:ever-demand',
+				name: 'Ever Demand',
+				status: 'soon',
+				url: 'https://demand.example.com',
+				host: 'demand.example.com',
+				order: 3
+			});
+			const element = await mount({ data: response([EVER_WORKS, GAUZY, TEAMS, demand, CAL]) });
+			await open(element);
+
+			const tile = queryAll<HTMLElement>(element, '.tile').find(
+				(candidate) => candidate.dataset.key === 'platform:ever-demand'
+			);
+			expect(tile, 'the soon platform is listed').toBeTruthy();
+			expect(tile?.tagName).not.toBe('A');
+			expect(tile?.hasAttribute('href')).toBe(false);
+			expect(tile?.getAttribute('aria-disabled')).toBe('true');
+			expect(tile?.getAttribute('tabindex')).toBe('-1');
+			const chip = tile?.querySelector<HTMLElement>('.chip');
+			expect(chip?.textContent?.trim()).toBe('Soon');
+			expect(chip?.dataset.chip).toBe('soon');
+			// The chip replaces the host line, as every other chip does.
+			expect(tile?.textContent).not.toContain('demand.example.com');
+
+			// Neither a click nor Enter activates it: no event, no tab.
+			const activations: Event[] = [];
+			element.addEventListener('ever-app-launcher:item-activate', (event) => activations.push(event));
+			tile?.click();
+			if (tile) keydown(tile, 'Enter');
+			expect(activations).toHaveLength(0);
+			expect(openSpy).not.toHaveBeenCalled();
+		});
+
+		it('takes the Soon chip from the host strings like every other chip (FR-42)', async () => {
+			const demand = item({ key: 'platform:ever-demand', name: 'Ever Demand', status: 'soon' });
+			const element = await mount({ data: response([EVER_WORKS, demand]), strings: { chipSoon: 'Bientôt' } });
+			await open(element);
+
+			const chip = queryAll<HTMLElement>(element, '.tile')
+				.find((candidate) => candidate.dataset.key === 'platform:ever-demand')
+				?.querySelector('.chip');
+			expect(chip?.textContent?.trim()).toBe('Bientôt');
+		});
+
 		it('hides items the registry marked not visible', async () => {
 			const hidden = item({ key: 'work:hidden', kind: 'work', section: 'works', visible: false });
 			const element = await mount({ data: response([EVER_WORKS, CAL, hidden]) });
@@ -603,6 +649,39 @@ describe('<ever-app-launcher>', () => {
 
 			keydown(panel, 'Tab', true);
 			expect(focused(element)).toBe(manage);
+		});
+
+		it('keeps the tab stop on an enabled tile while the arrow keys rest on a Soon tile (FR-9, FR-40)', async () => {
+			const demand = item({ key: 'platform:ever-demand', name: 'Ever Demand', status: 'soon', order: 3 });
+			const element = await mount({ data: response([EVER_WORKS, GAUZY, demand, CAL]) });
+			await open(element);
+			const panel = query<HTMLElement>(element, '.panel') as EventTarget;
+			const manage = query<HTMLElement>(element, '.manage') as HTMLElement;
+			const tileFor = (key: string) =>
+				tiles(element).find((candidate) => candidate.dataset.key === key) as HTMLElement;
+
+			keydown(panel, 'ArrowRight');
+			keydown(panel, 'ArrowRight');
+			await element.updateComplete;
+			expect(focused(element)).toBe(tileFor('platform:ever-demand'));
+			expect(tileFor('platform:ever-demand').tabIndex).toBe(-1);
+			// The grid keeps exactly one tab stop, on the last enabled tile.
+			expect(tiles(element).filter((tile) => tile.tabIndex === 0)).toEqual([tileFor('platform:ever-gauzy')]);
+
+			// Tab leaves the grid for Manage apps, and Shift+Tab comes back to it.
+			keydown(panel, 'Tab');
+			expect(focused(element)).toBe(manage);
+			keydown(panel, 'Tab', true);
+			expect(focused(element)).toBe(tileFor('platform:ever-gauzy'));
+		});
+
+		it('never puts the tab stop on a Soon tile, even when it is the first tile', async () => {
+			const demand = item({ key: 'platform:ever-demand', name: 'Ever Demand', status: 'soon', order: 0 });
+			const element = await mount({ data: response([demand, GAUZY, CAL]) });
+			await open(element);
+			const stops = tiles(element).filter((tile) => tile.tabIndex === 0);
+			expect(stops).toHaveLength(1);
+			expect(stops[0].dataset.key).toBe('platform:ever-gauzy');
 		});
 
 		it('Esc closes the panel and returns focus to the control', async () => {

@@ -95,6 +95,13 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     // never re-link an account to an identity.
     'ExternalIdentity',
     'RefreshToken',
+    // Anonymous usage statistics — the installation's identity and its
+    // statistics key, the sent payloads and the send schedule describe the
+    // installation, not an account: an export never carries them and a restore
+    // never brings another installation's identity along.
+    'EverInstance',
+    'EverStatsReport',
+    'EverStatsLease',
     // Encrypted runtime credentials and their per-version snapshots.
     'TenantCredentialSnapshot',
     // Derived and regenerated on demand — an archive of them would be

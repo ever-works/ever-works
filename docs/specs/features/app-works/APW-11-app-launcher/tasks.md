@@ -659,6 +659,12 @@ ships, so it is not a P2 blocker (APW11-G01)._
       for allow-listed origins and none for others (ACC-11-38), never `Access-Control-Allow-Credentials`, `204`
       preflight, other routes untouched; the existing CORS e2e contract passes unchanged.
       **Done when**: the spec passes and a 51st origin fails boot with `NODE_ENV=production`.
+      **Added 2026-10-02 (FR-50 on the server too):** the read handler declares the same list as the origins
+      a delegated token may come from (`@DelegatedRead('apps:read', { allowedOrigins })`), so a delegated call
+      from any other origin, or with none, answers `403 origin_not_allowed` before the token is verified;
+      `EVER_ID_TRUSTED_CLIENT_IDS` optionally narrows the token's client. The contract is
+      `contracts/openapi/apw-11.openapi.yaml`; proved by
+      `apps/api/src/app-launcher/launcher-delegated-read.integration.spec.ts`.
 
 - [ ] **T27. Cross-framework fixtures, P2 i18n, e2e.**
       **Create** `packages/app-launcher/fixtures/angular/index.html`, `fixtures/react/index.html`,

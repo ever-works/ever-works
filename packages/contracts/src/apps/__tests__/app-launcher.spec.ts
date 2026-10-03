@@ -17,6 +17,7 @@ import {
 	APP_LAUNCHER_MAX_ITEMS_RESPONSE,
 	APP_LAUNCHER_MAX_PREFERENCE_ROWS,
 	APP_LAUNCHER_NAME_MAX_LENGTH,
+	APP_LAUNCHER_ORIGIN_NOT_ALLOWED,
 	APP_LAUNCHER_PANEL_PLATFORMS_MAX,
 	APP_LAUNCHER_PANEL_WORKS_MAX,
 	APP_LAUNCHER_PIN_LIMIT,
@@ -32,6 +33,7 @@ import {
 	type AppLauncherItemKind,
 	type AppLauncherListResponse,
 	type AppLauncherManageState,
+	type AppLauncherOriginNotAllowedErrorBody,
 	type AppLauncherPinLimitErrorBody,
 	type AppLauncherPlatformStatus,
 	type AppLauncherPlatformsResponse,
@@ -69,7 +71,7 @@ type SpecAppLauncherItemKind = 'platform' | 'work'; // plan.md:248
 type SpecAppLauncherSection = 'pinned' | 'platforms' | 'works'; // plan.md:249, FR-2 spec.md:188-189
 type SpecAppLauncherWorkChip = 'deploying' | 'lastDeployFailed'; // plan.md:250, FR-18 spec.md:238-239
 type SpecAppLauncherManageState = 'listed' | 'notLive' | 'exposureOff'; // plan.md:251
-type SpecAppLauncherPlatformStatus = 'available' | 'beta'; // plan.md:263, FR-9 spec.md:214
+type SpecAppLauncherPlatformStatus = 'available' | 'beta' | 'soon'; // plan.md:263, FR-9 spec.md:214
 type SpecAppLauncherRejectionReason = 'unknownItem' | 'cannotHideCurrent'; // plan.md:299, FR-35 spec.md:323-324
 type SpecAppLauncherEmptyAction = 'createAppWork' | 'goToWorks'; // plan.md:289, FR-64 spec.md:201-204
 
@@ -103,7 +105,7 @@ const UNIONS: Array<[name: string, actual: readonly string[], expected: readonly
 	['APP_LAUNCHER_SECTIONS', APP_LAUNCHER_SECTIONS, ['pinned', 'platforms', 'works']], // FR-2 spec.md:188-189
 	['APP_LAUNCHER_WORK_CHIPS', APP_LAUNCHER_WORK_CHIPS, ['deploying', 'lastDeployFailed']], // FR-18 spec.md:238-239
 	['APP_LAUNCHER_MANAGE_STATES', APP_LAUNCHER_MANAGE_STATES, ['listed', 'notLive', 'exposureOff']], // plan.md:251
-	['APP_LAUNCHER_PLATFORM_STATUSES', APP_LAUNCHER_PLATFORM_STATUSES, ['available', 'beta']], // FR-9 spec.md:214
+	['APP_LAUNCHER_PLATFORM_STATUSES', APP_LAUNCHER_PLATFORM_STATUSES, ['available', 'beta', 'soon']], // FR-9 spec.md:214
 	['APP_LAUNCHER_REJECTION_REASONS', APP_LAUNCHER_REJECTION_REASONS, ['unknownItem', 'cannotHideCurrent']],
 	['APP_LAUNCHER_EMPTY_ACTIONS', APP_LAUNCHER_EMPTY_ACTIONS, ['createAppWork', 'goToWorks']] // FR-64 spec.md:201-204
 ];
@@ -121,7 +123,7 @@ const EVERY_ITEM_KIND: Record<AppLauncherItemKind, true> = { platform: true, wor
 const EVERY_SECTION: Record<AppLauncherSection, true> = { pinned: true, platforms: true, works: true };
 const EVERY_WORK_CHIP: Record<AppLauncherWorkChip, true> = { deploying: true, lastDeployFailed: true };
 const EVERY_MANAGE_STATE: Record<AppLauncherManageState, true> = { listed: true, notLive: true, exposureOff: true };
-const EVERY_PLATFORM_STATUS: Record<AppLauncherPlatformStatus, true> = { available: true, beta: true };
+const EVERY_PLATFORM_STATUS: Record<AppLauncherPlatformStatus, true> = { available: true, beta: true, soon: true };
 const EVERY_REJECTION_REASON: Record<AppLauncherRejectionReason, true> = {
 	unknownItem: true,
 	cannotHideCurrent: true
@@ -249,7 +251,7 @@ describe('app-launcher — the derived unions reject what they do not list', () 
 		const chip: AppLauncherWorkChip = 'failed';
 		// @ts-expect-error FR-56's state is `notLive`, not 'hidden' (spec.md:245-247)
 		const manageState: AppLauncherManageState = 'hidden';
-		// @ts-expect-error a catalog status is 'available' | 'beta' (FR-9 spec.md:214)
+		// @ts-expect-error a catalog status is 'available' | 'beta' | 'soon' (FR-9 spec.md:214)
 		const status: AppLauncherPlatformStatus = 'preview';
 		// @ts-expect-error one identical reason covers unknown and inaccessible (FR-35 spec.md:323-324)
 		const reason: AppLauncherRejectionReason = 'inaccessible';
@@ -436,6 +438,25 @@ describe('app-launcher — the eligible count and the filter cap (FR-63 spec.md:
 	});
 });
 
+describe('app-launcher — the delegated origin refusal (FR-50 spec.md:364-365, ACC-11-38)', () => {
+	it('is the snake_case wire code of CONTRACTS §12, never the camelCase i18n leaf', () => {
+		expect(APP_LAUNCHER_ORIGIN_NOT_ALLOWED).toBe('origin_not_allowed');
+		expect(APP_LAUNCHER_ORIGIN_NOT_ALLOWED).toMatch(/^[a-z]+(_[a-z]+)*$/);
+	});
+
+	it('types the 403 body in the platform error shape, with the literal code', () => {
+		const body: AppLauncherOriginNotAllowedErrorBody = {
+			status: 'error',
+			code: APP_LAUNCHER_ORIGIN_NOT_ALLOWED,
+			message: 'Delegated reads are not accepted from this origin.'
+		};
+		const pinCode: Equal<AppLauncherOriginNotAllowedErrorBody['code'], 'origin_not_allowed'> = true;
+
+		expect(pinCode).toBe(true);
+		expect(Object.keys(body)).toEqual(['status', 'code', 'message']);
+	});
+});
+
 describe('app-launcher — reachable from the package root (tasks.md:71-75, ACC-11-54 spec.md:682-683)', () => {
 	/**
 	 * Every RUNTIME name this module adds. The barrel's collision check
@@ -464,6 +485,7 @@ describe('app-launcher — reachable from the package root (tasks.md:71-75, ACC-
 		'APP_LAUNCHER_CLIENT_CACHE_MS',
 		'APP_LAUNCHER_NAME_MAX_LENGTH',
 		'APP_LAUNCHER_DESCRIPTION_MAX_LENGTH',
+		'APP_LAUNCHER_ORIGIN_NOT_ALLOWED',
 		'isAppLauncherEnvironment',
 		'appLauncherPinLimitExceeded'
 	];

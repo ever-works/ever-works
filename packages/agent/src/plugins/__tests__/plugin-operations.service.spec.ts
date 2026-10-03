@@ -22,6 +22,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
+import * as registryModule from '../services/plugin-registry.service';
 import type {
     IDeviceAuthProvider,
     IPlugin,
@@ -540,6 +541,106 @@ describe('PluginOperationsService', () => {
             const result = await service.listPlugins('user-1');
 
             expect(result.plugins).toHaveLength(2);
+        });
+
+        it('does not advertise a capability only hidden plugins provide', async () => {
+            const visible = createRegisteredPlugin();
+            visible.plugin = { ...visible.plugin, id: 'openai' } as IPlugin;
+            visible.manifest = {
+                ...visible.manifest,
+                id: 'openai',
+                capabilities: ['ai-provider', 'shared'],
+                visibility: 'public',
+            } as PluginManifest;
+
+            const hidden = createRegisteredPlugin();
+            hidden.plugin = { ...hidden.plugin, id: 'ever-stats-sink' } as IPlugin;
+            hidden.manifest = {
+                ...hidden.manifest,
+                id: 'ever-stats-sink',
+                capabilities: ['stats-sink', 'shared'],
+                visibility: 'hidden',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([visible, hidden]);
+            jest.spyOn(pluginRegistryService, 'getAvailableCapabilities').mockReturnValue([
+                'ai-provider',
+                'stats-sink',
+                'shared',
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listPlugins('user-1');
+
+            // The hidden plugin is not listed, and neither is the capability
+            // only it provides; a capability a listed plugin also provides stays.
+            expect(result.plugins.map((p) => p.pluginId)).toEqual(['openai']);
+            expect(result.capabilities).toEqual(['ai-provider', 'shared']);
+            const union = new Set(result.plugins.flatMap((p) => p.capabilities ?? []));
+            expect(new Set(result.capabilities)).toEqual(union);
+        });
+
+        it('resolves class-only visibility outside the requested category before indexing', async () => {
+            // A cold builtIn outside the category whose class (getManifest())
+            // marks it hidden: the listing load is what reveals that.
+            const inCategory = createRegisteredPlugin();
+            inCategory.plugin = { ...inCategory.plugin, id: 'openai' } as IPlugin;
+            inCategory.manifest = {
+                ...inCategory.manifest,
+                id: 'openai',
+                category: 'ai-provider',
+                capabilities: ['ai-provider'],
+            } as PluginManifest;
+
+            const coldHidden = createRegisteredPlugin();
+            coldHidden.plugin = { ...coldHidden.plugin, id: 'cold-hidden' } as IPlugin;
+            coldHidden.builtIn = true;
+            coldHidden.manifest = {
+                ...coldHidden.manifest,
+                id: 'cold-hidden',
+                category: 'integration',
+                capabilities: ['class-only-hidden'],
+                visibility: undefined,
+            } as unknown as PluginManifest;
+
+            const load = jest
+                .spyOn(registryModule, 'loadPluginsForListing')
+                .mockImplementation(async (entries) => {
+                    for (const entry of entries) {
+                        if (entry.plugin.id === 'cold-hidden') {
+                            entry.manifest = { ...entry.manifest, visibility: 'hidden' };
+                        }
+                    }
+                });
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([inCategory, coldHidden]);
+            jest.spyOn(pluginRegistryService, 'getAvailableCapabilities').mockReturnValue([
+                'ai-provider',
+                'class-only-hidden',
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            try {
+                const result = await service.listPlugins('user-1', 'ai-provider');
+
+                expect(result.plugins.map((p) => p.pluginId)).toEqual(['openai']);
+                expect(result.capabilities).toEqual(['ai-provider']);
+                // Control: the out-of-category builtIn was handed to the load.
+                expect(load.mock.calls.some(([entries]) => entries.includes(coldHidden))).toBe(
+                    true,
+                );
+            } finally {
+                load.mockRestore();
+            }
         });
     });
 

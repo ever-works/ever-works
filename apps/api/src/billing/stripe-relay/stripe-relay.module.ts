@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '@src/auth';
+import { IsPlatformAdminGuard } from '@src/auth/guards/platform-admin.guard';
+import { StripeRelayAdminController } from './stripe-relay-admin.controller';
 import { StripeRelayController } from './stripe-relay.controller';
 import { StripeRelayService } from './stripe-relay.service';
 
@@ -11,8 +13,9 @@ import { StripeRelayService } from './stripe-relay.service';
  * Imports mirror `ActivityFeedModule`, the other platform to site caller:
  * `WorkModule` for `PlatformSyncSecretService` (per-Work signing secret) and
  * `DatabaseModule` for `WorkRepository` (resolving `work_id` to a Work + its
- * deployed website). `AuthModule` supplies the guard that `@Public()` opts out
- * of, matching every other webhook receiver in this app.
+ * deployed website) and `StripeRelayDeadLetterRepository` (events the relay
+ * could not deliver, audit CC05-06). `AuthModule` supplies the guard that
+ * `@Public()` opts out of, matching every other webhook receiver in this app.
  *
  * No `HttpModule`: the forwarder uses global `fetch` so it can pin
  * `redirect: 'manual'` per request and abort on a timeout without adding a
@@ -23,8 +26,11 @@ import { StripeRelayService } from './stripe-relay.service';
  */
 @Module({
     imports: [WorkModule, DatabaseModule, AuthModule],
-    controllers: [StripeRelayController],
-    providers: [StripeRelayService],
+    controllers: [StripeRelayController, StripeRelayAdminController],
+    // `IsPlatformAdminGuard` is listed so Nest can build it for the admin
+    // controller (it needs `UserRepository` from `DatabaseModule`), the same
+    // way `BudgetsModule` wires it for `AdminUsageController`.
+    providers: [StripeRelayService, IsPlatformAdminGuard],
     exports: [StripeRelayService],
 })
 export class StripeRelayModule {}

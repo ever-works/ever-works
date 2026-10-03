@@ -17,6 +17,7 @@ export const DEFAULT_LAUNCHER_STRINGS: LauncherStrings = {
 	sectionWorks: 'Your apps',
 	chipCurrent: "You're here",
 	chipBeta: 'Beta',
+	chipSoon: 'Soon',
 	chipDeploying: 'Deploying',
 	chipLastDeployFailed: 'Last deploy failed',
 	viewAll: 'View all {count}',

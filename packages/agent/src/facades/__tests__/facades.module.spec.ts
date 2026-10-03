@@ -35,6 +35,8 @@ import { AppRuntimeFacadeService } from '../app-runtime.facade';
 import { AppDependencyFacadeService } from '../app-dependency.facade';
 // APW-12 (Ever ID) — the identity provider facade (capability `identity-provider`).
 import { IdentityProviderFacadeService } from '../identity-provider.facade';
+// Anonymous usage statistics — the `stats-sink` facade.
+import { StatsSinkFacadeService } from '../stats-sink.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -87,6 +89,9 @@ describe('FacadesModule + barrel re-exports', () => {
         // APW-12 — the identity provider facade: platform tier only, and the
         // administrator's on/off switch for sign-in with it.
         IdentityProviderFacadeService,
+        // Anonymous usage statistics — the one delivery plugin named by
+        // EVER_WORKS_STATS_SINK; inert unless the statistics module calls it.
+        StatsSinkFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -167,6 +172,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.AppRuntimeFacadeService).toBe(AppRuntimeFacadeService);
             expect(facadesBarrel.AppDependencyFacadeService).toBe(AppDependencyFacadeService);
             expect(facadesBarrel.IdentityProviderFacadeService).toBe(IdentityProviderFacadeService);
+            expect(facadesBarrel.StatsSinkFacadeService).toBe(StatsSinkFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -280,6 +286,9 @@ describe('FacadesModule + barrel re-exports', () => {
                     // PR #1019 — Skills + Tasks facades.
                     'SkillsFacadeError',
                     'SkillsFacadeService',
+                    // Anonymous usage statistics — the stats-sink facade and its error.
+                    'StatsSinkFacadeService',
+                    'StatsSinkUnavailableError',
                     'TasksFacadeError',
                     'TasksFacadeService',
                     // Agent-Memory facade (default plugin: agentmemory REST :3111).

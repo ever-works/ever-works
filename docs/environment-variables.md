@@ -253,9 +253,37 @@ The [App Launcher](./features/app-launcher.md) is off by default on every instal
 | `EVER_WORKS_PLATFORM_CATALOG_REF`     | The branch, tag or 40-character commit SHA read from that repository.                                        | `string`                             | `main`                 | No       |
 | `EVER_WORKS_PLATFORM_CATALOG_ENV`     | Whose addresses the tiles use. Set it per deployment, or a stage installation shows production addresses.    | `production` \| `stage` \| `develop` | `production`           | No       |
 | `EVER_WORKS_PLATFORM_CATALOG_SELF_ID` | The catalog entry marked as the app you are in.                                                              | `string`                             | `ever-works`           | No       |
+| `EVER_WORKS_APP_LAUNCHER_ORIGINS`     | Origins another Ever app may read a person's launcher list from, with a delegated token.                     | `string`                             | --                     | No       |
+| `EVER_ID_TRUSTED_CLIENT_IDS`          | Optional: the Ever ID client ids such a delegated token must have been issued to.                            | `string`                             | --                     | No       |
 
 Where the web app has PostHog configured, the launcher also needs the `app-launcher` flag to resolve to `true` for the
 person; without PostHog, `EVER_WORKS_APP_LAUNCHER_ENABLED` alone decides.
+
+`EVER_WORKS_APP_LAUNCHER_ORIGINS` takes exact `https://` origins, comma-separated, at most 50: a delegated read from
+any other origin, or from none, is refused (`403`), and an invalid entry stops a production API from starting.
+`EVER_ID_TRUSTED_CLIENT_IDS` takes at most 5 client ids; unset, any client whose token verifies may read.
+
+---
+
+## Anonymous Usage Statistics
+
+One small, signed report a day (plus one for the closed month on days 1–3 of a month) with counts, monthly totals and feature switches only — never a name, an address, a URL or any content. See [Anonymous usage statistics](./ever-platform/anonymous-statistics.md) for exactly what is sent and how to verify it.
+
+| Variable                     | Description                                                                                    | Type     | Default                 | Required |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | -------- | ----------------------- | -------- |
+| `EVER_STATS_ENABLED`         | `false` (or any value other than empty / `true`) switches the module off entirely              | `string` | on                      | No       |
+| `EVER_STATS_API_URL`         | Base URL of the statistics endpoint (`https`; `http` only for a private or local host)         | `string` | `EVER_PLATFORM_API_URL` | No       |
+| `EVER_PLATFORM_API_URL`      | Ever Platform base URL                                                                         | `string` | `https://api.ever.co`   | No       |
+| `EVER_STATS_COUNTRY`         | The country you declare (ISO 3166-1 alpha-2); unset sends `ZZ`                                 | `string` | --                      | No       |
+| `EVER_INSTALL_SOURCE`        | `self-hosted`, `cloud`, `ever.sh`, `works_app`, `desktop` or `partner:<slug>` — never inferred | `string` | `self-hosted`           | No       |
+| `EVER_STATS_SEND_INTERVAL_S` | Seconds between reports; below 3600 only in tests                                              | `number` | `86400`                 | No       |
+| `EVER_WORKS_STATS_SINK`      | The `stats-sink` plugin that delivers reports                                                  | `string` | `ever-stats-sink`       | No       |
+
+Set `EVER_STATS_ENABLED=false` where the API reads its settings: `.env.compose` with the Docker Compose files (a
+`.env` next to them never reaches the containers), `apps/api/.env` when you run the API from source, or the
+container / pod environment. A value already in the environment wins over the `.env` file.
+
+The operator can also switch statistics off in **Settings → Ever Platform** without a restart.
 
 ---
 

@@ -95,8 +95,12 @@ export type AppLauncherManageState = (typeof APP_LAUNCHER_MANAGE_STATES)[number]
  * A platform entry's status (FR-9 spec.md:214, `plan.md:261`). An entry carrying
  * any other status is dropped by the catalog reader and logged with its entry id
  * only (FR-11 spec.md:219-221).
+ *
+ * `soon` (added after `available` and `beta`, R-26: a union only gains members)
+ * is a platform that is announced but not open yet: its tile is listed with a
+ * **Soon** chip and can never be activated, so the launcher never opens it.
  */
-export const APP_LAUNCHER_PLATFORM_STATUSES = ['available', 'beta'] as const;
+export const APP_LAUNCHER_PLATFORM_STATUSES = ['available', 'beta', 'soon'] as const;
 
 /** Union derived from {@link APP_LAUNCHER_PLATFORM_STATUSES}. */
 export type AppLauncherPlatformStatus = (typeof APP_LAUNCHER_PLATFORM_STATUSES)[number];
@@ -266,6 +270,25 @@ export interface AppLauncherSavePreferencesResponse {
 export interface AppLauncherPinLimitErrorBody {
 	code: 'pinLimit';
 	limit: typeof APP_LAUNCHER_PIN_LIMIT;
+}
+
+/**
+ * The wire code of a delegated read refused for where it came from (FR-50
+ * spec.md:364-365, ACC-11-38 spec.md:638): the request carries a delegated
+ * token, and its `Origin` header is absent or not one of the installation's
+ * `EVER_WORKS_APP_LAUNCHER_ORIGINS`. Answered `403` before the token is read.
+ *
+ * snake_case on the wire like every error code (CONTRACTS §12); the camelCase
+ * `originNotAllowed` is only ever an i18n leaf. A host renders the refusal as
+ * the signed-out state (FR-48, FR-50).
+ */
+export const APP_LAUNCHER_ORIGIN_NOT_ALLOWED = 'origin_not_allowed' as const;
+
+/** The `403` body of {@link APP_LAUNCHER_ORIGIN_NOT_ALLOWED}, in the platform's error shape. */
+export interface AppLauncherOriginNotAllowedErrorBody {
+	status: 'error';
+	code: typeof APP_LAUNCHER_ORIGIN_NOT_ALLOWED;
+	message: string;
 }
 
 /**

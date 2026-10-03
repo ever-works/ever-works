@@ -321,7 +321,7 @@ Every threshold below is a number on purpose.
 
 ### 4.8 Other Ever platforms (details in [`cross-platform.md`](./cross-platform.md))
 
-- **FR-54.** Adoption order: Ever Works, then Ever Teams, then Ever Gauzy production last.
+- **FR-54.** Adoption order: Ever Works first; Ever Teams and Ever Gauzy next, side by side; Ever Gauzy production last.
 - **FR-55.** Each platform adds Ever ID as an additional method and keeps every existing method.
 - **FR-56.** Each platform applies FR-21–FR-28's rules. On Ever Gauzy, where a person has one account per
   workspace, a pair belongs to at most one account per workspace, and the workspace picker lists only

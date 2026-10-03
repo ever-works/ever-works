@@ -88,6 +88,12 @@ module.exports = {
         // NodeDispatcherFactory / NodeJobRuntimePlugin rather than a stub.
         '^@ever-works/job-runtime-node-plugin$':
             '<rootDir>/../../../packages/plugins/job-runtime-node/src/index.ts',
+        // Anonymous usage statistics — the `ever-stats-sink` plugin, source-mapped
+        // so the statistics specs deliver through the real sender (to a local
+        // receiver) rather than a stub. The API never imports it at run time:
+        // the plugin system discovers it like every other plugin.
+        '^@ever-works/ever-stats-sink-plugin$':
+            '<rootDir>/../../../packages/plugins/ever-stats-sink/src/index.ts',
         // AW-07 — two pull-model job-runtime plugins, source-mapped so
         // `memory-facts/memory-fact-embed.job-runtime.spec.ts` proves the
         // memory-fact embed dispatcher and handler run on the real

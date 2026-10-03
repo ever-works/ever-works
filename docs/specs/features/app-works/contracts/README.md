@@ -67,15 +67,18 @@ programme never touches). A fragment that demanded equality would be unusable. W
 **loss**: a route the plan promised that never got a controller, a field whose `@ApiProperty` is missing, a
 `202` that became a `200`.
 
-**Enforcement (one task, APW-13 P0).** `apps/api/src/openapi/__tests__/app-works-contract.spec.ts` —
-Jest, beside the generator — loads every fragment, loads the generated document, and asserts method + path +
-required properties + declared status codes per operation. It is the reason this directory has tests at all;
-without it a fragment is a document nobody reads.
+**Enforcement.** `apps/api/src/openapi/__tests__/app-works-contract.spec.ts` — Jest, beside the generator —
+runs the generator from the API's build output, loads every fragment, and asserts method + path + parameters +
+required properties + declared status codes + response headers per operation, plus each `x-mcp` against the
+MCP whitelist. Gaps the generated document has not closed yet are an exact register in the spec, each with its
+reason; the launcher fragment may have none ([`openapi/README.md`](./openapi/README.md) §3). It is the reason
+this directory has tests at all; without it a fragment is a document nobody reads.
 
-**Linting.** `@apidevtools/swagger-parser` is **already a dependency of `apps/mcp`**
-(`apps/mcp/package.json:25`, `"@apidevtools/swagger-parser": "^12.1.0"`) and already used at runtime
-(`apps/mcp/src/openapi-tools/openapi-loader.service.ts:5`). The fragment lint reuses it — no new dependency
-is introduced. **Not found:** Redocly, Spectral or any other OpenAPI linter in this repository.
+**Linting.** The same spec lints each fragment itself (OpenAPI 3.0.3, no `servers`, no 3.1 nullability,
+`x-source` and `x-mcp` on every operation, every `$ref` resolving) with the `yaml` parser the API's tests
+already use — no new dependency. `@apidevtools/swagger-parser`, a dependency of `apps/mcp`
+(`apps/mcp/package.json:25`), remains available for a fuller structural check. **Not found:** Redocly,
+Spectral or any other OpenAPI linter in this repository.
 
 ---
 

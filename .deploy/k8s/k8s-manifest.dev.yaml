@@ -299,6 +299,14 @@ spec:
             # reads it through config.everWorks.apps.worksEnabled().
             - name: EVER_WORKS_APP_WORKS_ENABLED
               value: "false"
+            # Anonymous usage statistics (one signed, counts-only report a day to the
+            # Ever Platform statistics endpoint). Self-hosted installations default to
+            # on; Ever Works' own deployments keep it OFF until that endpoint is ready
+            # for them. 'false' means the module is not loaded at all: no route, no
+            # timer, no request. Pinned by
+            # apps/api/src/instance-stats/__tests__/deploy-switch.spec.ts.
+            - name: EVER_STATS_ENABLED
+              value: "false"
 
 
             # APW-11 (XC-10, spec FR-65) - the App Launcher's operator switches.
@@ -309,6 +317,20 @@ spec:
             # unrecognised value are all the OFF state, so it cannot fail open.
             - name: EVER_WORKS_APP_LAUNCHER_ENABLED
               value: "false"
+            # APW-11 P2 (spec FR-50) - the browser origins another Ever app may read
+            # GET /api/me/apps from with a delegated Ever ID token: exact https origins,
+            # comma-separated, at most 50, never with credentials. A delegated call from
+            # any other origin, or with none, is refused (403). Inert while the switch
+            # above is off. Here: app-dev.ever.co, the Ever Platform web app of this environment.
+            - name: EVER_WORKS_APP_LAUNCHER_ORIGINS
+              value: "https://app-dev.ever.co"
+            # Optional narrowing of the same read: the identity provider client ids a
+            # delegated token must have been minted for (at most 5, comma-separated).
+            # Empty keeps the default, any client whose token verifies. Rendered from the
+            # GitHub environment variable of the same name, which holds the client id of
+            # the Ever Platform web app; a client id is not a secret.
+            - name: EVER_ID_TRUSTED_CLIENT_IDS
+              value: "$EVER_ID_TRUSTED_CLIENT_IDS"
             # The platform catalog (ever-works/platforms). REPO, REF and SELF_ID
             # fall back to the service's own defaults (ever-works/platforms, main,
             # ever-works) when the deploy environment does not define them, because

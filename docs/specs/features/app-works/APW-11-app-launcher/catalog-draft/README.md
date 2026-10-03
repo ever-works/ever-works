@@ -42,7 +42,7 @@ the owner and live only in that repository, never in the public spec tree.
 ## Adding a platform
 
 1. Add an entry to [`platforms.json`](./platforms.json) with a new stable `id`, a name (≤ 40 characters), a
-   one-line description (≤ 80), an `order`, a `status` of `available` or `beta`, and at least one `https`
+   one-line description (≤ 80), an `order`, a `status` of `available`, `beta` or `soon`, and at least one `https`
    address.
 2. Add `icons/<id>.svg` or `icons/<id>.png`, at most 16 KB.
 3. Run `node tools/validate.mjs` (and the schema check from the workflow) locally.

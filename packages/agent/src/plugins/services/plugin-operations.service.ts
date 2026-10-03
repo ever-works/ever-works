@@ -252,11 +252,36 @@ export class PluginOperationsService {
             }),
         );
 
+        // The capability index advertises only what a LISTED (non-hidden)
+        // plugin provides. A capability whose every provider is hidden (for
+        // example `stats-sink`, served only by the hidden system plugin
+        // `ever-stats-sink`) would otherwise show up as a catalog filter that
+        // matches no plugin. Visibility is read after the load above, so a
+        // builtIn that sets `hidden` in getManifest() counts as hidden. The
+        // index is registry-wide, so a category list also loads the builtIns
+        // outside its category: exactly the set the uncategorised list loads.
+        if (category) {
+            await loadPluginsForListing(
+                allPlugins.filter(
+                    (p) => p.manifest?.visibility !== 'hidden' && !candidates.includes(p),
+                ),
+            );
+        }
+        const listedCapabilities = new Set<string>();
+        for (const registered of allPlugins) {
+            if ((registered.manifest?.visibility ?? 'public') === 'hidden') continue;
+            for (const capability of registered.manifest?.capabilities ?? []) {
+                listedCapabilities.add(capability);
+            }
+        }
+
         return {
             plugins,
             total: plugins.length,
             categories: this.pluginRegistryService.getAvailableCategories(),
-            capabilities: this.pluginRegistryService.getAvailableCapabilities(),
+            capabilities: this.pluginRegistryService
+                .getAvailableCapabilities()
+                .filter((capability) => listedCapabilities.has(capability)),
         };
     }
 

@@ -1,0 +1,25 @@
+# Egress audit only (see README.md) — layered after docker-compose.yml by the audit config.
+#
+# - Runs the API image built from this checkout (EVER_WORKS_API_IMAGE) instead of the published
+#   one, and never pulls it.
+# - The production image refuses to start without a 32+ character AUTH_SECRET and a
+#   PLATFORM_ENCRYPTION_KEY; these are fake, test-only values (the e2e workflow uses the same
+#   kind), never used outside this run.
+# - Mounts the API's `.env` file at its working directory (/app): the file the workflow writes for
+#   the mode — empty, or `EVER_STATS_ENABLED=false` for `off_env_file`.
+# - Publishes no port: everything runs on the audit's sealed networks.
+services:
+    ever-works-api:
+        image: ${EVER_WORKS_API_IMAGE:-ever-works-api:egress-audit}
+        pull_policy: never
+        environment:
+            AUTH_SECRET: ever-works-egress-audit-secret-padding-to-32min-fake
+            PLATFORM_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        volumes:
+            - ${EVER_WORKS_AUDIT_DOTENV:?set EVER_WORKS_AUDIT_DOTENV to the API .env file of this run}:/app/.env:ro
+
+    ever-works-db:
+        ports: !reset []
+
+    ever-works-redis:
+        ports: !reset []

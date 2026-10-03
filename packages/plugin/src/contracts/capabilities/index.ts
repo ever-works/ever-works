@@ -123,3 +123,10 @@ export * from './identity-provider.interface.js';
 // `apps-tier` compiles and behaves exactly as before.
 export * from './apps-tier.interface.js';
 export * from './apps-tier.types.js';
+// Anonymous usage statistics — the `stats-sink` capability: `IStatsSinkPlugin`
+// (deliver one signed `ever.stats.v1` report, byte for byte), its options and
+// guard. The capability string is declared with the interface (like the
+// job-runtime strings) rather than appended to `PLUGIN_CAPABILITIES`, so no
+// existing table or category changes; a plugin that never declares
+// `stats-sink` compiles and behaves exactly as before.
+export * from './stats-sink.interface.js';

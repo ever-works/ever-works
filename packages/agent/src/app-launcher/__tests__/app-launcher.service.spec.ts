@@ -847,6 +847,57 @@ describe('AppLauncherService.listForUser (APW-11 T6)', () => {
 
     // ── Scope, pins, meta ───────────────────────────────────────────────────
 
+    describe('Ever apps — the catalog status travels with the tile (FR-9)', () => {
+        async function platformTiles(input: AppLauncherPlatformInput[]) {
+            const response = await buildService().listForUser({ id: USER }, personal, input, {});
+            return response.items.filter((item) => item.kind === 'platform');
+        }
+
+        it('keeps a `soon` platform listed with its status and its address, so the element can render the Soon chip', async () => {
+            const tiles = await platformTiles([
+                ...platforms(),
+                {
+                    key: 'platform:ever-demand',
+                    name: 'Ever Demand',
+                    url: 'https://demand.example.test/',
+                    catalogOrder: 60,
+                    status: 'soon',
+                },
+            ]);
+
+            expect(tiles.find((item) => item.key === 'platform:ever-demand')).toMatchObject({
+                status: 'soon',
+                url: 'https://demand.example.test/',
+                host: 'demand.example.test',
+                manageState: 'listed',
+                visible: true,
+            });
+            // The statuses already in the union are untouched.
+            expect(tiles.find((item) => item.key === 'platform:ever-gauzy')?.status).toBe(
+                'available',
+            );
+            expect(tiles.find((item) => item.key === 'platform:cal-diy')?.status).toBe('beta');
+        });
+
+        it('drops a status outside the closed union instead of passing an unknown string through', async () => {
+            const tiles = await platformTiles([
+                ...platforms(),
+                {
+                    key: 'platform:ever-preview',
+                    name: 'Ever Preview',
+                    url: 'https://preview.example.test/',
+                    catalogOrder: 70,
+                    status: 'preview' as unknown as AppLauncherPlatformInput['status'],
+                },
+            ]);
+
+            const tile = tiles.find((item) => item.key === 'platform:ever-preview');
+            // The tile itself is still listed; only the unknown status is dropped.
+            expect(tile).toBeDefined();
+            expect(tile?.status).toBeUndefined();
+        });
+    });
+
     describe('scope, pins and meta (FR-24, FR-62, FR-63, FR-64)', () => {
         it('keeps Work pins per Organization and Ever app pins shared (ACC-11-21)', async () => {
             const workA = await makeWork({

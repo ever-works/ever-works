@@ -20,7 +20,15 @@
  * so the facade's normalisation is exercised too. The published plugin's own
  * behaviour is pinned by its Vitest suite against the same fake provider.
  */
-import { Controller, Get, INestApplication, Request, ValidationPipe } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    INestApplication,
+    Request,
+    ValidationPipe,
+    type Provider,
+    type Type,
+} from '@nestjs/common';
 import * as request from 'supertest';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -439,6 +447,15 @@ export async function createEverIdHarness(
         withFakeProvider?: boolean;
         issuerUrl?: string;
         settings?: Partial<TestProviderSettings>;
+        /**
+         * Controllers and providers of another surface, mounted next to the Ever ID ones so a
+         * spec can drive its own delegated-read handler through the real guard (the App
+         * Launcher's `GET /api/me/apps`, for one).
+         */
+        controllers?: Type<unknown>[];
+        providers?: Provider[];
+        /** Runs on the application before `init()`, for example to mount a middleware. */
+        configureApp?: (app: INestApplication) => void;
     } = {},
 ): Promise<EverIdHarness> {
     process.env.AUTH_SECRET = TEST_AUTH_SECRET;
@@ -608,7 +625,7 @@ export async function createEverIdHarness(
     const apiKeyOwner: { id: string } = { id: '' };
 
     const moduleRef = await Test.createTestingModule({
-        controllers: [EverIdController, DelegatedProbeController],
+        controllers: [EverIdController, DelegatedProbeController, ...(options.controllers ?? [])],
         providers: [
             { provide: EverIdSignInService, useValue: signIn },
             { provide: EverIdLinkingService, useValue: linking },
@@ -623,12 +640,14 @@ export async function createEverIdHarness(
             { provide: EVER_ID_SIGNED_OUT_PROBE, useValue: sessions },
             EverIdAdminGuard,
             { provide: APP_GUARD, useClass: AuthSessionGuard },
+            ...(options.providers ?? []),
         ],
     }).compile();
     const app = moduleRef.createNestApplication();
     app.useGlobalPipes(
         new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
     );
+    options.configureApp?.(app);
     await app.init();
 
     let userCounter = 0;

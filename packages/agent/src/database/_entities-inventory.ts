@@ -145,6 +145,7 @@ import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { BillingProfile } from '../entities/billing-profile.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { LicencePurchase } from '../entities/licence-purchase.entity';
+import { StripeRelayDeadLetter } from '../entities/stripe-relay-dead-letter.entity';
 import { CreditMeterEvent } from '../entities/credit-meter-event.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
@@ -201,6 +202,9 @@ import { WorkBuildPreparation } from '../entities/work-build-preparation.entity'
 // most one of them ACTIVE (the partial unique this inventory's drift spec
 // cannot see, because it compares names, not indexes).
 import { WorkAppProvisioning } from '../entities/work-app-provisioning.entity';
+import { EverInstance } from '../entities/ever-instance.entity';
+import { EverStatsReport } from '../entities/ever-stats-report.entity';
+import { EverStatsLease } from '../entities/ever-stats-lease.entity';
 
 import {
     PluginEntity,
@@ -403,6 +407,9 @@ export const ENTITIES = [
     Invoice,
     LicencePurchase,
     CreditMeterEvent,
+    // Shared Stripe webhook relay: events it could not deliver to a
+    // directory, with the verbatim payload for an operator replay.
+    StripeRelayDeadLetter,
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
@@ -520,4 +527,11 @@ export const ENTITIES = [
     // APW-04 App Provisioner — the provisioning rows of an App Work: derived
     // only, written by the start path and the step executor, read by the card.
     WorkAppProvisioning,
+    // Anonymous usage statistics — the one instance row (opaque id + the
+    // statistics-only key pair, wrapped), the last 12 send attempts with their
+    // exact payloads, and the one schedule/lease row that keeps N replicas to
+    // one report a day. Instance-wide: no tenant or organization column.
+    EverInstance,
+    EverStatsReport,
+    EverStatsLease,
 ];

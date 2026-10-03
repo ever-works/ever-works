@@ -51,7 +51,7 @@ guard).
 # yaml-language-server: $schema=https://api.ever.works/api/schema/works.yml.schema.json
 version: 2
 kind: app
-name: Cal.diy (community build) # v1 root keys keep their meaning
+name: Cal (community build) # v1 root keys keep their meaning
 spec:
     kind: app # optional; repeats the root kind
     appSpecVersion: 1 # optional; default 1
@@ -550,12 +550,12 @@ issue that names it records which rules were skipped in its `params`.
 ```yaml
 version: 2
 kind: app
-name: Cal.diy (community build)
+name: Cal (community build)
 spec:
     source: { relation: fork, upstream: { repo: calcom/cal.diy, defaultBranch: main }, branch: main }
     blueprint: { id: cal, version: 1.0.0, repo: ever-works/cal-template, sha: 0123456789abcdef0123456789abcdef01234567 }
     license: { spdx: MIT, class: green, source: blueprint, notice: 'Cal.diy® is a trademark of Cal.com, Inc.' }
-    display: { name: 'Cal.diy (community build)', protectedPaths: ['apps/web/public/brand/**'] }
+    display: { name: 'Cal (community build)', protectedPaths: ['apps/web/public/brand/**'] }
     build:
         strategy: dockerfile
         dockerfile: Dockerfile
