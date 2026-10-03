@@ -68,13 +68,14 @@ describe('ever-stats-config', () => {
     it('prefers EVER_STATS_API_URL over EVER_PLATFORM_API_URL', () => {
         expect(
             readEverStatsConfig({
-                EVER_PLATFORM_API_URL: 'https://api-stage.ever.co',
+                EVER_PLATFORM_API_URL: 'https://platform.example.test',
                 EVER_STATS_API_URL: 'https://stats.example.com',
             }).apiBaseUrl,
         ).toBe('https://stats.example.com');
         expect(
-            readEverStatsConfig({ EVER_PLATFORM_API_URL: 'https://api-stage.ever.co' }).apiBaseUrl,
-        ).toBe('https://api-stage.ever.co');
+            readEverStatsConfig({ EVER_PLATFORM_API_URL: 'https://platform.example.test' })
+                .apiBaseUrl,
+        ).toBe('https://platform.example.test');
     });
 
     it.each([
