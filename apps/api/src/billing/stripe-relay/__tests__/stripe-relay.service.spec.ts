@@ -642,6 +642,16 @@ describe('StripeRelayService', () => {
             expect(deadLetters.countOpen).toHaveBeenLastCalledWith(
                 new Date('2026-09-28T11:00:00.000Z'),
             );
+
+            // An empty or blank value is "unset", not zero minutes.
+            for (const blank of ['', '   ']) {
+                process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES = blank;
+                await service.openDeadLetterCount(NOW);
+                expect(deadLetters.countOpen).toHaveBeenLastCalledWith(
+                    new Date('2026-09-28T11:00:00.000Z'),
+                );
+            }
+            delete process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES;
         });
     });
 

@@ -33,8 +33,15 @@ const MAX_PAGE = 100;
  *
  * The listing never returns the stored payload (it holds what Stripe sent,
  * including customer contact details on invoice events). Replay routes that
- * stored payload exactly as the original delivery would have been routed, so
- * it is safe to repeat: the directory de-duplicates by Stripe event id.
+ * stored payload exactly as the original delivery would have been routed.
+ *
+ * Replay is NOT guaranteed idempotent end to end. The directory's
+ * RelayEventCoordinator de-duplicates by Stripe event id only per pod and in
+ * memory (about 1000 entries, lost on restart), so a replay of an event the
+ * site already fulfilled but never confirmed (for example after the relay's
+ * 10 s timeout) is protected only by the fulfilment handlers' own
+ * idempotency. Check the directory before replaying such an event; dismiss it
+ * instead when it was in fact fulfilled.
  */
 @ApiTags('Admin')
 @Controller('api/admin/stripe-relay/dead-letters')

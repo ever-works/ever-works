@@ -35,6 +35,15 @@ import {
  *
  * A known-DIRTY control runs through the same harness: an Ever Works credit
  * top-up must produce a write, which proves the harness can see one.
+ *
+ * ASSUMPTION (stated, not tested): every foreign event here names a Stripe
+ * customer that has NO Ever Works billing profile, so each customer lookup
+ * returns null. `invoice.*` and `payment_method.*` are attributed BY
+ * CUSTOMER, so a foreign-product event on a `cus_` that ALSO has a Works
+ * billing profile would be attributed to that Works account and would write.
+ * This holds only while the shared ever.co checkout and the other products
+ * never reuse a Works customer id; if that changes, add that case here and
+ * gate attribution on the product metadata.
  */
 
 const WHSEC = 'whsec_foreign_product_spec';

@@ -216,7 +216,10 @@ export class StripeRelayService {
      * that decides the HTTP status; the probe body carries no detail.
      */
     async openDeadLetterCount(now: Date = new Date()): Promise<number> {
-        const minutes = Number(process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES);
+        // An empty or blank value means "not configured" (Number('') is 0,
+        // which would silently drop the grace period to nothing).
+        const raw = process.env.STRIPE_RELAY_DEAD_LETTER_ALERT_AFTER_MINUTES?.trim();
+        const minutes = raw ? Number(raw) : Number.NaN;
         const graceMinutes =
             Number.isFinite(minutes) && minutes >= 0 ? minutes : DEFAULT_ALERT_AFTER_MINUTES;
         return this.deadLetters.countOpen(new Date(now.getTime() - graceMinutes * 60_000));

@@ -3,6 +3,7 @@ import {
     NotFoundException,
     ServiceUnavailableException,
 } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 
 // Same barrel mocks as the service spec: the real barrels pull ESM-only
 // modules that stop the suite from loading at all.
@@ -23,7 +24,12 @@ jest.mock('@ever-works/agent/entities', () => ({
 jest.mock('@ever-works/agent/subscriptions', () => ({ constructStripeEvent: jest.fn() }));
 jest.mock('@ever-works/agent/utils', () => ({ isSafeWebhookUrl: jest.fn(() => true) }));
 jest.mock('@src/auth/guards/platform-admin.guard', () => ({ IsPlatformAdminGuard: class {} }));
-jest.mock('@src/auth/decorators/public.decorator', () => ({ Public: () => () => undefined }));
+// The REAL metadata decorators (not no-ops), so the access-control specs at the
+// bottom can read which routes are public and which guards apply.
+jest.mock('@src/auth/decorators/public.decorator', () => ({
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    Public: () => require('@nestjs/common').SetMetadata('isPublic', true),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { StripeRelayController } = require('../stripe-relay.controller');
@@ -31,6 +37,8 @@ const { StripeRelayController } = require('../stripe-relay.controller');
 const { StripeRelayAdminController } = require('../stripe-relay-admin.controller');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { StripeRelayDeadLetterNotFoundError } = require('../stripe-relay.service');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { IsPlatformAdminGuard } = require('@src/auth/guards/platform-admin.guard');
 
 function relayService(overrides: Record<string, unknown> = {}) {
     return {
@@ -135,14 +143,12 @@ describe('StripeRelayAdminController', () => {
     it('returns the replay verdict and the dismiss result', async () => {
         const { controller } = build(
             relayService({
-                replay: jest
-                    .fn()
-                    .mockResolvedValue({
-                        status: 'forwarded',
-                        eventId: 'evt_1',
-                        workId: 'w',
-                        siteStatus: 200,
-                    }),
+                replay: jest.fn().mockResolvedValue({
+                    status: 'forwarded',
+                    eventId: 'evt_1',
+                    workId: 'w',
+                    siteStatus: 200,
+                }),
                 dismiss: jest.fn().mockResolvedValue(true),
             }),
         );
@@ -151,5 +157,36 @@ describe('StripeRelayAdminController', () => {
             eventId: 'evt_1',
             dismissed: true,
         });
+    });
+});
+
+describe('Stripe relay access control', () => {
+    // A dropped decorator would leave every behavioural spec above green while
+    // opening replay/dismiss of payment events to any signed-in user, so pin
+    // the metadata itself.
+    const publicRoutes = (controller: { prototype: object }) =>
+        Object.getOwnPropertyNames(controller.prototype).filter(
+            (name) =>
+                name !== 'constructor' &&
+                Reflect.getMetadata(
+                    'isPublic',
+                    (controller.prototype as Record<string, unknown>)[name] as object,
+                ) === true,
+        );
+
+    it('puts every admin dead-letter route behind IsPlatformAdminGuard', () => {
+        expect(Reflect.getMetadata(GUARDS_METADATA, StripeRelayAdminController)).toEqual([
+            IsPlatformAdminGuard,
+        ]);
+    });
+
+    it('makes no admin dead-letter route public', () => {
+        expect(Reflect.getMetadata('isPublic', StripeRelayAdminController)).toBeUndefined();
+        expect(publicRoutes(StripeRelayAdminController)).toEqual([]);
+    });
+
+    it('keeps exactly the Stripe receiver and the health probe public on the relay controller', () => {
+        // Control: the helper does see public metadata when it is there.
+        expect(publicRoutes(StripeRelayController).sort()).toEqual(['health', 'receive']);
     });
 });
