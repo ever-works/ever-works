@@ -11,12 +11,18 @@ import * as request from 'supertest';
 import type { DataSource } from 'typeorm';
 import { ActivityLogModule, ActivityLogService } from '@ever-works/agent/activity-log';
 import { DatabaseModule, ENTITIES, UserRepository } from '@ever-works/agent/database';
-import { EVER_STATS_LEASE_ROW_ID, EverStatsLease } from '@ever-works/agent/entities';
+import {
+    EVER_STATS_LEASE_ROW_ID,
+    EverInstance,
+    EverStatsLease,
+    EverStatsReport,
+} from '@ever-works/agent/entities';
 import { readEverStatsConfig } from '@ever-works/agent/ever-instance';
 import { FacadesModule, StatsSinkFacadeService } from '@ever-works/agent/facades';
 import type { PluginRegistryService } from '@ever-works/agent/plugins';
 import EverStatsSinkPlugin from '@ever-works/ever-stats-sink-plugin';
-import { instanceStatsModuleImports } from '../instance-stats';
+import { InstanceStatsModule, instanceStatsModuleImports } from '../instance-stats';
+import { InstanceStatsSenderService } from '../instance-stats/instance-stats-sender.service';
 import {
     INSTANCE_STATS_CLOCK,
     INSTANCE_STATS_CONFIG,
@@ -36,6 +42,10 @@ import {
  * 3. Control — the same boot with a report due: exactly one request, to the
  *    statistics endpoint. Without it, (1) and (2) could pass because the spies
  *    were blind.
+ * 4. The module in the graph although `EVER_STATS_ENABLED=false` (the import
+ *    decision is taken when `ApiModule` is imported, so it depends on the
+ *    environment being loaded first): it still does nothing — no identity, no
+ *    schedule, no request, every route 404, and the sender refuses.
  *
  * The real `ApiModule` cannot be imported under this app's jest (see
  * `app-works-di-reachability.spec.ts`); it reaches the statistics module ONLY
@@ -115,8 +125,11 @@ class TestActivityLogModule {}
 async function boot(
     env: Record<string, string | undefined>,
     clock: { now: Date },
+    options: { forceModule?: boolean } = {},
 ): Promise<INestApplication> {
-    @Module({ imports: [...instanceStatsModuleImports(env)] })
+    @Module({
+        imports: options.forceModule ? [InstanceStatsModule] : [...instanceStatsModuleImports(env)],
+    })
     class StatsRoot {}
 
     const moduleRef = await Test.createTestingModule({ imports: [StatsRoot] })
@@ -246,6 +259,44 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
                     target: 'stats.example.test',
                 })),
             );
+        } finally {
+            await app.close();
+        }
+    });
+
+    it('loaded although EVER_STATS_ENABLED=false: no identity, no schedule, no request, every route 404', async () => {
+        const clock = { now: new Date() };
+        const env = {
+            EVER_STATS_ENABLED: 'false',
+            EVER_STATS_API_URL: 'https://stats.example.test',
+            EVER_STATS_SEND_INTERVAL_S: '5',
+        };
+        const app = await boot(env, clock, { forceModule: true });
+        try {
+            await run30s(clock);
+            expect(outbound()).toEqual([]);
+            const dataSource = app.get<DataSource>(getDataSourceToken());
+            expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
+            expect(await dataSource.getRepository(EverStatsLease).count()).toBe(0);
+            expect(await dataSource.getRepository(EverStatsReport).count()).toBe(0);
+
+            const sender = app.get(InstanceStatsSenderService);
+            expect(await sender.runDue()).toEqual({ ran: false, reason: 'env' });
+            expect(await sender.sendNow()).toEqual({ ran: false, reason: 'env' });
+            expect(outbound()).toEqual([]);
+
+            jest.useRealTimers();
+            for (const [method, path] of [
+                ['get', '/api/instance-stats/status'],
+                ['post', '/api/instance-stats/preview'],
+                ['get', '/api/instance-stats/last'],
+                ['post', '/api/instance-stats/send-now'],
+                ['put', '/api/instance-stats/toggle'],
+                ['post', '/api/instance-stats/reset-identity'],
+            ] as const) {
+                await request(app.getHttpServer())[method](path).expect(404);
+            }
+            expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
         } finally {
             await app.close();
         }

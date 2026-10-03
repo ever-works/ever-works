@@ -22,15 +22,20 @@ import type {
 } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { IsPlatformAdminGuard } from '../auth/guards/platform-admin.guard';
+import { SessionOnlyGuard } from '../auth/guards/session-only.guard';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { InstanceStatsToggleDto } from './dto/instance-stats.dto';
-import { InstanceStatsSendNowRefusedError, InstanceStatsService } from './instance-stats.service';
+import {
+    InstanceStatsResetRefusedError,
+    InstanceStatsSendNowRefusedError,
+    InstanceStatsService,
+} from './instance-stats.service';
 
 /**
  * Anonymous usage statistics — the operator routes behind Settings → Ever
  * Platform → Anonymous usage statistics.
  *
- *   GET  /api/instance-stats/status          any signed-in person: `{enabled}`;
+ *   GET  /api/instance-stats/status          any signed-in person: `{enabled, managedBy}`;
  *                                             the platform admin: the full status
  *   POST /api/instance-stats/preview         admin: what would be sent now
  *   GET  /api/instance-stats/last            admin: the exact last payload
@@ -38,10 +43,14 @@ import { InstanceStatsSendNowRefusedError, InstanceStatsService } from './instan
  *   PUT  /api/instance-stats/toggle          admin: the switch
  *   POST /api/instance-stats/reset-identity  admin: new instance id and key
  *
- * Every route needs a session (the global guard); none is public and none is
- * called by Ever Platform (see `ever-connect.routes.json`). The module is not
- * loaded at all with `EVER_STATS_ENABLED=false`, so every route then answers
- * 404. Responses are never cached.
+ * Every route needs a signed-in caller (the global guard); none is public and
+ * none is called by Ever Platform (see `ever-connect.routes.json`). The three
+ * operator CONTROLS — the switch, *Send now* and *Reset instance identity* —
+ * also need the admin's interactive session (`SessionOnlyGuard`): an API key
+ * or a fleet-run credential acting as the admin is refused with 403, so an
+ * automation can never switch statistics back on, send or reset the identity.
+ * The module is not loaded at all with `EVER_STATS_ENABLED=false`, so every
+ * route then answers 404. Responses are never cached.
  */
 @ApiTags('instance-stats')
 @ApiBearerAuth('JWT-auth')
@@ -56,12 +65,12 @@ export class InstanceStatsController {
     @Header('Cache-Control', 'no-store')
     @ApiOperation({
         summary:
-            'Whether this installation sends anonymous usage statistics. A platform admin also gets the reason, the next send, the endpoint and the last attempt; anyone else gets {enabled} only.',
+            'Whether this installation sends anonymous usage statistics and who manages them. A platform admin also gets the reason, the next send, the endpoint and the last attempt; anyone else gets {enabled, managedBy} only.',
     })
     async status(@CurrentUser() auth: AuthenticatedUser): Promise<InstanceStatsStatus> {
         const user = auth?.userId ? await this.users.findById(auth.userId) : null;
         if (user?.isPlatformAdmin === true) return this.stats.operatorStatus();
-        return { enabled: await this.stats.isEnabled() };
+        return this.stats.publicStatus();
     }
 
     @Post('preview')
@@ -87,13 +96,16 @@ export class InstanceStatsController {
 
     @Post('send-now')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(IsPlatformAdminGuard)
+    @UseGuards(SessionOnlyGuard, IsPlatformAdminGuard)
     @Header('Cache-Control', 'no-store')
     @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Send one report now (at most once per 10 minutes; refused while switched off).',
     })
-    @ApiResponse({ status: 403, description: 'Caller is not a platform admin' })
+    @ApiResponse({
+        status: 403,
+        description: 'Caller is not a platform admin, or not in an interactive session',
+    })
     @ApiResponse({
         status: 409,
         description: 'Statistics are switched off, or a send is in progress',
@@ -136,14 +148,17 @@ export class InstanceStatsController {
     }
 
     @Put('toggle')
-    @UseGuards(IsPlatformAdminGuard)
+    @UseGuards(SessionOnlyGuard, IsPlatformAdminGuard)
     @Header('Cache-Control', 'no-store')
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary:
             'Switch anonymous usage statistics on or off for this installation. Off: no request is made at all. Writes an Activity row with the actor and the action only.',
     })
-    @ApiResponse({ status: 403, description: 'Caller is not a platform admin' })
+    @ApiResponse({
+        status: 403,
+        description: 'Caller is not a platform admin, or not in an interactive session',
+    })
     async toggle(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: InstanceStatsToggleDto,
@@ -153,17 +168,33 @@ export class InstanceStatsController {
 
     @Post('reset-identity')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(IsPlatformAdminGuard)
+    @UseGuards(SessionOnlyGuard, IsPlatformAdminGuard)
     @Header('Cache-Control', 'no-store')
     @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary:
             'Give this installation a new instance id and a new statistics key, so future reports cannot be joined to past ones. Writes an Activity row with the actor and the action only.',
     })
-    @ApiResponse({ status: 403, description: 'Caller is not a platform admin' })
+    @ApiResponse({
+        status: 403,
+        description: 'Caller is not a platform admin, or not in an interactive session',
+    })
+    @ApiResponse({ status: 409, description: 'A report is being sent right now' })
     async resetIdentity(
         @CurrentUser() auth: AuthenticatedUser,
     ): Promise<{ instanceId: string; resetCount: number }> {
-        return this.stats.resetIdentity(auth.userId);
+        try {
+            return await this.stats.resetIdentity(auth.userId);
+        } catch (error) {
+            if (!(error instanceof InstanceStatsResetRefusedError)) throw error;
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'send_in_progress',
+                    message: 'A report is being sent right now',
+                },
+                HttpStatus.CONFLICT,
+            );
+        }
     }
 }

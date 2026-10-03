@@ -26,8 +26,11 @@ import { PluginEntity } from '@ever-works/agent/plugins';
  * not set with a unique `canary-…` marker (names, e-mails, descriptions,
  * URLs, prompts, slugs — whatever the entity has), so the canary list is
  * generated from the schema rather than written by hand, and a column added
- * later is covered the day it lands. Enum-constrained columns get their first
- * allowed value instead (a marker would break their CHECK constraint).
+ * later is covered the day it lands. Every id it generates (row UUIDs, `…Id`
+ * columns) is a canary too, and so is every free value the seed sets by hand
+ * (a custom deployment provider, an unknown Work kind, plugin ids). Enum-
+ * constrained columns get their first allowed value instead (a marker would
+ * break their CHECK constraint; a closed enum value names nobody).
  */
 export async function createStatsDataSource(): Promise<DataSource> {
     const dataSource = new DataSource({
@@ -48,6 +51,13 @@ export async function createStatsDataSource(): Promise<DataSource> {
 export const CANARIES: string[] = [];
 
 let canarySeq = 0;
+
+/** A generated id — never allowed in a payload either. */
+function generatedId(): string {
+    const id = randomUUID();
+    CANARIES.push(id);
+    return id;
+}
 
 function canary(table: string, column: string): string {
     canarySeq += 1;
@@ -72,7 +82,7 @@ export async function insertRow<T extends ObjectLiteral>(
         if (column.isCreateDate || column.isUpdateDate || column.isDeleteDate || column.isVersion)
             continue;
         if (column.isGenerated) {
-            if (column.generationStrategy === 'uuid') row[key] = randomUUID();
+            if (column.generationStrategy === 'uuid') row[key] = generatedId();
             continue;
         }
         const type =
@@ -87,12 +97,12 @@ export async function insertRow<T extends ObjectLiteral>(
         if (/char|text|string/.test(type)) {
             row[key] =
                 /uuid/i.test(key) || key.endsWith('Id')
-                    ? randomUUID()
+                    ? generatedId()
                     : canary(metadata.tableName, key);
             continue;
         }
         if (type === 'uuid') {
-            row[key] = randomUUID();
+            row[key] = generatedId();
             continue;
         }
         if (!required) continue;
@@ -154,6 +164,15 @@ export async function seedOneUserInstance(
     const repoUrl = 'https://github.com/canary-org/canary-repo';
     const prompt = 'Build a canary directory of secret things';
     CANARIES.push(person.email, person.name, person.username, company, workName, repoUrl, prompt);
+    // The free values set by hand below: an unknown Work kind and a custom
+    // deployment provider (both counted under `other`, never named), and the
+    // plugin ids (counted, never named).
+    CANARIES.push(
+        'a-kind-from-the-future',
+        'acme-internal-deployer',
+        'ever-stats-sink',
+        'another-plugin',
+    );
 
     const user = await insertRow(dataSource, User, {
         email: person.email,

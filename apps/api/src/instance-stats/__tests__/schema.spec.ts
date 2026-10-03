@@ -20,11 +20,26 @@ type Json = Record<string, unknown>;
  * one `additionalProperties: false` and shows both the meta-test and the
  * validator then let an unknown field through.
  */
-function openObjects(schema: unknown, path = '#'): string[] {
+/** Keywords whose subschemas apply to the SAME instance as the node that holds them. */
+const IN_PLACE_ARRAYS = ['allOf', 'anyOf', 'oneOf'];
+const IN_PLACE_SCHEMAS = ['if', 'then', 'else', 'not'];
+
+/**
+ * Every object level that is not closed. A branch of `oneOf`/`allOf`/`if`…
+ * applies to the same object as its parent, so a closed parent covers it
+ * (a property the branch names but the parent does not is refused by the
+ * parent's `additionalProperties: false`); its nested schemas are still walked.
+ */
+function openObjects(schema: unknown, path = '#', covered = false): string[] {
     if (!schema || typeof schema !== 'object') return [];
     const node = schema as Json;
     const found: string[] = [];
-    const isObject = node.type === 'object';
+    // An object-shaped subschema counts whether or not it says `type: 'object'`.
+    const isObject =
+        node.type === 'object' ||
+        ['properties', 'patternProperties', 'additionalProperties', 'propertyNames'].some(
+            (keyword) => keyword in node,
+        );
     if (isObject) {
         const closed = node.additionalProperties === false;
         const boundedMap =
@@ -32,15 +47,18 @@ function openObjects(schema: unknown, path = '#'): string[] {
             node.additionalProperties !== null &&
             typeof (node.propertyNames as Json | undefined)?.pattern === 'string' &&
             typeof node.maxProperties === 'number';
-        if (!closed && !boundedMap) found.push(path);
+        if (!closed && !boundedMap && !covered) found.push(path);
     }
+    const closesHere = node.additionalProperties === false || covered;
     for (const [key, value] of Object.entries(node)) {
         if (Array.isArray(value)) {
+            const inPlace = IN_PLACE_ARRAYS.includes(key) && closesHere;
             value.forEach((item, index) =>
-                found.push(...openObjects(item, `${path}/${key}/${index}`)),
+                found.push(...openObjects(item, `${path}/${key}/${index}`, inPlace)),
             );
         } else if (value && typeof value === 'object') {
-            found.push(...openObjects(value, `${path}/${key}`));
+            const inPlace = IN_PLACE_SCHEMAS.includes(key) && closesHere;
+            found.push(...openObjects(value, `${path}/${key}`, inPlace));
         }
     }
     return found;
@@ -89,6 +107,24 @@ describe('ever.stats.v1 — strict schema', () => {
         };
         expect(validateMutated(leaking)).toBe(true);
         expect(validateStatsReport(leaking).ok).toBe(false);
+    });
+
+    it('control: a branch under an OPEN parent is not covered', () => {
+        const mutated = JSON.parse(JSON.stringify(EVER_STATS_V1_SCHEMA)) as Json;
+        expect(Array.isArray(mutated.oneOf)).toBe(true);
+        delete mutated.additionalProperties;
+        const open = openObjects(mutated);
+        expect(open).toContain('#');
+        expect(open.filter((path) => path.startsWith('#/oneOf/')).length).toBeGreaterThan(0);
+    });
+
+    it('control: an object-shaped subschema without `type` is checked all the same', () => {
+        const mutated = JSON.parse(JSON.stringify(EVER_STATS_V1_SCHEMA)) as Json;
+        const works = ((mutated.$defs as Json).works as Json).counts as Json;
+        expect(works.properties).toBeDefined();
+        delete works.type;
+        delete works.additionalProperties;
+        expect(openObjects(mutated)).toEqual(['#/$defs/works/counts']);
     });
 
     it('accepts the builder output strictly', () => {

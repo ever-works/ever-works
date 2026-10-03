@@ -5,7 +5,7 @@ import type {
     StatsSendResult,
     WorksStatsV1Report,
 } from '@ever-works/contracts';
-import { serverFetch, serverMutation } from './server-api';
+import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 /**
  * Anonymous usage statistics — the web's client for `/api/instance-stats/*`.
@@ -18,6 +18,20 @@ const BASE = '/instance-stats';
 
 export const instanceStatsAPI = {
     status: () => serverFetch<InstanceStatsStatus>(`${BASE}/status`, { cache: 'no-store' }),
+    /**
+     * Whether this installation has the statistics module at all: `false`
+     * only when the API answers 404 (switched off by `EVER_STATS_ENABLED`).
+     * Any other failure answers `true`, so the page can say that the status
+     * could not be read rather than vanish.
+     */
+    isAvailable: async (): Promise<boolean> => {
+        try {
+            await instanceStatsAPI.status();
+            return true;
+        } catch (error) {
+            return !(error instanceof ApiResponseError && error.statusCode === 404);
+        }
+    },
     last: () =>
         serverFetch<{ report: InstanceStatsReportView | null }>(`${BASE}/last`, {
             cache: 'no-store',

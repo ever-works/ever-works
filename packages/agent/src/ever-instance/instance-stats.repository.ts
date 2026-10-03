@@ -146,7 +146,9 @@ export class InstanceStatsRepository {
             .groupBy(`${alias}.${column}`);
         if (where) qb = where(qb);
         const rows: Array<{ value: unknown; total: unknown }> = await qb.getRawMany();
-        const out: Record<string, number> = {};
+        // No prototype: a stored value such as `constructor` or `__proto__` is
+        // a key like any other (and is folded under `other` by the module).
+        const out: Record<string, number> = Object.create(null);
         for (const row of rows) {
             const key = typeof row.value === 'string' ? row.value : String(row.value ?? '');
             out[key] = (out[key] ?? 0) + toCount(row.total);

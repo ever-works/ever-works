@@ -121,7 +121,7 @@ describe('instance statistics — delivery to a contract receiver', () => {
                 },
             ],
         });
-        expect((await h.lease.schedule())?.rejectedModuleVersion).toBe('1.0.0');
+        expect((await h.lease.schedule())?.rejectedModuleVersion).toBe(h.sender.releaseMarker());
     });
 
     it('is refused as key_mismatch with another key for a pinned instance, and accepted again after a reset', async () => {

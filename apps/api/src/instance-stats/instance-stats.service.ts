@@ -1,6 +1,8 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type {
+    InstanceStatsManagedBy,
     InstanceStatsOperatorStatus,
+    InstanceStatsPublicStatus,
     InstanceStatsReason,
     InstanceStatsReportView,
     WorksStatsV1Report,
@@ -36,6 +38,14 @@ export class InstanceStatsSendNowRefusedError extends Error {
     }
 }
 
+/** *Reset instance identity* refused: a report is being built or sent right now. */
+export class InstanceStatsResetRefusedError extends Error {
+    constructor() {
+        super('reset refused: send in progress');
+        this.name = 'InstanceStatsResetRefusedError';
+    }
+}
+
 /**
  * The operator surface of the anonymous usage statistics module (Settings →
  * Ever Platform → Anonymous usage statistics): status, a live preview of what
@@ -58,32 +68,41 @@ export class InstanceStatsService {
         @Optional() private readonly activity?: ActivityLogService,
     ) {}
 
-    /** What any signed-in person may know: whether statistics are on. */
-    async isEnabled(): Promise<boolean> {
+    /** What any signed-in person may know: whether statistics are on, and who manages them. */
+    async publicStatus(): Promise<InstanceStatsPublicStatus> {
         const instance = await this.identity.ensure();
-        return instance.statsEnabledUi;
+        return { enabled: instance.statsEnabledUi, managedBy: this.managedBy() };
+    }
+
+    /** Ever Cloud for an installation that declares itself `cloud`, the instance operator otherwise. */
+    managedBy(): InstanceStatsManagedBy {
+        return this.config.installSource === 'cloud' ? 'cloud' : 'operator';
     }
 
     async operatorStatus(): Promise<InstanceStatsOperatorStatus> {
         const instance = await this.identity.ensure();
-        const [schedule, last] = await Promise.all([
+        const [schedule, last, keyReadable] = await Promise.all([
             this.lease.schedule(),
             this.lease.lastReport(),
+            this.identity.isKeyReadable(),
         ]);
         const sinkAvailable = this.sink.isAvailable(this.config.sinkPluginId);
         const reason: InstanceStatsReason = !instance.statsEnabledUi
             ? 'ui'
-            : !sinkAvailable
-              ? 'sink_unavailable'
-              : this.config.installSource === 'cloud'
-                ? 'cloud-managed'
-                : 'on';
+            : !keyReadable
+              ? 'key_unreadable'
+              : !sinkAvailable
+                ? 'sink_unavailable'
+                : this.config.installSource === 'cloud'
+                  ? 'cloud-managed'
+                  : 'on';
         const lastManual = schedule?.lastManualSendAt?.getTime() ?? null;
         const nextManual =
             lastManual !== null ? lastManual + INSTANCE_STATS_SEND_NOW_INTERVAL_MS : null;
         return {
             operator: true,
             enabled: instance.statsEnabledUi,
+            managedBy: this.managedBy(),
             reason,
             uiEnabled: instance.statsEnabledUi,
             installSource: this.config.installSource,
@@ -96,6 +115,7 @@ export class InstanceStatsService {
                     ? schedule.nextSendAt.toISOString()
                     : null,
             sinkAvailable,
+            keyStoredEncrypted: this.identity.isKeyStoredWrapped(instance),
             lastReport: last ? withoutPayload(toView(last)) : null,
             sendNowAvailableAt:
                 nextManual !== null && nextManual > this.clock().getTime()
@@ -146,15 +166,35 @@ export class InstanceStatsService {
         return instance.statsEnabledUi;
     }
 
+    /**
+     * A new instance id and key, taken under the send lease: every send builds
+     * and signs under that lease, so a report built for the OLD identity can
+     * never be signed with the NEW key (one request would pair them). While a
+     * send holds the lease the reset is refused (409).
+     *
+     * The lease lives on the schedule row, so a reset that comes before the
+     * boot created it (the scheduler's first look is asynchronous) creates it
+     * first — due one send interval from now, as after a first boot — and is
+     * never without the lease.
+     */
     async resetIdentity(actorUserId: string): Promise<{ instanceId: string; resetCount: number }> {
-        const instance = await this.identity.reset();
-        await this.sender.clearPark();
-        this.audit(
-            actorUserId,
-            'instance_stats.identity_reset',
-            'Reset the anonymous usage statistics identity',
-        );
-        return { instanceId: instance.instanceId, resetCount: instance.resetCount };
+        const now = this.clock();
+        await this.lease.ensureSchedule(new Date(now.getTime() + this.config.sendIntervalS * 1000));
+        if (!(await this.lease.tryAcquire(now))) {
+            throw new InstanceStatsResetRefusedError();
+        }
+        try {
+            const instance = await this.identity.reset();
+            await this.sender.clearPark();
+            this.audit(
+                actorUserId,
+                'instance_stats.identity_reset',
+                'Reset the anonymous usage statistics identity',
+            );
+            return { instanceId: instance.instanceId, resetCount: instance.resetCount };
+        } finally {
+            await this.lease.release();
+        }
     }
 
     /** One Activity row: actor and action, nothing else. Best-effort, never fails the request. */

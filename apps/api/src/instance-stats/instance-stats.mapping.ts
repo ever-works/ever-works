@@ -56,7 +56,9 @@ const PROVIDER_KEYS: Readonly<Record<string, WorksStatsDeploymentProviderKey>> =
 
 /** A stored deployment provider id → its schema key; any other provider (a custom plugin) → `other`. */
 export function deploymentProviderKey(stored: string): WorksStatsDeploymentProviderKey {
-    return PROVIDER_KEYS[stored.trim().toLowerCase()] ?? 'other';
+    const id = stored.trim().toLowerCase();
+    // Own keys only: `constructor`, `toString` or `__proto__` must fold to `other`.
+    return Object.prototype.hasOwnProperty.call(PROVIDER_KEYS, id) ? PROVIDER_KEYS[id] : 'other';
 }
 
 /** `deployments_by_provider` with every schema key present. */

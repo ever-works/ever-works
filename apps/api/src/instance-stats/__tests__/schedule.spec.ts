@@ -1,6 +1,9 @@
 import type { DataSource } from 'typeorm';
 import { EverInstance } from '@ever-works/agent/entities';
 import { StatsSinkUnavailableError } from '@ever-works/agent/facades';
+import { INSTANCE_STATS_MODULE_VERSION, versionAndChannel } from '../instance-stats.mapping';
+import { instanceStatsReleaseMarker } from '../instance-stats-sender.service';
+import { getBuildInfo } from '../../health/build-info';
 import { createHarness, FakeSink, type StatsHarness } from './fixtures/harness.helper-spec';
 import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
@@ -8,8 +11,10 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
  * The schedule: first send a day after first boot (10 minutes after boot when
  * overdue by more than a day), then once per UTC day at a random second drawn
  * per report, the closed month re-sent on days 1-3, the retry ladder after a
- * failure, no retry of a refused report until an upgrade or a reset, the
- * operator switch, and ONE report from two replicas.
+ * failure, no retry of a report refused by the schema or for its key until
+ * a release changes the product or module version (or a reset), a bounded
+ * 7-day pause after any other refusal (a redirect, say), the operator switch,
+ * and ONE report from two replicas.
  */
 const HOUR = 60 * 60 * 1000;
 
@@ -122,6 +127,10 @@ describe('InstanceStatsSenderService — schedule', () => {
             ['2026-11', false],
             ['2026-10', true],
         ]);
+        // Both attempts share their time: *Last payload* is the one sent last.
+        const last = await h.lease.lastReport();
+        expect(last?.final).toBe(true);
+        expect(last?.payload).toBe(Buffer.from(h.sink.calls[1].report.body).toString('utf8'));
 
         h.clock.now = (await h.lease.schedule())!.nextSendAt!;
         await h.sender.runDue();
@@ -158,7 +167,7 @@ describe('InstanceStatsSenderService — schedule', () => {
         expect(last?.status).toBe('sent');
     });
 
-    it('does not retry a refused report until the module version changes or the identity is reset', async () => {
+    it('does not retry a report refused by the schema until the release changes', async () => {
         const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');
         h.sink.answer = {
             status: 'rejected',
@@ -168,7 +177,13 @@ describe('InstanceStatsSenderService — schedule', () => {
         };
         await h.lease.ensureSchedule(new Date('2026-10-15T08:00:00Z'));
         await h.sender.runDue();
-        expect((await h.lease.schedule())?.rejectedModuleVersion).toBe('1.0.0');
+        // Pinned to (statistics module version, product version), in the 14
+        // characters of the column.
+        const marker = (await h.lease.schedule())?.rejectedModuleVersion;
+        const product = versionAndChannel(getBuildInfo().version).version;
+        expect(marker).toBe(instanceStatsReleaseMarker(product));
+        expect(marker).toHaveLength(14);
+        expect(marker).not.toBe(instanceStatsReleaseMarker(`${product}.1`));
         const stored = await h.lease.lastReport();
         expect(stored).toMatchObject({
             status: 'rejected',
@@ -181,12 +196,65 @@ describe('InstanceStatsSenderService — schedule', () => {
         expect(await h.sender.runDue()).toEqual({ ran: false, reason: 'parked' });
         expect(h.sink.calls).toHaveLength(1);
 
-        // An upgrade: the parked version is no longer the running one.
-        await h.lease.updateSchedule({ rejectedModuleVersion: '0.9.0' });
+        // A Works upgrade (another product version, same statistics module):
+        // the parked marker is no longer the running release's.
+        await h.lease.updateSchedule({
+            rejectedModuleVersion: instanceStatsReleaseMarker('0.0.1'),
+        });
         h.sink.answer = { status: 'sent', httpStatus: 202, errorCode: null };
         h.clock.now = (await h.lease.schedule())!.nextSendAt!;
         expect((await h.sender.runDue()).ran).toBe(true);
         expect(h.sink.calls).toHaveLength(2);
+    });
+
+    it('un-parks a refusal stored by an earlier build (the bare module version)', async () => {
+        const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');
+        await h.lease.ensureSchedule(new Date('2026-10-15T08:00:00Z'));
+        await h.lease.updateSchedule({ rejectedModuleVersion: INSTANCE_STATS_MODULE_VERSION });
+        expect((await h.sender.runDue()).ran).toBe(true);
+    });
+
+    it.each([
+        [302, 'redirect'],
+        [401, 'http_error'],
+        [404, 'http_error'],
+    ] as const)(
+        'pauses for 7 days after a %s refusal, then tries again',
+        async (httpStatus, errorCode) => {
+            const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');
+            await h.lease.ensureSchedule(new Date('2026-10-15T08:00:00Z'));
+            h.sink.answer = { status: 'rejected', httpStatus, errorCode };
+            await h.sender.runDue();
+            const schedule = (await h.lease.schedule())!;
+            expect(schedule.rejectedModuleVersion ?? null).toBeNull();
+            // Seven days at the earliest: the random second (the test random
+            // draws 3600 s) of the day after 2026-10-22T08:00.
+            expect(schedule.nextSendAt?.toISOString()).toBe('2026-10-23T01:00:00.000Z');
+
+            h.clock.now = new Date('2026-10-22T08:00:00Z');
+            expect(await h.sender.runDue()).toEqual({ ran: false, reason: 'not_due' });
+            expect(h.sink.calls).toHaveLength(1);
+
+            h.sink.answer = { status: 'sent', httpStatus: 202, errorCode: null };
+            h.clock.now = schedule.nextSendAt!;
+            expect((await h.sender.runDue()).ran).toBe(true);
+            expect(h.sink.calls).toHaveLength(2);
+        },
+    );
+
+    it('a reset before the boot created the schedule creates it, under the lease', async () => {
+        const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');
+        expect(await h.lease.schedule()).toBeNull();
+
+        await h.service.resetIdentity('operator-user');
+        const schedule = (await h.lease.schedule())!;
+        // Due one interval out, as after a first boot, and the lease is free again.
+        expect(schedule.nextSendAt?.toISOString()).toBe('2026-10-16T08:00:00.000Z');
+        expect(schedule.holder ?? null).toBeNull();
+        // The boot's own first look keeps it.
+        expect((await h.sender.initialise()).nextSendAt?.toISOString()).toBe(
+            '2026-10-16T08:00:00.000Z',
+        );
     });
 
     it('makes no request at all while the operator switch is off', async () => {

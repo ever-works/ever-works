@@ -106,8 +106,10 @@ export class EverStatsSinkPlugin implements IStatsSinkPlugin {
 
 /**
  * Map an HTTP answer onto the closed result (status table of the published contract): `202`
- * sent; `429`/`5xx` failed (retried, honouring a `Retry-After` in seconds); everything else —
- * a redirect included — rejected, and not retried until the module is upgraded.
+ * sent; `408`/`429`/`5xx` failed (retried, honouring a `Retry-After` in seconds); everything
+ * else — a redirect included — rejected. What a refusal then does is the module's schedule:
+ * `422` and `409` wait for a new release (or, for `409`, an identity reset), any other refusal
+ * is tried again after a few days.
  */
 export function mapAnswer(status: number, answer: unknown, retryAfter: string | null = null): StatsSendResult {
 	const problem = (answer && typeof answer === 'object' ? answer : {}) as {
@@ -130,6 +132,13 @@ export function mapAnswer(status: number, answer: unknown, retryAfter: string | 
 		};
 	}
 	if (status === 409) return failed('key_mismatch', status, 'rejected');
+	// `408`: the receiver gave up waiting for the request — transient, retried like a 5xx.
+	if (status === 408 || status === 429 || status >= 500) {
+		const result = failed(status === 429 ? 'rate_limited' : status === 408 ? 'timeout' : 'server_error', status);
+		const asked = retryAfter !== null && /^\d{1,6}$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : 0;
+		if (asked > 0) result.retryAfterS = asked;
+		return result;
+	}
 	if (status === 413) return failed('too_large', status, 'rejected');
 	if (status === 415) return failed('unsupported_media_type', status, 'rejected');
 	if (status === 400) {
@@ -138,12 +147,6 @@ export function mapAnswer(status: number, answer: unknown, retryAfter: string | 
 			status,
 			'rejected'
 		);
-	}
-	if (status === 429 || status >= 500) {
-		const result = failed(status === 429 ? 'rate_limited' : 'server_error', status);
-		const asked = retryAfter !== null && /^\d{1,6}$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : 0;
-		if (asked > 0) result.retryAfterS = asked;
-		return result;
 	}
 	return failed('http_error', status, 'rejected');
 }
@@ -169,11 +172,42 @@ function fieldErrors(raw: unknown): StatsSendFieldError[] {
 	return out;
 }
 
-/** Read a small JSON answer; anything else (or too large) is `null`. */
-async function readAnswer(response: Response): Promise<unknown> {
+/**
+ * Read a small JSON answer; anything else (or too large) is `null`.
+ *
+ * Never more than {@link MAX_ANSWER_BYTES} is held in memory: a declared
+ * `Content-Length` above the cap is refused before reading, and the body is
+ * read chunk by chunk with a running count and cancelled as soon as it passes
+ * the cap — an endpoint that streams without end costs nothing beyond it.
+ */
+export async function readAnswer(response: Response): Promise<unknown> {
+	const declared = response.headers.get('content-length');
+	if (declared !== null && /^\d+$/.test(declared.trim()) && Number(declared.trim()) > MAX_ANSWER_BYTES) {
+		await response.body?.cancel().catch(() => undefined);
+		return null;
+	}
+	const reader = response.body?.getReader();
+	if (!reader) return null;
+	const chunks: Uint8Array[] = [];
+	let total = 0;
 	try {
-		const buffer = new Uint8Array(await response.arrayBuffer());
-		if (buffer.byteLength === 0 || buffer.byteLength > MAX_ANSWER_BYTES) return null;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			total += value.byteLength;
+			if (total > MAX_ANSWER_BYTES) {
+				await reader.cancel().catch(() => undefined);
+				return null;
+			}
+			chunks.push(value);
+		}
+		if (total === 0) return null;
+		const buffer = new Uint8Array(total);
+		let offset = 0;
+		for (const chunk of chunks) {
+			buffer.set(chunk, offset);
+			offset += chunk.byteLength;
+		}
 		return JSON.parse(new TextDecoder().decode(buffer));
 	} catch {
 		return null;

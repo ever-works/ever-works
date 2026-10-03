@@ -89,3 +89,7 @@ docs/specs/features/app-works/_build-artifacts/expected-outputs/golden/__negativ
 # schema's against the published value, so reformatting any of them would
 # break that check (and the fixtures are deliberately malformed in places).
 packages/agent/src/ever-instance/contract
+
+# Vendored byte for byte from the published statistics contract (a drift test
+# compares their SHA-256): formatting them would break that copy.
+packages/agent/src/ever-instance/contract/

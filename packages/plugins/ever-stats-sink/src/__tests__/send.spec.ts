@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { SignedStatsReport } from '@ever-works/contracts';
-import { EverStatsSinkPlugin, mapAnswer } from '../ever-stats-sink.plugin.js';
+import { EverStatsSinkPlugin, mapAnswer, readAnswer } from '../ever-stats-sink.plugin.js';
 
 /**
  * The plugin posts the signed body BYTE FOR BYTE, with the signature headers
@@ -173,6 +173,7 @@ describe('mapAnswer — the published status table', () => {
 		[500, null, { status: 'failed', httpStatus: 500, errorCode: 'server_error' }],
 		[503, null, { status: 'failed', httpStatus: 503, errorCode: 'server_error' }],
 		[404, null, { status: 'rejected', httpStatus: 404, errorCode: 'http_error' }],
+		[408, null, { status: 'failed', httpStatus: 408, errorCode: 'timeout' }],
 		[301, null, { status: 'rejected', httpStatus: 301, errorCode: 'redirect' }]
 	])('%s maps as published', (status, answer, expected) => {
 		expect(mapAnswer(status, answer)).toEqual(expected);
@@ -186,6 +187,12 @@ describe('mapAnswer — the published status table', () => {
 			retryAfterS: 7200
 		});
 		expect(mapAnswer(503, null, '60')).toMatchObject({ errorCode: 'server_error', retryAfterS: 60 });
+		expect(mapAnswer(408, null, '7200')).toEqual({
+			status: 'failed',
+			httpStatus: 408,
+			errorCode: 'timeout',
+			retryAfterS: 7200
+		});
 		expect(mapAnswer(429, null, 'Wed, 21 Oct 2026 07:28:00 GMT')).not.toHaveProperty('retryAfterS');
 		expect(mapAnswer(422, { errors: [] }, '60')).not.toHaveProperty('retryAfterS');
 	});
@@ -204,5 +211,53 @@ describe('mapAnswer — the published status table', () => {
 				{ path: '/b', code: 'pattern' }
 			]
 		});
+	});
+});
+
+describe('readAnswer — never more than 64 KiB in memory', () => {
+	const KIB = 1024;
+
+	/** A body that streams `chunks` chunks of 16 KiB and records whether it was cancelled. */
+	function streamed(chunks: number, headers: Record<string, string> = {}) {
+		const state = { pulled: 0, cancelled: false };
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				if (state.pulled >= chunks) {
+					controller.close();
+					return;
+				}
+				state.pulled += 1;
+				controller.enqueue(new Uint8Array(16 * KIB).fill(0x20));
+			},
+			cancel() {
+				state.cancelled = true;
+			}
+		});
+		return { response: new Response(body, { status: 422, headers }), state };
+	}
+
+	it('reads a small JSON problem document', async () => {
+		expect(await readAnswer(new Response('{"code":"schema_violation"}', { status: 422 }))).toEqual({
+			code: 'schema_violation'
+		});
+	});
+
+	it('stops reading an endless body just past the cap and cancels it', async () => {
+		const { response, state } = streamed(10_000);
+		expect(await readAnswer(response)).toBeNull();
+		expect(state.cancelled).toBe(true);
+		// 64 KiB is four 16 KiB chunks; the fifth crosses the cap. Nothing beyond is read.
+		expect(state.pulled).toBeLessThanOrEqual(6);
+	});
+
+	it('refuses a declared Content-Length above the cap without reading the body', async () => {
+		const { response, state } = streamed(10, { 'content-length': String(160 * KIB) });
+		expect(await readAnswer(response)).toBeNull();
+		expect(state.pulled).toBeLessThanOrEqual(1);
+	});
+
+	it('answers null for an empty or non-JSON body', async () => {
+		expect(await readAnswer(new Response(null, { status: 404 }))).toBeNull();
+		expect(await readAnswer(new Response('<html>', { status: 302 }))).toBeNull();
 	});
 });
