@@ -36,6 +36,14 @@ export class InstanceStatsSendNowRefusedError extends Error {
     }
 }
 
+/** *Reset instance identity* refused: a report is being built or sent right now. */
+export class InstanceStatsResetRefusedError extends Error {
+    constructor() {
+        super('reset refused: send in progress');
+        this.name = 'InstanceStatsResetRefusedError';
+    }
+}
+
 /**
  * The operator surface of the anonymous usage statistics module (Settings →
  * Ever Platform → Anonymous usage statistics): status, a live preview of what
@@ -146,15 +154,30 @@ export class InstanceStatsService {
         return instance.statsEnabledUi;
     }
 
+    /**
+     * A new instance id and key, taken under the send lease: every send builds
+     * and signs under that lease, so a report built for the OLD identity can
+     * never be signed with the NEW key (one request would pair them). While a
+     * send holds the lease the reset is refused (409); with no schedule row
+     * yet, nothing can be sending.
+     */
     async resetIdentity(actorUserId: string): Promise<{ instanceId: string; resetCount: number }> {
-        const instance = await this.identity.reset();
-        await this.sender.clearPark();
-        this.audit(
-            actorUserId,
-            'instance_stats.identity_reset',
-            'Reset the anonymous usage statistics identity',
-        );
-        return { instanceId: instance.instanceId, resetCount: instance.resetCount };
+        const leased = (await this.lease.schedule()) !== null;
+        if (leased && !(await this.lease.tryAcquire(this.clock()))) {
+            throw new InstanceStatsResetRefusedError();
+        }
+        try {
+            const instance = await this.identity.reset();
+            await this.sender.clearPark();
+            this.audit(
+                actorUserId,
+                'instance_stats.identity_reset',
+                'Reset the anonymous usage statistics identity',
+            );
+            return { instanceId: instance.instanceId, resetCount: instance.resetCount };
+        } finally {
+            if (leased) await this.lease.release();
+        }
     }
 
     /** One Activity row: actor and action, nothing else. Best-effort, never fails the request. */

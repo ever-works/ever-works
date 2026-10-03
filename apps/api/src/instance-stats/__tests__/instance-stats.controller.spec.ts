@@ -23,24 +23,32 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
  * is the platform admin's (403 for anyone else), *Send now* is refused while
  * switched off (409) and allowed once per 10 minutes (429), the switch and
  * the reset each write one Activity row with the actor and the action only,
- * and no response may be cached.
+ * and no response may be cached. The three controls (the switch, *Send now*,
+ * *Reset instance identity*) need the admin's interactive session: an API key
+ * or a fleet-run credential acting as the admin is refused (403) and changes
+ * nothing.
  */
 const USERS: Record<string, { isPlatformAdmin: boolean }> = {
     admin: { isPlatformAdmin: true },
     member: { isPlatformAdmin: false },
 };
 
-/** Stands in for the global session guard: `x-test-user` names the signed-in person. */
+/**
+ * Stands in for the global session guard: `x-test-user` names the signed-in
+ * person and `x-test-auth` the credential path it stamps (`authMethod`) —
+ * `session` unless the request says otherwise, `none` for no stamp at all.
+ */
 @Injectable()
 class TestSessionGuard implements CanActivate {
     canActivate(context: ExecutionContext): boolean {
         const req = context.switchToHttp().getRequest<{
             headers: Record<string, string | undefined>;
-            user?: { userId: string };
+            user?: { userId: string; authMethod?: string };
         }>();
         const id = req.headers['x-test-user'];
         if (!id) return false;
-        req.user = { userId: id };
+        const method = req.headers['x-test-auth'] ?? 'session';
+        req.user = method === 'none' ? { userId: id } : { userId: id, authMethod: method };
         return true;
     }
 }
@@ -79,11 +87,23 @@ describe('InstanceStatsController', () => {
         if (dataSource?.isInitialized) await dataSource.destroy();
     });
 
-    const as = (user: string) => ({
-        get: (path: string) => request(app.getHttpServer()).get(path).set('x-test-user', user),
-        post: (path: string) => request(app.getHttpServer()).post(path).set('x-test-user', user),
+    const as = (user: string, auth = 'session') => ({
+        get: (path: string) =>
+            request(app.getHttpServer())
+                .get(path)
+                .set('x-test-user', user)
+                .set('x-test-auth', auth),
+        post: (path: string) =>
+            request(app.getHttpServer())
+                .post(path)
+                .set('x-test-user', user)
+                .set('x-test-auth', auth),
         put: (path: string, body: object) =>
-            request(app.getHttpServer()).put(path).set('x-test-user', user).send(body),
+            request(app.getHttpServer())
+                .put(path)
+                .set('x-test-user', user)
+                .set('x-test-auth', auth)
+                .send(body),
     });
 
     it('answers {enabled} and nothing else to a member', async () => {
@@ -124,6 +144,46 @@ describe('InstanceStatsController', () => {
         await as('member').put('/api/instance-stats/toggle', { enabled: false }).expect(403);
         expect((await harness.identity.get())?.statsEnabledUi).toBe(true);
     });
+
+    // `api-key`: an `ew_live_` personal key or an `ew_run_` fleet-run credential
+    // acting as the admin; `ever-id-delegated`: a delegated Ever ID token; `none`:
+    // a credential path that stamped nothing (fails closed).
+    describe.each(['api-key', 'ever-id-delegated', 'none'])(
+        'the platform admin through a %s credential',
+        (auth) => {
+            it('cannot switch statistics on or off (403) — the switch is unchanged', async () => {
+                const before = (await harness.identity.get())!.statsEnabledUi;
+                const res = await as('admin', auth)
+                    .put('/api/instance-stats/toggle', { enabled: !before })
+                    .expect(403);
+                expect(res.body.code).toBe('session_required');
+                expect((await harness.identity.get())!.statsEnabledUi).toBe(before);
+            });
+
+            it('cannot Send now (403) — nothing is sent', async () => {
+                const sent = harness.sink.calls.length;
+                await as('admin', auth).post('/api/instance-stats/send-now').expect(403);
+                expect(harness.sink.calls).toHaveLength(sent);
+            });
+
+            it('cannot reset the identity (403) — the identity is unchanged', async () => {
+                const before = (await harness.identity.get())!;
+                await as('admin', auth).post('/api/instance-stats/reset-identity').expect(403);
+                const after = (await harness.identity.get())!;
+                expect(after.instanceId).toBe(before.instanceId);
+                expect(after.resetCount).toBe(before.resetCount);
+            });
+
+            it('can still read the status, the preview and the last payload', async () => {
+                const status = await as('admin', auth)
+                    .get('/api/instance-stats/status')
+                    .expect(200);
+                expect(status.body.operator).toBe(true);
+                await as('admin', auth).post('/api/instance-stats/preview').expect(200);
+                await as('admin', auth).get('/api/instance-stats/last').expect(200);
+            });
+        },
+    );
 
     it('previews the report the admin would send, without sending or storing it', async () => {
         const res = await as('admin').post('/api/instance-stats/preview').expect(200);
@@ -182,6 +242,20 @@ describe('InstanceStatsController', () => {
         await as('admin')
             .put('/api/instance-stats/toggle', { enabled: true, extra: 1 })
             .expect(400);
+    });
+
+    it('refuses the reset while a send holds the lease (409), and changes nothing', async () => {
+        const before = (await harness.identity.get())!;
+        // Another replica is sending: it holds the lease.
+        const other = createHarness(dataSource, { now: harness.clock.now });
+        expect(await other.lease.tryAcquire(harness.clock.now)).toBe(true);
+        try {
+            const res = await as('admin').post('/api/instance-stats/reset-identity').expect(409);
+            expect(res.body.code).toBe('send_in_progress');
+            expect((await harness.identity.get())!.instanceId).toBe(before.instanceId);
+        } finally {
+            await other.lease.release();
+        }
     });
 
     it('resets the identity for the admin', async () => {
