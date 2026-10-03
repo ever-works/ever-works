@@ -129,3 +129,39 @@ describe('SettingsLayoutClient — the App Launcher tab', () => {
         expect(launcher).toBe(notifications + 1);
     });
 });
+
+/**
+ * The Ever Platform tab exists only where the API has the anonymous usage
+ * statistics module: with `EVER_STATS_ENABLED=false` the status route answers
+ * 404, the server layout passes `everPlatformEnabled={false}`, and the nav has
+ * no entry to a page that would itself be a 404.
+ */
+describe('SettingsLayoutClient — the Ever Platform tab', () => {
+    const renderNav = (props: { everPlatformEnabled?: boolean } = {}) =>
+        render(
+            <SettingsLayoutClient settingsMenu={null} {...props}>
+                <div data-testid="page-body" />
+            </SettingsLayoutClient>,
+        );
+
+    const hrefs = () =>
+        [...document.querySelectorAll('a')].map((a) => a.getAttribute('href') || '');
+    const everPlatformLink = () => hrefs().find((href) => href.endsWith('/settings/ever-platform'));
+
+    it('renders the tab while the API has the module (and by default)', () => {
+        renderNav({ everPlatformEnabled: true });
+        expect(everPlatformLink()).toBeTruthy();
+    });
+
+    it('renders the tab when a caller passes no prop — only a definite 404 hides it', () => {
+        renderNav();
+        expect(everPlatformLink()).toBeTruthy();
+    });
+
+    it('hides the tab when the module is switched off by the configuration', () => {
+        renderNav({ everPlatformEnabled: false });
+        // Control: the neighbouring Usage tab still renders.
+        expect(hrefs().some((href) => href.endsWith('/settings/usage'))).toBe(true);
+        expect(everPlatformLink()).toBeUndefined();
+    });
+});

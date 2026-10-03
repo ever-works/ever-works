@@ -4206,13 +4206,14 @@
                 "statistics": {
                     "title": "Anonymous usage statistics",
                     "description": "Once a day this installation can send Ever Platform one small, signed report with counts (for example how many Works, agents and deployments it has), which features are switched on, its version and how it was installed. It never contains anything that identifies a person or an organization.",
-                    "offByConfiguration": "Anonymous usage statistics are switched off for this installation by its configuration (EVER_STATS_ENABLED=false). Nothing is sent.",
                     "unavailable": "The anonymous usage statistics status could not be read right now.",
                     "memberOn": "Anonymous usage statistics are on for this installation.",
                     "memberOff": "Anonymous usage statistics are off for this installation.",
                     "managedByOperator": "They are managed by the instance operator.",
+                    "managedByCloud": "They are managed by Ever Cloud.",
                     "notScheduled": "Not scheduled",
                     "docsLink": "What is sent, and how to verify it",
+                    "keyUnencrypted": "The statistics key of this installation is stored unencrypted. Set PLUGIN_SECRET_ENCRYPTION_KEY in the API's environment: the key is encrypted at the next restart.",
                     "toggle": {
                         "label": "Send anonymous usage statistics",
                         "helper": "Off: this installation makes no statistics request at all.",
@@ -4232,6 +4233,7 @@
                         "env": "Off (switched off by the configuration)",
                         "ui": "Off (switched off here)",
                         "cloud-managed": "On — managed by Ever Cloud",
+                        "key_unreadable": "On, but the statistics key cannot be read (the encryption key it was stored with is missing or changed): nothing can be sent. Restore PLUGIN_SECRET_ENCRYPTION_KEY, or reset the instance identity.",
                         "sink_unavailable": "On, but the sender plugin is not available: nothing can be sent"
                     },
                     "sendNow": {
@@ -4250,6 +4252,7 @@
                         "none": "Nothing has been sent yet.",
                         "summary": "{when} · {status} · HTTP {http} · {bytes} bytes",
                         "error": "Reason: {code}.",
+                        "refusedFields": "Fields the receiver refused",
                         "status": {
                             "sent": "sent",
                             "rejected": "refused by the receiver",

@@ -48,8 +48,12 @@ const NEVER_INCLUDED = [
 ] as const;
 
 interface UsageStatisticsSettingsProps {
-    /** `off`: the API answered 404 — switched off by the installation's configuration. */
-    state: 'loaded' | 'off' | 'unavailable';
+    /**
+     * `unavailable`: the status could not be read. (With the module switched
+     * off by the configuration the API answers 404 and the page itself is a
+     * 404, so this component is never rendered then.)
+     */
+    state: 'loaded' | 'unavailable';
     initialStatus: InstanceStatsStatus | null;
     initialLast: InstanceStatsReportView | null;
 }
@@ -91,11 +95,6 @@ export function UsageStatisticsSettings({
                 </p>
             </div>
 
-            {state === 'off' && (
-                <Notice testId="usage-statistics-env-off">
-                    {t('statistics.offByConfiguration')}
-                </Notice>
-            )}
             {state === 'unavailable' && (
                 <Notice testId="usage-statistics-unavailable">{t('statistics.unavailable')}</Notice>
             )}
@@ -106,7 +105,9 @@ export function UsageStatisticsSettings({
                         {initialStatus.enabled
                             ? t('statistics.memberOn')
                             : t('statistics.memberOff')}{' '}
-                        {t('statistics.managedByOperator')}
+                        {initialStatus.managedBy === 'cloud'
+                            ? t('statistics.managedByCloud')
+                            : t('statistics.managedByOperator')}
                     </Notice>
                 )}
             {state === 'loaded' &&
@@ -296,6 +297,14 @@ function OperatorView({
                         {t('sendNow.disabledOff')}
                     </p>
                 )}
+                {!status.keyStoredEncrypted && (
+                    <p
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                        data-testid="usage-statistics-key-unencrypted"
+                    >
+                        {t('keyUnencrypted')}
+                    </p>
+                )}
             </div>
 
             {preview && (
@@ -322,6 +331,21 @@ function OperatorView({
                             })}
                             {last.errorCode ? ` ${t('last.error', { code: last.errorCode })}` : ''}
                         </p>
+                        {last.errors.length > 0 && (
+                            <div data-testid="usage-statistics-last-errors">
+                                <h4 className="text-xs font-semibold text-text dark:text-text-dark">
+                                    {t('last.refusedFields')}
+                                </h4>
+                                <ul className="list-disc pl-5 text-xs text-text-muted dark:text-text-muted-dark">
+                                    {last.errors.map((error, index) => (
+                                        <li key={`${error.path}-${index}`}>
+                                            <code className="break-all">{error.path || '/'}</code>
+                                            {error.code ? ` — ${error.code}` : ''}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         <Payload body={last.payload} testId="usage-statistics-last-body" />
                     </>
                 ) : (

@@ -7,10 +7,12 @@ import { UsageStatisticsSettings } from './UsageStatisticsSettings';
 /**
  * Settings → Ever Platform → Anonymous usage statistics.
  *
- * Pins the three views (switched off by configuration, a member, the
- * operator), that the operator's *Last payload* is the stored bytes verbatim,
- * that the switch and *Send now* call their actions, that *Send now* is
- * disabled while statistics are off, and that the reset asks first.
+ * Pins the two views (a member, the operator — with the module switched off
+ * by the configuration the page itself is a 404), who manages statistics,
+ * that the operator's *Last payload* is the stored bytes verbatim with the
+ * fields a receiver refused, that an unencrypted key is said, that the switch
+ * and *Send now* call their actions, that *Send now* is disabled while
+ * statistics are off, and that the reset asks first.
  */
 
 const actions = {
@@ -69,6 +71,7 @@ function operator(over: Partial<InstanceStatsOperatorStatus> = {}): InstanceStat
     return {
         operator: true,
         enabled: true,
+        managedBy: 'operator',
         reason: 'on',
         uiEnabled: true,
         installSource: 'self-hosted',
@@ -78,6 +81,7 @@ function operator(over: Partial<InstanceStatsOperatorStatus> = {}): InstanceStat
         resetCount: 0,
         nextSendAt: '2026-10-16T08:00:00.000Z',
         sinkAvailable: true,
+        keyStoredEncrypted: true,
         lastReport: null,
         sendNowAvailableAt: null,
         ...over,
@@ -106,10 +110,12 @@ describe('UsageStatisticsSettings', () => {
         actions.getInstanceStatsLastAction.mockResolvedValue({ success: true, data: LAST });
     });
 
-    it('names the configuration switch when the API has the module off', () => {
-        render(<UsageStatisticsSettings state="off" initialStatus={null} initialLast={null} />);
-        expect(screen.getByTestId('usage-statistics-env-off').textContent).toBe(
-            'statistics.offByConfiguration',
+    it('says when the status could not be read', () => {
+        render(
+            <UsageStatisticsSettings state="unavailable" initialStatus={null} initialLast={null} />,
+        );
+        expect(screen.getByTestId('usage-statistics-unavailable').textContent).toBe(
+            'statistics.unavailable',
         );
         expect(screen.queryByTestId('usage-statistics-operator')).toBeNull();
     });
@@ -118,7 +124,7 @@ describe('UsageStatisticsSettings', () => {
         render(
             <UsageStatisticsSettings
                 state="loaded"
-                initialStatus={{ enabled: true }}
+                initialStatus={{ enabled: true, managedBy: 'operator' }}
                 initialLast={null}
             />,
         );
@@ -130,6 +136,77 @@ describe('UsageStatisticsSettings', () => {
         );
         expect(screen.queryByTestId('usage-statistics-toggle')).toBeNull();
         expect(screen.queryByTestId('usage-statistics-last-body')).toBeNull();
+    });
+
+    it('tells a member of a cloud installation that Ever Cloud manages statistics', () => {
+        render(
+            <UsageStatisticsSettings
+                state="loaded"
+                initialStatus={{ enabled: true, managedBy: 'cloud' }}
+                initialLast={null}
+            />,
+        );
+        const notice = screen.getByTestId('usage-statistics-member').textContent;
+        expect(notice).toContain('statistics.managedByCloud');
+        expect(notice).not.toContain('statistics.managedByOperator');
+    });
+
+    it('lists the fields a receiver refused under the last payload', () => {
+        render(
+            <UsageStatisticsSettings
+                state="loaded"
+                initialStatus={operator()}
+                initialLast={{
+                    ...LAST,
+                    status: 'rejected',
+                    httpStatus: 422,
+                    errorCode: 'schema_violation',
+                    errors: [
+                        { path: '/counts/works_by_kind/app', code: 'unknown_field' },
+                        { path: '/country', code: null },
+                    ],
+                }}
+            />,
+        );
+        const errors = screen.getByTestId('usage-statistics-last-errors').textContent;
+        expect(errors).toContain('last.refusedFields');
+        expect(errors).toContain('/counts/works_by_kind/app — unknown_field');
+        expect(errors).toContain('/country');
+        // The stored bytes are still shown verbatim.
+        expect(screen.getByTestId('usage-statistics-last-body').textContent).toBe(LAST.payload);
+    });
+
+    it('shows no refused-fields list for an accepted report', () => {
+        render(
+            <UsageStatisticsSettings
+                state="loaded"
+                initialStatus={operator()}
+                initialLast={LAST}
+            />,
+        );
+        expect(screen.queryByTestId('usage-statistics-last-errors')).toBeNull();
+    });
+
+    it('says when the statistics key is stored unencrypted, and only then', () => {
+        const { unmount } = render(
+            <UsageStatisticsSettings
+                state="loaded"
+                initialStatus={operator({ keyStoredEncrypted: false })}
+                initialLast={null}
+            />,
+        );
+        expect(screen.getByTestId('usage-statistics-key-unencrypted').textContent).toBe(
+            'keyUnencrypted',
+        );
+        unmount();
+        render(
+            <UsageStatisticsSettings
+                state="loaded"
+                initialStatus={operator()}
+                initialLast={null}
+            />,
+        );
+        expect(screen.queryByTestId('usage-statistics-key-unencrypted')).toBeNull();
     });
 
     it('shows the operator the exact last payload and the reason', () => {
