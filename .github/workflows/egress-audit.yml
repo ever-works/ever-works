@@ -14,6 +14,10 @@ name: Egress audit
 #                   other than the statistics report
 #   control         positive_stats without the mock must FAIL, so a green run is not a blind one
 #
+# A second job runs the real sender against the same mock platform (202, every published
+# fixture's 422 with its path, 409 for a second key, 202 after an identity reset):
+# apps/api/src/instance-stats/__tests__/instance-stats.mock.itest.spec.ts.
+#
 # The harness is the public Ever Platform SDK's egress audit, checked out at a pinned commit
 # (EVER_CONNECT_SDK_SHA below); nothing of it is copied into this repository.
 #
@@ -193,3 +197,63 @@ jobs:
           name: egress-audit
           path: ${{ env.AUDIT_ARTIFACTS }}
           retention-days: 14
+
+  stats-mock:
+    name: statistics against the mock platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout the mock platform (pinned commit)
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.EVER_CONNECT_SDK_REPOSITORY }}
+          ref: ${{ env.EVER_CONNECT_SDK_SHA }}
+          path: .egress-audit/sdk
+          persist-credentials: false
+
+      - name: Start the mock platform
+        run: |
+          docker build -q -t ever-mock-platform:pinned .egress-audit/sdk/tools/mock-platform
+          docker run -d --name ever-mock-platform -p 127.0.0.1:18080:8080 ever-mock-platform:pinned
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:18080/__mock/healthz && exit 0
+            sleep 1
+          done
+          docker logs ever-mock-platform
+          exit 1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the packages the API tests read
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm exec turbo build --filter="ever-works-api^..." --filter="@ever-works/ever-stats-sink-plugin..."
+
+      - name: The real sender against the mock platform
+        working-directory: apps/api
+        env:
+          EVER_STATS_MOCK_URL: http://127.0.0.1:18080
+        run: node --max-old-space-size=8192 node_modules/jest/bin/jest.js --maxWorkers=1 src/instance-stats/__tests__/instance-stats.mock.itest.spec.ts
+
+      - name: The mock platform's call record
+        if: always()
+        run: |
+          curl -s http://127.0.0.1:18080/__mock/requests || true
+          docker logs ever-mock-platform 2>&1 | tail -50 || true
