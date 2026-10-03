@@ -107,6 +107,28 @@ describe('StripeRelayDeadLetterRepository (better-sqlite3, real unique index)', 
         expect(new Date(third.lastFailedAt).toISOString()).toBe(minutes(9).toISOString());
     });
 
+    it("counts a retry through the driver's own identifier quoting (MySQL backticks)", async () => {
+        // MySQL (a supported driver) reads a hand-written "attempts" as a STRING
+        // literal unless ANSI_QUOTES is on, which would pin the count at 1. The
+        // increment must go through driver.escape; here it quotes the MySQL way
+        // (backticks, which SQLite also accepts as identifier quotes).
+        jest.spyOn(dataSource.driver, 'escape').mockImplementation(
+            (name: string) => '`' + name + '`',
+        );
+        const update = jest.spyOn(rows, 'update');
+
+        await deadLetters.recordFailure(failure());
+        const second = await deadLetters.recordFailure(failure({ at: minutes(1) }));
+
+        expect(second.attempts).toBe(2);
+        // The SET expression itself, as the database receives it: TypeORM
+        // escapes the column on the left anyway, so only the right-hand side
+        // tells a driver-escaped increment from a hand-quoted one.
+        const set = update.mock.calls.at(-1)?.[1] as { attempts?: () => string };
+        expect(typeof set?.attempts).toBe('function');
+        expect(set.attempts!()).toBe('`attempts` + 1');
+    });
+
     it('converges on the winner when two pods record the same event at once', async () => {
         await deadLetters.recordFailure(failure());
         // The second pod's pre-read missed the row: its insert hits the UNIQUE

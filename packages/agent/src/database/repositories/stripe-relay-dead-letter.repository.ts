@@ -164,7 +164,11 @@ export class StripeRelayDeadLetterRepository {
         await this.repository.update(
             { id: row.id, status: StripeRelayDeadLetterStatus.OPEN },
             {
-                attempts: () => '"attempts" + 1',
+                // The driver escapes the column its own way: a hand-written
+                // `"attempts"` is a STRING literal on MySQL without ANSI_QUOTES,
+                // which would pin the count at 1.
+                attempts: () =>
+                    `${this.repository.manager.connection.driver.escape('attempts')} + 1`,
                 disposition: failure.disposition,
                 reason: failure.reason,
                 siteStatus: failure.siteStatus,
