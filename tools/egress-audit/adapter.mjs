@@ -11,6 +11,19 @@ const ADMIN = {
 	password: 'egress-audit-only-1!'
 };
 
+/** Every statistics route, with the method the settings page uses. */
+const STATS_ROUTES = [
+	['GET', '/api/instance-stats/status'],
+	['POST', '/api/instance-stats/preview'],
+	['GET', '/api/instance-stats/last'],
+	['POST', '/api/instance-stats/send-now'],
+	['PUT', '/api/instance-stats/toggle'],
+	['POST', '/api/instance-stats/reset-identity']
+];
+
+/** The modes in which the module is switched off by configuration. */
+const OFF_MODES = new Set(['off', 'off_env_file']);
+
 export default {
 	// Extra environment per mode (the harness adds it to the API container).
 	//
@@ -48,6 +61,33 @@ export default {
 			throw new Error('registering the admin answered no session');
 		log('adapter: the platform admin is signed in');
 		return { authorization: `Bearer ${token}` };
+	},
+
+	/**
+	 * Off modes only: what the settings page would call, with each route's own method. The
+	 * harness's route probe sends GET only, so the POST and PUT routes are checked here: every
+	 * one must answer 404 (a refusal here fails the run). Never in the other modes, where these
+	 * calls would switch statistics on or send.
+	 */
+	async openSettings({ baseUrl, mode, fetch, log }) {
+		if (!OFF_MODES.has(mode)) return;
+		const answers = [];
+		for (const [method, path] of STATS_ROUTES) {
+			const response = await fetch(`${baseUrl}${path}`, {
+				method,
+				redirect: 'manual',
+				headers: method === 'GET' ? {} : { 'content-type': 'application/json' },
+				body: method === 'GET' ? undefined : JSON.stringify(method === 'PUT' ? { enabled: true } : {})
+			});
+			answers.push({ route: `${method} ${path}`, status: response.status });
+		}
+		log(`adapter: ${answers.map((a) => `${a.route} ${a.status}`).join('; ')}`);
+		const answered = answers.filter((a) => a.status !== 404);
+		if (answered.length > 0) {
+			throw new Error(
+				`with statistics off every statistics route must answer 404: ${answered.map((a) => `${a.route} ${a.status}`).join('; ')}`
+			);
+		}
 	},
 
 	/** Switch statistics off in Settings, as the admin, and check that the module says so. */

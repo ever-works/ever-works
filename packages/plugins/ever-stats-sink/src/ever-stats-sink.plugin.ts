@@ -132,8 +132,13 @@ export function mapAnswer(status: number, answer: unknown, retryAfter: string | 
 		};
 	}
 	if (status === 409) return failed('key_mismatch', status, 'rejected');
-	// The receiver gave up waiting for the request: a transient condition, retried like a 5xx.
-	if (status === 408) return failed('timeout', status);
+	// `408`: the receiver gave up waiting for the request — transient, retried like a 5xx.
+	if (status === 408 || status === 429 || status >= 500) {
+		const result = failed(status === 429 ? 'rate_limited' : status === 408 ? 'timeout' : 'server_error', status);
+		const asked = retryAfter !== null && /^\d{1,6}$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : 0;
+		if (asked > 0) result.retryAfterS = asked;
+		return result;
+	}
 	if (status === 413) return failed('too_large', status, 'rejected');
 	if (status === 415) return failed('unsupported_media_type', status, 'rejected');
 	if (status === 400) {
@@ -142,12 +147,6 @@ export function mapAnswer(status: number, answer: unknown, retryAfter: string | 
 			status,
 			'rejected'
 		);
-	}
-	if (status === 429 || status >= 500) {
-		const result = failed(status === 429 ? 'rate_limited' : 'server_error', status);
-		const asked = retryAfter !== null && /^\d{1,6}$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : 0;
-		if (asked > 0) result.retryAfterS = asked;
-		return result;
 	}
 	return failed('http_error', status, 'rejected');
 }

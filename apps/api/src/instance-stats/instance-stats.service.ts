@@ -170,12 +170,17 @@ export class InstanceStatsService {
      * A new instance id and key, taken under the send lease: every send builds
      * and signs under that lease, so a report built for the OLD identity can
      * never be signed with the NEW key (one request would pair them). While a
-     * send holds the lease the reset is refused (409); with no schedule row
-     * yet, nothing can be sending.
+     * send holds the lease the reset is refused (409).
+     *
+     * The lease lives on the schedule row, so a reset that comes before the
+     * boot created it (the scheduler's first look is asynchronous) creates it
+     * first — due one send interval from now, as after a first boot — and is
+     * never without the lease.
      */
     async resetIdentity(actorUserId: string): Promise<{ instanceId: string; resetCount: number }> {
-        const leased = (await this.lease.schedule()) !== null;
-        if (leased && !(await this.lease.tryAcquire(this.clock()))) {
+        const now = this.clock();
+        await this.lease.ensureSchedule(new Date(now.getTime() + this.config.sendIntervalS * 1000));
+        if (!(await this.lease.tryAcquire(now))) {
             throw new InstanceStatsResetRefusedError();
         }
         try {
@@ -188,7 +193,7 @@ export class InstanceStatsService {
             );
             return { instanceId: instance.instanceId, resetCount: instance.resetCount };
         } finally {
-            if (leased) await this.lease.release();
+            await this.lease.release();
         }
     }
 

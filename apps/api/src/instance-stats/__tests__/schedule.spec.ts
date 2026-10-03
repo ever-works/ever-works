@@ -227,10 +227,11 @@ describe('InstanceStatsSenderService — schedule', () => {
             await h.sender.runDue();
             const schedule = (await h.lease.schedule())!;
             expect(schedule.rejectedModuleVersion ?? null).toBeNull();
-            // The random second of the 7th day (the test random draws 3600 s).
-            expect(schedule.nextSendAt?.toISOString()).toBe('2026-10-22T01:00:00.000Z');
+            // Seven days at the earliest: the random second (the test random
+            // draws 3600 s) of the day after 2026-10-22T08:00.
+            expect(schedule.nextSendAt?.toISOString()).toBe('2026-10-23T01:00:00.000Z');
 
-            h.clock.now = new Date('2026-10-21T08:00:00Z');
+            h.clock.now = new Date('2026-10-22T08:00:00Z');
             expect(await h.sender.runDue()).toEqual({ ran: false, reason: 'not_due' });
             expect(h.sink.calls).toHaveLength(1);
 
@@ -240,6 +241,21 @@ describe('InstanceStatsSenderService — schedule', () => {
             expect(h.sink.calls).toHaveLength(2);
         },
     );
+
+    it('a reset before the boot created the schedule creates it, under the lease', async () => {
+        const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');
+        expect(await h.lease.schedule()).toBeNull();
+
+        await h.service.resetIdentity('operator-user');
+        const schedule = (await h.lease.schedule())!;
+        // Due one interval out, as after a first boot, and the lease is free again.
+        expect(schedule.nextSendAt?.toISOString()).toBe('2026-10-16T08:00:00.000Z');
+        expect(schedule.holder ?? null).toBeNull();
+        // The boot's own first look keeps it.
+        expect((await h.sender.initialise()).nextSendAt?.toISOString()).toBe(
+            '2026-10-16T08:00:00.000Z',
+        );
+    });
 
     it('makes no request at all while the operator switch is off', async () => {
         const h = await bootAt(dataSource, '2026-10-15T08:00:00Z');

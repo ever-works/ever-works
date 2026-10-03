@@ -290,11 +290,12 @@ export class InstanceStatsSenderService {
             return;
         }
         if (result.status === 'rejected' && !parksUntilRelease(result)) {
-            // Bounded: a redirect or an access refusal is tried again in 7 days.
+            // Bounded: a redirect or an access refusal is tried again after 7
+            // days at the earliest (the daily slot of the day after that).
             await this.lease.updateSchedule({
                 failures: 0,
                 nextSendAt: this.nextSlot(
-                    new Date(now.getTime() + INSTANCE_STATS_REJECTED_RETRY_MS - DAY_MS),
+                    new Date(now.getTime() + INSTANCE_STATS_REJECTED_RETRY_MS),
                 ),
                 rejectedModuleVersion: null,
             });

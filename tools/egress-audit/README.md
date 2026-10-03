@@ -31,8 +31,9 @@ This directory holds only Works' inputs:
 - `egress-audit.config.json` — the compose files, the API service, the statistics routes probed
   in the off modes, and the Works mode `off_env_file`;
 - `adapter.mjs` — what an operator does: for `loaded_off`, register the platform admin and switch
-  statistics off in Settings; per mode, `CI=true` so the module honours the modes' short send
-  interval (otherwise raised to one hour);
+  statistics off in Settings; in the off modes, call all six statistics routes with their own
+  method (the harness's probe sends GET only) and require 404 from each; per mode, `CI=true` so
+  the module honours the modes' short send interval (otherwise raised to one hour);
 - `compose.egress-audit.yml` — the image built from the commit, fake test-only values the
   production image needs to start, the API's `.env` file of the mode, and no published port.
 

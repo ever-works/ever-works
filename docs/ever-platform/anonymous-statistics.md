@@ -107,11 +107,11 @@ Names of people or companies, e-mail addresses, phone numbers, postal addresses,
 - Once per UTC day, at a second drawn at random for each report, starting one day after the installation's first boot (ten minutes after boot if the installation was down so long that a report is overdue by more than a day).
 - On days 1–3 of a month, one more report: the `final: true` report for the previous month.
 - If the receiver cannot be reached or answers with a server error, a rate limit or a request timeout (`408`), the module retries after 1 h, 4 h and 12 h, then at the next day's slot.
-- A report the receiver refuses as invalid (`422`), or because another key holds the `instance_id` (`409`), is not retried until a release changes the Ever Works version or the statistics module version — or, for `409`, until you reset the identity (§5). Any other refusal (a redirect, `401`, `403`, `404`, …) is retried after 7 days.
-- _Send now_ (§5) sends one more report each time the operator uses it.
+- A report the receiver refuses as invalid (`422`), or because another key holds the `instance_id` (`409`), is not retried until a release changes the Ever Works version or the statistics module version — or, for `409`, until you reset the identity (§5). Any other refusal (a redirect, `401`, `403`, `404`, …) is retried after 7 days at the earliest.
+- _Send now_ (§5) sends one more report each time the operator uses it — two on days 1–3 of a month while the closed month's report has not been delivered yet.
 - Installations with several API replicas on one database elect one sender through a database lease: the replicas together send what a single API would, never one report per replica.
 
-So the scheduled traffic is one request a day — two on days 1–3 of a month — plus up to three retries on a day a delivery failed, and one request for each _Send now_.
+So the scheduled traffic is one request a day — two on days 1–3 of a month — plus up to three retries on a day a delivery failed, and the requests of each _Send now_.
 
 The request is `POST <EVER_STATS_API_URL>/v1/stats/reports` with `Content-Type: application/json`, no cookie and no credential, no redirects followed, and three headers:
 
@@ -170,7 +170,7 @@ docker compose up -d
 docker run --rm --net container:ever-works-api nicolaka/netshoot tcpdump -n '(tcp[tcpflags] & tcp-syn != 0) or udp port 53'
 ```
 
-With statistics off you will see no query for an Ever host and no connection to one. With them on, you will see the connections §2 lists — one a day to the statistics endpoint, a second one on days 1–3 of a month, retries after a failed delivery and one per _Send now_ — and nothing else from this module.
+With statistics off you will see no query for an Ever host and no connection to one. With them on, you will see the connections §2 lists — one a day to the statistics endpoint, a second one on days 1–3 of a month, retries after a failed delivery and those of each _Send now_ — and nothing else from this module.
 
 The repository runs the same check in CI on every push to `develop`, `stage` and `main`: an egress audit boots the API image on a Docker network with no route out and records every DNS query and connection attempt, with statistics off through the environment and through `.env`, and on against a mock receiver (where the only call allowed is the report itself).
 

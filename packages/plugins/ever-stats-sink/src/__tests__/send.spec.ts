@@ -187,6 +187,12 @@ describe('mapAnswer — the published status table', () => {
 			retryAfterS: 7200
 		});
 		expect(mapAnswer(503, null, '60')).toMatchObject({ errorCode: 'server_error', retryAfterS: 60 });
+		expect(mapAnswer(408, null, '7200')).toEqual({
+			status: 'failed',
+			httpStatus: 408,
+			errorCode: 'timeout',
+			retryAfterS: 7200
+		});
 		expect(mapAnswer(429, null, 'Wed, 21 Oct 2026 07:28:00 GMT')).not.toHaveProperty('retryAfterS');
 		expect(mapAnswer(422, { errors: [] }, '60')).not.toHaveProperty('retryAfterS');
 	});
