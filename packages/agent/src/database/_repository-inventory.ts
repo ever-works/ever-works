@@ -66,6 +66,7 @@ import { PluginUsageRepository } from './repositories/plugin-usage.repository';
 import { ProductChangelogReadRepository } from './repositories/product-changelog-read.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { RepoConnectionRepository } from './repositories/repo-connection.repository';
+import { StripeRelayDeadLetterRepository } from './repositories/stripe-relay-dead-letter.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { TemplateRepository } from './repositories/template.repository';
@@ -132,6 +133,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ProductChangelogReadRepository,
     RefreshTokenRepository,
     RepoConnectionRepository,
+    StripeRelayDeadLetterRepository,
     SubscriptionPlanRepository,
     TemplateCustomizationRepository,
     TemplateRepository,

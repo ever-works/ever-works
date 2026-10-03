@@ -160,6 +160,8 @@ export * from './plan-entitlement.entity';
 export * from './billing-profile.entity';
 export * from './invoice.entity';
 export * from './licence-purchase.entity';
+// Shared Stripe webhook relay: events it could not deliver to a directory.
+export * from './stripe-relay-dead-letter.entity';
 export * from './credit-meter-event.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';
