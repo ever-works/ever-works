@@ -7,10 +7,14 @@
 #
 # Quick start:
 #
-#   cp .env.compose .env                             # optional — edit as needed
+#   # optional — edit .env.compose: every service reads its settings from it
 #   docker compose up -d
 #   open http://localhost:3000                       # web dashboard
 #
+# Settings go in `.env.compose` (the `env_file` of every service below). A
+# `.env` file next to this one only fills in `${...}` placeholders of THIS
+# file (for example WEB_URL); the containers never read it. So a switch such
+# as `EVER_STATS_ENABLED=false` belongs in `.env.compose`.
 # Want to build the images locally instead of pulling from GHCR? Use
 # docker-compose.build.yml — same services, but with `build:` blocks.
 #
