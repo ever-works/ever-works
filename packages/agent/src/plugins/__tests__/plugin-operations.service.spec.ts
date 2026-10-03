@@ -541,6 +541,43 @@ describe('PluginOperationsService', () => {
 
             expect(result.plugins).toHaveLength(2);
         });
+
+        it('does not advertise a capability only hidden plugins provide', async () => {
+            const visible = createRegisteredPlugin();
+            visible.plugin = { ...visible.plugin, id: 'openai' } as IPlugin;
+            visible.manifest = {
+                ...visible.manifest,
+                id: 'openai',
+                capabilities: ['ai-provider', 'shared'],
+                visibility: 'public',
+            } as PluginManifest;
+
+            const hidden = createRegisteredPlugin();
+            hidden.plugin = { ...hidden.plugin, id: 'ever-stats-sink' } as IPlugin;
+            hidden.manifest = {
+                ...hidden.manifest,
+                id: 'ever-stats-sink',
+                capabilities: ['stats-sink', 'shared'],
+                visibility: 'hidden',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([visible, hidden]);
+            jest.spyOn(pluginRegistryService, 'getAvailableCapabilities').mockReturnValue([
+                'ai-provider',
+                'stats-sink',
+                'shared',
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listPlugins('user-1');
+
+            // The hidden plugin is not listed, and neither is the capability
+            // only it provides; a capability a listed plugin also provides stays.
+            expect(result.plugins.map((p) => p.pluginId)).toEqual(['openai']);
+            expect(result.capabilities).toEqual(['ai-provider', 'shared']);
+            const union = new Set(result.plugins.flatMap((p) => p.capabilities ?? []));
+            expect(new Set(result.capabilities)).toEqual(union);
+        });
     });
 
     describe('getPlugin', () => {
