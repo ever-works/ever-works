@@ -205,6 +205,23 @@ const gauzySubscription = (status: string) => ({
     items: { data: [] },
 });
 
+/**
+ * What the handler reports for a foreign event. Invoice and payment-method
+ * handlers look for an Ever Works billing profile first and return
+ * 'unattributed' when none resolves; every other handler recognises the
+ * event as not Ever Works' and returns 'ignored'. Neither writes anything.
+ */
+const UNATTRIBUTED_FOREIGN_TYPES = new Set([
+    'invoice.finalized',
+    'invoice.paid',
+    'invoice.payment_failed',
+    'invoice.voided',
+    'payment_method.attached',
+    'payment_method.detached',
+]);
+const expectedForeignAction = (type: string): 'ignored' | 'unattributed' =>
+    UNATTRIBUTED_FOREIGN_TYPES.has(type) ? 'unattributed' : 'ignored';
+
 const FOREIGN_EVENTS: Array<[string, string, Record<string, unknown>]> = [
     [
         'the Gauzy $99 lifetime sale (the real evt_1UFwPn shape: no customer)',
@@ -390,7 +407,9 @@ describe('account-wide billing webhook vs other Ever products (audit CC04-08)', 
 
         const outcome = await deliver(billing, type, object);
 
-        expect(['ignored', 'unattributed']).toContain(outcome.action);
+        // Exact per type, so a normalisation regression that flips one
+        // handler from "not ours" to "ours but unresolved" (or back) fails.
+        expect(outcome.action).toBe(expectedForeignAction(type));
         expect(recorder.writes).toEqual([]);
     });
 

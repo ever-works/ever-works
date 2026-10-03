@@ -156,14 +156,15 @@ export class StripeRelayDeadLetterRepository {
         if (row.status !== StripeRelayDeadLetterStatus.OPEN) {
             return row;
         }
-        await this.repository.increment(
-            { id: row.id, status: StripeRelayDeadLetterStatus.OPEN },
-            'attempts',
-            1,
-        );
+        // ONE conditional UPDATE: a resolve landing between two separate writes
+        // would otherwise leave a resolved row with a counted attempt and stale
+        // failure details. Two failures of one event racing each other can
+        // still land in either order; their details differ by milliseconds,
+        // so the last writer winning is acceptable for an audit row.
         await this.repository.update(
             { id: row.id, status: StripeRelayDeadLetterStatus.OPEN },
             {
+                attempts: () => '"attempts" + 1',
                 disposition: failure.disposition,
                 reason: failure.reason,
                 siteStatus: failure.siteStatus,

@@ -465,12 +465,40 @@ export class StripeRelayService {
  */
 async function readSiteVerdict(response: Response): Promise<'confirmed' | 'unconfirmed'> {
     try {
-        const text = await response.text();
-        if (!text || text.length > MAX_SITE_BODY_CHARS) return 'unconfirmed';
+        const text = await readBounded(response, MAX_SITE_BODY_CHARS);
+        if (!text) return 'unconfirmed';
         const body = JSON.parse(text) as { dispatched?: unknown; duplicate?: unknown };
         return body?.dispatched === true || body?.duplicate === true ? 'confirmed' : 'unconfirmed';
     } catch {
         return 'unconfirmed';
+    }
+}
+
+/**
+ * Read at most `limit` characters of the body, cancelling the stream as soon
+ * as it runs over, so a misbehaving directory cannot make the API buffer an
+ * unbounded body. Returns null for an oversized, absent or unreadable body.
+ */
+async function readBounded(response: Response, limit: number): Promise<string | null> {
+    const reader = response.body?.getReader();
+    if (!reader) return null;
+    const decoder = new TextDecoder();
+    let text = '';
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            text += decoder.decode(value, { stream: true });
+            if (text.length > limit) {
+                void reader.cancel().catch(() => undefined);
+                return null;
+            }
+        }
+        text += decoder.decode();
+        return text;
+    } catch {
+        void reader.cancel().catch(() => undefined);
+        return null;
     }
 }
 

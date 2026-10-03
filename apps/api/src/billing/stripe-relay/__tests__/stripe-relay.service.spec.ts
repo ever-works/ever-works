@@ -60,11 +60,9 @@ const DISPATCHED = { received: true, type: 'subscription.created', dispatched: t
 
 function siteResponse(status: number, body?: unknown) {
     const text = body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body);
-    return {
-        status,
-        text: jest.fn().mockResolvedValue(text),
-        body: { cancel: jest.fn().mockResolvedValue(undefined) },
-    };
+    // A real WHATWG Response, so the relay's bounded stream read is exercised
+    // exactly as it runs against `fetch`.
+    return new Response(text === '' ? null : text, { status });
 }
 
 function makeService(overrides?: {
@@ -439,7 +437,18 @@ describe('StripeRelayService', () => {
             ['a 200 with an HTML body (a proxy page)', siteResponse(200, '<html>ok</html>')],
             [
                 'a 200 whose body cannot be read',
-                { status: 200, text: jest.fn().mockRejectedValue(new Error('reset')) },
+                new Response(
+                    new ReadableStream({
+                        pull(controller) {
+                            controller.error(new Error('reset'));
+                        },
+                    }),
+                    { status: 200 },
+                ),
+            ],
+            [
+                'a 200 whose body runs past the size limit, even if it would confirm',
+                siteResponse(200, JSON.stringify({ dispatched: true, pad: 'x'.repeat(70 * 1024) })),
             ],
         ])(
             'RETRIES %s — a no-op receiver must never count as delivered',
