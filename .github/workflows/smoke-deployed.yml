@@ -120,10 +120,10 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 26.x
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 26.x
           cache: pnpm
 
       # Resolve dependencies through the internal Verdaccio cache when this job runs

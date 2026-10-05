@@ -1,11 +1,15 @@
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 
 # bookworm (not alpine) on purpose: the node's `browser-check` executor
 # drives a real Chromium, and the prebuilt Chromium/keyring binaries the
 # optional dependencies ship are glibc-linked. A musl base would silently
 # lose both capabilities.
+#
+# Node.js 25+ no longer bundles corepack, so the node:26 images do not ship
+# it; install it from npm before enabling it.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/* \
+    && npm install -g corepack@0.36.0 \
     && corepack enable \
     && corepack prepare pnpm@10 --activate \
     && npm install -g turbo@latest
@@ -53,7 +57,7 @@ RUN pnpm exec turbo build --filter=ever-works-node...
 RUN pnpm deploy --filter=ever-works-node --prod --legacy /app/deploy
 
 #-- Production
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 
 # WITH_BROWSER=true installs Chromium so the image advertises — and can
 # honour — the `browser` capability. It roughly triples the image size,

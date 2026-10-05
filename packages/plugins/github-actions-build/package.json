@@ -44,7 +44,7 @@
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
 		"@types/libsodium-wrappers": "^0.7.14",
-		"@types/node": "^22.0.0",
+		"@types/node": "^26.6.4",
 		"ajv": "^8.18.0",
 		"js-yaml": "^5.2.3",
 		"tsup": "^8.4.0",

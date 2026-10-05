@@ -89,11 +89,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Install the harness dependencies (from its lockfile)
         working-directory: .egress-audit/sdk
         run: |
+          # Node.js 25+ no longer bundles corepack; install it before enabling it.
+          npm install -g corepack@0.36.0
           corepack enable
           pnpm install --frozen-lockfile --filter ./tools/egress-audit
           node tools/egress-audit/run.mjs --help > /dev/null
@@ -235,7 +237,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 26.x
           cache: 'pnpm'
 
       - name: Install dependencies

@@ -25,9 +25,9 @@
 		"@apidevtools/swagger-parser": "^12.1.0",
 		"@ever-works/contracts": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.27.1",
-		"@nestjs/common": "^11.1.18",
-		"@nestjs/core": "^11.1.18",
-		"@nestjs/platform-express": "^11.1.18",
+		"@nestjs/common": "^11.2.7",
+		"@nestjs/core": "^11.2.7",
+		"@nestjs/platform-express": "^11.2.7",
 		"@rekog/mcp-nest": "^1.9.6",
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.2",
@@ -35,7 +35,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.28.0",
-		"@types/node": "^22.19.3",
+		"@types/node": "^26.6.4",
 		"eslint": "^9.28.0",
 		"eslint-config-prettier": "^10.1.5",
 		"eslint-plugin-prettier": "^5.4.1",
@@ -46,6 +46,6 @@
 		"vitest": "^4.1.0"
 	},
 	"engines": {
-		"node": ">=22.0.0"
+		"node": ">=26.0.0"
 	}
 }

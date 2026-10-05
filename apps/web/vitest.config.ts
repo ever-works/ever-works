@@ -33,6 +33,13 @@ export default defineConfig({
         testTimeout: 30000,
         hookTimeout: 30000,
         environment: 'jsdom',
+        // Node 25+ defines its own `localStorage` global (an accessor that is
+        // `undefined` without `--localstorage-file`). It shadows the jsdom
+        // `localStorage` this suite runs against, so every spec that touches
+        // storage throws "Cannot read properties of undefined". Turning Node's
+        // Web Storage off in the worker leaves jsdom's in place; the flag is
+        // also accepted (as a no-op default) by Node 22.
+        execArgv: ['--no-experimental-webstorage'],
         globals: true,
         include: ['src/**/*.unit.spec.{ts,tsx}'],
         setupFiles: ['./vitest.setup.ts'],

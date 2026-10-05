@@ -19,6 +19,10 @@ export default defineConfig({
     // instance (trigger.ever.co, org "Ever"). Falls back to the original cloud
     // project ref when TRIGGER_PROJECT_REF is unset (e.g. legacy cloud CI).
     project: process.env.TRIGGER_PROJECT_REF || 'proj_uevrbfmpvojzzazvhffy',
+    // Stays 'node-22' while the API/web images run Node 26: the self-hosted
+    // Trigger.dev server (trigger.ever.co, v4.5.4) validates the build manifest
+    // against a runtime enum of ['node', 'node-22', 'bun'] only. 'node-26' exists
+    // from @trigger.dev/core 4.5.11 on; move this once the server is upgraded.
     runtime: 'node-22',
     logLevel: 'log',
     // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.
