@@ -88,7 +88,7 @@ jobs:
       # in the playwright invocation below; they MUST stay in sync.
       fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [26.x]
         # 32 shards (was 24, 16, 8, 4): the suite keeps growing (now ~6000 tests
         # after the +2000 wave). The binding constraint is per-shard ACCUMULATION:
         # the API's in-memory sqlite + resident memory grow over a shard's run, so
@@ -678,7 +678,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [26.x]
 
     steps:
       - name: Checkout repository
@@ -848,7 +848,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [26.x]
 
     # The matrix's service containers: the env below points SMTP_HOST and
     # REDIS_URL / THROTTLER_REDIS_URL at them.

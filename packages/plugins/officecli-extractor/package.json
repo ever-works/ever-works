@@ -34,14 +34,14 @@
 	},
 	"dependencies": {
 		"@officecli/sdk": "^0.1.2",
-		"axios": "^1.18.0"
+		"axios": "^1.20.0"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"@types/node": "^22.0.0",
+		"@types/node": "^26.6.4",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.18"

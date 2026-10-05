@@ -20,7 +20,7 @@ analogue (a long-running worker rather than an HTTP server). Reuse from it:
 - `turbo prune --scope=ever-works-hosting-operator --docker` for the pruned workspace,
 - the `VERDACCIO_REGISTRY` probe-with-fallback layer, verbatim — a Verdaccio outage must not fail
   an image build (see that file's own rationale),
-- `node:22-bookworm-slim`. There is no Chromium here, so `alpine` would be defensible — but
+- `node:26-bookworm-slim`. There is no Chromium here, so `alpine` would be defensible — but
   matching the fleet's base image is worth more than the megabytes.
 
 Differences from `node`:
