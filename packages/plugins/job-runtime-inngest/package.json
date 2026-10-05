@@ -37,7 +37,7 @@
 		"inngest": "^4.7.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",
-		"vitest": "^4.1.0"
+		"vitest": "^5.0.3"
 	},
 	"everworks": {
 		"plugin": {
