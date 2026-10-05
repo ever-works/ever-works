@@ -197,9 +197,12 @@ describe('InstanceStatsSenderService — schedule', () => {
         expect(h.sink.calls).toHaveLength(1);
 
         // A Works upgrade (another product version, same statistics module):
-        // the parked marker is no longer the running release's.
+        // the parked marker is no longer the running release's. Derived from
+        // the running version, never a literal: under `pnpm test` the product
+        // version is apps/api's package.json version, which is 0.0.1, so a
+        // hard-coded '0.0.1' named the running release and kept it parked.
         await h.lease.updateSchedule({
-            rejectedModuleVersion: instanceStatsReleaseMarker('0.0.1'),
+            rejectedModuleVersion: instanceStatsReleaseMarker(`${product}.1`),
         });
         h.sink.answer = { status: 'sent', httpStatus: 202, errorCode: null };
         h.clock.now = (await h.lease.schedule())!.nextSendAt!;
