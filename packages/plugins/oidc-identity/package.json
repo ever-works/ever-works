@@ -46,7 +46,7 @@
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"@types/node": "^22.0.0",
+		"@types/node": "^26.6.4",
 		"ajv": "^8.18.0",
 		"ajv-formats": "^3.0.1",
 		"tsup": "^8.0.0",

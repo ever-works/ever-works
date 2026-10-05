@@ -70,7 +70,7 @@ pnpm typeorm migration:revert -d typeorm.config.ts
 pnpm deploy:trigger
 ```
 
-**Package manager**: pnpm only (never npm/yarn). Node.js >=22 (matches the Docker `node:22-alpine` base image). Run `pnpm install` after adding dependencies.
+**Package manager**: pnpm only (never npm/yarn). Node.js >=26 (matches the Docker `node:26-alpine` base image). Run `pnpm install` after adding dependencies.
 
 ## Architecture
 
@@ -199,7 +199,7 @@ If you find a stray doc in the root, move it into `docs/` (most likely
 
 | Concern            | Package                                        | Version          |
 | ------------------ | ---------------------------------------------- | ---------------- |
-| Backend framework  | NestJS                                         | 11.1.13          |
+| Backend framework  | NestJS                                         | 11.2.7           |
 | Frontend framework | Next.js                                        | 16.1.5           |
 | React              | React                                          | 19.2.3           |
 | ORM                | TypeORM                                        | 0.3.28           |

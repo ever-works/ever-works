@@ -1,8 +1,11 @@
 # NodeJS Base
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 
 # Update npm and configure pnpm and turbo
-RUN corepack enable && \
+# Node.js 25+ no longer bundles corepack, so the node:26 images do not ship it;
+# install it from npm before enabling it.
+RUN npm install -g corepack@0.36.0 && \
+    corepack enable && \
     corepack prepare pnpm@10 --activate && \
     npm install -g turbo@latest
 
@@ -112,7 +115,7 @@ RUN cd apps/web && pnpm prune --prod
 
 #--
 # Build
-FROM node:22-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 

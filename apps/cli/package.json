@@ -24,7 +24,7 @@
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
         "@types/inquirer": "^9.0.9",
-        "@types/node": "^22.19.3",
+        "@types/node": "^26.6.4",
         "esbuild": "^0.25.12",
         "typescript": "^5.9.3",
         "vitest": "^4.1.0"
@@ -33,7 +33,7 @@
         "@ever-works/cli-shared": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
-        "axios": "^1.18.0",
+        "axios": "^1.20.0",
         "chalk": "^4.1.2",
         "commander": "^14.0.2",
         "dotenv": "^17.2.3",

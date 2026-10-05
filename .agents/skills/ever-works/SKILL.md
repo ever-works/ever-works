@@ -36,7 +36,7 @@ builds via `^build`.
 - `packages/tasks` — Trigger.dev background jobs; `packages/monitoring` — Sentry + PostHog; `packages/cli-shared` — shared CLI utilities.
 - `docs/` — markdown docs content; `.specify/` — GitHub Spec Kit (feature specs live under `docs/specs/features/`).
 
-## Commands (pnpm only — never npm/yarn; Node >= 22)
+## Commands (pnpm only — never npm/yarn; Node >= 26)
 
 ```bash
 pnpm install
@@ -98,7 +98,7 @@ across the tree, the working rules are:
 
 ## Deployment (do not run ad-hoc deploy commands)
 
-Apps ship as containers (`node:22-alpine`) to Kubernetes via GitOps. The API
+Apps ship as containers (`node:26-alpine`) to Kubernetes via GitOps. The API
 self-applies pending TypeORM migrations on boot (`migrationsRun`, gated by the
 `RUN_MIGRATIONS` env). Trigger.dev tasks deploy via `pnpm deploy:trigger`. Do not
 invent or run other deploy / `kubectl` commands from this repository.

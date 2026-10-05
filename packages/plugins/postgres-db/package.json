@@ -36,7 +36,7 @@
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"@types/node": "^22.0.0",
+		"@types/node": "^26.6.4",
 		"@types/pg": "^8.15.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",

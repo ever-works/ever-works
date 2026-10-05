@@ -1,6 +1,9 @@
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 
-RUN corepack enable && \
+# Node.js 25+ no longer bundles corepack, so the node:26 images do not ship it;
+# install it from npm before enabling it.
+RUN npm install -g corepack@0.36.0 && \
+    corepack enable && \
     corepack prepare pnpm@10 --activate && \
     npm install -g turbo@latest
 
@@ -117,7 +120,7 @@ RUN if [ "$PLUGIN_DISTRIBUTION_MODE" = "dynamic" ]; then \
     fi
 
 #-- Production
-FROM node:22-alpine
+FROM node:26-alpine
 
 USER node
 WORKDIR /app
