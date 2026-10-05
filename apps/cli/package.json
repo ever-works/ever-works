@@ -27,7 +27,7 @@
         "@types/node": "^26.6.4",
         "esbuild": "^0.25.12",
         "typescript": "^5.9.3",
-        "vitest": "^4.1.0"
+        "vitest": "^5.0.3"
     },
     "dependencies": {
         "@ever-works/cli-shared": "workspace:*",

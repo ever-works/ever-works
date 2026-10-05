@@ -39,13 +39,13 @@
 		"@ever-works/contracts": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"@kubernetes/client-node": "^1.4.0",
-		"js-yaml": "^5.2.3"
+		"js-yaml": "^5.4.1"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.4",
 		"ajv": "^8.18.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",
-		"vitest": "^4.1.0"
+		"vitest": "^5.0.3"
 	}
 }
