@@ -61,7 +61,11 @@ COPY --from=pruner /app/out/full/ .
 COPY docs/ ./docs/
 
 # Build the static site (defaults to all locales — pass --locale en to speed up if needed)
-RUN pnpm --filter ever-works-docs build
+# Docusaurus 3.10 needs more than V8's default ~4 GB heap for the full multi-locale build: every
+# k8s-build docs leg since the 3.9 -> 3.10.2 / Node 26 bump (#2547) died with "JavaScript heap out of
+# memory" after ~33 min (develop bb2e9d9f, 0bbc5626, stage 764e7de3). 8 GB stays within the
+# x64-8 runner's requests (runner 8Gi + dind 4Gi; dind limit 76Gi).
+RUN NODE_OPTIONS="--max-old-space-size=8192" pnpm --filter ever-works-docs build
 
 #-- Runtime: nginx serving the static build output
 FROM nginx:1.27-alpine
