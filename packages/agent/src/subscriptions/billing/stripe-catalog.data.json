@@ -15,7 +15,7 @@
         "on the price they bought. Never create these by hand in the Dashboard.",
         "",
         "Amounts are integer minor units (cents) in `currency`. An annual amount is the figure the",
-        "marketing site displays per month x 12: cloud Pro shows \"$17/mo\" and bills 20400 once a year.",
+        "marketing site displays per month x 12: cloud Pro shows \"$34/mo\" and bills 40800 once a year.",
         "",
         "`interval` values:",
         "  monthly  - recurring, month",
@@ -87,10 +87,10 @@
             "seatsIncluded": 10,
             "seatCentsPerMonth": 500,
             "monthlyCredits": 3000,
-            "note": "Matches Ever Gauzy / Ever Teams cloud Small Business ($25 / $204) and their $5 per additional employee.",
+            "note": "Matches Ever Gauzy / Ever Teams cloud Small Business ($49 / $408 since the 2026-10-05 repricing; was $25 / $204) and their $5 per additional employee.",
             "prices": [
-                { "interval": "monthly", "amountCents": 2500 },
-                { "interval": "annual", "amountCents": 20400 }
+                { "interval": "monthly", "amountCents": 4900 },
+                { "interval": "annual", "amountCents": 40800 }
             ]
         },
         {
@@ -100,10 +100,10 @@
             "seatsIncluded": 10,
             "seatCentsPerMonth": 1000,
             "monthlyCredits": 25000,
-            "note": "Matches Ever Gauzy / Ever Teams Enterprise ($199 / $1,668) and their $10 per additional employee. Option 1 (one organization, unlimited seats) is the same SKU with seat metering switched off on the subscription; Option 2 (unlimited organizations, 10 seats each) is the metered default.",
+            "note": "Matches Ever Gauzy / Ever Teams Enterprise ($499 / $4,188 since the 2026-10-05 repricing; was $199 / $1,668) and their $10 per additional employee. These four Enterprise lookup keys are co-owned with ever-co/ever-website's catalog.json: change both together. Option 1 (one organization, unlimited seats) is the same SKU with seat metering switched off on the subscription; Option 2 (unlimited organizations, 10 seats each) is the metered default.",
             "prices": [
-                { "interval": "monthly", "amountCents": 19900 },
-                { "interval": "annual", "amountCents": 166800 }
+                { "interval": "monthly", "amountCents": 49900 },
+                { "interval": "annual", "amountCents": 418800 }
             ]
         },
 
@@ -138,10 +138,10 @@
             "seatsIncluded": 10,
             "seatCentsPerMonth": 1000,
             "monthlyCredits": 25000,
-            "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Enterprise Edition.",
+            "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Enterprise Edition ($499 / $4,188 since the 2026-10-05 repricing). Lookup keys co-owned with ever-co/ever-website's catalog.json.",
             "prices": [
-                { "interval": "monthly", "amountCents": 19900 },
-                { "interval": "annual", "amountCents": 166800 }
+                { "interval": "monthly", "amountCents": 49900 },
+                { "interval": "annual", "amountCents": 418800 }
             ]
         }
     ],

@@ -289,16 +289,16 @@ describe('startPlanCheckout — the server prices everything', () => {
             url: 'https://pay.example/cs_plan_1',
             sessionId: 'cs_plan_1',
             planCode: 'standard',
-            priceCents: 2500,
-            basePriceCents: 2500,
+            priceCents: 4900,
+            basePriceCents: 4900,
             seatCents: 0,
             extraSeats: 0,
             currency: 'usd',
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
-        // $25.00 → 2500 cents. The row and the shared-account catalog agree; neither comes from the body.
+        // The shared-account catalog prices it ($49.00 → 4900 cents since the 2026-10-05 repricing); never the body.
         expect(request.plan).toEqual(
-            expect.objectContaining({ code: 'standard', priceCents: 2500, interval: 'month' }),
+            expect.objectContaining({ code: 'standard', priceCents: 4900, interval: 'month' }),
         );
         // Server-authored correlation id, echoed back on the signed event.
         expect(request.referenceId).toBe('u1:standard');
@@ -314,9 +314,9 @@ describe('startPlanCheckout — the server prices everything', () => {
         // resolver reads as cloud — the same default the migration gives every pre-existing row.
         expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
         // priceCents is still carried: the provider falls back to it when the account has no
-        // catalog price, so removing it would break every unsynced deployment. Here the catalog
-        // and the seeded row agree, which is the invariant stripe-catalog.spec.ts guards.
-        expect(request.plan.priceCents).toBe(2500);
+        // catalog price, so removing it would break every unsynced deployment. The catalog wins:
+        // it says 4900 since the 2026-10-05 repricing (the seeded row follows in seedPlans).
+        expect(request.plan.priceCents).toBe(4900);
     });
 
     it('bills no seat line when the buyer stays inside the plan allowance', async () => {
@@ -340,11 +340,11 @@ describe('startPlanCheckout — the server prices everything', () => {
 
         const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
 
-        // 27 requested − 10 included = 17 billable, at $5.00/mo = 8500 on top of the 2500 base.
-        expect(started.basePriceCents).toBe(2500);
+        // 27 requested − 10 included = 17 billable, at $5.00/mo = 8500 on top of the 4900 base.
+        expect(started.basePriceCents).toBe(4900);
         expect(started.extraSeats).toBe(17);
         expect(started.seatCents).toBe(8500);
-        expect(started.priceCents).toBe(11000);
+        expect(started.priceCents).toBe(13400);
 
         // The echoed total must equal what the provider was actually asked to bill.
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
@@ -362,10 +362,10 @@ describe('startPlanCheckout — the server prices everything', () => {
         });
 
         // An annual seat is 12x the monthly rate with no discount: 17 x 6000 = 102000,
-        // on top of the 20400 annual base.
-        expect(started.basePriceCents).toBe(20400);
+        // on top of the 40800 annual base.
+        expect(started.basePriceCents).toBe(40800);
         expect(started.seatCents).toBe(102000);
-        expect(started.priceCents).toBe(122400);
+        expect(started.priceCents).toBe(142800);
     });
 
     it('never adds a seat charge to a total that carries no seat line', async () => {
