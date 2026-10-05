@@ -110,6 +110,17 @@ const LINT_BACKLOG = {
     'react-hooks/static-components': 'warn',
     // 1 — an anonymous component in a spec file.
     'react/display-name': 'warn',
+    // eslint-plugin-react-hooks 7.1.1 (arrived with the next 16.3.8 security bump,
+    // GHSA-vcvr-r3jv-pc5j) reports 24 findings under these React-Compiler rules that
+    // 7.0.1 did not. Demoted so the plugin stays on its latest version instead of
+    // being pinned back. Tracked location-by-location in ever-works#2544; fix them
+    // one at a time and return each rule to 'error'.
+    // 17 — reading/writing ref.current during render.
+    'react-hooks/refs': 'warn',
+    // 6 — variable accessed before declaration / value modified after render.
+    'react-hooks/immutability': 'warn',
+    // 1 — a manual memo the compiler cannot preserve (use-autosave-status.ts).
+    'react-hooks/preserve-manual-memoization': 'warn',
 };
 
 const eslintConfig = [
