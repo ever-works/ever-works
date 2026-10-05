@@ -35,7 +35,7 @@
 		"@ever-works/plugin": "workspace:*"
 	},
 	"optionalDependencies": {
-		"playwright-core": "^1.59.1"
+		"playwright-core": "^1.63.0"
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
