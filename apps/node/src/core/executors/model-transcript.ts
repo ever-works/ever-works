@@ -10,7 +10,7 @@ import {
 	type FleetAgentTaskModelStep,
 	type FleetAgentTaskModelStepStatus
 } from '@ever-works/contracts';
-import { scrubModelOutputText } from './model-cli';
+import { scrubModelOutputText, withJsonEscapedSpellings } from './model-cli';
 
 /**
  * Run evidence of a fleet model step (self-build slice AP).
@@ -157,7 +157,11 @@ interface PendingCall {
 
 /** Build a recorder for one model run's output stream. */
 export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOptions): ModelTranscriptRecorder {
-	const values = options.protectedValues;
+	// Expanded HERE as well as by `collectModelOutputProtectedValues`, so the
+	// recorder is safe whoever builds its list: a killed run's half-written
+	// last line is not JSON, is scrubbed as raw text, and carries a value in
+	// its escaped spelling (review).
+	const values = withJsonEscapedSpellings(options.protectedValues);
 	const workspace = typeof options.workspacePath === 'string' ? options.workspacePath.trim() : '';
 	// The same path as it appears inside a JSON string (`C:\\Users\\…`).
 	const workspaceJson = workspace ? JSON.stringify(workspace).slice(1, -1) : '';

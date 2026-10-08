@@ -144,6 +144,23 @@ describe('createModelTranscriptRecorder — keys and call ids are cleaned (revie
 		expect(evidence.timeline[0].callId).toBe('toolu_[redacted]');
 		expect(evidence.timeline[0].argsSummary).toBe('+[redacted]');
 	});
+
+	it("scrubs the escaped spelling in a killed run's half-written last line, whoever built the value list", () => {
+		// Raw values, NOT pre-expanded by collectModelOutputProtectedValues:
+		// the recorder must be safe on its own. The cut line is not JSON, so
+		// it is kept as raw text — where the value is still JSON-escaped.
+		const recorder = createModelTranscriptRecorder({ provider: 'claude-code', protectedValues: [ESCAPED_VALUE] });
+		const whole = JSON.stringify({
+			type: 'user',
+			message: {
+				content: [{ type: 'tool_result', tool_use_id: 't', content: `PASSWORD=${ESCAPED_VALUE} and more` }]
+			}
+		});
+		recorder.feed(whole.slice(0, whole.indexOf(' and more')), null);
+		const evidence = recorder.finish(null);
+		expect(evidence.transcript).not.toContain(ESCAPED_IN_JSON);
+		expect(evidence.transcript).toContain('[redacted]');
+	});
 });
 
 describe('runAgentTaskJob — the bounded reader fails open to readFile (review)', () => {

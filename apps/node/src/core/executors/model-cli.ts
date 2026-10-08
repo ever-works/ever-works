@@ -700,23 +700,32 @@ function mergeProtectedValues(values: readonly string[], extra?: readonly string
 	for (const value of extra ?? []) {
 		if (typeof value === 'string' && value.trim().length >= 8) merged.add(value);
 	}
-	// Self-build slice AP (review): every text this node reports that came
-	// out of a CLI's JSON stream — the raw output tail of a run that wrote
-	// no verdict line, a Codex event tail — carries a value the way JSON
-	// wrote it: a quote as `\"`, a backslash as `\\`, a control character
-	// as `\uXXXX`. A `.env` value like `pa"ss\word` is then in the report
-	// in a spelling a verbatim match never finds. So each value is also
-	// protected in its JSON-escaped spelling, and in the doubly escaped one
-	// a JSON document quoted inside another (a tool result holding a JSON
-	// file) produces.
-	for (const value of [...merged]) {
+	return withJsonEscapedSpellings([...merged]);
+}
+
+/**
+ * Self-build slice AP (review) — `values` plus the spellings JSON gives them.
+ *
+ * Every text this node reports that came out of a CLI's JSON stream — the
+ * raw output tail of a run that wrote no verdict line, a Codex event tail,
+ * the half-written last line of a killed run — carries a value the way JSON
+ * wrote it: a quote as `\"`, a backslash as `\\`, a control character as
+ * `\uXXXX`. A `.env` value like `pa"ss\word` is then in the report in a
+ * spelling a verbatim match never finds. So each value is also protected in
+ * its JSON-escaped spelling, and in the doubly escaped one a JSON document
+ * quoted inside another (a tool result holding a JSON file) produces.
+ * Longest first, so a value that contains another is replaced whole.
+ */
+export function withJsonEscapedSpellings(values: readonly string[]): string[] {
+	const all = new Set<string>(values);
+	for (const value of values) {
 		const once = JSON.stringify(value).slice(1, -1);
 		if (once !== value) {
-			merged.add(once);
-			merged.add(JSON.stringify(once).slice(1, -1));
+			all.add(once);
+			all.add(JSON.stringify(once).slice(1, -1));
 		}
 	}
-	return [...merged].sort((a, b) => b.length - a.length);
+	return [...all].sort((a, b) => b.length - a.length);
 }
 
 /**
