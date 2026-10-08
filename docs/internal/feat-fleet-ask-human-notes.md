@@ -204,12 +204,17 @@ deriving the waiting state from `awaitingInput`; every typed `InboxProducer` dou
 
 - **No CLI session resume.** `result.model.sessionId` is not persisted; the answer run starts a fresh
   CLI session whose instructions carry the answer. Passing `--resume` on the same node is a
-  follow-up.
+  follow-up. _Delivered by self-build slice AU: the reconciler keeps the session id with the
+  reporting node (`agent_runs.fleetCliSession`), resume carries it, the planner offers it as
+  `execution.resume`, and the node runs `claude -p --resume <id> --fork-session` when the job lands
+  on that node (Codex is never resumed; any other case runs fresh)._
 - **A question run is a NORMAL terminal job on the node.** The job is `done`, the run is
   `completed` + `awaitingInput`; the wait is server-side only, and the answer always travels as
   text in the NEXT job's instructions. A node never holds a lease waiting for a human.
 - **No Q&A replay.** Only the reply that resumed the run rides along; earlier questions and answers
-  are not re-rendered into later runs (one Inbox item per run).
+  are not re-rendered into later runs (one Inbox item per run). _Delivered by self-build slice AU:
+  a fresh session's instructions replay the Task's earlier answered questions under
+  `# EARLIER QUESTIONS AND ANSWERS`._
 - **API-level resume from the Sessions page leaves the Inbox item open** (auto-closing it would need
   `InboxItemRepository` inside `AgentsModule` — a module cycle). The Task page hides its own Resume
   while a question is open, which covers the surface the owner actually uses.
@@ -241,8 +246,8 @@ runbook `EVER_WORKS_FLEET_NODES.md` describes the manual check.
 ## Follow-ups
 
 - Persist `result.model.sessionId` → `cliSessionId` and pass `--resume` when the answer run lands on
-  the same node, so the model keeps its own context instead of re-reading the branch.
-- Replay answered questions (the whole Q&A trail of a Task) into later runs.
+  the same node, so the model keeps its own context instead of re-reading the branch. _(Done — slice AU.)_
+- Replay answered questions (the whole Q&A trail of a Task) into later runs. _(Done — slice AU.)_
 - Option buttons parsed from `QUESTION.md` (a `- [ ]` list → `InboxItemOption[]`).
 - Steer on a LIVE fleet run is still undeliverable (nothing on a node drains `pendingInput`); the
   Task page keeps offering it because it cannot tell a fleet run from a cloud one.
