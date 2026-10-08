@@ -131,6 +131,8 @@ describe('FleetAgentTaskReconcilerService', () => {
             updateTelemetry: jest.fn().mockResolvedValue(undefined),
             addTokens: jest.fn().mockResolvedValue(undefined),
             stampCostCents: jest.fn().mockResolvedValue(undefined),
+            // Self-build slice AU — the CLI session a node reported.
+            recordFleetCliSession: jest.fn().mockResolvedValue(undefined),
         };
         tasks = {
             findById: jest.fn().mockResolvedValue({
@@ -1532,6 +1534,135 @@ describe('FleetAgentTaskReconcilerService', () => {
                     }),
                 );
             });
+        });
+    });
+
+    /**
+     * Self-build slice AU — the CLI session a node reported used to ride the
+     * wire and be dropped here, so an answered question restarted the model
+     * from zero. It is now kept, with the node that holds it — and only in a
+     * shape and from a source that the next job can trust.
+     */
+    describe('CLI session continuity (self-build slice AU)', () => {
+        const SESSION = '3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b';
+        const plannedJob = (provider: string | null = 'claude-code') =>
+            job({
+                payload: {
+                    taskId: TASK,
+                    runId: RUN,
+                    agentId: AGENT,
+                    userId: USER,
+                    ...(provider ? { execution: { provider, instructions: 'brief' } } : {}),
+                },
+            });
+        const withSession = (sessionId: unknown, provider = 'claude-code') => ({
+            ...successResult,
+            model: { ...successResult.model!, provider, sessionId },
+        });
+        const report = (
+            result: Record<string, unknown>,
+            jobView: FleetJobView = plannedJob(),
+            source: 'node-report' | 'queue-expired' | 'cancelled' = 'node-report',
+        ) => build().onCompleted(new FleetJobCompletedEvent(jobView, USER, source, NODE, result));
+
+        it('⭐ keeps the session with the reporting node and the PLANNED provider — before the question is filed', async () => {
+            await report({
+                ...withSession(SESSION),
+                question: {
+                    text: 'Use Postgres?',
+                    context: null,
+                    truncated: false,
+                    mountDir: null,
+                },
+            });
+
+            expect(runs.recordFleetCliSession).toHaveBeenCalledTimes(1);
+            expect(runs.recordFleetCliSession).toHaveBeenCalledWith(RUN, {
+                sessionId: SESSION,
+                nodeId: NODE,
+                provider: 'claude-code',
+            });
+            // The owner can only answer once the Inbox item exists, and the
+            // answer's resume carries whatever is on the row at that moment.
+            expect(runs.recordFleetCliSession.mock.invocationCallOrder[0]).toBeLessThan(
+                inbox!.questionRaised.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('keeps it on the success path too (a later CI resume can continue it)', async () => {
+            await report(withSession(SESSION) as unknown as Record<string, unknown>);
+            expect(runs.recordFleetCliSession).toHaveBeenCalledWith(RUN, {
+                sessionId: SESSION,
+                nodeId: NODE,
+                provider: 'claude-code',
+            });
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
+
+        it.each<[string, unknown]>([
+            ['shell metacharacters', `${SESSION}; rm -rf /`],
+            ['a non-UUID id', 'sess-1'],
+            ['a number', 42],
+            ['nothing', undefined],
+        ])(
+            'records nothing for a session id that is %s (the wire is untrusted)',
+            async (_label, id) => {
+                await report(withSession(id) as unknown as Record<string, unknown>);
+                expect(runs.recordFleetCliSession).not.toHaveBeenCalled();
+            },
+        );
+
+        it('records nothing when the node claims another provider than the one the plan asked for', async () => {
+            await report(withSession(SESSION, 'codex') as unknown as Record<string, unknown>);
+            expect(runs.recordFleetCliSession).not.toHaveBeenCalled();
+        });
+
+        it('records nothing for a legacy command-mode job (no planned provider)', async () => {
+            await report(
+                withSession(SESSION) as unknown as Record<string, unknown>,
+                plannedJob(null),
+            );
+            expect(runs.recordFleetCliSession).not.toHaveBeenCalled();
+        });
+
+        it('retires an INHERITED session when this run reported none — the next run must not resume a conversation that never saw this one', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                cliSessionId: SESSION,
+                fleetCliSession: { sessionId: SESSION, nodeId: NODE, provider: 'claude-code' },
+            });
+            await report(withSession(null) as unknown as Record<string, unknown>);
+            expect(runs.recordFleetCliSession).toHaveBeenCalledWith(RUN, null);
+        });
+
+        it('says nothing about a CLI for a synthetic settlement or a cancelled run', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                fleetCliSession: { sessionId: SESSION, nodeId: NODE, provider: 'claude-code' },
+            });
+            await report(
+                withSession(SESSION) as unknown as Record<string, unknown>,
+                plannedJob(),
+                'queue-expired',
+            );
+            await report(
+                withSession(SESSION) as unknown as Record<string, unknown>,
+                plannedJob(),
+                'cancelled',
+            );
+            expect(runs.recordFleetCliSession).not.toHaveBeenCalled();
+        });
+
+        it('a failed write never stops the run from settling', async () => {
+            runs.recordFleetCliSession.mockRejectedValue(new Error('db blip'));
+            await report(withSession(SESSION) as unknown as Record<string, unknown>);
+            expect(runs.markCompleted).toHaveBeenCalled();
         });
     });
 
