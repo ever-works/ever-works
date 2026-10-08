@@ -82,6 +82,14 @@ describe('sanitizeSvg', () => {
             }
         });
 
+        it('fails closed on a handler that one removal pass would splice together on the root', () => {
+            const result = sanitizeSvg(
+                '<svg o onx="1"nclick="evil()" viewBox="0 0 24 24"><path d="M0 0"/></svg>',
+            );
+
+            expect(result).toEqual({ ok: false, reason: 'dangerous-content' });
+        });
+
         it('strips xlink:href and href attributes', () => {
             const input =
                 '<svg viewBox="0 0 24 24"><a href="https://evil.example.com"><circle xlink:href="#bad" cx="12" cy="12" r="6"/></a></svg>';

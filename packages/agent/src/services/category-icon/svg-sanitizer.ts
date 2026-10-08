@@ -218,8 +218,14 @@ export function sanitizeSvg(input: string | null | undefined): SanitizeResult {
     // Strip forbidden elements wholesale (both paired and self-closing).
     working = working.replace(FORBIDDEN_ELEMENT_RE, '');
 
-    // Strip event handler attributes anywhere they appear.
-    working = working.replace(EVENT_HANDLER_ATTR_RE, '');
+    // Strip event handler attributes anywhere they appear. A handler that only
+    // appears once another is stripped was built to slip past the scrub: fail
+    // closed rather than trust the rewrite.
+    const handlerFree = stripUntilStable(working, EVENT_HANDLER_ATTR_RE);
+    if (handlerFree.rounds > 1) {
+        return { ok: false, reason: 'dangerous-content' };
+    }
+    working = handlerFree.text;
 
     // Strip xlink:href / href attributes — inline icons should not need
     // them, and they're the most common SVG XSS vector.
@@ -303,6 +309,29 @@ function hasLiveMarkup(svg: string): boolean {
 }
 
 /**
+ * Apply `pattern` (a global regex) until the text stops changing, so a removal
+ * cannot splice the leftovers into a new match — e.g. `<path o onx="1"nclick="y">`
+ * would leave `<path onclick="y">` after one pass (CodeQL
+ * js/incomplete-multi-character-sanitization). Every pass shortens the text,
+ * and the input is capped at {@link MAX_SVG_INPUT_LENGTH}, so this terminates.
+ * `rounds` counts the passes that removed something: more than one means the
+ * input was built to survive a single pass.
+ */
+function stripUntilStable(input: string, pattern: RegExp): { text: string; rounds: number } {
+    let rounds = 0;
+    let previous: string;
+    let current = input;
+    do {
+        previous = current;
+        current = current.replace(pattern, '');
+        if (current !== previous) {
+            rounds += 1;
+        }
+    } while (current !== previous);
+    return { text: current, rounds };
+}
+
+/**
  * Remove every `opener … closer` span from `input` — each opener through the
  * first `closer` that starts after it — scanning left to right, in linear time.
  * The same spans `input.replace(/<opener>[\s\S]*?<closer>/g, '')` removes: an
@@ -342,7 +371,7 @@ function normalizeRootAttrs(rawAttrs: string): string {
     attrs = attrs.replace(WIDTH_HEIGHT_ATTR_RE, '');
 
     // Strip event handlers and href once more in case they were on <svg>.
-    attrs = attrs.replace(EVENT_HANDLER_ATTR_RE, '');
+    attrs = stripUntilStable(attrs, EVENT_HANDLER_ATTR_RE).text;
     attrs = attrs.replace(DANGEROUS_HREF_RE, '');
     attrs = attrs.replace(STYLE_ATTR_RE, '');
 
