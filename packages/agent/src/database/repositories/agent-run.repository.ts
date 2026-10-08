@@ -4,7 +4,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
-import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
+import {
+    AgentRun,
+    AgentRunStatus,
+    AgentRunTriggerKind,
+    type AgentRunFleetCliSession,
+} from '../../entities/agent-run.entity';
 import { Agent, AgentStatus } from '../../entities/agent.entity';
 import { ConversationMessage } from '../../entities/conversation-message.entity';
 import { Mission } from '../../entities/mission.entity';
@@ -1721,12 +1726,45 @@ export class AgentRunRepository {
      */
     async seedResumeContext(
         runId: string,
-        patch: { cliSessionId?: string | null; pendingInput?: string[] | null },
+        patch: {
+            cliSessionId?: string | null;
+            pendingInput?: string[] | null;
+            /** Self-build slice AU — the fleet node the carried session lives on. */
+            fleetCliSession?: AgentRunFleetCliSession | null;
+        },
     ): Promise<void> {
         const update: Record<string, unknown> = {};
         if (patch.cliSessionId !== undefined) update.cliSessionId = patch.cliSessionId;
         if (patch.pendingInput !== undefined) update.pendingInput = patch.pendingInput;
+        if (patch.fleetCliSession !== undefined) update.fleetCliSession = patch.fleetCliSession;
         if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
+    }
+
+    /**
+     * Self-build slice AU — record the CLI session a fleet node reported for
+     * this run, or retire the one it carried.
+     *
+     * `session` writes BOTH columns in one statement — `cliSessionId` (the
+     * run's resume key, which `RunSteeringService.resume` already carries)
+     * and `fleetCliSession` (which node holds it) — so the pair can never be
+     * half-written. `null` clears ONLY `fleetCliSession`: a run that reported
+     * no session must not hand its successor the session it inherited from
+     * ITS source, which would resume a conversation that never saw this
+     * run's work; `cliSessionId` is left to its other writers.
+     *
+     * The caller validates every field (the wire is untrusted); this is a
+     * plain whitelisted write with no status guard, like
+     * {@link seedResumeContext}, because the session is a fact about the
+     * CLI, not about the run's lifecycle.
+     */
+    async recordFleetCliSession(
+        runId: string,
+        session: AgentRunFleetCliSession | null,
+    ): Promise<void> {
+        const update: Record<string, unknown> = session
+            ? { cliSessionId: session.sessionId, fleetCliSession: session }
+            : { fleetCliSession: null };
         await this.repository.update(runId, update);
     }
 
