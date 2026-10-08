@@ -52,6 +52,7 @@ import {
 	type FleetEnrollableNodeKind,
 	type FleetNodeView,
 	type NodeConfig,
+	type NodeLimitCeiling,
 	type NodeResourceLimits
 } from './types';
 
@@ -572,10 +573,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Node lifecycle (slice AR): the lanes the version floor holds. Filled in
 	// as they are built below; the tracker resolves them per verdict.
 	const holdableLanes: UpgradeHoldable[] = [];
+	// Remote node limits (slice AS): where an owner's ceiling lands — the
+	// work lane, once it exists below. Unset on a visibility-only node.
+	let limitTarget: ((ceiling: NodeLimitCeiling) => void) | null = null;
 	const lifecycle = new NodeLifecycleTracker({
 		daemonVersion: io.version,
 		logger: io.logger,
 		lanes: () => holdableLanes,
+		onLimitCeiling: (ceiling) => limitTarget?.(ceiling),
 		...(options.persistLifecycle ? { persist: options.persistLifecycle } : {}),
 		...(io.now ? { now: io.now } : {})
 	});
@@ -595,6 +600,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			pendingComputerSessions?: string[];
 			minNodeVersion?: string;
 			upgradeRequired?: boolean;
+			limitCeiling?: NodeLimitCeiling;
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
@@ -658,6 +664,19 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// the same tracker so both lanes and the record agree.
 		holdableLanes.push(worker);
 		worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
+		// Remote node limits (self-build slice AS): the owner's ceiling clamps
+		// THIS lane — the work lane — to min(its own limits, the ceiling),
+		// from the next lease. The live-view lane keeps its fixed two views:
+		// a view is the owner watching, not work the ceiling is about. The
+		// heartbeat reports the result back as the effective limits.
+		limitTarget = (ceiling) => {
+			if (worker.applyLimitCeiling(ceiling)) {
+				io.logger.info(
+					`Platform limit ceiling applied — this node now enforces ${describeEnforcedLimits(worker.resourceLimits)} (its own limits: ${describeEnforcedLimits(worker.localResourceLimits)})`
+				);
+			}
+		};
+		telemetry.limits = () => worker.resourceLimits;
 		// Fleet health signals (EW-776). Wired onto the SAME telemetry
 		// object `describe` already closed over above, so the heartbeat
 		// starts reporting worker state without the loop having to be
@@ -927,6 +946,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	}
 
 	return runtime;
+}
+
+/** `2 concurrent job(s), CPU < 80%, no memory ceiling` — for the log line a ceiling change writes. */
+export function describeEnforcedLimits(
+	limits: Pick<NodeResourceLimits, 'maxConcurrentJobs' | 'maxCpuPercent' | 'maxMemoryMb'>
+): string {
+	return [
+		`${limits.maxConcurrentJobs} concurrent job(s)`,
+		limits.maxCpuPercent === null ? 'no CPU ceiling' : `CPU < ${limits.maxCpuPercent}%`,
+		limits.maxMemoryMb === null ? 'no memory ceiling' : `memory < ${limits.maxMemoryMb}MB`
+	].join(', ');
 }
 
 /** Most live views one machine serves at once — the platform's per-machine default. */

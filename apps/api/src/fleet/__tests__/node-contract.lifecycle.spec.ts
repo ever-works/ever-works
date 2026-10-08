@@ -281,3 +281,85 @@ describe('the floor gates the lease and nothing else', () => {
         expect(floorAt).toBeGreaterThan(authAt);
     });
 });
+
+/**
+ * Remote node limits (self-build slice AS) — the owner's ceiling travels
+ * DOWN on every heartbeat answer and the node's effective limits travel UP
+ * on every beat. Pinned against the real handler over the real service.
+ */
+describe('remote node limits on the real heartbeat (slice AS)', () => {
+    const pinned = baseline.limitCeiling;
+
+    function controllerWithRow(row: Record<string, unknown>) {
+        const update = jest.fn(async () => undefined);
+        const service = new FleetService({
+            findById: async (id: string) =>
+                id === NODE_ID ? { ...nodeRow('0.2.0'), ...row } : null,
+            update,
+        } as never);
+        const controller = new FleetController(
+            service,
+            { promoteWaitingForNode: async () => undefined } as never,
+            undefined as never,
+            undefined as never,
+            undefined as never,
+            undefined as never,
+        );
+        return { controller, update };
+    }
+
+    it('pins a known number of read fields (anti-vacuity)', () => {
+        expect(pinned.heartbeatResponseFields).toHaveLength(4);
+    });
+
+    it('carries the owner ceiling on the answer, with every field the node reads', async () => {
+        const ceiling = pinned.heartbeatWithCeiling.ceiling;
+        const { controller } = controllerWithRow({
+            ceilingMaxConcurrentJobs: ceiling.maxConcurrentJobs,
+            ceilingMaxCpuPercent: ceiling.maxCpuPercent,
+            ceilingMaxMemoryMb: ceiling.maxMemoryMb,
+        });
+        const answer = await controller.heartbeat({ nodeId: NODE_ID, secret: SECRET } as never);
+
+        assertShape(
+            checkResponse(
+                'heartbeat (real handler, ceiling set)',
+                answer,
+                pinned.heartbeatResponseFields,
+            ),
+            'NODE CONTRACT BROKEN — THE PLATFORM NO LONGER EMITS WHAT A NODE READS',
+        );
+        expect(answer.limitCeiling).toEqual(ceiling);
+    });
+
+    it('still carries an all-null ceiling when none is set, so lifting one reaches the machine', async () => {
+        const { controller } = controllerWithRow({});
+        const answer = await controller.heartbeat({ nodeId: NODE_ID, secret: SECRET } as never);
+        assertShape(
+            checkResponse(
+                'heartbeat (real handler, no ceiling)',
+                answer,
+                pinned.heartbeatResponseFields,
+            ),
+            'NODE CONTRACT BROKEN — A LIFTED CEILING WOULD NEVER REACH THE NODE',
+        );
+        expect(answer.limitCeiling).toEqual(pinned.heartbeatWithoutCeiling.ceiling);
+    });
+
+    it('stores the limits the node reports enforcing, as a set', async () => {
+        const { controller, update } = controllerWithRow({});
+        await controller.heartbeat({
+            nodeId: NODE_ID,
+            secret: SECRET,
+            ...pinned.reportedLimits,
+        } as never);
+        expect(update).toHaveBeenCalledWith(
+            NODE_ID,
+            expect.objectContaining({
+                effectiveMaxConcurrentJobs: pinned.reportedLimits.maxConcurrentJobs,
+                effectiveMaxCpuPercent: pinned.reportedLimits.maxCpuPercent,
+                effectiveMaxMemoryMb: pinned.reportedLimits.maxMemoryMb,
+            }),
+        );
+    });
+});

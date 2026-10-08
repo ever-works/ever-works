@@ -45,6 +45,7 @@ import {
     revokeFleetEnrollmentTokenAction,
     rotateFleetNodeCredentialAction,
     updateFleetNodeAction,
+    setFleetNodeLimitCeilingAction,
 } from '@/app/actions/settings/fleet';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { FleetCostCeiling } from './FleetCostCeiling';
@@ -52,6 +53,8 @@ import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
 import { FleetKillSwitchBanner } from './FleetKillSwitchBanner';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
+import { isEmptyLimitCeiling } from './fleet-node-limits.shared';
+import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
 import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
 
@@ -347,6 +350,27 @@ export function FleetSettings({
                     dailyCostCeilingCents === null
                         ? t('costCeiling.nodeCleared')
                         : t('costCeiling.nodeSaved'),
+                );
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
+    /** Remote node limits (slice AS): the per-node limit ceiling; all-null clears it. */
+    const handleSaveLimitCeiling = (ceiling: FleetNodeLimitCeiling) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await setFleetNodeLimitCeilingAction(target.id, ceiling);
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data : entry)),
+                );
+                setDrawerNode(result.data);
+                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data } : prev));
+                toast.success(
+                    isEmptyLimitCeiling(ceiling) ? t('limits.cleared') : t('limits.saved'),
                 );
             } else {
                 toast.error(result.error);
@@ -845,6 +869,7 @@ export function FleetSettings({
                 }}
                 onSaveCapabilities={handleSaveCapabilities}
                 onSaveCostCeiling={handleSaveCostCeiling}
+                onSaveLimitCeiling={handleSaveLimitCeiling}
                 onRotate={handleRotate}
                 onDrain={handleDrain}
             />

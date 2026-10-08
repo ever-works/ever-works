@@ -1,4 +1,4 @@
-import { normalizeFleetNodeVersionFloor } from '@ever-works/contracts';
+import { normalizeFleetNodeVersionFloor, type FleetNodeLimitCeiling } from '@ever-works/contracts';
 import type { Logger } from './logger';
 import {
 	MAX_CREDENTIAL_LENGTH,
@@ -271,6 +271,11 @@ export class FleetClient {
 		if (lifecycle.upgradeRequired !== undefined) {
 			response.upgradeRequired = lifecycle.upgradeRequired;
 		}
+		// Remote node limits (self-build slice AS): the owner's ceiling.
+		const ceiling = readLimitCeiling(payload);
+		if (ceiling) {
+			response.limitCeiling = ceiling;
+		}
 		return response;
 	}
 
@@ -427,6 +432,18 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.lastReclaimFreedBytes !== undefined) {
 		out.lastReclaimFreedBytes = source.lastReclaimFreedBytes;
 	}
+	// Remote node limits (self-build slice AS). The CPU / memory pair may
+	// legitimately go out as `null` ("no ceiling in force"), so the test is
+	// `!== undefined`, never truthiness.
+	if (source.maxConcurrentJobs !== undefined) {
+		out.maxConcurrentJobs = source.maxConcurrentJobs;
+	}
+	if (source.maxCpuPercent !== undefined) {
+		out.maxCpuPercent = source.maxCpuPercent;
+	}
+	if (source.maxMemoryMb !== undefined) {
+		out.maxMemoryMb = source.maxMemoryMb;
+	}
 	return out;
 }
 
@@ -468,6 +485,32 @@ export function readHeartbeatLifecycle(payload: unknown): { minNodeVersion?: str
 	if (floor !== null) out.minNodeVersion = floor;
 	if (typeof body.upgradeRequired === 'boolean') out.upgradeRequired = body.upgradeRequired;
 	return out;
+}
+
+/**
+ * Remote node limits (self-build slice AS) — the owner's ceiling off a
+ * heartbeat answer, or null when the answer carries none or a malformed one.
+ *
+ * All three keys must be present and each a finite number or null; anything
+ * else ignores the WHOLE ceiling rather than half of it. A ceiling only ever
+ * lowers what the machine does, so the safe reading of nonsense is "no new
+ * instruction" — the node keeps the last ceiling it understood.
+ */
+export function readLimitCeiling(payload: unknown): FleetNodeLimitCeiling | null {
+	if (!payload || typeof payload !== 'object') return null;
+	const raw = (payload as { limitCeiling?: unknown }).limitCeiling;
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const body = raw as Record<string, unknown>;
+	const read = (key: keyof FleetNodeLimitCeiling): number | null | undefined => {
+		const value = body[key];
+		if (value === null) return null;
+		return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+	};
+	const maxConcurrentJobs = read('maxConcurrentJobs');
+	const maxCpuPercent = read('maxCpuPercent');
+	const maxMemoryMb = read('maxMemoryMb');
+	if (maxConcurrentJobs === undefined || maxCpuPercent === undefined || maxMemoryMb === undefined) return null;
+	return { maxConcurrentJobs, maxCpuPercent, maxMemoryMb };
 }
 
 /** Most pending live-view ids a heartbeat answer is read for (a wake-up hint, not a work list). */

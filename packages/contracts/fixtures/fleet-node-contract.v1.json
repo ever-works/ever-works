@@ -518,7 +518,10 @@
 			"workspaceCount",
 			"workspaceBytes",
 			"lastReclaimAt",
-			"lastReclaimFreedBytes"
+			"lastReclaimFreedBytes",
+			"maxConcurrentJobs",
+			"maxCpuPercent",
+			"maxMemoryMb"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -529,7 +532,10 @@
 			"workspaceCount",
 			"workspaceBytes",
 			"lastReclaimAt",
-			"lastReclaimFreedBytes"
+			"lastReclaimFreedBytes",
+			"maxConcurrentJobs",
+			"maxCpuPercent",
+			"maxMemoryMb"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -546,7 +552,10 @@
 				"workspaceCount",
 				"workspaceBytes",
 				"lastReclaimAt",
-				"lastReclaimFreedBytes"
+				"lastReclaimFreedBytes",
+				"maxConcurrentJobs",
+				"maxCpuPercent",
+				"maxMemoryMb"
 			],
 			"heartbeat": [
 				"platform",
@@ -562,7 +571,10 @@
 				"workspaceCount",
 				"workspaceBytes",
 				"lastReclaimAt",
-				"lastReclaimFreedBytes"
+				"lastReclaimFreedBytes",
+				"maxConcurrentJobs",
+				"maxCpuPercent",
+				"maxMemoryMb"
 			]
 		}
 	},
@@ -686,5 +698,49 @@
 		"gatedVerbs": ["jobs-lease"],
 		"ungatedVerbs": ["heartbeat", "jobs-heartbeat", "jobs-complete"],
 		"ungatedReason": "A below-floor machine must stay observable and must still settle the work it already holds; only NEW work is refused."
+	},
+	"limitCeiling": {
+		"note": "Self-build slice AS (remote node limits). The node REPORTS the limits its worker enforces (maxConcurrentJobs, maxCpuPercent, maxMemoryMb — a set keyed on maxConcurrentJobs; null on the CPU/memory pair = no ceiling in force) and READS the owner's platform-side ceiling off every heartbeat answer, clamping itself to min(its own start flags, the ceiling) before its next lease. The ceiling is sent on EVERY beat, all-null when none is set, so lifting one reaches the machine too. BREAK DIRECTION if limitCeiling vanishes from the answer: nothing breaks loudly — a current node keeps its last ceiling for the life of the process and an owner's change silently stops reaching the fleet. That is why it is pinned as read. The reported fields are bounded by the int column only, never by the node-side clamp: a newer node that allows more must not have its beat refused.",
+		"heartbeatResponseFields": [
+			{
+				"path": "limitCeiling",
+				"type": "object",
+				"reader": "fleet-client.ts readLimitCeiling() → node-lifecycle.ts NodeLifecycleTracker → worker-loop.ts applyLimitCeiling()"
+			},
+			{
+				"path": "limitCeiling.maxConcurrentJobs",
+				"type": "number|null",
+				"reader": "fleet-client.ts readLimitCeiling()"
+			},
+			{
+				"path": "limitCeiling.maxCpuPercent",
+				"type": "number|null",
+				"reader": "fleet-client.ts readLimitCeiling()"
+			},
+			{
+				"path": "limitCeiling.maxMemoryMb",
+				"type": "number|null",
+				"reader": "fleet-client.ts readLimitCeiling()"
+			}
+		],
+		"heartbeatWithCeiling": {
+			"ceiling": {
+				"maxConcurrentJobs": 2,
+				"maxCpuPercent": 80,
+				"maxMemoryMb": null
+			}
+		},
+		"heartbeatWithoutCeiling": {
+			"ceiling": {
+				"maxConcurrentJobs": null,
+				"maxCpuPercent": null,
+				"maxMemoryMb": null
+			}
+		},
+		"reportedLimits": {
+			"maxConcurrentJobs": 2,
+			"maxCpuPercent": 70,
+			"maxMemoryMb": null
+		}
 	}
 }

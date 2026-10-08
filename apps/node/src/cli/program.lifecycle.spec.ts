@@ -253,3 +253,43 @@ describe('status and doctor read the recorded verdict', () => {
 		});
 	});
 });
+
+describe('status and doctor show the platform limit ceiling (slice AS)', () => {
+	const withCeiling = record({
+		upgradeRequired: false,
+		minNodeVersion: '0.1.0',
+		limitCeiling: { maxConcurrentJobs: 2, maxCpuPercent: 80, maxMemoryMb: null }
+	});
+	const configWithLimits = JSON.stringify({
+		...JSON.parse(storedConfig),
+		limits: { maxConcurrentJobs: 4, maxCpuPercent: 70, maxMemoryMb: null }
+	});
+
+	it('status says what the platform set and what the node enforces under it', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: configWithLimits, [RECORD_PATH]: withCeiling } });
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain(
+			'ceiling      2 concurrent job(s), CPU < 80% set on the platform (as of 2026-10-08T11:00:00.000Z) — enforcing 2 concurrent job(s), CPU < 70%, no memory ceiling'
+		);
+	});
+
+	it('status says plainly when no ceiling is set', async () => {
+		const h = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[RECORD_PATH]: record({ upgradeRequired: false, limitCeiling: null })
+			}
+		});
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('ceiling      none set on the platform');
+	});
+
+	it('doctor --json carries the ceiling and the effective limits', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: configWithLimits, [RECORD_PATH]: withCeiling } });
+		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet', '--json'], h.deps)).toBe(EXIT_OK);
+		expect(JSON.parse(h.output())).toMatchObject({
+			limitCeiling: { maxConcurrentJobs: 2, maxCpuPercent: 80, maxMemoryMb: null },
+			effectiveLimits: { maxConcurrentJobs: 2, maxCpuPercent: 70, maxMemoryMb: null }
+		});
+	});
+});

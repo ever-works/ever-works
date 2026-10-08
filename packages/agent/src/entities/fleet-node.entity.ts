@@ -430,6 +430,50 @@ export class FleetNode {
     lastReclaimFreedBytes?: string | number | null;
 
     /**
+     * Remote node limits (self-build slice AS) — the resource limits the
+     * node last reported ENFORCING: `min(its own start flags, the owner's
+     * ceiling below)`. Written as a SET by the heartbeat (all three or none),
+     * so a CPU / memory NULL beside a non-null concurrency means "no ceiling
+     * in force on that dimension", while concurrency NULL means "never
+     * reported" (an older daemon, a node without a worker).
+     *
+     * Reported for visibility, like the housekeeping figures above: the
+     * platform never routes on these. Migration: `1795030000000-AddFleetNodeLimits`.
+     */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxConcurrentJobs?: number | null;
+
+    /** See {@link effectiveMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxCpuPercent?: number | null;
+
+    /** See {@link effectiveMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxMemoryMb?: number | null;
+
+    /**
+     * Remote node limits (slice AS) — the OWNER's platform-side ceiling for
+     * this node, set only through `FleetService.setLimitCeilingForUser`
+     * (audited as `node.limits`). NULL = no ceiling on that dimension.
+     *
+     * The node clamps itself to `min(local flag, this)` on its next beat,
+     * so a ceiling can only lower what a machine does. Stored HERE, on the
+     * platform, precisely so that a service reinstall on the machine — which
+     * re-applies whatever flags the installer was given — cannot silently
+     * revert it: the next beat hands it straight back.
+     */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxConcurrentJobs?: number | null;
+
+    /** See {@link ceilingMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxCpuPercent?: number | null;
+
+    /** See {@link ceilingMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxMemoryMb?: number | null;
+
+    /**
      * Agent computers — who may take control of this machine from a live
      * view: `owner` (the default), `org-admins` or `org-members`. Watching
      * is never widened by it on its own; control is refused server-side to

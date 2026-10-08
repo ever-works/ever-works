@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	FLEET_MAX_REPORTED_LIMIT_VALUE,
+	FLEET_NODE_MAX_CONCURRENT_JOBS,
+	FLEET_NODE_MAX_CPU_PERCENT,
+	FLEET_NODE_MAX_MEMORY_MB,
+	FLEET_NODE_MIN_CONCURRENT_JOBS,
+	FLEET_NODE_MIN_CPU_PERCENT,
+	FLEET_NODE_MIN_MEMORY_MB,
 	compareFleetNodeVersions,
 	FLEET_DEFAULT_MIN_NODE_VERSION,
 	FLEET_MAX_CLI_VERSION_LENGTH,
@@ -104,5 +111,21 @@ describe('the operator-facing constants', () => {
 	it('bounds per-provider CLI versions like the single cliVersion field', () => {
 		expect(FLEET_MAX_CLI_VERSIONS).toBe(8);
 		expect(FLEET_MAX_CLI_VERSION_LENGTH).toBe(64);
+	});
+});
+
+describe('remote node limits (slice AS) — the bounds', () => {
+	it('pins the literal bounds the node clamps its flags into', () => {
+		// The node's own `MIN_/MAX_*` constants are pinned equal to these in
+		// apps/node; a ceiling the platform accepted but the node rewrote
+		// would be a setting that does not do what the owner typed.
+		expect([FLEET_NODE_MIN_CONCURRENT_JOBS, FLEET_NODE_MAX_CONCURRENT_JOBS]).toEqual([1, 16]);
+		expect([FLEET_NODE_MIN_CPU_PERCENT, FLEET_NODE_MAX_CPU_PERCENT]).toEqual([5, 100]);
+		expect([FLEET_NODE_MIN_MEMORY_MB, FLEET_NODE_MAX_MEMORY_MB]).toEqual([256, 1_048_576]);
+	});
+
+	it('lets a reported limit be wider than the clamp, up to the int column', () => {
+		expect(FLEET_MAX_REPORTED_LIMIT_VALUE).toBe(2 ** 31 - 1);
+		expect(FLEET_MAX_REPORTED_LIMIT_VALUE).toBeGreaterThan(FLEET_NODE_MAX_MEMORY_MB);
 	});
 });

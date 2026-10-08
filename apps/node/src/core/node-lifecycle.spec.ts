@@ -217,7 +217,8 @@ describe('NodeLifecycleTracker', () => {
 			recordedAt: '2026-10-08T12:00:00.000Z',
 			daemonVersion: '0.2.0',
 			minNodeVersion: '0.3.0',
-			upgradeRequired: true
+			upgradeRequired: true,
+			limitCeiling: null
 		});
 	});
 
@@ -253,7 +254,8 @@ describe('the lifecycle record beside the config', () => {
 			recordedAt: '2026-10-08T12:00:00.000Z',
 			daemonVersion: '0.2.0',
 			minNodeVersion: '0.3.0',
-			upgradeRequired: true
+			upgradeRequired: true,
+			limitCeiling: null
 		};
 		await writeNodeLifecycleRecord(fs, '/etc/ever-works-node/node-config.json', record);
 		expect(nodeLifecycleRecordPath('/etc/ever-works-node/node-config.json')).toBe(

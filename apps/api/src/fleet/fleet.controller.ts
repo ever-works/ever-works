@@ -68,6 +68,7 @@ import {
     FleetUnenrollDto,
     RotateFleetNodeCredentialDto,
     SetFleetCostCeilingDto,
+    SetFleetNodeLimitCeilingDto,
     SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
@@ -94,6 +95,8 @@ const NODE_HISTORY_LIMIT = 25;
  *   GET    /api/fleet/nodes/:id/audit         this node's lifecycle trail
  *   POST   /api/fleet/nodes/:id/drain         drain: disable AND requeue
  *                                             the node's in-flight claims
+ *   PUT    /api/fleet/nodes/:id/limits        platform-side ceiling on the
+ *                                             node's resource limits (AS)
  *   PATCH  /api/fleet/nodes/:id               rename / pause / disable
  *   DELETE /api/fleet/nodes/:id               remove registration
  *   GET    /api/fleet/enrollment-tokens       outstanding (unused) tokens
@@ -444,6 +447,27 @@ export class FleetController {
         return this.panic.drainNodeForUser(auth.userId, id, body.drain);
     }
 
+    @Put('nodes/:id/limits')
+    @ApiOperation({
+        summary:
+            'Set (or clear, with nulls) the platform-side CEILING on one node’s resource limits — concurrent jobs, CPU % and memory MB. The node enforces the lower of its own start flags and this, from its next heartbeat; a ceiling can only lower what a machine does. Survives a reinstall on the machine, which only re-applies its local flags. Audited as node.limits. Owner-scoped: another account’s node id answers 404.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setLimitCeiling(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: SetFleetNodeLimitCeilingDto,
+    ): Promise<FleetNodeView> {
+        // Every field is forwarded by name: a body-mapping whitelist that
+        // quietly drops one is how a shipped setting ends up doing nothing.
+        return this.service.setLimitCeilingForUser(auth.userId, id, {
+            maxConcurrentJobs: body.maxConcurrentJobs,
+            maxCpuPercent: body.maxCpuPercent,
+            maxMemoryMb: body.maxMemoryMb,
+        });
+    }
+
     @Post('nodes/enrollment-token')
     @ApiOperation({
         summary:
@@ -564,6 +588,10 @@ export class FleetController {
             workspaceBytes: body.workspaceBytes,
             lastReclaimAt: body.lastReclaimAt,
             lastReclaimFreedBytes: body.lastReclaimFreedBytes,
+            // Remote node limits (slice AS): what the worker is enforcing.
+            maxConcurrentJobs: body.maxConcurrentJobs,
+            maxCpuPercent: body.maxCpuPercent,
+            maxMemoryMb: body.maxMemoryMb,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -603,6 +631,10 @@ export class FleetController {
             workspaceBytes: body.workspaceBytes,
             lastReclaimAt: body.lastReclaimAt,
             lastReclaimFreedBytes: body.lastReclaimFreedBytes,
+            // Remote node limits (slice AS): what the worker is enforcing.
+            maxConcurrentJobs: body.maxConcurrentJobs,
+            maxCpuPercent: body.maxCpuPercent,
+            maxMemoryMb: body.maxMemoryMb,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
@@ -641,6 +673,10 @@ export class FleetController {
             // so a daemon too old to read these two fields is still held.
             minNodeVersion: result.minNodeVersion,
             upgradeRequired: result.upgradeRequired,
+            // Remote node limits (self-build slice AS) — the owner's ceiling,
+            // on every beat (all-null when none), so the machine clamps itself
+            // to it, or lifts the clamp, before its next lease.
+            limitCeiling: result.limitCeiling,
         };
         if (pending.length > 0) {
             response.pendingComputerSessions = pending;

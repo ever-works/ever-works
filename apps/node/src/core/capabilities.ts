@@ -453,6 +453,16 @@ export interface SelfDescriptionTelemetry {
 	 * reports the floor alone.
 	 */
 	housekeeping?: () => Promise<NodeHousekeepingReport | null> | NodeHousekeepingReport | null;
+	/**
+	 * Remote node limits (self-build slice AS) — the limits the worker is
+	 * ENFORCING right now (`min(local flags, platform ceiling)`), via
+	 * `worker.resourceLimits`. Absent on a visibility-only node, which has no
+	 * worker and therefore no limits to report.
+	 */
+	limits?: () =>
+		| Promise<{ maxConcurrentJobs: number; maxCpuPercent: number | null; maxMemoryMb: number | null } | null>
+		| { maxConcurrentJobs: number; maxCpuPercent: number | null; maxMemoryMb: number | null }
+		| null;
 }
 
 /**
@@ -544,6 +554,17 @@ export async function describeSelf(
 				description.lastReclaimFreedBytes = housekeeping.lastReclaimFreedBytes;
 			}
 		}
+	}
+	// Remote node limits (slice AS). The set travels together, keyed on the
+	// concurrency (always a number); the CPU / memory pair go out as `null`
+	// when no ceiling is in force — the server reads that as "none", and an
+	// absent concurrency as "said nothing". Copied field by field, never
+	// spread, for the reason the housekeeping block above gives.
+	const limits = await resolveTelemetry(telemetry.limits);
+	if (limits && typeof limits.maxConcurrentJobs === 'number' && Number.isInteger(limits.maxConcurrentJobs)) {
+		description.maxConcurrentJobs = limits.maxConcurrentJobs;
+		description.maxCpuPercent = typeof limits.maxCpuPercent === 'number' ? limits.maxCpuPercent : null;
+		description.maxMemoryMb = typeof limits.maxMemoryMb === 'number' ? limits.maxMemoryMb : null;
 	}
 	return description;
 }

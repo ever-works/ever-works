@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FleetJob } from '../../entities/fleet-job.entity';
 import { FleetNode } from '../../entities/fleet-node.entity';
 import { FleetJobService } from '../fleet-job.service';
@@ -281,5 +282,132 @@ describe('FleetService — node lifecycle on the heartbeat (slice AR)', () => {
         await build().heartbeat(NODE, SECRET, { cliVersions: [] });
         const patch = repository.update.mock.calls[0][1] as Partial<FleetNode>;
         expect(patch.cliVersions).toEqual([]);
+    });
+});
+
+/**
+ * Remote node limits (self-build slice AS) — the agent side: the reported
+ * limits are stored as a SET keyed on the concurrency, and the owner's
+ * ceiling is validated, owner-scoped, audited, and handed back on every beat.
+ */
+describe('FleetService — remote node limits (slice AS)', () => {
+    let repository: { findById: jest.Mock; update: jest.Mock };
+    let audit: { recordNodeAction: jest.Mock };
+
+    beforeEach(() => {
+        repository = {
+            findById: jest.fn(async () => node()),
+            update: jest.fn(async () => undefined),
+        };
+        audit = { recordNodeAction: jest.fn(async () => true) };
+    });
+
+    const build = () =>
+        new FleetService(repository as never, undefined, undefined, undefined, audit as never);
+    const patchOf = () => repository.update.mock.calls[0][1] as Partial<FleetNode>;
+
+    it('stores what the worker reports enforcing, as a set — null = no ceiling in force', async () => {
+        await build().heartbeat(NODE, SECRET, {
+            maxConcurrentJobs: 2,
+            maxCpuPercent: null,
+            maxMemoryMb: 4096,
+        });
+        expect(patchOf()).toMatchObject({
+            effectiveMaxConcurrentJobs: 2,
+            effectiveMaxCpuPercent: null,
+            effectiveMaxMemoryMb: 4096,
+        });
+    });
+
+    it('leaves the stored set alone when a beat says nothing (an older daemon, no worker)', async () => {
+        repository.findById.mockResolvedValue(
+            node({ effectiveMaxConcurrentJobs: 3 } as Partial<FleetNode>),
+        );
+        const result = await build().heartbeat(NODE, SECRET, { maxCpuPercent: 50 });
+        expect(patchOf()).not.toHaveProperty('effectiveMaxConcurrentJobs');
+        expect(patchOf()).not.toHaveProperty('effectiveMaxCpuPercent');
+        expect(result?.node.effectiveLimits).toEqual({
+            maxConcurrentJobs: 3,
+            maxCpuPercent: null,
+            maxMemoryMb: null,
+        });
+    });
+
+    it('hands the owner ceiling back on every beat — all-null when none is set', async () => {
+        let result = await build().heartbeat(NODE, SECRET, {});
+        expect(result?.limitCeiling).toEqual({
+            maxConcurrentJobs: null,
+            maxCpuPercent: null,
+            maxMemoryMb: null,
+        });
+
+        repository.findById.mockResolvedValue(
+            node({ ceilingMaxConcurrentJobs: 2, ceilingMaxCpuPercent: 80 } as Partial<FleetNode>),
+        );
+        result = await build().heartbeat(NODE, SECRET, {});
+        expect(result?.limitCeiling).toEqual({
+            maxConcurrentJobs: 2,
+            maxCpuPercent: 80,
+            maxMemoryMb: null,
+        });
+        // A beat never writes the ceiling — only the owner does.
+        expect(repository.update.mock.calls[1][1]).not.toHaveProperty('ceilingMaxConcurrentJobs');
+    });
+
+    it('sets the ceiling owner-scoped, audits before/after as node.limits', async () => {
+        repository.findById.mockResolvedValue(
+            node({ ceilingMaxConcurrentJobs: 4 } as Partial<FleetNode>),
+        );
+        const view = await build().setLimitCeilingForUser(USER, NODE, {
+            maxConcurrentJobs: 2,
+            maxCpuPercent: null,
+            maxMemoryMb: 8192,
+        });
+
+        expect(repository.update).toHaveBeenCalledWith(NODE, {
+            ceilingMaxConcurrentJobs: 2,
+            ceilingMaxCpuPercent: null,
+            ceilingMaxMemoryMb: 8192,
+        });
+        expect(view.limitCeiling).toEqual({
+            maxConcurrentJobs: 2,
+            maxCpuPercent: null,
+            maxMemoryMb: 8192,
+        });
+        expect(audit.recordNodeAction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: 'node.limits',
+                actorUserId: USER,
+                nodeId: NODE,
+                before: { maxConcurrentJobs: 4, maxCpuPercent: null, maxMemoryMb: null },
+                after: { maxConcurrentJobs: 2, maxCpuPercent: null, maxMemoryMb: 8192 },
+            }),
+        );
+    });
+
+    it('refuses a ceiling outside the node’s own bounds rather than clamping it', async () => {
+        for (const bad of [
+            { maxConcurrentJobs: 17, maxCpuPercent: null, maxMemoryMb: null },
+            { maxConcurrentJobs: null, maxCpuPercent: 4, maxMemoryMb: null },
+            { maxConcurrentJobs: null, maxCpuPercent: null, maxMemoryMb: 100 },
+            { maxConcurrentJobs: 1.5, maxCpuPercent: null, maxMemoryMb: null },
+            { maxConcurrentJobs: null, maxCpuPercent: null },
+        ]) {
+            await expect(build().setLimitCeilingForUser(USER, NODE, bad)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        }
+        expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 for another account's node, exactly like an unknown one", async () => {
+        await expect(
+            build().setLimitCeilingForUser('someone-else', NODE, {
+                maxConcurrentJobs: 1,
+                maxCpuPercent: null,
+                maxMemoryMb: null,
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(repository.update).not.toHaveBeenCalled();
     });
 });

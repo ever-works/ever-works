@@ -54,6 +54,12 @@ interface NodeContractBaseline {
 		heartbeatWhenBelowFloor: { status: number; minNodeVersion: string; upgradeRequired: boolean };
 		leaseWhenBelowFloor: { status: number; minNodeVersion: string; body: Record<string, unknown> };
 	};
+	limitCeiling: {
+		heartbeatResponseFields: Array<{ path: string; type: string }>;
+		heartbeatWithCeiling: { ceiling: Record<string, number | null> };
+		heartbeatWithoutCeiling: { ceiling: Record<string, number | null> };
+		reportedLimits: Record<string, number | null>;
+	};
 }
 
 const API_URL = 'https://api.ever.works';
@@ -132,7 +138,9 @@ describe('what the node actually puts on the wire', () => {
 		// sends nothing rather than a null, so an older platform is unaffected.
 		// 7 → 8 with the node lifecycle (slice AR): the pinned per-provider CLI
 		// versions, sent only by a node whose telemetry has a compat probe.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(8);
+		// 8 → 11 with remote node limits (slice AS): the limits the worker
+		// enforces, sent only by a node that HAS a worker.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(11);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -228,7 +236,12 @@ describe('what the node actually puts on the wire', () => {
 			workspaceCount: 3,
 			workspaceBytes: 12_000_000_000,
 			lastReclaimAt: '2026-09-06T00:00:00.000Z',
-			lastReclaimFreedBytes: 4_000_000_000
+			lastReclaimFreedBytes: 4_000_000_000,
+			// Remote node limits (slice AS) — the null on memory must survive
+			// the projection: it means "no ceiling in force", not "said nothing".
+			maxConcurrentJobs: 2,
+			maxCpuPercent: 70,
+			maxMemoryMb: null
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(
@@ -239,6 +252,8 @@ describe('what the node actually puts on the wire', () => {
 		expect(bodyOf(sent).workspaceCount).toBe(3);
 		expect(bodyOf(sent).lastReclaimAt).toBe('2026-09-06T00:00:00.000Z');
 		expect(bodyOf(sent).cliVersions).toEqual(['claude-code 2.1.3', 'codex 0.48.0']);
+		expect(bodyOf(sent)).toMatchObject(baseline.limitCeiling.reportedLimits);
+		expect(bodyOf(sent)).toHaveProperty('maxMemoryMb', null);
 	});
 
 	it('pause and unenroll send exactly the pinned bodies', async () => {
@@ -383,6 +398,31 @@ describe('what the node reads back', () => {
 		});
 		expect(legacy).not.toHaveProperty('minNodeVersion');
 		expect(legacy).not.toHaveProperty('upgradeRequired');
+	});
+
+	it('reads the owner limit ceiling off every heartbeat answer, and an all-null one too (slice AS)', async () => {
+		const pinned = baseline.limitCeiling;
+		expect(pinned.heartbeatResponseFields.map((field) => field.path).sort()).toEqual([
+			'limitCeiling',
+			'limitCeiling.maxConcurrentJobs',
+			'limitCeiling.maxCpuPercent',
+			'limitCeiling.maxMemoryMb'
+		]);
+		for (const variant of [pinned.heartbeatWithCeiling, pinned.heartbeatWithoutCeiling]) {
+			const answer = { ...baseline.routes.heartbeat.response, limitCeiling: variant.ceiling };
+			const beat = await fleetClient(recorder(200, answer).fetchFn).heartbeat({
+				nodeId: NODE_ID,
+				secret: SECRET
+			});
+			// The all-null ceiling must be READ, not dropped: it is how a lifted
+			// ceiling reaches the machine.
+			expect(beat.limitCeiling).toEqual(variant.ceiling);
+		}
+		const legacy = await fleetClient(recorder(200, baseline.routes.heartbeat.response).fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET
+		});
+		expect(legacy).not.toHaveProperty('limitCeiling');
 	});
 
 	it('rejects a lease answer that is not a list, rather than treating it as empty', async () => {

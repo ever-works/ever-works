@@ -117,6 +117,13 @@ export interface NodeContractBaseline {
         gatedVerbs: string[];
         ungatedVerbs: string[];
     };
+    /** Remote node limits (self-build slice AS) — the owner's ceiling and the reported limits. */
+    limitCeiling: {
+        heartbeatResponseFields: ContractResponseField[];
+        heartbeatWithCeiling: { ceiling: Record<string, number | null> };
+        heartbeatWithoutCeiling: { ceiling: Record<string, number | null> };
+        reportedLimits: Record<string, number | null>;
+    };
 }
 
 export interface BrokenContractFixture {

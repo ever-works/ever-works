@@ -1,6 +1,8 @@
 import { normalizeFleetNodeVersionFloor } from '@ever-works/contracts';
 import type { ConfigFileSystem } from './config-store';
+import { readLimitCeiling } from './fleet-client';
 import type { Logger } from './logger';
+import type { NodeLimitCeiling } from './types';
 import { describeUpgradeRequired, type WorkerUpgradeHold } from './worker-loop';
 
 /**
@@ -33,6 +35,12 @@ export interface NodeLifecycleRecord {
 	minNodeVersion: string | null;
 	/** True when the platform said this daemon is below the floor. */
 	upgradeRequired: boolean;
+	/**
+	 * Remote node limits (self-build slice AS) — the owner's platform-side
+	 * ceiling as last heard, or null when the platform never sent one. A
+	 * record written before the field existed reads as null.
+	 */
+	limitCeiling: NodeLimitCeiling | null;
 }
 
 /** Deliberately adjacent to the config, like the worker-session marker. */
@@ -77,7 +85,8 @@ export function parseNodeLifecycleRecord(raw: string | null): NodeLifecycleRecor
 		recordedAt: record.recordedAt,
 		daemonVersion: typeof record.daemonVersion === 'string' ? record.daemonVersion : '',
 		minNodeVersion: normalizeFleetNodeVersionFloor(record.minNodeVersion),
-		upgradeRequired: record.upgradeRequired === true
+		upgradeRequired: record.upgradeRequired === true,
+		limitCeiling: readLimitCeiling({ limitCeiling: record.limitCeiling })
 	};
 }
 
@@ -104,17 +113,27 @@ export interface NodeLifecycleTrackerOptions {
 	lanes: () => readonly UpgradeHoldable[];
 	persist?: (record: NodeLifecycleRecord) => Promise<void> | void;
 	now?: () => number;
+	/**
+	 * Remote node limits (self-build slice AS) — called when the owner's
+	 * ceiling CHANGES (including the first one heard), so the composition
+	 * root can clamp the work lane to it. Not called for a beat that carries
+	 * the same ceiling again, nor for an answer from a platform that sends
+	 * none — that keeps the last ceiling understood.
+	 */
+	onLimitCeiling?: (ceiling: NodeLimitCeiling) => void;
 }
 
 /** The heartbeat-answer fields this tracker reads. */
 export interface HeartbeatLifecycleFields {
 	minNodeVersion?: string;
 	upgradeRequired?: boolean;
+	limitCeiling?: NodeLimitCeiling;
 }
 
 export class NodeLifecycleTracker {
 	private minNodeVersion: string | null = null;
 	private upgradeRequired = false;
+	private limitCeiling: NodeLimitCeiling | null = null;
 	private lastPersisted: string | null = null;
 	private readonly now: () => number;
 
@@ -132,7 +151,24 @@ export class NodeLifecycleTracker {
 		if (typeof response.upgradeRequired === 'boolean') {
 			this.transition(response.upgradeRequired);
 		}
+		if (response.limitCeiling) this.applyLimitCeiling(response.limitCeiling);
 		this.persist();
+	}
+
+	/** Remote node limits (slice AS): adopt a new ceiling, once per change. */
+	private applyLimitCeiling(ceiling: NodeLimitCeiling): void {
+		const next: NodeLimitCeiling = {
+			maxConcurrentJobs: ceiling.maxConcurrentJobs,
+			maxCpuPercent: ceiling.maxCpuPercent,
+			maxMemoryMb: ceiling.maxMemoryMb
+		};
+		if (this.limitCeiling && JSON.stringify(this.limitCeiling) === JSON.stringify(next)) return;
+		this.limitCeiling = next;
+		try {
+			this.options.onLimitCeiling?.(next);
+		} catch {
+			// The lane reports its own limits; a failed clamp must not fail the beat.
+		}
 	}
 
 	/** The LEASE refused this daemon for the floor — the same fact, from the other channel. */
@@ -148,7 +184,8 @@ export class NodeLifecycleTracker {
 			recordedAt: new Date(this.now()).toISOString(),
 			daemonVersion: this.options.daemonVersion,
 			minNodeVersion: this.minNodeVersion,
-			upgradeRequired: this.upgradeRequired
+			upgradeRequired: this.upgradeRequired,
+			limitCeiling: this.limitCeiling ? { ...this.limitCeiling } : null
 		};
 	}
 
@@ -186,7 +223,12 @@ export class NodeLifecycleTracker {
 		if (!this.options.persist) return;
 		const record = this.snapshot();
 		// Only on a CHANGE of verdict — not a disk write per beat.
-		const fingerprint = JSON.stringify([record.daemonVersion, record.minNodeVersion, record.upgradeRequired]);
+		const fingerprint = JSON.stringify([
+			record.daemonVersion,
+			record.minNodeVersion,
+			record.upgradeRequired,
+			record.limitCeiling
+		]);
 		if (fingerprint === this.lastPersisted) return;
 		this.lastPersisted = fingerprint;
 		void Promise.resolve()

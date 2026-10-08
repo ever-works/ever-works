@@ -27,7 +27,7 @@ import {
 	type ResourceSample
 } from './resource-limits';
 import type { DiskProbeIo } from './telemetry-probe';
-import { clampResourceLimits, type NodeResourceLimits } from './types';
+import { applyNodeLimitCeiling, clampResourceLimits, type NodeLimitCeiling, type NodeResourceLimits } from './types';
 import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { WorkerSafetyGate } from './worker-safety-store';
 
@@ -548,7 +548,14 @@ export class WorkerLoop {
 	private readonly concurrency: number;
 	private readonly leaseTtlSec: number;
 	private readonly idlePollMs: number;
-	private readonly limits: NodeResourceLimits;
+	/**
+	 * The limits this loop ENFORCES: `localLimits`, lowered by the owner's
+	 * platform ceiling when one is in force (remote node limits, slice AS).
+	 * Mutable for that reason alone — see {@link applyLimitCeiling}.
+	 */
+	private limits: NodeResourceLimits;
+	/** The operator's own limits (start flags / stored config), clamped. The upper bound. */
+	private readonly localLimits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
 	private readonly diskProbe: DiskProbeIo | undefined;
 	private readonly workspacePath: string | undefined;
@@ -608,7 +615,8 @@ export class WorkerLoop {
 		);
 		// `limits` wins over the legacy `concurrency` option so there is
 		// exactly one number in play once an operator has set limits.
-		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.localLimits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.limits = { ...this.localLimits };
 		this.resourceProbe = options.resourceProbe;
 		this.diskProbe = options.diskProbe;
 		this.workspacePath = options.workspacePath;
@@ -637,6 +645,31 @@ export class WorkerLoop {
 	/** Max jobs this loop will ever run at once. */
 	get maxConcurrency(): number {
 		return this.limits.maxConcurrentJobs;
+	}
+
+	/** The operator's own limits, before any platform ceiling (slice AS). */
+	get localResourceLimits(): NodeResourceLimits {
+		return { ...this.localLimits };
+	}
+
+	/**
+	 * Remote node limits (self-build slice AS) — clamp this loop to
+	 * `min(its own limits, the owner's platform ceiling)`, or back to its own
+	 * limits when the ceiling is lifted (`null`, or all-null).
+	 *
+	 * Takes effect at the next lease: a lower concurrency never cancels work
+	 * already running — the loop simply leases nothing more until it is back
+	 * under the new number — and a CPU / memory ceiling joins the admission
+	 * gate on the next poll. Returns true when the enforced limits changed.
+	 */
+	applyLimitCeiling(ceiling: NodeLimitCeiling | null): boolean {
+		const next = applyNodeLimitCeiling(this.localLimits, ceiling);
+		const changed =
+			next.maxConcurrentJobs !== this.limits.maxConcurrentJobs ||
+			next.maxCpuPercent !== this.limits.maxCpuPercent ||
+			next.maxMemoryMb !== this.limits.maxMemoryMb;
+		this.limits = next;
+		return changed;
 	}
 
 	/** Lease an executor must have left before it may publish (clamped). */

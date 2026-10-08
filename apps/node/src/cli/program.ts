@@ -29,6 +29,7 @@ import {
 	type WorkspaceReapResult
 } from '../core/workspaces/workspace-reaper';
 import {
+	applyNodeLimitCeiling,
 	clampResourceLimits,
 	clampWorkspaceGcPolicy,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -872,11 +873,15 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 	deps.out(`work         ${view.paused ? 'PAUSED (draining — no new work)' : 'accepting new work'}`);
 	// Node lifecycle (slice AR): the daemon version floor, as the running
 	// service last heard it from the platform.
-	deps.out(`daemon       ${describeDaemonLifecycle(deps, await readNodeLifecycleRecord(deps.fs, deps.configPath))}`);
+	const lifecycleRecord = await readNodeLifecycleRecord(deps.fs, deps.configPath);
+	deps.out(`daemon       ${describeDaemonLifecycle(deps, lifecycleRecord)}`);
 	deps.out(
 		`offering     ${view.capabilitySelection ? view.capabilitySelection.join(', ') || '(identity only)' : '(everything detected)'}`
 	);
 	deps.out(`limits       ${describeLimits(view.limits)}`);
+	// Remote node limits (slice AS): the owner's platform ceiling as the
+	// running service last heard it, and what the node enforces under it.
+	deps.out(`ceiling      ${describePlatformCeiling(lifecycleRecord, view.limits)}`);
 	deps.out(`workspace gc ${describeWorkspaceGc(view.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY)}`);
 	// The secret itself is never printed — only whether one is stored.
 	deps.out(`credential   ${view.hasSecret ? 'stored' : 'MISSING'}`);
@@ -1131,9 +1136,10 @@ function housekeepingJson(report: HousekeepingReport): Record<string, unknown> {
 interface LifecycleReport {
 	record: NodeLifecycleRecord | null;
 	modelCli: ModelCliCompatibility[];
+	config: NodeConfig | null;
 }
 
-async function gatherLifecycle(deps: CliDeps): Promise<LifecycleReport> {
+async function gatherLifecycle(deps: CliDeps, config: NodeConfig | null): Promise<LifecycleReport> {
 	const record = await readNodeLifecycleRecord(deps.fs, deps.configPath);
 	const probe = new ModelCliCompatibilityProbe({
 		runner: deps.io.runner,
@@ -1146,7 +1152,7 @@ async function gatherLifecycle(deps: CliDeps): Promise<LifecycleReport> {
 	} catch {
 		modelCli = [];
 	}
-	return { record, modelCli };
+	return { record, modelCli, config };
 }
 
 /**
@@ -1194,8 +1200,34 @@ function describeModelCli(compat: ModelCliCompatibility): string {
 	return `${head} — compatible${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`;
 }
 
+/**
+ * Remote node limits (self-build slice AS) — the owner's platform ceiling,
+ * as the running service last heard it, and the limits this node enforces
+ * under it: `min(local, ceiling)` per dimension. `local` is the STORED
+ * config; a service started with one-off `--max-cpu` style overrides
+ * enforces the lower of those instead, and logs it.
+ */
+function describePlatformCeiling(record: NodeLifecycleRecord | null, local: NodeResourceLimits): string {
+	const ceiling = record?.limitCeiling ?? null;
+	if (!record) return 'not reported yet (it arrives on the running service’s first heartbeat)';
+	if (
+		!ceiling ||
+		(ceiling.maxConcurrentJobs === null && ceiling.maxCpuPercent === null && ceiling.maxMemoryMb === null)
+	) {
+		return `none set on the platform (as of ${record.recordedAt}) — this node runs on its own limits`;
+	}
+	const parts = [
+		ceiling.maxConcurrentJobs === null ? null : `${ceiling.maxConcurrentJobs} concurrent job(s)`,
+		ceiling.maxCpuPercent === null ? null : `CPU < ${ceiling.maxCpuPercent}%`,
+		ceiling.maxMemoryMb === null ? null : `memory < ${ceiling.maxMemoryMb}MB`
+	].filter((part): part is string => part !== null);
+	const effective = applyNodeLimitCeiling(clampResourceLimits(local), ceiling);
+	return `${parts.join(', ')} set on the platform (as of ${record.recordedAt}) — enforcing ${describeLimits(effective)}`;
+}
+
 function printLifecycle(deps: CliDeps, report: LifecycleReport): void {
 	deps.out(`daemon       ${describeDaemonLifecycle(deps, report.record)}`);
+	deps.out(`ceiling      ${describePlatformCeiling(report.record, clampResourceLimits(report.config?.limits))}`);
 	if (report.modelCli.length === 0) {
 		deps.out(
 			'model cli    none pinned in this shell (no claude / codex resolved — set EVER_WORKS_NODE_CLAUDE_PATH / EVER_WORKS_NODE_CODEX_PATH; a service started with --claude-path / --codex-path pins its own)'
@@ -1218,6 +1250,19 @@ function lifecycleJson(deps: CliDeps, report: LifecycleReport): Record<string, u
 			(floor !== null && isFleetNodeVersionBelowFloor(deps.io.version, floor)) ||
 			(report.record?.upgradeRequired === true && report.record.daemonVersion === deps.io.version),
 		upgradeCommand: FLEET_NODE_UPGRADE_COMMAND,
+		// Remote node limits (slice AS).
+		limitCeiling: report.record?.limitCeiling ?? null,
+		effectiveLimits: (() => {
+			const effective = applyNodeLimitCeiling(
+				clampResourceLimits(report.config?.limits),
+				report.record?.limitCeiling ?? null
+			);
+			return {
+				maxConcurrentJobs: effective.maxConcurrentJobs,
+				maxCpuPercent: effective.maxCpuPercent,
+				maxMemoryMb: effective.maxMemoryMb
+			};
+		})(),
 		modelCli: report.modelCli.map((compat) => ({
 			provider: compat.provider,
 			executable: compat.executable,
@@ -1255,7 +1300,7 @@ async function logModelCliCompatibility(
 export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): Promise<void> {
 	const report = await gatherHousekeeping(deps, options);
 	// Node lifecycle (slice AR): daemon version vs floor, CLI compatibility.
-	const lifecycle = await gatherLifecycle(deps);
+	const lifecycle = await gatherLifecycle(deps, report.config);
 	const now = (deps.now ?? (() => Date.now()))();
 	if (options.json === true) {
 		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle) }, null, 2));

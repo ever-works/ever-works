@@ -302,6 +302,26 @@ export interface FleetNodeSelfDescription {
 	lastReclaimAt?: string;
 	/** Bytes that sweep reclaimed. Zero is a real answer: it ran and found nothing to take. */
 	lastReclaimFreedBytes?: number;
+	/**
+	 * Remote node limits (self-build slice AS) — the resource limits the
+	 * node's WORKER is actually enforcing right now: the lower of its own
+	 * start flags (`--concurrency`, `--max-cpu`, `--max-memory`) and the
+	 * owner's platform-side ceiling ({@link FleetHeartbeatResponse.limitCeiling}).
+	 *
+	 * The three travel together: a beat that carries `maxConcurrentJobs`
+	 * reports the whole set, and `null` on the CPU / memory pair means "no
+	 * ceiling in force on that dimension" (it overwrites). A beat without
+	 * `maxConcurrentJobs` said nothing — a visibility-only node has no
+	 * worker, an older daemon predates the fields — and leaves the stored
+	 * set alone.
+	 *
+	 * Bounded by type and the column's range only, never by the node-side
+	 * clamp (`FLEET_NODE_*` below): a newer node that allows more must not
+	 * have its beat — and with it its liveness — refused.
+	 */
+	maxConcurrentJobs?: number;
+	maxCpuPercent?: number | null;
+	maxMemoryMb?: number | null;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -416,6 +436,22 @@ export interface FleetNodeView {
 	workspaceBytes?: number | null;
 	lastReclaimAt?: string | null;
 	lastReclaimFreedBytes?: number | null;
+
+	/**
+	 * Remote node limits (self-build slice AS) — what the node last reported
+	 * ENFORCING (`min(its own flags, the platform ceiling)`), or null when it
+	 * never reported (an older daemon, a node without a worker). Its CPU and
+	 * memory entries are null when no ceiling is in force on that dimension.
+	 */
+	effectiveLimits?: FleetNodeEffectiveLimits | null;
+	/**
+	 * Remote node limits (slice AS) — the owner's platform-side CEILING for
+	 * this node, set with `PUT /api/fleet/nodes/:id/limits`. Every field null
+	 * means no ceiling: the node runs on its own start flags. The node
+	 * clamps itself to it on its next heartbeat; its own flags stay the
+	 * upper bound, so a ceiling can only ever LOWER what a machine does.
+	 */
+	limitCeiling?: FleetNodeLimitCeiling | null;
 
 	/**
 	 * Agent computers — who may take control of this machine from a live
@@ -536,6 +572,18 @@ export interface FleetHeartbeatResponse {
 	 * and turns a reversible floor into a fleet-wide re-enrollment.
 	 */
 	upgradeRequired?: boolean;
+	/**
+	 * Remote node limits (self-build slice AS) — the owner's ceiling for this
+	 * node, on EVERY accepted beat (all-null when none is set, so lifting a
+	 * ceiling reaches the machine too). The node clamps its worker to
+	 * `min(its own start flags, this)` before its next lease and reports the
+	 * result back as its effective limits.
+	 *
+	 * Optional and additive: a daemon built before this field ignores it and
+	 * keeps running on its own flags — the ceiling is then shown in Fleet
+	 * against the limits that daemon does not report.
+	 */
+	limitCeiling?: FleetNodeLimitCeiling;
 }
 
 // ─── Node lifecycle: the daemon version floor (self-build slice AR) ─────────
@@ -650,6 +698,56 @@ export function normalizeFleetNodeVersionFloor(value: unknown): string | null {
 	if (!trimmed || trimmed.length > FLEET_MAX_VERSION_LENGTH) return null;
 	return parseFleetNodeVersion(trimmed) ? trimmed.replace(/^v/, '') : null;
 }
+
+// ─── Remote node limits (self-build slice AS) ───────────────────────────────
+
+/**
+ * The resource limits a node reports enforcing (slice AS). `maxConcurrentJobs`
+ * is always a number; the CPU / memory ceilings are null when none is in
+ * force on that dimension.
+ */
+export interface FleetNodeEffectiveLimits {
+	maxConcurrentJobs: number;
+	maxCpuPercent: number | null;
+	maxMemoryMb: number | null;
+}
+
+/**
+ * The owner's platform-side ceiling for one node (slice AS). Each field is
+ * independent; null = no ceiling on that dimension. The node enforces
+ * `min(its own start flag, this)`, so a ceiling can only lower what a
+ * machine does — the person who lent the machine keeps the last word.
+ */
+export interface FleetNodeLimitCeiling {
+	maxConcurrentJobs: number | null;
+	maxCpuPercent: number | null;
+	maxMemoryMb: number | null;
+}
+
+/** Request body for `PUT /api/fleet/nodes/:id/limits` — every field required, null clears it. */
+export type FleetNodeLimitCeilingRequest = FleetNodeLimitCeiling;
+
+/**
+ * Bounds of the node's resource limits — the SAME numbers the node clamps
+ * its start flags into (`apps/node/src/core/types.ts`) and the platform
+ * validates an owner's ceiling against. A ceiling outside them is refused
+ * rather than clamped: a value the node would silently rewrite is a
+ * setting that does not do what the owner typed.
+ */
+export const FLEET_NODE_MIN_CONCURRENT_JOBS = 1;
+export const FLEET_NODE_MAX_CONCURRENT_JOBS = 16;
+export const FLEET_NODE_MIN_CPU_PERCENT = 5;
+export const FLEET_NODE_MAX_CPU_PERCENT = 100;
+export const FLEET_NODE_MIN_MEMORY_MB = 256;
+export const FLEET_NODE_MAX_MEMORY_MB = 1_024 * 1_024;
+
+/**
+ * Widest value a REPORTED limit may carry on the heartbeat: the int column
+ * it lands in. Deliberately not the node-side clamp above — a newer node
+ * that allows more must not have its beat refused (a refused beat is a node
+ * swept offline). The service stores what fits and drops what does not.
+ */
+export const FLEET_MAX_REPORTED_LIMIT_VALUE = 2_147_483_647;
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
 

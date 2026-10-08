@@ -78,7 +78,11 @@ const OPTIONAL_DESCRIPTION_FIELDS = [
 	'workspaceCount',
 	'workspaceBytes',
 	'lastReclaimAt',
-	'lastReclaimFreedBytes'
+	'lastReclaimFreedBytes',
+	// Remote node limits (self-build slice AS).
+	'maxConcurrentJobs',
+	'maxCpuPercent',
+	'maxMemoryMb'
 ] as const;
 
 export interface HeartbeatLoopOptions {

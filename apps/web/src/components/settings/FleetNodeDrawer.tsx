@@ -21,6 +21,14 @@ import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@/lib/api
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { centsToUsdInput, formatCeilingCents, usdInputToCents } from './fleet-cost-ceiling.shared';
 import {
+    draftToLimitCeiling,
+    FLEET_NODE_LIMIT_FIELDS,
+    isEmptyLimitCeiling,
+    limitCeilingToDraft,
+    type FleetNodeLimitDraft,
+} from './fleet-node-limits.shared';
+import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
+import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
     fleetJobDurationMs,
@@ -48,6 +56,11 @@ interface FleetNodeDrawerProps {
      * ceiling, in cents; null clears it back to the deployment default.
      */
     onSaveCostCeiling: (dailyCostCeilingCents: number | null) => void;
+    /**
+     * Remote node limits (self-build slice AS): the owner's platform-side
+     * ceiling on this node's resource limits; all-null clears it.
+     */
+    onSaveLimitCeiling: (ceiling: FleetNodeLimitCeiling) => void;
     onRotate: () => void;
     onDrain: (drain: boolean) => void;
 }
@@ -108,6 +121,7 @@ export function FleetNodeDrawer({
     onClose,
     onSaveCapabilities,
     onSaveCostCeiling,
+    onSaveLimitCeiling,
     onRotate,
     onDrain,
 }: FleetNodeDrawerProps) {
@@ -152,7 +166,34 @@ export function FleetNodeDrawer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ceilingSeedKey]);
 
+    // Remote node limits (slice AS): the ceiling editor, re-seeded from the
+    // server's value the same way the cost ceiling is.
+    const serverLimitCeiling = detail?.node.limitCeiling ?? node?.limitCeiling ?? null;
+    const limitSeedKey = `${nodeId}|${JSON.stringify(serverLimitCeiling)}`;
+    const [limitDraft, setLimitDraft] = useState<FleetNodeLimitDraft>(() =>
+        limitCeilingToDraft(serverLimitCeiling),
+    );
+    useEffect(() => {
+        setLimitDraft(limitCeilingToDraft(serverLimitCeiling));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [limitSeedKey]);
+
     if (!node) return null;
+
+    const saveLimitCeiling = () => {
+        const parsed = draftToLimitCeiling(limitDraft);
+        if (!parsed.ok) {
+            toast.error(t('limits.invalid'));
+            return;
+        }
+        onSaveLimitCeiling(parsed.ceiling);
+    };
+    const formatCpu = (value: number | null | undefined) =>
+        typeof value === 'number' ? `${value}%` : t('limits.noCeilingValue');
+    const formatMemory = (value: number | null | undefined) =>
+        typeof value === 'number' ? `${value} MB` : t('limits.noCeilingValue');
+    const limitCeiling = node.limitCeiling ?? null;
+    const effectiveLimits = node.effectiveLimits ?? null;
 
     const saveCeiling = () => {
         const cents = usdInputToCents(ceilingDraft);
@@ -498,6 +539,94 @@ export function FleetNodeDrawer({
                                 data-testid="fleet-node-cost-ceiling-clear"
                             >
                                 {t('costCeiling.clear')}
+                            </Button>
+                        </div>
+                    </section>
+
+                    {/* Remote node limits (self-build slice AS): what the node
+                        reports enforcing, the owner's platform-side ceiling,
+                        and the editor for it. */}
+                    <section className="space-y-2" data-testid="fleet-node-limits">
+                        <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('limits.title')}
+                        </h4>
+                        <p
+                            className="text-sm text-text dark:text-text-dark"
+                            data-testid="fleet-node-limits-effective"
+                        >
+                            {effectiveLimits
+                                ? t('limits.enforcing', {
+                                      jobs: effectiveLimits.maxConcurrentJobs,
+                                      cpu: formatCpu(effectiveLimits.maxCpuPercent),
+                                      memory: formatMemory(effectiveLimits.maxMemoryMb),
+                                  })
+                                : t('limits.notReported')}
+                        </p>
+                        <p
+                            className="text-xs text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-node-limits-ceiling"
+                        >
+                            {isEmptyLimitCeiling(limitCeiling)
+                                ? t('limits.noCeiling')
+                                : t('limits.ceilingSummary', {
+                                      jobs:
+                                          limitCeiling?.maxConcurrentJobs ??
+                                          t('limits.noCeilingValue'),
+                                      cpu: formatCpu(limitCeiling?.maxCpuPercent),
+                                      memory: formatMemory(limitCeiling?.maxMemoryMb),
+                                  })}
+                        </p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('limits.hint')}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {FLEET_NODE_LIMIT_FIELDS.map((field) => (
+                                <label key={field} className="space-y-1 text-xs">
+                                    <span className="text-text-muted dark:text-text-muted-dark">
+                                        {t(`limits.fields.${field}` as never)}
+                                    </span>
+                                    <Input
+                                        inputMode="numeric"
+                                        value={limitDraft[field]}
+                                        onChange={(event) =>
+                                            setLimitDraft({
+                                                ...limitDraft,
+                                                [field]: event.target.value,
+                                            })
+                                        }
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter') {
+                                                event.preventDefault();
+                                                saveLimitCeiling();
+                                            }
+                                        }}
+                                        aria-label={t(`limits.fields.${field}` as never)}
+                                        data-testid={`fleet-node-limit-input-${field}`}
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                onClick={saveLimitCeiling}
+                                loading={isPending}
+                                data-testid="fleet-node-limits-save"
+                            >
+                                {t('limits.save')}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() =>
+                                    onSaveLimitCeiling({
+                                        maxConcurrentJobs: null,
+                                        maxCpuPercent: null,
+                                        maxMemoryMb: null,
+                                    })
+                                }
+                                disabled={isPending || isEmptyLimitCeiling(limitCeiling)}
+                                data-testid="fleet-node-limits-clear"
+                            >
+                                {t('limits.clear')}
                             </Button>
                         </div>
                     </section>

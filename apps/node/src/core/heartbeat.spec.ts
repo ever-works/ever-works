@@ -367,6 +367,34 @@ describe('HeartbeatLoop', () => {
 			expect(loop.getState().state).toBe('connected');
 		});
 
+		it('drops the reported limits too (remote node limits, slice AS)', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					maxConcurrentJobs: 2,
+					maxCpuPercent: null,
+					maxMemoryMb: null
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			for (const field of ['maxConcurrentJobs', 'maxCpuPercent', 'maxMemoryMb']) {
+				expect(scripted.requests[0]).toHaveProperty(field);
+				expect(scripted.requests[1]).not.toHaveProperty(field);
+			}
+			expect(loop.getState().state).toBe('connected');
+		});
+
 		it('treats an explicit NULL floor as a carried field, so it still triggers the fallback', async () => {
 			// `minFreeDiskBytes: null` is the one legitimate null on this
 			// payload ("the operator switched the floor off"). A truthiness

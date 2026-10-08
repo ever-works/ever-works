@@ -129,7 +129,18 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_CLI_VERSIONS',
 	'compareFleetNodeVersions',
 	'isFleetNodeVersionBelowFloor',
-	'normalizeFleetNodeVersionFloor'
+	'normalizeFleetNodeVersionFloor',
+	// Remote node limits (self-build slice AS): the resource-limit bounds
+	// the node clamps to and the owner's ceiling is validated against, and
+	// the widest value a reported limit may carry. Covered in
+	// `fleet-node-lifecycle.spec.ts`.
+	'FLEET_NODE_MIN_CONCURRENT_JOBS',
+	'FLEET_NODE_MAX_CONCURRENT_JOBS',
+	'FLEET_NODE_MIN_CPU_PERCENT',
+	'FLEET_NODE_MAX_CPU_PERCENT',
+	'FLEET_NODE_MIN_MEMORY_MB',
+	'FLEET_NODE_MAX_MEMORY_MB',
+	'FLEET_MAX_REPORTED_LIMIT_VALUE'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -365,7 +376,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 190 runtime symbols', () => {
+	it('exposes exactly these 197 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -405,8 +416,10 @@ describe('fleet barrel', () => {
 		// version floor (default, comparator, below-floor predicate, env
 		// normaliser), the upgrade command and the `cliVersions` cap. All in
 		// `fleet-node.types.ts`, an existing module.
+		// → 197 with remote node limits (self-build slice AS): the six
+		// resource-limit bounds and the reported-limit cap, same module.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(190);
+		expect(Object.keys(fleet)).toHaveLength(197);
 	});
 
 	it.each([
