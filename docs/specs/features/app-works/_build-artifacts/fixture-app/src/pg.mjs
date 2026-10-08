@@ -5,7 +5,8 @@
  * `pg` client the plan's layout table names. It implements exactly what the fixture needs and nothing
  * else:
  *
- *   - startup, with `sslmode` (`disable` | `prefer` | `require`) and the `PG*` environment fallback
+ *   - startup, with `sslmode` (`disable` | `prefer` | `require` | `verify-ca` | `verify-full`, libpq's
+ *     meanings — see `pgTlsOptions`) and the `PG*` environment fallback
  *   - authentication: AuthenticationOk, cleartext, MD5 and SCRAM-SHA-256 (Postgres 14+ default)
  *   - the simple query protocol (several statements per message, used by `migrations/*.sql`)
  *   - the extended query protocol with text parameters (`Parse`/`Bind`/`Describe`/`Execute`/`Sync`)
@@ -140,6 +141,26 @@ const saslEscape = (value) => String(value).replace(/=/g, '=3D').replace(/,/g, '
 
 const md5 = (data) => crypto.createHash('md5').update(data).digest('hex');
 
+/**
+ * The TLS options for `sslmode`, with libpq's meaning of each mode:
+ *
+ *   - `verify-full` — the chain must reach a trusted CA **and** the certificate must name `host`
+ *   - `verify-ca`   — the chain must reach a trusted CA; the name is not checked
+ *   - `prefer` / `require` — encrypt only, no verification (libpq does the same without a root cert)
+ *
+ * The trusted CAs are Node's (add a private CA with `NODE_EXTRA_CA_CERTS`); `sslrootcert` is not read.
+ * @param {string} sslmode @param {string} host
+ */
+export function pgTlsOptions(sslmode, host) {
+	const mode = String(sslmode || 'prefer').toLowerCase();
+	const verify = mode === 'verify-ca' || mode === 'verify-full';
+	/** @type {import('node:tls').ConnectionOptions} */
+	const options = { host, rejectUnauthorized: verify };
+	if (!net.isIP(host)) options.servername = host;
+	if (mode === 'verify-ca') options.checkServerIdentity = () => undefined;
+	return options;
+}
+
 export class PgClient {
 	#socket = null;
 	#buffer = Buffer.alloc(0);
@@ -226,7 +247,7 @@ export class PgClient {
 		const answer = await this.#readExact(socket, 1);
 		if (answer[0] === 0x53 /* 'S' */) {
 			const secure = await new Promise((resolve, reject) => {
-				const upgraded = tls.connect({ socket, servername: host, rejectUnauthorized: false });
+				const upgraded = tls.connect({ socket, ...pgTlsOptions(sslmode, host) });
 				upgraded.once('secureConnect', () => resolve(upgraded));
 				upgraded.once('error', reject);
 			});

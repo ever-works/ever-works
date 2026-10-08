@@ -321,4 +321,72 @@ describe('app-health-poll (APW-06 T32)', () => {
             health: summary,
         });
     });
+
+    /**
+     * The tick's result is what the local worker answers `POST /run` with, so it may carry an
+     * `Error`'s message and nothing else: a thrown non-`Error` (a pasted stack, an object with a
+     * custom `toString`) is named by its type, and its text goes to the run's log only.
+     */
+    describe('failure text — a result carries a message, never a thrown value', () => {
+        const STACK_TEXT =
+            'Error: lock said no\n    at CacheClient.get (/srv/agent/dist/cache/lock.js:17:3)';
+
+        function logged(mock: ReturnType<typeof vi.fn>): string {
+            return mock.mock.calls.map((call) => call.map(String).join(' ')).join('\n');
+        }
+
+        it('a lock service that rejects with a non-Error', async () => {
+            isLocked.mockRejectedValue(STACK_TEXT);
+
+            const result = await registered.run();
+
+            expect(result).toMatchObject({ reason: 'lock_service_unavailable' });
+            expect(JSON.stringify(result)).not.toContain('lock.js:17');
+            expect(result.error).toMatch(/non-Error value \(string\)/);
+            expect(logged(loggerErrorMock) + logged(loggerWarnMock)).toContain('lock.js:17');
+        });
+
+        it('a cache sweep that rejects with a non-Error', async () => {
+            cleanExpired.mockRejectedValue({ toString: () => STACK_TEXT });
+
+            const result = await registered.run();
+
+            expect(result.cacheSweep).toMatchObject({ status: 'unavailable', expired: null });
+            expect(JSON.stringify(result)).not.toContain('lock.js:17');
+            expect(result.cacheSweep?.message).toMatch(/non-Error value \(object\)/);
+            expect(logged(loggerWarnMock)).toContain('lock.js:17');
+        });
+
+        it('a health sweep that throws a non-Error', async () => {
+            const poll = vi.fn(async () => {
+                throw STACK_TEXT;
+            });
+            appContext.get.mockImplementation((token: unknown) =>
+                token === AppHealthService
+                    ? { poll }
+                    : new Map<unknown, unknown>([
+                          [DistributedTaskLockService, { isLocked }],
+                          [CACHE_MANAGER, { cleanExpired }],
+                      ]).get(token),
+            );
+
+            const result = await registered.run();
+
+            expect(result).toMatchObject({ status: 'skipped', reason: 'health_sweep_failed' });
+            expect(JSON.stringify(result)).not.toContain('lock.js:17');
+            expect(result.error).toMatch(/non-Error value \(string\)/);
+            expect(logged(loggerErrorMock)).toContain('lock.js:17');
+        });
+
+        it('an Error still contributes its message — and never its stack', async () => {
+            const error = new Error('the API is unreachable');
+            error.stack = STACK_TEXT;
+            isLocked.mockRejectedValue(error);
+
+            const result = await registered.run();
+
+            expect(result.error).toBe('the API is unreachable');
+            expect(JSON.stringify(result)).not.toContain('lock.js:17');
+        });
+    });
 });

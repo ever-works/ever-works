@@ -218,6 +218,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UnknownSubscriptionPlanError',
                     'PlanNotPurchasableError',
                     'CheckoutSessionNotFoundError',
+                    // 90-day free trial on Cloud paid plans (2026-10-05 repricing)
+                    'CLOUD_PLAN_TRIAL_PERIOD_DAYS',
+                    'planCheckoutTrialPeriodDays',
                     // Payment methods (audit B10/B25)
                     'PaymentMethodService',
                     'PaygService',

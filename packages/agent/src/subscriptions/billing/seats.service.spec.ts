@@ -21,7 +21,8 @@ const PRO_PLAN = {
     code: 'standard',
     displayName: 'Pro',
     hosting: 'cloud',
-    seatsIncluded: 10,
+    // Mirrors the seeded `standard` row since the 2026-10-05 repricing (was 10).
+    seatsIncluded: 25,
     seatMonthlyPrice: '5',
 };
 
@@ -154,13 +155,13 @@ describe('SeatsService.getSeats', () => {
         const seats = await h.service.getSeats('owner-1');
 
         expect(seats).toMatchObject({
-            included: 10,
+            included: 25,
             purchased: 4,
-            allowance: 14,
+            allowance: 29,
             members: 3,
             agents: 2,
             used: 5,
-            available: 9,
+            available: 24,
             seatPriceCents: 500,
             purchasable: true,
         });
@@ -223,18 +224,18 @@ describe('SeatsService.assertSeatAvailable', () => {
     });
 
     it('admits while a seat is left and refuses when the next one would exceed the allowance', async () => {
-        const full = makeHarness({ members: 10, agents: 4 }); // 14 used, allowance 10
+        const full = makeHarness({ members: 25, agents: 4 }); // 29 used, allowance 25
         await expect(full.service.assertSeatAvailable('owner-1')).rejects.toBeInstanceOf(
             SeatLimitExceededError,
         );
 
-        const room = makeHarness({ members: 3, agents: 2 }); // 5 used, allowance 10
+        const room = makeHarness({ members: 3, agents: 2 }); // 5 used, allowance 25
         await expect(room.service.assertSeatAvailable('owner-1')).resolves.toBeUndefined();
     });
 
     it('refuses exactly at the boundary, not one seat early', async () => {
-        // 9 used of 10 → the 10th is allowed; an 11th is not.
-        const h = makeHarness({ members: 7, agents: 2 });
+        // 24 used of 25 → the 25th is allowed; a 26th is not.
+        const h = makeHarness({ members: 22, agents: 2 });
         await expect(h.service.assertSeatAvailable('owner-1', 1)).resolves.toBeUndefined();
         await expect(h.service.assertSeatAvailable('owner-1', 2)).rejects.toBeInstanceOf(
             SeatLimitExceededError,
@@ -287,9 +288,9 @@ describe('SeatsService.setSeats', () => {
     it('bills only the extras above the plan allowance, clamped server-side, and persists what the provider confirms', async () => {
         const h = makeHarness({ members: 3, agents: 2 });
 
-        await h.service.setSeats('owner-1', 15);
+        await h.service.setSeats('owner-1', 30);
 
-        // 15 wanted − 10 included = 5 extras. The client's number never reaches the provider raw.
+        // 30 wanted − 25 included = 5 extras. The client's number never reaches the provider raw.
         expect(h.billingProvider.updateSeatQuantity).toHaveBeenCalledWith({
             subscriptionId: 'sub_stripe',
             seatLookupKeys: {
@@ -354,7 +355,7 @@ describe('SeatsService.setSeats', () => {
             },
         });
 
-        await h.service.setSeats('owner-1', 10);
+        await h.service.setSeats('owner-1', 25);
 
         expect(h.billingProvider.updateSeatQuantity).toHaveBeenCalledWith(
             expect.objectContaining({ seatItemId: 'si_seat', quantity: 0 }),

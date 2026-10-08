@@ -1156,13 +1156,14 @@ describe('T12 — rollback, first-Deployment handling, the deadline and the veri
 			.find((object) => String(object.data?.['requests.json']).includes('"kind":"smoke"'));
 		const requests = JSON.parse(String(smokeConfigMap?.data?.['requests.json'])).requests as Json[];
 		expect(requests.length).toBeGreaterThan(0);
+		// Every RegExp metacharacter escaped, backslash included — not just `.` (CodeQL
+		// js/incomplete-sanitization). A namespace is a DNS label, but the matcher should not rely on it.
+		const namespacePattern = verificationNamespace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 		for (const request of requests) {
 			// §4.12:657 — `Host: <component>.<ns>.svc`, which for an in-cluster request IS the URL's
 			// authority: the runner sets `Host` from the URL unless a request overrides it.
-			expect(String(request.url)).toMatch(
-				new RegExp(`^http://web\\.${verificationNamespace.replace(/\./g, '\\.')}\\.svc:80/`)
-			);
+			expect(String(request.url)).toMatch(new RegExp(`^http://web\\.${namespacePattern}\\.svc:80/`));
 			const url = new URL(String(request.url));
 			expect(url.hostname).toBe(`web.${verificationNamespace}.svc`);
 			// `http:` on the default port, so `URL` reports an empty explicit port — the request

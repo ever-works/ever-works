@@ -54,6 +54,7 @@
  *     `GET /api/notifications?limit=50`; `GET /api/works/:id/app-env` → `404`
  *   - absent from the fake's entire call ledger (162 calls recorded at probe time)
  */
+import { randomInt } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
@@ -82,8 +83,15 @@ const UPSTREAM_OWNER = 'apw-e2e-upstream';
 /** The env name this file types a value for. */
 const PROBE_ENV_NAME = 'APW13_PROBE_SECRET';
 
+/**
+ * A run-unique suffix. It names repositories and seeds the probe secrets below, so it comes from
+ * `node:crypto` rather than `Math.random()`: uniqueness is what the assertions rely on, and a
+ * value that stands in for a secret should not be drawn from a predictable generator either.
+ */
 function stamp(): string {
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    return `${Date.now().toString(36)}-${randomInt(36 ** 4)
+        .toString(36)
+        .padStart(4, '0')}`;
 }
 
 function repoUrl(repo: { owner: string; name: string }): string {

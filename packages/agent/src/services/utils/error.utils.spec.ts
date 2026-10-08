@@ -58,6 +58,47 @@ describe('normalizeGeneratorError', () => {
         expect(result).toContain('git push rejected using token');
     });
 
+    // CodeQL js/polynomial-redos: the credential pattern used to start with a
+    // scheme `[a-z][a-z0-9+.-]*` that was retried from every offset of a long
+    // run of scheme characters — about 2.8 s for 50,000 `a`s on a dev box —
+    // and the message is upstream text (git / provider errors).
+    it('redacts a long run of scheme characters in well under 200 ms', () => {
+        const error = new Error('a'.repeat(50_000));
+        const started = performance.now();
+
+        const result = normalizeGeneratorError(error);
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(result).toBe('a'.repeat(50_000));
+    });
+
+    // Recorded from the regex this replaced: the same URLs are redacted, the
+    // same near-misses are left alone.
+    it.each<[string, string]>([
+        ['fatal: https://u:p@h/x', 'fatal: https://***:***@h/x'],
+        ['1https://u:p@h', '1https://***:***@h'],
+        ['git+ssh://user:tok@github.com/x', 'git+ssh://***:***@github.com/x'],
+        ['x://a:b://c:d@x', 'x://a:b://***:***@x'],
+        ['HTTPS://U:P@H', 'HTTPS://***:***@H'],
+        ['http://u:p:q@h', 'http://***:***@h'],
+        ['http://@h', 'http://@h'],
+        ['http://u:@h', 'http://u:@h'],
+        [' ://u:p@h', ' ://u:p@h'],
+        ['-://u:p@h', '-://u:p@h'],
+        ['1-2://u:p@h', '1-2://u:p@h'],
+        ['a.b-c+d://u:p@h', 'a.b-c+d://***:***@h'],
+        ['http://u:p@h and ftp://v:q@i', 'http://***:***@h and ftp://***:***@i'],
+        ['http://u:p/x@h', 'http://u:p/x@h'],
+        ['http://u:p@h@i', 'http://***:***@h@i'],
+        ['http://u p:q@h', 'http://u p:q@h'],
+        ['redis://:pass@host', 'redis://:pass@host'],
+        ['9a://u:p@h', '9a://***:***@h'],
+        ['é://u:p@h', 'é://u:p@h'],
+        ['aé://u:p@h', 'aé://u:p@h'],
+    ])('redacts %p as %p', (message, redacted) => {
+        expect(normalizeGeneratorError(new Error(message))).toBe(redacted);
+    });
+
     it('returns a clean message unchanged', () => {
         const error = new Error('Something unexpected happened while building the page');
 

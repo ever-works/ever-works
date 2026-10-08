@@ -1,6 +1,8 @@
 import {
     ActivePlanSubscriptionError,
     CheckoutSessionNotFoundError,
+    CLOUD_PLAN_TRIAL_PERIOD_DAYS,
+    planCheckoutTrialPeriodDays,
     PlanNotPurchasableError,
     PlanSubscriptionService,
     UnknownSubscriptionPlanError,
@@ -35,11 +37,12 @@ const STANDARD_PLAN = {
     code: 'standard',
     displayName: 'Pro',
     hosting: 'cloud',
-    monthlyPrice: '25',
-    // The YEARLY charge, not the "$17/mo" the marketing site displays.
-    annualPrice: '204',
+    // 2026-10-05 repricing: $49/mo, $408/yr, 25 seats (was $25 / $204 / 10).
+    monthlyPrice: '49',
+    // The YEARLY charge, not the "$34/mo" the marketing site displays.
+    annualPrice: '408',
     lifetimePrice: null,
-    seatsIncluded: 10,
+    seatsIncluded: 25,
     seatMonthlyPrice: '5',
     monthlyCredits: 3000,
     currency: 'usd',
@@ -56,7 +59,7 @@ const SELFHOSTED_PRO_PLAN = {
     monthlyPrice: '49',
     annualPrice: '408',
     lifetimePrice: '99',
-    seatsIncluded: 10,
+    seatsIncluded: 25,
     seatMonthlyPrice: '5',
     monthlyCredits: 3000,
     currency: 'usd',
@@ -112,6 +115,8 @@ function makeSubscriptionRepository(overrides: Record<string, unknown> = {}) {
         createOrUpdate: jest.fn().mockResolvedValue({ id: 'sub-row-1' }),
         findByProviderSubscriptionId: jest.fn().mockResolvedValue(null),
         findActiveByUser: jest.fn().mockResolvedValue(null),
+        // No subscription history: a first-time buyer, so a cloud paid checkout gets the trial.
+        listByUser: jest.fn().mockResolvedValue([]),
         cancel: jest.fn().mockResolvedValue(undefined),
         ...overrides,
     } as any;
@@ -289,16 +294,18 @@ describe('startPlanCheckout — the server prices everything', () => {
             url: 'https://pay.example/cs_plan_1',
             sessionId: 'cs_plan_1',
             planCode: 'standard',
-            priceCents: 2500,
-            basePriceCents: 2500,
+            priceCents: 4900,
+            basePriceCents: 4900,
             seatCents: 0,
             extraSeats: 0,
             currency: 'usd',
+            // A first-time buyer of a cloud paid plan: 90-day free trial (2026-10-05 repricing).
+            trialPeriodDays: 90,
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
-        // $25.00 → 2500 cents. The row and the shared-account catalog agree; neither comes from the body.
+        // The shared-account catalog prices it ($49.00 → 4900 cents since the 2026-10-05 repricing); never the body.
         expect(request.plan).toEqual(
-            expect.objectContaining({ code: 'standard', priceCents: 2500, interval: 'month' }),
+            expect.objectContaining({ code: 'standard', priceCents: 4900, interval: 'month' }),
         );
         // Server-authored correlation id, echoed back on the signed event.
         expect(request.referenceId).toBe('u1:standard');
@@ -314,16 +321,16 @@ describe('startPlanCheckout — the server prices everything', () => {
         // resolver reads as cloud — the same default the migration gives every pre-existing row.
         expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
         // priceCents is still carried: the provider falls back to it when the account has no
-        // catalog price, so removing it would break every unsynced deployment. Here the catalog
-        // and the seeded row agree, which is the invariant stripe-catalog.spec.ts guards.
-        expect(request.plan.priceCents).toBe(2500);
+        // catalog price, so removing it would break every unsynced deployment. The catalog wins:
+        // it says 4900 since the 2026-10-05 repricing (the seeded row follows in seedPlans).
+        expect(request.plan.priceCents).toBe(4900);
     });
 
     it('bills no seat line when the buyer stays inside the plan allowance', async () => {
         const { service, provider } = build();
 
-        // Pro includes 10. Asking for 10 is not an upsell.
-        await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+        // Pro includes 25 (since the 2026-10-05 repricing). Asking for 25 is not an upsell.
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 25 });
 
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.extraSeats).toBe(0);
@@ -331,20 +338,20 @@ describe('startPlanCheckout — the server prices everything', () => {
     });
 
     // 🛑 The echoed total used to be the BASE plan amount while the seats were billed as a
-    // separate Stripe line item, so 27 seats on Pro was reported as 2500 and charged 11000.
+    // separate Stripe line item, so 27 seats on the old $25 Pro was reported as 2500 and charged 11000.
     // Stripe's hosted page always showed the truth, so nobody was mischarged — but any in-app
     // confirmation built on this number understated the price. These assert the OUTCOME (the
     // amount echoed equals the amount billed), not the mechanism that produces it.
     it('echoes the TOTAL the buyer will pay, seats included', async () => {
         const { service, provider } = build();
 
-        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 42 });
 
-        // 27 requested − 10 included = 17 billable, at $5.00/mo = 8500 on top of the 2500 base.
-        expect(started.basePriceCents).toBe(2500);
+        // 42 requested − 25 included = 17 billable, at $5.00/mo = 8500 on top of the 4900 base.
+        expect(started.basePriceCents).toBe(4900);
         expect(started.extraSeats).toBe(17);
         expect(started.seatCents).toBe(8500);
-        expect(started.priceCents).toBe(11000);
+        expect(started.priceCents).toBe(13400);
 
         // The echoed total must equal what the provider was actually asked to bill.
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
@@ -358,21 +365,21 @@ describe('startPlanCheckout — the server prices everything', () => {
         const started = await service.startPlanCheckout({
             ...checkoutOptions,
             interval: 'annual',
-            seats: 27,
+            seats: 42,
         });
 
         // An annual seat is 12x the monthly rate with no discount: 17 x 6000 = 102000,
-        // on top of the 20400 annual base.
-        expect(started.basePriceCents).toBe(20400);
+        // on top of the 40800 annual base.
+        expect(started.basePriceCents).toBe(40800);
         expect(started.seatCents).toBe(102000);
-        expect(started.priceCents).toBe(122400);
+        expect(started.priceCents).toBe(142800);
     });
 
     it('never adds a seat charge to a total that carries no seat line', async () => {
         const { service, provider } = build();
 
         // Inside the allowance: no seat line item, so no seat money either.
-        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 25 });
 
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.seatLookupKey).toBeNull();
@@ -383,10 +390,10 @@ describe('startPlanCheckout — the server prices everything', () => {
     it('bills only the seats beyond the allowance, on the matching seat price', async () => {
         const { service, provider } = build();
 
-        await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 42 });
 
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
-        // 27 requested - 10 included = 17 billable, NOT 27.
+        // 42 requested - 25 included = 17 billable, NOT 42.
         expect(request.plan.extraSeats).toBe(17);
         expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_monthly');
     });
@@ -438,7 +445,7 @@ describe('startPlanCheckout — the server prices everything', () => {
     it('matches the seat period to the plan period on an annual purchase', async () => {
         const { service, provider } = build();
 
-        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual', seats: 12 });
+        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual', seats: 27 });
 
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.extraSeats).toBe(2);
@@ -570,6 +577,171 @@ describe('startPlanCheckout — the server prices everything', () => {
         await expect(service.startPlanCheckout(checkoutOptions)).rejects.toBeInstanceOf(
             PlanNotPurchasableError,
         );
+    });
+});
+
+/**
+ * Owner rule (2026-10-05 repricing): a 90-day free trial on CLOUD paid plans only. Self-hosted
+ * subscriptions are charged at purchase, a perpetual licence is a one-off payment, and the trial is
+ * one per account so it cannot be renewed by cancelling and starting again.
+ */
+describe('startPlanCheckout — the 90-day trial is Cloud paid plans only', () => {
+    const SELFHOSTED_ENTERPRISE_PLAN = {
+        ...SELFHOSTED_PRO_PLAN,
+        id: 'plan-selfhosted-enterprise',
+        code: 'selfhosted_enterprise',
+        displayName: 'Enterprise Edition',
+        monthlyPrice: '499',
+        annualPrice: '4188',
+        lifetimePrice: null,
+        seatsIncluded: 50,
+        seatMonthlyPrice: '10',
+    };
+
+    it('is 90 days', () => {
+        expect(CLOUD_PLAN_TRIAL_PERIOD_DAYS).toBe(90);
+    });
+
+    it.each(['monthly', 'annual'] as const)(
+        'gives a first-time buyer of cloud Pro %s a 90-day trial, and echoes it',
+        async (interval) => {
+            const { service, provider } = build();
+
+            const started = await service.startPlanCheckout({ ...checkoutOptions, interval });
+
+            const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+            expect(request.plan.trialPeriodDays).toBe(90);
+            expect(request.plan.mode).toBe('subscription');
+            expect(started.trialPeriodDays).toBe(90);
+            // The amount charged when the trial ends is still the full plan price.
+            expect(started.basePriceCents).toBe(interval === 'annual' ? 40800 : 4900);
+        },
+    );
+
+    it('trials the seat line with the plan (the whole subscription trials)', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 30 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(5);
+        expect(request.plan.trialPeriodDays).toBe(90);
+    });
+
+    it.each([
+        ['selfhosted_pro', 'monthly'],
+        ['selfhosted_pro', 'annual'],
+        ['selfhosted_enterprise', 'monthly'],
+        ['selfhosted_enterprise', 'annual'],
+    ] as const)(
+        'charges a self-hosted %s %s subscription at purchase: no trial',
+        async (code, interval) => {
+            const plan =
+                code === 'selfhosted_pro' ? SELFHOSTED_PRO_PLAN : SELFHOSTED_ENTERPRISE_PLAN;
+            const { service, provider } = build({
+                planRepository: makePlanRepository({
+                    findByCode: jest.fn().mockResolvedValue(plan),
+                }),
+            });
+
+            const started = await service.startPlanCheckout({
+                ...checkoutOptions,
+                planCode: code,
+                interval,
+            });
+
+            const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+            expect(request.plan.mode).toBe('subscription');
+            expect(request.plan.trialPeriodDays).toBe(0);
+            expect(started.trialPeriodDays).toBe(0);
+        },
+    );
+
+    it('never puts a trial on a perpetual licence', async () => {
+        const { service, provider } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+        });
+
+        await service.startPlanCheckout({
+            ...checkoutOptions,
+            planCode: 'selfhosted_pro',
+            interval: 'lifetime',
+        });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.mode).toBe('payment');
+        expect(request.plan.trialPeriodDays).toBe(0);
+    });
+
+    it('gives no second trial to an owner who has already held a provider subscription', async () => {
+        const { service, provider } = build({
+            subscriptionRepository: makeSubscriptionRepository({
+                listByUser: jest.fn().mockResolvedValue([
+                    {
+                        id: 'sub-row-old',
+                        status: SubscriptionStatus.CANCELED,
+                        providerSubscriptionId: 'sub_old',
+                    },
+                ]),
+            }),
+        });
+
+        const started = await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.trialPeriodDays).toBe(0);
+        expect(started.trialPeriodDays).toBe(0);
+    });
+
+    it('still gives the trial to a free user whose only history is a free plan row', async () => {
+        const { service, provider } = build({
+            subscriptionRepository: makeSubscriptionRepository({
+                listByUser: jest.fn().mockResolvedValue([
+                    {
+                        id: 'sub-row-free',
+                        status: SubscriptionStatus.ACTIVE,
+                        providerSubscriptionId: null,
+                    },
+                ]),
+            }),
+        });
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        expect(provider.createPlanCheckoutSession.mock.calls[0][0].plan.trialPeriodDays).toBe(90);
+    });
+
+    describe('planCheckoutTrialPeriodDays (pure rule)', () => {
+        const base = {
+            mode: 'subscription' as const,
+            basePriceCents: 4900,
+            hadProviderSubscription: false,
+        };
+
+        it('reads a row with no hosting as cloud, like the catalog resolver', () => {
+            expect(planCheckoutTrialPeriodDays({ ...base, hosting: null })).toBe(90);
+            expect(planCheckoutTrialPeriodDays({ ...base, hosting: undefined })).toBe(90);
+            expect(planCheckoutTrialPeriodDays({ ...base, hosting: 'cloud' })).toBe(90);
+        });
+
+        it('is 0 for self-hosted, payment mode, a free price, or a returning subscriber', () => {
+            expect(planCheckoutTrialPeriodDays({ ...base, hosting: 'selfhosted' })).toBe(0);
+            expect(
+                planCheckoutTrialPeriodDays({ ...base, hosting: 'cloud', mode: 'payment' }),
+            ).toBe(0);
+            expect(
+                planCheckoutTrialPeriodDays({ ...base, hosting: 'cloud', basePriceCents: 0 }),
+            ).toBe(0);
+            expect(
+                planCheckoutTrialPeriodDays({
+                    ...base,
+                    hosting: 'cloud',
+                    hadProviderSubscription: true,
+                }),
+            ).toBe(0);
+        });
     });
 });
 

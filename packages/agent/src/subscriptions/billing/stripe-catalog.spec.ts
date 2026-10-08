@@ -94,21 +94,21 @@ describe('stripe-catalog', () => {
     });
 
     describe('prices agree with Ever Gauzy / Ever Teams', () => {
-        // Owner directive 2026-08-22. Amounts are CENTS; an annual amount is the yearly charge,
+        // Owner directive 2026-08-22, repriced 2026-10-05 (SB $49 / ENT $499, yearly = floor(monthly x 0.7) x 12). Amounts are CENTS; an annual amount is the yearly charge,
         // NOT the per-month figure the marketing site displays.
         it.each`
             hosting         | tier            | interval      | cents     | displays
             ${'cloud'}      | ${'free'}       | ${'monthly'}  | ${0}      | ${'$0'}
             ${'cloud'}      | ${'free'}       | ${'annual'}   | ${0}      | ${'$0'}
-            ${'cloud'}      | ${'pro'}        | ${'monthly'}  | ${2500}   | ${'$25/mo'}
-            ${'cloud'}      | ${'pro'}        | ${'annual'}   | ${20400}  | ${'$17/mo'}
-            ${'cloud'}      | ${'enterprise'} | ${'monthly'}  | ${19900}  | ${'$199/mo'}
-            ${'cloud'}      | ${'enterprise'} | ${'annual'}   | ${166800} | ${'$139/mo'}
+            ${'cloud'}      | ${'pro'}        | ${'monthly'}  | ${4900}   | ${'$49/mo'}
+            ${'cloud'}      | ${'pro'}        | ${'annual'}   | ${40800}  | ${'$34/mo'}
+            ${'cloud'}      | ${'enterprise'} | ${'monthly'}  | ${49900}  | ${'$499/mo'}
+            ${'cloud'}      | ${'enterprise'} | ${'annual'}   | ${418800} | ${'$349/mo'}
             ${'selfhosted'} | ${'pro'}        | ${'monthly'}  | ${4900}   | ${'$49/mo'}
             ${'selfhosted'} | ${'pro'}        | ${'annual'}   | ${40800}  | ${'$34/mo'}
             ${'selfhosted'} | ${'pro'}        | ${'lifetime'} | ${9900}   | ${'$99 one-time'}
-            ${'selfhosted'} | ${'enterprise'} | ${'monthly'}  | ${19900}  | ${'$199/mo'}
-            ${'selfhosted'} | ${'enterprise'} | ${'annual'}   | ${166800} | ${'$139/mo'}
+            ${'selfhosted'} | ${'enterprise'} | ${'monthly'}  | ${49900}  | ${'$499/mo'}
+            ${'selfhosted'} | ${'enterprise'} | ${'annual'}   | ${418800} | ${'$349/mo'}
         `(
             '$hosting $tier $interval is $cents cents (displays $displays)',
             ({ hosting, tier, interval, cents }) => {
@@ -119,15 +119,15 @@ describe('stripe-catalog', () => {
         );
 
         it('stores annual as the YEARLY charge, twelve times the displayed monthly figure', () => {
-            // The trap this guards: writing 1700 (the "$17/mo" the site shows) instead of 20400.
+            // The trap this guards: writing 3400 (the "$34/mo" the site shows) instead of 40800.
             expect(
                 resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'annual' })!.price
                     .amountCents,
-            ).toBe(1700 * 12);
+            ).toBe(3400 * 12);
             expect(
                 resolveCatalogSku({ hosting: 'cloud', tier: 'enterprise', interval: 'annual' })!
                     .price.amountCents,
-            ).toBe(13900 * 12);
+            ).toBe(34900 * 12);
         });
     });
 
@@ -186,11 +186,14 @@ describe('stripe-catalog', () => {
     });
 
     describe('seats', () => {
-        it('includes ten seats on every paid tier, matching Gauzy', () => {
-            expect(plan('cloud', 'pro').seatsIncluded).toBe(10);
-            expect(plan('cloud', 'enterprise').seatsIncluded).toBe(10);
-            expect(plan('selfhosted', 'pro').seatsIncluded).toBe(10);
-            expect(plan('selfhosted', 'enterprise').seatsIncluded).toBe(10);
+        // 2026-10-05 repricing: Free 15, Pro (Small Business) 25, Enterprise Option 2 50 — on
+        // both hostings, matching every other Ever product.
+        it('includes 15 / 25 / 50 seats on Free / Pro / Enterprise, matching Gauzy', () => {
+            expect(plan('cloud', 'free').seatsIncluded).toBe(15);
+            expect(plan('cloud', 'pro').seatsIncluded).toBe(25);
+            expect(plan('cloud', 'enterprise').seatsIncluded).toBe(50);
+            expect(plan('selfhosted', 'pro').seatsIncluded).toBe(25);
+            expect(plan('selfhosted', 'enterprise').seatsIncluded).toBe(50);
         });
 
         it('charges Gauzy’s $5 on Pro and $10 on Enterprise', () => {
@@ -208,14 +211,14 @@ describe('stripe-catalog', () => {
         it('bills only the seats beyond the allowance, and never a negative quantity', () => {
             const pro = plan('cloud', 'pro');
             expect(billableSeats(pro, 0)).toBe(0);
-            expect(billableSeats(pro, 10)).toBe(0);
-            expect(billableSeats(pro, 11)).toBe(1);
-            expect(billableSeats(pro, 37)).toBe(27);
+            expect(billableSeats(pro, 25)).toBe(0);
+            expect(billableSeats(pro, 26)).toBe(1);
+            expect(billableSeats(pro, 52)).toBe(27);
             // Nonsense input must not produce a charge.
             expect(billableSeats(pro, -5)).toBe(0);
             expect(billableSeats(pro, Number.NaN)).toBe(0);
             expect(billableSeats(pro, Number.POSITIVE_INFINITY)).toBe(0);
-            expect(billableSeats(pro, 10.9)).toBe(0);
+            expect(billableSeats(pro, 25.9)).toBe(0);
         });
 
         it('never bills a seat on an unbounded plan — that is Enterprise Option 1', () => {

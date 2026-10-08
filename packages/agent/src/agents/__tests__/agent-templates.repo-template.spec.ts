@@ -221,6 +221,41 @@ describe('repo-agent-template pure guards', () => {
         expect(stripTemplateHtml('no markup')).toBe('no markup');
     });
 
+    // CodeQL js/incomplete-multi-character-sanitization: `<[^>]*>` only
+    // removes a `<` that some later `>` closes, so an unterminated opener
+    // survived — and becomes a live tag as soon as a consumer interpolates
+    // the value into HTML that supplies the `>`.
+    it.each<[string, string]>([
+        ['Helpful <img src=x onerror=alert(1) ', 'Helpful img src=x onerror=alert(1) '],
+        ['<<script>script>alert(1)<</script>/script', 'script>alert(1)/script'],
+        ['trailing <', 'trailing '],
+    ])('leaves no tag opener in %p', (value, stripped) => {
+        expect(stripTemplateHtml(value)).toBe(stripped);
+        expect(stripTemplateHtml(value)).not.toContain('<');
+    });
+
+    it.each<[string, string]>([
+        ['App <b>Provisioner</b>', 'App Provisioner'],
+        ['a <b c="d>">e', 'a ">e'],
+        ['> quoted line\n-> arrow', '> quoted line\n-> arrow'],
+        ['x <y> z <w', 'x  z w'],
+        ['', ''],
+    ])('strips %p to %p', (value, stripped) => {
+        expect(stripTemplateHtml(value)).toBe(stripped);
+    });
+
+    // CodeQL js/polynomial-redos: `<[^>]*>` retried from every `<` of a run
+    // with no `>` after it — about 2.6 s for 50,000 of them on a dev box — and
+    // the SOUL file is stripped before it is capped.
+    it('strips 50,000 unclosed tag openers in well under 200 ms', () => {
+        const started = performance.now();
+
+        const stripped = stripTemplateHtml('<'.repeat(50_000));
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(stripped).toBe('');
+    });
+
     it('refuses a skills.yml with no required Skills', () => {
         expect(parseRepoAgentSkills(YAML.stringify({ required: [], recommended: [] })).status).toBe(
             'refused',

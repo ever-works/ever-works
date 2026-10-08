@@ -61,17 +61,17 @@ export type SubscriptionPlanHosting = 'cloud' | 'selfhosted';
  * `subscription-plan.entity.ts`. The code is the identity; the columns describe it.
  */
 export enum SubscriptionPlanCode {
-    /** Cloud, Free — 1 seat, 50 credits/day, never purchasable through checkout. */
+    /** Cloud, Free — 15 seats, 50 credits/day, never purchasable through checkout. */
     FREE = 'free',
-    /** Cloud, shown as "Pro" — $25/mo or $204/yr, 10 seats, 3,000 credits/mo. */
+    /** Cloud, shown as "Pro" — $49/mo or $408/yr, 25 seats, 3,000 credits/mo, 90-day free trial. */
     STANDARD = 'standard',
-    /** Cloud, shown as "Enterprise" — $199/mo or $1,668/yr, 10 seats, 25,000 credits/mo. */
+    /** Cloud, shown as "Enterprise" — $499/mo or $4,188/yr, 50 seats, 25,000 credits/mo, 90-day free trial. */
     PREMIUM = 'premium',
     /** Self-hosted Community Edition — free AGPLv3 download, unlimited seats, no Stripe object. */
     SELFHOSTED_COMMUNITY = 'selfhosted_community',
-    /** Self-hosted Pro Edition — $49/mo, $408/yr, or a $99 one-time perpetual commercial licence. */
+    /** Self-hosted Pro Edition — $49/mo, $408/yr, or a $99 one-time perpetual commercial licence; 25 seats. */
     SELFHOSTED_PRO = 'selfhosted_pro',
-    /** Self-hosted Enterprise Edition — $199/mo or $1,668/yr commercial licence. */
+    /** Self-hosted Enterprise Edition — $499/mo or $4,188/yr commercial licence; 50 seats. */
     SELFHOSTED_ENTERPRISE = 'selfhosted_enterprise',
 }
 

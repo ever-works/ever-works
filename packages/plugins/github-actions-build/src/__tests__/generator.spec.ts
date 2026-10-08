@@ -912,3 +912,24 @@ describe('generator — the checks-only file (T42, R-9, ACC-05-30, FR-70)', () =
 		);
 	});
 });
+
+/**
+ * CodeQL js/polynomial-redos on the "Verify in the runner" step. The script's trailing newlines
+ * used to be dropped with `/\n+$/`, which backtracks quadratically over a long run of newlines
+ * that is not at the end (every `\n` restarts a scan to the end of the run). The script is the
+ * embedded constant in production, but `verifyRunnerScript` is an input, so the step must not
+ * care what it is handed.
+ */
+describe('the embedded verify script', () => {
+	it('drops only the trailing newlines, in linear time', () => {
+		const script = `echo first${'\n'.repeat(50_000)}echo last\n\n\n`;
+
+		const started = performance.now();
+		const file = generateWorkflow({ ...fixtures.minimal, verifyRunnerScript: script });
+		const elapsedMs = performance.now() - started;
+
+		expect(elapsedMs).toBeLessThan(200);
+		expect(file).toContain(`          echo first\n${'\n'.repeat(49_999)}          echo last\n`);
+		expect(file).not.toContain('          echo last\n\n');
+	});
+});

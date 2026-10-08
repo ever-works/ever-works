@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '../config';
+import { trimEdgeChars } from '../utils/text.utils';
 import {
     EverWorksGitDisabledError,
     EverWorksGitMisconfiguredError,
@@ -214,11 +215,13 @@ export class EverWorksGitProvider {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Edge hyphens go by a linear scan: `-` is kept as is here, so a slug can carry a
+ * long hyphen run, and `/^-+|-+$/g` is retried from every offset of one that does
+ * not end the value (seconds for 50,000 — CodeQL js/polynomial-redos).
+ */
 function slugify(input: string): string {
-    return input
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+    return trimEdgeChars(input.toLowerCase().replace(/[^a-z0-9-]+/g, '-'), '-', '-');
 }
 
 function trimRepoName(name: string, reservedSuffixLength = 0): string {

@@ -228,6 +228,201 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    // The comparison read sinks take the slug of a `GET …/comparisons/:slug`
+    // request: a hostile slug is refused before any file is opened, and a
+    // plain one still reads `<comparisons>/<slug>/<slug>{.yml,.md,-extended.md}`.
+    it('confines comparison reads to the comparison directory', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        const repository = await DataRepository.create(repoDir);
+
+        // A read that reached the disk would answer ENOENT as null/undefined;
+        // only the confinement check rejects.
+        for (const hostile of ['../victim', '..', '.', 'a/b', 'a\\b', '/etc/passwd', 'x\0y']) {
+            await expect(repository.getComparison(hostile)).rejects.toThrow(/Invalid slug/);
+            await expect(repository.getComparisonMarkdown(hostile)).rejects.toThrow(/Invalid slug/);
+            await expect(repository.getComparisonExtendedMarkdown(hostile)).rejects.toThrow(
+                /Invalid slug/,
+            );
+        }
+
+        const slug = 'netlify--vercel';
+        await repository.writeComparison({ slug, sources: [] } as any);
+        await repository.writeComparisonMarkdown(slug, '# Netlify vs Vercel');
+        await repository.writeComparisonExtendedMarkdown(slug, '## More');
+
+        await expect(repository.getComparison(slug)).resolves.toMatchObject({ slug });
+        await expect(repository.getComparisonMarkdown(slug)).resolves.toBe('# Netlify vs Vercel');
+        await expect(repository.getComparisonExtendedMarkdown(slug)).resolves.toBe('## More');
+        await expect(repository.getComparisonMarkdown('absent')).resolves.toBeUndefined();
+        await expect(
+            fs.readdir(path.join(repoDir, 'comparisons', slug)).then((names) => names.sort()),
+        ).resolves.toEqual([`${slug}-extended.md`, `${slug}.md`, `${slug}.yml`]);
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
+    // The data repository is the member's own GitHub repository. isomorphic-git
+    // checks a mode-120000 entry out as a real symlink (fs.symlink), so a
+    // committed link can point anywhere on the server. The slug checks above are
+    // lexical and cannot see that; every read and write must refuse to follow a
+    // link whose real target lies outside the checkout.
+    describe('links that leave the cloned repository', () => {
+        const SECRET = 'SERVER-SECRET=hunter2\n';
+        let root: string;
+        let repoDir: string;
+        let outsideDir: string;
+
+        // A directory link is a junction on Windows (no privilege needed) and
+        // a plain symlink elsewhere (the type argument is ignored there).
+        const linkDir = (target: string, link: string) => fs.symlink(target, link, 'junction');
+        const linkFile = (target: string, link: string) => fs.symlink(target, link, 'file');
+
+        beforeEach(async () => {
+            root = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-links-'));
+            repoDir = path.join(root, 'repo');
+            outsideDir = path.join(root, 'outside');
+            await fs.mkdir(repoDir, { recursive: true });
+            await fs.mkdir(outsideDir, { recursive: true });
+            await fs.writeFile(path.join(outsideDir, 'secret.md'), SECRET, 'utf-8');
+            await fs.writeFile(path.join(outsideDir, 'x.yml'), 'slug: x\nsources: []\n', 'utf-8');
+            await fs.writeFile(path.join(outsideDir, 'x.md'), SECRET, 'utf-8');
+            await fs.writeFile(path.join(outsideDir, 'x-extended.md'), SECRET, 'utf-8');
+        });
+
+        afterEach(async () => {
+            await fs.rm(root, { recursive: true, force: true });
+        });
+
+        it('refuses a comparison file that links out of the repository', async () => {
+            const compDir = path.join(repoDir, 'comparisons', 'x');
+            await fs.mkdir(compDir, { recursive: true });
+            await fs.writeFile(path.join(compDir, 'x.yml'), 'slug: x\nsources: []\n', 'utf-8');
+            await linkFile(path.join(outsideDir, 'secret.md'), path.join(compDir, 'x.md'));
+            await linkFile(path.join(outsideDir, 'secret.md'), path.join(compDir, 'x-extended.md'));
+
+            const repository = await DataRepository.create(repoDir);
+
+            await expect(repository.getComparison('x')).resolves.toMatchObject({ slug: 'x' });
+            await expect(repository.getComparisonMarkdown('x')).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.getComparisonExtendedMarkdown('x')).rejects.toThrow(
+                /link out of the data repository/,
+            );
+        });
+
+        it('refuses a comparison directory that links out of the repository', async () => {
+            await fs.mkdir(path.join(repoDir, 'comparisons'), { recursive: true });
+            await linkDir(outsideDir, path.join(repoDir, 'comparisons', 'x'));
+
+            const repository = await DataRepository.create(repoDir);
+
+            for (const read of [
+                () => repository.getComparison('x'),
+                () => repository.getComparisonMarkdown('x'),
+                () => repository.getComparisonExtendedMarkdown('x'),
+            ]) {
+                const outcome = await read().then(
+                    (value) => ({ value }),
+                    (error: Error) => ({ error: error.message }),
+                );
+                expect(JSON.stringify(outcome)).not.toContain('hunter2');
+                expect(outcome).toEqual({
+                    error: expect.stringMatching(/link out of the data repository/),
+                });
+            }
+        });
+
+        it('refuses item, taxonomy and licence files that link out of the repository', async () => {
+            const itemDir = path.join(repoDir, 'data', 'box');
+            await fs.mkdir(itemDir, { recursive: true });
+            await linkFile(path.join(outsideDir, 'x.yml'), path.join(itemDir, 'box.yml'));
+            await linkFile(path.join(outsideDir, 'secret.md'), path.join(itemDir, 'box.md'));
+            await linkFile(path.join(outsideDir, 'x.yml'), path.join(repoDir, 'categories.yml'));
+            await linkFile(path.join(outsideDir, 'secret.md'), path.join(repoDir, 'LICENSE.md'));
+
+            const repository = await DataRepository.create(repoDir);
+
+            await expect(repository.getItem('box')).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.getMarkdown('box')).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.getCategories()).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.getLicense()).rejects.toThrow(
+                /link out of the data repository/,
+            );
+        });
+
+        it('refuses to write through a link out of the repository', async () => {
+            // An existing directory link: the write would land in outsideDir.
+            await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+            await linkDir(outsideDir, path.join(repoDir, 'data', 'box'));
+            // A dangling file link: writing it would create the target.
+            const compDir = path.join(repoDir, 'comparisons', 'z');
+            await fs.mkdir(compDir, { recursive: true });
+            await linkFile(path.join(outsideDir, 'created.md'), path.join(compDir, 'z.md'));
+            // A linked config directory.
+            await linkDir(outsideDir, path.join(repoDir, '.works'));
+
+            const repository = await DataRepository.create(repoDir);
+            const before = (await fs.readdir(outsideDir)).sort();
+
+            await expect(
+                repository.writeItemMarkdown({ slug: 'box' } as any, 'pwned'),
+            ).rejects.toThrow(/link out of the data repository/);
+            await expect(repository.writeItem({ slug: 'box', name: 'Box' } as any)).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.writeComparisonMarkdown('z', 'pwned')).rejects.toThrow(
+                /link out of the data repository/,
+            );
+            await expect(repository.writeConfig({ company_name: 'pwned' })).rejects.toThrow(
+                /link out of the data repository/,
+            );
+
+            await expect(fs.readdir(outsideDir).then((names) => names.sort())).resolves.toEqual(
+                before,
+            );
+            await expect(fs.readFile(path.join(outsideDir, 'secret.md'), 'utf-8')).resolves.toBe(
+                SECRET,
+            );
+        });
+
+        it('still follows links that stay inside the repository, and a linked repository root', async () => {
+            const sharedDir = path.join(repoDir, 'shared');
+            const compDir = path.join(repoDir, 'comparisons', 'x');
+            await fs.mkdir(sharedDir, { recursive: true });
+            await fs.mkdir(compDir, { recursive: true });
+            await fs.writeFile(path.join(sharedDir, 'x.md'), '# Shared', 'utf-8');
+            await fs.writeFile(path.join(compDir, 'x.yml'), 'slug: x\nsources: []\n', 'utf-8');
+            await linkFile(path.join(sharedDir, 'x.md'), path.join(compDir, 'x.md'));
+
+            // The checkout itself reached through a link (a temp-dir alias).
+            const alias = path.join(root, 'alias');
+            await linkDir(repoDir, alias);
+            const repository = await DataRepository.create(alias);
+
+            await expect(repository.getComparison('x')).resolves.toMatchObject({ slug: 'x' });
+            await expect(repository.getComparisonMarkdown('x')).resolves.toBe('# Shared');
+
+            await repository.writeComparisonMarkdown('y', '# Y');
+            await expect(repository.getComparisonMarkdown('y')).resolves.toBe('# Y');
+            await repository.createItemDir({ slug: 'box' } as any);
+            await repository.writeItem({ slug: 'box', name: 'Box' } as any);
+            await expect(repository.getItem('box')).resolves.toMatchObject({ name: 'Box' });
+            await expect(repository.ensureDefaultConfig()).resolves.toMatchObject({
+                company_name: 'Acme',
+            });
+            await expect(
+                fs.readFile(path.join(repoDir, 'comparisons', 'y', 'y.md'), 'utf-8'),
+            ).resolves.toBe('# Y');
+        });
+    });
+
     it('normalizes public reference errors before writing references.yaml', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
         const repository = await DataRepository.create(repoDir);

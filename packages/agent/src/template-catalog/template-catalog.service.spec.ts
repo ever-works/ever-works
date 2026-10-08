@@ -1588,4 +1588,36 @@ describe('TemplateCatalogService', () => {
             expect(result.forkReadiness).toBe('pending');
         });
     });
+
+    describe('discovered repository descriptions', () => {
+        const sanitize = (value: string | null | undefined): string | null =>
+            (
+                service as unknown as {
+                    sanitizeDiscoveredDescription(value: string | null | undefined): string | null;
+                }
+            ).sanitizeDiscoveredDescription(value);
+
+        it.each<[string | null, string | null]>([
+            ['A <b>fast</b> starter', 'A fast starter'],
+            ['<img src=x onerror=alert(1)>Docs', 'Docs'],
+            ['Unclosed <script src=x', 'Unclosed script src=x'],
+            ['a > b and c < d', 'a  b and c  d'],
+            ['tab\there\u0000', 'tab\there'],
+            ['<p></p>', null],
+            [null, null],
+        ])('sanitizes %p to %p', (value, sanitized) => {
+            expect(sanitize(value)).toBe(sanitized);
+        });
+
+        // CodeQL js/polynomial-redos: the tag pass `<[^>]*>` retried from every
+        // `<` of a run with no `>` after it — about 2.6 s for 50,000 of them.
+        it('sanitizes 50,000 unclosed tag openers in well under 200 ms', () => {
+            const started = performance.now();
+
+            const sanitized = sanitize(`${'<'.repeat(50_000)}ok`);
+
+            expect(performance.now() - started).toBeLessThan(200);
+            expect(sanitized).toBe('ok');
+        });
+    });
 });

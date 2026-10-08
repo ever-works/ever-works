@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { createFakeSmtp } from './helpers/fake-smtp.mjs';
 import { baseEnv, startDatabase, withServer } from './helpers/harness.mjs';
-import { buildMessage, sendMail, smtpConfig } from '../src/mail.mjs';
+import { buildMessage, sendMail, smtpConfig, smtpTlsOptions } from '../src/mail.mjs';
 
 test('smtpConfig reads the names the App spec binds, and is null without SMTP_HOST', () => {
 	assert.equal(smtpConfig({}), null);
@@ -21,6 +21,18 @@ test('smtpConfig reads the names the App spec binds, and is null without SMTP_HO
 	);
 	assert.equal(smtpConfig({ SMTP_HOST: 'h' }).port, 587, 'the submission port is the default');
 	assert.equal(smtpConfig({ SMTP_HOST: 'h', SMTP_SECURE: '1' }).secure, true);
+});
+
+test('SMTP TLS verifies the certificate against SMTP_HOST unless SMTP_TLS_REJECT_UNAUTHORIZED=0', () => {
+	const config = smtpConfig({ SMTP_HOST: 'smtp.example.test', SMTP_PORT: '465' });
+	assert.deepEqual(smtpTlsOptions(config), { host: 'smtp.example.test', servername: 'smtp.example.test', rejectUnauthorized: true });
+
+	const optedOut = smtpConfig({ SMTP_HOST: 'smtp.example.test', SMTP_TLS_REJECT_UNAUTHORIZED: '0' });
+	assert.equal(smtpTlsOptions(optedOut).rejectUnauthorized, false, 'the explicit opt-out, for a sink with a self-signed certificate');
+
+	// A caller that builds the config by hand (no smtpConfig) gets verification too.
+	assert.equal(smtpTlsOptions({ host: 'smtp.example.test', port: 465 }).rejectUnauthorized, true);
+	assert.deepEqual(smtpTlsOptions({ host: '127.0.0.1', port: 465 }), { host: '127.0.0.1', rejectUnauthorized: true }, 'an IP address is never sent as SNI');
 });
 
 test('buildMessage produces CRLF headers and dot-stuffs the body', () => {
@@ -47,6 +59,31 @@ test('sendMail delivers one message through a real SMTP conversation', async (t)
 	assert.match(message.data, /Subject: app-fixture-hello smoke test/);
 	assert.match(message.data, /marker: run-unique-marker/);
 	assert.equal(smtp.sessions[0].auth.user, 'smtp-user');
+});
+
+test('SMTP_REQUIRE_TLS=1: a server without STARTTLS (or a stripped one) never receives the credentials', async (t) => {
+	assert.equal(smtpConfig({ SMTP_HOST: 'h', SMTP_REQUIRE_TLS: '1' }).requireTls, true);
+	assert.equal(smtpConfig({ SMTP_HOST: 'h' }).requireTls, false, 'opportunistic by default — the lane sink offers no TLS');
+
+	// The fake server never offers STARTTLS: exactly what a client sees when a man in the middle
+	// removes it from the EHLO reply.
+	const smtp = createFakeSmtp({ user: 'smtp-user', password: 'smtp-password' });
+	const port = await smtp.listen(0);
+	t.after(() => smtp.close());
+
+	await assert.rejects(
+		() =>
+			sendMail(
+				{ host: '127.0.0.1', port, user: 'smtp-user', password: 'smtp-password', from: 'fixture@example.test', requireTls: true, timeoutMs: 3_000 },
+				{ to: 'sink@example.test', subject: 'x', text: 'y' }
+			),
+		(error) => {
+			assert.equal(error.code, 'ENOTLS');
+			return true;
+		}
+	);
+	assert.equal(smtp.sessions[0].auth, null, 'no AUTH command reached the server');
+	assert.equal(smtp.messages.length, 0);
 });
 
 test('sendMail refuses a server that rejects the credentials', async (t) => {

@@ -24,7 +24,7 @@
 	"dependencies": {
 		"@apidevtools/swagger-parser": "^12.1.0",
 		"@ever-works/contracts": "workspace:*",
-		"@modelcontextprotocol/sdk": "^1.27.1",
+		"@modelcontextprotocol/sdk": "^1.32.1",
 		"@nestjs/common": "^11.2.7",
 		"@nestjs/core": "^11.2.7",
 		"@nestjs/platform-express": "^11.2.7",

@@ -9,6 +9,7 @@ import { WorkMemberRole, GenerateStatusType, WorkScheduleStatus } from '@src/ent
 import { WorkOwnershipService } from './work-ownership.service';
 import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
 import { isRepositoryWork } from '@src/works/repository-work-guard';
+import { trimEdgeChars } from '@src/utils/text.utils';
 import {
     WorkGenerationHistoryDto,
     WorkGenerationHistoryListDto,
@@ -563,11 +564,14 @@ export class WorkQueryService {
      * form will submit.
      */
     private normalizeSlug(value: string): string {
-        return (value ?? '')
+        // Edge hyphens by a linear scan, never `/^-+|-+$/g`, which is polynomial
+        // on an interior hyphen run (none survives the collapse, but the scan
+        // does not have to rely on that).
+        const hyphenated = (value ?? '')
             .trim()
             .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
+            .replace(/[^a-z0-9]+/g, '-');
+        return trimEdgeChars(hyphenated, '-', '-');
     }
 
     async workItems(workId: string, user: User) {

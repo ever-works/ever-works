@@ -268,7 +268,7 @@ describe('SubscriptionService', () => {
             }
         });
 
-        it('FREE seed row pins maxWorks=1, monthlyPrice=0, overagePricePerRun=10, displayName=Free', async () => {
+        it('FREE seed row pins maxWorks=1, monthlyPrice=0, overagePricePerRun=10, 15 seats, displayName=Free', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const free = planRepository.upsert.mock.calls
@@ -280,10 +280,13 @@ describe('SubscriptionService', () => {
                 maxWorks: 1,
                 monthlyPrice: '0',
                 overagePricePerRun: '10',
+                // 15 since the 2026-10-05 repricing: every Ever product is free for up to 15.
+                seatsIncluded: 15,
+                seatMonthlyPrice: null,
             });
         });
 
-        it('STANDARD seed row is the "Pro" tier: $25/mo, $204/yr, 10 seats at $5 + the 4 allowed cadences', async () => {
+        it('STANDARD seed row is the "Pro" tier: $49/mo, $408/yr, 25 seats at $5 + the 4 allowed cadences', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const std = planRepository.upsert.mock.calls
@@ -296,12 +299,12 @@ describe('SubscriptionService', () => {
                 displayName: 'Pro',
                 hosting: 'cloud',
                 maxWorks: 5,
-                // Ever Gauzy / Ever Teams cloud Small Business. annualPrice is the YEARLY charge,
-                // not the "$17/mo" the marketing site displays.
-                monthlyPrice: '25',
-                annualPrice: '204',
+                // Ever Gauzy / Ever Teams cloud Small Business (2026-10-05 repricing). annualPrice is
+                // the YEARLY charge, not the "$34/mo" the marketing site displays.
+                monthlyPrice: '49',
+                annualPrice: '408',
                 lifetimePrice: null,
-                seatsIncluded: 10,
+                seatsIncluded: 25,
                 seatMonthlyPrice: '5',
                 monthlyCredits: 3000,
                 overagePricePerRun: '8',
@@ -309,7 +312,7 @@ describe('SubscriptionService', () => {
             expect(std.allowedCadences).toEqual(STANDARD_ALLOWED_CADENCES);
         });
 
-        it('PREMIUM seed row is the "Enterprise" tier: $199/mo, $1,668/yr, 10 seats at $10 + ALL cadences', async () => {
+        it('PREMIUM seed row is the "Enterprise" tier: $499/mo, $4,188/yr, 50 seats at $10 + ALL cadences', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const premium = planRepository.upsert.mock.calls
@@ -320,10 +323,10 @@ describe('SubscriptionService', () => {
                 displayName: 'Enterprise',
                 hosting: 'cloud',
                 maxWorks: 15,
-                monthlyPrice: '199',
-                annualPrice: '1668',
+                monthlyPrice: '499',
+                annualPrice: '4188',
                 lifetimePrice: null,
-                seatsIncluded: 10,
+                seatsIncluded: 50,
                 seatMonthlyPrice: '10',
                 monthlyCredits: 25000,
                 overagePricePerRun: '0',
@@ -349,7 +352,7 @@ describe('SubscriptionService', () => {
                 // The ONLY row sold as a perpetual commercial licence. Anything with a
                 // lifetimePrice is bought in Stripe `mode: payment`, never `subscription`.
                 lifetimePrice: '99',
-                seatsIncluded: 10,
+                seatsIncluded: 25,
                 seatMonthlyPrice: '5',
                 monthlyCredits: 3000,
             });

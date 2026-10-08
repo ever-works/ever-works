@@ -1519,11 +1519,22 @@ function repositoryOf(reference: string): string {
     return colon > slash ? reference.slice(0, colon) : reference;
 }
 
-/** APW-03 schema §10's relative default `memoryLimit = 2 × memory`, as a quantity (`512Mi` → `1024Mi`). */
+/**
+ * APW-03 schema §10's relative default `memoryLimit = 2 × memory`, as a quantity (`512Mi` → `1024Mi`).
+ *
+ * The amount and the unit are split in two linear steps. The single pattern this replaced,
+ * `^(\d+(?:\.\d+)?)(.*)$`, backtracked every digit against a `.*` that stops at a line break —
+ * seconds for 50,000 digits (CodeQL js/polynomial-redos) — and the quantity is App spec content
+ * from the member's repository. Same answers: a quantity whose unit holds a line break is left as
+ * it is, because `.` does not match one.
+ */
 function doubleQuantity(quantity: string): string {
-    const match = /^(\d+(?:\.\d+)?)(.*)$/.exec(text(quantity));
+    const value = text(quantity);
+    const amount = /^\d+(?:\.\d+)?/.exec(value)?.[0];
+    if (amount === undefined) return quantity;
 
-    return match ? `${Number(match[1]) * 2}${match[2]}` : quantity;
+    const unit = value.slice(amount.length);
+    return /^.*$/.test(unit) ? `${Number(amount) * 2}${unit}` : quantity;
 }
 
 /** `e5f6::1` → `e5f6::1/128`, `192.0.2.7` → `192.0.2.7/32`; anything else is not an address and yields `null`. */

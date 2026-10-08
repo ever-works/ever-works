@@ -159,6 +159,43 @@ describe('PostmarkPlugin', () => {
 		it('returns [] on malformed JSON (never throws)', () => {
 			expect(plugin.extractInboundRecipients(Buffer.from('not json'), {})).toEqual([]);
 		});
+
+		/**
+		 * CodeQL js/polynomial-redos. The `To` fallback used to be read with `/<([^>]+)>/`, which
+		 * backtracks quadratically over a run of `<` that never closes. The header is written by
+		 * whoever sent the mail and is read here BEFORE the webhook is authenticated (and
+		 * authentication is an operator opt-in for Postmark), so one POST could pin the event loop.
+		 */
+		const recipientsOf = (to: string) =>
+			plugin.extractInboundRecipients(Buffer.from(JSON.stringify({ To: to })), {});
+
+		it.each([
+			['a run of "<" that never closes', '<'.repeat(50_000)],
+			['"<" followed by a run of "<="', `<${'<='.repeat(25_000)}`]
+		])('reads %s in linear time', (_label, hostile) => {
+			const started = performance.now();
+			const recipients = recipientsOf(hostile);
+			const elapsedMs = performance.now() - started;
+
+			expect(recipients).toEqual([hostile]);
+			expect(elapsedMs).toBeLessThan(200);
+		});
+
+		// The rewrite must name exactly the mailbox the regex named.
+		it.each([
+			['a@b.test', ['a@b.test']],
+			['"Name" <a@b.test>', ['a@b.test']],
+			['<> <a@b.test>', ['a@b.test']],
+			['<<a@b.test>', ['<a@b.test']],
+			['<a@b.test', ['<a@b.test']],
+			['x <  spaced@b.test  >', ['spaced@b.test']],
+			['<a@b.test> <c@d.test>', ['a@b.test']],
+			['a>b <c@d.test>', ['c@d.test']],
+			['<>', ['<>']],
+			['<\n>', []]
+		])('parses the To fallback %j as the angle-address regex did', (to, expected) => {
+			expect(recipientsOf(to)).toEqual(expected);
+		});
 	});
 
 	describe('verifyWebhookSignature', () => {
