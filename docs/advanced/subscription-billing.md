@@ -56,8 +56,9 @@ Plan codes are identities (`free` / `standard` / `premium`) and never change;
 ## Seats
 
 A seat is an **employee OR an agent** — interchangeable, which is the point of
-the product. Paid plans include 10; extras are billed per seat per month from
-the catalog ($5 Pro / $10 Enterprise).
+the product. Free includes 15, Pro 25 and Enterprise 50 (Option 2), since the
+2026-10-05 repricing; extras are billed per seat per month from the catalog
+($5 Pro / $10 Enterprise).
 
 - **Counted tenant-wide.** Access in Ever Works is tenant-wide, so somebody
   who belongs to three Organizations in one Tenant occupies ONE seat, and an
