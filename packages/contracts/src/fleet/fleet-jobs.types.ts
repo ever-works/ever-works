@@ -1568,6 +1568,18 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 */
 	question?: FleetAgentTaskQuestion | null;
 	/**
+	 * Self-build slice AU (a slice-Q follow-up): owner-question files the
+	 * model wrote somewhere OTHER than a repository root — e.g.
+	 * `apps/api/.ever-works/QUESTION.md` after it `cd`-ed into a package.
+	 * The exclude rule keeps such a file out of Git, but the node only
+	 * READS the root one, so without this the question was lost in silence.
+	 * Workspace-relative POSIX paths (a mount's prefixed with
+	 * `.mounts/<dir>/`), bounded in count and length, never content; the
+	 * node removes each file after reporting it. Absent when there were
+	 * none, so a normal run reports exactly what it always did.
+	 */
+	misplacedQuestionFiles?: string[];
+	/**
 	 * Self-build slice Z: what the MCP bridge did, when the payload asked
 	 * for one. Reports whether it actually ran and how many `tools/call`
 	 * requests the loopback proxy forwarded. NEVER the token — the whole
