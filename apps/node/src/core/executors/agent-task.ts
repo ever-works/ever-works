@@ -1291,80 +1291,24 @@ async function runModelStep(
 		// could not be even if a payload asked — `EVER_WORKS_` is refused
 		// by `NODE_PLATFORM_OWNED_ENV_PATTERN` whatever a grant says.
 		const step = buildModelCliStep(execution, command, execution.envPassthrough, execution.envGrants);
-		// Slice AP: the SAME protected values the summary is scrubbed of —
-		// granted env values and the delivered `.env` contents — so the step
-		// records and the transcript cannot carry what the summary may not.
-		const protectedValues = recordEvidence
-			? collectModelOutputProtectedValues(
-					execution.envPassthrough,
-					execution.envGrants,
-					io.parentEnv,
-					runSecretValues
-				)
-			: [];
-		const newRecorder = () =>
-			createModelTranscriptRecorder({ provider: execution.provider, protectedValues, workspacePath });
-		const recorder = recordEvidence ? newRecorder() : null;
-		const startedAt = Date.now();
-		let observer: ModelOutputObserver | null = null;
-		if (recorder && lineDelimitedOutput && scratchFs.readChunk) {
-			observer = observeModelOutput({
-				path: scratch.resultPath,
-				readChunk: scratchFs.readChunk.bind(scratchFs),
-				recorder,
-				startedAt,
-				...(io.modelTranscriptPollMs !== undefined ? { pollMs: io.modelTranscriptPollMs } : {})
-			});
-		}
 		// Slice AK: the ONE call on this node that carries a containment
-		// overlay. The setup phase and the acceptance checks deliberately do
-		// not — see {@link establishModelContainment}.
-		let result: NodeCheckResult;
-		let observed: { complete: boolean } | null = null;
-		try {
-			result = await runNodeCommandStep(step, workspacePath, io, signal, undefined, containment.envOverlay);
-		} finally {
-			// Stopped on EVERY exit, a throw included: a poll timer left
-			// running would keep reading a file the cleanup below deletes.
-			if (observer) observed = await observer.stop().catch(() => ({ complete: false }));
-		}
-		const rawOutput = await readModelOutput(scratchFs, scratch.resultPath, lineDelimitedOutput);
-		// `envPassthrough` names the credential env vars this CLI was handed;
-		// their values are scrubbed out of the summary and output tail before
-		// the result leaves the node. `envGrants` (self-build slice Y) names
-		// the per-repository grants and is scrubbed on the SAME footing: a
-		// granted DATABASE_URL is a credential the model could have echoed,
-		// and the whole point of granting one is that it stays on the machine.
-		const parsed = parseModelCliResult(
-			execution.provider,
-			rawOutput,
-			result,
-			execution.envPassthrough,
-			execution.envGrants,
-			io.parentEnv,
-			runSecretValues
-		);
-		// Slice AP: the evidence comes from the LIVE view when it saw the
-		// whole stream (it carries the timings), and is otherwise rebuilt
-		// from the file now, untimed — never from a partial live view.
-		let evidence: ModelTranscriptEvidence | null = null;
-		if (recorder) {
-			try {
-				if (observed?.complete) {
-					evidence = recorder.finish(Math.max(0, Date.now() - startedAt));
-				} else if (rawOutput !== null) {
-					const fallback = newRecorder();
-					fallback.feed(rawOutput, null);
-					evidence = fallback.finish(null);
-				}
-			} catch (error) {
-				// Evidence is a report about the run, never a verdict on it.
-				io.logger?.warn(
-					`[fleet-node] run evidence for ${jobId} could not be recorded: ${error instanceof Error ? error.message : String(error)}`
-				);
-			}
-		}
-		const model = evidence ? withRunEvidence(parsed, evidence) : parsed;
+		// overlay (inside {@link invokeModelCliStep}). The setup phase and
+		// the acceptance checks deliberately do not — see
+		// {@link establishModelContainment}.
+		const model = await invokeModelCliStep({
+			jobId,
+			execution,
+			step,
+			workspacePath,
+			scratch,
+			scratchFs,
+			io,
+			signal,
+			envOverlay: containment.envOverlay,
+			runSecretValues,
+			recordEvidence,
+			lineDelimitedOutput
+		});
 		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
@@ -2105,6 +2049,105 @@ function defaultDirectoryExists(path: string): boolean {
 }
 
 /**
+ * ONE model-CLI invocation: spawn the built step, read what the CLI wrote,
+ * parse it — and, self-build slice AP, record the run's evidence on the
+ * way.
+ *
+ * Its own function so that every invocation of the model in a run gets
+ * exactly the same treatment: a caller that runs the CLI more than once
+ * (a resumed session that falls back to a fresh one) calls this per
+ * attempt, and the evidence it reports is the evidence of the attempt
+ * whose verdict it reports.
+ *
+ * `envPassthrough` names the credential env vars this CLI was handed;
+ * their values are scrubbed out of the summary, the output tail, the step
+ * records and the transcript before the result leaves the node.
+ * `envGrants` (self-build slice Y) names the per-repository grants and is
+ * scrubbed on the SAME footing, and so are `runSecretValues`, the delivered
+ * `.env` contents, which live in no environment at all.
+ */
+async function invokeModelCliStep(input: {
+	jobId: string;
+	execution: FleetAgentModelExecution;
+	step: WireCheck;
+	workspacePath: string;
+	scratch: { instructionsPath: string; resultPath: string };
+	scratchFs: AgentTaskScratchFs;
+	io: AgentTaskIo;
+	signal: AbortSignal | undefined;
+	envOverlay: NodeCommandEnvOverlay | undefined;
+	runSecretValues: readonly string[];
+	recordEvidence: boolean;
+	lineDelimitedOutput: boolean;
+}): Promise<FleetAgentTaskModelResult> {
+	const { jobId, execution, step, workspacePath, scratch, scratchFs, io, signal } = input;
+	// Slice AP: the SAME protected values the summary is scrubbed of, so the
+	// step records and the transcript cannot carry what the summary may not.
+	const protectedValues = input.recordEvidence
+		? collectModelOutputProtectedValues(
+				execution.envPassthrough,
+				execution.envGrants,
+				io.parentEnv,
+				input.runSecretValues
+			)
+		: [];
+	const newRecorder = () =>
+		createModelTranscriptRecorder({ provider: execution.provider, protectedValues, workspacePath });
+	const recorder = input.recordEvidence ? newRecorder() : null;
+	const startedAt = Date.now();
+	let observer: ModelOutputObserver | null = null;
+	if (recorder && input.lineDelimitedOutput && scratchFs.readChunk) {
+		observer = observeModelOutput({
+			path: scratch.resultPath,
+			readChunk: scratchFs.readChunk.bind(scratchFs),
+			recorder,
+			startedAt,
+			...(io.modelTranscriptPollMs !== undefined ? { pollMs: io.modelTranscriptPollMs } : {})
+		});
+	}
+	let result: NodeCheckResult;
+	let observed: { complete: boolean } | null = null;
+	try {
+		result = await runNodeCommandStep(step, workspacePath, io, signal, undefined, input.envOverlay);
+	} finally {
+		// Stopped on EVERY exit, a throw included: a poll timer left running
+		// would keep reading a file the caller's cleanup deletes.
+		if (observer) observed = await observer.stop().catch(() => ({ complete: false }));
+	}
+	const rawOutput = await readModelOutput(scratchFs, scratch.resultPath, input.lineDelimitedOutput);
+	const parsed = parseModelCliResult(
+		execution.provider,
+		rawOutput,
+		result,
+		execution.envPassthrough,
+		execution.envGrants,
+		io.parentEnv,
+		input.runSecretValues
+	);
+	// Slice AP: the evidence comes from the LIVE view when it saw the whole
+	// stream (it carries the timings), and is otherwise rebuilt from the file
+	// now, untimed — never from a partial live view.
+	let evidence: ModelTranscriptEvidence | null = null;
+	if (recorder) {
+		try {
+			if (observed?.complete) {
+				evidence = recorder.finish(Math.max(0, Date.now() - startedAt));
+			} else if (rawOutput !== null) {
+				const fallback = newRecorder();
+				fallback.feed(rawOutput, null);
+				evidence = fallback.finish(null);
+			}
+		} catch (error) {
+			// Evidence is a report about the run, never a verdict on it.
+			io.logger?.warn(
+				`[fleet-node] run evidence for ${jobId} could not be recorded: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	return evidence ? withRunEvidence(parsed, evidence) : parsed;
+}
+
+/**
  * Self-build slice AP — attach the run evidence to the model result, only
  * the parts there are: a run that took no step reports no empty array, and
  * a node with nothing dropped reports no zero.
@@ -2140,7 +2183,15 @@ async function readModelOutput(
 	lineDelimited: boolean
 ): Promise<string | null> {
 	if (lineDelimited && scratchFs.readChunk) {
-		const probe = await scratchFs.readChunk(path, 0, 0);
+		let probe: { bytes: Uint8Array; size: number } | null;
+		try {
+			probe = await scratchFs.readChunk(path, 0, 0);
+		} catch {
+			// The bounded reader is an optimisation for the oversize case;
+			// a reader that cannot even size the file (a sharing violation
+			// on Windows) must not fail a run `readFile` can still read.
+			return scratchFs.readFile(path);
+		}
 		if (probe === null) return null;
 		if (probe.size > MODEL_CLI_MAX_OUTPUT_BYTES) {
 			const window = await scratchFs.readChunk(

@@ -251,7 +251,10 @@ export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOp
 	const openCall = (callId: string | null, toolName: string, argsSummary: string, atMs: number | null): void => {
 		const name = capText(clean(toolName).trim(), FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value || 'unknown';
 		const summary = capText(clean(argsSummary).trim(), FLEET_AGENT_TASK_TIMELINE_ARGS_MAX_CHARS);
-		const id = callId ? capText(callId, FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value : '';
+		// Cleaned like every other reported string: an id is the CLI's, but
+		// nothing reported is exempt (review). `closeCall` cleans the same way,
+		// so the two still meet.
+		const id = callId ? capText(clean(callId), FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value : '';
 		const step: FleetAgentTaskModelStep = {
 			kind: 'tool-call',
 			atMs,
@@ -268,7 +271,7 @@ export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOp
 
 	const closeCall = (callId: string | null, status: FleetAgentTaskModelStepStatus, atMs: number | null): boolean => {
 		if (!callId) return false;
-		const id = capText(callId, FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value;
+		const id = capText(clean(callId), FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value;
 		const open = calls.get(id);
 		if (!open) return false;
 		calls.delete(id);
@@ -546,14 +549,17 @@ function elideForTranscript(
 	const record = value as Record<string, unknown>;
 	const out: Record<string, unknown> = {};
 	for (const [childKey, child] of Object.entries(record)) {
+		// A KEY is model-controllable too (a tool input whose property name
+		// is a secret), so it is cleaned like a value (review).
+		const outKey = clean(childKey);
 		if (childKey === 'tool_use_result') {
-			out[childKey] = '[elided tool output]';
+			out[outKey] = '[elided tool output]';
 		} else if (record.type === 'tool_result' && childKey === 'content') {
-			out[childKey] = elisionMarker(typeof child === 'string' ? child : (JSON.stringify(child) ?? ''));
+			out[outKey] = elisionMarker(typeof child === 'string' ? child : (JSON.stringify(child) ?? ''));
 		} else if (record.type === 'reasoning' && childKey === 'text') {
-			out[childKey] = elisionMarker(typeof child === 'string' ? child : '');
+			out[outKey] = elisionMarker(typeof child === 'string' ? child : '');
 		} else {
-			out[childKey] = elideForTranscript(
+			out[outKey] = elideForTranscript(
 				child,
 				childKey,
 				depth + 1,

@@ -104,6 +104,18 @@ describe('FleetJobRepository.purgeTerminalBodies (self-build slice AP, better-sq
             kind: 'agent-task',
         });
         expect(failed.completedAt?.toISOString()).toBe(OLD.toISOString());
+        // SQL NULL, not the JSON text 'null': a `simple-json` column that
+        // re-reads `'null'` as null would pass the entity assertions above
+        // while the bytes stayed on disk (review). Asked of the DRIVER.
+        const raw = (await dataSource.query(
+            `SELECT "id", "payload" IS NULL AS "payloadNull", "result" IS NULL AS "resultNull" FROM "fleet_jobs" WHERE "id" IN (?, ?)`,
+            [oldDone.id, oldFailed.id],
+        )) as Array<{ payloadNull: number; resultNull: number }>;
+        expect(raw).toHaveLength(2);
+        for (const row of raw) {
+            expect(Number(row.payloadNull)).toBe(1);
+            expect(Number(row.resultNull)).toBe(1);
+        }
         // Recent, active and queued rows are untouched.
         for (const kept of [recentDone, oldActive, queued]) {
             const row = byId.get(kept.id)!;

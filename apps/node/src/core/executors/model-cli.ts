@@ -696,10 +696,25 @@ export function redactCommandResult(
  * ordinary prose out of every tail the node reports.
  */
 function mergeProtectedValues(values: readonly string[], extra?: readonly string[]): string[] {
-	if (!extra?.length) return [...values];
 	const merged = new Set<string>(values);
-	for (const value of extra) {
+	for (const value of extra ?? []) {
 		if (typeof value === 'string' && value.trim().length >= 8) merged.add(value);
+	}
+	// Self-build slice AP (review): every text this node reports that came
+	// out of a CLI's JSON stream — the raw output tail of a run that wrote
+	// no verdict line, a Codex event tail — carries a value the way JSON
+	// wrote it: a quote as `\"`, a backslash as `\\`, a control character
+	// as `\uXXXX`. A `.env` value like `pa"ss\word` is then in the report
+	// in a spelling a verbatim match never finds. So each value is also
+	// protected in its JSON-escaped spelling, and in the doubly escaped one
+	// a JSON document quoted inside another (a tool result holding a JSON
+	// file) produces.
+	for (const value of [...merged]) {
+		const once = JSON.stringify(value).slice(1, -1);
+		if (once !== value) {
+			merged.add(once);
+			merged.add(JSON.stringify(once).slice(1, -1));
+		}
 	}
 	return [...merged].sort((a, b) => b.length - a.length);
 }
@@ -795,6 +810,15 @@ function parseModelCliOutcome(
 	const combinedTail = tail([output, step.logTail ?? ''].filter((part) => part.trim()).join('\n'));
 
 	if (provider === 'claude-code') {
+		// Self-build slice AP (review): Claude Code's `stream-json` output is
+		// every turn of the run — tool RESULTS included, i.e. file bodies and
+		// command output. The `json` document it replaced held only the final
+		// envelope, and a run that died before writing one left an empty
+		// stdout, so its tail was the CLI's stderr. Keep that: for a stream,
+		// the tail is what the model SAID last plus stderr, never the raw
+		// stream (it reaches the Task chat on failure).
+		const streamTail = claudeStreamTail(output, step.logTail);
+		const outputTail = streamTail ?? combinedTail;
 		const envelope = parseClaudeEnvelope(output);
 		if (envelope) {
 			const summary = nonEmptyString(envelope.result);
@@ -811,9 +835,10 @@ function parseModelCliOutcome(
 				// travel with the cost, so the run row and the Costs dashboard
 				// read a fleet run exactly like a cloud one.
 				...tokenFields(parseClaudeUsage(envelope.usage), dominantClaudeModel(envelope.modelUsage)),
-				...(summary ? {} : { outputTail: combinedTail })
+				...(summary ? {} : outputTail ? { outputTail } : {})
 			};
 		}
+		return { ...base, ...(outputTail ? { outputTail } : {}) };
 	} else if (provider === 'codex') {
 		const parsed = parseCodexEvents(output);
 		if (parsed) {
@@ -832,6 +857,51 @@ function parseModelCliOutcome(
 		}
 	}
 	return { ...base, ...(combinedTail ? { outputTail: combinedTail } : {}) };
+}
+
+/**
+ * The output tail of a Claude Code `stream-json` run, or null when the
+ * output is not such a stream (the single `json` document, nothing, noise).
+ *
+ * The last assistant TEXT the model wrote (decoded, newest last) followed by
+ * the CLI's stderr, cut to {@link MODEL_CLI_OUTPUT_TAIL_BYTES}. Never a tool
+ * result and never a tool's arguments: the stream carries both, and the tail
+ * is what the reconciler quotes back into the Task chat when a run fails.
+ *
+ * A stream is recognised by at least one line that parses to an event of
+ * the stream's own vocabulary (`system` / `assistant` / `user` / `result`)
+ * that is NOT the lone `result` document `json` mode prints — so a `json`
+ * run keeps exactly the tail it always had.
+ */
+function claudeStreamTail(output: string, stderrTail: string | null | undefined): string | null {
+	const lines = output.split(/\r?\n/).filter((line) => line.trim());
+	let streamEvents = 0;
+	const said: string[] = [];
+	for (const line of lines) {
+		let event: Record<string, unknown> | null = null;
+		try {
+			const parsed = JSON.parse(line) as unknown;
+			event =
+				parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+					? (parsed as Record<string, unknown>)
+					: null;
+		} catch {
+			continue;
+		}
+		if (!event) continue;
+		if (event.type === 'system' || event.type === 'assistant' || event.type === 'user') streamEvents += 1;
+		if (event.type !== 'assistant') continue;
+		const message = event.message as Record<string, unknown> | undefined;
+		const blocks = message && Array.isArray(message.content) ? message.content : [];
+		for (const block of blocks) {
+			const record = block as Record<string, unknown> | null;
+			if (record && record.type === 'text' && typeof record.text === 'string' && record.text.trim()) {
+				said.push(record.text.trim());
+			}
+		}
+	}
+	if (streamEvents === 0) return null;
+	return tail([...said, stderrTail ?? ''].filter((part) => part.trim()).join('\n'));
 }
 
 /** Claude Code `--output-format json` prints ONE JSON document; be tolerant of leading noise. */
