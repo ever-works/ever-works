@@ -144,6 +144,18 @@ export interface BillingPlanDescriptor {
      * "no seat line item".
      */
     readonly extraSeats?: number | null;
+
+    /**
+     * Free-trial length in days for a recurring plan, decided by the SERVER (never the browser).
+     *
+     * Owner rule (2026-10-05 repricing): every Ever product gives a 90-day free trial on CLOUD paid
+     * plans only. Self-hosted subscriptions are charged at purchase, a perpetual licence
+     * (`mode: payment`) never has one, and the free plan is never checked out. The provider applies
+     * it to the subscription (Stripe `subscription_data.trial_period_days`); the whole subscription
+     * trials, seat line included. Zero, absent or `null` means "charge now", which is exactly how
+     * every checkout behaved before this field existed.
+     */
+    readonly trialPeriodDays?: number | null;
 }
 
 /**

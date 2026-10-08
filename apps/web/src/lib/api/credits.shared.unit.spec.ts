@@ -14,11 +14,13 @@ import {
     formatMonthlyPrice,
     formatSignedCredits,
     formatUsageMonthLabel,
+    CLOUD_PLAN_TRIAL_DAYS,
     isFreePlan,
     isUsageMonthPeriod,
     isUsagePeriod,
     ledgerKindTone,
     parseUsagePeriod,
+    planOffersTrial,
     recentUsageMonths,
     USAGE_ROLLING_PERIODS,
 } from './credits.shared';
@@ -193,6 +195,25 @@ describe('isFreePlan', () => {
         expect(isFreePlan({ monthlyPrice: '0.00' })).toBe(true);
         expect(isFreePlan({ monthlyPrice: '29' })).toBe(false);
         expect(isFreePlan({ monthlyPrice: 'oops' })).toBe(false);
+    });
+});
+
+describe('planOffersTrial — 90-day trial on cloud paid plans only (2026-10-05 repricing)', () => {
+    it('is 90 days', () => {
+        expect(CLOUD_PLAN_TRIAL_DAYS).toBe(90);
+    });
+
+    it('offers it on cloud paid plans, and on rows that predate the hosting column', () => {
+        expect(planOffersTrial({ monthlyPrice: '49', hosting: 'cloud' })).toBe(true);
+        expect(planOffersTrial({ monthlyPrice: '499.00', hosting: 'cloud' })).toBe(true);
+        expect(planOffersTrial({ monthlyPrice: '49' })).toBe(true);
+    });
+
+    it('never on a free plan, a self-hosted edition, or an unparseable price', () => {
+        expect(planOffersTrial({ monthlyPrice: '0', hosting: 'cloud' })).toBe(false);
+        expect(planOffersTrial({ monthlyPrice: '49', hosting: 'selfhosted' })).toBe(false);
+        expect(planOffersTrial({ monthlyPrice: '499', hosting: 'selfhosted' })).toBe(false);
+        expect(planOffersTrial({ monthlyPrice: 'oops', hosting: 'cloud' })).toBe(false);
     });
 });
 

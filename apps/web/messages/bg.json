@@ -3188,6 +3188,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "seatsIncluded": "Включени {count} служители или агенти",
+                    "trial": "{days}-дневен безплатен пробен период за първия ви абонамент",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

@@ -186,11 +186,14 @@ describe('stripe-catalog', () => {
     });
 
     describe('seats', () => {
-        it('includes ten seats on every paid tier, matching Gauzy', () => {
-            expect(plan('cloud', 'pro').seatsIncluded).toBe(10);
-            expect(plan('cloud', 'enterprise').seatsIncluded).toBe(10);
-            expect(plan('selfhosted', 'pro').seatsIncluded).toBe(10);
-            expect(plan('selfhosted', 'enterprise').seatsIncluded).toBe(10);
+        // 2026-10-05 repricing: Free 15, Pro (Small Business) 25, Enterprise Option 2 50 — on
+        // both hostings, matching every other Ever product.
+        it('includes 15 / 25 / 50 seats on Free / Pro / Enterprise, matching Gauzy', () => {
+            expect(plan('cloud', 'free').seatsIncluded).toBe(15);
+            expect(plan('cloud', 'pro').seatsIncluded).toBe(25);
+            expect(plan('cloud', 'enterprise').seatsIncluded).toBe(50);
+            expect(plan('selfhosted', 'pro').seatsIncluded).toBe(25);
+            expect(plan('selfhosted', 'enterprise').seatsIncluded).toBe(50);
         });
 
         it('charges Gauzy’s $5 on Pro and $10 on Enterprise', () => {
@@ -208,14 +211,14 @@ describe('stripe-catalog', () => {
         it('bills only the seats beyond the allowance, and never a negative quantity', () => {
             const pro = plan('cloud', 'pro');
             expect(billableSeats(pro, 0)).toBe(0);
-            expect(billableSeats(pro, 10)).toBe(0);
-            expect(billableSeats(pro, 11)).toBe(1);
-            expect(billableSeats(pro, 37)).toBe(27);
+            expect(billableSeats(pro, 25)).toBe(0);
+            expect(billableSeats(pro, 26)).toBe(1);
+            expect(billableSeats(pro, 52)).toBe(27);
             // Nonsense input must not produce a charge.
             expect(billableSeats(pro, -5)).toBe(0);
             expect(billableSeats(pro, Number.NaN)).toBe(0);
             expect(billableSeats(pro, Number.POSITIVE_INFINITY)).toBe(0);
-            expect(billableSeats(pro, 10.9)).toBe(0);
+            expect(billableSeats(pro, 25.9)).toBe(0);
         });
 
         it('never bills a seat on an unbounded plan — that is Enterprise Option 1', () => {

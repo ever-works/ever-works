@@ -71,10 +71,10 @@
             "hosting": "cloud",
             "tier": "free",
             "tierName": "Free",
-            "seatsIncluded": 1,
+            "seatsIncluded": 15,
             "seatCentsPerMonth": null,
             "monthlyCredits": 0,
-            "note": "Free forever. 50 credits/day. Not purchasable through checkout - assigned by the self-service plan endpoint. The $0 prices exist only so a future move to the shared ever.co/checkout can keep 'does this email have a subscription?' a single uniform question.",
+            "note": "Free forever. 50 credits/day. 15 seats (was 1 before the 2026-10-05 repricing). Not purchasable through checkout - assigned by the self-service plan endpoint. The $0 prices exist only so a future move to the shared ever.co/checkout can keep 'does this email have a subscription?' a single uniform question.",
             "prices": [
                 { "interval": "monthly", "amountCents": 0 },
                 { "interval": "annual", "amountCents": 0 }
@@ -84,10 +84,10 @@
             "hosting": "cloud",
             "tier": "pro",
             "tierName": "Pro",
-            "seatsIncluded": 10,
+            "seatsIncluded": 25,
             "seatCentsPerMonth": 500,
             "monthlyCredits": 3000,
-            "note": "Matches Ever Gauzy / Ever Teams cloud Small Business ($49 / $408 since the 2026-10-05 repricing; was $25 / $204) and their $5 per additional employee.",
+            "note": "Matches Ever Gauzy / Ever Teams cloud Small Business ($49 / $408 and 25 seats included since the 2026-10-05 repricing; was $25 / $204 and 10) and their $5 per additional employee.",
             "prices": [
                 { "interval": "monthly", "amountCents": 4900 },
                 { "interval": "annual", "amountCents": 40800 }
@@ -97,10 +97,10 @@
             "hosting": "cloud",
             "tier": "enterprise",
             "tierName": "Enterprise",
-            "seatsIncluded": 10,
+            "seatsIncluded": 50,
             "seatCentsPerMonth": 1000,
             "monthlyCredits": 25000,
-            "note": "Matches Ever Gauzy / Ever Teams Enterprise ($499 / $4,188 since the 2026-10-05 repricing; was $199 / $1,668) and their $10 per additional employee. These four Enterprise lookup keys are co-owned with ever-co/ever-website's catalog.json: change both together. Option 1 (one organization, unlimited seats) is the same SKU with seat metering switched off on the subscription; Option 2 (unlimited organizations, 10 seats each) is the metered default.",
+            "note": "Matches Ever Gauzy / Ever Teams Enterprise ($499 / $4,188 since the 2026-10-05 repricing; was $199 / $1,668) and their $10 per additional employee. These four Enterprise lookup keys are co-owned with ever-co/ever-website's catalog.json: change both together. Option 1 (one organization, unlimited seats) is the same SKU with seat metering switched off on the subscription; Option 2 (unlimited organizations, 50 seats included in total since the 2026-10-05 repricing; was 10) is the metered default.",
             "prices": [
                 { "interval": "monthly", "amountCents": 49900 },
                 { "interval": "annual", "amountCents": 418800 }
@@ -121,10 +121,10 @@
             "hosting": "selfhosted",
             "tier": "pro",
             "tierName": "Pro Edition",
-            "seatsIncluded": 10,
+            "seatsIncluded": 25,
             "seatCentsPerMonth": 500,
             "monthlyCredits": 3000,
-            "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Small Business Edition: $49/mo, $408/yr (displays $34/mo), $99 one-time lifetime.",
+            "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Small Business Edition: $49/mo, $408/yr (displays $34/mo), $99 one-time lifetime (all unchanged by the 2026-10-05 repricing; seats included 10 -> 25).",
             "prices": [
                 { "interval": "monthly", "amountCents": 4900 },
                 { "interval": "annual", "amountCents": 40800 },
@@ -135,7 +135,7 @@
             "hosting": "selfhosted",
             "tier": "enterprise",
             "tierName": "Enterprise Edition",
-            "seatsIncluded": 10,
+            "seatsIncluded": 50,
             "seatCentsPerMonth": 1000,
             "monthlyCredits": 25000,
             "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Enterprise Edition ($499 / $4,188 since the 2026-10-05 repricing). Lookup keys co-owned with ever-co/ever-website's catalog.json.",

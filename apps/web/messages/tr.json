@@ -3120,6 +3120,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "seatsIncluded": "{count} çalışan veya ajan dahil",
+                    "trial": "İlk aboneliğinizde {days} günlük ücretsiz deneme",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

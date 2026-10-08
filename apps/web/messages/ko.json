@@ -3120,6 +3120,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "seatsIncluded": "직원 또는 에이전트 {count}명 포함",
+                    "trial": "첫 구독 시 {days}일 무료 체험",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

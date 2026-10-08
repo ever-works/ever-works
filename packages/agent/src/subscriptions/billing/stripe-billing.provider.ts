@@ -196,6 +196,24 @@ export const STRIPE_CLIENT_FACTORY = Symbol('STRIPE_CLIENT_FACTORY');
  * (`amount_total`, `amount_received`, `amount_refunded`), never from a
  * request body. The client only ever names a PACK ID.
  */
+
+/** Stripe's ceiling for `subscription_data.trial_period_days`. */
+const STRIPE_MAX_TRIAL_PERIOD_DAYS = 730;
+
+/**
+ * The trial to put on a plan checkout, or `null` for "charge now".
+ *
+ * The caller (`PlanSubscriptionService`) owns the business rule — 90 days on CLOUD paid plans
+ * only. This only refuses values Stripe would reject, so a bad number degrades to the pre-trial
+ * behaviour (charge at checkout) instead of failing the purchase.
+ */
+function planTrialPeriodDays(plan: { trialPeriodDays?: number | null }): number | null {
+    const days = plan.trialPeriodDays;
+    if (typeof days !== 'number' || !Number.isInteger(days)) return null;
+    if (days < 1 || days > STRIPE_MAX_TRIAL_PERIOD_DAYS) return null;
+    return days;
+}
+
 @Injectable()
 export class StripeBillingProvider extends BillingProvider {
     private readonly logger = new Logger(StripeBillingProvider.name);
@@ -334,6 +352,7 @@ export class StripeBillingProvider extends BillingProvider {
         };
 
         const lineItems = await this.buildPlanLineItems(request);
+        const trialDays = isPerpetual ? null : planTrialPeriodDays(request.plan);
 
         const params: Stripe.Checkout.SessionCreateParams = {
             mode: isPerpetual ? 'payment' : 'subscription',
@@ -353,9 +372,20 @@ export class StripeBillingProvider extends BillingProvider {
             // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
             // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
             // refund or dispute on the charge can still be traced back to the sale.
+            //
+            // The free trial (owner rule 2026-10-05: 90 days, CLOUD paid plans only) is decided by
+            // the caller and applied here only in subscription mode — a perpetual licence has no
+            // subscription to trial. Checkout still collects the card (`payment_method_collection`
+            // stays at Stripe's subscription-mode default, `always`), the session settles as
+            // `no_payment_required`, and the webhook already treats `trialing` as a live plan.
             ...(isPerpetual
                 ? { payment_intent_data: { metadata } }
-                : { subscription_data: { metadata } }),
+                : {
+                      subscription_data: {
+                          metadata,
+                          ...(trialDays !== null ? { trial_period_days: trialDays } : {}),
+                      },
+                  }),
         };
         const session = request.idempotencyKey
             ? await stripe.checkout.sessions.create(params, {

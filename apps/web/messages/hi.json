@@ -3120,6 +3120,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "seatsIncluded": "{count} कर्मचारी या एजेंट शामिल",
+                    "trial": "आपकी पहली सदस्यता पर {days} दिन का निःशुल्क परीक्षण",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

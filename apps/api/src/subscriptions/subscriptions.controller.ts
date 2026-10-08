@@ -109,7 +109,7 @@ export class SubscriptionsController {
                 allowedCadences: plan.allowedCadences ?? [],
                 monthlyPrice: plan.monthlyPrice,
                 // The yearly total, NOT a per-month figure (cloud Pro stores
-                // '204'). Rendering it against a '/mo' suffix shows $204/mo.
+                // '408'). Rendering it against a '/mo' suffix shows $408/mo.
                 annualPrice: plan.annualPrice,
                 lifetimePrice: plan.lifetimePrice,
                 seatsIncluded: plan.seatsIncluded,
