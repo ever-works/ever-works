@@ -145,15 +145,45 @@ the root `package.json`. The bar is both of:
    input in our usage.
 
 Current entries. The first two are `image-size`, reached via
-`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the last two are
-`extract-zip`, reached via `packages/plugins/opencode`:
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the next two are
+`extract-zip`, reached via `packages/plugins/opencode`; the last two are
+`http-cache-semantics` and `braces` (see below):
 
-| GHSA                  | Issue                                                         | Why it's ignored                                                                                                  |
-| --------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)                    | Runs only while **building** the docs site, over images committed to this repo                                    |
-| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS)                | Same path — no request-time, attacker-supplied image ever reaches it                                              |
-| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal                   | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below |
-| `GHSA-7pqw-9j4j-h8q3` | `extract-zip` write through a planted same-name symlink entry | No fix exists (`patched_versions` is `<0.0.0`); same call site, same symlink vector — see below                   |
+| GHSA                  | Issue                                                          | Why it's ignored                                                                                                          |
+| --------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)                     | Runs only while **building** the docs site, over images committed to this repo                                            |
+| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS)                 | Same path — no request-time, attacker-supplied image ever reaches it                                                      |
+| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal                    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below         |
+| `GHSA-7pqw-9j4j-h8q3` | `extract-zip` write through a planted same-name symlink entry  | No fix exists (`patched_versions` is `<0.0.0`); same call site, same symlink vector — see below                           |
+| `GHSA-ch52-4w7c-c8xp` | `http-cache-semantics` `max-stale` cross-user cache disclosure | No fix exists (`<=4.2.0`, `patched_versions` `<0.0.0`); no shared cache serves one user's response to another — see below |
+| `GHSA-vfj7-8cjw-p6xm` | `braces` stack exhaustion on deeply nested patterns            | No fix exists (`<=3.0.3`, `patched_versions` `<0.0.0`); every pattern is ours or the docs build's — see below             |
+
+**On `GHSA-ch52-4w7c-c8xp`.** Added 2026-10-05. The advisory needs a cache
+that stores one client's response and serves it to a different client that
+sends `Cache-Control: max-stale`. Every consumer here is a private, outbound
+client inside one process: `apps/docs > @docusaurus/core > update-notifier >
+got` (the docs build's update check), `@ever-works/agent > check-links > got`
+(item-health link checks, which call `got` without a `cache` option, so
+`cacheable-request` never stores a response), and `@ever-works/agent > pacote >
+make-fetch-happen` (the plugin installer's npm-registry cache, holding only the
+server's own registry fetches). Nothing serves a cached response back to a
+user. **Re-check trigger:** drop this entry when `http-cache-semantics` ships a
+release above 4.2.0, or if anything starts passing a shared `cache` to `got` or
+serving responses out of `make-fetch-happen`'s cache.
+
+**On `GHSA-vfj7-8cjw-p6xm`.** Added 2026-10-05. The advisory needs an
+attacker-chosen glob pattern. `braces` 3.0.3 is reached through
+`micromatch@4` from the Docusaurus build (`chokidar`, `fast-glob` via
+`copy-webpack-plugin`/`globby`, `http-proxy-middleware`), which globs this
+repo's own docs tree, and through `@ever-works/agent-pipeline-plugin >
+bash-tool > fast-glob`, which bash-tool calls only for `uploadDirectory.include`
+— an option our workers never pass (`createBashTool({ sandbox, destination })`).
+The other runtime path that used to pull it in,
+`apps/api > @nestjs-modules/mailer@2 > mjml > mjml-cli > chokidar`, is gone:
+mailer 3 no longer installs the template engines as optional dependencies.
+**Re-check trigger:** drop this entry when `braces` ships a release above 3.0.3
+(or `micromatch` stops using it), or if any code starts passing a user- or
+LLM-supplied pattern to a glob.
 
 **On `GHSA-7pqw-9j4j-h8q3`.** Added 2026-09-13. The advisory needs the
 archive to contain a symlink entry followed by a regular file of the same

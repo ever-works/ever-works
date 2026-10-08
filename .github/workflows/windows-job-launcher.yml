@@ -49,10 +49,10 @@ jobs:
         with:
           version: 10.33.3
 
-      - name: Setup Node.js 24.x
+      - name: Setup Node.js 26.x
         uses: actions/setup-node@v7
         with:
-          node-version: 24.x
+          node-version: 26.x
           cache: 'pnpm'
 
       - name: Install JavaScript dependencies

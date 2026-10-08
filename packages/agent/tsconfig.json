@@ -15,6 +15,18 @@
         // would drift on is prices.
         "resolveJsonModule": true,
         "target": "ES2021",
+        // Type-check against the ES2022 library the Node 26 runtime provides (the same set
+        // `"target": "ES2022"` would default to). Up to @types/node 22 a compatibility shim
+        // declared `Array#at` & co. for ES2021-lib projects; @types/node 26 drops it. The
+        // emitted syntax (`target`) is unchanged.
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable",
+            "DOM.AsyncIterable",
+            "WebWorker.ImportScripts",
+            "ScriptHost"
+        ],
         "sourceMap": true,
         "outDir": "./dist",
         "baseUrl": "./",

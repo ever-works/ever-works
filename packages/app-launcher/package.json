@@ -37,7 +37,7 @@
 	},
 	"devDependencies": {
 		"@ever-works/contracts": "workspace:*",
-		"@types/node": "^22.19.11",
+		"@types/node": "^26.6.4",
 		"@vitest/coverage-v8": "^4.1.0",
 		"happy-dom": "^20.14.5",
 		"tsup": "^8.4.0",

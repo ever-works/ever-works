@@ -455,7 +455,7 @@ test.describe('Platform ingest — DTO validation matrix (exact class-validator 
             }),
         );
         expect(ok.status(), `under-cap body=${await ok.text().catch(() => '')}`).toBe(202);
-        const { id } = await ok.json();
+        const { id } = (await ok.json()) as { id: string };
         expect(id).toBeTruthy();
 
         const detail = await request.get(`${API_BASE}/api/activity-log/${id}`, {
@@ -548,7 +548,7 @@ test.describe('Platform ingest — PlatformSecretGuard isolation (@Public, beare
                 }),
             );
             expect(res.status(), `anon ingest body=${await res.text().catch(() => '')}`).toBe(202);
-            const { id } = await res.json();
+            const { id } = (await res.json()) as { id: string };
             expect(id).toBeTruthy();
 
             // Same anon context, missing bearer → 401 (the guard is the ONLY gate).
@@ -579,7 +579,7 @@ test.describe('Platform ingest — idempotency immutability + (workId,eventId) s
             }),
         );
         expect(first.status()).toBe(202);
-        const originalId = (await first.json()).id;
+        const originalId = ((await first.json()) as { id: string }).id;
         expect(originalId).toBeTruthy();
 
         // Replay the SAME (workId, eventId) but with a DIFFERENT actionType,
@@ -596,7 +596,10 @@ test.describe('Platform ingest — idempotency immutability + (workId,eventId) s
             }),
         );
         expect(replay.status()).toBe(202);
-        expect((await replay.json()).id, 'replay must resolve to the SAME row').toBe(originalId);
+        expect(
+            ((await replay.json()) as { id: string }).id,
+            'replay must resolve to the SAME row',
+        ).toBe(originalId);
 
         // Verify on the read surface that the stored row kept the ORIGINAL
         // content (the mutation never landed).
@@ -631,8 +634,8 @@ test.describe('Platform ingest — idempotency immutability + (workId,eventId) s
         const inB = await ingest(request, ingestPayload(workB, base));
         expect(inA.status()).toBe(202);
         expect(inB.status()).toBe(202);
-        const idA = (await inA.json()).id;
-        const idB = (await inB.json()).id;
+        const idA = ((await inA.json()) as { id: string }).id;
+        const idB = ((await inB.json()) as { id: string }).id;
         expect(idA).toBeTruthy();
         expect(idB).toBeTruthy();
         expect(idA, 'same eventId on different Works must yield distinct rows').not.toBe(idB);
@@ -667,7 +670,10 @@ test.describe('Platform ingest — idempotency immutability + (workId,eventId) s
         });
         const responses = await Promise.all(Array.from({ length: 8 }, () => ingest(request, body)));
         const results = await Promise.all(
-            responses.map(async (r) => ({ status: r.status(), id: (await r.json()).id as string })),
+            responses.map(async (r) => ({
+                status: r.status(),
+                id: ((await r.json()) as { id: string }).id,
+            })),
         );
         for (const r of results) {
             expect(r.status, `concurrent ingest should be 202, got ${r.status}`).toBe(202);
@@ -709,7 +715,7 @@ test.describe('Platform ingest — future-timestamp clamp + ordering forensics',
             }),
         );
         expect(res.status(), `clamp ingest body=${await res.text().catch(() => '')}`).toBe(202);
-        const { id } = await res.json();
+        const { id } = (await res.json()) as { id: string };
 
         const detail = await request.get(`${API_BASE}/api/activity-log/${id}`, {
             headers: authedHeaders(owner.access_token),
@@ -754,7 +760,7 @@ test.describe('Platform ingest — future-timestamp clamp + ordering forensics',
             }),
         );
         expect(oldRes.status()).toBe(202);
-        const oldId = (await oldRes.json()).id;
+        const oldId = ((await oldRes.json()) as { id: string }).id;
 
         const newRes = await ingest(
             request,
@@ -765,7 +771,7 @@ test.describe('Platform ingest — future-timestamp clamp + ordering forensics',
             }),
         );
         expect(newRes.status()).toBe(202);
-        const newId = (await newRes.json()).id;
+        const newId = ((await newRes.json()) as { id: string }).id;
 
         // The activity-log list is newest-first by createdAt; the newer event's
         // row must precede the older one even though both were just ingested.
@@ -898,7 +904,7 @@ test.describe('Platform ingest — ingested rows surface across every read surfa
             expect(res.status(), `ingest ${action} body=${await res.text().catch(() => '')}`).toBe(
                 202,
             );
-            ingested[action] = (await res.json()).id;
+            ingested[action] = ((await res.json()) as { id: string }).id;
         }
 
         // SURFACE 1 — activity-log LIST scoped to the Work, status=completed.

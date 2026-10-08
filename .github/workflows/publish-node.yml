@@ -44,10 +44,10 @@ jobs:
         with:
           version: 10.33.3
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js 26.x
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 26.x
           cache: 'pnpm'
 
       - name: Configure Registry
@@ -123,7 +123,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 26.x
           # setup-node writes the registry + NODE_AUTH_TOKEN wiring into its
           # own npmrc (NPM_CONFIG_USERCONFIG); nothing else needs configuring.
           registry-url: 'https://registry.npmjs.org'
