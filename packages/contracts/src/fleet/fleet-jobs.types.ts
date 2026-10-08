@@ -920,6 +920,18 @@ export interface FleetAgentTaskModelResult {
 	totalTokens?: number | null;
 	/** Last bytes of combined stdout/stderr, for the run report. */
 	outputTail?: string;
+	/**
+	 * Node lifecycle (self-build slice AR) — OPTIONAL command-line flags the
+	 * run asked for that the node DROPPED because the pinned CLI binary does
+	 * not advertise them (`--effort`, `--max-budget-usd`). A flag this
+	 * binary does not know used to fail every run on every PC the moment an
+	 * upstream release removed or renamed it — after the plan, the lease and
+	 * the provisioning were already spent. Recorded here so the drop is
+	 * visible on the run rather than silent: a dropped `--max-budget-usd`
+	 * means the CLI enforced no per-run budget (the platform's daily
+	 * ceilings still apply). Absent when nothing was dropped.
+	 */
+	droppedFlags?: string[];
 }
 
 /**
@@ -1521,6 +1533,22 @@ export interface FleetJobLeaseRequest {
 /** Response body for `POST /api/fleet/jobs/lease`. */
 export interface FleetJobLeaseResponse {
 	jobs: FleetJobView[];
+	/**
+	 * Node lifecycle (self-build slice AR) — present, and `true`, ONLY when
+	 * the platform refused this poll because the node's daemon is below the
+	 * minimum version (`minNodeVersion`). `jobs` is then empty.
+	 *
+	 * Deliberately a 200 with an empty list, exactly like the global stop
+	 * flag, and never a 401/403/426: `job-client.ts` reads a lease 401 as a
+	 * revoked credential and `heartbeat.ts` makes that sticky, so a refusal
+	 * shaped like an auth failure would turn a reversible floor into a
+	 * fleet-wide re-enrollment. A daemon built before this field reads the
+	 * same answer as "nothing to do" — it is refused all the same, it just
+	 * cannot say why (the Fleet drawer can).
+	 */
+	upgradeRequired?: true;
+	/** The floor the refusal was judged against. Present with `upgradeRequired`. */
+	minNodeVersion?: string;
 }
 
 /** Request body for `POST /api/fleet/jobs/:id/heartbeat`. */

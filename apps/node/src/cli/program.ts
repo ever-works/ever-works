@@ -54,6 +54,10 @@ import {
 	type NodeWorkspaceGcPolicy
 } from '../core/types';
 import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../core/api-base';
+import { FLEET_NODE_UPGRADE_COMMAND, isFleetNodeVersionBelowFloor } from '@ever-works/contracts';
+import { isModelCliCompatible, ModelCliCompatibilityProbe, type ModelCliCompatibility } from '../core/model-cli-compat';
+import type { ModelCliPaths } from '../core/executors/model-cli';
+import { readNodeLifecycleRecord, writeNodeLifecycleRecord, type NodeLifecycleRecord } from '../core/node-lifecycle';
 
 /**
  * `ever-works-node` CLI.
@@ -66,7 +70,8 @@ import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../
  *   unenroll     retire this node and erase the local credential
  *   status       show the local enrollment, credentials redacted
  *   capabilities print the tags this machine would report
- *   doctor       disk headroom vs the floor, and what the workspace reaper would do
+ *   doctor       daemon version vs the platform floor, model-CLI compatibility,
+ *                disk headroom vs the floor, and what the workspace reaper would do
  *   gc           run the workspace reaper (age / LRU, fail-closed; --dry-run to look)
  *
  * Built as `buildProgram(deps)` over injected IO so argument parsing and every
@@ -515,9 +520,19 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 				}
 			),
 		workerSafetyGate: createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform }),
+		// Node lifecycle (slice AR): what the platform last said about this
+		// daemon's version, recorded beside the config for `status`/`doctor`.
+		persistLifecycle: (record) => writeNodeLifecycleRecord(deps.fs, deps.configPath, record),
 		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {}),
 		attendEnabled
 	});
+	if (workerEnabled) {
+		// Node lifecycle (slice AR): say at startup what each pinned CLI is
+		// and whether this node can drive it — the first place an operator
+		// looks after a CLI auto-updated overnight. Not awaited: a hung
+		// `--help` must never delay the first heartbeat.
+		void logModelCliCompatibility(deps, runtime.cliCompat, modelCli.paths);
+	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
 	loop.onChange((state) => {
@@ -855,6 +870,9 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 	// plaintext visible.
 	deps.out(`credential   ${view.hasSecret ? 'stored' : 'MISSING'} (${view.secretStorage})`);
 	deps.out(`work         ${view.paused ? 'PAUSED (draining — no new work)' : 'accepting new work'}`);
+	// Node lifecycle (slice AR): the daemon version floor, as the running
+	// service last heard it from the platform.
+	deps.out(`daemon       ${describeDaemonLifecycle(deps, await readNodeLifecycleRecord(deps.fs, deps.configPath))}`);
 	deps.out(
 		`offering     ${view.capabilitySelection ? view.capabilitySelection.join(', ') || '(identity only)' : '(everything detected)'}`
 	);
@@ -1106,15 +1124,145 @@ function housekeepingJson(report: HousekeepingReport): Record<string, unknown> {
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Node lifecycle — daemon version floor + model-CLI compatibility (slice AR)
+// ---------------------------------------------------------------------------
+
+interface LifecycleReport {
+	record: NodeLifecycleRecord | null;
+	modelCli: ModelCliCompatibility[];
+}
+
+async function gatherLifecycle(deps: CliDeps): Promise<LifecycleReport> {
+	const record = await readNodeLifecycleRecord(deps.fs, deps.configPath);
+	const probe = new ModelCliCompatibilityProbe({
+		runner: deps.io.runner,
+		platform: deps.platform,
+		...(deps.io.statFile ? { statFile: deps.io.statFile } : {})
+	});
+	let modelCli: ModelCliCompatibility[] = [];
+	try {
+		modelCli = await probe.probeAll(deps.io.environment.modelCli ?? {});
+	} catch {
+		modelCli = [];
+	}
+	return { record, modelCli };
+}
+
+/**
+ * One line on this daemon vs the platform's floor. `deps.io.version` is the
+ * binary RUNNING THIS COMMAND; the record is what the SERVICE last heard.
+ * They differ right after `npm install -g` and before the service restart —
+ * exactly when an operator runs `doctor` to check the upgrade took.
+ */
+function describeDaemonLifecycle(deps: CliDeps, record: NodeLifecycleRecord | null): string {
+	const version = deps.io.version;
+	if (!record) {
+		return `${version} (the platform's minimum version has not been reported yet — it arrives on the running service's first heartbeat)`;
+	}
+	const floor = record.minNodeVersion;
+	const asOf = `as of ${record.recordedAt}`;
+	const restartHint =
+		record.daemonVersion && record.daemonVersion !== version
+			? `; the running service last reported ${record.daemonVersion} — restart it to run ${version}`
+			: '';
+	if (floor && isFleetNodeVersionBelowFloor(version, floor)) {
+		return `${version} — UPGRADE REQUIRED: below the platform's minimum ${floor} (${asOf}); this node is offered no new work. Run \`${FLEET_NODE_UPGRADE_COMMAND}\`, then restart the node service${restartHint}`;
+	}
+	if (record.upgradeRequired && record.daemonVersion === version) {
+		return `${version} — UPGRADE REQUIRED: the platform refused this daemon (${floor ? `minimum ${floor}, ` : ''}${asOf}). Run \`${FLEET_NODE_UPGRADE_COMMAND}\`, then restart the node service`;
+	}
+	return `${version} (platform minimum ${floor ?? 'not named'}, ${asOf})${restartHint}`;
+}
+
+/** One line per pinned model CLI: what it is and whether this node can drive it. */
+function describeModelCli(compat: ModelCliCompatibility): string {
+	const head = `${compat.provider} ${compat.version ?? 'version unknown'} (${compat.executable})`;
+	if (compat.supportedFlags === null) {
+		return `${head} — could not verify its flags: ${compat.note ?? 'no answer'}`;
+	}
+	if (!isModelCliCompatible(compat)) {
+		return `${head} — INCOMPATIBLE: does not advertise ${compat.missingRequiredFlags.join(', ')}, which every ${compat.provider} run passes; runs on this machine will fail until the CLI is upgraded or re-pinned`;
+	}
+	const notes: string[] = [];
+	if (compat.unsupportedOptionalFlags.length > 0) {
+		notes.push(`runs go without ${compat.unsupportedOptionalFlags.join(', ')} (not advertised by this build)`);
+	}
+	if (compat.missingConditionalFlags.length > 0) {
+		notes.push(`runs that need ${compat.missingConditionalFlags.join(', ')} will fail here`);
+	}
+	return `${head} — compatible${notes.length > 0 ? `; ${notes.join('; ')}` : ''}`;
+}
+
+function printLifecycle(deps: CliDeps, report: LifecycleReport): void {
+	deps.out(`daemon       ${describeDaemonLifecycle(deps, report.record)}`);
+	if (report.modelCli.length === 0) {
+		deps.out(
+			'model cli    none pinned in this shell (no claude / codex resolved — set EVER_WORKS_NODE_CLAUDE_PATH / EVER_WORKS_NODE_CODEX_PATH; a service started with --claude-path / --codex-path pins its own)'
+		);
+		return;
+	}
+	for (const compat of report.modelCli) {
+		deps.out(`model cli    ${describeModelCli(compat)}`);
+	}
+}
+
+function lifecycleJson(deps: CliDeps, report: LifecycleReport): Record<string, unknown> {
+	const floor = report.record?.minNodeVersion ?? null;
+	return {
+		daemonVersion: deps.io.version,
+		minNodeVersion: floor,
+		minNodeVersionRecordedAt: report.record?.recordedAt ?? null,
+		serviceDaemonVersion: report.record?.daemonVersion || null,
+		upgradeRequired:
+			(floor !== null && isFleetNodeVersionBelowFloor(deps.io.version, floor)) ||
+			(report.record?.upgradeRequired === true && report.record.daemonVersion === deps.io.version),
+		upgradeCommand: FLEET_NODE_UPGRADE_COMMAND,
+		modelCli: report.modelCli.map((compat) => ({
+			provider: compat.provider,
+			executable: compat.executable,
+			version: compat.version,
+			verified: compat.supportedFlags !== null,
+			compatible: compat.supportedFlags === null ? null : isModelCliCompatible(compat),
+			missingRequiredFlags: compat.missingRequiredFlags,
+			missingConditionalFlags: compat.missingConditionalFlags,
+			unsupportedOptionalFlags: compat.unsupportedOptionalFlags,
+			note: compat.note
+		}))
+	};
+}
+
+/** Startup log for `start --work`: never throws, never blocks the heartbeat. */
+async function logModelCliCompatibility(
+	deps: CliDeps,
+	probe: ModelCliCompatibilityProbe,
+	paths: ModelCliPaths
+): Promise<void> {
+	try {
+		for (const compat of await probe.probeAll(paths)) {
+			const line = `Model CLI — ${describeModelCli(compat)}`;
+			if (compat.supportedFlags !== null && !isModelCliCompatible(compat)) deps.io.logger.error(line);
+			else if (compat.supportedFlags === null || compat.unsupportedOptionalFlags.length > 0) {
+				deps.io.logger.warn(line);
+			} else deps.io.logger.info(line);
+		}
+	} catch {
+		// The probe never throws by contract; this is the belt.
+	}
+}
+
 /** `doctor`: read-only. Exit 0 even when below the floor — the finding IS the output. */
 export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): Promise<void> {
 	const report = await gatherHousekeeping(deps, options);
+	// Node lifecycle (slice AR): daemon version vs floor, CLI compatibility.
+	const lifecycle = await gatherLifecycle(deps);
 	const now = (deps.now ?? (() => Date.now()))();
 	if (options.json === true) {
-		deps.out(JSON.stringify(housekeepingJson(report), null, 2));
+		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle) }, null, 2));
 		return;
 	}
 	printHousekeepingHeader(deps, report, now);
+	printLifecycle(deps, lifecycle);
 	printPlan(deps, report.plan, now);
 }
 

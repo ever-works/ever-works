@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+    ArrayMaxSize,
     IsArray,
     IsBoolean,
     IsIn,
@@ -20,6 +21,7 @@ import {
     FLEET_EXECUTION_MODES,
     FLEET_EXECUTION_SCOPE_TYPES,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_CLI_VERSIONS,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
     FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_MODEL_IDENTITY_LENGTH,
@@ -250,6 +252,31 @@ export class FleetNodeSelfDescriptionDto {
     @IsString()
     @MaxLength(FLEET_MAX_CLI_VERSION_LENGTH)
     cliVersion?: string;
+
+    /**
+     * Node lifecycle (self-build slice AR) — the PINNED model-CLI versions,
+     * one `"<provider> <version>"` entry per provider.
+     *
+     * Bounded by count and per-entry length, and NEVER by an allow-list of
+     * providers: under `whitelist + forbidNonWhitelisted` a value this build
+     * refuses fails the whole beat, and a node that cannot beat is swept
+     * offline. A newer node pinning a provider this API has never heard of
+     * must still stay alive. `FleetService` sanitizes and re-caps every
+     * entry before it is stored.
+     */
+    @ApiProperty({
+        required: false,
+        type: [String],
+        maxItems: FLEET_MAX_CLI_VERSIONS,
+        description:
+            'Version of every model CLI the node has pinned, one "<provider> <version>" entry each (e.g. "claude-code 2.1.3"). An empty list means nothing is pinned any more.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(FLEET_MAX_CLI_VERSIONS)
+    @IsString({ each: true })
+    @MaxLength(FLEET_MAX_CLI_VERSION_LENGTH, { each: true })
+    cliVersions?: string[];
 
     /** Free bytes on the node's workspace volume. Same optional contract. */
     @ApiProperty({

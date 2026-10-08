@@ -70,6 +70,8 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELDS = [
+	// Node lifecycle (self-build slice AR).
+	'cliVersions',
 	'workerState',
 	'workerStateReason',
 	'minFreeDiskBytes',

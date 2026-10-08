@@ -509,6 +509,7 @@
 			"version",
 			"capabilities",
 			"cliVersion",
+			"cliVersions",
 			"diskFreeBytes",
 			"modelIdentity",
 			"workerState",
@@ -521,6 +522,7 @@
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
+			"cliVersions",
 			"workerState",
 			"workerStateReason",
 			"minFreeDiskBytes",
@@ -535,6 +537,7 @@
 				"version",
 				"capabilities",
 				"cliVersion",
+				"cliVersions",
 				"diskFreeBytes",
 				"modelIdentity",
 				"workerState",
@@ -550,6 +553,7 @@
 				"version",
 				"capabilities",
 				"cliVersion",
+				"cliVersions",
 				"diskFreeBytes",
 				"modelIdentity",
 				"workerState",
@@ -629,5 +633,58 @@
 		"gatedVerbs": ["jobs-lease"],
 		"ungatedVerbs": ["jobs-heartbeat", "jobs-complete"],
 		"ungatedReason": "A stopped fleet must still settle the work it already holds, or a cancel-in-flight could never resolve."
+	},
+	"versionFloor": {
+		"note": "Self-build slice AR (node lifecycle). The platform publishes a minimum DAEMON version (FLEET_MIN_NODE_VERSION, default below). Every accepted heartbeat carries it plus a per-node verdict; the lease refuses a node below it with 200 {jobs: [], upgradeRequired: true, minNodeVersion} — the kill-switch shape plus two keys — and NEVER a 401/403/426: job-client.ts maps a lease 401 to `unauthorized`, which heartbeat.ts makes sticky, so a refusal shaped like an auth failure would turn a reversible floor into a fleet-wide re-enrollment. A daemon built before the field reads the refusal as an empty poll and is held all the same. The floor fails OPEN on a version it cannot parse. BREAK DIRECTION if these fields vanish: NODE TOO OLD for nothing (old nodes never read them), but a CURRENT node stops learning it is below the floor — it keeps idling with no explanation.",
+		"defaultMinNodeVersion": "0.1.0",
+		"admittedByDefault": ["0.1.0", "0.2.0"],
+		"heartbeatResponseFields": [
+			{
+				"path": "minNodeVersion",
+				"type": "string",
+				"reader": "fleet-client.ts readHeartbeatLifecycle() → node-lifecycle.ts NodeLifecycleTracker"
+			},
+			{
+				"path": "upgradeRequired",
+				"type": "boolean",
+				"reader": "fleet-client.ts readHeartbeatLifecycle() → NodeLifecycleTracker holds (or lifts) the worker lanes"
+			}
+		],
+		"heartbeatWhenBelowFloor": {
+			"status": 200,
+			"minNodeVersion": "0.3.0",
+			"reportedVersion": "0.2.0",
+			"upgradeRequired": true
+		},
+		"leaseWhenBelowFloor": {
+			"status": 200,
+			"minNodeVersion": "0.3.0",
+			"reportedVersion": "0.2.0",
+			"body": {
+				"jobs": [],
+				"upgradeRequired": true,
+				"minNodeVersion": "0.3.0"
+			}
+		},
+		"leaseResponseFields": [
+			{
+				"path": "jobs",
+				"type": "array",
+				"reader": "job-client.ts Array.isArray(payload.jobs) — still a hard `malformed` throw otherwise"
+			},
+			{
+				"path": "upgradeRequired",
+				"type": "true",
+				"reader": "job-client.ts leaseOutcome() → worker-loop.ts setUpgradeHold()"
+			},
+			{
+				"path": "minNodeVersion",
+				"type": "string",
+				"reader": "job-client.ts leaseOutcome()"
+			}
+		],
+		"gatedVerbs": ["jobs-lease"],
+		"ungatedVerbs": ["heartbeat", "jobs-heartbeat", "jobs-complete"],
+		"ungatedReason": "A below-floor machine must stay observable and must still settle the work it already holds; only NEW work is refused."
 	}
 }

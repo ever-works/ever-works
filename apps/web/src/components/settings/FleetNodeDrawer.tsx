@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, KeyRound, Pin, PinOff, Plus, X } from 'lucide-react';
-import { QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
+import {
+    FLEET_NODE_UPGRADE_COMMAND,
+    QUEUED_REASON_WAITING_FOR_RUNNER,
+} from '@ever-works/contracts';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -365,6 +368,63 @@ export function FleetNodeDrawer({
                                         {t('housekeeping.neverReclaimed')}
                                     </span>
                                 ) : null}
+                            </dd>
+                        </div>
+                        {/* Node lifecycle (self-build slice AR): the daemon
+                            version against the platform's floor, and the
+                            model CLIs this machine has PINNED. A below-floor
+                            node looks perfectly online and quietly leases
+                            nothing — this is where it says why. */}
+                        <div className="col-span-2 sm:col-span-4">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('lifecycle.title')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-lifecycle"
+                            >
+                                {node.upgradeRequired ? (
+                                    <>
+                                        <span
+                                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-warning/10 text-warning"
+                                            data-testid="fleet-node-drawer-upgrade-required"
+                                        >
+                                            {t('lifecycle.upgradeRequired')}
+                                        </span>
+                                        <span
+                                            className="block text-xs text-text-muted dark:text-text-muted-dark break-words"
+                                            data-testid="fleet-node-drawer-upgrade-hint"
+                                        >
+                                            {t('lifecycle.upgradeRequiredHint', {
+                                                version: node.version ?? '-',
+                                                minimum: node.minNodeVersion ?? '-',
+                                                command: FLEET_NODE_UPGRADE_COMMAND,
+                                            })}
+                                        </span>
+                                    </>
+                                ) : node.minNodeVersion ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-version-floor"
+                                    >
+                                        {t('lifecycle.minimum', {
+                                            version: node.version ?? '-',
+                                            minimum: node.minNodeVersion,
+                                        })}
+                                    </span>
+                                ) : null}
+                                <span
+                                    className="block text-xs text-text-muted dark:text-text-muted-dark break-all"
+                                    data-testid="fleet-node-drawer-cli-versions"
+                                >
+                                    {!Array.isArray(node.cliVersions)
+                                        ? t('lifecycle.cliVersionsNotReported')
+                                        : node.cliVersions.length === 0
+                                          ? t('lifecycle.cliVersionsNone')
+                                          : t('lifecycle.cliVersions', {
+                                                list: node.cliVersions.join(', '),
+                                            })}
+                                </span>
                             </dd>
                         </div>
                         {/* Fleet cost accounting (EW-777): the seat this

@@ -120,7 +120,16 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS',
 	// Node housekeeping visibility (EW-803): the cap on a reported
 	// workspace count. Covered in `fleet-node.spec.ts`.
-	'FLEET_MAX_WORKSPACE_COUNT'
+	'FLEET_MAX_WORKSPACE_COUNT',
+	// Node lifecycle (self-build slice AR): the daemon version floor, its
+	// comparator and normaliser, the upgrade command every surface prints,
+	// and the cap on per-provider CLI versions. Covered in `fleet-node.spec.ts`.
+	'FLEET_DEFAULT_MIN_NODE_VERSION',
+	'FLEET_NODE_UPGRADE_COMMAND',
+	'FLEET_MAX_CLI_VERSIONS',
+	'compareFleetNodeVersions',
+	'isFleetNodeVersionBelowFloor',
+	'normalizeFleetNodeVersionFloor'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -328,6 +337,9 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetAgentTaskQuestion',
 	'normalizeFleetAgentTaskContainment',
 	'normalizeFleetNodeWorkerState',
+	'compareFleetNodeVersions',
+	'isFleetNodeVersionBelowFloor',
+	'normalizeFleetNodeVersionFloor',
 	'isFleetRunTokenRouteAllowed',
 	'fleetRunTokenExpiryFromLease',
 	'describeFleetPushCredentialRefusal',
@@ -353,7 +365,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 184 runtime symbols', () => {
+	it('exposes exactly these 190 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -389,8 +401,12 @@ describe('fleet barrel', () => {
 		// node's claim about how contained its own run was. All in
 		// `fleet-jobs.types.ts`, an existing module, so the witness table
 		// below needs no new row.
+		// → 190 with the node lifecycle (self-build slice AR): the daemon
+		// version floor (default, comparator, below-floor predicate, env
+		// normaliser), the upgrade command and the `cliVersions` cap. All in
+		// `fleet-node.types.ts`, an existing module.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(184);
+		expect(Object.keys(fleet)).toHaveLength(190);
 	});
 
 	it.each([

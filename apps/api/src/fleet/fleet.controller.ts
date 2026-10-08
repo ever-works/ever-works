@@ -548,6 +548,8 @@ export class FleetController {
             version: body.version,
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
+            // Node lifecycle (slice AR): the pinned per-provider CLI versions.
+            cliVersions: body.cliVersions,
             diskFreeBytes: body.diskFreeBytes,
             modelIdentity: body.modelIdentity,
             workerState: body.workerState,
@@ -585,6 +587,8 @@ export class FleetController {
             version: body.version,
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
+            // Node lifecycle (slice AR): the pinned per-provider CLI versions.
+            cliVersions: body.cliVersions,
             diskFreeBytes: body.diskFreeBytes,
             modelIdentity: body.modelIdentity,
             workerState: body.workerState,
@@ -630,6 +634,13 @@ export class FleetController {
             ok: true,
             node: result.node,
             rotationRequested: result.rotationRequested,
+            // Node lifecycle (self-build slice AR) — the daemon version
+            // floor, on EVERY accepted beat. The beat itself is never
+            // refused for being below it (liveness and the settling of
+            // in-flight work are not gated); the lease is, independently,
+            // so a daemon too old to read these two fields is still held.
+            minNodeVersion: result.minNodeVersion,
+            upgradeRequired: result.upgradeRequired,
         };
         if (pending.length > 0) {
             response.pendingComputerSessions = pending;

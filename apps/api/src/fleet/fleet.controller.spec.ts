@@ -411,6 +411,7 @@ describe('FleetController', () => {
                 version: undefined,
                 capabilities: undefined,
                 cliVersion: undefined,
+                cliVersions: undefined,
                 diskFreeBytes: undefined,
                 modelIdentity: undefined,
                 workerState: undefined,
@@ -436,6 +437,7 @@ describe('FleetController', () => {
                     'version',
                     'capabilities',
                     'cliVersion',
+                    'cliVersions',
                     'diskFreeBytes',
                     'modelIdentity',
                     'workerState',
@@ -533,6 +535,55 @@ describe('FleetController', () => {
                     workerStateReason: 'cpu ceiling',
                 }),
             );
+        });
+
+        it('forwards the pinned CLI versions on BOTH enroll and heartbeat (slice AR)', async () => {
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                cliVersions: ['claude-code 2.1.3'],
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({ cliVersions: ['claude-code 2.1.3'] }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                // An EMPTY list is a report ("nothing pinned any more") and
+                // must reach the service as one, not be dropped as falsy.
+                cliVersions: [],
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({ cliVersions: [] }),
+            );
+        });
+
+        it('carries the daemon version floor on an accepted beat, and never refuses the beat for it (slice AR)', async () => {
+            service.heartbeat.mockResolvedValue({
+                node: nodeView,
+                rotationRequested: false,
+                minNodeVersion: '0.3.0',
+                upgradeRequired: true,
+            });
+            const result = await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+            } as FleetHeartbeatDto);
+            expect(result).toMatchObject({
+                ok: true,
+                node: nodeView,
+                minNodeVersion: '0.3.0',
+                upgradeRequired: true,
+            });
         });
 
         it('heartbeat maps a rejected credential to 401 and success to ok', async () => {

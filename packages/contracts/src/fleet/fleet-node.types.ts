@@ -188,6 +188,28 @@ export interface FleetNodeSelfDescription {
 	 */
 	cliVersion?: string;
 	/**
+	 * Node lifecycle (self-build slice AR) — the version of every model CLI
+	 * this node has PINNED for an `agent-task`, one entry per provider, as
+	 * `"<provider> <version>"` (`claude-code 2.1.3`, `codex 0.48.0`), or
+	 * `"<provider> unknown"` when the pinned binary did not answer
+	 * `--version`.
+	 *
+	 * Distinct from {@link FleetNodeSelfDescription.cliVersion}, which a
+	 * daemon built before this field derived by scanning PATH for the first
+	 * of `claude` / `codex` / `gemini` / `opencode` — not necessarily the
+	 * binary a run actually spawns. These entries come from the SAME paths
+	 * the model step executes, so "which Claude Code does this PC run" has
+	 * one answer.
+	 *
+	 * Bounded by type and length only — never by an allow-list of
+	 * providers: under `whitelist + forbidNonWhitelisted` a rejected field
+	 * fails the whole beat, and a newer node may pin a provider this API has
+	 * never heard of. At most {@link FLEET_MAX_CLI_VERSIONS} entries of at
+	 * most {@link FLEET_MAX_CLI_VERSION_LENGTH} characters each. Additive
+	 * like `cliVersion`: absent leaves the stored list alone.
+	 */
+	cliVersions?: string[];
+	/**
 	 * Free bytes on the volume the node's workspace lives on. A number,
 	 * not a formatted string, so the UI owns the units.
 	 *
@@ -317,6 +339,24 @@ export interface FleetNodeView {
 	 * the daemon's own version.
 	 */
 	cliVersion?: string | null;
+	/**
+	 * Node lifecycle (slice AR) — the pinned model-CLI versions the node
+	 * last reported, one `"<provider> <version>"` entry each, or null when
+	 * it never reported any (a daemon older than the field).
+	 */
+	cliVersions?: string[] | null;
+	/**
+	 * Node lifecycle (slice AR) — true when the daemon version this node
+	 * last reported is below the platform's minimum
+	 * ({@link FleetNodeView.minNodeVersion}). Such a node keeps
+	 * heartbeating and keeps settling the work it already holds, but the
+	 * lease refuses it new work until it is upgraded. False when the
+	 * version is at or above the floor, or could not be parsed (the floor
+	 * fails OPEN: a dev build must never be bricked by a version string).
+	 */
+	upgradeRequired?: boolean;
+	/** The minimum daemon version the platform admits, or null for a cluster row. */
+	minNodeVersion?: string | null;
 	/** Free bytes last reported for the node's workspace volume, or null. */
 	diskFreeBytes?: number | null;
 	/**
@@ -474,6 +514,141 @@ export interface FleetHeartbeatResponse {
 	 * with nothing pending omits it.
 	 */
 	pendingComputerSessions?: string[];
+	/**
+	 * Node lifecycle (self-build slice AR) — the minimum daemon version
+	 * this platform admits (`FLEET_MIN_NODE_VERSION`, default
+	 * {@link FLEET_DEFAULT_MIN_NODE_VERSION}). Carried on every accepted
+	 * beat so a node can show "upgrade required" in its own status and
+	 * `doctor` without a separate endpoint.
+	 *
+	 * Optional and additive: a daemon built before this field ignores it,
+	 * and is refused new work by the lease all the same (see
+	 * {@link FleetHeartbeatResponse.upgradeRequired}).
+	 */
+	minNodeVersion?: string;
+	/**
+	 * True when THIS node's reported `version` is below
+	 * {@link FleetHeartbeatResponse.minNodeVersion}. The beat itself is
+	 * still accepted — liveness, telemetry and the settling of in-flight
+	 * work are never gated on the floor — but the lease answers
+	 * `200 { jobs: [], upgradeRequired: true }` until the machine runs a
+	 * new enough daemon. NEVER a 401: that is read as a revoked credential
+	 * and turns a reversible floor into a fleet-wide re-enrollment.
+	 */
+	upgradeRequired?: boolean;
+}
+
+// ─── Node lifecycle: the daemon version floor (self-build slice AR) ─────────
+
+/**
+ * Default minimum daemon version (`FLEET_MIN_NODE_VERSION` overrides it).
+ *
+ * `0.1.0` is the first `ever-works-node` ever published, so the default
+ * floor admits EVERY daemon that exists — shipping the mechanism must not
+ * brick a single machine. Raising it is an operator decision, made after
+ * the fleet has been upgraded, and the drawer shows which PCs it would
+ * refuse.
+ */
+export const FLEET_DEFAULT_MIN_NODE_VERSION = '0.1.0';
+
+/**
+ * The upgrade a node prints when it is below the floor. One string, so the
+ * daemon's log, `doctor` and the Fleet drawer all tell the operator the
+ * same thing. Followed by a service restart on that machine.
+ */
+export const FLEET_NODE_UPGRADE_COMMAND = 'npm install -g ever-works-node@latest';
+
+/** Most `cliVersions` entries one beat may carry — one per pinned provider, with room to grow. */
+export const FLEET_MAX_CLI_VERSIONS = 8;
+
+/** `1.2.3`, `v1.2`, `1.2.3-beta.1`, `1.2.3+build.5` — leading `v` and build metadata tolerated. */
+const FLEET_NODE_VERSION_PATTERN =
+	/^v?(\d{1,9})\.(\d{1,9})(?:\.(\d{1,9}))?(?:-([0-9A-Za-z.-]{1,64}))?(?:\+[0-9A-Za-z.-]{1,64})?$/;
+
+interface ParsedFleetNodeVersion {
+	core: [number, number, number];
+	prerelease: string[];
+}
+
+function parseFleetNodeVersion(value: unknown): ParsedFleetNodeVersion | null {
+	if (typeof value !== 'string') return null;
+	const match = FLEET_NODE_VERSION_PATTERN.exec(value.trim());
+	if (!match) return null;
+	return {
+		core: [Number(match[1]), Number(match[2]), Number(match[3] ?? '0')],
+		prerelease: match[4] ? match[4].split('.') : []
+	};
+}
+
+/** SemVer §11 precedence for two prerelease identifier lists (both non-empty). */
+function comparePrerelease(a: readonly string[], b: readonly string[]): number {
+	const length = Math.max(a.length, b.length);
+	for (let index = 0; index < length; index += 1) {
+		const left = a[index];
+		const right = b[index];
+		if (left === undefined) return -1;
+		if (right === undefined) return 1;
+		const leftNumeric = /^\d+$/.test(left);
+		const rightNumeric = /^\d+$/.test(right);
+		if (leftNumeric && rightNumeric) {
+			const diff = Number(left) - Number(right);
+			if (diff !== 0) return diff < 0 ? -1 : 1;
+			continue;
+		}
+		if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+		if (left !== right) return left < right ? -1 : 1;
+	}
+	return 0;
+}
+
+/**
+ * Compare two daemon versions with SemVer precedence: `-1`, `0` or `1`, or
+ * `null` when either side does not parse as a version.
+ *
+ * `null` is a real answer, not an error: the caller decides what an
+ * unparseable version means, and for the floor the answer is "admit" (see
+ * {@link isFleetNodeVersionBelowFloor}).
+ */
+export function compareFleetNodeVersions(a: unknown, b: unknown): -1 | 0 | 1 | null {
+	const left = parseFleetNodeVersion(a);
+	const right = parseFleetNodeVersion(b);
+	if (!left || !right) return null;
+	for (let index = 0; index < 3; index += 1) {
+		if (left.core[index] !== right.core[index]) return left.core[index] < right.core[index] ? -1 : 1;
+	}
+	// A prerelease sorts BELOW its release (`1.2.0-rc.1` < `1.2.0`).
+	if (left.prerelease.length === 0 && right.prerelease.length === 0) return 0;
+	if (left.prerelease.length === 0) return 1;
+	if (right.prerelease.length === 0) return -1;
+	const order = comparePrerelease(left.prerelease, right.prerelease);
+	return order === 0 ? 0 : order < 0 ? -1 : 1;
+}
+
+/**
+ * Is this daemon below the floor? The ONE predicate the lease, the
+ * heartbeat, the drawer and the node itself all ask, so the four can
+ * never disagree about which machine is refused.
+ *
+ * Fails OPEN: an absent or unparseable version (an embedder's dev build,
+ * a daemon that never reported one), or an unparseable floor, is NOT below
+ * it. The floor is a compatibility gate, not a security boundary — a
+ * machine can report any version it likes — so refusing what it cannot
+ * read would only ever brick honest machines.
+ */
+export function isFleetNodeVersionBelowFloor(version: unknown, floor: unknown): boolean {
+	return compareFleetNodeVersions(version, floor) === -1;
+}
+
+/**
+ * Normalize an operator-supplied floor (`FLEET_MIN_NODE_VERSION`), or
+ * null when it is not a version at all — the caller then falls back to
+ * {@link FLEET_DEFAULT_MIN_NODE_VERSION} rather than enforcing nonsense.
+ */
+export function normalizeFleetNodeVersionFloor(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	if (!trimmed || trimmed.length > FLEET_MAX_VERSION_LENGTH) return null;
+	return parseFleetNodeVersion(trimmed) ? trimmed.replace(/^v/, '') : null;
 }
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────

@@ -650,3 +650,47 @@ describe('FleetNodeDrawer — reconciled job outcome', () => {
         expect(screen.queryByTestId('fleet-node-job-summary-job-quiet')).toBeNull();
     });
 });
+
+describe('FleetNodeDrawer — node lifecycle (self-build slice AR)', () => {
+    it('says UPGRADE REQUIRED with the exact command when the daemon is below the floor', () => {
+        const old = node({ version: '0.2.0', minNodeVersion: '0.3.0', upgradeRequired: true });
+        renderDrawer({ node: old, detail: detail({ node: old }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-upgrade-required')).toHaveTextContent(
+            'lifecycle.upgradeRequired',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-upgrade-hint')).toHaveTextContent(
+            'lifecycle.upgradeRequiredHint:0.2.0,0.3.0,npm install -g ever-works-node@latest',
+        );
+    });
+
+    it('shows the floor quietly when the daemon is above it', () => {
+        const current = node({ version: '0.2.0', minNodeVersion: '0.1.0', upgradeRequired: false });
+        renderDrawer({ node: current, detail: detail({ node: current }) });
+        expect(screen.queryByTestId('fleet-node-drawer-upgrade-required')).toBeNull();
+        expect(screen.getByTestId('fleet-node-drawer-version-floor')).toHaveTextContent(
+            'lifecycle.minimum:0.2.0,0.1.0',
+        );
+    });
+
+    it('lists the pinned CLI versions, and tells "none pinned" apart from "never reported"', () => {
+        const pinned = node({ cliVersions: ['claude-code 2.1.3', 'codex 0.48.0'] });
+        const { unmount } = renderDrawer({ node: pinned, detail: detail({ node: pinned }) });
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersions:claude-code 2.1.3, codex 0.48.0',
+        );
+        unmount();
+
+        const none = node({ cliVersions: [] });
+        const second = renderDrawer({ node: none, detail: detail({ node: none }) });
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersionsNone',
+        );
+        second.unmount();
+
+        renderDrawer();
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersionsNotReported',
+        );
+    });
+});

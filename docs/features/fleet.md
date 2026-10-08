@@ -150,10 +150,11 @@ The sweep is piggybacked on owner-scoped list reads (there is no cron): the runn
 
 ### Knobs
 
-| Env                                  | Default | Meaning                                                        |
-| ------------------------------------ | ------- | -------------------------------------------------------------- |
-| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`       |
-| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice |
+| Env                                  | Default | Meaning                                                               |
+| ------------------------------------ | ------- | --------------------------------------------------------------------- |
+| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`              |
+| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice        |
+| `FLEET_MIN_NODE_VERSION`             | `0.1.0` | minimum daemon version the lease admits (see "Keeping nodes current") |
 
 The notice window is floored at the sweep window: an escalation that could fire before the node is even considered offline would be two notices for one event.
 
@@ -284,6 +285,7 @@ Check subprocesses get an environment built **from scratch**, never the inherite
 | `ever-works-node status`                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
 | `ever-works-node capabilities`                           | Prints the tags this machine would report, without enrolling.                                                                       |
 | `ever-works-node clear-quarantine`                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
+| `ever-works-node doctor [--json]`                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
 
 `--work` is opt-in on purpose: **enrolling a machine and letting it run the owner's commands are two different consents.** A paused node keeps heartbeating, too — a drained machine that vanished from Fleet would be indistinguishable from a dead one.
 
@@ -341,6 +343,37 @@ You can also hand-edit a node's tags under **Settings → Fleet → Capability t
 :::note Build it yourself for now
 `ever-works-node` is not published to npm yet, and the Fleet handoff panel says as much: "Node app downloads ship in an upcoming release." Build it from a monorepo checkout with `pnpm build:node` — the app is deliberately excluded from the default root build — or build the desktop node shell with `pnpm build:desktop-node`, the Electron packaging of the same shared core, with a setup wizard, a status window, a tray and auto-start.
 :::
+
+## Keeping nodes current
+
+Upgrading a node is still a manual step per machine — `npm install -g ever-works-node@latest`, then restart the node service — but the platform now tells you which machines need it, and refuses the ones that are too old instead of letting them fail work.
+
+### The daemon version floor
+
+The platform publishes a **minimum daemon version** (`FLEET_MIN_NODE_VERSION`, default `0.1.0` — the first release ever published, so out of the box every daemon is admitted). Every accepted heartbeat carries it, plus a per-node verdict.
+
+A node whose reported version is below the floor:
+
+- keeps heartbeating, stays visible in Fleet, and keeps settling the work it already holds — liveness and in-flight work are never gated;
+- is offered **no new work**: the lease answers `200 { "jobs": [], "upgradeRequired": true, "minNodeVersion": "…" }`. That is deliberately the same shape as the global stop flag and **never a 401** — a node reads a lease 401 as a revoked credential and makes it sticky, so an auth-shaped refusal would turn a reversible floor into a fleet-wide re-enrollment;
+- says so itself: its worker reports `throttled` with an "Upgrade required" reason that names the exact command, the service logs it once, and `ever-works-node status` / `doctor` print it (the running service records the verdict beside its config, in `node-config.json.lifecycle.json`, for those separate processes to read).
+
+The Fleet node drawer shows **Upgrade required** with the same command, judged by the same predicate the lease uses. A daemon built before the floor existed cannot read the new fields, but the lease refuses it all the same; it simply reads the refusal as an empty poll. The floor **fails open** on a version it cannot parse (a dev build, a daemon that never reported one): it is a compatibility gate, not a security boundary. Raise it only after the fleet is upgraded — the drawer shows which machines it would refuse.
+
+After `npm install -g`, `doctor` run by the new binary tells you when the service is still the old one ("restart it to run …").
+
+### Model CLI compatibility
+
+The node now probes the **pinned** model CLI binaries — the exact paths an `agent-task` spawns (`EVER_WORKS_NODE_CLAUDE_PATH` / `--claude-path`, `EVER_WORKS_NODE_CODEX_PATH` / `--codex-path`, else the first launchable one on `PATH`) — rather than scanning `PATH` for the first of `claude` / `codex` / `gemini` / `opencode`. Each binary is asked for `--version` and its help text (`claude --help`, `codex exec --help`) once, cached per path and file modification time, so a beat or a run costs a `stat`, and a CLI upgraded in place is re-probed at once.
+
+- The heartbeat reports one `"<provider> <version>"` entry per pinned binary (`cliVersions`), and the legacy `cliVersion` now comes from the pinned binary too. The drawer lists them under **Daemon & model CLIs**.
+- Right before a model step, an **optional** flag the pinned build does not advertise — `--effort`, `--max-budget-usd` — is left off the command instead of failing the run after the lease and the worktree were spent. The drop is logged and recorded on the run as `model.droppedFlags`. A dropped `--max-budget-usd` means the CLI enforced no per-run budget; the platform's daily ceilings still apply.
+- Nothing else is ever dropped: the permission, sandbox, MCP and directory-grant flags decide what the model may touch. A binary that lacks one of the flags every run passes is reported **INCOMPATIBLE** by `doctor` and in the startup log.
+- A help text the node cannot recognise (it lists none of the flags every run passes) drops **nothing** — the command is exactly what it always was. Guessing would trade a loud failure for a silent downgrade.
+
+`ever-works-node doctor` prints one line for the daemon and one per pinned CLI; `--json` carries the same facts (`daemonVersion`, `minNodeVersion`, `upgradeRequired`, `upgradeCommand`, `modelCli[]`). `doctor` resolves the CLIs the way this shell does; a service started with `--claude-path` / `--codex-path` pins its own and logs its verdict at startup.
+
+There is no self-updater and no canary ring yet: an opt-in, reviewed self-update path is a follow-up. Until then the floor plus `doctor` is the rollout tool — upgrade a canary machine, confirm with `doctor`, upgrade the rest, then raise `FLEET_MIN_NODE_VERSION`.
 
 ## Pinning an Agent to a machine
 

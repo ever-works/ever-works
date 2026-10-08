@@ -10,6 +10,7 @@ import {
 	installShutdownHandlers
 } from './runtime';
 import { PUBLISH_FENCE_MARGIN_MS } from './worker-loop';
+import { ModelCliCompatibilityProbe } from './model-cli-compat';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -96,6 +97,47 @@ describe('buildSelfDescriptionTelemetry — model identity (fleet cost accountin
 		await telemetry.modelIdentity?.();
 		await telemetry.modelIdentity?.();
 		expect(run).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('buildSelfDescriptionTelemetry — pinned CLI versions (node lifecycle, slice AR)', () => {
+	const help = ['  -p, --print', '  --output-format <f>', '  --permission-mode <m>'].join(String.fromCharCode(10));
+
+	it('reports the version of the PINNED binary, not the first CLI on PATH', async () => {
+		const run = vi.fn(async (command: string, args: string[]) => {
+			if (command === '/opt/pinned/claude' && args[0] === '--version') {
+				return { code: 0, stdout: '2.1.3 (Claude Code)', stderr: '' };
+			}
+			if (command === '/opt/pinned/claude') return { code: 0, stdout: help, stderr: '' };
+			// The PATH scan would have found an OLD claude here.
+			if (command === 'claude') return { code: 0, stdout: '1.0.0', stderr: '' };
+			return { code: 127, stdout: '', stderr: '' };
+		});
+		const deps = {
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run },
+			environment: { ...environment, modelCli: { 'claude-code': '/opt/pinned/claude', codex: null } }
+		};
+		const telemetry = buildSelfDescriptionTelemetry(deps, new ModelCliCompatibilityProbe({ runner: deps.runner }));
+
+		await expect(telemetry.cliVersion?.()).resolves.toBe('claude 2.1.3');
+		await expect(telemetry.cliVersions?.()).resolves.toEqual(['claude-code 2.1.3']);
+		expect(run).not.toHaveBeenCalledWith('claude', ['--version']);
+	});
+
+	it('falls back to the PATH scan when nothing is pinned (a visibility-only machine)', async () => {
+		const run = vi.fn(async (command: string) =>
+			command === 'gemini'
+				? { code: 0, stdout: 'gemini 0.9.1', stderr: '' }
+				: { code: 127, stdout: '', stderr: '' }
+		);
+		const deps = {
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run }
+		};
+		const telemetry = buildSelfDescriptionTelemetry(deps, new ModelCliCompatibilityProbe({ runner: deps.runner }));
+		await expect(telemetry.cliVersion?.()).resolves.toBe('gemini 0.9.1');
+		await expect(telemetry.cliVersions?.()).resolves.toEqual([]);
 	});
 });
 

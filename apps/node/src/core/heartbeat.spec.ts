@@ -344,6 +344,29 @@ describe('HeartbeatLoop', () => {
 			expect(loop.getState().consecutiveFailures).toBe(0);
 		});
 
+		it('drops the pinned CLI versions too (node lifecycle, slice AR)', async () => {
+			// `cliVersions` is sent by every node with a compat probe — even as
+			// an empty list — so forgetting it here would 400 every beat of a
+			// new node against an older platform, forever.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({ platform: 'linux/x64', capabilities: [], cliVersions: [] }),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('cliVersions');
+			expect(scripted.requests[1]).not.toHaveProperty('cliVersions');
+			expect(loop.getState().state).toBe('connected');
+		});
+
 		it('treats an explicit NULL floor as a carried field, so it still triggers the fallback', async () => {
 			// `minFreeDiskBytes: null` is the one legitimate null on this
 			// payload ("the operator switched the floor off"). A truthiness

@@ -414,6 +414,14 @@ export type NodeSelfDescriptionPayload = NodeSelfDescription &
 export interface SelfDescriptionTelemetry {
 	/** Agent-CLI probe, e.g. `detectAgentCliVersion(runner)`. */
 	cliVersion?: () => Promise<string | null> | string | null;
+	/**
+	 * Node lifecycle (self-build slice AR) — the PINNED model-CLI versions,
+	 * one `"<provider> <version>"` entry per provider, via
+	 * `ModelCliCompatibilityProbe` + `describeCliVersions`. An array (even
+	 * an empty one) is sent; null or a throw leaves the field ABSENT, which
+	 * the server reads as "leave the stored list alone".
+	 */
+	cliVersions?: () => Promise<string[] | null> | string[] | null;
 	/** Free-disk probe for the node's workspace volume. */
 	diskFreeBytes?: () => Promise<number | null> | number | null;
 	/**
@@ -477,6 +485,14 @@ export async function describeSelf(
 	const cliVersion = await resolveTelemetry(telemetry.cliVersion);
 	if (typeof cliVersion === 'string' && cliVersion) {
 		description.cliVersion = cliVersion;
+	}
+	// Node lifecycle (slice AR). Copied as strings only, so a reporter bug
+	// can never put a non-string on a wire whose pipe would 400 the beat.
+	const cliVersions = await resolveTelemetry(telemetry.cliVersions);
+	if (Array.isArray(cliVersions)) {
+		description.cliVersions = cliVersions.filter(
+			(entry): entry is string => typeof entry === 'string' && entry.length > 0
+		);
 	}
 	const diskFreeBytes = await resolveTelemetry(telemetry.diskFreeBytes);
 	if (typeof diskFreeBytes === 'number' && Number.isFinite(diskFreeBytes) && diskFreeBytes >= 0) {

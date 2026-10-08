@@ -234,6 +234,22 @@ export class FleetNode {
     cliVersion?: string | null;
 
     /**
+     * Node lifecycle (self-build slice AR) — the version of every model CLI
+     * the node has PINNED, one `"<provider> <version>"` entry per provider
+     * (`claude-code 2.1.3`), as last reported. Unlike {@link cliVersion}
+     * these come from the exact binaries an `agent-task` spawns, not from a
+     * PATH scan.
+     *
+     * NULL = never reported (a daemon older than the field). Same additive
+     * contract as `cliVersion`: a beat that omits the list leaves it alone.
+     * Sanitized and capped (`FLEET_MAX_CLI_VERSIONS` ×
+     * `FLEET_MAX_CLI_VERSION_LENGTH`) in `FleetService` before it lands.
+     * Migration: `1795020000000-AddFleetNodeCliVersions`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    cliVersions?: string[] | null;
+
+    /**
      * Free bytes on the volume the node's workspace lives on, as last
      * reported.
      *

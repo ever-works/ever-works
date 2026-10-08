@@ -96,6 +96,27 @@ export interface NodeContractBaseline {
         gatedVerbs: string[];
         ungatedVerbs: string[];
     };
+    /** Node lifecycle (self-build slice AR) — the daemon version floor. */
+    versionFloor: {
+        defaultMinNodeVersion: string;
+        admittedByDefault: string[];
+        heartbeatResponseFields: ContractResponseField[];
+        heartbeatWhenBelowFloor: {
+            status: number;
+            minNodeVersion: string;
+            reportedVersion: string;
+            upgradeRequired: boolean;
+        };
+        leaseWhenBelowFloor: {
+            status: number;
+            minNodeVersion: string;
+            reportedVersion: string;
+            body: Record<string, unknown>;
+        };
+        leaseResponseFields: ContractResponseField[];
+        gatedVerbs: string[];
+        ungatedVerbs: string[];
+    };
 }
 
 export interface BrokenContractFixture {

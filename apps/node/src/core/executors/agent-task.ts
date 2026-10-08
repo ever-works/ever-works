@@ -67,6 +67,7 @@ import {
 import {
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
+	unsupportedOptionalModelCliFlags,
 	buildModelCliStep,
 	ModelCliCommandError,
 	parseModelCliResult,
@@ -345,6 +346,21 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	onProvisionDeclined?: (reason: string) => void;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
+	/**
+	 * Node lifecycle (self-build slice AR) — what the PINNED binary for a
+	 * provider is and which flags it advertises, asked right before the
+	 * model step. An optional flag it does not advertise (`--effort`,
+	 * `--max-budget-usd`) is then left off the command and recorded on the
+	 * result as `droppedFlags`, instead of failing the run after the lease
+	 * and the worktree were already spent.
+	 *
+	 * Optional: absent (or answering null, or throwing) means "could not
+	 * tell", and the command is built exactly as it always was.
+	 */
+	modelCliCompat?: (
+		provider: FleetAgentModelExecution['provider'],
+		executable: string
+	) => Promise<{ version: string | null; supportedFlags: ReadonlySet<string> | null } | null>;
 	/**
 	 * Self-build slice Z (EW-796) — the node's redacting logger.
 	 *
@@ -1215,6 +1231,10 @@ async function runModelStep(
 	const bridge = await startBridge(jobId, bridgeSpec, mcpConfigPath, scratchFs, io);
 	try {
 		await scratchFs.writeFile(scratch.instructionsPath, execution.instructions);
+		// Node lifecycle (slice AR): ask the pinned binary what it supports
+		// BEFORE building its command line. A probe that cannot answer drops
+		// nothing — the command is then exactly what it always was.
+		const droppedFlags = await optionalFlagsToDrop(jobId, execution, executable, io);
 		let command: string;
 		try {
 			command = buildModelCliCommand({
@@ -1224,7 +1244,8 @@ async function runModelStep(
 				scratch,
 				...(mounts && mounts.length > 0 ? { mounts } : {}),
 				...(bridge.cli ? { mcp: bridge.cli } : {}),
-				...(io.platform ? { platform: io.platform } : {})
+				...(io.platform ? { platform: io.platform } : {}),
+				...(droppedFlags.length > 0 ? { omitFlags: droppedFlags } : {})
 			});
 			// Last gate before the spawn: the grant has to be in the string
 			// that is actually run, not merely computed. Nothing downstream
@@ -1256,7 +1277,7 @@ async function runModelStep(
 		// the per-repository grants and is scrubbed on the SAME footing: a
 		// granted DATABASE_URL is a credential the model could have echoed,
 		// and the whole point of granting one is that it stays on the machine.
-		const model = parseModelCliResult(
+		const parsed = parseModelCliResult(
 			execution.provider,
 			rawOutput,
 			result,
@@ -1265,6 +1286,10 @@ async function runModelStep(
 			io.parentEnv,
 			runSecretValues
 		);
+		// Recorded on the run, not only logged: a dropped `--max-budget-usd`
+		// means the CLI enforced no per-run budget, and whoever reads the
+		// run should not have to find that in a node's log file.
+		const model = droppedFlags.length > 0 ? { ...parsed, droppedFlags } : parsed;
 		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
@@ -1292,6 +1317,36 @@ async function runModelStep(
 			);
 		}
 	}
+}
+
+/**
+ * Node lifecycle (self-build slice AR) — the optional flags this run would
+ * pass that the pinned binary does not advertise. Never throws and never
+ * blocks the run: any failure to ask reads as "could not tell", which drops
+ * nothing.
+ */
+async function optionalFlagsToDrop(
+	jobId: string,
+	execution: FleetAgentModelExecution,
+	executable: string,
+	io: AgentTaskIo
+): Promise<string[]> {
+	if (!io.modelCliCompat) return [];
+	let compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null = null;
+	try {
+		compat = await io.modelCliCompat(execution.provider, executable);
+	} catch {
+		return [];
+	}
+	const dropped = unsupportedOptionalModelCliFlags(execution, compat?.supportedFlags ?? null);
+	if (dropped.length > 0) {
+		io.logger?.warn(
+			`[fleet-node] job ${jobId}: the pinned ${execution.provider} CLI (${compat?.version ?? 'version unknown'}) ` +
+				`does not advertise ${dropped.join(', ')} — running without ${dropped.length === 1 ? 'it' : 'them'}. ` +
+				'Upgrade the CLI on this machine to restore them (`ever-works-node doctor` lists what it supports).'
+		);
+	}
+	return dropped;
 }
 
 /**

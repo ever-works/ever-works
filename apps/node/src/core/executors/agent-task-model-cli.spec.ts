@@ -327,6 +327,53 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		expect(spawnEnvs[1]?.HOME).not.toBe(isolatedRoot);
 	});
 
+	it('drops an optional flag the PINNED binary does not advertise, and records it on the run (slice AR)', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const warn = vi.fn();
+		const modelCliCompat = vi.fn(async () => ({
+			version: '3.0.0',
+			// This build no longer has `--effort`; everything else is there.
+			supportedFlags: new Set(['-p', '--output-format', '--permission-mode', '--model', '--max-budget-usd'])
+		}));
+		const io = baseIo({
+			spawnFn,
+			modelCliCompat,
+			logger: {
+				info: vi.fn(),
+				warn,
+				error: vi.fn(),
+				protect: vi.fn(),
+				unprotect: vi.fn(),
+				redact: (v: string) => v
+			}
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		// Asked about the binary that is actually spawned.
+		expect(modelCliCompat).toHaveBeenCalledWith('claude-code', CLAUDE);
+		expect(commands[0]).not.toContain('--effort');
+		expect(commands[0]).toContain('--model claude-opus-5');
+		expect(outcome.status).toBe('succeeded');
+		expect(outcome.model?.droppedFlags).toEqual(['--effort']);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('does not advertise --effort'));
+	});
+
+	it('drops nothing when the binary cannot be judged — the command is exactly what it always was (slice AR)', async () => {
+		for (const answer of [
+			async () => null,
+			async () => ({ version: null, supportedFlags: null }),
+			async () => {
+				throw new Error('probe exploded');
+			}
+		]) {
+			const { commands, spawnFn } = recordingSpawn([]);
+			const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, modelCliCompat: answer }));
+			expect(commands[0]).toContain('--effort high');
+			expect(outcome.model).not.toHaveProperty('droppedFlags');
+		}
+	});
+
 	it('honours the git policy: custom subject, no push', async () => {
 		const { spawnFn } = recordingSpawn([]);
 		const io = baseIo({ spawnFn });

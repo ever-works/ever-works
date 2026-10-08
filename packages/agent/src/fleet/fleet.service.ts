@@ -15,6 +15,7 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
     FLEET_ENROLLABLE_NODE_KINDS,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_CLI_VERSIONS,
     FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
@@ -23,6 +24,7 @@ import {
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    isFleetNodeVersionBelowFloor,
     normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
 import type {
@@ -150,6 +152,13 @@ export interface EnrollInput {
      * whole compatibility story — see the comment in `heartbeat`.
      */
     cliVersion?: string;
+    /**
+     * Node lifecycle (self-build slice AR) — the PINNED model-CLI versions,
+     * one `"<provider> <version>"` entry per provider. An array (even an
+     * empty one: "nothing is pinned any more") replaces the stored list;
+     * absent leaves it alone, like every other telemetry field.
+     */
+    cliVersions?: string[];
     /** Free bytes on the node's workspace volume. Same optional contract. */
     diskFreeBytes?: number;
     /**
@@ -188,6 +197,23 @@ export interface EnrollInput {
     lastReclaimAt?: string;
     /** Bytes that sweep freed. */
     lastReclaimFreedBytes?: number;
+}
+
+/**
+ * What an accepted heartbeat hands back to the API edge.
+ *
+ * The two node-lifecycle fields (self-build slice AR) travel to the
+ * machine on the heartbeat response; the lease enforces the same floor
+ * independently (`FleetJobService.lease`), so a daemon that ignores them
+ * — every build older than the field — is still refused new work.
+ */
+export interface FleetHeartbeatResult {
+    node: FleetNodeView;
+    rotationRequested: boolean;
+    /** The minimum daemon version the platform admits right now. */
+    minNodeVersion: string;
+    /** True when this node's reported version is below that floor. */
+    upgradeRequired: boolean;
 }
 
 export interface EnrollResult {
@@ -394,6 +420,8 @@ export class FleetService {
             // Heartbeat is the opposite case and treats absent as
             // "leave alone"; see the comment there.
             cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
+            // Node lifecycle (slice AR): the pinned per-provider versions.
+            cliVersions: sanitizeCliVersions(input.cliVersions),
             diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
             modelIdentity: sanitizeModelIdentity(input.modelIdentity),
             // Health signals (EW-776): normalized, never stored verbatim.
@@ -477,7 +505,7 @@ export class FleetService {
         nodeId: unknown,
         secret: unknown,
         refresh: EnrollInput = {},
-    ): Promise<{ node: FleetNodeView; rotationRequested: boolean } | null> {
+    ): Promise<FleetHeartbeatResult | null> {
         const verified = verifyNodeSecret(nodeId, secret);
         if (!verified) return null;
 
@@ -518,6 +546,12 @@ export class FleetService {
         // "report nothing" to mean "erase".
         const cliVersion = sanitizeText(refresh.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH);
         if (cliVersion) patch.cliVersion = cliVersion;
+        // Node lifecycle (slice AR). `null` only when the beat carried no
+        // list at all; an EMPTY list is a real report ("nothing is pinned
+        // any more") and does overwrite, or an un-pinned CLI would be shown
+        // for ever.
+        const cliVersions = sanitizeCliVersions(refresh.cliVersions);
+        if (cliVersions !== null) patch.cliVersions = cliVersions;
         const diskFreeBytes = sanitizeByteCount(refresh.diskFreeBytes);
         if (diskFreeBytes !== null) patch.diskFreeBytes = diskFreeBytes;
         // Same additive contract (EW-777): a beat that says nothing about
@@ -548,9 +582,16 @@ export class FleetService {
         // Inbox call then fails we log it rather than re-arming, exactly
         // as the daily-ceiling notice does.
         await this.announceWorkerTransition(node, patch, workerState);
+        const view = this.toView({ ...node, ...patch });
         return {
-            node: this.toView({ ...node, ...patch }),
+            node: view,
             rotationRequested: Boolean(node.rotationRequestedAt),
+            // Node lifecycle (slice AR). Judged on the version THIS beat
+            // stored (the patch wins over the row), so the beat a freshly
+            // upgraded daemon sends is the one that clears the flag — not
+            // the one after it.
+            minNodeVersion: view.minNodeVersion ?? config.fleet.getMinNodeVersion(),
+            upgradeRequired: view.upgradeRequired === true,
         };
     }
 
@@ -1563,6 +1604,19 @@ export class FleetService {
             persisted: true,
             capabilitiesPinned: Boolean(node.capabilitiesPinned),
             cliVersion: node.cliVersion ?? null,
+            // Node lifecycle (slice AR): the pinned per-provider CLI
+            // versions, and whether this daemon is below the platform's
+            // floor. The floor is read per call (an env change lands
+            // without a restart) and judged by the ONE shared predicate the
+            // lease uses, so the drawer and the lease can never disagree.
+            // `this` is not used here on purpose: the conformance suite
+            // calls this method unbound.
+            cliVersions: Array.isArray(node.cliVersions) ? node.cliVersions : null,
+            minNodeVersion: config.fleet.getMinNodeVersion(),
+            upgradeRequired: isFleetNodeVersionBelowFloor(
+                node.version,
+                config.fleet.getMinNodeVersion(),
+            ),
             // `bigint` comes back as a STRING on Postgres and a number on
             // sqlite. Normalizing HERE — the one place an entity becomes
             // a wire view — is what stops `"12345" > 0` style bugs from
@@ -1715,6 +1769,34 @@ function sanitizeReportedInstant(value: unknown, now: Date): Date | null {
  * unattended machine and comfortably less than a timezone mistake.
  */
 const REPORTED_INSTANT_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
+ * Node lifecycle (self-build slice AR) — the pinned model-CLI versions a
+ * node reports, one `"<provider> <version>"` entry each.
+ *
+ * `null` means "the beat said nothing" (not an array) and leaves the
+ * stored list alone. Anything else becomes a list — possibly empty — of
+ * trimmed, single-line, deduplicated entries, each capped at the
+ * single-`cliVersion` bound and at most {@link FLEET_MAX_CLI_VERSIONS} of
+ * them. Free text from the machine, so control characters are stripped
+ * and known token shapes scrubbed, exactly like `modelIdentity`: these
+ * strings are stored and rendered in the drawer.
+ */
+function sanitizeCliVersions(value: unknown): string[] | null {
+    if (!Array.isArray(value)) return null;
+    const out: string[] = [];
+    for (const entry of value) {
+        if (typeof entry !== 'string') continue;
+        // eslint-disable-next-line no-control-regex
+        const line = entry.replace(/[\u0000-\u001F\u007F]+/g, ' ').trim();
+        if (!line) continue;
+        const cleaned = redactSecrets(line).cleaned.slice(0, FLEET_MAX_CLI_VERSION_LENGTH);
+        if (out.includes(cleaned)) continue;
+        out.push(cleaned);
+        if (out.length >= FLEET_MAX_CLI_VERSIONS) break;
+    }
+    return out;
+}
 
 function sanitizeText(value: unknown, maxLength: number): string | null {
     if (typeof value !== 'string') return null;
