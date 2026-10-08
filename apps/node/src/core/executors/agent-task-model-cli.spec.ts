@@ -295,7 +295,12 @@ describe('runAgentTaskJob — model-cli execution', () => {
 				summary: 'Implemented the change.',
 				costUsd: 0.5,
 				turns: 3,
-				sessionId: 'sess-1'
+				sessionId: 'sess-1',
+				// Self-build slice AP: the run's redacted transcript rides with
+				// the verdict. This CLI output is one `result` line and no
+				// turns, so there is a transcript and no step record.
+				transcript: claudeEnvelope,
+				transcriptSourceBytes: Buffer.byteLength(claudeEnvelope, 'utf8')
 			},
 			checks: [{ id: 'unit', status: 'green', exitCode: 0, durationMs: expect.any(Number) }],
 			gateStatus: 'green',
