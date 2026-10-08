@@ -16,6 +16,7 @@ import {
     type InboxItemDto,
     type InboxItemOption,
     type InboxItemSourceMeta,
+    type InboxItemSourceType,
     type InboxItemStatus,
 } from '@ever-works/contracts';
 import {
@@ -77,6 +78,8 @@ export interface ListInboxOptions {
     status?: InboxItemStatus;
     /** Only items linked to this Task (the Task page's open-question lookup, slice Q). */
     taskId?: string;
+    /** Only items from this producer — `fleet-run` for the fleet filter (slice AU). */
+    sourceType?: InboxItemSourceType;
     limit?: number;
     offset?: number;
 }
