@@ -53,7 +53,7 @@ import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
 import { FleetKillSwitchBanner } from './FleetKillSwitchBanner';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
-import { isEmptyLimitCeiling } from './fleet-node-limits.shared';
+import { isEmptyLimitCeiling, keepIfStillOpen } from './fleet-node-limits.shared';
 import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
 import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
@@ -367,8 +367,12 @@ export function FleetSettings({
                 setNodes((prev) =>
                     prev.map((entry) => (entry.id === target.id ? result.data : entry)),
                 );
-                setDrawerNode(result.data);
-                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data } : prev));
+                // Only into a drawer still open on this node — closing it while
+                // the save was in flight must not reopen it.
+                setDrawerNode((prev) => keepIfStillOpen(prev, result.data));
+                setDrawerDetail((prev) =>
+                    prev && prev.node.id === result.data.id ? { ...prev, node: result.data } : prev,
+                );
                 toast.success(
                     isEmptyLimitCeiling(ceiling) ? t('limits.cleared') : t('limits.saved'),
                 );

@@ -128,7 +128,7 @@ Every heartbeat now carries what the node's **worker** is doing, alongside the r
 Two properties are load-bearing and deliberately awkward:
 
 - **The field is a string on the wire, not an enum.** The heartbeat DTO runs under `whitelist + forbidNonWhitelisted`, so a value an older API rejects fails the whole request — and a failed heartbeat is a node that sweeps to `offline`. A node newer than the platform must be able to report a state this build has never heard of and stay alive; the server normalizes anything unrecognised to "unknown" rather than trusting it.
-- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts.
+- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts. The optional fields are dropped in tiers, newest first: a platform that predates only the pinned CLI versions and enforced limits (slices AR / AS) loses just those, and keeps receiving the worker state and housekeeping. Enrollment never sends the newest tier at all — it has no such fallback — so a new node can always enroll against an older platform.
 
 The drawer judges a job FAILED on the reconciled run outcome — the badge, the **Failed** filter chip and the endpoint’s `failures` subset all use the same rule, so a job the node called `done` whose run failed appears in all three.
 

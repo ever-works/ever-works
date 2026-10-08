@@ -113,14 +113,30 @@ export interface ModelCliCompatibilityProbeOptions {
 	now?: () => number;
 	/** How long an answer is reused when the binary cannot be stamped. Default 10 minutes. */
 	unstampedTtlMs?: number;
+	/**
+	 * How long an INCOMPLETE answer is reused — the binary did not answer
+	 * `--version` or its help at all (a timeout, a busy machine, a spawn
+	 * failure). Default 1 minute, whatever the file stamp says.
+	 */
+	incompleteRetryMs?: number;
 }
 
 /** Default lifetime of an answer for a binary whose file could not be stamped. */
 export const MODEL_CLI_COMPAT_UNSTAMPED_TTL_MS = 10 * 60_000;
 
+/**
+ * Default lifetime of an answer the binary did not fully give (review): a
+ * `--help` that timed out once must not switch the compatibility check off
+ * until the daemon restarts, just because the file on disk did not change.
+ */
+export const MODEL_CLI_COMPAT_INCOMPLETE_RETRY_MS = 60_000;
+
 interface CacheEntry {
 	key: string;
-	stamped: boolean;
+	/** True when the answer may be kept until the binary's file changes. */
+	permanent: boolean;
+	/** How long a non-permanent answer is reused. */
+	ttlMs: number;
 	probedAt: number;
 	result: ModelCliCompatibility;
 }
@@ -137,10 +153,12 @@ export class ModelCliCompatibilityProbe {
 	private readonly inFlight = new Map<string, Promise<ModelCliCompatibility>>();
 	private readonly now: () => number;
 	private readonly unstampedTtlMs: number;
+	private readonly incompleteRetryMs: number;
 
 	constructor(private readonly options: ModelCliCompatibilityProbeOptions) {
 		this.now = options.now ?? (() => Date.now());
 		this.unstampedTtlMs = options.unstampedTtlMs ?? MODEL_CLI_COMPAT_UNSTAMPED_TTL_MS;
+		this.incompleteRetryMs = options.incompleteRetryMs ?? MODEL_CLI_COMPAT_INCOMPLETE_RETRY_MS;
 	}
 
 	/** One pinned binary. */
@@ -148,16 +166,20 @@ export class ModelCliCompatibilityProbe {
 		const stamp = await this.stamp(executable);
 		const key = `${provider}|${executable}|${stamp ? `${stamp.mtimeMs}:${stamp.size}` : 'unstamped'}`;
 		const cached = this.cache.get(`${provider}|${executable}`);
-		if (cached && cached.key === key && (cached.stamped || this.now() - cached.probedAt < this.unstampedTtlMs)) {
+		if (cached && cached.key === key && (cached.permanent || this.now() - cached.probedAt < cached.ttlMs)) {
 			return cached.result;
 		}
 		const pending = this.inFlight.get(key);
 		if (pending) return pending;
 		const run = this.run(provider, executable)
-			.then((result) => {
+			.then(({ result, answered }) => {
 				this.cache.set(`${provider}|${executable}`, {
 					key,
-					stamped: stamp !== null,
+					// Only a COMPLETE answer from a stamped file is kept until the
+					// file changes. An incomplete one is retried soon, and an
+					// unstamped one on the slower clock.
+					permanent: answered && stamp !== null,
+					ttlMs: answered ? this.unstampedTtlMs : this.incompleteRetryMs,
 					probedAt: this.now(),
 					result
 				});
@@ -191,13 +213,21 @@ export class ModelCliCompatibilityProbe {
 		}
 	}
 
-	private async run(provider: ModelCliProvider, executable: string): Promise<ModelCliCompatibility> {
+	private async run(
+		provider: ModelCliProvider,
+		executable: string
+	): Promise<{ result: ModelCliCompatibility; answered: boolean }> {
 		const command = this.commandFor(executable);
-		const version = await this.ask(command, ['--version']).then((output) =>
-			output === null ? null : parseCliVersion(output)
-		);
+		const versionOutput = await this.ask(command, ['--version']);
+		const version = versionOutput === null ? null : parseCliVersion(versionOutput);
 		const help = await this.ask(command, [...HELP_ARGS[provider]]);
-		return judgeModelCliHelp(provider, executable, version, help);
+		return {
+			result: judgeModelCliHelp(provider, executable, version, help),
+			// "Answered" = both invocations produced output. An UNRECOGNISED
+			// help text is still an answer — deterministic for that file — and
+			// re-asking every minute would learn nothing.
+			answered: versionOutput !== null && help !== null
+		};
 	}
 
 	/**

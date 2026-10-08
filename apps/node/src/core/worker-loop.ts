@@ -976,6 +976,27 @@ export class WorkerLoop {
 			this.scheduleNext(this.idlePollMs);
 			return;
 		}
+		// Re-read AFTER the admission await, not before it (review, slice AS):
+		// a heartbeat answer can land in that await and both lift an upgrade
+		// hold and lower the platform limit ceiling. The capacity captured at
+		// the top of this poll would then ask for the OLD batch size and run
+		// every job it was handed, past the ceiling the owner just set.
+		// Read through the accessor: TypeScript narrowed the field to null at
+		// the top of this poll and cannot see the await in between.
+		const holdAfterAdmission = this.getUpgradeHold();
+		if (holdAfterAdmission) {
+			this.patch({
+				state: this.inFlight.size > 0 ? 'working' : 'throttled',
+				throttleReason: holdAfterAdmission.reason
+			});
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+		const leaseCapacity = this.limits.maxConcurrentJobs - this.inFlight.size;
+		if (leaseCapacity <= 0) {
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
 		if (this.state.throttleReason != null) {
 			this.patch({ throttleReason: null });
 		}
@@ -994,7 +1015,7 @@ export class WorkerLoop {
 				kinds?: FleetJobKind[];
 				excludeKinds?: FleetJobKind[];
 			} = {
-				max: capacity,
+				max: leaseCapacity,
 				leaseTtlSec: this.leaseTtlSec
 			};
 			if (this.options.capabilities) request.capabilities = this.options.capabilities;

@@ -291,3 +291,81 @@ describe('readHeartbeatLifecycle — a malformed answer is ignored, never coerce
 		expect(readHeartbeatLifecycle(null)).toEqual({});
 	});
 });
+
+describe('review fixes (slice AR/AS)', () => {
+	it('applies a ceiling carried by the same answer BEFORE lifting the hold', () => {
+		const calls: string[] = [];
+		const tracker = new NodeLifecycleTracker({
+			daemonVersion: '0.2.0',
+			logger: silentLogger() as never,
+			lanes: () => [{ setUpgradeHold: (hold) => calls.push(hold ? 'hold' : 'lift') }],
+			onLimitCeiling: (ceiling) => calls.push(`ceiling:${ceiling.maxConcurrentJobs}`)
+		});
+		tracker.applyLeaseRefusal('0.3.0');
+		calls.length = 0;
+
+		tracker.applyHeartbeat({
+			minNodeVersion: '0.2.0',
+			upgradeRequired: false,
+			limitCeiling: { maxConcurrentJobs: 1, maxCpuPercent: null, maxMemoryMb: null }
+		});
+		// Lifting a hold polls at once; that poll must already see the ceiling.
+		expect(calls).toEqual(['ceiling:1', 'lift']);
+	});
+
+	it('the first resumed lease is sized to a ceiling applied right after the hold lifts', async () => {
+		const requests: Array<{ max?: number }> = [];
+		const loop = new WorkerLoop({
+			client: {
+				heartbeat: vi.fn(),
+				complete: vi.fn(async () => true),
+				lease: vi.fn(async (request: { max?: number }) => {
+					requests.push(request);
+					return [] as FleetJobView[];
+				})
+			} as never,
+			scheduler: controllableScheduler(),
+			limits: clampResourceLimits({ maxConcurrentJobs: 4 })
+		});
+		loop.setUpgradeHold({ minNodeVersion: '0.3.0', reason: describeUpgradeRequired('0.3.0', '0.2.0') });
+		await loop.start();
+		expect(requests).toHaveLength(0);
+
+		// Both land synchronously, in the "wrong" order: the poll the lift
+		// starts must still read the limit AFTER its admission await.
+		loop.setUpgradeHold(null);
+		loop.applyLimitCeiling({ maxConcurrentJobs: 1, maxCpuPercent: null, maxMemoryMb: null });
+
+		await vi.waitFor(() => expect(requests).toHaveLength(1));
+		expect(requests[0].max).toBe(1);
+		await loop.stop();
+	});
+
+	it('writes changed verdicts to disk in the order they were learned', async () => {
+		const written: Array<boolean> = [];
+		let releaseFirst: () => void = () => undefined;
+		const firstGate = new Promise<void>((resolve) => {
+			releaseFirst = resolve;
+		});
+		let call = 0;
+		const persist = vi.fn(async (record: NodeLifecycleRecord) => {
+			call += 1;
+			// The FIRST write is slow, the second fast — the race the review named.
+			if (call === 1) await firstGate;
+			written.push(record.upgradeRequired);
+		});
+		const tracker = new NodeLifecycleTracker({
+			daemonVersion: '0.2.0',
+			logger: silentLogger() as never,
+			lanes: () => [],
+			persist
+		});
+		tracker.applyLeaseRefusal('0.3.0'); // verdict 1: upgrade required
+		tracker.applyHeartbeat({ minNodeVersion: '0.2.0', upgradeRequired: false }); // verdict 2
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		releaseFirst();
+		await vi.waitFor(() => expect(written).toHaveLength(2));
+		// The file ends on the NEWEST verdict.
+		expect(written).toEqual([true, false]);
+	});
+});

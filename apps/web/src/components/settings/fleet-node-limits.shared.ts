@@ -84,3 +84,13 @@ export function isEmptyLimitCeiling(ceiling: FleetNodeLimitCeiling | null | unde
             ceiling.maxMemoryMb === null)
     );
 }
+
+/**
+ * Apply a saved node to the drawer ONLY if the drawer is still open on that
+ * node (review). The close controls stay usable while a save is in flight;
+ * writing the saved node back unconditionally would reopen a drawer the
+ * operator already closed, or swap in a different machine.
+ */
+export function keepIfStillOpen<T extends { id: string }>(current: T | null, saved: T): T | null {
+    return current !== null && current.id === saved.id ? saved : current;
+}

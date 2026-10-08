@@ -234,6 +234,40 @@ describe('ModelCliCompatibilityProbe', () => {
 		expect(run.run).toHaveBeenCalledTimes(4);
 	});
 
+	it('retries an INCOMPLETE answer soon, even for a stamped binary that did not change (review)', async () => {
+		let now = 0;
+		let healthy = false;
+		const run = {
+			run: vi.fn(async (_command: string, args: string[]) => {
+				if (!healthy) throw new Error('timed out');
+				return args[0] === '--version'
+					? { code: 0, stdout: '2.1.3', stderr: '' }
+					: { code: 0, stdout: CLAUDE_HELP, stderr: '' };
+			})
+		};
+		const probe = new ModelCliCompatibilityProbe({
+			runner: run as never,
+			statFile: () => ({ mtimeMs: 1, size: 100 }),
+			now: () => now,
+			incompleteRetryMs: 60_000
+		});
+
+		expect((await probe.probe('claude-code', '/opt/claude')).supportedFlags).toBeNull();
+		healthy = true;
+		now = 30_000;
+		expect((await probe.probe('claude-code', '/opt/claude')).supportedFlags).toBeNull(); // still cached
+		now = 61_000;
+		const recovered = await probe.probe('claude-code', '/opt/claude');
+		expect(recovered.supportedFlags).not.toBeNull();
+		expect(recovered.version).toBe('2.1.3');
+
+		// A COMPLETE answer from a stamped file is then kept until the file changes.
+		const calls = run.run.mock.calls.length;
+		now = 10 * 60 * 60_000;
+		await probe.probe('claude-code', '/opt/claude');
+		expect(run.run.mock.calls.length).toBe(calls);
+	});
+
 	it('asks codex through `exec --help` and quotes a Windows path with spaces', async () => {
 		const run = {
 			run: vi.fn(async (_command: string, args: string[]) =>

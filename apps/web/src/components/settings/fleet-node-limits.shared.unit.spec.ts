@@ -3,6 +3,7 @@ import {
     draftToLimitCeiling,
     FLEET_NODE_LIMIT_BOUNDS,
     isEmptyLimitCeiling,
+    keepIfStillOpen,
     limitCeilingToDraft,
 } from './fleet-node-limits.shared';
 
@@ -64,5 +65,17 @@ describe('fleet node limit ceiling — editor parsing', () => {
         expect(
             isEmptyLimitCeiling({ maxConcurrentJobs: 1, maxCpuPercent: null, maxMemoryMb: null }),
         ).toBe(false);
+    });
+});
+
+describe('keepIfStillOpen — a save never reopens a closed drawer (review)', () => {
+    it('updates the drawer only when it is still open on the saved node', () => {
+        const saved = { id: 'node-1', name: 'saved' };
+        expect(keepIfStillOpen({ id: 'node-1', name: 'stale' }, saved)).toBe(saved);
+        // Closed while the request was in flight: stays closed.
+        expect(keepIfStillOpen(null, saved)).toBeNull();
+        // Another node opened meanwhile: left alone.
+        const other = { id: 'node-2', name: 'other' };
+        expect(keepIfStillOpen(other, saved)).toBe(other);
     });
 });

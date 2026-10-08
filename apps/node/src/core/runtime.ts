@@ -207,17 +207,13 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 		options.environment,
 		options.version,
 		options.capabilitySelection ?? null,
-		// Node lifecycle (slice AR): enrollment already reports the PINNED
-		// CLI versions, so a freshly enrolled machine's drawer is complete
-		// before its first beat.
-		buildSelfDescriptionTelemetry(
-			options,
-			new ModelCliCompatibilityProbe({
-				runner: options.runner,
-				platform: options.environment.platform,
-				...(options.statFile ? { statFile: options.statFile } : {})
-			})
-		)
+		// Deliberately WITHOUT the pinned-CLI compat probe (review, slice AR):
+		// that probe adds `cliVersions`, an optional field an older platform's
+		// `forbidNonWhitelisted` pipe answers with a 400 — and enrollment, unlike
+		// the heartbeat, has no strip-and-retry fallback, so a new node could
+		// never enroll against it. The first heartbeat reports the pinned
+		// versions, behind the heartbeat's own fallback.
+		buildSelfDescriptionTelemetry(options)
 	);
 	logger.info(`Enrolling with ${client.baseUrl} as ${description.platform} [${description.capabilities.join(', ')}]`);
 

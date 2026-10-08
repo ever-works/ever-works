@@ -141,6 +141,35 @@ describe('buildSelfDescriptionTelemetry — pinned CLI versions (node lifecycle,
 	});
 });
 
+describe('enrollNode — no field an older platform would 400 (review, slice AR)', () => {
+	it('does not send cliVersions on enroll, even with a pinned CLI — enrollment has no strip-and-retry', async () => {
+		const bodies: Array<Record<string, unknown>> = [];
+		const fetchFn: FetchLike = async (_url, init) => {
+			bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+			return {
+				ok: true,
+				status: 201,
+				text: async () => JSON.stringify({ nodeId: NODE_ID, secret: SECRET, node: nodeFromApi })
+			};
+		};
+		const run = vi.fn(async (command: string, args: string[]) =>
+			command === '/opt/pinned/claude' && args[0] === '--version'
+				? { code: 0, stdout: '2.1.3', stderr: '' }
+				: { code: 127, stdout: '', stderr: '' }
+		);
+		await enrollNode({
+			...io(fetchFn).io,
+			runner: { run },
+			environment: { ...environment, modelCli: { 'claude-code': '/opt/pinned/claude' } },
+			apiUrl: 'https://api.ever.works',
+			token: TOKEN,
+			kind: 'node'
+		});
+		expect(bodies).toHaveLength(1);
+		expect(bodies[0]).not.toHaveProperty('cliVersions');
+	});
+});
+
 describe('enrollNode', () => {
 	it('detects capabilities, consumes the token and returns a persistable config', async () => {
 		const { io: deps, entries } = io(enrollResponse({ nodeId: NODE_ID, secret: SECRET, node: nodeFromApi }));

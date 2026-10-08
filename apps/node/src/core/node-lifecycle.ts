@@ -135,6 +135,8 @@ export class NodeLifecycleTracker {
 	private upgradeRequired = false;
 	private limitCeiling: NodeLimitCeiling | null = null;
 	private lastPersisted: string | null = null;
+	/** Lifecycle-record writes, chained so they complete in verdict order. */
+	private writeQueue: Promise<void> = Promise.resolve();
 	private readonly now: () => number;
 
 	constructor(private readonly options: NodeLifecycleTrackerOptions) {
@@ -148,10 +150,13 @@ export class NodeLifecycleTracker {
 	 */
 	applyHeartbeat(response: HeartbeatLifecycleFields): void {
 		if (typeof response.minNodeVersion === 'string') this.minNodeVersion = response.minNodeVersion;
+		// The ceiling FIRST, then the hold (review, slice AS): lifting a hold
+		// polls immediately, and that first resumed lease must already be
+		// sized to a ceiling carried by the very same answer.
+		if (response.limitCeiling) this.applyLimitCeiling(response.limitCeiling);
 		if (typeof response.upgradeRequired === 'boolean') {
 			this.transition(response.upgradeRequired);
 		}
-		if (response.limitCeiling) this.applyLimitCeiling(response.limitCeiling);
 		this.persist();
 	}
 
@@ -231,11 +236,17 @@ export class NodeLifecycleTracker {
 		]);
 		if (fingerprint === this.lastPersisted) return;
 		this.lastPersisted = fingerprint;
-		void Promise.resolve()
+		// QUEUED behind the previous write (review): two verdicts changing in
+		// quick succession — a lease refusal and the beat after it — must land
+		// on disk in the order they were learned, or an older record could
+		// finish last and stay there while the fingerprint says it is current.
+		this.writeQueue = this.writeQueue
 			.then(() => this.options.persist?.(record))
 			.catch((error: unknown) => {
-				// Forget the fingerprint so the next beat retries the write.
-				this.lastPersisted = null;
+				// Forget the fingerprint so the next beat retries the write —
+				// unless a newer verdict is already queued behind this one,
+				// which will overwrite the file anyway.
+				if (this.lastPersisted === fingerprint) this.lastPersisted = null;
 				this.options.logger.warn(
 					`Could not record the platform's lifecycle verdict for \`status\` / \`doctor\`: ${
 						error instanceof Error ? error.message : String(error)
