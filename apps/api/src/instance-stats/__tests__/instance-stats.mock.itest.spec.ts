@@ -1,30 +1,26 @@
-import { generateKeyPairSync } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { DataSource } from 'typeorm';
-import {
-    EVER_STATS_KEY_HEADER,
-    EVER_STATS_KEY_ID_HEADER,
-    EVER_STATS_SIGNATURE_HEADER,
-    EVER_STATS_SIGNATURE_PREFIX,
-    type SignedStatsReport,
-} from '@ever-works/contracts';
+import { STATS_HEADERS, STATS_SIGNATURE_PREFIX, statsKeyId } from '@ever-co/connect-sdk';
+import type { SignedStatsReport } from '@ever-works/contracts';
 import { EverInstance } from '@ever-works/agent/entities';
-import { keyIdOf, publicKeyBytes, toBase64Url } from '@ever-works/agent/ever-instance';
+import { newStoredStatsKey } from '@ever-works/agent/ever-instance';
 import { StatsSinkFacadeService } from '@ever-works/agent/facades';
 import { PluginSecretEncService, type PluginRegistryService } from '@ever-works/agent/plugins';
 import EverStatsSinkPlugin from '@ever-works/ever-stats-sink-plugin';
+import { STATS_FIXTURES_DIR } from './contract-files.helper-spec';
 import { createHarness, type StatsHarness } from './fixtures/harness.helper-spec';
 import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
- * The real sender against the MOCK PLATFORM of the public Ever Platform SDK —
- * the same answers, problem codes and checks as the statistics ingest
- * (signature over the exact bytes, key id, size, the strict JSON reader, the
- * published schema, the key pinned to the instance id on first sight).
+ * The real sender against the MOCK PLATFORM of the Ever Platform SDK
+ * (`ever-mock-platform` from the pinned `@ever-co/connect-tools`) — the same
+ * answers, problem codes and checks as the statistics ingest (signature over
+ * the exact bytes, key id, size, the strict JSON reader, the published schema,
+ * the key pinned to the instance id on first sight).
  *
  * Runs only where a mock is listening: `EVER_STATS_MOCK_URL` (the egress
- * audit workflow starts it from the SDK at its pinned commit). Elsewhere the
+ * audit workflow starts the mock from the installed package). Elsewhere the
  * suite is skipped; `instance-stats.receiver.spec.ts` covers the same flow
  * against a receiver written from the contract.
  *
@@ -40,21 +36,8 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
 const MOCK_URL = process.env.EVER_STATS_MOCK_URL?.replace(/\/+$/, '');
 const describeMock = MOCK_URL ? describe : describe.skip;
 
-const FIXTURES = join(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '..',
-    '..',
-    'packages',
-    'agent',
-    'src',
-    'ever-instance',
-    'contract',
-    'fixtures',
-    'stats',
-);
+/** The statistics fixtures of the pinned `@ever-co/connect-contracts`. */
+const FIXTURES = STATS_FIXTURES_DIR;
 
 interface Expected {
     status: number;
@@ -104,16 +87,21 @@ describeMock('instance statistics — against the SDK mock platform', () => {
         if (dataSource?.isInitialized) await dataSource.destroy();
     });
 
-    /** Sign `body` exactly as the module signs a report, with this installation's key. */
+    /**
+     * Sign `body` with this installation's key and the module's headers — but
+     * without the module's checks, so a fixture the ingest must refuse is
+     * posted all the same.
+     */
     async function signed(body: Buffer): Promise<SignedStatsReport> {
         const bytes = new Uint8Array(body);
-        const { signature, publicKey, keyId } = await h.identity.sign(bytes);
+        const signer = await h.identity.statsSigner();
+        const signature = Buffer.from(signer.sign(bytes)).toString('base64url');
         return {
             body: bytes,
             headers: {
-                [EVER_STATS_KEY_HEADER]: publicKey,
-                [EVER_STATS_SIGNATURE_HEADER]: `${EVER_STATS_SIGNATURE_PREFIX}${signature}`,
-                [EVER_STATS_KEY_ID_HEADER]: keyId,
+                [STATS_HEADERS.key]: signer.publicKey,
+                [STATS_HEADERS.signature]: `${STATS_SIGNATURE_PREFIX}${signature}`,
+                [STATS_HEADERS.key_id]: statsKeyId(signer.publicKey),
             },
             reportId: '00000000-0000-4000-8000-000000000000',
             period: '2026-10',
@@ -192,20 +180,9 @@ describeMock('instance statistics — against the SDK mock platform', () => {
 
         // The same instance id with another key: what a copied database with a
         // regenerated key would send.
-        const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-        const raw = publicKeyBytes(publicKey);
-        await dataSource.getRepository(EverInstance).update(
-            { id: 'self' },
-            {
-                statsPublicKey: toBase64Url(raw),
-                statsKeyId: keyIdOf(raw),
-                statsPrivateKeyEncrypted: new PluginSecretEncService().encryptValue(
-                    (privateKey.export({ format: 'der', type: 'pkcs8' }) as Buffer).toString(
-                        'base64',
-                    ),
-                ),
-            },
-        );
+        await dataSource
+            .getRepository(EverInstance)
+            .update({ id: 'self' }, newStoredStatsKey(new PluginSecretEncService()));
         h.clock.now = new Date('2026-10-16T09:00:00Z');
         await h.lease.updateSchedule({ nextSendAt: h.clock.now });
         expect(await h.sender.runDue()).toEqual({

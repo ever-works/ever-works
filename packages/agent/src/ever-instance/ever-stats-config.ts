@@ -1,3 +1,4 @@
+import { CONSTANTS } from '@ever-co/connect-sdk';
 import {
     EVER_PLATFORM_DEFAULT_API_URL,
     normaliseStatsBaseUrl,
@@ -44,13 +45,13 @@ export interface EverStatsConfig {
 
 /** The default delivery plugin. */
 export const EVER_STATS_DEFAULT_SINK_PLUGIN_ID = 'ever-stats-sink';
-/** One report a day. */
-export const EVER_STATS_DEFAULT_INTERVAL_S = 86_400;
-/** Floor of `EVER_STATS_SEND_INTERVAL_S` outside tests and CI. */
-export const EVER_STATS_MIN_INTERVAL_S = 3_600;
+/** One report a day (the contract's `stats.send_interval_s`). */
+export const EVER_STATS_DEFAULT_INTERVAL_S: number = CONSTANTS.stats.send_interval_s;
+/** Floor of `EVER_STATS_SEND_INTERVAL_S` outside tests and CI (the contract's `stats.min_interval_s`). */
+export const EVER_STATS_MIN_INTERVAL_S: number = CONSTANTS.stats.min_interval_s;
 
-const INSTALL_SOURCE_PATTERN =
-    /^(cloud|self-hosted|ever\.sh|works_app|desktop|partner:[a-z0-9-]{2,32})$/;
+/** The install sources the contract accepts (`install_sources`). */
+const INSTALL_SOURCE_PATTERN = new RegExp(CONSTANTS.install_sources);
 const COUNTRY_PATTERN = /^[A-Z]{2}$/;
 const PLUGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
