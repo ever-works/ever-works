@@ -143,4 +143,46 @@ describe('MailgunPlugin', () => {
 		expect(msg.to).toEqual(['attacker@a.test', 'victim@v.test', 'ops@o.test']);
 		expect(msg.to).toEqual(plugin.extractInboundRecipients(raw, {}));
 	});
+
+	/**
+	 * CodeQL js/polynomial-redos. The mailbox used to be pulled out with `/<([^>]+)>/`, which
+	 * backtracks quadratically over a run of `<` that never closes: every `<` restarts a scan
+	 * to the end of the string. The `To` header is written by whoever sent the mail, and
+	 * `extractInboundRecipients` reads it BEFORE the webhook signature is checked, so a single
+	 * unauthenticated POST could pin the API's event loop (50 000 characters took ~2.4 s).
+	 */
+	describe('recipient parsing on hostile headers', () => {
+		const recipientsOf = (to: string) =>
+			plugin.extractInboundRecipients(Buffer.from(JSON.stringify({ To: to })), {});
+
+		it.each([
+			['a run of "<" that never closes', '<'.repeat(50_000)],
+			['"<" followed by a run of "<="', `<${'<='.repeat(25_000)}`]
+		])('reads %s in linear time', (_label, hostile) => {
+			const started = performance.now();
+			const recipients = recipientsOf(hostile);
+			const elapsedMs = performance.now() - started;
+
+			expect(recipients).toEqual([hostile]);
+			expect(elapsedMs).toBeLessThan(200);
+		});
+
+		// The rewrite must name exactly the mailboxes the regex named.
+		it.each([
+			['a@b.test', ['a@b.test']],
+			['"Name" <a@b.test>', ['a@b.test']],
+			['Name <a@b.test>, c@d.test', ['a@b.test', 'c@d.test']],
+			['<> <a@b.test>', ['a@b.test']],
+			['<<a@b.test>', ['<a@b.test']],
+			['<a@b.test', ['<a@b.test']],
+			['x <  spaced@b.test  >', ['spaced@b.test']],
+			['<a@b.test> <c@d.test>', ['a@b.test']],
+			['a>b <c@d.test>', ['c@d.test']],
+			['<>', ['<>']],
+			['<\n>', []],
+			['Team <ops@o.test> , <> , "X" <<x@y.test>', ['ops@o.test', '<>', '<x@y.test']]
+		])('parses %j as the angle-address regex did', (to, expected) => {
+			expect(recipientsOf(to)).toEqual(expected);
+		});
+	});
 });

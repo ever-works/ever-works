@@ -316,10 +316,9 @@ function sanitiseName(value: unknown, maxLength: number): string {
 	const sanitised = String(value ?? '')
 		.toLowerCase()
 		.replace(/[^a-z0-9-]+/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^-+|-+$/g, '');
+		.replace(/-+/g, '-');
 
-	return trimHyphens(sanitised.slice(0, limit));
+	return trimHyphens(trimHyphens(sanitised).slice(0, limit));
 }
 
 /**
@@ -332,8 +331,18 @@ function fitLabel(base: string, suffix: string, maxLength: number): string {
 	return `${head}${suffix}`;
 }
 
+/**
+ * Drop leading and trailing `-`, by hand. The `/^-+|-+$/g` this replaces backtracks
+ * quadratically over a long inner run of `-` (CodeQL js/polynomial-redos); the dash runs are
+ * collapsed before any trim here, so no such run could reach it, but a linear trim does not
+ * depend on that ordering staying true.
+ */
 function trimHyphens(value: string): string {
-	return value.replace(/^-+/, '').replace(/-+$/, '');
+	let start = 0;
+	let end = value.length;
+	while (start < end && value[start] === '-') start += 1;
+	while (end > start && value[end - 1] === '-') end -= 1;
+	return value.slice(start, end);
 }
 
 function normaliseComponentName(component: unknown): string {

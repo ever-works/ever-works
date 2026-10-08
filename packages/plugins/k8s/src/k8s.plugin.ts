@@ -1753,13 +1753,30 @@ function applyKubeContextOverride(settings: KubernetesSettings, override?: strin
 	}
 }
 
-function sanitiseSlug(input: string): string {
-	return input
+/**
+ * A project name as a Kubernetes object name: lower case, every run of other
+ * characters → `-`, dash runs collapsed, leading/trailing dashes dropped, 63 max.
+ *
+ * Collapse BEFORE trimming, and trim by hand: stripping with `/^-+|-+$/g` on the
+ * uncollapsed text backtracked quadratically over a long inner run of `-`
+ * (CodeQL js/polynomial-redos), and the name is tenant-supplied. Exported for
+ * its spec only — the package entry exports the plugin class alone.
+ */
+export function sanitiseSlug(input: string): string {
+	const collapsed = input
 		.toLowerCase()
 		.replace(/[^a-z0-9-]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.replace(/-+/g, '-')
-		.slice(0, 63);
+		.replace(/-+/g, '-');
+	return trimDashes(collapsed).slice(0, 63);
+}
+
+/** Drop leading and trailing `-`, in linear time. */
+function trimDashes(value: string): string {
+	let start = 0;
+	let end = value.length;
+	while (start < end && value[start] === '-') start += 1;
+	while (end > start && value[end - 1] === '-') end -= 1;
+	return value.slice(start, end);
 }
 
 // Security: RFC-1123 DNS label (Kubernetes namespace rule). Lowercase

@@ -528,6 +528,26 @@ describe('renderRunnerJob (plan §4.8: "http jobs, http cron and every smoke run
 		expect(objectNamed(verification, 'Job', 'job-hairpin-5e6f7a8b')).toBeUndefined();
 	});
 
+	/**
+	 * CodeQL js/polynomial-redos. A declared `publicUrl` lost its trailing slashes to `/\/+$/`,
+	 * which backtracks quadratically over a long run of `/` that is not at the end (50 000 took
+	 * ~2.4 s). No production caller declares one today (the deployer derives the URL from the
+	 * primary host), so this pins the linear trim rather than a live exploit.
+	 */
+	it('trims a declared hairpin `publicUrl` in linear time, and only its trailing slashes', () => {
+		const hostile = `https://helpdesk.example.com${'/'.repeat(50_000)}x`;
+
+		const started = performance.now();
+		const plan = planFor(() => undefined, { publicUrl: hostile });
+		const elapsedMs = performance.now() - started;
+
+		expect(elapsedMs).toBeLessThan(200);
+		expect(requestsOf(configMapFor(plan, 'hairpin'))[0].url).toBe(`${hostile}/healthz`);
+
+		const slashed = planFor(() => undefined, { publicUrl: 'https://helpdesk.example.com///' });
+		expect(requestsOf(configMapFor(slashed, 'hairpin'))[0].url).toBe('https://helpdesk.example.com/healthz');
+	});
+
 	it('labels an `isolation-probe` pod with `ever-works.io/isolation-probe` (plan §4.10, APW06-G18)', () => {
 		const plan = planFor(() => undefined);
 		const probe = objectNamed(plan, 'Job', 'job-isolation-probe-5e6f7a8b') as Json;
