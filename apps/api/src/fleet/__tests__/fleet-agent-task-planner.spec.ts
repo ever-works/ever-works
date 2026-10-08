@@ -882,6 +882,16 @@ describe('FleetAgentTaskPlannerService', () => {
             expect(plan!.execution).not.toHaveProperty('resume');
         });
 
+        it('never offers a Claude session to a job that now runs Codex (provider switched since the question)', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'codex';
+            runs.findById.mockResolvedValue(resumedRun());
+            const plan = await build().plan(payload);
+            expect(plan!.execution.provider).toBe('codex');
+            expect(plan!.execution).not.toHaveProperty('resume');
+            // The fresh prompt still carries the answer — nothing is lost.
+            expect(plan!.execution.instructions).toContain('# OWNER ANSWER');
+        });
+
         it('withholds the offer when the continuation would not fit beside the fresh prompt', async () => {
             // A system prompt far over the budget is trimmed to fill it, so the
             // fresh instructions take the WHOLE budget and nothing is left for

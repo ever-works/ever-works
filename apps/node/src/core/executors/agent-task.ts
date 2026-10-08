@@ -1982,17 +1982,40 @@ function decideSessionResume(
 }
 
 /**
- * Self-build slice AU — the resumed invocation never got a session at all:
- * it failed, reported no session id and no model turn. That is the shape of
- * `claude --resume <unknown id>` ("No conversation found", exit 1, empty
- * stdout) and of a CLI too old to know `--fork-session`, and NOT the shape
- * of a resumed session that ran and then failed — that one reports its
- * session and its turns, and re-running it fresh would spend the model a
- * second time on work it already did. A timeout never falls back either:
- * the budget is gone.
+ * Self-build slice AU — the CLI's own words for "I could not open that
+ * session", which is the ONLY thing allowed to trigger a fresh retry:
+ *
+ *   - `No conversation found with session ID: <id>` — what `claude -p
+ *     --resume <unknown id>` prints on stderr before exiting 1 (probed against
+ *     Claude Code 2.1.294): the id is not in this machine's CLI home, or not
+ *     under this worktree's project directory;
+ *   - `unknown option '--resume'` / `'--fork-session'` — a CLI too old for
+ *     the flags (commander's wording), which also exits before any model turn.
+ */
+const RESUME_NEVER_OPENED_SIGNATURES: readonly RegExp[] = [
+	/No conversation found with session ID/i,
+	/unknown option ['"]?--(?:resume|fork-session)\b/i
+];
+
+/**
+ * Self-build slice AU — the resumed invocation demonstrably never opened the
+ * session: it failed, reported no session id and no model turn, AND the CLI
+ * said why in one of {@link RESUME_NEVER_OPENED_SIGNATURES}. Only then is a
+ * fresh retry safe — nothing ran, nothing was spent, the worktree is as the
+ * offer found it.
+ *
+ * Missing result fields alone are NOT proof (review, PR #2571): a resumed
+ * CLI that edited files and was then killed or crashed before printing its
+ * final JSON reports no session and no turns either, and re-running the
+ * model then would spend it twice on an already-changed worktree while the
+ * first attempt's cost went unreported. An unexplained failure is reported
+ * as the failure it is. A timeout never falls back either: the budget is gone.
  */
 function resumeNeverOpened(model: FleetAgentTaskModelResult): boolean {
-	return model.status === 'failed' && !model.sessionId && !(typeof model.turns === 'number' && model.turns > 0);
+	if (model.status !== 'failed') return false;
+	if (model.sessionId || (typeof model.turns === 'number' && model.turns > 0)) return false;
+	const said = typeof model.outputTail === 'string' ? model.outputTail : '';
+	return RESUME_NEVER_OPENED_SIGNATURES.some((signature) => signature.test(said));
 }
 
 function describeModelFailure(model: FleetAgentTaskModelResult): string {

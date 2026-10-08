@@ -676,8 +676,11 @@ What happens next:
   earlier runs asked and the answers you gave, oldest first, under
   **`# EARLIER QUESTIONS AND ANSWERS`**. That happens when the run lands on another node, when the
   provider is Codex, or when the CLI no longer has the session (for example "No conversation found"
-  after the CLI's history was cleared). In that last case the node notices the CLI never opened the
-  session and runs fresh within the same job. The job result records what happened as
+  after the CLI's history was cleared). In that last case the node runs fresh within the same job,
+  but only when the CLI itself said it could not open the session ("No conversation found", or a
+  CLI too old to know the resume flags) and no model turn ran. A resumed session that crashed
+  without saying why is reported as a failed run rather than run a second time, because it may
+  already have changed the worktree. The job result records what happened as
   `model.resume`: `resumed`, `fell-back` or `skipped`, with the reason.
   Codex is never resumed: `codex exec resume` does not take `--sandbox`, `-C` or `--add-dir`, so a
   resumed Codex run could not be held to the sandbox and mount grants it was planned with.
