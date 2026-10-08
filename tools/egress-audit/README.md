@@ -14,17 +14,22 @@ allow.
 
 ## The harness
 
-The harness is the public egress audit of the Ever Platform SDK,
-[`ever-co/ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk) (Apache-2.0),
-`tools/egress-audit` with the mock platform from `tools/mock-platform`. It is not copied here and
-not installed from a registry: the workflow checks the SDK out at a **pinned commit** and installs
-the harness's own dependencies from the SDK's lockfile.
+The harness is the egress audit of the Ever Platform SDK, with its mock platform: the dev-only
+[`@ever-co/connect-tools`](https://www.npmjs.com/package/@ever-co/connect-tools) package (Apache-2.0,
+source in [`ever-co/ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk)). Nothing of it
+is copied here: this directory is a small workspace package (`@ever-works/egress-audit`) whose only
+dependency is that package, **pinned to one exact version** and installed from the repository's
+lockfile. The workflow runs its `ever-egress-audit` bin; the statistics job against the mock runs
+its `ever-mock-platform` bin.
 
-| Pinned commit                              | Where it is set                                                |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| `2fd74dad9357a18471292f38012a5f5e4e6d2938` | `EVER_CONNECT_SDK_SHA` in `.github/workflows/egress-audit.yml` |
+| Pinned version | Where it is set                                               |
+| -------------- | ------------------------------------------------------------- |
+| `1.0.0-rc.2`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
 
-To move to a newer harness, change that one value in a pull request; the audit runs on it.
+The module itself uses `@ever-co/connect-sdk` and `@ever-co/connect-contracts` at the same
+version (`apps/api`, `packages/agent`, `packages/contracts`); `drift.spec.ts` in the statistics
+module fails when the pins in these four manifests differ. To move to a newer release, change them
+together in one pull request and refresh the lockfile; the audit runs on it.
 
 This directory holds only Works' inputs:
 
@@ -63,9 +68,7 @@ pcaps, the DNS log, the API log and the mock's call record per mode — is uploa
 Linux with Docker (the sniffer needs `NET_RAW` and `NET_ADMIN`), Node.js 20 or later:
 
 ```sh
-git clone https://github.com/ever-co/ever-connect-sdk .egress-audit/sdk
-git -C .egress-audit/sdk checkout 2fd74dad9357a18471292f38012a5f5e4e6d2938
-(cd .egress-audit/sdk && corepack enable && pnpm install --frozen-lockfile --filter ./tools/egress-audit)
+pnpm install --frozen-lockfile --filter @ever-works/egress-audit
 
 docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:egress-audit .
 
@@ -73,9 +76,22 @@ docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:egress-audit .
 printf 'EVER_STATS_ENABLED=false\n' > /tmp/api-stats-off.env
 
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-empty.env \
-  node .egress-audit/sdk/tools/egress-audit/run.mjs --config tools/egress-audit/egress-audit.config.json --mode off
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode off
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-stats-off.env \
-  node .egress-audit/sdk/tools/egress-audit/run.mjs --config tools/egress-audit/egress-audit.config.json --mode off_env_file
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode off_env_file
+```
+
+In the positive mode the harness points the API at the mock platform's fixed address on the
+sealed network (`__MOCK_URL__`, a private address the module accepts over `http`); the mock's
+documents name the issuer `https://mock-platform.test` (`__MOCK_ISSUER__`), which the statistics
+module does not read.
+
+The real sender against the mock outside the audit (what the workflow's second job runs):
+
+```sh
+tools/egress-audit/node_modules/.bin/ever-mock-platform --host 127.0.0.1 --port 18080 &
+(cd apps/api && EVER_STATS_MOCK_URL=http://127.0.0.1:18080 \
+  npx jest src/instance-stats/__tests__/instance-stats.mock.itest.spec.ts)
 ```
 
 Exit codes: `0` pass, `1` a violation, `2` the harness could not prove anything (for example the

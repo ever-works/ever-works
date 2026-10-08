@@ -96,7 +96,7 @@ One JSON document per day, schema `ever.stats.v1`, at most 16 KiB, integers only
 
 Every installation sends the same fields whatever its size — a one-person installation included. The keys of the nested maps (`works_by_kind`, `deployments_by_provider`) come from closed lists: a kind or a deployment provider the list does not name (a custom provider plugin, say) is counted under `other`, never under its own name.
 
-The schema is published in the open-source [`ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk) repository (`contracts/schemas/ever.stats.v1.json`, SHA-256 `0cd746f7dec75117a6b812b7a832f9ceca4c97a6ecf65d22d6967a6475efc6e5`). Ever Works carries a byte-for-byte copy and a test that fails if it differs. The schema closes every object (`additionalProperties: false`), so no unknown field can be added by accident, and Ever Platform refuses anything off-schema.
+The schema is published in the open-source [`ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk) repository and on npm as [`@ever-co/connect-contracts`](https://www.npmjs.com/package/@ever-co/connect-contracts) (`schemas/ever.stats.v1.json`, SHA-256 `0cd746f7dec75117a6b812b7a832f9ceca4c97a6ecf65d22d6967a6475efc6e5`). Ever Works depends on that package and on [`@ever-co/connect-sdk`](https://www.npmjs.com/package/@ever-co/connect-sdk) (the checks every report passes before it is signed, and the signing itself) at one exact version, and a test fails if the installed schema differs from that hash. The schema closes every object (`additionalProperties: false`), so no unknown field can be added by accident, and Ever Platform refuses anything off-schema.
 
 ### 1.1 What is never included
 

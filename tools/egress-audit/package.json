@@ -1,0 +1,10 @@
+{
+	"name": "@ever-works/egress-audit",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Ever Works' inputs to the Ever Platform egress audit (config, adapter, compose overlay) and the pinned dev-only tools that run it",
+	"license": "AGPL-3.0",
+	"devDependencies": {
+		"@ever-co/connect-tools": "1.0.0-rc.2"
+	}
+}
