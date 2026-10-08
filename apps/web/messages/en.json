@@ -5362,6 +5362,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Usage is billed from your credits balance",
+                    "seatsIncluded": "{count} employees or agents included",
+                    "trial": "{days}-day free trial on your first subscription",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

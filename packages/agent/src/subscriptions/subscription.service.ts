@@ -96,8 +96,10 @@ const PLAN_SEED_DATA: Array<{
         monthlyPrice: '0',
         annualPrice: '0',
         lifetimePrice: null,
-        // One seat, and no per-seat price: upgrading is how you get more, not a top-up.
-        seatsIncluded: 1,
+        // 15 seats (employees or agents), and no per-seat price: upgrading is how you get more,
+        // not a top-up. 15 since the 2026-10-05 repricing (was 1) — every Ever product's free
+        // Starter covers up to 15 employees.
+        seatsIncluded: 15,
         seatMonthlyPrice: null,
         // Free accounts live on the universal 50-credits-a-day grant, not a monthly allowance.
         monthlyCredits: 0,
@@ -109,11 +111,12 @@ const PLAN_SEED_DATA: Array<{
         hosting: 'cloud',
         maxWorks: 5,
         allowedCadences: PAID_CADENCES,
-        // Ever Gauzy / Ever Teams cloud Small Business: $25/mo, $204/yr (displays "$17/mo").
-        monthlyPrice: '25',
-        annualPrice: '204',
+        // Ever Gauzy / Ever Teams cloud Small Business since the 2026-10-05 repricing: $49/mo,
+        // $408/yr (displays "$34/mo" = floor(49 x 7 / 10)), 25 seats included (was $25 / $204 / 10).
+        monthlyPrice: '49',
+        annualPrice: '408',
         lifetimePrice: null,
-        seatsIncluded: 10,
+        seatsIncluded: 25,
         seatMonthlyPrice: '5',
         monthlyCredits: 3000,
         overagePricePerRun: '8',
@@ -124,14 +127,16 @@ const PLAN_SEED_DATA: Array<{
         hosting: 'cloud',
         maxWorks: 15,
         allowedCadences: ALL_CADENCES,
-        // Ever Gauzy / Ever Teams Enterprise: $199/mo, $1,668/yr (displays "$139/mo").
-        monthlyPrice: '199',
-        annualPrice: '1668',
+        // Ever Gauzy / Ever Teams Enterprise since the 2026-10-05 repricing: $499/mo, $4,188/yr
+        // (displays "$349/mo" = floor(499 x 7 / 10)); was $199 / $1,668.
+        monthlyPrice: '499',
+        annualPrice: '4188',
         lifetimePrice: null,
-        // Option 2 (unlimited organizations, 10 seats each) is the metered default. Option 1 (one
-        // organization, unlimited seats) is the same plan with seat metering switched off on the
-        // subscription rather than a separate row.
-        seatsIncluded: 10,
+        // Option 2 (unlimited organizations, 50 seats included in total, then $10/mo each) is the
+        // metered default; seats are counted tenant-wide. Option 1 (one organization, unlimited
+        // seats) is the same plan with seat metering switched off on the subscription rather than
+        // a separate row. 50 since the 2026-10-05 repricing (was 10).
+        seatsIncluded: 50,
         seatMonthlyPrice: '10',
         monthlyCredits: 25000,
         overagePricePerRun: '0',
@@ -162,11 +167,12 @@ const PLAN_SEED_DATA: Array<{
         maxWorks: 5,
         allowedCadences: PAID_CADENCES,
         // Ever Gauzy self-hosted Small Business Edition: $49/mo, $408/yr (displays "$34/mo"),
-        // or a $99 one-time perpetual commercial licence.
+        // or a $99 one-time perpetual commercial licence (UNCHANGED by the 2026-10-05 repricing).
+        // Seats included: 25 since that repricing (was 10), the same as cloud Pro.
         monthlyPrice: '49',
         annualPrice: '408',
         lifetimePrice: '99',
-        seatsIncluded: 10,
+        seatsIncluded: 25,
         seatMonthlyPrice: '5',
         monthlyCredits: 3000,
         overagePricePerRun: '8',
@@ -177,10 +183,12 @@ const PLAN_SEED_DATA: Array<{
         hosting: 'selfhosted',
         maxWorks: 15,
         allowedCadences: ALL_CADENCES,
-        monthlyPrice: '199',
-        annualPrice: '1668',
+        // Same price as cloud Enterprise (cloud == self-hosted since the 2026-10-05 repricing):
+        // $499/mo, $4,188/yr, 50 seats included (was $199 / $1,668 / 10).
+        monthlyPrice: '499',
+        annualPrice: '4188',
         lifetimePrice: null,
-        seatsIncluded: 10,
+        seatsIncluded: 50,
         seatMonthlyPrice: '10',
         monthlyCredits: 25000,
         overagePricePerRun: '0',

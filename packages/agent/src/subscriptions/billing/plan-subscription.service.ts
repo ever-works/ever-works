@@ -28,6 +28,37 @@ import {
     type CatalogInterval,
 } from './stripe-catalog';
 
+/**
+ * Free-trial length for a CLOUD paid plan (owner rule, 2026-10-05 repricing): every Ever product
+ * gives a 90-day free trial on its Cloud paid plans, and only there. Self-hosted subscriptions are
+ * charged at purchase (Terms 1.1.0), a perpetual licence is a one-off payment, and the free plan is
+ * never checked out — the same scope ever.co's shared checkout applies (cloud + paid + recurring).
+ */
+export const CLOUD_PLAN_TRIAL_PERIOD_DAYS = 90;
+
+/**
+ * The trial a plan checkout gets, in days — `0` means "charge at checkout".
+ *
+ * Pure, so the rule is unit-tested on its own. One trial per account: an owner who has EVER held a
+ * provider subscription (trialing, active, past due or cancelled) is charged at checkout, so a
+ * trial cannot be renewed by cancelling and starting again.
+ */
+export function planCheckoutTrialPeriodDays(params: {
+    hosting: string | null | undefined;
+    mode: 'subscription' | 'payment';
+    basePriceCents: number;
+    hadProviderSubscription: boolean;
+}): number {
+    // Same normalisation as `resolveSkuForPlanRow`: a row with no hosting predates the column and
+    // is cloud.
+    const hosting = params.hosting === 'selfhosted' ? 'selfhosted' : 'cloud';
+    if (hosting !== 'cloud') return 0;
+    if (params.mode !== 'subscription') return 0;
+    if (!(params.basePriceCents > 0)) return 0;
+    if (params.hadProviderSubscription) return 0;
+    return CLOUD_PLAN_TRIAL_PERIOD_DAYS;
+}
+
 /** A checkout was asked for with a plan code that is not sellable. */
 export class UnknownSubscriptionPlanError extends Error {
     constructor(planCode: string) {
@@ -127,6 +158,12 @@ export interface PlanCheckoutStarted {
     /** Additional seats being billed, after the plan's own included allowance. */
     extraSeats: number;
     currency: string;
+    /**
+     * Free-trial days on this checkout (Cloud paid plans, first subscription only); `0` = the
+     * buyer is charged {@link priceCents} at checkout. When positive, the first charge of
+     * {@link priceCents} happens when the trial ends.
+     */
+    trialPeriodDays: number;
 }
 
 export interface PlanCheckoutReturn {
@@ -271,6 +308,18 @@ export class PlanSubscriptionService {
         );
         const priceCents = basePriceCents + seatTotalCents;
 
+        const mode: 'subscription' | 'payment' =
+            catalogSku?.mode ?? (interval === 'lifetime' ? 'payment' : 'subscription');
+        const trialPeriodDays = planCheckoutTrialPeriodDays({
+            hosting: plan.hosting,
+            mode,
+            basePriceCents,
+            hadProviderSubscription:
+                mode === 'subscription'
+                    ? await this.hasHadProviderSubscription(options.userId)
+                    : false,
+        });
+
         const user = await this.userRepository.findById(options.userId);
         const existing = await this.billingProfileRepository.findByUserId(options.userId);
 
@@ -304,7 +353,10 @@ export class PlanSubscriptionService {
                 interval: interval === 'annual' ? 'year' : 'month',
                 // A `lifetime` SKU is bought outright. Decided from the catalog SKU, never from
                 // the interval name alone — see `resolveCatalogSku`.
-                mode: catalogSku?.mode ?? (interval === 'lifetime' ? 'payment' : 'subscription'),
+                mode,
+                // 90 days on a Cloud paid plan, first subscription only; 0 everywhere else
+                // (see `planCheckoutTrialPeriodDays`).
+                trialPeriodDays,
                 // Prefer the catalog price in the shared Stripe account over the row's own amount,
                 // so the invoice line carries a lookup_key that maps back to a reviewed commit.
                 // `null` here is normal on a deployment whose catalog has not been synced — the
@@ -326,7 +378,18 @@ export class PlanSubscriptionService {
             seatCents: seatTotalCents,
             extraSeats: catalogKeys.extraSeats ?? 0,
             currency: plan.currency,
+            trialPeriodDays,
         };
+    }
+
+    /**
+     * Has this owner ever held a PROVIDER subscription (any status)? Rows without a provider
+     * subscription id — a free plan switched to directly — do not count, so a free user still gets
+     * the trial on their first paid checkout.
+     */
+    private async hasHadProviderSubscription(userId: string): Promise<boolean> {
+        const rows = await this.userSubscriptionRepository.listByUser(userId);
+        return (rows ?? []).some((row) => Boolean(row.providerSubscriptionId));
     }
 
     /**
