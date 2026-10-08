@@ -1769,6 +1769,36 @@ export class AgentRunRepository {
     }
 
     /**
+     * Self-build slice AU — record WHERE a run was dispatched, in the one
+     * column that already means "what executes this run": `runnerKind`.
+     *
+     * A fleet run gets the bring-your-own tag its usage row already carries
+     * (`fleet-node:<provider>`, or `fleet-node:command` in legacy command
+     * mode), which is what lets the Task page tell a FLEET run from a cloud
+     * one: a node never reads `pendingInput` or `interruptRequested` mid-run,
+     * so a free-text steer offered on a live fleet run is undeliverable.
+     *
+     * `null` (the run went to the platform runtime instead) clears ONLY a
+     * fleet tag, with a conditional UPDATE — `RunSteeringService.resume`
+     * carries `runnerKind` onto a successor, and a successor of a fleet run
+     * that is routed to the cloud must not keep reading as a fleet run; any
+     * other value a cloud pipeline wrote is left alone.
+     */
+    async recordDispatchRunner(runId: string, runnerKind: string | null): Promise<void> {
+        if (runnerKind) {
+            await this.repository.update(runId, { runnerKind });
+            return;
+        }
+        await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ runnerKind: null })
+            .where('id = :runId', { runId })
+            .andWhere('runnerKind LIKE :fleet', { fleet: 'fleet-node:%' })
+            .execute();
+    }
+
+    /**
      * Resume single-flight — CAS claim of a SOURCE run for one `resume`.
      *
      * The point is the DUPLICATE-SUCCESSOR refusal: two requests that both
