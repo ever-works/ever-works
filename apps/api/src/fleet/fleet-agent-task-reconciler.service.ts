@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { RunDispatchGateService } from '@ever-works/agent/agents';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import {
+    AgentRepository,
+    AgentRunLogRepository,
+    AgentRunRepository,
+} from '@ever-works/agent/database';
 import type { AgentRun, FleetNode, Task } from '@ever-works/agent/entities';
 import { PluginUsageCapability } from '@ever-works/agent/entities';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
@@ -43,6 +47,7 @@ import {
     correlateAgentTaskJob,
     type FleetAgentTaskCorrelation,
 } from './fleet-agent-task.correlation';
+import { FLEET_TIMELINE_LOG_STEPS, fleetModelTimelineLogRows } from './fleet-run-evidence';
 
 /** What an `agent-task` job correlates to on the platform side (declared in the leaf). */
 export type { FleetAgentTaskCorrelation };
@@ -139,6 +144,12 @@ export class FleetAgentTaskReconcilerService {
         @Optional() private readonly pluginUsage?: PluginUsageService,
         @Optional() private readonly jobs?: FleetJobRepository,
         @Optional() private readonly costCeiling?: FleetCostCeilingService,
+        // Self-build slice AP — the run's step records land in the SAME
+        // `agent_run_logs` timeline the cloud tool loop writes, so the
+        // Sessions view renders a fleet run unchanged. Appended LAST and
+        // @Optional() per the positional-construction rule (handover §5.2):
+        // absent, a fleet run simply has no timeline, as before the slice.
+        @Optional() private readonly runLogs?: AgentRunLogRepository,
     ) {}
 
     /**
@@ -205,6 +216,14 @@ export class FleetAgentTaskReconcilerService {
             );
             return;
         }
+
+        // Self-build slice AP — the run's step records, for EVERY verdict
+        // (a cancelled run's are as interesting as anyone's). Taken before
+        // the cancelled-run guard below on purpose: that guard exists to
+        // stop side effects nobody can undo — a pull request, a chat
+        // message, an inbox notice — and appending the evidence of what the
+        // node actually did is none of those.
+        await this.recordModelTimeline(ctx.runId, event.result);
 
         // A cancelled run gets the board mirror and NOTHING else.
         //
@@ -1099,6 +1118,34 @@ export class FleetAgentTaskReconcilerService {
             );
             return [];
         }
+    }
+
+    /**
+     * Self-build slice AP — append the node's step records to the run's
+     * `agent_run_logs` timeline, in the shape the cloud capture writes (see
+     * `fleet-run-evidence.ts`).
+     *
+     * Best-effort like every other side effect here: evidence is a report
+     * about the run, never a verdict on it. Idempotent: a run that already
+     * has timeline rows is left alone, because nothing else writes these
+     * step names for a fleet-executed run (the cloud tool loop never runs
+     * one), so rows already there mean this completion was seen before.
+     * Rows are appended ONE AT A TIME, in order — the timeline is read back
+     * by (createdAt, insertion order), and a batch insert sharing one
+     * transaction timestamp would come back in random-uuid order on
+     * Postgres.
+     */
+    private async recordModelTimeline(runId: string, result: unknown): Promise<void> {
+        const runLogs = this.runLogs;
+        if (!runLogs) return;
+        const rows = fleetModelTimelineLogRows(result);
+        if (rows.length === 0) return;
+        await this.bestEffort('model timeline', async () => {
+            if ((await runLogs.countByRunSteps(runId, FLEET_TIMELINE_LOG_STEPS)) > 0) return;
+            for (const row of rows) {
+                await runLogs.append({ runId, ...row });
+            }
+        });
     }
 
     private async bestEffort(what: string, fn: () => Promise<unknown>): Promise<void> {
