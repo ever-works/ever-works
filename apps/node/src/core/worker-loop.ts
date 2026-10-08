@@ -191,6 +191,14 @@ export function isSuspendGap(gap: TimerGap): boolean {
 }
 
 /**
+ * The upgrade path for a node that was NOT installed from the npm package
+ * (review): the package's publish is tag-triggered and not every machine
+ * runs it — a node built from a monorepo checkout upgrades by rebuilding.
+ */
+export const NODE_SOURCE_UPGRADE_HINT =
+	'(or, on a node built from a monorepo checkout, pull and run `pnpm build:node`)';
+
+/**
  * The sentence every surface prints for a daemon below the platform's
  * minimum version (node lifecycle, self-build slice AR): what is wrong and
  * the exact command that fixes it.
@@ -200,7 +208,7 @@ export function describeUpgradeRequired(minNodeVersion: string | null, currentVe
 	const floor = minNodeVersion
 		? `the platform's minimum version ${minNodeVersion}`
 		: "the platform's minimum version";
-	return `Upgrade required — ${current} is below ${floor}, so it is offered no new work. Run \`${FLEET_NODE_UPGRADE_COMMAND}\` on this machine, then restart the node service.`;
+	return `Upgrade required — ${current} is below ${floor}, so it is offered no new work. Run \`${FLEET_NODE_UPGRADE_COMMAND}\` on this machine ${NODE_SOURCE_UPGRADE_HINT}, then restart the node service.`;
 }
 
 /**

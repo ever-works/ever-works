@@ -346,7 +346,7 @@ You can also hand-edit a node's tags under **Settings → Fleet → Capability t
 
 ## Keeping nodes current
 
-Upgrading a node is still a manual step per machine — `npm install -g ever-works-node@latest`, then restart the node service — but the platform now tells you which machines need it, and refuses the ones that are too old instead of letting them fail work.
+Upgrading a node is still a manual step per machine — `npm install -g ever-works-node@latest` for a machine installed from the npm package (see `apps/node/README.md`; the package publishes on a release tag), or `git pull` + `pnpm build:node` for a node built from a monorepo checkout — then restart the node service. The platform now tells you which machines need it, and refuses the ones that are too old instead of letting them fail work.
 
 ### The daemon version floor
 

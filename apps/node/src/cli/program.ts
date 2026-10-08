@@ -59,6 +59,7 @@ import { FLEET_NODE_UPGRADE_COMMAND, isFleetNodeVersionBelowFloor } from '@ever-
 import { isModelCliCompatible, ModelCliCompatibilityProbe, type ModelCliCompatibility } from '../core/model-cli-compat';
 import type { ModelCliPaths } from '../core/executors/model-cli';
 import { readNodeLifecycleRecord, writeNodeLifecycleRecord, type NodeLifecycleRecord } from '../core/node-lifecycle';
+import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
 
 /**
  * `ever-works-node` CLI.
@@ -1162,23 +1163,32 @@ async function gatherLifecycle(deps: CliDeps, config: NodeConfig | null): Promis
  * exactly when an operator runs `doctor` to check the upgrade took.
  */
 function describeDaemonLifecycle(deps: CliDeps, record: NodeLifecycleRecord | null): string {
-	const version = deps.io.version;
+	const local = deps.io.version;
 	if (!record) {
-		return `${version} (the platform's minimum version has not been reported yet — it arrives on the running service's first heartbeat)`;
+		return `${local} (the platform's minimum version has not been reported yet — it arrives on the running service's first heartbeat)`;
 	}
+	// The verdict is about the RUNNING SERVICE — the process that holds the
+	// work lane — so it is the platform's own answer to that service, never
+	// this binary's version (review). The two differ whenever another
+	// install or PATH order resolves the CLI, and right after an upgrade.
 	const floor = record.minNodeVersion;
 	const asOf = `as of ${record.recordedAt}`;
-	const restartHint =
-		record.daemonVersion && record.daemonVersion !== version
-			? `; the running service last reported ${record.daemonVersion} — restart it to run ${version}`
-			: '';
-	if (floor && isFleetNodeVersionBelowFloor(version, floor)) {
-		return `${version} — UPGRADE REQUIRED: below the platform's minimum ${floor} (${asOf}); this node is offered no new work. Run \`${FLEET_NODE_UPGRADE_COMMAND}\`, then restart the node service${restartHint}`;
+	const service = record.daemonVersion || local;
+	const localBelow = floor !== null && isFleetNodeVersionBelowFloor(local, floor);
+	if (record.upgradeRequired) {
+		const fix =
+			local !== service && !localBelow
+				? `This command's binary is already ${local} — restart the node service to run it`
+				: `Run \`${FLEET_NODE_UPGRADE_COMMAND}\` ${NODE_SOURCE_UPGRADE_HINT}, then restart the node service`;
+		return `${service} (running service) — UPGRADE REQUIRED: below the platform's minimum ${floor ?? '(not named)'} (${asOf}); it is offered no new work. ${fix}`;
 	}
-	if (record.upgradeRequired && record.daemonVersion === version) {
-		return `${version} — UPGRADE REQUIRED: the platform refused this daemon (${floor ? `minimum ${floor}, ` : ''}${asOf}). Run \`${FLEET_NODE_UPGRADE_COMMAND}\`, then restart the node service`;
-	}
-	return `${version} (platform minimum ${floor ?? 'not named'}, ${asOf})${restartHint}`;
+	const note =
+		local === service
+			? ''
+			: localBelow
+				? `; this command's binary is ${local}, below that minimum — another install on PATH? The running service itself is admitted`
+				: `; this command's binary is ${local} — restart the node service to run it`;
+	return `${service} (running service; platform minimum ${floor ?? 'not named'}, ${asOf})${note}`;
 }
 
 /** One line per pinned model CLI: what it is and whether this node can drive it. */
@@ -1246,10 +1256,12 @@ function lifecycleJson(deps: CliDeps, report: LifecycleReport): Record<string, u
 		minNodeVersion: floor,
 		minNodeVersionRecordedAt: report.record?.recordedAt ?? null,
 		serviceDaemonVersion: report.record?.daemonVersion || null,
-		upgradeRequired:
-			(floor !== null && isFleetNodeVersionBelowFloor(deps.io.version, floor)) ||
-			(report.record?.upgradeRequired === true && report.record.daemonVersion === deps.io.version),
+		// The platform's verdict on the RUNNING SERVICE (review), and separately
+		// whether the binary running this command would be below the floor.
+		upgradeRequired: report.record?.upgradeRequired === true,
+		localBinaryBelowFloor: floor !== null && isFleetNodeVersionBelowFloor(deps.io.version, floor),
 		upgradeCommand: FLEET_NODE_UPGRADE_COMMAND,
+		sourceUpgradeHint: NODE_SOURCE_UPGRADE_HINT,
 		// Remote node limits (slice AS).
 		limitCeiling: report.record?.limitCeiling ?? null,
 		effectiveLimits: (() => {

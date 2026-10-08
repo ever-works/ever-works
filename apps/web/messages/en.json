@@ -5165,7 +5165,7 @@
                 "lifecycle": {
                     "title": "Daemon & model CLIs",
                     "upgradeRequired": "Upgrade required",
-                    "upgradeRequiredHint": "This machine runs {version}, below the platform minimum {minimum}. It keeps reporting and finishes the work it holds, but is offered no new work until it is upgraded. On that machine run {command}, then restart the node service.",
+                    "upgradeRequiredHint": "This machine runs {version}, below the platform minimum {minimum}. It keeps reporting and finishes the work it holds, but is offered no new work until it is upgraded. On that machine run {command} (or, for a node built from a monorepo checkout, pull and run pnpm build:node), then restart the node service.",
                     "minimum": "Daemon {version} · platform minimum {minimum}",
                     "cliVersions": "Pinned CLIs: {list}",
                     "cliVersionsNone": "No model CLI pinned on this machine.",

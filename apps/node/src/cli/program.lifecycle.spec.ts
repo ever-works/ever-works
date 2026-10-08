@@ -191,9 +191,12 @@ describe('status and doctor read the recorded verdict', () => {
 		const h = harness({ files: { [CONFIG_PATH]: storedConfig, [RECORD_PATH]: record() } });
 		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
 		expect(h.output()).toContain(
-			"daemon       0.2.0 — UPGRADE REQUIRED: below the platform's minimum 0.3.0 (as of 2026-10-08T11:00:00.000Z)"
+			"daemon       0.2.0 (running service) — UPGRADE REQUIRED: below the platform's minimum 0.3.0 (as of 2026-10-08T11:00:00.000Z); it is offered no new work"
 		);
-		expect(h.output()).toContain('`npm install -g ever-works-node@latest`, then restart the node service');
+		expect(h.output()).toContain(
+			'Run `npm install -g ever-works-node@latest` (or, on a node built from a monorepo'
+		);
+		expect(h.output()).toContain('then restart the node service');
 	});
 
 	it('doctor run by the UPGRADED binary says to restart the service that is still old', async () => {
@@ -203,8 +206,35 @@ describe('status and doctor read the recorded verdict', () => {
 		});
 		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
 		expect(h.output()).toContain(
-			'daemon       0.3.0 (platform minimum 0.3.0, as of 2026-10-08T11:00:00.000Z); the running service last reported 0.2.0 — restart it to run 0.3.0'
+			"daemon       0.2.0 (running service) — UPGRADE REQUIRED: below the platform's minimum 0.3.0 (as of 2026-10-08T11:00:00.000Z); it is offered no new work. This command's binary is already 0.3.0 — restart the node service to run it"
 		);
+	});
+
+	it('never claims the SERVICE is refused because the binary running the command is older (review)', async () => {
+		// The service runs 0.3.0 and the platform admits it; the CLI on PATH
+		// is an older 0.2.0 install. The verdict is about the service.
+		const h = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[RECORD_PATH]: record({ daemonVersion: '0.3.0', minNodeVersion: '0.3.0', upgradeRequired: false })
+			},
+			version: '0.2.0'
+		});
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).not.toContain('UPGRADE REQUIRED');
+		expect(h.output()).toContain(
+			"daemon       0.3.0 (running service; platform minimum 0.3.0, as of 2026-10-08T11:00:00.000Z); this command's binary is 0.2.0, below that minimum"
+		);
+
+		const json = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[RECORD_PATH]: record({ daemonVersion: '0.3.0', minNodeVersion: '0.3.0', upgradeRequired: false })
+			},
+			version: '0.2.0'
+		});
+		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet', '--json'], json.deps)).toBe(EXIT_OK);
+		expect(JSON.parse(json.output())).toMatchObject({ upgradeRequired: false, localBinaryBelowFloor: true });
 	});
 
 	it('status before the service has ever beaten says the floor is not known yet', async () => {
@@ -222,7 +252,9 @@ describe('status and doctor read the recorded verdict', () => {
 			modelCli: { 'claude-code': '/opt/pinned/claude', codex: null }
 		});
 		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
-		expect(h.output()).toContain('daemon       0.2.0 (platform minimum 0.1.0, as of 2026-10-08T11:00:00.000Z)');
+		expect(h.output()).toContain(
+			'daemon       0.2.0 (running service; platform minimum 0.1.0, as of 2026-10-08T11:00:00.000Z)'
+		);
 		expect(h.output()).toContain(
 			'model cli    claude-code 2.1.3 (/opt/pinned/claude) — compatible; runs go without --effort, --max-budget-usd (not advertised by this build)'
 		);
