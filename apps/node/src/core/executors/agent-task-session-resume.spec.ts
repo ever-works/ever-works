@@ -109,18 +109,30 @@ const noQuestion: AgentTaskQuestionFs = {
 };
 
 /** Spawn double: records every command; exit codes scripted by substring. */
-function recordingSpawn(exitCodes: Array<[match: string, code: number]>) {
+function recordingSpawn(
+	exitCodes: Array<[match: string, code: number]>,
+	/** What a matching command prints on stderr before it exits (slice AU review). */
+	stderrFor: Array<[match: string, text: string]> = []
+) {
 	const commands: string[] = [];
 	const spawnFn = ((command: string) => {
 		commands.push(command);
 		const handlers = new Map<string, (arg?: unknown) => void>();
+		let onStderr: ((chunk: Buffer) => void) | null = null;
 		queueMicrotask(() => {
+			const said = stderrFor.find(([match]) => command.includes(match));
+			if (said && onStderr) onStderr(Buffer.from(said[1]));
 			const hit = exitCodes.find(([match]) => command.includes(match));
 			handlers.get('close')?.(hit ? hit[1] : 0);
 		});
 		return {
 			stdout: { on: () => undefined, destroy: () => undefined },
-			stderr: { on: () => undefined, destroy: () => undefined },
+			stderr: {
+				on: (event: string, handler: (chunk: Buffer) => void) => {
+					if (event === 'data') onStderr = handler;
+				},
+				destroy: () => undefined
+			},
 			on: (event: string, handler: (arg?: unknown) => void) => {
 				handlers.set(event, handler);
 			},
@@ -205,7 +217,10 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 		// `claude --resume <unknown>` prints "No conversation found" on stderr,
 		// nothing on stdout, and exits 1 — before any model turn.
 		const fs = scratchFs([null, envelope({ session_id: 'fresh-session' })]);
-		const { commands, spawnFn } = recordingSpawn([['--resume', 1]]);
+		const { commands, spawnFn } = recordingSpawn(
+			[['--resume', 1]],
+			[['--resume', `No conversation found with session ID: ${SESSION}`]]
+		);
 
 		const outcome = await runAgentTaskJob(job(payload(offer())), io({ fs, spawnFn }));
 
@@ -225,6 +240,36 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 				reason: expect.stringContaining('could not open the earlier session')
 			}
 		});
+	});
+
+	it('falls back for a CLI too old to know --fork-session, which also exits before any model turn', async () => {
+		const fs = scratchFs([null, envelope({ session_id: 'fresh-session' })]);
+		const { commands, spawnFn } = recordingSpawn(
+			[['--resume', 1]],
+			[['--resume', "error: unknown option '--fork-session'"]]
+		);
+
+		const outcome = await runAgentTaskJob(job(payload(offer())), io({ fs, spawnFn }));
+
+		expect(modelCommands(commands)).toHaveLength(2);
+		expect(outcome.model?.resume?.outcome).toBe('fell-back');
+	});
+
+	it('⭐ does NOT re-run a resumed CLI that crashed without saying why — the worktree may already be changed (review)', async () => {
+		// Killed / crashed mid-session: no final JSON, so no session id and no
+		// turns — exactly like "never opened", except it may have edited files
+		// and spent money. Missing fields are not proof; only the CLI's own
+		// "could not open" message is.
+		const fs = scratchFs([null, envelope({ session_id: 'must-not-run' })]);
+		const { commands, spawnFn } = recordingSpawn([['--resume', 1]], [['--resume', 'Error: socket hang up']]);
+
+		const outcome = await runAgentTaskJob(job(payload(offer())), io({ fs, spawnFn }));
+
+		expect(modelCommands(commands)).toHaveLength(1);
+		expect(fs.instructions).toEqual([CONTINUATION]);
+		expect(outcome.status).toBe('failed');
+		expect(outcome.model).toMatchObject({ status: 'failed', resume: { outcome: 'resumed' } });
+		expect(outcome.model?.sessionId).toBeFalsy();
 	});
 
 	it('does NOT re-run a resumed session that ran and then failed — that would spend the model twice', async () => {
