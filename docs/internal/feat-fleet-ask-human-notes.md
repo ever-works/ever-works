@@ -202,19 +202,21 @@ deriving the waiting state from `awaitingInput`; every typed `InboxProducer` dou
 
 ## Deliberate limits
 
-- **No CLI session resume.** `result.model.sessionId` is not persisted; the answer run starts a fresh
-  CLI session whose instructions carry the answer. Passing `--resume` on the same node is a
-  follow-up. _Delivered by self-build slice AU: the reconciler keeps the session id with the
-  reporting node (`agent_runs.fleetCliSession`), resume carries it, the planner offers it as
-  `execution.resume`, and the node runs `claude -p --resume <id> --fork-session` when the job lands
-  on that node (Codex is never resumed; any other case runs fresh)._
+- **CLI session resume is same-node, Claude-Code-only** (self-build slice AU; slice Q shipped
+  without it). The reconciler keeps `result.model.sessionId` with the reporting node
+  (`agent_runs.fleetCliSession`), resume carries it, and the planner offers it as
+  `execution.resume`. The node runs `claude -p --resume <id> --fork-session` only when the answer
+  job lands on that same node. Codex is never resumed (`codex exec resume` takes no `--sandbox` /
+  `-C` / `--add-dir`). Every other case starts a fresh session on the full instructions, and so does
+  a CLI that says it cannot open the session.
 - **A question run is a NORMAL terminal job on the node.** The job is `done`, the run is
   `completed` + `awaitingInput`; the wait is server-side only, and the answer always travels as
   text in the NEXT job's instructions. A node never holds a lease waiting for a human.
-- **No Q&A replay.** Only the reply that resumed the run rides along; earlier questions and answers
-  are not re-rendered into later runs (one Inbox item per run). _Delivered by self-build slice AU:
-  a fresh session's instructions replay the Task's earlier answered questions under
-  `# EARLIER QUESTIONS AND ANSWERS`._
+- **Q&A replay is bounded** (self-build slice AU; slice Q replayed only the reply that resumed the
+  run). A fresh session's instructions replay the earlier answered questions found on the Task's 50
+  newest runs under `# EARLIER QUESTIONS AND ANSWERS`. The section is capped at 16 KiB with the
+  oldest dropped first, and is left out when the brief alone fills the job. Answers given to cloud
+  runs are not replayed: those runs drain their `pendingInput`.
 - **API-level resume from the Sessions page leaves the Inbox item open** (auto-closing it would need
   `InboxItemRepository` inside `AgentsModule` — a module cycle). The Task page hides its own Resume
   while a question is open, which covers the surface the owner actually uses.
