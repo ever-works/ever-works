@@ -42,8 +42,26 @@ function resolveInboundSecret(options: EmailOptions): string | undefined {
  * angle-bracket form is present.
  */
 function parseEmailAddress(raw: string): string {
-	const match = raw.match(/<([^>]+)>/);
-	return (match ? match[1] : raw).trim();
+	return (angleAddress(raw) ?? raw).trim();
+}
+
+/**
+ * The text inside the first `<…>` pair that holds at least one character, or `null` — exactly
+ * what `/<([^>]+)>/` captured, in linear time. That regex backtracked quadratically over a run
+ * of `<` that never closes (CodeQL js/polynomial-redos), and the `To` header it read is written
+ * by whoever sent the mail and parsed BEFORE the webhook is authenticated.
+ */
+function angleAddress(value: string): string | null {
+	let open = value.indexOf('<');
+	while (open !== -1) {
+		const close = value.indexOf('>', open + 1);
+		// No `>` after this `<` means none after any later `<` either.
+		if (close === -1) return null;
+		if (close > open + 1) return value.slice(open + 1, close);
+		// `<>` holds nothing; the regex moved on to the next `<`.
+		open = value.indexOf('<', close + 1);
+	}
+	return null;
 }
 
 interface PostmarkInboundPayload {

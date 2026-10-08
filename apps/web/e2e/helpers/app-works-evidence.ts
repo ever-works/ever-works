@@ -592,9 +592,16 @@ export interface LaneSummaryInput {
     evidenceUrl?: string;
 }
 
+/**
+ * One markdown table cell. Backslashes are escaped **before** pipes: escaping only `|` turns a
+ * recorded `\|` into `\\|`, where the pipe's own backslash reads as an escaped backslash — marked
+ * then splits the cell at that pipe (the row shifts a column) and markdown-it drops the backslash.
+ * Plain text only: inside a code span a backslash is literal, so a backticked observation would
+ * show every doubled backslash. No caller passes one today.
+ */
 function cell(value: string | undefined): string {
     const text = value === undefined || value === '' ? '—' : value;
-    return text.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+    return text.replace(/\r?\n/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 }
 
 /**

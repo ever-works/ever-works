@@ -466,17 +466,24 @@ function seededTimestamp(value: string | undefined, fallback: Date): Date {
  * no unique index (uniqueness is a per-owner check in `WorkRepository.create`,
  * which this route does not go through) — so a derived slug is a readable
  * default, never a claim of uniqueness.
+ *
+ * The derivation is the name's `[a-z0-9]` runs joined by single hyphens — one
+ * linear scan, and no second pass that trims hyphens back off the ends (an
+ * unanchored `-+$` is quadratic on a long run of `-`; the runs here never
+ * produce a hyphen to trim in the first place).
  */
 function seedSlug(body: E2eSeedWorkDto): string {
     const explicit = trimmedOrNull(body.slug);
     if (explicit) {
         return explicit;
     }
-    const derived = body.name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
+    const derived = (
+        body.name
+            .trim()
+            .toLowerCase()
+            .match(/[a-z0-9]+/g) ?? []
+    )
+        .join('-')
         .slice(0, 80);
     return derived.length > 0 ? derived : `e2e-${Date.now().toString(36)}`;
 }

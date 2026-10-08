@@ -261,6 +261,33 @@ describe('object name helpers', () => {
 		]);
 		expect([...APP_DEPLOYMENT_NETWORK_POLICY_NAMES]).toEqual(['ew-allow-ingress', 'ew-allow-deps']);
 	});
+
+	/**
+	 * CodeQL js/polynomial-redos flagged the `/^-+|-+$/g` trim in the name sanitiser: `-+$`
+	 * backtracks quadratically over a long inner run of `-`. Dash runs were already collapsed
+	 * before that trim, so no such run reached it; the trim is now a linear scan regardless, and
+	 * these cases pin that the names did not move.
+	 */
+	it('sanitises a component name with a long inner run of "-" in linear time', () => {
+		const started = performance.now();
+		const name = componentObjectName(`a${'-'.repeat(50_000)}a`);
+		const elapsedMs = performance.now() - started;
+
+		expect(name).toBe('a-a');
+		expect(elapsedMs).toBeLessThan(200);
+	});
+
+	it.each([
+		['--Web--', 'web'],
+		['My  Web!!', 'my-web'],
+		['API_Server v2', 'api-server-v2'],
+		['---', 'app'],
+		['', 'app'],
+		[`${'a'.repeat(62)}-b`, 'a'.repeat(62)],
+		['a'.repeat(70), 'a'.repeat(63)]
+	])('sanitises the component name %j to %j as before', (component, expected) => {
+		expect(componentObjectName(component)).toBe(expected);
+	});
 });
 
 describe('labels', () => {

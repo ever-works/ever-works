@@ -33,6 +33,7 @@ import { randomUUID } from 'node:crypto';
 import type { Template, TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
 import { APP_BLUEPRINT_TOPIC } from '@src/apps-catalog/app-blueprint.constants';
+import { stripHtmlTags } from '@src/utils/text.utils';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
 import type { GitRepository } from '@ever-works/plugin';
 import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
@@ -1258,10 +1259,10 @@ export class TemplateCatalogService implements OnModuleInit {
         if (!value) {
             return null;
         }
-        const stripped = value
-            // Drop anything that looks like an HTML/XML tag.
-            .replace(/<[^>]*>/g, '')
-            // Remove stray angle brackets left by malformed/partial tags.
+        // Drop anything that looks like an HTML/XML tag (a linear scan: `<[^>]*>`
+        // is quadratic on a run of unclosed `<`), then every stray angle bracket
+        // a malformed or partial tag left behind — so no `<` survives at all.
+        const stripped = stripHtmlTags(value)
             .replace(/[<>]/g, '')
             // eslint-disable-next-line no-control-regex
             .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+/g, ' ')

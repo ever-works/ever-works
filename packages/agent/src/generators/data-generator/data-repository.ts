@@ -27,6 +27,42 @@ import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 // Mirrors `GitHubSyncService.safeSlugDir`.
 const SAFE_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
+/**
+ * The real, link-free form of `target`: the real path of its deepest existing
+ * ancestor with the not-yet-existing tail appended. Answers `null` when a
+ * dangling link sits on the way, because creating a file through it would
+ * land wherever the link points.
+ */
+async function realPathOf(target: string): Promise<string | null> {
+    let probe = path.resolve(target);
+    const tail: string[] = [];
+    for (;;) {
+        try {
+            const real = await fs.realpath(probe);
+            return tail.length ? path.join(real, ...tail.reverse()) : real;
+        } catch (err) {
+            if ((err as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+        // ENOENT: either nothing is there, or a link whose target is missing.
+        try {
+            await fs.lstat(probe);
+            return null;
+        } catch (err) {
+            if ((err as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+        const parent = path.dirname(probe);
+        if (parent === probe) {
+            return path.resolve(target);
+        }
+        tail.push(path.basename(probe));
+        probe = parent;
+    }
+}
+
 export type PRUpdate = {
     branch: string;
     title: string;
@@ -396,6 +432,24 @@ export class DataRepository {
         return dirPath;
     }
 
+    /**
+     * Security (link escape): the checkout is the member's own repository, and
+     * isomorphic-git checks a committed symlink out as a real one, so a path
+     * that is lexically inside `this.dir` can still resolve anywhere on the
+     * server. Every read and write goes through here: the real target (links
+     * resolved) must lie inside the real checkout, and the returned real path
+     * is what the caller opens. Links that stay inside the checkout still work.
+     */
+    private async inRepo(target: string): Promise<string> {
+        const root = (await realPathOf(this.dir)) ?? path.resolve(this.dir);
+        const real = await realPathOf(target);
+        if (real === null || (real !== root && !real.startsWith(root + path.sep))) {
+            const relative = path.relative(this.dir, target).split(path.sep).join('/');
+            throw new Error(`Refusing to follow a link out of the data repository: ${relative}`);
+        }
+        return real;
+    }
+
     private getItemPath(slug: string) {
         return this.confineSlugPath(this.dataDir, slug);
     }
@@ -425,8 +479,10 @@ export class DataRepository {
 
     async ensureWorksExist() {
         await Promise.all([
-            fs.mkdir(this.markdownTemplatePath, { recursive: true }),
-            fs.mkdir(this.dataDir, { recursive: true }),
+            this.inRepo(this.markdownTemplatePath).then((dir) =>
+                fs.mkdir(dir, { recursive: true }),
+            ),
+            this.inRepo(this.dataDir).then((dir) => fs.mkdir(dir, { recursive: true })),
         ]);
     }
 
@@ -450,7 +506,7 @@ export class DataRepository {
 
         for (const filePath of [...this.configFallbackPaths].reverse().concat(this.configPath)) {
             try {
-                const config = await fs.readFile(filePath, 'utf-8');
+                const config = await fs.readFile(await this.inRepo(filePath), 'utf-8');
                 const parsed = yaml.parse(config);
                 if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
                     mergedConfig = mergeDataConfig(mergedConfig ?? {}, parsed);
@@ -472,7 +528,7 @@ export class DataRepository {
             return this.categories;
         }
         try {
-            const categories = await fs.readFile(this.categoriesPath, 'utf-8');
+            const categories = await fs.readFile(await this.inRepo(this.categoriesPath), 'utf-8');
             this.categories = yaml.parse(categories);
         } catch (err) {
             if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
@@ -487,7 +543,7 @@ export class DataRepository {
 
     async getTags(): Promise<Tag[]> {
         try {
-            const tags = await fs.readFile(this.tagsPath, 'utf-8');
+            const tags = await fs.readFile(await this.inRepo(this.tagsPath), 'utf-8');
             return yaml.parse(tags);
         } catch (err) {
             if (err?.code === 'ENOENT') {
@@ -554,7 +610,7 @@ export class DataRepository {
                     continue;
                 }
 
-                const content = await fs.readFile(filepath, 'utf-8');
+                const content = await fs.readFile(await this.inRepo(filepath), 'utf-8');
                 try {
                     yaml.parse(content);
                 } catch (error) {
@@ -577,7 +633,7 @@ export class DataRepository {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
         try {
-            const content = await fs.readFile(ymlPath, 'utf-8');
+            const content = await fs.readFile(await this.inRepo(ymlPath), 'utf-8');
             const item = this.parseItemYaml<Partial<ItemData>>(content, ymlPath);
 
             return { ...item, slug } as ItemData;
@@ -585,7 +641,7 @@ export class DataRepository {
             if (err?.code === 'ENOENT') {
                 const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
                 try {
-                    const content = await fs.readFile(yamlPath, 'utf-8');
+                    const content = await fs.readFile(await this.inRepo(yamlPath), 'utf-8');
                     const item = this.parseItemYaml<Partial<ItemData>>(content, yamlPath);
                     return { ...item, slug } as ItemData;
                 } catch (yamlErr) {
@@ -604,7 +660,7 @@ export class DataRepository {
     async getMarkdown(slug: string): Promise<string | undefined> {
         const mdPath = path.join(this.getItemPath(slug), `${slug}.md`);
         try {
-            const md = await fs.readFile(mdPath, 'utf-8');
+            const md = await fs.readFile(await this.inRepo(mdPath), 'utf-8');
             return md;
         } catch (err) {
             if (err?.code === 'ENOENT') {
@@ -617,7 +673,7 @@ export class DataRepository {
     async getLicense(): Promise<string | null> {
         const licensePath = path.join(this.dir, 'LICENSE.md');
         try {
-            const license = await fs.readFile(licensePath, 'utf-8');
+            const license = await fs.readFile(await this.inRepo(licensePath), 'utf-8');
             return license;
         } catch (err) {
             if (err?.code === 'ENOENT') {
@@ -635,8 +691,8 @@ export class DataRepository {
     async writeConfig(config: IDataConfig) {
         this.config = config;
         const str = yaml.stringify(config);
-        await fs.mkdir(path.dirname(this.configPath), { recursive: true });
-        await fs.writeFile(this.configPath, str, 'utf-8');
+        await fs.mkdir(await this.inRepo(path.dirname(this.configPath)), { recursive: true });
+        await fs.writeFile(await this.inRepo(this.configPath), str, 'utf-8');
     }
     async getNextVersion(config?: IDataConfig) {
         const theConfig = config ?? (await this.getConfig());
@@ -682,17 +738,17 @@ export class DataRepository {
     async writeCategories(categories: Category[]) {
         this.categories = categories;
         const str = yaml.stringify(categories);
-        await fs.writeFile(this.categoriesPath, str, 'utf-8');
+        await fs.writeFile(await this.inRepo(this.categoriesPath), str, 'utf-8');
     }
 
     async writeTags(tags: Tag[]) {
         const str = yaml.stringify(tags);
-        await fs.writeFile(this.tagsPath, str, 'utf-8');
+        await fs.writeFile(await this.inRepo(this.tagsPath), str, 'utf-8');
     }
 
     async getCollections(): Promise<Collection[]> {
         try {
-            const collections = await fs.readFile(this.collectionsPath, 'utf-8');
+            const collections = await fs.readFile(await this.inRepo(this.collectionsPath), 'utf-8');
             return yaml.parse(collections) || [];
         } catch (err) {
             if (err?.code === 'ENOENT') {
@@ -704,12 +760,12 @@ export class DataRepository {
 
     async writeCollections(collections: Collection[]) {
         const str = yaml.stringify(collections);
-        await fs.writeFile(this.collectionsPath, str, 'utf-8');
+        await fs.writeFile(await this.inRepo(this.collectionsPath), str, 'utf-8');
     }
 
     async getReferences(): Promise<ReferenceEntry[]> {
         try {
-            const references = await fs.readFile(this.referencesPath, 'utf-8');
+            const references = await fs.readFile(await this.inRepo(this.referencesPath), 'utf-8');
             return yaml.parse(references) || [];
         } catch (err) {
             if (err?.code === 'ENOENT') {
@@ -723,7 +779,7 @@ export class DataRepository {
         const str = yaml.stringify(
             references.map((reference) => this.normalizeReferenceForStorage(reference)),
         );
-        await fs.writeFile(this.referencesPath, str, 'utf-8');
+        await fs.writeFile(await this.inRepo(this.referencesPath), str, 'utf-8');
     }
 
     private normalizeReferenceForStorage(reference: ReferenceEntry): ReferenceEntry {
@@ -768,6 +824,27 @@ export class DataRepository {
         // Same path-traversal confinement as item slugs (see confineSlugPath):
         // comparison slugs feed fs.rm / fs.writeFile / fs.readFile sinks.
         return this.confineSlugPath(this.comparisonsDir, slug);
+    }
+
+    /**
+     * `<comparisons>/<slug>/<slug><suffix>` for the read sinks, whose slug is a
+     * `GET …/comparisons/:slug` path parameter. The slug is confined by
+     * {@link getComparisonPath} first; the file path is then resolved and
+     * checked to lie inside that directory, so the guarantee is visible at the
+     * sink itself rather than only in the helper the directory came from.
+     * That check is lexical, so the answer finally goes through
+     * {@link inRepo}, which refuses a committed link out of the checkout.
+     */
+    private async getComparisonFilePath(
+        slug: string,
+        suffix: '.yml' | '.md' | '-extended.md',
+    ): Promise<string> {
+        const compDir = path.resolve(this.getComparisonPath(slug));
+        const filePath = path.resolve(compDir, `${slug}${suffix}`);
+        if (!filePath.startsWith(compDir + path.sep)) {
+            throw new Error(`Invalid slug: ${slug}`);
+        }
+        return this.inRepo(filePath);
     }
 
     private normalizeComparisonSource(source: unknown): ComparisonSource | null {
@@ -836,7 +913,7 @@ export class DataRepository {
     }
 
     async getComparison(slug: string): Promise<ComparisonData | null> {
-        const ymlPath = path.join(this.getComparisonPath(slug), `${slug}.yml`);
+        const ymlPath = await this.getComparisonFilePath(slug, '.yml');
         try {
             const content = await fs.readFile(ymlPath, 'utf-8');
             return this.normalizeComparison(yaml.parse(content) as ComparisonData);
@@ -849,7 +926,7 @@ export class DataRepository {
     }
 
     async getComparisonMarkdown(slug: string): Promise<string | undefined> {
-        const mdPath = path.join(this.getComparisonPath(slug), `${slug}.md`);
+        const mdPath = await this.getComparisonFilePath(slug, '.md');
         try {
             return await fs.readFile(mdPath, 'utf-8');
         } catch (err) {
@@ -862,28 +939,28 @@ export class DataRepository {
 
     async writeComparison(comparison: ComparisonData): Promise<void> {
         const compDir = this.getComparisonPath(comparison.slug);
-        await fs.mkdir(compDir, { recursive: true });
+        await fs.mkdir(await this.inRepo(compDir), { recursive: true });
         const filepath = path.join(compDir, `${comparison.slug}.yml`);
         const str = yaml.stringify(comparison);
-        await fs.writeFile(filepath, str, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), str, 'utf-8');
     }
 
     async writeComparisonMarkdown(slug: string, markdown: string): Promise<void> {
         const compDir = this.getComparisonPath(slug);
-        await fs.mkdir(compDir, { recursive: true });
+        await fs.mkdir(await this.inRepo(compDir), { recursive: true });
         const filepath = path.join(compDir, `${slug}.md`);
-        await fs.writeFile(filepath, markdown, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), markdown, 'utf-8');
     }
 
     async writeComparisonExtendedMarkdown(slug: string, markdown: string): Promise<void> {
         const compDir = this.getComparisonPath(slug);
-        await fs.mkdir(compDir, { recursive: true });
+        await fs.mkdir(await this.inRepo(compDir), { recursive: true });
         const filepath = path.join(compDir, `${slug}-extended.md`);
-        await fs.writeFile(filepath, markdown, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), markdown, 'utf-8');
     }
 
     async getComparisonExtendedMarkdown(slug: string): Promise<string | undefined> {
-        const mdPath = path.join(this.getComparisonPath(slug), `${slug}-extended.md`);
+        const mdPath = await this.getComparisonFilePath(slug, '-extended.md');
         try {
             return await fs.readFile(mdPath, 'utf-8');
         } catch (err) {
@@ -928,20 +1005,26 @@ export class DataRepository {
         // directories outside `this.dataDir`. Legitimate slugifyText output is
         // unchanged.
         const itemDir = this.getItemPath(item.slug);
-        await fs.mkdir(itemDir, { recursive: true });
+        await fs.mkdir(await this.inRepo(itemDir), { recursive: true });
     }
 
     async writeMarkdownTemplate(header: string, footer: string) {
+        const headerPath = await this.inRepo(path.join(this.markdownTemplatePath, 'header.md'));
+        const footerPath = await this.inRepo(path.join(this.markdownTemplatePath, 'footer.md'));
         await Promise.all([
-            fs.writeFile(path.join(this.markdownTemplatePath, 'header.md'), header, 'utf-8'),
-            fs.writeFile(path.join(this.markdownTemplatePath, 'footer.md'), footer, 'utf-8'),
+            fs.writeFile(headerPath, header, 'utf-8'),
+            fs.writeFile(footerPath, footer, 'utf-8'),
         ]);
     }
 
     async readMarkdownTemplate() {
         const [header, footer] = await Promise.all([
-            fs.readFile(path.join(this.markdownTemplatePath, 'header.md'), 'utf-8'),
-            fs.readFile(path.join(this.markdownTemplatePath, 'footer.md'), 'utf-8'),
+            this.inRepo(path.join(this.markdownTemplatePath, 'header.md')).then((file) =>
+                fs.readFile(file, 'utf-8'),
+            ),
+            this.inRepo(path.join(this.markdownTemplatePath, 'footer.md')).then((file) =>
+                fs.readFile(file, 'utf-8'),
+            ),
         ]);
         return { header, footer };
     }
@@ -949,10 +1032,11 @@ export class DataRepository {
     async writeItem(item: ItemData) {
         const { slug, ...rest } = item; // we don't want to write slug to the file
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
+        const realPath = await this.inRepo(filepath);
 
         // Skip write when content is unchanged (avoids spurious Git diffs)
         try {
-            const existingContent = await fs.readFile(filepath, 'utf-8');
+            const existingContent = await fs.readFile(realPath, 'utf-8');
             const existingData = this.parseItemYaml<Record<string, unknown>>(
                 existingContent,
                 filepath,
@@ -969,7 +1053,7 @@ export class DataRepository {
 
         const updated_at = format(new Date(), 'yyyy-MM-dd HH:mm');
         const str = yaml.stringify({ ...rest, updated_at });
-        await fs.writeFile(filepath, str, 'utf-8');
+        await fs.writeFile(realPath, str, 'utf-8');
     }
 
     private parseItemYaml<T>(content: string, filepath: string): T {
@@ -1042,17 +1126,17 @@ export class DataRepository {
 
     async writeItemMarkdown(item: ItemData, markdown: string) {
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
-        await fs.writeFile(filepath, markdown, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), markdown, 'utf-8');
     }
 
     async writeReadme(content: string) {
         const filepath = path.join(this.dir, 'README.md');
-        await fs.writeFile(filepath, content, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), content, 'utf-8');
     }
 
     async writeLicense(content: string) {
         const filepath = path.join(this.dir, 'LICENSE.md');
-        await fs.writeFile(filepath, content, 'utf-8');
+        await fs.writeFile(await this.inRepo(filepath), content, 'utf-8');
     }
 
     async removeItem(slug: string): Promise<boolean> {

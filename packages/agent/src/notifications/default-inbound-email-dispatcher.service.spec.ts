@@ -251,4 +251,32 @@ describe('deriveThreadKey', () => {
     it('falls back for an empty subject', () => {
         expect(deriveThreadKey('   ')).toBe('(no subject)');
     });
+
+    it.each<[string, string]>([
+        ['re:fwd:FW: x', 'x'],
+        ['  Re :  Fwd:\tRe:\nHello', 'hello'],
+        ['Re: Re', 're'],
+        ['Re Hello', 're hello'],
+        ['Fwd:', '(no subject)'],
+        ['Refund: Re: x', 'refund: re: x'],
+        ['fw: fwd: fwx: y', 'fwx: y'],
+    ])('keys %p as %p', (subject, key) => {
+        expect(deriveThreadKey(subject)).toBe(key);
+    });
+
+    // The subject is sender-controlled (any inbound email). CodeQL flagged the
+    // prefix pattern as polynomial on whitespace runs; these are the shapes it
+    // names, pinned under a tight budget.
+    it.each<[string, string]>([
+        ['whitespace before a non-prefix', `${' '.repeat(50_000)}x`],
+        ['a prefix, then whitespace, then a partial prefix', `re:${' '.repeat(50_000)}r`],
+        ['many prefixes', 're: '.repeat(50_000)],
+        ['a prefix word and whitespace with no colon', `re${' '.repeat(50_000)}x`],
+    ])('keys a subject of %s in well under 200 ms', (_, subject) => {
+        const started = performance.now();
+
+        deriveThreadKey(subject);
+
+        expect(performance.now() - started).toBeLessThan(200);
+    });
 });

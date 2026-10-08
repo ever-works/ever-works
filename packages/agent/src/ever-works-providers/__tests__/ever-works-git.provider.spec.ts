@@ -68,6 +68,29 @@ describe('EverWorksGitProvider', () => {
             const work = { ...WORK, slug: 'My Tools & Co' };
             expect(p.buildRepoName(work)).toBe('evereq-my-tools-co');
         });
+
+        // CodeQL js/polynomial-redos: the slug's edge trim was `/^-+|-+$/g`,
+        // retried from every offset of a hyphen run that does not end the
+        // string — about 2.4 s for 50,000 hyphens on a dev box.
+        it('slugifies a long interior run of hyphens in well under 200 ms', () => {
+            const p = new EverWorksGitProvider();
+            const work = { ...WORK, slug: `a${'-'.repeat(50_000)}b` };
+            const started = performance.now();
+
+            const name = p.buildRepoName(work);
+
+            expect(performance.now() - started).toBeLessThan(200);
+            expect(name).toBe('evereq-a-b');
+        });
+
+        it.each<[string, string, string]>([
+            ['--Evereq--', '--My--Tools--', 'evereq-my-tools'],
+            ['-', 'x', '-x'],
+            ['ÄB', 'c_d', 'b-c-d'],
+        ])('slugifies user %p and work %p to %p as before', (userSlug, slug, name) => {
+            const p = new EverWorksGitProvider();
+            expect(p.buildRepoName({ ...WORK, userSlug, slug })).toBe(name);
+        });
     });
 
     describe('isEnabled', () => {

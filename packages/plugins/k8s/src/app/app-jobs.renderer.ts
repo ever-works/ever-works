@@ -795,13 +795,23 @@ export function componentRequestUrl(input: AppRenderInput, component: string | n
 function publicUrl(input: AppRenderInput, options: AppJobOptions): string | null {
 	const declared = normaliseText(options?.publicUrl);
 	if (declared) {
-		return declared.replace(/\/+$/, '');
+		return stripTrailingSlashes(declared);
 	}
 	const host = normaliseText(input?.hosts?.primary);
 	if (!host) {
 		return null;
 	}
 	return `${options?.urlScheme ?? (input?.ingress?.tls === 'none' ? 'http' : 'https')}://${host}`;
+}
+
+/**
+ * Drop every trailing `/` — what `/\/+$/` removed, in linear time. That regex backtracked
+ * quadratically over a long run of `/` that is not at the end (CodeQL js/polynomial-redos).
+ */
+function stripTrailingSlashes(url: string): string {
+	let end = url.length;
+	while (end > 0 && url.charCodeAt(end - 1) === 0x2f /* '/' */) end -= 1;
+	return url.slice(0, end);
 }
 
 /** §4.10: the hairpin run needs the flag and a public URL, and never runs for a verification ref. */

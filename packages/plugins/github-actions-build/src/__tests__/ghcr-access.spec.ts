@@ -381,7 +381,15 @@ describe('the token goes to exactly two endpoints', () => {
 		const result = await checkImageAccess({ imageRepository: IMAGE, tag: TAG, pullToken: TOKEN }, fetchImpl);
 
 		expect(result.readable).toBe(false);
-		expect(fetchImpl.calls.every((call) => !call.url.startsWith('https://registry.attacker.example'))).toBe(true);
+		// Every request went to one of the two hosts the token may reach — an allow-list of
+		// parsed hosts. A string-prefix check (CodeQL js/incomplete-url-substring-sanitization)
+		// would also have counted `https://registry.attacker.example.evil`; comparing against
+		// `elsewhere`'s host alone would not. The allow-list is stricter than either.
+		const allowedHosts = new Set([new URL(GHCR_HOST).host, new URL(GITHUB_API_HOST).host]);
+		expect(fetchImpl.calls.map((call) => new URL(call.url).host).filter((host) => !allowedHosts.has(host))).toEqual(
+			[]
+		);
+		expect(fetchImpl.calls.some((call) => new URL(call.url).host === new URL(elsewhere).host)).toBe(false);
 		expect(fetchImpl.calls.every((call) => call.redirect === 'manual')).toBe(true);
 		// A 3xx is not a token: nothing was read from ghcr.io/v2 with anything.
 		expect(fetchImpl.calls.filter((call) => call.url.startsWith(`${GHCR_HOST}/v2/`))).toEqual([]);

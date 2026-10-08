@@ -41,7 +41,7 @@
  * package learned the hard way in T6.
  */
 
-import { createHash, createSign, generateKeyPairSync, randomBytes } from 'node:crypto';
+import { createHash, createSign, generateKeyPairSync, randomBytes, randomInt } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
@@ -630,7 +630,10 @@ export class FakeOidcProvider {
 		} catch (error) {
 			// A fake that threw inside a request handler would hang the socket and look
 			// like a slow provider rather than a bug in the spec.
-			return sendJson(response, 500, { error: 'fake_provider_error', error_description: String(error) });
+			return sendJson(response, 500, {
+				error: 'fake_provider_error',
+				error_description: errorDescription(error)
+			});
 		}
 	}
 
@@ -712,7 +715,8 @@ export class FakeOidcProvider {
 
 		void this.tokensFor(stored.nonce, stored.scope).then(
 			(tokens) => sendJson(response, 200, tokens),
-			(error: unknown) => sendJson(response, 500, { error: 'server_error', error_description: String(error) })
+			(error: unknown) =>
+				sendJson(response, 500, { error: 'server_error', error_description: errorDescription(error) })
 		);
 	}
 
@@ -743,7 +747,8 @@ export class FakeOidcProvider {
 		const authorizedParty = this.isLocalClient(grant.clientId) ? grant.clientId : this.clientId;
 		void this.tokensFor(null, grant.scope, authorizedParty).then(
 			(tokens) => sendJson(response, 200, tokens),
-			(error: unknown) => sendJson(response, 500, { error: 'server_error', error_description: String(error) })
+			(error: unknown) =>
+				sendJson(response, 500, { error: 'server_error', error_description: errorDescription(error) })
 		);
 	}
 
@@ -907,16 +912,27 @@ function randomId(prefix: string): string {
 	return `${prefix}-${randomBytes(12).toString('hex')}`;
 }
 
-/** RFC 8628 §6.1's `user_code`: readable, and not too short to be guessable. */
+/**
+ * RFC 8628 §6.1's `user_code`: readable, and not too short to be guessable. Each letter is a
+ * uniform `randomInt` draw: `byte % 20` over-weighted the first 16 letters (256 is not a multiple
+ * of 20 — CodeQL js/biased-cryptographic-random).
+ */
 function randomUserCode(): string {
 	const alphabet = 'BCDFGHJKLMNPQRSTVWXZ';
-	const bytes = randomBytes(8);
 	let code = '';
 	for (let index = 0; index < 8; index += 1) {
 		if (index === 4) code += '-';
-		code += alphabet[bytes[index] % alphabet.length];
+		code += alphabet[randomInt(alphabet.length)];
 	}
 	return code;
+}
+
+/**
+ * What a 500 tells the caller about a failure inside the fake: the error's message and never
+ * its stack (CodeQL js/stack-trace-exposure). A spec reading the body still sees why it failed.
+ */
+function errorDescription(error: unknown): string {
+	return error instanceof Error ? error.message : 'unexpected fake provider failure';
 }
 
 /** Send a JSON body with `no-store`, the way every token response must be cached. */

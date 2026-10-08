@@ -123,3 +123,104 @@ describe('buildSecretPattern', () => {
 		expect('a.b*c?d a-b-c-d a.b*c?d'.replace(p, 'X')).toBe('X a-b-c-d X');
 	});
 });
+
+/**
+ * CodeQL js/polynomial-redos. The kubeconfig and PEM patterns were lazy `[\s\S]+?` scans, so on a
+ * text with many openers and no closer every opener rescanned to the end of the text: quadratic.
+ * `scrubString` runs over error messages that carry what the tenant's own cluster answered and
+ * what its kubeconfig held, so the shapes below are input a tenant can send. They are now
+ * scanned by hand, in linear time, with results identical to the regexes (checked against them
+ * as an oracle below).
+ */
+describe('scrubString on hostile input', () => {
+	it.each([
+		['many kubeconfig openers with no `kind: Config`', 'apiVersion:v1'.repeat(50_000)],
+		[
+			'one kubeconfig blob followed by many `kind: Config`',
+			`apiVersion:v1akind:Config${'akind:Config'.repeat(50_000)}`
+		],
+		['many PEM headers with no END line', '-----BEGIN ,-----'.repeat(50_000)]
+	])('scrubs %s in linear time', (_label, hostile) => {
+		const started = performance.now();
+		scrubString(hostile);
+		const elapsedMs = performance.now() - started;
+
+		expect(elapsedMs).toBeLessThan(200);
+	});
+
+	/** The four patterns `scrubString` applied before the scanners — the oracle for the rewrite. */
+	const REFERENCE_PATTERNS: readonly RegExp[] = [
+		/apiVersion:\s*v1[\s\S]+?kind:\s*Config[\s\S]+?(?=$|\n\S)/g,
+		/-----BEGIN [^-]+-----[\s\S]+?-----END [^-]+-----/g,
+		/Authorization:\s*Bearer\s+[A-Za-z0-9._\-+/=]+/gi,
+		/(\b(?:token|password|client-certificate-data|client-key-data|certificate-authority-data)\b\s*[:=]\s*)[^\s,;}"']+/gi
+	];
+
+	function referenceScrub(input: string): string {
+		let out = input;
+		for (const pattern of REFERENCE_PATTERNS) {
+			out = out.replace(pattern, (_match: string, ...groups: unknown[]) => {
+				const prefix = typeof groups[0] === 'string' ? groups[0] : '';
+				return prefix ? `${prefix}[REDACTED]` : '[REDACTED]';
+			});
+		}
+		return out;
+	}
+
+	it('redacts exactly what the regexes redacted, on real-shaped messages', () => {
+		const messages = [
+			'error context: apiVersion: v1\nkind: Config\nusers:\n  - name: a\n    user:\n      token: SECRET\nclusters: []',
+			'before\napiVersion: v1\nkind: Config\ncontexts: []\nafter: tail',
+			'apiVersion: v1\nkind: Config',
+			'apiVersion: v1 kind: Config\n\n  indented\nnext line',
+			'apiVersion:v1 no config here, kind: Pod',
+			'... -----BEGIN CERTIFICATE-----\nABCD\n-----END CERTIFICATE----- ...',
+			'-----BEGIN RSA PRIVATE KEY-----\nAAA\n-----END -----\nBBB\n-----END RSA PRIVATE KEY----- tail',
+			'-----BEGIN CERTIFICATE-----\nnever closed',
+			'two: -----BEGIN A-----x-----END A----- and -----BEGIN B-----y-----END B-----',
+			'failed: Authorization: Bearer ya29.fake-bearer-token',
+			'detail: token: very-secret-12345, password=hunter2'
+		];
+		for (const message of messages) {
+			expect(scrubString(message), JSON.stringify(message)).toBe(referenceScrub(message));
+		}
+	});
+
+	it('redacts exactly what the regexes redacted, on generated messages', () => {
+		const fragments = [
+			'apiVersion:',
+			'apiVersion: v1\n',
+			' ',
+			'\t',
+			'\u00a0',
+			'v1',
+			'kind:',
+			'kind: Config\n',
+			'Config',
+			'\n',
+			'\n ',
+			'x',
+			'-',
+			'-----',
+			'-----BEGIN ',
+			'-----END ',
+			'-----BEGIN X-----',
+			'-----END X-----',
+			'CERT',
+			'token: t0k',
+			'Authorization: Bearer abc'
+		];
+		// A fixed-seed LCG: the same corpus on every run, so a failure is reproducible.
+		let seed = 0x2501;
+		const next = (bound: number): number => {
+			seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+			return (seed >>> 8) % bound;
+		};
+		for (let run = 0; run < 20_000; run += 1) {
+			let message = '';
+			const length = 1 + next(14);
+			for (let index = 0; index < length; index += 1) message += fragments[next(fragments.length)];
+			expect(scrubString(message), JSON.stringify(message)).toBe(referenceScrub(message));
+		}
+	});
+});

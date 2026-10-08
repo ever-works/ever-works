@@ -57,6 +57,20 @@ export class SettingsSchemaValidatorService {
      */
     private static readonly MAX_CACHE_ENTRIES = 100;
 
+    /**
+     * Security (CodeQL js/resource-exhaustion-from-deep-object-traversal):
+     * settings are a request body, and Ajv runs with `allErrors: true` — it
+     * walks the whole value and records one error per offending element, where
+     * the default would stop at the first. `allErrors` stays, so a rejected
+     * request still hears about every problem at once; instead the value is measured
+     * (iteratively, so depth cannot overflow the stack) and refused before Ajv
+     * sees it when it is deeper or larger than any settings object, and the
+     * reported errors are capped.
+     */
+    private static readonly MAX_SETTINGS_DEPTH = 32;
+    private static readonly MAX_SETTINGS_VALUES = 10_000;
+    private static readonly MAX_REPORTED_ERRORS = 20;
+
     constructor() {
         this.ajv = new Ajv({
             allErrors: true,
@@ -92,18 +106,61 @@ export class SettingsSchemaValidatorService {
         // Build the filtered settings object
         const scopedSettings = this.filterSettingsByScope(settings, schema, scope);
 
+        const oversize = this.describeOversize(scopedSettings);
+        if (oversize) {
+            this.logger.debug(`Settings validation refused: ${oversize}`);
+            return { valid: false, errors: [oversize] };
+        }
+
         // Get or create the validator
         const validate = this.getValidator(scopedSchema, scope);
 
         const valid = validate(scopedSettings);
 
         if (!valid && validate.errors) {
-            const errors = this.formatErrors(validate.errors);
+            const errors = this.formatErrors(
+                validate.errors.slice(0, SettingsSchemaValidatorService.MAX_REPORTED_ERRORS),
+            );
+            const unreported = validate.errors.length - errors.length;
+            if (unreported > 0) {
+                errors.push(`…and ${unreported} more errors`);
+            }
             this.logger.debug(`Settings validation failed: ${errors.join(', ')}`);
             return { valid: false, errors };
         }
 
         return { valid: true, errors: [] };
+    }
+
+    /**
+     * Why `value` is too deep or too large to validate, or `null` when it is
+     * within {@link MAX_SETTINGS_DEPTH} levels and {@link MAX_SETTINGS_VALUES}
+     * values. An explicit stack, so a hostile depth cannot overflow the call
+     * stack, and the walk stops at the first limit it crosses.
+     */
+    private describeOversize(value: unknown): string | null {
+        const { MAX_SETTINGS_DEPTH, MAX_SETTINGS_VALUES } = SettingsSchemaValidatorService;
+        const pending: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
+        // Counted as values are queued, so an oversized array is refused
+        // before any of its elements is.
+        let values = 1;
+
+        for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+            if (next.value === null || typeof next.value !== 'object') continue;
+            if (next.depth >= MAX_SETTINGS_DEPTH) {
+                return `Settings are too deeply nested to validate (more than ${MAX_SETTINGS_DEPTH} levels).`;
+            }
+            const children = Array.isArray(next.value) ? next.value : Object.values(next.value);
+            values += children.length;
+            if (values > MAX_SETTINGS_VALUES) {
+                return `Settings are too large to validate (more than ${MAX_SETTINGS_VALUES} values).`;
+            }
+            for (const child of children) {
+                pending.push({ value: child, depth: next.depth + 1 });
+            }
+        }
+
+        return null;
     }
 
     /**

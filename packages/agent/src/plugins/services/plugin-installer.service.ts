@@ -352,7 +352,11 @@ export class PluginInstallerService {
             // Symlink under node_modules so the existing loader's
             // `loadPluginModule(path)` can `await import()` it without
             // further wiring.
-            const linkDir = await this.symlinkUnderNodeModules(packageName, destDir);
+            const linkDir = await this.symlinkUnderNodeModules(
+                input.pluginId,
+                packageName,
+                destDir,
+            );
 
             const installedVersion = manifest.version;
             const integrity = manifest._integrity ?? null;
@@ -438,7 +442,7 @@ export class PluginInstallerService {
                 // The store path is built from the pin: refuse one that is
                 // not a plain name and exact version before touching the disk.
                 this.assertSafePin(pluginId, packageName, entity.installedVersion);
-                const versioned = this.versionedDir(packageName, entity.installedVersion);
+                const versioned = this.versionedDir(pluginId, packageName, entity.installedVersion);
                 const local = (await this.hasLocalCopy(
                     versioned,
                     packageName,
@@ -457,6 +461,7 @@ export class PluginInstallerService {
                 return {
                     ...local,
                     installPath: await this.ensureNodeModulesLink(
+                        pluginId,
                         local.packageName,
                         local.installPath,
                     ),
@@ -634,7 +639,17 @@ export class PluginInstallerService {
         const packageName =
             (entity.registrySpec && this.packageNameFromSpec(entity.registrySpec)) ||
             this.derivePackageName(pluginId);
-        const linkDir = this.symlinkPathFor(packageName);
+        // The link path is built from row data, and whatever sits there is
+        // removed: refuse a name that is not a plain npm package name before
+        // touching the disk, as every install path does (`assertSafePin`).
+        if (!NPM_PACKAGE_NAME.test(packageName)) {
+            throw new PluginInstallRefusedError(
+                pluginId,
+                `Refusing to uninstall plugin "${pluginId}": "${packageName}" is not a valid npm ` +
+                    `package name.`,
+            );
+        }
+        const linkDir = this.symlinkPathFor(pluginId, packageName);
         try {
             await fs.rm(linkDir, { force: true, recursive: false });
         } catch {
@@ -780,16 +795,36 @@ export class PluginInstallerService {
         return spec.slice(0, at);
     }
 
-    private versionedDir(packageName: string, version: string): string {
+    private versionedDir(pluginId: string, packageName: string, version: string): string {
         // Encode scope so '@' doesn't escape the dir.
         const safe = packageName.replace('/', '__');
-        return path.join(this.installDir, '.versions', safe, version);
+        return this.pathInside(pluginId, path.join(this.installDir, '.versions'), safe, version);
     }
 
-    private symlinkPathFor(packageName: string): string {
+    private symlinkPathFor(pluginId: string, packageName: string): string {
         // Mirror the npm node_modules layout so Node module resolution
         // picks the package up via standard import().
-        return path.join(this.installDir, 'node_modules', packageName);
+        return this.pathInside(pluginId, path.join(this.installDir, 'node_modules'), packageName);
+    }
+
+    /**
+     * `root/…segments`, resolved to an absolute path that lies strictly inside
+     * `root` — or {@link PluginInstallRefusedError}. Every store and link path
+     * is built here, from a package name and version that come from row data
+     * and the registry: {@link assertSafePin} refuses a name or version that
+     * could reach outside, and this makes the same guarantee where the path is
+     * made, for any caller that did not (or could not) run it first.
+     */
+    private pathInside(pluginId: string, root: string, ...segments: string[]): string {
+        const base = path.resolve(root);
+        const target = path.resolve(base, ...segments);
+        if (!target.startsWith(base + path.sep) || target.includes('\0')) {
+            throw new PluginInstallRefusedError(
+                pluginId,
+                `Refusing plugin "${pluginId}": its files would lie outside the plugin store.`,
+            );
+        }
+        return target;
     }
 
     /**
@@ -822,7 +857,7 @@ export class PluginInstallerService {
         registry: string;
     }): Promise<string> {
         this.assertSafePin(pin.pluginId, pin.packageName, pin.version);
-        const destDir = this.versionedDir(pin.packageName, pin.version);
+        const destDir = this.versionedDir(pin.pluginId, pin.packageName, pin.version);
         const store = path.resolve(this.installDir, '.versions');
         if (!path.resolve(destDir).startsWith(store + path.sep)) {
             throw new PluginInstallRefusedError(
@@ -926,8 +961,12 @@ export class PluginInstallerService {
      * only when it does not already resolve there — so a warm call touches
      * nothing on disk.
      */
-    private async ensureNodeModulesLink(packageName: string, targetDir: string): Promise<string> {
-        const linkDir = this.symlinkPathFor(packageName);
+    private async ensureNodeModulesLink(
+        pluginId: string,
+        packageName: string,
+        targetDir: string,
+    ): Promise<string> {
+        const linkDir = this.symlinkPathFor(pluginId, packageName);
         try {
             const [linked, target] = await Promise.all([
                 fs.realpath(linkDir),
@@ -937,11 +976,21 @@ export class PluginInstallerService {
         } catch {
             // Missing or dangling — (re)create it below.
         }
-        return this.symlinkUnderNodeModules(packageName, targetDir);
+        return this.symlinkUnderNodeModules(pluginId, packageName, targetDir);
     }
 
-    private async symlinkUnderNodeModules(packageName: string, targetDir: string): Promise<string> {
-        const linkDir = this.symlinkPathFor(packageName);
+    private async symlinkUnderNodeModules(
+        pluginId: string,
+        packageName: string,
+        storeDir: string,
+    ): Promise<string> {
+        const linkDir = this.symlinkPathFor(pluginId, packageName);
+        // The link only ever points into this node's store.
+        const targetDir = this.pathInside(
+            pluginId,
+            path.join(this.installDir, '.versions'),
+            storeDir,
+        );
         const parent = path.dirname(linkDir);
         await fs.mkdir(parent, { recursive: true });
         // Replace any existing entry — could be a stale link to a prior version.

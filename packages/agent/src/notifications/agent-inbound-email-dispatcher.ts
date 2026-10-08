@@ -112,10 +112,16 @@ export const INBOUND_EMAIL_TASK_SPAWNER = 'INBOUND_EMAIL_TASK_SPAWNER' as const;
  * Normalize an email subject into a stable conversation thread key.
  * Strips leading Re:/Fwd: prefixes (case-insensitive, repeated) and
  * collapses whitespace so a reply chain maps to one conversation.
+ *
+ * The subject is sender-controlled. The prefix pattern gives each repetition
+ * one unambiguous shape — whitespace once up front, then `prefix \s* : \s*` —
+ * instead of `(\s*prefix\s*:\s*)+`, whose trailing and leading `\s*` could
+ * split the same whitespace between two repetitions (CodeQL
+ * js/polynomial-redos). It strips exactly the same prefix.
  */
 export function deriveThreadKey(subject: string): string {
     const stripped = subject
-        .replace(/^(\s*(re|fwd|fw)\s*:\s*)+/i, '')
+        .replace(/^\s*(?:(?:re|fwd|fw)\s*:\s*)+/i, '')
         .trim()
         .replace(/\s+/g, ' ')
         .toLowerCase();

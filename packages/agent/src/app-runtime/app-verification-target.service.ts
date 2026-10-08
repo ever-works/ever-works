@@ -115,6 +115,7 @@ import type {
     AppTargetRef,
 } from '@ever-works/plugin';
 
+import { trimEdgeChars } from '../utils/text.utils.js';
 import { APP_DEPENDENCIES_SERVICE } from './app-runtime-deletion.service.js';
 import {
     APP_RUNTIME_ENV_SOURCE,
@@ -453,16 +454,20 @@ async function withDeadline<T>(work: Promise<T>, millis: number): Promise<T | 't
     }
 }
 
-/** DNS-1123 label charset, capped, with no trailing hyphen — the same shape §4.1's names use. */
+/**
+ * DNS-1123 label charset, capped, with no trailing hyphen — the same shape §4.1's names use.
+ *
+ * The edge hyphens go by a linear scan (`trimEdgeChars`), not `/^-+|-+$/`, which is polynomial
+ * on a hyphen run that does not end the value. Runs are already collapsed here, so the regex
+ * was safe in this spot; the scan keeps that true without depending on the line above.
+ */
 function sanitiseName(value: unknown, maxLength: number): string {
     const limit = Math.max(1, Math.floor(maxLength));
-    return String(value ?? '')
+    const hyphenated = String(value ?? '')
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, limit)
-        .replace(/-+$/, '');
+        .replace(/-+/g, '-');
+    return trimEdgeChars(trimEdgeChars(hyphenated, '-', '-').slice(0, limit), '', '-');
 }
 
 /* -------------------------------------------------------------------------- *
