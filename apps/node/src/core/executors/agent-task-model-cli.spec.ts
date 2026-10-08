@@ -260,7 +260,9 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		// The model command came FIRST, then the acceptance check.
 		expect(commands).toHaveLength(2);
 		expect(commands[0]).toContain(CLAUDE);
-		expect(commands[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		// Self-build slice AP: the line-delimited stream, which is what carries
+		// the turns the run's step records are built from.
+		expect(commands[0]).toContain('-p --output-format stream-json --verbose --permission-mode acceptEdits');
 		expect(commands[0]).toContain('--model claude-opus-5');
 		expect(commands[0]).toContain('--effort high');
 		expect(commands[0]).toContain('instructions.md');

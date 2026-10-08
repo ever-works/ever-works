@@ -212,6 +212,20 @@ export function buildModelCliCommand(input: {
 	 */
 	mcp?: ModelCliMcpBridge;
 	platform?: NodeJS.Platform;
+	/**
+	 * Self-build slice AP — ask Claude Code for its LINE-DELIMITED event
+	 * stream (`--output-format stream-json --verbose`) instead of the one
+	 * result document `--output-format json` prints at exit. The stream is
+	 * what carries every turn and tool call, which is the only place the
+	 * run's step records can come from, and — unlike the single document —
+	 * it is written AS the run goes, so a run killed at its timeout still
+	 * leaves the steps it took. Its last line is the same `result` envelope
+	 * the parser already reads (see `parseClaudeEnvelope`'s JSONL branch).
+	 *
+	 * Absent (the default) produces byte-for-byte the command this step has
+	 * always built. Codex is unaffected: `exec --json` is already a stream.
+	 */
+	stream?: boolean;
 }): string {
 	const platform = input.platform ?? process.platform;
 	const { execution } = input;
@@ -291,7 +305,13 @@ export function buildModelCliCommand(input: {
 
 	const args: string[] = [];
 	if (execution.provider === 'claude-code') {
-		args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
+		if (input.stream === true) {
+			// `--verbose` is REQUIRED by `-p` with `stream-json`; the CLI
+			// refuses the combination without it.
+			args.push('-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', permissionMode);
+		} else {
+			args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
+		}
 		if (model) args.push('--model', model);
 		if (execution.effort) args.push('--effort', execution.effort);
 		if (budget) args.push('--max-budget-usd', budget);
@@ -604,11 +624,37 @@ export function parseModelCliResult(
 ): FleetAgentTaskModelResult {
 	return redactModelResult(
 		parseModelCliOutcome(provider, rawOutput, step),
-		mergeProtectedValues(
-			collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
-			extraValues
-		)
+		collectModelOutputProtectedValues(envPassthrough, envGrants, parentEnv, extraValues)
 	);
+}
+
+/**
+ * The credential VALUES a model run's reported text is scrubbed of — the
+ * values behind the granted env NAMES (`envPassthrough`, `envGrants`), read
+ * from this process, plus values that live in no environment at all (the
+ * run's delivered `.env` file contents, self-build slice Y). Longest first,
+ * 8-character floor.
+ *
+ * Exported so every channel a model run reports through — the summary and
+ * output tail here, and the step records and transcript of self-build slice
+ * AP — is scrubbed of exactly the SAME set. Two channels computing the set
+ * two ways is how one of them ends up scrubbing nothing.
+ */
+export function collectModelOutputProtectedValues(
+	envPassthrough?: readonly string[],
+	envGrants?: readonly string[],
+	parentEnv?: NodeJS.ProcessEnv,
+	extraValues?: readonly string[]
+): string[] {
+	return mergeProtectedValues(
+		collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
+		extraValues
+	);
+}
+
+/** Replace every protected value in `text` with {@link MODEL_CLI_REDACTED}. */
+export function scrubModelOutputText(text: string, values: readonly string[]): string {
+	return scrub(text, values) ?? text;
 }
 
 /** Placeholder left where a credential value was removed. */
