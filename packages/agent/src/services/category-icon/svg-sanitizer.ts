@@ -27,20 +27,54 @@
  *     in fill/stroke/filter/etc. would otherwise leak the viewer's IP to
  *     an arbitrary host as a tracking pixel.
  *   - viewBox normalized to "0 0 24 24"; width/height attrs stripped.
+ *   - The finished string is checked, not trusted: an element outside the
+ *     SVG allow-list (ALLOWED_ELEMENTS) or an on* / href / style attribute
+ *     in ANY position the HTML tokenizer accepts — after whitespace, after
+ *     `/`, straight after a quoted value — fails the icon as
+ *     dangerous-content. The removal passes above only see the whitespace
+ *     form, and innerHTML turns an <img> inside <svg> into a live HTML
+ *     element.
  *   - Total length capped at MAX_SVG_LENGTH bytes (matches the DTO cap).
+ *   - Input longer than MAX_SVG_INPUT_LENGTH refused before any pass runs.
  *
  * The sanitizer is intentionally regex-based to keep the agent package
  * free of jsdom / DOMPurify (heavy server-side deps). For the trust
  * profile above, conservative regex passes that reject anything they
  * can't fully parse are sufficient.
+ *
+ * Work is bounded, because the input is hostile by assumption (CodeQL
+ * js/polynomial-redos). The comment / DOCTYPE / PI / CDATA passes are linear
+ * scans ({@link stripDelimitedBlocks}) — as regexes they retried from every
+ * unterminated opener, seconds for a few hundred KB. The attribute passes only
+ * start at the first character of a whitespace run (`(?<!\s)`), which makes
+ * them linear too, as are EXTERNAL_URL_REF_RE and the final allow-list scan.
+ * What remains polynomial on paper — FORBIDDEN_ELEMENT_RE on an unclosed
+ * forbidden element, SVG_OPEN_TAG_RE on `<svg` with no `>` — runs on at most
+ * MAX_SVG_INPUT_LENGTH characters: under 20 ms on a dev box.
  */
 
 export const MAX_SVG_LENGTH = 4000;
 
-const COMMENT_RE = /<!--[\s\S]*?-->/g;
-const DOCTYPE_RE = /<!DOCTYPE[\s\S]*?>/gi;
-const PI_RE = /<\?[\s\S]*?\?>/g;
-const CDATA_RE = /<!\[CDATA\[[\s\S]*?\]\]>/g;
+/**
+ * The longest input the sanitizer scrubs: twice the output cap, so every
+ * DTO-capped paste (MAX_SVG_LENGTH) and any icon-sized model reply — pretty
+ * printed, with a line of prose around it — still gets through, while a
+ * reply that could never shrink to an icon is refused as `too-large` up front.
+ */
+export const MAX_SVG_INPUT_LENGTH = 2 * MAX_SVG_LENGTH;
+
+/**
+ * Markup constructs dropped before any structural check, in this order: each
+ * opener through the first closer after it. Same spans as the regexes they
+ * replace (`<!--[\s\S]*?-->`, `<!DOCTYPE[\s\S]*?>` case-insensitively,
+ * `<\?[\s\S]*?\?>`, `<!\[CDATA\[[\s\S]*?\]\]>`), found in linear time.
+ */
+const STRIPPED_BLOCKS: ReadonlyArray<{ readonly opener: RegExp; readonly closer: string }> = [
+    { opener: /<!--/g, closer: '-->' },
+    { opener: /<!DOCTYPE/gi, closer: '>' },
+    { opener: /<\?/g, closer: '?>' },
+    { opener: /<!\[CDATA\[/g, closer: ']]>' },
+];
 
 // Match paired or self-closing forbidden elements. The non-capturing
 // group has two arms: self-close (`<script/>`) or full pair
@@ -55,13 +89,18 @@ const CDATA_RE = /<!\[CDATA\[[\s\S]*?\]\]>/g;
 const FORBIDDEN_ELEMENT_RE =
     /<\s*(script|foreignObject|iframe|embed|object|animate|animateTransform|set|handler|listener|use)\b[^>]*(?:\/>|>[\s\S]*?<\/\s*\1\s*>)/gi;
 
-const EVENT_HANDLER_ATTR_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+// The attribute passes each start with the whitespace before the attribute.
+// `(?<!\s)` lets a match start only where a whitespace run starts: every other
+// offset in the run would reach the same text after it and fail or succeed the
+// same way, so the matches are unchanged — but a long run is scanned once, not
+// once per offset.
+const EVENT_HANDLER_ATTR_RE = /(?<!\s)\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-const DANGEROUS_HREF_RE = /\s+(?:xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const DANGEROUS_HREF_RE = /(?<!\s)\s+(?:xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const STYLE_ATTR_RE = /(?<!\s)\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-const WIDTH_HEIGHT_ATTR_RE = /\s+(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const WIDTH_HEIGHT_ATTR_RE = /(?<!\s)\s+(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 // IMPORTANT: no `g` flag. JavaScript regexes are stateful when `g` is set —
 // `RegExp.prototype.test()` advances `lastIndex` between calls, so a match
@@ -75,7 +114,57 @@ const DANGEROUS_URL_VALUE_RE = /\b(?:javascript|data|vbscript|file)\s*:/i;
 // `url(//host/…)`. Local fragment refs like `url(#id)` are fine and stay.
 // Without this guard, an attribute like `fill="url(https://tracker/pixel)"`
 // turns the inline SVG into an IP-logging beacon for any viewer.
-const EXTERNAL_URL_REF_RE = /url\s*\(\s*['"]?\s*(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+// Written as `\s*(?:['"]\s*)?` rather than `\s*['"]?\s*`: the same language,
+// but a whitespace run can no longer be split between two `\s*` in every
+// possible way (CodeQL js/polynomial-redos), so a match attempt is linear.
+const EXTERNAL_URL_REF_RE = /url\s*\(\s*(?:['"]\s*)?(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+
+/**
+ * The only elements an icon may contain, lowercased. The output is set with
+ * innerHTML, so the HTML parser reads it: there an HTML tag inside <svg>
+ * (<img>, <p>, <font>, …) leaves SVG and becomes a live HTML element, and
+ * <title>/<desc> parse their content as HTML. A deny-list can never name
+ * every such tag, so anything not listed here fails the icon.
+ */
+const ALLOWED_ELEMENTS: ReadonlySet<string> = new Set([
+    'svg',
+    'g',
+    'defs',
+    'symbol',
+    'title',
+    'desc',
+    'path',
+    'circle',
+    'ellipse',
+    'line',
+    'polyline',
+    'polygon',
+    'rect',
+    'text',
+    'tspan',
+    'a',
+    'lineargradient',
+    'radialgradient',
+    'stop',
+    'clippath',
+    'mask',
+    'pattern',
+    'marker',
+]);
+
+// Every tag the HTML tokenizer opens or closes starts `<` or `</` and an ASCII
+// letter; its name runs to whitespace, `/` or `>`. `\s` is a superset of the
+// tokenizer's whitespace, so a name read here is the tokenizer's name or a
+// prefix of it, never a longer one.
+const TAG_NAME_RE = /<\/?([a-z][^\s/>]*)/gi;
+
+// An attribute the scrubbing passes exist to remove, wherever the HTML
+// tokenizer starts an attribute: after whitespace, after `/`, or straight after
+// a quoted value. The passes only see the whitespace form, and removing one
+// attribute can glue the text around it into another (`o onload="x"nload=`),
+// so the output is checked rather than trusted. No `g` flag (see
+// DANGEROUS_URL_VALUE_RE).
+const LIVE_ATTRIBUTE_RE = /[\s/"'](?:on[a-z]+|(?:xlink:)?href|style)\s*=/i;
 
 const SVG_OPEN_TAG_RE = /<svg\b([^>]*)>/i;
 
@@ -115,13 +204,16 @@ export function sanitizeSvg(input: string | null | undefined): SanitizeResult {
         return { ok: false, reason: 'empty' };
     }
 
+    // Bound the work before any pass runs (see MAX_SVG_INPUT_LENGTH).
+    if (working.length > MAX_SVG_INPUT_LENGTH) {
+        return { ok: false, reason: 'too-large' };
+    }
+
     // Drop comments / DOCTYPE / PIs / CDATA before any structural checks
     // so attackers can't hide payloads inside them.
-    working = working
-        .replace(COMMENT_RE, '')
-        .replace(DOCTYPE_RE, '')
-        .replace(PI_RE, '')
-        .replace(CDATA_RE, '');
+    for (const { opener, closer } of STRIPPED_BLOCKS) {
+        working = stripDelimitedBlocks(working, opener, closer);
+    }
 
     // Strip forbidden elements wholesale (both paired and self-closing).
     working = working.replace(FORBIDDEN_ELEMENT_RE, '');
@@ -179,12 +271,62 @@ export function sanitizeSvg(input: string | null | undefined): SanitizeResult {
     // Collapse runs of whitespace — keeps payloads small for YAML.
     working = working.replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
 
+    // Fail closed on what the passes above could not remove: this exact
+    // string is what the browser parses.
+    if (hasLiveMarkup(working)) {
+        return { ok: false, reason: 'dangerous-content' };
+    }
+
     const bytes = Buffer.byteLength(working, 'utf8');
     if (bytes > MAX_SVG_LENGTH) {
         return { ok: false, reason: 'too-large' };
     }
 
     return { ok: true, svg: working, bytes };
+}
+
+/**
+ * True when `svg` still carries an element outside {@link ALLOWED_ELEMENTS} or
+ * an event handler / href / style attribute in any position the HTML tokenizer
+ * reads as an attribute. Both scans are linear.
+ */
+function hasLiveMarkup(svg: string): boolean {
+    if (LIVE_ATTRIBUTE_RE.test(svg)) {
+        return true;
+    }
+    for (const [, name] of svg.matchAll(TAG_NAME_RE)) {
+        if (!ALLOWED_ELEMENTS.has(name.toLowerCase())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Remove every `opener … closer` span from `input` — each opener through the
+ * first `closer` that starts after it — scanning left to right, in linear time.
+ * The same spans `input.replace(/<opener>[\s\S]*?<closer>/g, '')` removes: an
+ * opener with no closer after it is left in place, and then so is everything
+ * after it, because no later opener can have a closer either.
+ */
+function stripDelimitedBlocks(input: string, opener: RegExp, closer: string): string {
+    // A fresh global copy: `lastIndex` is per-call state, never shared.
+    const open = new RegExp(
+        opener.source,
+        opener.flags.includes('g') ? opener.flags : `${opener.flags}g`,
+    );
+    let stripped = '';
+    let cursor = 0;
+    for (;;) {
+        open.lastIndex = cursor;
+        const found = open.exec(input);
+        if (!found) break;
+        const end = input.indexOf(closer, found.index + found[0].length);
+        if (end === -1) break;
+        stripped += input.slice(cursor, found.index);
+        cursor = end + closer.length;
+    }
+    return cursor === 0 ? input : stripped + input.slice(cursor);
 }
 
 /**

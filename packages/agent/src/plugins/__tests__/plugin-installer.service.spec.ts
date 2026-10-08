@@ -1102,6 +1102,43 @@ describe('PluginInstallerService (EW-693)', () => {
             await victimIntact();
         });
 
+        // CodeQL js/path-injection: uninstall built its `node_modules` link path
+        // from the row with no pin check, and removed whatever sat there.
+        it('uninstall refuses a package name that is a path, and removes nothing outside the store', async () => {
+            // `<store>/node_modules/@ever-works/../../../victim/keep.txt` is
+            // `<tmp>/victim/keep.txt`.
+            const pluginRepo = makePluginRepo({
+                'notion-extractor': {
+                    ...PINNED_ROW,
+                    registrySpec: '@ever-works/../../../victim/keep.txt@1.0.0',
+                    manifest: { systemPlugin: false } as never,
+                },
+            });
+            const installer = makeInstaller({ pluginRepo, options: { installDir: store } });
+
+            await expect(installer.uninstall('notion-extractor')).rejects.toBeInstanceOf(
+                PluginInstallRefusedError,
+            );
+            await victimIntact();
+            expect(pluginRepo.updateInstallState).not.toHaveBeenCalled();
+        });
+
+        it('answers store and link paths that are absolute and inside the install dir', async () => {
+            const pluginRepo = makePluginRepo({ 'notion-extractor': PINNED_ROW });
+            const pacote = makePinnedPacote();
+            const installer = makeInstaller({ pluginRepo, pacote, options: { installDir: store } });
+
+            const local = await installer.ensureLocalInstall('notion-extractor');
+            const available = await installer.ensurePluginAvailable('notion-extractor');
+
+            expect(local.installPath).toBe(
+                path.resolve(store, '.versions', '@ever-works__notion-extractor-plugin', '1.2.0'),
+            );
+            expect(available?.installPath).toBe(
+                path.resolve(store, 'node_modules', '@ever-works', 'notion-extractor-plugin'),
+            );
+        });
+
         it('still installs an exact pre-release version', async () => {
             const pluginRepo = makePluginRepo({
                 'notion-extractor': {

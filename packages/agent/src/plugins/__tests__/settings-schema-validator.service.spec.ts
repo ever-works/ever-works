@@ -626,4 +626,67 @@ describe('SettingsSchemaValidatorService', () => {
             expect(tooHighResult.valid).toBe(false);
         });
     });
+
+    // CodeQL js/resource-exhaustion-from-deep-object-traversal: settings are a
+    // request body, and Ajv runs with `allErrors: true`, so it walks the whole
+    // value and reports one error per offending element.
+    describe('bounded work on a hostile settings body', () => {
+        const schema: JsonSchema = {
+            type: 'object',
+            properties: {
+                config: { type: 'object' },
+                tags: { type: 'array', items: { type: 'string' } },
+            },
+        };
+
+        const nested = (depth: number): Record<string, unknown> => {
+            let value: Record<string, unknown> = {};
+            for (let level = 0; level < depth; level += 1) value = { a: value };
+            return value;
+        };
+
+        it('refuses a value nested deeper than any settings object, without validating it', () => {
+            const result = service.validateSettings({ config: nested(1_000) }, schema, 'global');
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toEqual([expect.stringMatching(/too deeply nested/)]);
+        });
+
+        it('refuses a body with more values than any settings object, without validating it', () => {
+            const started = performance.now();
+
+            const result = service.validateSettings(
+                { tags: new Array(200_000).fill(0) },
+                schema,
+                'global',
+            );
+
+            expect(performance.now() - started).toBeLessThan(200);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toEqual([expect.stringMatching(/too large/)]);
+        });
+
+        it('reports a bounded number of errors for a body within the limits', () => {
+            const result = service.validateSettings(
+                { tags: new Array(5_000).fill(0) },
+                schema,
+                'global',
+            );
+
+            expect(result.valid).toBe(false);
+            expect(result.errors.length).toBeLessThanOrEqual(21);
+            expect(result.errors[0]).toBe('/tags/0: must be string (expected string)');
+            expect(result.errors[result.errors.length - 1]).toMatch(/4980 more errors/);
+        });
+
+        it('still validates an ordinary nested settings value', () => {
+            const result = service.validateSettings(
+                { config: nested(10), tags: ['a', 'b'] },
+                schema,
+                'global',
+            );
+
+            expect(result).toEqual({ valid: true, errors: [] });
+        });
+    });
 });

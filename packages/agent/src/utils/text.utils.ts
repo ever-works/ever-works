@@ -48,17 +48,19 @@ export function unSlugifyText(slug: string): string {
  * Strip the given characters from both ends of `value`, in linear time.
  *
  * **Why this is not a regex.** The obvious spelling of an edge trim —
- * `value.replace(/^-+|-+$/g, '')` — is polynomial on paper: a trailing-anchored
- * `-+$` can be retried from every offset inside a long run. CodeQL flags it for
- * that reason.
+ * `value.replace(/^-+|-+$/g, '')` — is polynomial: a trailing-anchored `-+$` is
+ * retried from every offset inside a run, and each retry scans the rest of it.
+ * CodeQL flags it for that reason.
  *
- * Measured, that cost does not currently appear: V8 optimises the anchored trim
- * and handles a 160k-character run of `-` in well under a millisecond, flat as
- * the input grows. So this is not a fix for a live denial of service, and it
- * should not be described as one. It is here because the guarantee should come
- * from the code rather than from an engine optimisation the caller cannot see,
- * and because it silences a standing alert on a hot path that takes user
- * filenames and document titles. A two-pointer scan cannot backtrack at all.
+ * Measured on V8 (Node 24), the cost depends on where the run sits. A run that
+ * ends the string is matched on the first try — 160k `-` in well under a
+ * millisecond. A run that does NOT end the string (`a` + n × `-` + `b`) fails
+ * `$` from every offset and is genuinely quadratic: about 0.4 s at n = 20,000
+ * and 1.7 s at n = 40,000. So on user input that can carry such a run, the regex
+ * is a live denial of service, and this two-pointer scan — which cannot
+ * backtrack at all — is the fix, not a cosmetic one. (Input whose runs were
+ * already collapsed to one character is safe either way; the scan still makes
+ * that guarantee local instead of depending on the line above.)
  *
  * `leading` and `trailing` are sets of characters, not patterns; each is
  * matched literally. Trimming meets in the middle, so an all-trimmable string
@@ -70,4 +72,32 @@ export function trimEdgeChars(value: string, leading: string, trailing: string):
     while (start < end && leading.includes(value[start])) start++;
     while (end > start && trailing.includes(value[end - 1])) end--;
     return value.slice(start, end);
+}
+
+/**
+ * Remove every `<…>` span from `value` — each `<` through the first `>` after
+ * it — in one linear pass. Same result as `value.replace(/<[^>]*>/g, '')`.
+ *
+ * **Why this is not that regex.** `<[^>]*>` is retried from every `<` that no
+ * `>` follows, and each retry scans to the end: 50,000 `<` take seconds.
+ *
+ * **What it does not do.** A `<` that no `>` follows is not a span, so it is
+ * kept, exactly as the regex kept it. Such an unclosed opener is still the
+ * start of a tag once the value is placed in HTML that supplies a `>` —
+ * callers whose contract is "no markup" must drop the stray `<` themselves
+ * (see `stripTemplateHtml`, `TemplateCatalogService`).
+ */
+export function stripHtmlTags(value: string): string {
+    let stripped = '';
+    let cursor = 0;
+    for (;;) {
+        const open = value.indexOf('<', cursor);
+        if (open === -1) break;
+        const close = value.indexOf('>', open + 1);
+        // No `>` after this `<` means none after any later `<` either.
+        if (close === -1) break;
+        stripped += value.slice(cursor, open);
+        cursor = close + 1;
+    }
+    return cursor === 0 ? value : stripped + value.slice(cursor);
 }

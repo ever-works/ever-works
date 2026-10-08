@@ -1,4 +1,4 @@
-import { slugifyText, trimEdgeChars, unSlugifyText } from '../text.utils';
+import { slugifyText, stripHtmlTags, trimEdgeChars, unSlugifyText } from '../text.utils';
 
 describe('slugifyText', () => {
     it('lowercases and replaces single spaces with dashes', () => {
@@ -107,13 +107,47 @@ describe('trimEdgeChars', () => {
     });
 
     it('matches what the regex trim it replaced produced, including long runs', () => {
-        // The pattern it replaced was `/^-+|-+$/g`. Measured, V8 handles that
-        // one in linear time, so this is not a performance fix and the tests do
-        // not pretend otherwise — these pin behavioural equivalence, which is
-        // what the rewrite had to preserve.
+        // The pattern it replaced was `/^-+|-+$/g`. V8 answers these edge runs
+        // on the first try, so the regex itself is a safe oracle for them; the
+        // interior run below is the shape it is quadratic on.
         const cases = ['--a--', '-', '', 'a', '-'.repeat(50_000) + 'a', 'a' + '-'.repeat(50_000)];
         for (const value of cases) {
             expect(trimEdgeChars(value, '-', '-')).toBe(value.replace(/^-+|-+$/g, ''));
         }
+    });
+
+    it('trims around a long interior run in well under 200 ms', () => {
+        const value = `-a${'-'.repeat(50_000)}b-`;
+        const started = performance.now();
+
+        const trimmed = trimEdgeChars(value, '-', '-');
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(trimmed).toBe(value.slice(1, -1));
+    });
+});
+
+describe('stripHtmlTags', () => {
+    it.each<[string, string]>([
+        ['App <b>Provisioner</b>', 'App Provisioner'],
+        ['<<script>x', 'x'],
+        ['a <b c="d>">e', 'a ">e'],
+        ['keep a < b', 'keep a < b'],
+        ['x <y> z <w', 'x  z <w'],
+        ['> quote', '> quote'],
+        ['<>', ''],
+        ['', ''],
+    ])('strips %p to %p, as `<[^>]*>` did', (value, stripped) => {
+        expect(stripHtmlTags(value)).toBe(stripped);
+    });
+
+    it('strips 50,000 unclosed openers in well under 200 ms', () => {
+        const value = `${'<'.repeat(50_000)}ok`;
+        const started = performance.now();
+
+        const stripped = stripHtmlTags(value);
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(stripped).toBe(value);
     });
 });

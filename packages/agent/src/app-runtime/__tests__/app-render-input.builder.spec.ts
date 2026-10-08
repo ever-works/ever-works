@@ -41,6 +41,7 @@ import {
     APP_RENDER_WARNING_HOST_SOURCE_UNAVAILABLE,
     APP_RENDER_WEB_STARTUP_PROBE,
     AppRenderInputBuilder,
+    componentInputs,
     declaredDependencyKinds,
     deploymentShortFor,
     internalUrlsFor,
@@ -1573,5 +1574,49 @@ describe('the constants and pure helpers this file publishes', () => {
     it('reverses §4.1’s namespace rule', () => {
         expect(workSlugFromNamespace('ew-helpdesk-0f8e2c1a')).toBe('helpdesk');
         expect(workSlugFromNamespace('ew-helpdesk-0f8e2c1a-v4f3a2b-1')).toBe('');
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The schema §10 relative default — `memoryLimit = 2 × memory`
+ * -------------------------------------------------------------------------- */
+
+describe('memoryLimit default (APW-03 schema §10)', () => {
+    const LINE_SEPARATOR = String.fromCharCode(0x2028);
+
+    const memoryLimitFor = (memory: string): string | undefined =>
+        componentInputs(
+            appSpec({ components: [{ name: 'web', role: 'web', resources: { memory } }] }),
+            LIVE_NAMESPACE,
+        )[0]?.resources.memoryLimit;
+
+    // CodeQL js/polynomial-redos: the quantity was split by
+    // `/^(\d+(?:\.\d+)?)(.*)$/`, which backtracks every digit against a `.*`
+    // that stops at a line break — about 3 s for 50,000 digits on a dev box —
+    // and the quantity is App spec content from the member's repository.
+    it('answers for 50,000 digits and a line break in well under 200 ms, leaving it as it is', () => {
+        const memory = `${'0'.repeat(50_000)}\nx`;
+        const started = performance.now();
+
+        const memoryLimit = memoryLimitFor(memory);
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(memoryLimit).toBe(memory);
+    });
+
+    it.each<[string, string]>([
+        ['512Mi', '1024Mi'],
+        ['1.5Gi', '3Gi'],
+        ['1.Gi', '2.Gi'],
+        ['12.5.3', '25.3'],
+        ['250', '500'],
+        ['0.5', '1'],
+        ['1e3', '2e3'],
+        ['Mi512', 'Mi512'],
+        ['1Gi\n', '2Gi'],
+        ['1G\ni', '1G\ni'],
+        [`1G${LINE_SEPARATOR}i`, `1G${LINE_SEPARATOR}i`],
+    ])('doubles %p to %p as before', (memory, memoryLimit) => {
+        expect(memoryLimitFor(memory)).toBe(memoryLimit);
     });
 });

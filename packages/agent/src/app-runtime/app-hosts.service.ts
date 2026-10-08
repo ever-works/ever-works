@@ -97,6 +97,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { APP_DOMAIN_RECONCILE_S } from '@ever-works/contracts';
 
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
+import { trimEdgeChars } from '../utils/text.utils';
 import {
     APP_DEPLOY_SPEC_SOURCE,
     type AppDeploySpecSource,
@@ -1116,9 +1117,15 @@ export function sameHost(left: string, right: string): boolean {
     return normaliseHost(left) === normaliseHost(right);
 }
 
-/** One spelling of a host: lower-case, no trailing dot, no surrounding whitespace. */
+/**
+ * One spelling of a host: lower-case, no trailing dot, no surrounding whitespace.
+ *
+ * The trailing dots go by a linear scan: `/\.+$/` is retried from every offset of
+ * a dot run that does not end the value (seconds for 50,000 dots — CodeQL
+ * js/polynomial-redos), and a custom domain is member input.
+ */
 export function normaliseHost(host: string | null | undefined): string {
-    return typeof host === 'string' ? host.trim().toLowerCase().replace(/\.+$/, '') : '';
+    return typeof host === 'string' ? trimEdgeChars(host.trim().toLowerCase(), '', '.') : '';
 }
 
 function dedupe(values: readonly (string | null)[]): string[] {

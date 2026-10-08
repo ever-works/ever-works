@@ -4,6 +4,7 @@ import YAML from 'yaml';
 
 import { AgentAvatarMode, AgentIdleBehavior } from '../entities/agent.entity';
 import type { GitFacadeService } from '../facades/git.facade';
+import { stripHtmlTags } from '../utils/text.utils';
 import type { AgentGuardrails } from './guardrails';
 
 /**
@@ -242,9 +243,6 @@ const SAFE_CATALOG_REF_RE = /^[A-Za-z0-9._/-]{1,100}$/;
 /** Slug allow-list pattern, same shape the API-side catalog uses. */
 const SAFE_CATALOG_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-/** HTML tag pattern — the catalog service's stripper, applied to our fields. */
-const HTML_TAG_RE = /<[^>]*>/g;
-
 const RAW_CATALOG_BASE = 'https://raw.githubusercontent.com';
 
 const RAW_READ_TIMEOUT_MS = 10_000;
@@ -266,14 +264,20 @@ export function isInstantiableRepoAgentTemplateSlug(slug: string): boolean {
 /**
  * Drop HTML tags from a catalog string.
  *
- * Mirrors the catalog service's `stripHtml`
- * (`apps/api/src/agents/agent-template-catalog.service.ts:68-70`): a
- * compromised catalog repository must not be able to inject markup into a
+ * A compromised catalog repository must not be able to inject markup into a
  * value the web UI renders (an Agent name, title, capability summary) or into
  * an instruction file the model reads.
+ *
+ * Every `<…>` span goes (as the catalog service's `stripHtml`,
+ * `apps/api/src/agents/agent-template-catalog.service.ts`, does), and so does
+ * any `<` left after that: such a `<` has no `>` after it, and it would open a
+ * tag the moment the value is placed in HTML that supplies one
+ * (`<img src=x onerror=…` + `</span>`). A lone `>` opens nothing, so it stays —
+ * markdown quotes and arrows in a SOUL file survive. Linear time: the SOUL file
+ * is stripped before it is capped.
  */
 export function stripTemplateHtml(value: string): string {
-    return typeof value === 'string' ? value.replace(HTML_TAG_RE, '') : '';
+    return typeof value === 'string' ? stripHtmlTags(value).replace(/</g, '') : '';
 }
 
 /** HTML-strip + trim + cap. The single gate every catalog string passes. */
