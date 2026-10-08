@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { InboxSourceFilter, inboxSourceHref } from './InboxTabs';
+import { InboxSourceFilter, InboxTabs, inboxSourceHref } from './InboxTabs';
 
 /**
  * Self-build slice AU — the Inbox's "From your fleet" filter. It is a pair
@@ -56,6 +56,29 @@ describe('InboxSourceFilter', () => {
         render(<InboxSourceFilter view="archived" fleetOnly />);
         expect(screen.getByTestId('inbox-source-fleet').getAttribute('aria-pressed')).toBe('true');
         expect(screen.getByTestId('inbox-source-all').getAttribute('href')).toBe(
+            '/inbox?view=archived',
+        );
+    });
+});
+
+describe('InboxTabs — the fleet filter survives switching views (review)', () => {
+    it('keeps `source=fleet` on the Active and Archived tabs, and leaves My Decisions alone', () => {
+        render(<InboxTabs view="active" fleetOnly />);
+        expect(screen.getByTestId('inbox-tab-active').getAttribute('href')).toBe(
+            '/inbox?source=fleet',
+        );
+        expect(screen.getByTestId('inbox-tab-archived').getAttribute('href')).toBe(
+            '/inbox?view=archived&source=fleet',
+        );
+        expect(screen.getByTestId('inbox-tab-decisions').getAttribute('href')).not.toContain(
+            'source=',
+        );
+    });
+
+    it('builds the plain links without the filter', () => {
+        render(<InboxTabs view="archived" />);
+        expect(screen.getByTestId('inbox-tab-active').getAttribute('href')).toBe('/inbox');
+        expect(screen.getByTestId('inbox-tab-archived').getAttribute('href')).toBe(
             '/inbox?view=archived',
         );
     });

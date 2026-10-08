@@ -2211,6 +2211,27 @@ describe('parseAgentTaskResult — misplaced question files (self-build slice AU
         ]);
     });
 
+    it('keeps a printable Unicode path, and drops bidi/format tricks and code-span breakouts (review)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                '资源/.ever-works/QUESTION.md',
+                'docs/café/.ever-works/QUESTION.md',
+                // U+202E RIGHT-TO-LEFT OVERRIDE disguises the path when shown.
+                'apps/‮txt.md/.ever-works/QUESTION.md',
+                // U+200B ZERO WIDTH SPACE — invisible.
+                'apps/a​b/.ever-works/QUESTION.md',
+                'tab\there/.ever-works/QUESTION.md',
+                'apps/`[link](https://evil.example)`/.ever-works/QUESTION.md',
+            ],
+        });
+        expect(parsed?.misplacedQuestionFiles).toEqual([
+            '资源/.ever-works/QUESTION.md',
+            'docs/café/.ever-works/QUESTION.md',
+        ]);
+    });
+
     it('caps the list and reads nothing from a malformed field', () => {
         const many = Array.from({ length: 9 }, (_, i) => `pkg${i}/.ever-works/QUESTION.md`);
         expect(

@@ -1273,8 +1273,9 @@ const MAX_MISPLACED_QUESTION_FILES = 5;
 /**
  * Self-build slice AU — the node's list of misplaced question files, or
  * `undefined` when it sent none. Each entry must be a relative path of
- * printable characters (no drive, no leading slash, no `..` segment) and is
- * capped at {@link MAX_QUOTED_CHARS}; anything else is dropped.
+ * printable (Unicode) characters (no drive, no leading slash, no `..`
+ * segment, no backtick) and is capped at {@link MAX_QUOTED_CHARS}; anything
+ * else is dropped.
  */
 function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
     if (!Array.isArray(raw)) return undefined;
@@ -1285,7 +1286,14 @@ function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
             (entry) =>
                 entry.length > 0 &&
                 entry.length <= MAX_QUOTED_CHARS &&
-                /^[\x20-\x7E]+$/.test(entry) &&
+                // Printable Unicode is a real path (`资源/.ever-works/QUESTION.md`)
+                // and must still be reported (review). Refused: every `\p{C}`
+                // code point — controls, newlines, bidi overrides and other
+                // format characters that could disguise a path in the chat —
+                // and the backtick, which would close the code span the note
+                // quotes the path in.
+                !/\p{C}/u.test(entry) &&
+                !entry.includes('`') &&
                 !entry.startsWith('/') &&
                 !entry.startsWith('\\') &&
                 !/^[A-Za-z]:/.test(entry) &&

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
@@ -53,6 +54,8 @@ export function formatDuration(ms: number | null | undefined): string | null {
 }
 
 function RunRow({ run }: { run: AgentRunSession }) {
+    // Slice AU (review): the parked chip reuses the run controls' own strings.
+    const t = useTranslations('dashboard.tasksPage.detail.runControls');
     const tokens = formatTokens(run.totalTokens);
     const duration = formatDuration(run.durationMs);
     const started = run.startedAt ?? run.createdAt;
@@ -82,13 +85,9 @@ function RunRow({ run }: { run: AgentRunSession }) {
                     <span
                         className="text-[10px] px-1.5 py-0.5 rounded shrink-0 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
                         data-testid="task-run-history-parked"
-                        title={
-                            isFleetRun(run)
-                                ? 'Parked on a question from the fleet run — answer it in the Inbox'
-                                : 'Parked — waiting for your input'
-                        }
+                        title={isFleetRun(run) ? t('parkedHintQuestion') : t('parkedHint')}
                     >
-                        awaiting input
+                        {t('awaitingInput')}
                     </span>
                 )}
                 <Link

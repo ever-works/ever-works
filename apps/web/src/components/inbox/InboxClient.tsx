@@ -255,7 +255,7 @@ export function InboxClient({
                 )}
             </header>
 
-            <InboxTabs view={view} />
+            <InboxTabs view={view} fleetOnly={fleetOnly} />
             {view !== 'decisions' && <InboxSourceFilter view={view} fleetOnly={fleetOnly} />}
 
             {loadError && (

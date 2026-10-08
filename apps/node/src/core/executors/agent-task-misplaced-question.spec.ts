@@ -141,3 +141,36 @@ describe('collectMisplacedOwnerQuestions', () => {
 		).rejects.toMatchObject({ name: 'AbortError' });
 	});
 });
+
+describe('collectMisplacedOwnerQuestions — the entry budget bounds what is READ (review)', () => {
+	it('never asks a directory for more entries than the budget has left', async () => {
+		const { maxEntries } = MISPLACED_QUESTION_SCAN_LIMITS;
+		const requested: number[] = [];
+		let delivered = 0;
+		// A generated directory far larger than the budget, everywhere.
+		const huge: AgentTaskQuestionFs = {
+			readHead: async () => null,
+			remove: async () => undefined,
+			removeDirIfEmpty: async () => undefined,
+			readDir: async (_path, limit) => {
+				requested.push(limit);
+				const size = Math.min(limit, maxEntries * 3);
+				delivered += size;
+				return Array.from({ length: size }, (_, i) => ({ name: `d${i}`, kind: 'dir' as const }));
+			}
+		};
+
+		expect(await collectMisplacedOwnerQuestions({ primaryPath: '/ws' }, huge)).toEqual([]);
+		expect(requested[0]).toBe(maxEntries);
+		expect(Math.max(...requested)).toBeLessThanOrEqual(maxEntries);
+		expect(delivered).toBeLessThanOrEqual(maxEntries);
+	});
+
+	it('the default reader stops at the limit', async () => {
+		const dir = tempRoot('many');
+		for (let i = 0; i < 30; i += 1) writeFileSync(join(dir, `f${i}.txt`), '');
+		expect(await defaultQuestionFs.readDir!(dir, 10)).toHaveLength(10);
+		expect(await defaultQuestionFs.readDir!(dir, 0)).toEqual([]);
+		expect(await defaultQuestionFs.readDir!(dir, 1000)).toHaveLength(30);
+	});
+});

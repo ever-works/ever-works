@@ -68,8 +68,13 @@ export interface AgentTaskQuestionFs {
 	 * a symlink or junction reads as `other`, never as a directory, so the
 	 * misplaced-question scan cannot be walked out of the worktree. Optional:
 	 * a seam without it scans nothing (today's behaviour).
+	 *
+	 * Returns AT MOST `limit` entries and stops reading the directory there
+	 * (review, PR #2571): the scan's entry budget has to bound what is read,
+	 * not only what is looked at afterwards, or one huge generated directory
+	 * outside the skip list costs its full listing on every run.
 	 */
-	readDir?(path: string): Promise<Array<{ name: string; kind: 'dir' | 'file' | 'other' }>>;
+	readDir?(path: string, limit: number): Promise<Array<{ name: string; kind: 'dir' | 'file' | 'other' }>>;
 }
 
 /** One place the question file may be: the primary worktree or a writable mount. */
@@ -148,15 +153,23 @@ export const defaultQuestionFs: AgentTaskQuestionFs = {
 			throw error;
 		}
 	},
-	// `withFileTypes` classifies by lstat: a symlink — and on Windows a
-	// junction — is `isSymbolicLink()`, never `isDirectory()`, so the scan
-	// below never descends through one.
-	readDir: async (path) => {
-		const entries = await fs.readdir(path, { withFileTypes: true });
-		return entries.map((entry) => ({
-			name: entry.name,
-			kind: entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
-		}));
+	// `opendir` streams the directory, so reading stops at `limit` instead of
+	// materialising the whole listing first; breaking out of the `for await`
+	// closes the handle. Its dirents classify by lstat: a symlink — and on
+	// Windows a junction — is `isSymbolicLink()`, never `isDirectory()`, so
+	// the scan below never descends through one.
+	readDir: async (path, limit) => {
+		const out: Array<{ name: string; kind: 'dir' | 'file' | 'other' }> = [];
+		if (!(limit > 0)) return out;
+		const dir = await fs.opendir(path);
+		for await (const entry of dir) {
+			out.push({
+				name: entry.name,
+				kind: entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
+			});
+			if (out.length >= limit) break;
+		}
+		return out;
 	}
 };
 
@@ -172,7 +185,9 @@ export const MISPLACED_QUESTION_SCAN_LIMITS = {
 	/** Directory entries examined per repository before the scan gives up. */
 	maxEntries: 20_000,
 	/** Misplaced files reported per run (all found are still removed). */
-	maxReported: 5
+	maxReported: 5,
+	/** Entries read from one `.ever-works/` directory while looking for the file. */
+	maxMetaEntries: 64
 } as const;
 
 /** Never descended into: Git's own store, dependency trees, and the mount links. */
@@ -316,7 +331,8 @@ export async function collectMisplacedOwnerQuestions(
 			const current = queue.shift()!;
 			let entries: Array<{ name: string; kind: 'dir' | 'file' | 'other' }>;
 			try {
-				entries = await readDir(current.path);
+				// Never ask for more than the budget has left (review).
+				entries = await readDir(current.path, MISPLACED_QUESTION_SCAN_LIMITS.maxEntries - examined);
 			} catch (error) {
 				rethrowIfAbort(error);
 				continue;
@@ -333,7 +349,7 @@ export async function collectMisplacedOwnerQuestions(
 					if (current.depth === 0) continue;
 					let meta: Array<{ name: string; kind: 'dir' | 'file' | 'other' }> = [];
 					try {
-						meta = await readDir(absolute);
+						meta = await readDir(absolute, MISPLACED_QUESTION_SCAN_LIMITS.maxMetaEntries);
 					} catch (error) {
 						rethrowIfAbort(error);
 					}

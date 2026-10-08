@@ -10,6 +10,10 @@ import type { AgentRunSession } from '@/lib/api/agents.shared';
  * "did this ever work?" answerable without leaving the Task page.
  */
 
+vi.mock('next-intl', () => ({
+    useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
+}));
+
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, ...props }: { children: React.ReactNode }) => <a {...props}>{children}</a>,
 }));
@@ -228,8 +232,20 @@ describe('TaskRunsHistory — parked runs (self-build slice AU)', () => {
         );
         const chips = screen.getAllByTestId('task-run-history-parked');
         expect(chips).toHaveLength(1);
-        expect(chips[0].textContent).toBe('awaiting input');
-        expect(chips[0].getAttribute('title')).toContain('answer it in the Inbox');
+        // Localized through the run controls' own keys (review).
+        expect(chips[0].textContent).toBe('dashboard.tasksPage.detail.runControls.awaitingInput');
+        expect(chips[0].getAttribute('title')).toBe(
+            'dashboard.tasksPage.detail.runControls.parkedHintQuestion',
+        );
+    });
+
+    it('explains a parked CLOUD run with the generic parked hint', () => {
+        render(
+            <TaskRunsHistory runs={[run({ awaitingInput: true, runnerKind: 'claude-code' })]} />,
+        );
+        expect(screen.getByTestId('task-run-history-parked').getAttribute('title')).toBe(
+            'dashboard.tasksPage.detail.runControls.parkedHint',
+        );
     });
 
     it('leaves a live run awaiting input to the run controls', () => {

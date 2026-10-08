@@ -66,15 +66,21 @@ export function InboxSourceFilter({
     );
 }
 
-/** The Active / My Decisions / Archived switch at the top of `/inbox`. */
-export function InboxTabs({ view }: { view: InboxView }) {
+/**
+ * The Active / My Decisions / Archived switch at the top of `/inbox`.
+ *
+ * `fleetOnly` (self-build slice AU, review): the "From your fleet" filter
+ * applies to Active and Archived alike, so switching between those two
+ * keeps it; My Decisions has its own filters and is left as it was.
+ */
+export function InboxTabs({ view, fleetOnly = false }: { view: InboxView; fleetOnly?: boolean }) {
     const t = useTranslations('dashboard.inbox');
     return (
         <div className="mb-4 flex flex-wrap items-center gap-2" role="tablist">
             {TAB_ORDER.map((tab) => (
                 <Button
                     key={tab}
-                    href={TAB_HREF[tab]}
+                    href={tab === 'decisions' ? TAB_HREF[tab] : inboxSourceHref(tab, fleetOnly)}
                     variant={view === tab ? 'primary' : 'secondary'}
                     size="sm"
                     role="tab"
