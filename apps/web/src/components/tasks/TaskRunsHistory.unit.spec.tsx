@@ -211,3 +211,29 @@ describe('formatDuration', () => {
         expect(formatDuration(-1)).toBeNull();
     });
 });
+
+describe('TaskRunsHistory — parked runs (self-build slice AU)', () => {
+    it('chips a finished run that is parked on the owner, so it does not read as done', () => {
+        render(
+            <TaskRunsHistory
+                runs={[
+                    run({
+                        id: 'parked',
+                        awaitingInput: true,
+                        runnerKind: 'fleet-node:claude-code',
+                    }),
+                    run({ id: 'done' }),
+                ]}
+            />,
+        );
+        const chips = screen.getAllByTestId('task-run-history-parked');
+        expect(chips).toHaveLength(1);
+        expect(chips[0].textContent).toBe('awaiting input');
+        expect(chips[0].getAttribute('title')).toContain('answer it in the Inbox');
+    });
+
+    it('leaves a live run awaiting input to the run controls', () => {
+        render(<TaskRunsHistory runs={[run({ status: 'running', awaitingInput: true })]} />);
+        expect(screen.queryByTestId('task-run-history-parked')).toBeNull();
+    });
+});
