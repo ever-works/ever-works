@@ -467,6 +467,28 @@ describe('APW-11 T33 — POST /api/e2e/app-launcher/seed', () => {
             expect(work.slug).toBe('seeded-app-work');
         });
 
+        it('derives the slug from the name: alphanumeric runs joined by single hyphens, never hyphen-edged', async () => {
+            const cases: Array<[name: string, slug: string | RegExp]> = [
+                ['--- Seeded / App!! Work ---', 'seeded-app-work'],
+                ['  Seeded__App  ', 'seeded-app'],
+                [`${'-'.repeat(118)}ok`, 'ok'],
+                ['*** !!! ***', /^e2e-[0-9a-z]+$/],
+            ];
+            for (const [name, slug] of cases) {
+                const response = await seed({
+                    ...liveAppFixture(),
+                    name,
+                    managedSubdomain: undefined,
+                });
+                expect(response.status).toBe(201);
+                const work = await dataSource
+                    .getRepository(Work)
+                    .findOneByOrFail({ id: (response.body as E2eSeedResponse).workId });
+                if (typeof slug === 'string') expect(work.slug).toBe(slug);
+                else expect(work.slug).toMatch(slug);
+            }
+        });
+
         it('writes one Work per request into the workspace the request names', async () => {
             const personal = await seed(liveAppFixture());
             const inOrg = await seed(

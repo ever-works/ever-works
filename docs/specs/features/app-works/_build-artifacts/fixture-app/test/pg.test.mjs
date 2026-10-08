@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createStubPostgres } from '../tools/dev-postgres.mjs';
-import { PgClient, PgError, parseDatabaseUrl, redactUrl } from '../src/pg.mjs';
+import { PgClient, PgError, parseDatabaseUrl, pgTlsOptions, redactUrl } from '../src/pg.mjs';
 
 async function withStub(options, fn) {
 	const stub = createStubPostgres({ log: () => {}, ...options });
@@ -23,6 +23,24 @@ async function withStub(options, fn) {
 		await stub.close();
 	}
 }
+
+test('sslmode verify-ca and verify-full verify the server certificate; prefer and require only encrypt (libpq)', () => {
+	const full = pgTlsOptions('verify-full', 'db.example.test');
+	assert.equal(full.rejectUnauthorized, true, 'verify-full rejects a certificate no trusted CA signed');
+	assert.equal(full.servername, 'db.example.test');
+	assert.equal(full.host, 'db.example.test', 'the host name the certificate is checked against');
+	assert.equal(full.checkServerIdentity, undefined, "verify-full keeps Node's host-name check");
+
+	const ca = pgTlsOptions('VERIFY-CA', 'db.example.test');
+	assert.equal(ca.rejectUnauthorized, true, 'verify-ca rejects a certificate no trusted CA signed');
+	assert.equal(typeof ca.checkServerIdentity, 'function');
+	assert.equal(ca.checkServerIdentity('other.example.test', {}), undefined, 'verify-ca checks the chain, not the name');
+
+	for (const mode of ['prefer', 'require']) {
+		assert.equal(pgTlsOptions(mode, 'db.example.test').rejectUnauthorized, false, `${mode} encrypts without verifying, as libpq does`);
+	}
+	assert.equal(pgTlsOptions('verify-full', '10.0.0.5').servername, undefined, 'an IP address is never sent as SNI');
+});
 
 test('parseDatabaseUrl reads a URL and falls back to the PG* variables', () => {
 	const parsed = parseDatabaseUrl('postgres://user:p%40ss@db.example.test:6543/app?sslmode=require&application_name=x');

@@ -25,8 +25,34 @@ export function smtpConfig(env = process.env) {
 		from: env.SMTP_FROM || env.SMTP_USER || 'fixture@example.invalid',
 		secure: String(env.SMTP_SECURE || '') === '1' || port === 465,
 		requireTls: String(env.SMTP_REQUIRE_TLS || '') === '1',
+		// Certificates are verified unless the operator opts out for a sink with a self-signed one.
+		tlsRejectUnauthorized: String(env.SMTP_TLS_REJECT_UNAUTHORIZED ?? '') !== '0',
 		timeoutMs: numberOr(env.FIXTURE_SMTP_TIMEOUT_MS, DEFAULT_SMTP_TIMEOUT_MS)
 	};
+}
+
+/**
+ * The TLS options for implicit TLS and for STARTTLS: the certificate is verified against `SMTP_HOST`
+ * (`servername` doubles as SNI, which is never an IP address). Only an explicit
+ * `SMTP_TLS_REJECT_UNAUTHORIZED=0` turns verification off, for a sink or relay whose certificate is
+ * self-signed or issued by a private CA.
+ *
+ * Nothing on the platform guarantees today that an `smtp` dependency reading Ready presents a
+ * certificate that verifies: the `smtp-external` / `platform-smtp-relay` readiness checks are
+ * declared (provider ids and the `smtpTlsFailed` code in `@ever-works/contracts`) but not built yet.
+ * A lane whose relay uses a private CA binds `SMTP_TLS_REJECT_UNAUTHORIZED` through the App spec env.
+ *
+ * What verification covers: a connection that negotiates TLS (implicit, or STARTTLS when the server
+ * offers it) talks to the named host, so a man in the middle cannot read the AUTH credentials on it.
+ * What it does not cover: an active attacker who removes `STARTTLS` from the EHLO reply — see
+ * {@link sendMail}; `SMTP_REQUIRE_TLS=1` closes that.
+ * @param {{host: string, tlsRejectUnauthorized?: boolean}} config
+ */
+export function smtpTlsOptions(config) {
+	/** @type {import('node:tls').ConnectionOptions} */
+	const options = { host: config.host, rejectUnauthorized: config.tlsRejectUnauthorized !== false };
+	if (!net.isIP(config.host)) options.servername = config.host;
+	return options;
 }
 
 export class SmtpError extends Error {
@@ -96,9 +122,10 @@ class SmtpSession {
 		this.#socket.write(text);
 	}
 
-	async upgrade() {
+	/** STARTTLS: wrap the plain socket; `tlsOptions` carries the host the certificate must name. */
+	async upgrade(tlsOptions) {
 		const upgraded = await new Promise((resolve, reject) => {
-			const secure = tls.connect({ socket: this.#socket, servername: this.#socket.servername, rejectUnauthorized: false });
+			const secure = tls.connect({ ...tlsOptions, socket: this.#socket });
 			secure.once('secureConnect', () => resolve(secure));
 			secure.once('error', reject);
 		});
@@ -133,15 +160,21 @@ class SmtpSession {
 
 /**
  * Deliver one plain-text message.
+ *
+ * STARTTLS is opportunistic by default, as it is in nodemailer: a server that does not offer it is
+ * spoken to in the clear, AUTH included. That keeps the acceptance lane working — its mail sink is
+ * MailHog-compatible and offers no TLS (ACCEPTANCE.md) — but it means an active attacker who strips
+ * `STARTTLS` from the EHLO reply can read the credentials. `SMTP_REQUIRE_TLS=1` refuses that session
+ * before AUTH is sent; bind it wherever the SMTP credentials are real.
  * @param {{host: string, port: number, user?: string, password?: string, from: string, secure?: boolean,
- *          requireTls?: boolean, timeoutMs?: number}} config
+ *          requireTls?: boolean, tlsRejectUnauthorized?: boolean, timeoutMs?: number}} config
  * @param {{to: string, subject: string, text: string}} message
  * @returns {Promise<{accepted: boolean, replies: string[]}>}
  */
 export async function sendMail(config, message) {
 	const timeoutMs = config.timeoutMs || DEFAULT_SMTP_TIMEOUT_MS;
 	const socket = config.secure
-		? tls.connect({ host: config.host, port: config.port, servername: config.host, rejectUnauthorized: false })
+		? tls.connect({ ...smtpTlsOptions(config), port: config.port })
 		: net.connect({ host: config.host, port: config.port });
 	socket.setTimeout(timeoutMs, () => socket.destroy(new SmtpError(`the SMTP server did not answer within ${timeoutMs} ms`, 'ETIMEDOUT')));
 	const session = new SmtpSession(socket);
@@ -160,7 +193,7 @@ export async function sendMail(config, message) {
 			const offersStartTls = ehlo.lines.some((line) => /STARTTLS/i.test(line));
 			if (offersStartTls) {
 				replies.push(describe(await session.command('STARTTLS', [220])));
-				await session.upgrade();
+				await session.upgrade(smtpTlsOptions(config));
 				ehlo = await session.command(`EHLO ${config.heloName || 'app-fixture-hello'}`, [250]);
 				replies.push(describe(ehlo));
 			} else if (config.requireTls) {

@@ -288,6 +288,30 @@ describe('app-works-evidence: the lane summary shows spend against budget (§6.2
             }),
         ).toThrow(/is not a §6.2 result/);
     });
+
+    it('escapes backslashes before pipes, so a cell renders the observation it was given', () => {
+        // Raw observation: `expected C:\tmp\|x` — a backslash-pipe pair and a lone backslash.
+        // Escaping only `|` would emit `\\|`: the pipe's backslash reads as an escaped backslash,
+        // so marked splits the cell at that pipe (the row shifts a column and loses its last
+        // cell) and markdown-it prints `C:\tmp|x`, dropping the recorded backslash.
+        const summary = evidence.laneSummaryTable({
+            rows: [
+                {
+                    scenarioId: 'ACC-13-01',
+                    step: 'build',
+                    result: 'fail',
+                    observation: 'expected C:\\tmp\\|x',
+                },
+            ],
+            spend: { actionsMinutes: 1, tokens: 1 },
+            budget: { actionsMinutes: 60, tokens: 1000 },
+        });
+
+        // Every `\` doubled, then every `|` escaped: `expected C:\\tmp\\\|x`.
+        expect(summary).toContain(
+            '| ACC-13-01 | build | fail | — | expected C:\\\\tmp\\\\\\|x | — |',
+        );
+    });
 });
 
 describe('app-works-evidence: no secret reaches an artefact (ACC-13-16, ACC-13-23)', () => {
