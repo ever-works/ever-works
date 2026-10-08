@@ -160,6 +160,69 @@ describe('buildModelCliCommand — claude-code', () => {
 	});
 });
 
+describe('buildModelCliCommand — session resume (self-build slice AU)', () => {
+	const SESSION = '3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b';
+
+	it('continues the session with --resume <id> --fork-session, prompt still on stdin', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			resumeSessionId: SESSION,
+			platform: POSIX
+		});
+		expect(command).toBe(
+			`"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits --resume ${SESSION} --fork-session < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"`
+		);
+	});
+
+	it('keeps --add-dir LAST so the variadic grant cannot swallow the session flags', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT],
+			resumeSessionId: SESSION,
+			platform: POSIX
+		});
+		expect(command.indexOf('--resume')).toBeLessThan(command.indexOf('--add-dir'));
+		expect(command).toContain(`--add-dir "${WRITABLE_MOUNT.path}" <`);
+	});
+
+	it.each([
+		['shell metacharacters', `${SESSION}; rm -rf /`],
+		['a flag', '--dangerously-skip-permissions'],
+		['an empty id', ''],
+		['a non-UUID', 'sess-1']
+	])('refuses a session id that is %s — refused, never escaped', (_label, resumeSessionId) => {
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution(),
+				executable: '/bin/claude',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				resumeSessionId,
+				platform: POSIX
+			})
+		).toThrowError(ModelCliCommandError);
+	});
+
+	it('refuses to resume Codex — `codex exec resume` takes no --sandbox / -C / --add-dir', () => {
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution({ provider: 'codex' }),
+				executable: '/usr/local/bin/codex',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				resumeSessionId: SESSION,
+				platform: POSIX
+			})
+		).toThrowError(/cannot resume/);
+	});
+});
+
 describe('buildModelCliCommand — codex', () => {
 	it('maps the permission mode onto the sandbox and reads the prompt from stdin', () => {
 		const command = buildModelCliCommand({
