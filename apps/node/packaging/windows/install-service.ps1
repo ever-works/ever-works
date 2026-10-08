@@ -854,7 +854,18 @@ else {
         -StdoutPath $stdoutLog `
         -StderrPath $stderrLog
 
-    $action = New-ScheduledTaskAction -Execute $actionSpec.Execute -Argument $actionSpec.Argument -WorkingDirectory $stateDir
+    # Self-build slice AP: the logs rotate first, as their own action - see
+    # New-ScheduledTaskRotationActionSpec for why this branch cannot rotate
+    # while the node runs.
+    $rotationPolicy = Get-NodeLogRotationPolicy
+    $rotationSpec = New-ScheduledTaskRotationActionSpec `
+        -PowerShellExe (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -LogPaths @($stdoutLog, $stderrLog) `
+        -RotateBytes $rotationPolicy.Bytes `
+        -Keep $rotationPolicy.Keep
+    $rotationAction = New-ScheduledTaskAction -Execute $rotationSpec.Execute -Argument $rotationSpec.Argument -WorkingDirectory $stateDir
+    $nodeAction = New-ScheduledTaskAction -Execute $actionSpec.Execute -Argument $actionSpec.Argument -WorkingDirectory $stateDir
+    $action = @($rotationAction, $nodeAction)
     $trigger = New-ScheduledTaskTrigger -AtStartup
     $settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
@@ -924,6 +935,7 @@ else {
         Write-Host "  Start-ScheduledTask -TaskName $Name"
     }
 
+    Write-Host "  Rotate:     $($rotationSpec.Execute) -EncodedCommand <logs past $($rotationPolicy.Bytes) bytes, keep $($rotationPolicy.Keep)>"
     Write-Host "  Execute:    $($actionSpec.Execute)"
     Write-Host "  Argument:   $($actionSpec.Argument)"
     Write-Host "  RunAs:      $($identity.TaskUserId) (LogonType $($taskPlan.LogonType))"
@@ -931,7 +943,7 @@ else {
 }
 
 Write-Host ''
-Write-Host "Logs: $stdoutLog and $stderrLog"
+Write-Host "Logs: $stdoutLog and $stderrLog (rotated past $((Get-NodeLogRotationPolicy).Bytes) bytes)"
 Write-Host 'Operating:'
 Write-Host '  drain (finish in-flight work, take no more):  ever-works-node pause'
 Write-Host '  take work again:                              ever-works-node resume'
