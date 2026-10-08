@@ -250,12 +250,16 @@ runbook `EVER_WORKS_FLEET_NODES.md` describes the manual check.
 - Replay answered questions (the whole Q&A trail of a Task) into later runs. _(Done — slice AU.)_
 - Option buttons parsed from `QUESTION.md` (a `- [ ]` list → `InboxItemOption[]`).
 - Steer on a LIVE fleet run is still undeliverable (nothing on a node drains `pendingInput`); the
-  Task page keeps offering it because it cannot tell a fleet run from a cloud one.
+  Task page keeps offering it because it cannot tell a fleet run from a cloud one. _(Done — slice AU:
+  the fleet-aware dispatcher stamps `runnerKind = fleet-node:<provider>` and the Task page hides the
+  steer on a live fleet run.)_
 - A `fleet-run` filter / tab in the Inbox UI; a chip in `TaskRunsHistory` for the parked run.
+  _(Done — slice AU: `?source=fleet` / `sourceType=fleet-run`, and an "awaiting input" chip.)_
 - A nested `.ever-works/QUESTION.md` (written from a subdirectory) is kept out of Git by the
   unanchored exclude rule but not collected: have the node scan for it (a cheap glob, or
   `git status --porcelain --ignored`) and at least warn in the run report so a misplaced question
-  is visible.
+  is visible. _(Done — slice AU: a bounded, link-free scan reports `misplacedQuestionFiles`, removes
+  the files, and the reconciler notes them in the Task chat.)_
 - An organisation-visible Inbox so a teammate can answer a question on an org Task.
 - `apps/web/scripts/sync-locale-parity.mjs` has no check mode — it writes — and on this branch it
   reports 79 English-only keys missing from EVERY non-English locale, none of them from this slice
