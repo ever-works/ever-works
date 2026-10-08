@@ -1260,6 +1260,13 @@ export class FleetTaskWorkspaceProvisioner {
 				{
 					commitMessage: authorization.commitMessage,
 					push: opts.push,
+					// Self-build slice AL: a fleet checkout is attacker-authored
+					// and the model holds `acceptEdits` over it, so the node's own
+					// commit must not run a repository `pre-commit` / fsmonitor hook
+					// the model could have pointed at the checkout via the shared
+					// pool config. The credentialed push already does this; the flag
+					// extends it to the commit.
+					hardenRepoHooks: true,
 					...(signal ? { signal } : {}),
 					...(opts.publishFence ? { publishFence: opts.publishFence } : {}),
 					...(authorization.identity ? { identity: authorization.identity } : {}),

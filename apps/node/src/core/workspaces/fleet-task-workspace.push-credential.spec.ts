@@ -124,8 +124,14 @@ describe('FleetTaskWorkspaceProvisioner.finalize — a fleet publish is never to
 			expect(result.pushed).toBe(false);
 			expect(finalize).toHaveBeenCalledTimes(1);
 			// No identity and no credential: exactly the shape a caller with
-			// no job channel (a test, an embedder) always got.
-			expect(Object.keys(finalize.mock.calls[0]![1]).sort()).toEqual(['commitMessage', 'push']);
+			// no job channel (a test, an embedder) always got — plus
+			// `hardenRepoHooks`, which a fleet finalize sets on EVERY commit
+			// (slice AL), commit-only and provider-less included.
+			expect(Object.keys(finalize.mock.calls[0]![1]).sort()).toEqual([
+				'commitMessage',
+				'hardenRepoHooks',
+				'push'
+			]);
 		} finally {
 			cleanup();
 		}
