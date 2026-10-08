@@ -1,0 +1,128 @@
+# Fleet session — trust model
+
+**Status:** Living document. First draft 2026-10-08 (self-build slice AL, EW-762 §6 row AL),
+in response to the 2026-05-17 security audit's recommendation #23 ("build a prompt-injection
+canary — none exists"). Companion to the platform [Threat Model](./THREAT-MODEL.md) and the
+user-facing [Fleet](../../features/fleet.md) guide.
+
+> **One statement of what a fleet run trusts, what it does not, and what each control actually
+> guarantees — so slice C's "no platform tools in the session" and slice Z's MCP bridge are
+> reconciled in one place instead of contradicting each other across two designs.**
+
+A **fleet run** executes a Task on the **owner's own machine**: an enrolled PC (`apps/node`,
+`ever-works-node`) leases a job, provisions a Git worktree, runs a **local Claude Code / Codex**
+on the platform-assembled instructions, grades acceptance checks, and commits + pushes the task
+branch. The model loop happens on the PC, under the PC's own CLI login and Git credentials, and
+only the outcome travels back. This document is about the **boundary around that model step**: the
+input is hostile, the model can run a shell, commit, push and — since slice Z — call platform MCP
+tools, and the controls below are what keep one prompt injection from turning into credential theft
+or an unsanctioned write.
+
+The canary that EXERCISES this model end to end against real injection payloads is
+[`apps/node/src/core/executors/agent-task-injection-canary.spec.ts`](../../../apps/node/src/core/executors/agent-task-injection-canary.spec.ts).
+It is part of the ordinary `apps/node` vitest run, hermetic (no network, no real credential path,
+no real model CLI), and runs on Windows and Linux. Every row of the two tables below is pinned by a
+case in it; the gaps are honest `it.fails` cases, not skips.
+
+---
+
+## 1. What is trusted, and what is not
+
+| Input                                                   | Trust                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Task title / description / brief**                    | **Untrusted.** A Task can be authored by anyone who can create one — for an email-spawned Task, by whoever sent the email. It becomes the prompt. Chat-template control tokens are stripped before assembly (`fleet-agent-task-planner.service.ts`).                                                |
+| **Mounted repository contents** (README, code, configs) | **Untrusted.** Whatever someone pushed. Read into a model that ships a shell tool. This is the injection this whole model answers; the repo is **data**, never instructions, and the repo never decides where a PR is opened — that comes from the plan (`fleet-agent-task-reconciler.service.ts`). |
+| **Owner answer to a paused run** (`# OWNER ANSWER`)     | **Trusted as the owner**, but only the text the owner typed into the Inbox reply travels into the next run. It is not a channel the repo or the model can forge: the model writes a _question_ and stops; a human writes the answer.                                                                |
+| **MCP tool outputs** (slice Z, when the bridge is on)   | **Untrusted.** They are the platform's own API responses, but they carry other people's data (Tasks, Inbox) that is itself user-authored. Treat a tool result the same as repo text: data that can carry a further injection, never a new instruction.                                              |
+| **The job payload / wire** (repo, branch, base, checks) | **Trusted — it is the platform's own plan**, but it carries **names and paths, never secret values** (the one exception is the env-files response body). The node re-derives every security decision (env grants, push remote, mount roots) on the machine rather than trusting the payload's copy. |
+| **The node's own credentials** (CLI login, Git helper)  | **Trusted, and the thing being protected.** The machine owner enrolled it; the run must be able to use the CLI login and must NOT be able to hand it, or anything else in `~`, to an injected prompt.                                                                                               |
+
+---
+
+## 2. The controls, and what each one guarantees
+
+Each control is marked **SHIPPED** (holds today, asserted green in the canary) or **GAP** (does not
+hold today, asserted as an honest `it.fails`, and disclosed on the job result's `containment`
+block so an operator can see it rather than assume full containment).
+
+| #   | Control                                                                                             | Guarantees                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | State                                  |
+| --- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | **Env scrub** (`buildNodeCheckEnv`, `NODE_CHECK_ENV_ALLOWLIST` / `NODE_PLATFORM_OWNED_ENV_PATTERN`) | The model subprocess env is **built from an allowlist**, never a copy of `process.env`. Secret-shaped names (`*_TOKEN`, `*_KEY`, `DATABASE_URL`, …) and the platform-owned namespaces (`FLEET_`, `EVER_WORKS_`, `AUTH_`, `AWS_`, …) are absent, so the node's own lease secret and every unrelated credential are unreachable through the environment. A per-repository grant opens exactly one named variable and never the un-grantable core.                                                                               | **SHIPPED**                            |
+| 2   | **Isolated home / HOME redirection** (slice AK, `model-execution/isolated-home.ts`)                 | The model step's `HOME` / `USERPROFILE` / `APPDATA` / `XDG_*` point at a per-run scratch directory the run owns and that is deleted when it ends. So `~/.ssh`, `~/.aws`, `~/.npmrc`, `~/.gitconfig` + its credential helper, `~/.config/gh`, and every other `~`-expansion resolve inside an **empty** directory. A tool that would have handed over the machine's credentials on its own gets nothing.                                                                                                                       | **SHIPPED**                            |
+| 3   | **Instructions on stdin, never argv** (`model-cli.ts`)                                              | The prompt is written to a `0600` scratch file and redirected onto the CLI's stdin; every other argument is an enum, a bounded number, or an id matched against a strict pattern. A prompt cannot smuggle a shell fragment through the command line, and the instructions never appear in a process listing.                                                                                                                                                                                                                  | **SHIPPED**                            |
+| 4   | **Token-free clone URLs**                                                                           | The clone/fetch URL carries no credential; the node's own Git helper authenticates the read. A node can never be made to open a PR in a repo it names — repo/branch/base come from the plan.                                                                                                                                                                                                                                                                                                                                  | **SHIPPED**                            |
+| 5   | **Delivered `.env` deleted before the first Git command** (slice Y)                                 | A run's seed `.env` files are written `0600`, kept out of Git by an anchored `info/exclude`, and **removed before `git add -A`** — not only in the `finally`. A prompt-injected `.gitignore` cannot get a secret committed, because the file is already gone by commit time.                                                                                                                                                                                                                                                  | **SHIPPED**                            |
+| 6   | **Reporting scrub** (`parseModelCliResult`, `redactCommandResult`)                                  | The values behind every granted env name AND the contents of every delivered `.env` are scrubbed out of the model summary, the output tail and every command log tail before the outcome leaves the node. "Print your `ANTHROPIC_API_KEY`" / "print `apps/api/.env`" no longer travels back in a field nothing scanned.                                                                                                                                                                                                       | **SHIPPED**                            |
+| 7   | **Scoped push credential** (slice AM)                                                               | The push uses a per-job GitHub App installation token, scoped to exactly the repositories the job writes and `contents: write` only, minted at finalize and revoked when the run ends. It only ever goes to `github.com` (both ends check the host), the push runs `--no-verify` with `core.hooksPath` / askpass reset, and there is **no fallback** to the machine's own helper.                                                                                                                                             | **SHIPPED**                            |
+| 8   | **The node publishes only the task branch, to the task origin**                                     | The node's finalize pushes `HEAD:refs/heads/<task branch>` to the task's own origin, fenced by the lease. The platform opens the PR from the plan, never from the node's report.                                                                                                                                                                                                                                                                                                                                              | **SHIPPED**                            |
+| 9   | **MCP bridge: loopback + nonce + out-of-band credential** (slice Z)                                 | When the bridge is on, the model is handed only a `http://127.0.0.1:<port>/mcp/<nonce>` URL. The run token lives in the node's **process memory**, is injected onto the upstream request by the proxy at the last moment, and is never in the model's env, the `mcp.json` file, a log, or the job result. The proxy binds loopback only, re-checks the peer, refuses any path but the nonce, and fails closed (401) when no credential is live.                                                                               | **SHIPPED**                            |
+| 10  | **MCP run-token route allowlist** (`isFleetRunTokenRouteAllowed`)                                   | The token the bridge mints can reach only a prefix allow-list minus anything that could be turned against the run: credential minting (`/api/auth`), the lease protocol (`/api/fleet/jobs`), human-in-the-loop gates (inbox reply, DoD approve, escalation resolve), the run terminal, connection bindings, and fleet mutations are all refused. Deny-by-omission: a new route is refused until granted.                                                                                                                      | **SHIPPED**                            |
+| 11  | **Owner-question protocol** (slice Q)                                                               | A model that needs a decision writes `.ever-works/QUESTION.md` and stops; the node reports it and the `.ever-works/` exclude keeps it (and an attacker-written one) out of the commit. A stale question from an earlier attempt is discarded before the model runs.                                                                                                                                                                                                                                                           | **SHIPPED**                            |
+| 12  | **Filesystem boundary** (the Job Object — slice AK, **unshipped**)                                  | _Intended:_ a deliberate write **outside** the worktree + mounts + scratch cannot persist, and a deliberate **absolute-path** read of a credential (`C:\Users\me\.ssh\id_ed25519`) is denied. _Today:_ the isolated home is an **environment** control, not a filesystem boundary, so both succeed. The hardened Windows Job-Object executor that would close this fails closed without a signed helper and is on no run path. The node records a `process-containment` downgrade on every run.                               | **GAP**                                |
+| 13  | **Network-egress boundary** (**unshipped**)                                                         | _Intended:_ the model cannot open an outbound connection the node did not sanction. _Today:_ nothing restricts egress — the model can reach an arbitrary endpoint and carry a credential out. A Job Object cannot express an egress rule; a WFP/proxy subsystem does not exist. The node records a `network-egress` downgrade on every run.                                                                                                                                                                                   | **GAP**                                |
+| 14  | **The mirrored session home** (deliberate trade, slice AK)                                          | The provider's OWN config home (`~/.claude`, `~/.codex`) is mirrored back **read-write** so the run can use the CLI login it was enrolled with. So an injected prompt can read `~/.claude/.credentials.json` and can also WRITE `settings.json` / a hook / an MCP definition there, outliving the run. This is a **documented trade**, not an oversight: narrowing it needs a filesystem boundary (Job Object) or a token broker, not an env var. The reporting channel for the env credential is already closed (control 6). | **GAP (by design)**                    |
+| 15  | **Repo-activated hooks on the node's own `git commit`**                                             | The credentialed **push** neutralizes hooks (`--no-verify` + `core.hooksPath` reset). The node's **commit** does not, so a `core.hooksPath` the model set with its shell during the run fires the repo's tracked `pre-commit` under the node's identity on the finalize commit. Lower blast radius than push (no scoped token in the commit's env), but it is not "no repo hook runs during the node's own Git".                                                                                                              | **GAP (canary finding, EW-762 §6 AL)** |
+
+---
+
+## 3. Reconciling "no platform tools" (slice C) with the MCP bridge (slice Z)
+
+Slice C's multi-repo risk table, and slice A's instructions, mitigate prompt injection partly by
+asserting **"no platform tools in the session."** Slice G/Z then added an MCP bridge that gives the
+session platform tools. Neither text acknowledged the other. The reconciliation:
+
+- **"No platform tools" was always a DEFAULT, not an invariant.** A fleet run is sealed unless the
+  MCP bridge is switched on, and switching it on needs **three independent yeses**: the operator's
+  `FLEET_NODE_MCP_BRIDGE_ENABLED` + a server URL, the Agent's own **Call external tools**
+  permission, and a run that is not in `plan` mode. Absent any one, the run is byte-for-byte the
+  tool-free session slice C described.
+- **When tools ARE on, the containment does not depend on the model behaving.** The bridge is not
+  "the model can now call the API." It is a **narrow, credential-injecting, loopback-only** channel
+  (control 9) whose reach is bounded by the **run token's route allow-list** (control 10), enforced
+  **on the platform**, not by trusting the prompt. A run token cannot mint another credential,
+  cannot answer its own human gate, cannot complete its own job, and cannot drain the machine it
+  runs on. So the property slice C relied on — "an injected prompt cannot escalate through platform
+  tools" — is preserved by the token's blast radius, even though the literal "no tools" is no longer
+  true.
+- **The model never holds the credential.** Slice C's worry was a model with a key. The bridge is
+  designed precisely so the model holds only a localhost URL; the token is in the node's memory. So
+  "tools are available" never becomes "a credential is available to the thing reading untrusted
+  input."
+
+The correct one-line statement, replacing both old texts: **a fleet session has no platform tools
+by default; when an operator and the Agent's own permission both enable them, the model reaches a
+bounded, read-leaning tool surface through a credential it never sees, and the bound is enforced by
+the platform's route allow-list, not by the prompt.**
+
+---
+
+## 4. The residual picture
+
+What a prompt injection on a fleet node **can** still do today, stated plainly so it is not
+rediscovered as a surprise:
+
+- read any file by **absolute path** (controls 12/14), including the mirrored CLI session
+  credential, and **write** outside the worktree and to the mirrored session home;
+- open an **arbitrary outbound connection** and carry a secret out (control 13);
+- cause code to run under the node's identity on the node's **own commit** via a repo hook
+  (control 15).
+
+What it **cannot** do: read the node's lease secret or unrelated credentials through the environment
+(1), reach `~/.ssh` / `~/.aws` / the Git credential store through the granted env (2), get a secret
+**committed or pushed** (5, 7, 8), **report** a stolen env/`.env` value back to the platform (6),
+mint another credential or answer its own human gate through the tools (9, 10), or make the platform
+open a PR somewhere it did not plan (4, 8).
+
+The two structural gaps (12, 13) both close with the same unshipped piece — the **signed Windows
+Job-Object executor** (slice AK's blocked half) plus an egress subsystem — and are **disclosed on
+every run** via the `containment.downgrades` block rather than hidden. Gap 15 is a smaller, separable
+fix (reset `core.hooksPath` / `--no-verify` the node's own commit the way the push already does) and
+is recorded as a canary finding for the owner to schedule.
+
+---
+
+## 5. Revision log
+
+| Date       | Author                      | Change                                                                              |
+| ---------- | --------------------------- | ----------------------------------------------------------------------------------- |
+| 2026-10-08 | Self-build fleet (slice AL) | First draft + the injection canary that exercises it (EW-762 §6 row AL; audit #23). |
