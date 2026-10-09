@@ -658,6 +658,8 @@ What happens next:
   Task, the branch (and the mounted repository, if the agent asked from one), and a link to an
   existing pull request. The Inbox body also says what the run managed before asking (pushed,
   committed but not pushed, no changes, a failed push) and which required checks did not pass.
+  **From your fleet** above the Active and Archived lists narrows the Inbox to these messages
+  (`/inbox?source=fleet`, or `GET /api/inbox?sourceType=fleet-run`).
 - **Replying starts a new run for the same Task** — same Agent, same pinned node when the Agent is
   pinned, same branch. The new run's instructions carry your question and answer under
   **`# OWNER ANSWER`**, tell the model its earlier commits are on the branch (and whether they were
@@ -684,7 +686,13 @@ What happens next:
   resumed Codex run could not be held to the sandbox and mount grants it was planned with.
 - The **Task page** shows the open question with an _Answer it in the Inbox_ link and hides the
   free-text _Resume_ while a question is open: a resume from there would start a run that never sees
-  your answer.
+  your answer. In the **Runs** history the parked run carries an **awaiting input** chip, so it does
+  not read as simply _completed_.
+- While a fleet run is **live**, the Task page offers no _Steer_ box. A node runs the model on
+  instructions fixed when the job was dispatched and never reads messages sent mid-run, so a steer
+  would never reach the agent. The run is recorded as executing on the fleet (its `runnerKind` is
+  `fleet-node:<provider>`), and the strip says how it reaches you instead: with a question in your
+  Inbox. _Interrupt_ is still shown.
 - **Archiving** (or deleting) the open question drops the parked run — it stops waiting and the Task
   page returns to normal. Moving the question back to Active parks it again.
 
@@ -698,8 +706,11 @@ protocol; a Task that is _Done_ or _Cancelled_ cannot be resumed — the reply i
 reason, the question stays open until you archive it; an Agent whose git policy forbids pushing may
 lose uncommitted work when the answer run lands on a different node, because that node starts from
 the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
-written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
-but is not reported as a question.
+written somewhere other than the repository root (or a mounted repository's root), for example
+`apps/api/.ever-works/QUESTION.md` after the model changed directory, is kept out of Git and is not
+asked as a question. The node finds it (it searches up to 8 levels deep and skips `node_modules`,
+`.git`, `.mounts` and links), removes it, and reports it on the run. The Task chat then says where
+the agent tried to ask, so a question is never lost without a trace.
 
 ### Platform tools from a fleet run (MCP bridge)
 

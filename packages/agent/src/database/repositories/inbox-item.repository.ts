@@ -52,6 +52,8 @@ export interface ListInboxItemsOptions {
     status?: InboxItemStatus;
     /** Only items linked to this Task (the Task page's open-question lookup, slice Q). */
     taskId?: string;
+    /** Only items from this producer — e.g. `fleet-run` for the Inbox's fleet filter (slice AU). */
+    sourceType?: InboxItemSourceType;
     limit?: number;
     offset?: number;
 }
@@ -250,6 +252,11 @@ export class InboxItemRepository {
         // another owner's item through a guessed Task id.
         if (options.taskId) {
             qb.andWhere('item.taskId = :taskId', { taskId: options.taskId });
+        }
+        // Self-build slice AU — the Inbox's "From your fleet" filter. After
+        // the owner predicate like every other filter here.
+        if (options.sourceType) {
+            qb.andWhere('item.sourceType = :sourceType', { sourceType: options.sourceType });
         }
         const [rows, total] = await qb
             .orderBy('item.createdAt', 'DESC')

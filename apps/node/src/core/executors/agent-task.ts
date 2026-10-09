@@ -27,6 +27,7 @@ import type { WorkspacePublishFence } from '@ever-works/plugin';
 import {
 	FLEET_AGENT_TASK_MAX_SETUP_STEPS,
 	FLEET_AGENT_TASK_MAX_STEPS,
+	FLEET_AGENT_TASK_QUESTION_FILE,
 	FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC,
 	FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES,
 	FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
@@ -60,6 +61,7 @@ import {
 } from '../model-execution/isolated-home';
 import { resolveCommandRoot, type CommandRootFs } from './command-roots';
 import {
+	collectMisplacedOwnerQuestions,
 	collectOwnerQuestion,
 	defaultQuestionFs,
 	discardOwnerQuestion,
@@ -861,6 +863,10 @@ async function runResolvedAgentTask(
 	// NEVER pushes to `failures` — the platform decides what a paused run
 	// means, and the model / check / git verdicts below stay honest.
 	let question: FleetAgentTaskQuestion | null = null;
+	// Slice AU — question files written from a subdirectory: reported (and
+	// removed) so the owner learns the agent wanted to ask, instead of the
+	// question vanishing behind the exclude rule. Never a failure.
+	let misplacedQuestionFiles: string[] = [];
 	if (execution && !setupBlocked) {
 		question = await collectOwnerQuestion(
 			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
@@ -868,6 +874,19 @@ async function runResolvedAgentTask(
 			signal
 		);
 		throwIfAgentTaskAborted(signal);
+		misplacedQuestionFiles = await collectMisplacedOwnerQuestions(
+			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
+			questionFs,
+			signal
+		);
+		throwIfAgentTaskAborted(signal);
+		if (misplacedQuestionFiles.length > 0) {
+			io.logger?.warn(
+				`[fleet-node] job ${job.id}: the model wrote ${FLEET_AGENT_TASK_QUESTION_FILE} outside the ` +
+					`repository root (${misplacedQuestionFiles.join(', ')}); only the root file is read as a ` +
+					`question — reported on the run and removed`
+			);
+		}
 	}
 
 	const stepResults = setupBlocked ? [] : await runCommandPhase(steps, context, io, signal, undefined, reported);
@@ -983,6 +1002,8 @@ async function runResolvedAgentTask(
 		// Conditional key: a run without a question reports exactly what it
 		// always did (`question: null` would be a wire change for nothing).
 		...(question ? { question } : {}),
+		// Slice AU: same posture — absent unless a misplaced file was found.
+		...(misplacedQuestionFiles.length > 0 ? { misplacedQuestionFiles } : {}),
 		// Same posture for the MCP bridge: absent unless the job actually
 		// asked for one. NEVER carries the token — only whether the bridge
 		// ran and how many tool calls went through it.

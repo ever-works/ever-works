@@ -1,5 +1,5 @@
 import { constants as fsConstants, promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
 	FLEET_AGENT_TASK_META_DIR,
 	FLEET_AGENT_TASK_QUESTION_FILE,
@@ -63,6 +63,18 @@ export interface AgentTaskQuestionFs {
 	remove(path: string): Promise<void>;
 	/** rmdir only when empty; ENOENT / ENOTEMPTY / EEXIST are fine. */
 	removeDirIfEmpty(path: string): Promise<void>;
+	/**
+	 * Self-build slice AU — one directory's entries, WITHOUT following links:
+	 * a symlink or junction reads as `other`, never as a directory, so the
+	 * misplaced-question scan cannot be walked out of the worktree. Optional:
+	 * a seam without it scans nothing (today's behaviour).
+	 *
+	 * Returns AT MOST `limit` entries and stops reading the directory there
+	 * (review, PR #2571): the scan's entry budget has to bound what is read,
+	 * not only what is looked at afterwards, or one huge generated directory
+	 * outside the skip list costs its full listing on every run.
+	 */
+	readDir?(path: string, limit: number): Promise<Array<{ name: string; kind: 'dir' | 'file' | 'other' }>>;
 }
 
 /** One place the question file may be: the primary worktree or a writable mount. */
@@ -140,8 +152,46 @@ export const defaultQuestionFs: AgentTaskQuestionFs = {
 			if (code === 'ENOENT' || code === 'ENOTEMPTY' || code === 'EEXIST' || code === 'ENOTDIR') return;
 			throw error;
 		}
+	},
+	// `opendir` streams the directory, so reading stops at `limit` instead of
+	// materialising the whole listing first; breaking out of the `for await`
+	// closes the handle. Its dirents classify by lstat: a symlink — and on
+	// Windows a junction — is `isSymbolicLink()`, never `isDirectory()`, so
+	// the scan below never descends through one.
+	readDir: async (path, limit) => {
+		const out: Array<{ name: string; kind: 'dir' | 'file' | 'other' }> = [];
+		if (!(limit > 0)) return out;
+		const dir = await fs.opendir(path);
+		for await (const entry of dir) {
+			out.push({
+				name: entry.name,
+				kind: entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
+			});
+			if (out.length >= limit) break;
+		}
+		return out;
 	}
 };
+
+/**
+ * Self-build slice AU — bounds on the misplaced-question scan. It runs once
+ * per model step over a checkout that may be enormous, so it skips the
+ * directories that are never a model's working directory and stops early
+ * rather than walking a monorepo to the last file.
+ */
+export const MISPLACED_QUESTION_SCAN_LIMITS = {
+	/** Directory depth below a repository root that is searched. */
+	maxDepth: 8,
+	/** Directory entries examined per repository before the scan gives up. */
+	maxEntries: 20_000,
+	/** Misplaced files reported per run (all found are still removed). */
+	maxReported: 5,
+	/** Entries read from one `.ever-works/` directory while looking for the file. */
+	maxMetaEntries: 64
+} as const;
+
+/** Never descended into: Git's own store, dependency trees, and the mount links. */
+const MISPLACED_QUESTION_SKIP_DIRS = new Set(['.git', 'node_modules', '.mounts']);
 
 /** The error `readHead` rejects with for an entry that exists but is not a regular file. */
 function notRegularFile(path: string, stats: Awaited<ReturnType<typeof fs.lstat>>): NodeJS.ErrnoException {
@@ -232,6 +282,94 @@ export async function collectOwnerQuestion(
 		await removeQuestionFile(candidate.path, questionFs);
 	}
 	return found;
+}
+
+/**
+ * Self-build slice AU (a slice-Q follow-up) — find owner-question files the
+ * model wrote somewhere other than a repository root, remove them, and
+ * return where they were.
+ *
+ * A model that `cd`-ed into `apps/api` and then wrote
+ * `.ever-works/QUESTION.md` put the file at `apps/api/.ever-works/QUESTION.md`.
+ * The unanchored exclude rule keeps it out of Git, but
+ * {@link collectOwnerQuestion} reads only the root, so the question used to
+ * vanish in silence: the run finished, nobody was asked anything, and the
+ * owner never learned the agent had wanted to ask. Now the run reports the
+ * path, so the platform can say so.
+ *
+ * Scans the primary worktree and every WRITABLE mount (prefixed
+ * `.mounts/<dir>/`), breadth-first, never through a link, skipping
+ * {@link MISPLACED_QUESTION_SKIP_DIRS}, within {@link MISPLACED_QUESTION_SCAN_LIMITS}.
+ * Each file found is removed (and its directory when that empties it) so a
+ * reused worktree does not report it again next run. The paths are
+ * workspace-relative POSIX — never absolute, never content. Best-effort:
+ * an unreadable directory is skipped, a seam without `readDir` scans
+ * nothing, and only an abort propagates.
+ */
+export async function collectMisplacedOwnerQuestions(
+	input: CollectOwnerQuestionInput,
+	questionFs: AgentTaskQuestionFs = defaultQuestionFs,
+	signal?: AbortSignal
+): Promise<string[]> {
+	const readDir = questionFs.readDir?.bind(questionFs);
+	if (!readDir) return [];
+	const roots: Array<{ prefix: string; path: string }> = [
+		{ prefix: '', path: input.primaryPath },
+		...(input.mounts ?? [])
+			.filter((mount) => mount.writable)
+			.map((mount) => ({ prefix: `.mounts/${mount.mountDir}/`, path: mount.path }))
+	];
+	const questionName = FLEET_AGENT_TASK_QUESTION_FILE.split('/').pop() ?? 'QUESTION.md';
+	const found: Array<{ relative: string; directory: string }> = [];
+	for (const root of roots) {
+		const queue: Array<{ path: string; relative: string; depth: number }> = [
+			{ path: root.path, relative: '', depth: 0 }
+		];
+		let examined = 0;
+		while (queue.length > 0 && examined < MISPLACED_QUESTION_SCAN_LIMITS.maxEntries) {
+			throwIfQuestionAborted(signal);
+			const current = queue.shift()!;
+			let entries: Array<{ name: string; kind: 'dir' | 'file' | 'other' }>;
+			try {
+				// Never ask for more than the budget has left (review).
+				entries = await readDir(current.path, MISPLACED_QUESTION_SCAN_LIMITS.maxEntries - examined);
+			} catch (error) {
+				rethrowIfAbort(error);
+				continue;
+			}
+			for (const entry of entries) {
+				examined += 1;
+				if (examined > MISPLACED_QUESTION_SCAN_LIMITS.maxEntries) break;
+				if (entry.kind !== 'dir') continue;
+				const relative = current.relative ? `${current.relative}/${entry.name}` : entry.name;
+				const absolute = join(current.path, entry.name);
+				if (entry.name === FLEET_AGENT_TASK_META_DIR) {
+					// The root's own `.ever-works/` is the protocol's — read by
+					// `collectOwnerQuestion`. Every other one is misplaced.
+					if (current.depth === 0) continue;
+					let meta: Array<{ name: string; kind: 'dir' | 'file' | 'other' }> = [];
+					try {
+						meta = await readDir(absolute, MISPLACED_QUESTION_SCAN_LIMITS.maxMetaEntries);
+					} catch (error) {
+						rethrowIfAbort(error);
+					}
+					if (meta.some((file) => file.name === questionName && file.kind !== 'dir')) {
+						found.push({ relative: `${root.prefix}${relative}/${questionName}`, directory: absolute });
+					}
+					continue;
+				}
+				if (MISPLACED_QUESTION_SKIP_DIRS.has(entry.name)) continue;
+				if (current.depth + 1 > MISPLACED_QUESTION_SCAN_LIMITS.maxDepth) continue;
+				queue.push({ path: absolute, relative, depth: current.depth + 1 });
+			}
+		}
+	}
+	for (const file of found) {
+		// The containing directory's parent is the subdirectory the model
+		// wrote from; `removeQuestionFile` works relative to that.
+		await removeQuestionFile(dirname(file.directory), questionFs);
+	}
+	return found.slice(0, MISPLACED_QUESTION_SCAN_LIMITS.maxReported).map((file) => file.relative);
 }
 
 /** Remove the file, then the directory if that emptied it; swallow everything but an abort. */

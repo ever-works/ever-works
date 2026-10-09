@@ -1664,6 +1664,29 @@ describe('FleetAgentTaskReconcilerService', () => {
             await report(withSession(SESSION) as unknown as Record<string, unknown>);
             expect(runs.markCompleted).toHaveBeenCalled();
         });
+
+        // Same slice, the slice-Q follow-up: a question file the model wrote
+        // from a subdirectory was removed unread and the owner never knew.
+        it('tells the owner, in the Task chat, about a question file the model wrote from a subdirectory', async () => {
+            await report({
+                ...successResult,
+                misplacedQuestionFiles: ['apps/api/.ever-works/QUESTION.md'],
+            });
+            const body = String(taskChat.post.mock.calls[0][1].body);
+            expect(body).toContain('outside the repository root');
+            expect(body).toContain('`apps/api/.ever-works/QUESTION.md`');
+            // A warning, never a failure and never a parked run.
+            expect(runs.markCompleted).toHaveBeenCalled();
+            expect(runs.markFailed).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+
+        it('says nothing extra when the node found no misplaced file', async () => {
+            await report(successResult as unknown as Record<string, unknown>);
+            expect(String(taskChat.post.mock.calls[0][1].body)).not.toContain(
+                'outside the repository root',
+            );
+        });
     });
 
     describe('owner question (self-build slice Q)', () => {
@@ -2163,6 +2186,62 @@ describe('FleetAgentTaskReconcilerService', () => {
                 error.mockRestore();
             }
         });
+    });
+});
+
+describe('parseAgentTaskResult — misplaced question files (self-build slice AU)', () => {
+    it('keeps bounded relative paths and drops anything a human should not be shown', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                'apps/api/.ever-works/QUESTION.md',
+                '.mounts/template/src/.ever-works/QUESTION.md',
+                '/etc/passwd',
+                'C:\\Users\\owner\\secret.md',
+                '../outside/.ever-works/QUESTION.md',
+                'line\nbreak',
+                42,
+                'x'.repeat(500),
+            ],
+        });
+        expect(parsed?.misplacedQuestionFiles).toEqual([
+            'apps/api/.ever-works/QUESTION.md',
+            '.mounts/template/src/.ever-works/QUESTION.md',
+        ]);
+    });
+
+    it('keeps a printable Unicode path, and drops bidi/format tricks and code-span breakouts (review)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                '资源/.ever-works/QUESTION.md',
+                'docs/café/.ever-works/QUESTION.md',
+                // U+202E RIGHT-TO-LEFT OVERRIDE disguises the path when shown.
+                'apps/‮txt.md/.ever-works/QUESTION.md',
+                // U+200B ZERO WIDTH SPACE — invisible.
+                'apps/a​b/.ever-works/QUESTION.md',
+                'tab\there/.ever-works/QUESTION.md',
+                'apps/`[link](https://evil.example)`/.ever-works/QUESTION.md',
+            ],
+        });
+        expect(parsed?.misplacedQuestionFiles).toEqual([
+            '资源/.ever-works/QUESTION.md',
+            'docs/café/.ever-works/QUESTION.md',
+        ]);
+    });
+
+    it('caps the list and reads nothing from a malformed field', () => {
+        const many = Array.from({ length: 9 }, (_, i) => `pkg${i}/.ever-works/QUESTION.md`);
+        expect(
+            parseAgentTaskResult({ status: 'failed', taskId: TASK, misplacedQuestionFiles: many })
+                ?.misplacedQuestionFiles,
+        ).toHaveLength(5);
+        expect(
+            parseAgentTaskResult({ status: 'failed', taskId: TASK, misplacedQuestionFiles: 'x' })
+                ?.misplacedQuestionFiles,
+        ).toBeUndefined();
     });
 });
 
