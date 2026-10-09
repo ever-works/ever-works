@@ -130,7 +130,12 @@ const SAMPLE_INPUT: Record<string, unknown> = {
 
 /** The path a row's wrapper must request, with its placeholders filled in. */
 function expectedPath(row: ContractsRouteRow): string {
-    if (row.wildcard) return row.path.replace('*', 'events');
+    if (row.wildcard) {
+        // A wildcard family is a template that ENDS in `*` (`ContractsRouteRow.path`); the
+        // wrapper appends its sub-path in that one position, so the sample does the same.
+        expect(row.path.endsWith('*'), `${row.id}: a wildcard template ends in "*"`).toBe(true);
+        return `${row.path.slice(0, -1)}events`;
+    }
     return row.path.replace(/:(\w+)/g, (_match, param: string) => {
         const sample = PARAM_SAMPLES[param];
         expect(sample, `the spec has a sample for the :${param} placeholder`).toBeDefined();

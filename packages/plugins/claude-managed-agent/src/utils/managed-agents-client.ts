@@ -311,7 +311,27 @@ function normalizeAnthropicBaseUrl(baseUrl: string): string {
 		return DEFAULT_BASE_URL;
 	}
 
-	return trimmed.replace(/\/v1\/?$/, '').replace(/\/+$/, '');
+	return stripTrailingSlashes(stripVersionSuffix(trimmed));
+}
+
+/**
+ * Drop one trailing `/v1` or `/v1/` — what `/\/v1\/?$/` removed. Written out rather than
+ * as a regex so it sits beside {@link stripTrailingSlashes}.
+ */
+function stripVersionSuffix(url: string): string {
+	if (url.endsWith('/v1/')) return url.slice(0, -'/v1/'.length);
+	if (url.endsWith('/v1')) return url.slice(0, -'/v1'.length);
+	return url;
+}
+
+/**
+ * Drop every trailing `/` — what `/\/+$/` removed, in linear time. That regex backtracked
+ * quadratically over a long run of `/` that is not at the end (CodeQL js/polynomial-redos).
+ */
+function stripTrailingSlashes(url: string): string {
+	let end = url.length;
+	while (end > 0 && url.charCodeAt(end - 1) === 0x2f /* '/' */) end -= 1;
+	return url.slice(0, end);
 }
 
 function readNullableString(value: unknown): string | null {

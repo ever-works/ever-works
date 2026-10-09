@@ -31,6 +31,7 @@ import {
 } from '@src/entities/template-customization.entity';
 import { Template } from '@src/entities/template.entity';
 import { assertCreatedRepositoryTarget } from '@src/utils/git-repository.utils';
+import { trimEdgeChars } from '@src/utils/text.utils';
 import { getCustomizationPromptForBaseTemplate } from './customization-prompts';
 import { inferFrameworkFromRepository } from './utils/framework-inference';
 
@@ -766,12 +767,11 @@ export class TemplateCustomizationService {
     }
 
     private buildRepoName(displayName: string, base: WebsiteTemplateConfig): string {
-        const slug =
-            displayName
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '')
-                .slice(0, 50) || 'tpl';
+        // Edge hyphens by a linear scan, never `/^-+|-+$/g`, which is polynomial
+        // on an interior hyphen run (none survives the collapse above, but the
+        // scan does not have to rely on that).
+        const hyphenated = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const slug = trimEdgeChars(hyphenated, '-', '-').slice(0, 50) || 'tpl';
         const suffix = randomUUID().replace(/-/g, '').slice(0, SUFFIX_LEN);
         const prefix = `tpl-${base.id}-`;
         const maxBody = REPO_NAME_MAX - prefix.length - 1 - suffix.length;

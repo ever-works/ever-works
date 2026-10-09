@@ -1514,6 +1514,60 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(params.subscription_data.metadata).toEqual(params.metadata);
     });
 
+    // Owner rule (2026-10-05 repricing): 90-day free trial on CLOUD paid plans. The service decides
+    // the length; the provider puts it on the subscription and nowhere else.
+    it('puts the server-decided trial on the SUBSCRIPTION (90 days)', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, trialPeriodDays: 90 },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.subscription_data.trial_period_days).toBe(90);
+        // The card is still collected: payment_method_collection stays at Stripe's
+        // subscription-mode default ("always"), exactly like ever.co's shared checkout.
+        expect(params.payment_method_collection).toBeUndefined();
+        expect(params.subscription_data.metadata).toEqual(params.metadata);
+    });
+
+    it.each([undefined, null, 0, -5, 1.5, 731, Number.NaN])(
+        'charges at checkout (no trial_period_days) when the descriptor says %p',
+        async (trialPeriodDays) => {
+            const { provider, client } = build();
+
+            await provider.createPlanCheckoutSession({
+                ...planRequest,
+                plan: { ...planRequest.plan, trialPeriodDays: trialPeriodDays as any },
+            });
+
+            const params = client.checkout.sessions.create.mock.calls[0][0];
+            expect(params.subscription_data).toBeDefined();
+            expect('trial_period_days' in params.subscription_data).toBe(false);
+        },
+    );
+
+    it('never sends a trial on a perpetual licence, even if one is asked for', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                mode: 'payment',
+                code: 'selfhosted_pro',
+                trialPeriodDays: 90,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        expect(params.subscription_data).toBeUndefined();
+        expect(JSON.stringify(params)).not.toContain('trial');
+    });
+
     it('appends its own session-id token to the caller’s clean success URL', async () => {
         const { provider, client } = build();
 

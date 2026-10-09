@@ -5,7 +5,8 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { SandboxWorkspacePlugin, assertRemoteCloneUrl } from '../sandbox-workspace.plugin.js';
+import { SandboxWorkspacePlugin, assertRemoteCloneUrl, assertSafeRefName } from '../sandbox-workspace.plugin.js';
+import type { WorkspaceHandle } from '@ever-works/plugin';
 
 /**
  * Hermetic loopback suite: a real local BARE repo plays "origin"
@@ -569,5 +570,340 @@ describe('clone URL refusal', () => {
 		['the file:// origin this suite uses', 'file:///tmp/origin.git']
 	])('accepts %s', (_label, repoUrl) => {
 		expect(() => assertRemoteCloneUrl(repoUrl)).not.toThrow();
+	});
+});
+
+/**
+ * CodeQL js/second-order-command-line-injection flagged the `fetch` arguments built from the
+ * clone URL and from `baseRef` / `branch` / `targetRef`. The URL is refused above; every remote
+ * call now also puts `--` before its positional arguments, so nothing after it can be read as an
+ * option. The ref names are interpolated into refspecs (`+refs/heads/<ref>:…`), so a `:` or a `*`
+ * would rewrite WHICH refs are fetched: they are held to git's own branch-name rules — the names
+ * git itself would refuse — before any git call or directory write.
+ */
+describe('ref name refusal', () => {
+	const HOSTILE_REFS: ReadonlyArray<readonly [string, string]> = [
+		['a value git reads as an option', '--upload-pack=calc.exe'],
+		['a short option', '-u'],
+		['a refspec separator', 'main:refs/heads/elsewhere'],
+		['a refspec glob', '*'],
+		['a parent sequence', 'a..b'],
+		['a space', 'with space'],
+		['a control character', 'a\u0000b'],
+		['a reflog selector', 'main@{1}'],
+		['a lock-file component', 'main.lock'],
+		['a hidden component', 'task/.hidden'],
+		['an empty name', '']
+	];
+
+	it.each(HOSTILE_REFS)('refuses %s', (_label, ref) => {
+		expect(() => assertSafeRefName(ref, 'baseRef')).toThrow(/baseRef is not a valid branch name/);
+	});
+
+	it.each([
+		['main'],
+		['develop'],
+		['task/first-run-aaaa1111'],
+		['feat/app-works-implementation'],
+		['release/v1.2.3'],
+		['user@host']
+	])('accepts %s', (ref) => {
+		expect(() => assertSafeRefName(ref, 'baseRef')).not.toThrow();
+	});
+
+	it.each([
+		['baseRef', { baseRef: '--upload-pack=calc.exe', branch: 'task/hostile-ref-aaaa1111' }],
+		['branch', { baseRef: 'main', branch: 'main:refs/heads/elsewhere' }]
+	])('refuses a hostile %s at provision, before any git call or directory write', async (what, refs) => {
+		const bindingKey = `task-hostile-${what}`;
+		await expect(
+			plugin.provision({ repoUrl: originUrl, ...refs, bindingKey, settings: settings() })
+		).rejects.toThrow(new RegExp(`${what} is not a valid branch name`));
+		await expect(fs.access(join(baseDir, bindingKey))).rejects.toThrow();
+	});
+
+	it('refuses a hostile merge target before fetching it', async () => {
+		const handle = await plugin.provision({
+			repoUrl: originUrl,
+			baseRef: 'main',
+			branch: 'task/hostile-target-bbbb2222',
+			bindingKey: 'task-hostile-target',
+			settings: settings()
+		});
+		try {
+			await expect(plugin.simulateMerge(handle, '+refs/heads/*')).rejects.toThrow(
+				/targetRef is not a valid branch name/
+			);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+});
+
+/**
+ * The model can write this checkout's git dir, and git honours what it finds there on every
+ * remote call: `url.<x>.insteadOf` / `pushInsteadOf` rewrite even an explicit URL on the command
+ * line, a hook runs as a child of the push and is handed that URL as `$2`, `protocol.ext.allow`
+ * plus a rewrite to `ext::` runs a command, and a rewritten `remote.origin.url` is where a push
+ * that reads the URL back would be aimed. Putting `--` before the positionals touches none of
+ * that, so every fetch and push is checked here against a checkout tampered with after
+ * provision, the way a run could.
+ */
+describe('checkout-controlled git config and hooks never steer a remote call', () => {
+	let attackerDir: string;
+	let attackerUrl: string;
+	let markerDir: string;
+
+	beforeAll(() => {
+		attackerDir = join(root, 'attacker.git');
+		markerDir = join(root, 'markers');
+		mkdirSync(attackerDir, { recursive: true });
+		mkdirSync(markerDir, { recursive: true });
+		git(attackerDir, 'init', '--bare', '--initial-branch', 'main');
+		attackerUrl = pathToFileURL(attackerDir).toString();
+		// The attacker's repository has a `main` of its own, so a fetch that is
+		// redirected there SUCCEEDS rather than failing for an unrelated reason.
+		git(seedDir, 'push', attackerUrl, 'HEAD:refs/heads/main');
+	});
+
+	const refIn = (bareDir: string, branch: string): boolean =>
+		git(bareDir, 'for-each-ref', `refs/heads/${branch}`) !== '';
+
+	const marker = (name: string): string => join(markerDir, name).replace(/\\/g, '/');
+	const ran = (name: string): Promise<boolean> =>
+		fs.access(marker(name)).then(
+			() => true,
+			() => false
+		);
+
+	/** A hook that records that it ran, and with which arguments (the push URL is `$2`). */
+	const plantHook = (hooksDir: string, hook: string, markerName: string): void => {
+		mkdirSync(hooksDir, { recursive: true });
+		writeFileSync(join(hooksDir, hook), `#!/bin/sh\necho "$@" > "${marker(markerName)}"\nexit 0\n`, {
+			mode: 0o755
+		});
+	};
+
+	const provisionAt = (branch: string, bindingKey: string) =>
+		plugin.provision({ repoUrl: originUrl, baseRef: 'main', branch, bindingKey, settings: settings() });
+
+	const gitDirOf = (dir: string): string => git(dir, 'rev-parse', '--path-format=absolute', '--git-dir');
+
+	it('runs no checkout hook during the push, and the push still lands', async () => {
+		const branch = 'task/hook-push-1f2e3d4c';
+		const handle = await provisionAt(branch, 'task-hook-push');
+		try {
+			plantHook(join(gitDirOf(handle.path), 'hooks'), 'pre-push', 'PRE_PUSH_RAN');
+			writeFileSync(join(handle.path, 'hooked.txt'), 'x\n');
+
+			const fin = await plugin.finalize(handle, { commitMessage: 'agent: hooked', push: true });
+
+			expect(fin.pushed).toBe(true);
+			expect(refIn(originDir, branch)).toBe(true);
+			expect(await ran('PRE_PUSH_RAN')).toBe(false);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	it('runs no hook from a core.hooksPath the checkout sets (a husky-style setting is not refused)', async () => {
+		const branch = 'task/hookspath-5b6a7988';
+		const handle = await provisionAt(branch, 'task-hookspath');
+		try {
+			const hooksDir = join(handle.path, '.husky-like');
+			plantHook(hooksDir, 'pre-push', 'HOOKSPATH_PRE_PUSH_RAN');
+			git(handle.path, 'config', 'core.hooksPath', hooksDir.replace(/\\/g, '/'));
+			writeFileSync(join(handle.path, 'hookspath.txt'), 'x\n');
+
+			const fin = await plugin.finalize(handle, { commitMessage: 'agent: hookspath', push: true });
+
+			expect(fin.pushed).toBe(true);
+			expect(refIn(originDir, branch)).toBe(true);
+			expect(await ran('HOOKSPATH_PRE_PUSH_RAN')).toBe(false);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	it('runs no checkout hook during a fetch', async () => {
+		const handle = await provisionAt('task/hook-fetch-0a9b8c7d', 'task-hook-fetch');
+		try {
+			// Runs on every ref update — a fetch updating refs/remotes/origin/main included.
+			plantHook(join(gitDirOf(handle.path), 'hooks'), 'reference-transaction', 'REF_TX_RAN');
+
+			await plugin.simulateMerge(handle, 'main');
+
+			expect(await ran('REF_TX_RAN')).toBe(false);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	/*
+	 * `protocol.ext.allow` plus a rewrite to `ext::` runs a command. A URL read back with
+	 * `remote get-url` shows an `insteadOf` rewrite (and is then refused as a transport helper),
+	 * but a re-provision fetches the SPEC's URL without reading anything back, and
+	 * `pushInsteadOf` is invisible to `remote get-url` — both reach git unrewritten.
+	 */
+	it.each<readonly [string, 'insteadOf' | 'pushInsteadOf', (handle: WorkspaceHandle) => Promise<unknown>]>([
+		[
+			'the re-provision fetch',
+			'insteadOf',
+			(handle) =>
+				plugin.provision({
+					repoUrl: originUrl,
+					baseRef: 'main',
+					branch: handle.branch,
+					bindingKey: handle.bindingKey,
+					settings: settings()
+				})
+		],
+		['the push', 'pushInsteadOf', (handle) => plugin.finalize(handle, { commitMessage: 'agent: ext', push: true })]
+	])(
+		'never lets checkout config turn %s into a command (protocol.ext.allow + an ext:: %s)',
+		async (label, key, call) => {
+			const markerName = `EXT_RAN_${key}`;
+			const handle = await provisionAt(`task/ext-rewrite-${key.length}6e5d4c3b`, `task-ext-rewrite-${key}`);
+			try {
+				writeFileSync(join(handle.path, 'ext.txt'), `${label}\n`);
+				git(handle.path, 'config', 'protocol.ext.allow', 'always');
+				git(handle.path, 'config', `url.ext::sh -c touch% ${marker(markerName)}% ;false #.${key}`, originUrl);
+
+				await expect(call(handle)).rejects.toThrow(/refus/);
+				expect(await ran(markerName)).toBe(false);
+			} finally {
+				await plugin.teardown(handle);
+			}
+		}
+	);
+
+	const plantInclude = (dir: string): void => {
+		const extra = join(gitDirOf(dir), 'extra.cfg');
+		writeFileSync(extra, `[url "${attackerUrl}"]\n\tinsteadOf = ${originUrl}\n`);
+		git(dir, 'config', 'include.path', extra.replace(/\\/g, '/'));
+	};
+	const plantWorktreeConfig = (dir: string): void => {
+		git(dir, 'config', 'extensions.worktreeConfig', 'true');
+		writeFileSync(join(gitDirOf(dir), 'config.worktree'), `[url "${attackerUrl}"]\n\tinsteadOf = ${originUrl}\n`);
+	};
+
+	it.each<readonly [string, (dir: string) => void]>([
+		[
+			'url.<x>.insteadOf aimed at another repository',
+			(dir) => git(dir, 'config', `url.${attackerUrl}.insteadOf`, originUrl)
+		],
+		[
+			'url.<x>.pushInsteadOf aimed at another repository',
+			(dir) => git(dir, 'config', `url.${attackerUrl}.pushInsteadOf`, originUrl)
+		],
+		['an include.path that carries the rewrite', plantInclude],
+		['a worktree-scoped config that carries the rewrite', plantWorktreeConfig],
+		['a rewritten remote.origin.url', (dir) => git(dir, 'remote', 'set-url', 'origin', attackerUrl)],
+		[
+			'a checkout credential helper',
+			(dir) => git(dir, 'config', 'credential.helper', '!f() { cat >/dev/null; }; f')
+		],
+		['an http proxy', (dir) => git(dir, 'config', 'http.proxy', 'http://127.0.0.1:9')],
+		['a protocol allow rule', (dir) => git(dir, 'config', 'protocol.ext.allow', 'always')],
+		['core.sshCommand', (dir) => git(dir, 'config', 'core.sshCommand', 'sh -c true')],
+		['core.askpass', (dir) => git(dir, 'config', 'core.askpass', 'sh -c true')],
+		['core.gitProxy', (dir) => git(dir, 'config', 'core.gitProxy', 'sh -c true')]
+	])('refuses to push through %s, and nothing reaches either repository', async (label, plant) => {
+		const tag = `${label.length.toString(16)}${label.charCodeAt(2).toString(16)}${label.charCodeAt(6).toString(16)}`;
+		const branch = `task/steer-push-${tag}`;
+		const handle = await provisionAt(branch, `task-steer-push-${tag}`);
+		try {
+			writeFileSync(join(handle.path, 'steered.txt'), 'x\n');
+			const fin = await plugin.finalize(handle, { commitMessage: 'agent: steered', push: false });
+			plant(handle.path);
+
+			await expect(
+				plugin.finalize(handle, { commitMessage: 'x', push: true, publishSha: fin.headSha as string })
+			).rejects.toThrow(/refus/);
+			await expect(plugin.finalize(handle, { commitMessage: 'x', push: true })).rejects.toThrow(/refus/);
+			expect(refIn(originDir, branch)).toBe(false);
+			expect(refIn(attackerDir, branch)).toBe(false);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	// An instance that did not provision the checkout has no recorded origin to hold the push
+	// to, so the config check alone has to catch a rewrite — including one in a scope
+	// `git config --local` does not show.
+	it.each<readonly [string, (dir: string) => void]>([
+		['an include.path', plantInclude],
+		['a worktree-scoped config', plantWorktreeConfig],
+		['url.<x>.pushInsteadOf', (dir) => git(dir, 'config', `url.${attackerUrl}.pushInsteadOf`, originUrl)]
+	])(
+		'refuses a rewrite through %s even from an instance that did not provision the checkout',
+		async (label, plant) => {
+			const tag = `${label.length.toString(16)}${label.charCodeAt(3).toString(16)}`;
+			const branch = `task/steer-other-${tag}`;
+			const handle = await provisionAt(branch, `task-steer-other-${tag}`);
+			try {
+				writeFileSync(join(handle.path, 'other.txt'), 'x\n');
+				await plugin.finalize(handle, { commitMessage: 'agent: other', push: false });
+				plant(handle.path);
+
+				await expect(
+					new SandboxWorkspacePlugin().finalize(handle, { commitMessage: 'x', push: true })
+				).rejects.toThrow(/refus/);
+				expect(refIn(originDir, branch)).toBe(false);
+				expect(refIn(attackerDir, branch)).toBe(false);
+			} finally {
+				await plugin.teardown(handle);
+			}
+		}
+	);
+
+	it('refuses to re-provision a checkout whose config would redirect the credentialed fetch', async () => {
+		const branch = 'task/steer-provision-2c3d4e5f';
+		const first = await provisionAt(branch, 'task-steer-provision');
+		try {
+			// The same binding re-provisions the same directory (a re-run on this node).
+			git(first.path, 'config', `url.${attackerUrl}.insteadOf`, originUrl);
+
+			await expect(
+				plugin.provision({
+					repoUrl: originUrl,
+					baseRef: 'main',
+					branch,
+					bindingKey: 'task-steer-provision',
+					auth: { token: 'FAKE_TOKEN_NOT_REAL' },
+					settings: settings()
+				})
+			).rejects.toThrow(/refus/);
+		} finally {
+			await plugin.teardown(first);
+		}
+	});
+
+	it("keeps honouring the operator's own global git config", async () => {
+		const globalConfig = join(root, 'operator.gitconfig');
+		// Nothing here points at this suite's repositories; it only has to be
+		// PRESENT, in a scope the checkout cannot write, and not be read as tampering.
+		writeFileSync(
+			globalConfig,
+			'[http]\n\tsslVerify = true\n[url "https://mirror.invalid/"]\n\tinsteadOf = https://upstream.invalid/\n[credential]\n\thelper =\n'
+		);
+		const previous = process.env.GIT_CONFIG_GLOBAL;
+		process.env.GIT_CONFIG_GLOBAL = globalConfig;
+		const branch = 'task/operator-config-7a8b9c0d';
+		try {
+			const handle = await provisionAt(branch, 'task-operator-config');
+			try {
+				writeFileSync(join(handle.path, 'operator.txt'), 'x\n');
+				const fin = await plugin.finalize(handle, { commitMessage: 'agent: operator', push: true });
+				expect(fin.pushed).toBe(true);
+				expect(refIn(originDir, branch)).toBe(true);
+				expect((await plugin.simulateMerge(handle, 'main')).clean).toBe(true);
+			} finally {
+				await plugin.teardown(handle);
+			}
+		} finally {
+			if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+			else process.env.GIT_CONFIG_GLOBAL = previous;
+		}
 	});
 });

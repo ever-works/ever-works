@@ -100,10 +100,29 @@ import {
     appDeployTask,
     recoverFailedAppDeploy,
 } from '../tasks/trigger/app-deploy.task';
+import type { AddressInfo } from 'net';
+import type { INestApplicationContext } from '@nestjs/common';
 // Importing the entry point also evaluates the four task files, which is what makes `recorded`
 // hold all four registrations below.
-import { APP_RUNTIME_LOCAL_TASK_IDS, main } from '../tasks/trigger/app-runtime-local-worker';
+import {
+    APP_RUNTIME_LOCAL_TASK_IDS,
+    LocalAppRuntimeQueue,
+    main,
+    startLocalWorkerServer,
+} from '../tasks/trigger/app-runtime-local-worker';
 import { TriggerAppRuntimeModule } from '../trigger/worker/modules/trigger-app-runtime.module';
+
+/**
+ * A stack-shaped string — what a thrown non-`Error` can carry, and what must never come back in a
+ * result, a `POST /run` answer or a `lastError` row.
+ */
+const STACK_TEXT =
+    'Error: kube said no\n    at ClusterClient.apply (/srv/agent/dist/app-runtime/cluster.js:42:7)';
+
+/** Every argument `logger.error` was handed, joined — where the full text must still end up. */
+function loggedErrors(): string {
+    return loggerErrorMock.mock.calls.map((call) => call.map(String).join(' ')).join('\n');
+}
 
 /** The params the SDK was handed for one task id. */
 function registered(id: string): Record<string, any> {
@@ -345,6 +364,93 @@ describe('app-deploy (APW-06 T32)', () => {
                 error: new Error('boom'),
             }),
         ).resolves.toBeUndefined();
+    });
+
+    /**
+     * A throw around the orchestrator lands in the run's RESULT, and the local worker hands that
+     * result back over HTTP unchanged (`POST /run` → 200 with `result.error`). So the result may
+     * carry an `Error`'s message and nothing else: a thrown non-`Error` is named by its type, and
+     * its text — possibly a pasted stack — goes to the run's log only.
+     */
+    describe('failure text — a result carries a message, never a thrown value', () => {
+        it('a thrown non-Error never reaches the result; the log keeps its text', async () => {
+            runOrchestrator.mockRejectedValueOnce(STACK_TEXT);
+
+            const result = await registered('app-deploy').run({
+                workId: 'work-1',
+                deploymentId: 'deployment-1',
+            });
+
+            expect(result).toMatchObject({ status: 'failed', reason: 'deployFailed' });
+            expect(JSON.stringify(result)).not.toContain('cluster.js:42');
+            expect(JSON.stringify(result)).not.toContain('kube said no');
+            expect(result.error).toMatch(/non-Error value \(string\)/);
+            expect(loggedErrors()).toContain('cluster.js:42');
+        });
+
+        it('an Error contributes its message and never its stack', async () => {
+            const error = new Error('the cluster refused the apply');
+            error.stack = STACK_TEXT;
+            runOrchestrator.mockRejectedValueOnce(error);
+
+            const result = await registered('app-deploy').run({
+                workId: 'work-1',
+                deploymentId: 'deployment-1',
+            });
+
+            expect(result.error).toBe('the cluster refused the apply');
+            expect(JSON.stringify(result)).not.toContain('cluster.js:42');
+        });
+
+        it('onFailure never writes a thrown non-Error into `lastError`', async () => {
+            await registered('app-deploy').onFailure({
+                payload: { workId: 'work-1', deploymentId: 'deployment-1' },
+                error: { toString: () => STACK_TEXT },
+            });
+
+            const [, , patch] = markTerminal.mock.calls[0] as [
+                string,
+                string,
+                { lastError: string },
+            ];
+            expect(patch.lastError).toMatch(/^worker_failed: a non-Error value \(object\)/);
+            expect(patch.lastError).not.toContain('cluster.js:42');
+        });
+
+        it('POST /run on the real local worker does not echo it either', async () => {
+            runOrchestrator.mockRejectedValueOnce(STACK_TEXT);
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+            const server = await startLocalWorkerServer({
+                queue: new LocalAppRuntimeQueue(1),
+                context: {} as INestApplicationContext,
+                bootError: null,
+                port: 0,
+            });
+
+            try {
+                const { port } = server.address() as AddressInfo;
+                const response = await fetch(`http://127.0.0.1:${port}/run`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        task: 'app-deploy',
+                        payload: { workId: 'work-1', deploymentId: 'deployment-1' },
+                    }),
+                });
+                const text = await response.text();
+
+                expect(response.status).toBe(200);
+                expect(JSON.parse(text)).toMatchObject({
+                    ok: true,
+                    result: { status: 'failed', reason: 'deployFailed' },
+                });
+                expect(text).not.toContain('cluster.js:42');
+                expect(text).not.toContain('kube said no');
+            } finally {
+                errorSpy.mockRestore();
+                await new Promise<void>((resolve) => server.close(() => resolve()));
+            }
+        });
     });
 
     /**

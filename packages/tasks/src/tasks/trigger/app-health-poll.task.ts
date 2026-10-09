@@ -9,6 +9,7 @@ import {
     TriggerAppRuntimeModule,
 } from '../../trigger/worker/modules/trigger-app-runtime.module';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { errorText, logText } from '../../trigger/worker/utils/error-text.utils';
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-health-poll`**, the every-minute health tick
@@ -104,11 +105,6 @@ export interface AppHealthPollTaskResult {
     health: AppHealthPollSummary | null;
 }
 
-/** `error.message` when there is one, `String(error)` otherwise. */
-function errorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}
-
 /** The run body, exported — the local worker drains *this* function (see `app-deploy.task.ts`). */
 export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
     // App Works off (`EVER_WORKS_APP_WORKS_ENABLED` anything but 'true'): there is no App to poll,
@@ -157,6 +153,13 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
             try {
                 held = (await locks.isLocked(APP_HEALTH_POLL_LOCK_KEY)) === true;
             } catch (error) {
+                // The result carries `errorText` (the local worker hands it back over HTTP); the
+                // log line is where the whole text goes.
+                logger.warn(
+                    `app-health-poll: the lock service could not be asked, so nothing was polled — ${logText(
+                        error,
+                    )}`,
+                );
                 return {
                     status: 'skipped',
                     jobId: APP_HEALTH_POLL_TASK_ID,
@@ -218,7 +221,7 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
                 // §9.3's service resolves for every refusal it can name, so a throw here means the
                 // sweep died around it — reported, never reported as a poll that happened.
                 const message = errorText(error);
-                logger.error(`app-health-poll: the health sweep threw — ${message}`);
+                logger.error(`app-health-poll: the health sweep threw — ${logText(error)}`);
 
                 return {
                     status: 'skipped',
@@ -305,7 +308,7 @@ async function sweepExpiredCacheEntries(appContext: {
         const message = errorText(error);
         logger.warn(
             `app-health-poll: the cache sweep was refused, so an expired log tail may outlive ` +
-                `5 min + 60 s until it is fixed — ${message}`,
+                `5 min + 60 s until it is fixed — ${logText(error)}`,
         );
         return { status: 'unavailable', expired: null, message };
     }

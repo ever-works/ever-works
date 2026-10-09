@@ -892,8 +892,18 @@ function verifyInRunnerStep(verifyRunnerScript: string): string[] {
 		`        if: inputs.${APP_BUILD_VERIFY_PLAN_INPUT} != ''`,
 		`        timeout-minutes: ${APP_BUILD_VERIFY_TIMEOUT_MINUTES}`,
 		'        run: |',
-		...scalarBlock(verifyRunnerScript.replace(/\n+$/, '').split('\n'), 10)
+		...scalarBlock(stripTrailingNewlines(verifyRunnerScript).split('\n'), 10)
 	];
+}
+
+/**
+ * Drop every trailing `\n` — what `/\n+$/` removed, in linear time. That regex backtracked
+ * quadratically over a long run of newlines that is not at the end (CodeQL js/polynomial-redos).
+ */
+function stripTrailingNewlines(text: string): string {
+	let end = text.length;
+	while (end > 0 && text.charCodeAt(end - 1) === 0x0a /* '\n' */) end -= 1;
+	return text.slice(0, end);
 }
 
 /**

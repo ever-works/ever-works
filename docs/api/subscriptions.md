@@ -32,10 +32,13 @@ Plans are seeded automatically on module initialization via `SubscriptionService
 | Plan         | Code       | Max Works | Allowed Cadences                  | Monthly Price | Overage/Run |
 | ------------ | ---------- | --------- | --------------------------------- | ------------- | ----------- |
 | **Free**     | `free`     | 1         | Monthly, Weekly, Daily, Hourly \* | $0            | $10         |
-| **Standard** | `standard` | 5         | Monthly, Weekly, Daily            | $25           | $8          |
-| **Premium**  | `premium`  | 15        | Monthly, Weekly, Daily, Hourly    | $199          | $0          |
+| **Standard** | `standard` | 5         | Monthly, Weekly, Daily            | $49           | $8          |
+| **Premium**  | `premium`  | 15        | Monthly, Weekly, Daily, Hourly    | $499          | $0          |
 
 > \* Currently all cadences are enabled for the Free plan during the early-access period.
+>
+> Prices as of the 2026-10-05 repricing (annual: $408 / $4,188). Cloud paid plans start with a
+> 90-day free trial (first subscription only); self-hosted editions are charged at purchase.
 
 Each plan is stored as a `SubscriptionPlan` entity with fields: `code`, `displayName`, `maxWorks`, `allowedCadences`, `monthlyPrice`, `overagePricePerRun`, `currency`, and `active`.
 

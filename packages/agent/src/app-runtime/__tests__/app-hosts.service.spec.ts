@@ -272,6 +272,31 @@ describe('appUrlScheme (APW-06 T26, plan §4.11:621-626)', () => {
         expect(sameHost('cal.example.com', 'other.example.com')).toBe(false);
         expect(normaliseHost('  Cal.Example.COM.  ')).toBe('cal.example.com');
     });
+
+    // CodeQL js/polynomial-redos: the trailing-dot trim was `/\.+$/`, retried
+    // from every offset of a dot run that does not end the name — about 2.4 s
+    // for 50,000 dots on a dev box — and a custom domain is member input.
+    it('normalises a host with a long interior run of dots in well under 200 ms', () => {
+        const host = `a${'.'.repeat(50_000)}b`;
+        const started = performance.now();
+
+        const normalised = normaliseHost(host);
+
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(normalised).toBe(host);
+    });
+
+    it.each<[string | null | undefined, string]>([
+        ['Example.COM.', 'example.com'],
+        [' a.b.. ', 'a.b'],
+        ['...', ''],
+        ['.leading.dot', '.leading.dot'],
+        ['a. ', 'a'],
+        [null, ''],
+        [undefined, ''],
+    ])('normalises %p to %p as before', (host, normalised) => {
+        expect(normaliseHost(host)).toBe(normalised);
+    });
 });
 
 /* -------------------------------------------------------------------------- *

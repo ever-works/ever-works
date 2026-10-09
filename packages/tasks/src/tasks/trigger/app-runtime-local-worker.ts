@@ -10,6 +10,10 @@ import { runAppDeployTask, APP_DEPLOY_TASK_ID } from './app-deploy.task';
 import { runAppSmokeTask, APP_SMOKE_TASK_ID } from './app-smoke.task';
 import { runAppClusterOpTask, APP_CLUSTER_OP_TASK_ID } from './app-cluster-op.task';
 import { runAppHealthPollTask, APP_HEALTH_POLL_TASK_ID } from './app-health-poll.task';
+// One rule for every failure text that leaves this process: an `Error`'s message, never a thrown
+// value itself. The task files it drains render the failure text in their results with the same
+// helper, because `POST /run` hands a result back unchanged; the full text goes to the logs.
+import { errorText, logText } from '../../trigger/worker/utils/error-text.utils';
 
 /**
  * APW-06 T32 (`tasks.md:563-566`, plan §9.2:1267-1270) — **the `app-runtime:local-worker` entry
@@ -114,11 +118,6 @@ const TASK_RUNNERS: Record<string, (payload: unknown) => Promise<unknown>> = {
     [APP_HEALTH_POLL_TASK_ID]: () => runAppHealthPollTask(),
 };
 
-/** `error.message` when there is one, `String(error)` otherwise. */
-function errorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-}
-
 /** `[app-runtime-local-worker]`-prefixed stderr line — this is a plain node process, not a run. */
 function logError(message: string): void {
     // eslint-disable-next-line no-console
@@ -195,9 +194,8 @@ async function runOne(job: LocalJob): Promise<LocalJobResult> {
         const result = await TASK_RUNNERS[job.task](job.payload);
         return { jobId: job.id, task: job.task, ok: true, result, error: null };
     } catch (error) {
-        const message = errorText(error);
-        logError(`${job.task} ${job.id} threw — ${message}`);
-        return { jobId: job.id, task: job.task, ok: false, result: null, error: message };
+        logError(`${job.task} ${job.id} threw — ${logText(error)}`);
+        return { jobId: job.id, task: job.task, ok: false, result: null, error: errorText(error) };
     }
 }
 
@@ -221,6 +219,30 @@ async function readBody(request: IncomingMessage, maxBytes = 4 * 1024 * 1024): P
     });
 }
 
+/**
+ * `true` ⇔ the request's `Host` names this worker: a loopback name (or the bound host) **and** the
+ * port it is listening on.
+ *
+ * Binding to `127.0.0.1` keeps other machines out, but not a page in the developer's own browser:
+ * a DNS-rebinding page (a name the attacker re-points at 127.0.0.1) is same-origin with this server,
+ * so without this check it could `POST /run` and read the answer. The one thing such a request
+ * cannot choose is its `Host` header, which carries the attacker's name. Every caller this worker
+ * has — `.github/workflows/e2e.yml`'s `curl http://127.0.0.1:3101/health`, a local dispatcher —
+ * addresses it as `127.0.0.1:<port>` or `localhost:<port>`.
+ */
+function isLocalHostHeader(
+    hostHeader: string | undefined,
+    boundHost: string,
+    port: number,
+): boolean {
+    if (!hostHeader) return false;
+    const bound = boundHost.includes(':') ? `[${boundHost}]` : boundHost;
+    const names = new Set(['127.0.0.1', 'localhost', bound.toLowerCase()]);
+    const allowed = new Set([...names].map((name) => `${name}:${port}`));
+    if (port === 80) for (const name of names) allowed.add(name);
+    return allowed.has(hostHeader.trim().toLowerCase());
+}
+
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
     const text = JSON.stringify(body);
     response.writeHead(status, {
@@ -235,7 +257,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
  * `POST /run`, which is how a local dispatcher submits work.
  *
  * Bound to `127.0.0.1` **only**: this process holds the platform's cluster credentials, so it must
- * not be reachable from another host even on a dev machine.
+ * not be reachable from another host even on a dev machine. And it answers only a request whose
+ * `Host` is this loopback address and port ({@link isLocalHostHeader}), so a DNS-rebinding page in
+ * the developer's browser can neither submit work nor read an answer.
  */
 export function startLocalWorkerServer(input: {
     queue: LocalAppRuntimeQueue;
@@ -259,6 +283,15 @@ export function startLocalWorkerServer(input: {
 
     const handle = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
         const url = request.url ?? '/';
+
+        const address = server.address();
+        const boundPort = typeof address === 'object' && address ? address.port : port;
+        if (!isLocalHostHeader(request.headers.host, host, boundPort)) {
+            // A DNS-rebinding page, or a caller that is not this machine's loopback: nothing runs
+            // and nothing is read. See `isLocalHostHeader`.
+            sendJson(response, 403, { ok: false, reason: 'host_not_allowed' });
+            return;
+        }
 
         if (request.method === 'GET' && (url === '/health' || url === '/health/')) {
             sendJson(response, 200, health());
@@ -379,7 +412,7 @@ export async function main(): Promise<number> {
         bootError = errorText(error);
         logError(
             `TriggerAppRuntimeModule did not boot — the worker is starting DEGRADED and every ` +
-                `POST /run will answer 503 until this is fixed: ${bootError}`,
+                `POST /run will answer 503 until this is fixed: ${logText(error)}`,
         );
         logError(
             'the usual cause is a missing TRIGGER_INTERNAL_SECRET (the worker owns no DataSource, ' +
@@ -395,7 +428,7 @@ export async function main(): Promise<number> {
     try {
         server = await startLocalWorkerServer({ queue, context, bootError, port });
     } catch (error) {
-        logError(`could not bind 127.0.0.1:${port} — ${errorText(error)}`);
+        logError(`could not bind 127.0.0.1:${port} — ${logText(error)}`);
         await context?.close();
         return 1;
     }

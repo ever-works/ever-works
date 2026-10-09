@@ -622,7 +622,9 @@ class Project {
                     specifier.length >= prefix.length + suffix.length
                 ) {
                     const middle = specifier.slice(prefix.length, specifier.length - suffix.length);
-                    bases.push(...targets.map((t) => resolve(baseDir, t.replace('*', middle))));
+                    bases.push(
+                        ...targets.map((t) => resolve(baseDir, substituteWildcard(t, middle))),
+                    );
                 }
             }
         }
@@ -640,6 +642,18 @@ class Project {
         }
         return null;
     }
+}
+
+/**
+ * A `compilerOptions.paths` target with its `*` replaced by the matched middle.
+ *
+ * TypeScript allows at most one `*` per substitution (TS5062), so this substitutes exactly that
+ * one — deliberately, and positionally, rather than a string `replace('*', …)` that reads like an
+ * incomplete escape. A target without `*` is used as written.
+ */
+function substituteWildcard(target, middle) {
+    const star = target.indexOf('*');
+    return star === -1 ? target : `${target.slice(0, star)}${middle}${target.slice(star + 1)}`;
 }
 
 /** Every path a bare resolved base could mean: exact, +ext, /index+ext, .js→.ts. */

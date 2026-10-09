@@ -16,7 +16,7 @@ import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 /** Binding stamp kept INSIDE .git so it can never be committed. */
@@ -59,6 +59,89 @@ function literalHistoryEnv(): NodeJS.ProcessEnv {
 	return { GIT_GRAFT_FILE: join(tmpdir(), `ew-no-grafts-${randomUUID()}`, 'grafts') };
 }
 
+/**
+ * Global options for every FETCH and PUSH ({@link SandboxWorkspacePlugin.remoteGit}). The run
+ * can write this checkout's git dir, and git runs hooks from it during a remote call: a
+ * `pre-push` hook is handed the push URL — credential and all — as `$2`, and a
+ * `reference-transaction` hook runs on every ref a fetch updates. `core.hooksPath` pointed at
+ * a fresh random directory that is never created runs no hook at all, wherever the checkout's
+ * own config (a husky-style `core.hooksPath`, `.git/hooks`) says hooks live. Passed with `-c`,
+ * which outranks every config file, and carries nothing secret.
+ *
+ * With a token, two more: `credential.helper=` empties the helper list (the checkout's AND the
+ * machine's), so no helper is handed the token to store or forward when git approves it; and
+ * `core.askpass=` stops a configured askpass program being asked instead.
+ */
+function remoteCallArgs(auth: WorkspaceProvisionSpec['auth']): string[] {
+	return [
+		'-c',
+		`core.hooksPath=${join(tmpdir(), `ew-no-hooks-${randomUUID()}`)}`,
+		...(auth?.token ? ['-c', 'credential.helper=', '-c', 'core.askpass='] : [])
+	];
+}
+
+/**
+ * `git push` and the flags every push carries. `--no-verify` skips `pre-push` on its own
+ * account, not only through {@link remoteCallArgs}'s `core.hooksPath` — either alone is one
+ * edit away from being lost. `--no-recurse-submodules` keeps a push from walking into a
+ * submodule's git dir, which is configured by nothing this plugin checks (fetches carry the
+ * same flag).
+ */
+const PUSH_ARGS = ['push', '--no-verify', '--no-recurse-submodules'] as const;
+
+/**
+ * Settings that, found in the checkout's OWN config (`local` or `worktree` scope, includes
+ * followed), decide where a fetch or push connects, what it runs, or who answers for its
+ * credentials. They apply to an explicit URL on the command line, so `--` and
+ * {@link assertRemoteCloneUrl} do not help:
+ *
+ *  - `url.<x>.insteadOf` / `pushInsteadOf` rewrite the URL git connects to — credential
+ *    userinfo included — and, with `protocol.ext.allow`, can rewrite it to `ext::<command>`
+ *    (measured with git 2.53: plain, through an include, and worktree-scoped);
+ *  - `include.*` / `includeIf.*` pull in another file the run can write, so the check cannot
+ *    vouch for what it would contain at the moment of the call;
+ *  - per git's documentation: `credential.*` runs a helper that is handed the credential;
+ *    `http.*` sets a proxy, a CA, `sslVerify`, extra headers; `core.sshCommand` /
+ *    `core.gitProxy` / `core.askpass` run a program; `gpg.*` and `push.gpgSign` run
+ *    `gpg.program` to sign a push; `fetch.bundleURI` sends a fetch to another host first.
+ *
+ * The operator's own system and global config are NOT inspected: the checkout cannot write
+ * them. A husky-style `core.hooksPath` is not refused either — {@link remoteCallArgs}
+ * overrides it for every remote call, so it is harmless there.
+ */
+const REMOTE_STEERING_SECTIONS: ReadonlySet<string> = new Set([
+	'url',
+	'protocol',
+	'include',
+	'includeif',
+	'credential',
+	'http',
+	'gpg'
+]);
+const REMOTE_STEERING_KEYS: ReadonlySet<string> = new Set([
+	'core.sshcommand',
+	'core.gitproxy',
+	'core.askpass',
+	'push.gpgsign',
+	'fetch.bundleuri'
+]);
+
+/**
+ * `section[.<subsection>].key` as a family name, for an error message: the subsection is
+ * dropped because it is checkout-controlled text — a URL that may carry credentials.
+ */
+function remoteSteeringFamily(name: string): string | null {
+	const lower = name.toLowerCase();
+	const firstDot = lower.indexOf('.');
+	const lastDot = lower.lastIndexOf('.');
+	if (firstDot <= 0 || lastDot === lower.length - 1) return null;
+	const section = lower.slice(0, firstDot);
+	const key = lower.slice(lastDot + 1);
+	const hasSubsection = lastDot > firstDot;
+	if (REMOTE_STEERING_SECTIONS.has(section)) return hasSubsection ? `${section}.*.${key}` : `${section}.${key}`;
+	return !hasSubsection && REMOTE_STEERING_KEYS.has(lower) ? lower : null;
+}
+
 interface GitResult {
 	code: number;
 	stdout: string;
@@ -80,6 +163,12 @@ interface GitResult {
  * written to git config, the stamp file, or the working tree (the
  * checkout runs untrusted repo code). Tokens are scrubbed from every
  * error message before it can propagate into logs.
+ *
+ * The run can write the checkout's git dir, so no fetch or push trusts it:
+ * each one runs no hook, refuses a checkout whose own config would steer it
+ * (rewrite its URL, run a program, answer for its credentials), and, after
+ * provision, goes to the repository the checkout was provisioned from rather
+ * than wherever its `origin` now points ({@link remoteGit}, {@link originUrl}).
  */
 export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	readonly id = 'sandbox-workspace';
@@ -125,6 +214,14 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	private gitAvailable: boolean | null = null;
 
+	/**
+	 * The repository each checkout was provisioned from, by resolved path. The checkout's own
+	 * `remote.origin.url` is written by the run as easily as by this plugin, so a later fetch
+	 * or push that reads it back is held to this value ({@link originUrl}). In memory only:
+	 * anything written into the checkout could be rewritten by the run.
+	 */
+	private readonly provisionedRemotes = new Map<string, string>();
+
 	async onLoad(_context: PluginContext): Promise<void> {
 		// Availability is probed lazily on first use — onLoad must stay
 		// cheap and never fail registration (the API process loads every
@@ -166,25 +263,36 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// that never ran them. So it decides for itself rather than trusting a
 		// caller it cannot see.
 		assertRemoteCloneUrl(spec.repoUrl);
+		// Same posture for the two ref names, which are interpolated into
+		// refspecs and a checkout: see {@link assertSafeRefName}.
+		assertSafeRefName(spec.baseRef, 'baseRef');
+		assertSafeRefName(spec.branch, 'branch');
 
 		await fs.mkdir(dir, { recursive: true });
+		// Every call below that names the remote puts `--` before its positional
+		// arguments, so nothing after it can be parsed as an option — whatever
+		// the checks above ever let through.
 		if (!(await exists(join(dir, '.git')))) {
 			await this.git(['init', '--initial-branch', 'ew-provision'], dir, spec.auth);
-			await this.git(['remote', 'add', 'origin', spec.repoUrl], dir, spec.auth);
+			await this.git(['remote', 'add', '--', 'origin', spec.repoUrl], dir, spec.auth);
 		} else {
 			// Keep the persisted remote token-free and current.
-			await this.git(['remote', 'set-url', 'origin', spec.repoUrl], dir, spec.auth);
+			await this.git(['remote', 'set-url', '--', 'origin', spec.repoUrl], dir, spec.auth);
 		}
 
 		const authedUrl = this.authedUrl(spec.repoUrl, spec.auth);
 
 		// Fetch-first, ALWAYS: the base is branched from origin/<baseRef>
-		// as of NOW, never a cached ref.
-		await this.gitOrThrow(
+		// as of NOW, never a cached ref. A re-provision reuses this directory,
+		// config and all, so these fetches go through the same checks as a
+		// finalize's push ({@link remoteGit}).
+		await this.remoteGitOrThrow(
 			[
 				'fetch',
+				'--no-recurse-submodules',
 				'--depth',
 				String(depth),
+				'--',
 				authedUrl,
 				`+refs/heads/${spec.baseRef}:refs/remotes/origin/${spec.baseRef}`
 			],
@@ -195,8 +303,14 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 		// A previously pushed task branch is the durable identity — reuse
 		// it when it exists (re-run / conflict-fix loop).
-		const branchFetch = await this.git(
-			['fetch', authedUrl, `+refs/heads/${spec.branch}:refs/remotes/origin/${spec.branch}`],
+		const branchFetch = await this.remoteGit(
+			[
+				'fetch',
+				'--no-recurse-submodules',
+				'--',
+				authedUrl,
+				`+refs/heads/${spec.branch}:refs/remotes/origin/${spec.branch}`
+			],
 			dir,
 			spec.auth
 		);
@@ -215,6 +329,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		await this.gitOrThrow(['checkout', '-B', spec.branch, startPoint], dir, spec.auth, 'branch checkout failed');
 
 		await this.writeStamp(dir, { bindingKey: spec.bindingKey, branch: spec.branch });
+		this.provisionedRemotes.set(resolve(dir), spec.repoUrl);
 
 		return { path: dir, baseSha, reused, branch: spec.branch, bindingKey: spec.bindingKey };
 	}
@@ -270,11 +385,9 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 		let pushed = false;
 		if (opts.push) {
-			const repoUrl = (
-				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
-			).stdout.trim();
-			await this.gitOrThrow(
-				['push', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
+			const repoUrl = await this.originUrl(dir, opts.auth);
+			await this.remoteGitOrThrow(
+				[...PUSH_ARGS, '--', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
 				dir,
 				opts.auth,
 				'git push failed'
@@ -310,11 +423,9 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		const dir = handle.path;
 		const sha = await this.verifiedCommit(dir, publishSha, 'publishSha', opts.auth);
 		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, sha);
-		const repoUrl = (
-			await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
-		).stdout.trim();
-		await this.gitOrThrow(
-			['push', this.authedUrl(repoUrl, opts.auth), `${sha}:refs/heads/${handle.branch}`],
+		const repoUrl = await this.originUrl(dir, opts.auth);
+		await this.remoteGitOrThrow(
+			[...PUSH_ARGS, '--', this.authedUrl(repoUrl, opts.auth), `${sha}:refs/heads/${handle.branch}`],
 			dir,
 			opts.auth,
 			'git push failed'
@@ -385,10 +496,12 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		];
 		let diff = await this.gitLiteral(diffArgs, dir, undefined);
 		if (diff.code !== 0) {
-			const repoUrl = (
-				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, undefined, 'origin remote missing')
-			).stdout.trim();
-			await this.git(['fetch', this.authedUrl(repoUrl, undefined), '--unshallow'], dir, undefined);
+			const repoUrl = await this.originUrl(dir, undefined);
+			await this.remoteGit(
+				['fetch', '--no-recurse-submodules', '--unshallow', '--', this.authedUrl(repoUrl, undefined)],
+				dir,
+				undefined
+			);
 			diff = await this.gitLiteral(diffArgs, dir, undefined);
 			if (diff.code !== 0) {
 				throw new Error(
@@ -477,15 +590,20 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		auth?: WorkspaceProvisionSpec['auth']
 	): Promise<WorkspaceMergeSimulation> {
 		await this.ensureGit();
+		assertSafeRefName(targetRef, 'targetRef');
 		const dir = handle.path;
-		const repoUrl = (
-			await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, auth, 'origin remote missing')
-		).stdout.trim();
+		const repoUrl = await this.originUrl(dir, auth);
 
 		// Merge against the target AS OF NOW — a stale target is how you
 		// end up shipping a PR with a red merge banner.
-		await this.gitOrThrow(
-			['fetch', this.authedUrl(repoUrl, auth), `+refs/heads/${targetRef}:refs/remotes/origin/${targetRef}`],
+		await this.remoteGitOrThrow(
+			[
+				'fetch',
+				'--no-recurse-submodules',
+				'--',
+				this.authedUrl(repoUrl, auth),
+				`+refs/heads/${targetRef}:refs/remotes/origin/${targetRef}`
+			],
 			dir,
 			auth,
 			`fetch of merge target '${targetRef}' failed`
@@ -499,7 +617,11 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 		// Shallow histories can lack a merge base; deepen once and retry.
 		if (result.code > 1) {
-			await this.git(['fetch', this.authedUrl(repoUrl, auth), '--unshallow'], dir, auth);
+			await this.remoteGit(
+				['fetch', '--no-recurse-submodules', '--unshallow', '--', this.authedUrl(repoUrl, auth)],
+				dir,
+				auth
+			);
 			result = await this.git(
 				['merge-tree', '--write-tree', '--name-only', `refs/remotes/origin/${targetRef}`, 'HEAD'],
 				dir,
@@ -524,6 +646,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	async teardown(handle: WorkspaceHandle): Promise<void> {
 		await fs.rm(handle.path, { recursive: true, force: true, maxRetries: 3 });
+		this.provisionedRemotes.delete(resolve(handle.path));
 	}
 
 	async gc(policy: { olderThanDays: number }): Promise<{ removed: string[] }> {
@@ -644,6 +767,80 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return result;
 	}
 
+	/**
+	 * A FETCH or PUSH. The checkout's config is proved free of settings that steer a remote
+	 * call ({@link assertNoRemoteSteeringConfig}) immediately before it, and the call itself
+	 * runs no hook and, with a token, no credential helper ({@link remoteCallArgs}). A refusal
+	 * THROWS — even where the caller reads a non-zero exit as an answer (the branch fetch) —
+	 * so a tampered checkout can never pass for "no such branch".
+	 */
+	private async remoteGit(args: string[], cwd: string, auth: WorkspaceProvisionSpec['auth']): Promise<GitResult> {
+		await this.assertNoRemoteSteeringConfig(cwd);
+		return this.git([...remoteCallArgs(auth), ...args], cwd, auth);
+	}
+
+	private async remoteGitOrThrow(
+		args: string[],
+		cwd: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		what: string
+	): Promise<GitResult> {
+		const result = await this.remoteGit(args, cwd, auth);
+		if (result.code !== 0) {
+			throw new Error(`${what}: ${result.stderr.trim() || `git exited ${result.code}`}`);
+		}
+		return result;
+	}
+
+	/**
+	 * Refuse when the checkout's own config — `local` or `worktree` scope, includes followed —
+	 * carries a setting from {@link REMOTE_STEERING_SECTIONS} / {@link REMOTE_STEERING_KEYS}.
+	 * Names only (`--name-only`), NUL-separated (`-z`), so no value is ever read and no name
+	 * can forge a line. A config git cannot read is refused too: fail closed.
+	 */
+	private async assertNoRemoteSteeringConfig(cwd: string): Promise<void> {
+		const listing = await this.git(['config', '-z', '--name-only', '--show-scope', '--list'], cwd, undefined);
+		if (listing.code !== 0) {
+			throw new WorkspaceNotProvisionedError(
+				"this checkout's git config could not be read — the sandbox-workspace provider refuses to fetch or push through it."
+			);
+		}
+		const fields = listing.stdout.split('\0');
+		const found = new Set<string>();
+		for (let index = 0; index + 1 < fields.length; index += 2) {
+			const scope = fields[index];
+			if (scope !== 'local' && scope !== 'worktree') continue;
+			const family = remoteSteeringFamily(fields[index + 1]);
+			if (family !== null) found.add(family);
+		}
+		if (found.size > 0) {
+			throw new WorkspaceNotProvisionedError(
+				`this checkout's git config sets ${[...found].sort().join(', ')} — settings that can redirect a fetch or push, run a command during it, or answer for its credentials; the sandbox-workspace provider refuses to fetch or push through it.`
+			);
+		}
+	}
+
+	/**
+	 * The origin a fetch or push after provision goes to. `remote get-url origin` reads the
+	 * checkout's config, which the run can rewrite; when THIS instance provisioned the
+	 * checkout, the answer must still be the repository it was provisioned from, and that
+	 * recorded value is what is used. A checkout this instance did not provision falls back
+	 * to what the checkout says (the handle carries no repository to check it against).
+	 */
+	private async originUrl(dir: string, auth: WorkspaceProvisionSpec['auth']): Promise<string> {
+		const current = (
+			await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, auth, 'origin remote missing')
+		).stdout.trim();
+		const provisioned = this.provisionedRemotes.get(resolve(dir));
+		if (provisioned !== undefined && current !== provisioned) {
+			// Neither URL is echoed: either can carry credentials.
+			throw new WorkspaceNotProvisionedError(
+				"this checkout's origin remote is no longer the repository it was provisioned from — the sandbox-workspace provider refuses to fetch or push through it."
+			);
+		}
+		return provisioned ?? current;
+	}
+
 	private async readStamp(dir: string): Promise<{ bindingKey: string } | null> {
 		try {
 			const raw = await fs.readFile(join(dir, '.git', STAMP_FILE), 'utf8');
@@ -721,6 +918,41 @@ function isSafeCloneArgument(url: string): boolean {
 	}
 	// Same option-in-the-host-position problem, reached through a real URL.
 	return !parsed.hostname.startsWith('-');
+}
+
+/**
+ * Refuse a branch name that git itself would refuse (`git check-ref-format
+ * --branch`), before it reaches `git`.
+ *
+ * `baseRef`, `branch` and a merge `targetRef` are interpolated into refspecs —
+ * `+refs/heads/<ref>:refs/remotes/origin/<ref>` — and `branch` into
+ * `checkout -B`. A refspec cannot carry an option, and every remote call puts
+ * `--` before its positionals, so this is not what stops command execution; it
+ * stops a name from rewriting WHICH refs a call touches: a `:` retargets the
+ * destination, a `*` turns the fetch into a glob over every branch, and a
+ * leading `-` is an option wherever a future call forgets the `--`. None of
+ * these is a legal branch name, so refusing them costs no real branch. Fail
+ * closed, like {@link assertRemoteCloneUrl}; the value is not echoed.
+ */
+export function assertSafeRefName(ref: unknown, what: string): void {
+	if (!isSafeRefName(ref)) {
+		throw new WorkspaceNotProvisionedError(
+			`${what} is not a valid branch name — the sandbox-workspace provider refuses it rather than hand it to git.`
+		);
+	}
+}
+
+/** git's `check-ref-format` rules for a branch name, written out (no regex backtracking). */
+function isSafeRefName(ref: unknown): ref is string {
+	if (typeof ref !== 'string' || ref.length === 0 || ref === '@') return false;
+	if (ref.startsWith('-') || ref.startsWith('/') || ref.endsWith('/') || ref.endsWith('.')) return false;
+	if (ref.includes('..') || ref.includes('//') || ref.includes('@{')) return false;
+	for (let index = 0; index < ref.length; index += 1) {
+		const code = ref.charCodeAt(index);
+		// Control characters, space and DEL; then git's reserved `~ ^ : ? * [ \`.
+		if (code <= 0x20 || code === 0x7f || '~^:?*[\\'.includes(ref[index])) return false;
+	}
+	return ref.split('/').every((part) => !part.startsWith('.') && !part.endsWith('.lock'));
 }
 
 /**

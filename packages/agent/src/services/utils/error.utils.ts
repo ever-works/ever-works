@@ -7,15 +7,34 @@ import { redactSecrets } from '../../utils/secret-scan';
 // Redact both BEFORE the string is returned so no caller can leak them.
 //
 // 1. Userinfo in any `scheme://user:pass@host` URL → `scheme://***:***@host`.
-//    The pattern matches a URL scheme, then a userinfo segment of the form
-//    `user:pass@`, and replaces ONLY the user:pass with `***:***`.
-const URL_CREDENTIAL_RE = /([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi;
+//    A URL scheme (`[a-z][a-z0-9+.-]*`), then a userinfo segment of the form
+//    `user:pass@`; ONLY the user:pass is replaced with `***:***`.
+//
+//    The match starts at `://`, not at the scheme: a pattern that opens with
+//    the scheme is retried from every offset of a long run of scheme
+//    characters (seconds for 50,000 of them — CodeQL js/polynomial-redos),
+//    and the message is upstream text. Whether a scheme precedes the `://` is
+//    then read backwards from it: `[a-z][a-z0-9+.-]*` right before `://`
+//    exists exactly when the run of scheme characters ending there holds a
+//    letter. Runs before distinct `://` never overlap, so the whole pass stays
+//    linear, and it redacts exactly the URLs the scheme-first pattern did.
+const URL_USERINFO_RE = /:\/\/[^/\s:@]+:[^/\s@]+@/g;
+const URL_SCHEME_CHAR_RE = /^[a-z0-9+.-]$/i;
+const URL_SCHEME_LETTER_RE = /^[a-z]$/i;
+
+function redactUrlCredentials(message: string): string {
+    return message.replace(URL_USERINFO_RE, (userinfo: string, offset: number) => {
+        for (let at = offset - 1; at >= 0 && URL_SCHEME_CHAR_RE.test(message[at]); at -= 1) {
+            if (URL_SCHEME_LETTER_RE.test(message[at])) return '://***:***@';
+        }
+        return userinfo;
+    });
+}
 
 function redactCredentials(message: string): string {
     // Strip credentials embedded in URLs first, then run the shared secret
     // scrubber to catch standalone tokens (ghp_…, sk-…, Bearer …, JWTs, etc.).
-    const urlRedacted = message.replace(URL_CREDENTIAL_RE, '$1***:***@');
-    return redactSecrets(urlRedacted).cleaned;
+    return redactSecrets(redactUrlCredentials(message)).cleaned;
 }
 
 function getErrorMessage(error: unknown): string {

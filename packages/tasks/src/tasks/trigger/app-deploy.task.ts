@@ -12,6 +12,7 @@ import {
     appClusterWorkerRefusal,
 } from '../../trigger/worker/modules/trigger-app-runtime.module';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { errorText, logText } from '../../trigger/worker/utils/error-text.utils';
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-deploy`**, the one-shot that runs a Deployment on the
@@ -95,11 +96,6 @@ export interface AppDeployTaskResult {
     reason: string | null;
     error: string | null;
     result: AppDeployOrchestratorResult | null;
-}
-
-/** `error.message` when there is one, `String(error)` otherwise. */
-function errorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -209,8 +205,10 @@ export async function runAppDeployTask(
             } catch (error) {
                 // Only a throw OUTSIDE the orchestrator's own handling reaches here — the
                 // orchestrator resolves for every outcome it can name. `onFailure` lands the row.
+                // The RESULT carries `errorText` — an Error's message, never a thrown value — because
+                // the local worker hands it back over HTTP unchanged; the log keeps the whole text.
                 const failure = errorText(error);
-                logger.error(`app-deploy: work ${workId} failed — ${failure}`, {
+                logger.error(`app-deploy: work ${workId} failed — ${logText(error)}`, {
                     workId,
                     deploymentId,
                 });
@@ -258,6 +256,7 @@ export async function recoverFailedAppDeploy(
 
     if (!workId || !deploymentId) return outcome;
 
+    // `lastError` is shown on the Deploy tab, so it gets the answer text, never a thrown value.
     const failure = errorText(error);
 
     try {
@@ -280,7 +279,7 @@ export async function recoverFailedAppDeploy(
                     }
                 } catch (markError) {
                     logger.error(
-                        `app-deploy onFailure: could not mark deployment ${deploymentId} — ${errorText(
+                        `app-deploy onFailure: could not mark deployment ${deploymentId} — ${logText(
                             markError,
                         )}`,
                         { workId, deploymentId },
@@ -304,7 +303,7 @@ export async function recoverFailedAppDeploy(
                 } catch (lockError) {
                     outcome.lockRelease = 'failed';
                     logger.error(
-                        `app-deploy onFailure: could not release the deploy lock for ${deploymentId} — ${errorText(
+                        `app-deploy onFailure: could not release the deploy lock for ${deploymentId} — ${logText(
                             lockError,
                         )}`,
                         { workId, deploymentId },

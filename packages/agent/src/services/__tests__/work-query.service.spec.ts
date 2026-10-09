@@ -329,6 +329,20 @@ describe('WorkQueryService', () => {
             expect(workRepository.existsByUserAndSlug).not.toHaveBeenCalled();
             expect(result).toEqual({ available: false, slug: '' });
         });
+
+        it.each<[string, string]>([
+            ['  --My -- Tools!!  ', 'my-tools'],
+            ['-a-', 'a'],
+            [`${'-'.repeat(50_000)}x${'!'.repeat(50_000)}`, 'x'],
+        ])('normalises %p to %p', async (rawSlug, slug) => {
+            workRepository.existsByUserAndSlug.mockResolvedValue(false);
+            const started = performance.now();
+
+            const result = await service.checkSlugAvailability(rawSlug, user);
+
+            expect(performance.now() - started).toBeLessThan(200);
+            expect(result).toEqual({ available: true, slug });
+        });
     });
 
     it('returns the authoritative website repository initialization state on getWork', async () => {

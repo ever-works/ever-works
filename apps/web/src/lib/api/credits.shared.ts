@@ -198,7 +198,7 @@ export interface SubscriptionPlanListItem {
     /** Decimal string from the API (e.g. `'29'` / `'29.00'`). */
     monthlyPrice: string;
     /**
-     * The YEARLY total, not a monthly equivalent — cloud Pro is `'204'`.
+     * The YEARLY total, not a monthly equivalent — cloud Pro is `'408'`.
      * Divide by 12 before rendering it next to a `/mo` suffix.
      */
     annualPrice?: string | null;
@@ -441,4 +441,25 @@ export function formatMonthlyPrice(monthlyPrice: string, currency = 'usd'): stri
 export function isFreePlan(plan: Pick<SubscriptionPlanListItem, 'monthlyPrice'>): boolean {
     const price = Number(plan.monthlyPrice);
     return Number.isFinite(price) && price <= 0;
+}
+
+/**
+ * Free-trial days a CLOUD paid plan starts with (owner rule, 2026-10-05 repricing). Mirrors the
+ * server's `CLOUD_PLAN_TRIAL_PERIOD_DAYS` in `plan-subscription.service.ts`, which is what Stripe
+ * actually gets; this copy only drives the plan card's wording.
+ */
+export const CLOUD_PLAN_TRIAL_DAYS = 90;
+
+/**
+ * Whether a plan card may advertise the free trial: cloud (or a row with no hosting, which
+ * predates the column and is cloud) AND paid. Never a free plan, never a self-hosted edition —
+ * self-hosted is charged at purchase. The server additionally limits the trial to an owner's
+ * first subscription, which is why the card copy says so.
+ */
+export function planOffersTrial(
+    plan: Pick<SubscriptionPlanListItem, 'monthlyPrice' | 'hosting'>,
+): boolean {
+    if (plan.hosting === 'selfhosted') return false;
+    const price = Number(plan.monthlyPrice);
+    return Number.isFinite(price) && price > 0;
 }

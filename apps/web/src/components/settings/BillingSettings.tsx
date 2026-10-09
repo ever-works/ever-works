@@ -34,12 +34,14 @@ import {
     updateSeatsAction,
 } from '@/app/actions/dashboard/billing';
 import {
+    CLOUD_PLAN_TRIAL_DAYS,
     CREDIT_LEDGER_KINDS,
     formatCreditsAsDollars,
     formatMonthlyPrice,
     formatSignedCredits,
     isFreePlan,
     ledgerKindTone,
+    planOffersTrial,
     type CreditLedgerKind,
     type CreditsBalance,
     type CreditsLedgerPage,
@@ -729,6 +731,16 @@ export function BillingSettings({
                                 </div>
                                 <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-1 flex-1">
                                     <li>{t('plans.maxWorks', { count: plan.maxWorks })}</li>
+                                    {/* Seats = employees OR agents (15 / 25 / 50 since the
+                                        2026-10-05 repricing). Unbounded rows carry null. */}
+                                    {typeof plan.seatsIncluded === 'number' &&
+                                    plan.seatsIncluded > 0 ? (
+                                        <li data-testid={`billing-plan-seats-${plan.code}`}>
+                                            {t('plans.seatsIncluded', {
+                                                count: plan.seatsIncluded,
+                                            })}
+                                        </li>
+                                    ) : null}
                                     <li>
                                         {t('plans.cadences', {
                                             count: plan.allowedCadences.length,
@@ -745,6 +757,18 @@ export function BillingSettings({
                                         </li>
                                     ) : null}
                                     <li>{t('plans.payAsYouGo')}</li>
+                                    {/* Owner rule 2026-10-05: 90-day free trial on CLOUD paid
+                                        plans only (never Free, never self-hosted). The server
+                                        decides the real trial and limits it to a first
+                                        subscription, which the copy says. */}
+                                    {planOffersTrial(plan) && !plan.isCurrent ? (
+                                        <li
+                                            data-testid={`billing-plan-trial-${plan.code}`}
+                                            className="font-medium text-text dark:text-text-dark"
+                                        >
+                                            {t('plans.trial', { days: CLOUD_PLAN_TRIAL_DAYS })}
+                                        </li>
+                                    ) : null}
                                 </ul>
                                 {plan.isCurrent ? (
                                     <Button variant="secondary" disabled className="text-xs w-full">
