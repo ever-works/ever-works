@@ -2202,13 +2202,49 @@ describe('parseAgentTaskResult — misplaced question files (self-build slice AU
                 '../outside/.ever-works/QUESTION.md',
                 'line\nbreak',
                 42,
-                'x'.repeat(500),
+                // Past any real path length: a payload, not a path.
+                'x'.repeat(5000),
             ],
         });
         expect(parsed?.misplacedQuestionFiles).toEqual([
             'apps/api/.ever-works/QUESTION.md',
             '.mounts/template/src/.ever-works/QUESTION.md',
         ]);
+    });
+
+    it('keeps a deeply nested question path, validated in full and shortened from the front (review)', () => {
+        const deep = `${'packages/very-long-directory-name/'.repeat(6)}src/.ever-works/QUESTION.md`;
+        expect(deep.length).toBeGreaterThan(120);
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                deep,
+                // Long AND unsafe: the full path is what gets validated, so the
+                // `..` early in it still drops it even though display keeps the end.
+                `../${'a/'.repeat(80)}.ever-works/QUESTION.md`,
+            ],
+        });
+        const files = parsed?.misplacedQuestionFiles ?? [];
+        expect(files).toHaveLength(1);
+        expect(files[0].length).toBeLessThanOrEqual(120);
+        expect(files[0].startsWith('…')).toBe(true);
+        expect(deep.endsWith(files[0].slice(1))).toBe(true);
+        expect(files[0].endsWith('src/.ever-works/QUESTION.md')).toBe(true);
+    });
+
+    it('never splits a surrogate pair when it shortens a path (review)', () => {
+        const deep = `${'目录/'.repeat(30)}${'😀'.repeat(60)}/.ever-works/QUESTION.md`;
+        const files = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            misplacedQuestionFiles: [deep],
+        })?.misplacedQuestionFiles;
+        expect(files).toHaveLength(1);
+        expect(files?.[0].length).toBeLessThanOrEqual(120);
+        expect(files?.[0]).not.toMatch(
+            /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+        );
     });
 
     it('keeps a printable Unicode path, and drops bidi/format tricks and code-span breakouts (review)', () => {
