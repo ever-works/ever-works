@@ -292,6 +292,37 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 		});
 	});
 
+	it('drops an unadvertised optional flag on BOTH attempts and records it once on the run (slice AR × AU)', async () => {
+		const fs = scratchFs([null, envelope({ session_id: 'fresh-session' })]);
+		const { commands, spawnFn } = recordingSpawn(
+			[['--resume', 1]],
+			[['--resume', `No conversation found with session ID: ${SESSION}`]]
+		);
+		// The pinned build no longer advertises `--effort`; everything else is there.
+		const modelCliCompat = vi.fn(async () => ({
+			version: '3.0.0',
+			supportedFlags: new Set(['-p', '--output-format', '--permission-mode', '--model', '--max-budget-usd'])
+		}));
+
+		const outcome = await runAgentTaskJob(
+			job(payload({ effort: 'high', ...offer() })),
+			io({ fs, spawnFn, modelCliCompat })
+		);
+
+		const model = modelCommands(commands);
+		expect(model).toHaveLength(2);
+		expect(model[0]).toContain(`--resume ${SESSION}`);
+		for (const command of model) expect(command).not.toContain('--effort');
+		// Asked once per run, not once per attempt.
+		expect(modelCliCompat).toHaveBeenCalledTimes(1);
+		expect(outcome.model).toMatchObject({
+			status: 'succeeded',
+			sessionId: 'fresh-session',
+			droppedFlags: ['--effort'],
+			resume: { outcome: 'fell-back' }
+		});
+	});
+
 	it('falls back for a CLI too old to know --fork-session, which also exits before any model turn', async () => {
 		const fs = scratchFs([null, envelope({ session_id: 'fresh-session' })]);
 		const { commands, spawnFn } = recordingSpawn(

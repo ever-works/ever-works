@@ -128,7 +128,7 @@ Every heartbeat now carries what the node's **worker** is doing, alongside the r
 Two properties are load-bearing and deliberately awkward:
 
 - **The field is a string on the wire, not an enum.** The heartbeat DTO runs under `whitelist + forbidNonWhitelisted`, so a value an older API rejects fails the whole request — and a failed heartbeat is a node that sweeps to `offline`. A node newer than the platform must be able to report a state this build has never heard of and stay alive; the server normalizes anything unrecognised to "unknown" rather than trusting it.
-- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts.
+- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts. The optional fields are dropped in tiers, newest first: a platform that predates only the pinned CLI versions and enforced limits (slices AR / AS) loses just those, and keeps receiving the worker state and housekeeping. Enrollment never sends the newest tier at all — it has no such fallback — so a new node can always enroll against an older platform.
 
 The drawer judges a job FAILED on the reconciled run outcome — the badge, the **Failed** filter chip and the endpoint’s `failures` subset all use the same rule, so a job the node called `done` whose run failed appears in all three.
 
@@ -150,10 +150,11 @@ The sweep is piggybacked on owner-scoped list reads (there is no cron): the runn
 
 ### Knobs
 
-| Env                                  | Default | Meaning                                                        |
-| ------------------------------------ | ------- | -------------------------------------------------------------- |
-| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`       |
-| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice |
+| Env                                  | Default | Meaning                                                               |
+| ------------------------------------ | ------- | --------------------------------------------------------------------- |
+| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`              |
+| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice        |
+| `FLEET_MIN_NODE_VERSION`             | `0.1.0` | minimum daemon version the lease admits (see "Keeping nodes current") |
 
 The notice window is floored at the sweep window: an escalation that could fire before the node is even considered offline would be two notices for one event.
 
@@ -284,10 +285,11 @@ Check subprocesses get an environment built **from scratch**, never the inherite
 | `ever-works-node status`                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
 | `ever-works-node capabilities`                           | Prints the tags this machine would report, without enrolling.                                                                       |
 | `ever-works-node clear-quarantine`                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
+| `ever-works-node doctor [--json]`                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
 
 `--work` is opt-in on purpose: **enrolling a machine and letting it run the owner's commands are two different consents.** A paused node keeps heartbeating, too — a drained machine that vanished from Fleet would be indistinguishable from a dead one.
 
-Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, --concurrency <count>` (jobs at once), `--max-cpu <percent>` and `--max-memory <mb>` (refuse new work while the host is above a ceiling), `--capabilities <tags>` (offer a narrower set than was detected), and `--local-only` on `pause` / `resume` / `unenroll` for a machine being drained or decommissioned offline. Exit codes are `0` ok, `1` failure, `3` not enrolled — so provisioning scripts can branch on them.
+Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, --concurrency <count>` (jobs at once), `--max-cpu <percent>` and `--max-memory <mb>` (refuse new work while the host is above a ceiling — the owner can lower all three from Fleet, see "Remote node limits"), `--capabilities <tags>` (offer a narrower set than was detected), and `--local-only` on `pause` / `resume` / `unenroll` for a machine being drained or decommissioned offline. Exit codes are `0` ok, `1` failure, `3` not enrolled — so provisioning scripts can branch on them.
 
 ### Enroll a machine end to end
 
@@ -343,6 +345,49 @@ The node's own log rotates. Under systemd it goes to the journal (`journalctl -u
 :::note Build it yourself for now
 `ever-works-node` is not published to npm yet, and the Fleet handoff panel says as much: "Node app downloads ship in an upcoming release." Build it from a monorepo checkout with `pnpm build:node` — the app is deliberately excluded from the default root build — or build the desktop node shell with `pnpm build:desktop-node`, the Electron packaging of the same shared core, with a setup wizard, a status window, a tray and auto-start.
 :::
+
+## Keeping nodes current
+
+Upgrading a node is still a manual step per machine — `npm install -g ever-works-node@latest` for a machine installed from the npm package (see `apps/node/README.md`; the package publishes on a release tag), or `git pull` + `pnpm build:node` for a node built from a monorepo checkout — then restart the node service. The platform now tells you which machines need it, and refuses the ones that are too old instead of letting them fail work.
+
+### The daemon version floor
+
+The platform publishes a **minimum daemon version** (`FLEET_MIN_NODE_VERSION`, default `0.1.0` — the first release ever published, so out of the box every daemon is admitted). Every accepted heartbeat carries it, plus a per-node verdict.
+
+A node whose reported version is below the floor:
+
+- keeps heartbeating, stays visible in Fleet, and keeps settling the work it already holds — liveness and in-flight work are never gated;
+- is offered **no new work**: the lease answers `200 { "jobs": [], "upgradeRequired": true, "minNodeVersion": "…" }`. That is deliberately the same shape as the global stop flag and **never a 401** — a node reads a lease 401 as a revoked credential and makes it sticky, so an auth-shaped refusal would turn a reversible floor into a fleet-wide re-enrollment;
+- says so itself: its worker reports `throttled` with an "Upgrade required" reason that names the exact command, the service logs it once, and `ever-works-node status` / `doctor` print it (the running service records the verdict beside its config, in `node-config.json.lifecycle.json`, for those separate processes to read).
+
+The Fleet node drawer shows **Upgrade required** with the same command, judged by the same predicate the lease uses. A daemon built before the floor existed cannot read the new fields, but the lease refuses it all the same; it simply reads the refusal as an empty poll. The floor **fails open** on a version it cannot parse (a dev build, a daemon that never reported one): it is a compatibility gate, not a security boundary. Raise it only after the fleet is upgraded — the drawer shows which machines it would refuse.
+
+After `npm install -g`, `doctor` run by the new binary tells you when the service is still the old one ("restart it to run …").
+
+### Model CLI compatibility
+
+The node now probes the **pinned** model CLI binaries — the exact paths an `agent-task` spawns (`EVER_WORKS_NODE_CLAUDE_PATH` / `--claude-path`, `EVER_WORKS_NODE_CODEX_PATH` / `--codex-path`, else the first launchable one on `PATH`) — rather than scanning `PATH` for the first of `claude` / `codex` / `gemini` / `opencode`. Each binary is asked for `--version` and its help text (`claude --help`, `codex exec --help`) once, cached per path and file modification time, so a beat or a run costs a `stat`, and a CLI upgraded in place is re-probed at once.
+
+- The heartbeat reports one `"<provider> <version>"` entry per pinned binary (`cliVersions`), and the legacy `cliVersion` now comes from the pinned binary too. The drawer lists them under **Daemon & model CLIs**.
+- Right before a model step, an **optional** flag the pinned build does not advertise — `--effort`, `--max-budget-usd` — is left off the command instead of failing the run after the lease and the worktree were spent. The drop is logged and recorded on the run as `model.droppedFlags`. A dropped `--max-budget-usd` means the CLI enforced no per-run budget; the platform's daily ceilings still apply.
+- Nothing else is ever dropped: the permission, sandbox, MCP and directory-grant flags decide what the model may touch. A binary that lacks one of the flags every run passes is reported **INCOMPATIBLE** by `doctor` and in the startup log.
+- A help text the node cannot recognise (it lists none of the flags every run passes) drops **nothing** — the command is exactly what it always was. Guessing would trade a loud failure for a silent downgrade.
+
+`ever-works-node doctor` prints one line for the daemon and one per pinned CLI; `--json` carries the same facts (`daemonVersion`, `minNodeVersion`, `upgradeRequired`, `upgradeCommand`, `modelCli[]`). `doctor` resolves the CLIs the way this shell does; a service started with `--claude-path` / `--codex-path` pins its own and logs its verdict at startup.
+
+There is no self-updater and no canary ring yet: an opt-in, reviewed self-update path is a follow-up. Until then the floor plus `doctor` is the rollout tool — upgrade a canary machine, confirm with `doctor`, upgrade the rest, then raise `FLEET_MIN_NODE_VERSION`.
+
+## Remote node limits
+
+A node's concurrency, CPU and memory limits start as local start flags (`--concurrency`, `--max-cpu`, `--max-memory`, or the enrollment wizard). Fleet can now read them and lower them, without a visit to the machine.
+
+- **Reported.** Every heartbeat from a node with a worker carries the limits it is **enforcing** right now (`maxConcurrentJobs`, `maxCpuPercent`, `maxMemoryMb`; `null` on the CPU / memory pair means no ceiling in force). The node drawer shows them under **Resource limits** — "Enforcing 2 job(s) at once · CPU 70% · memory no ceiling" — or "not reported" for an older daemon or one started without `--work`.
+- **Ceiling.** In the same drawer section the owner sets a **platform-side ceiling** per node (`PUT /api/fleet/nodes/:id/limits`, every field required, `null` clears that dimension; audited as `node.limits` like every other lifecycle write). Each value must sit inside the node's own bounds (1–16 jobs, 5–100 %, 256–1,048,576 MB) and is refused, not clamped, outside them.
+- **The node clamps itself.** Every accepted heartbeat answer carries the ceiling (all-null when none is set, so lifting one reaches the machine too). The node enforces `min(its own flag, the ceiling)` per dimension from its next lease, logs the change, and reports the new effective limits on the beat after. A lower concurrency never cancels work already running — the node simply leases nothing more until it is back under the new number. The live-view lane keeps its own fixed limit.
+- **A ceiling can only lower.** The local flags stay the upper bound: whoever lent the machine keeps the last word, and a ceiling above the local flag changes nothing.
+- **Reinstall-proof.** The ceiling lives on the platform, not in the machine's config. A service reinstall — which re-applies whatever flags the installer was given — cannot revert it; the first heartbeat hands it straight back. (A re-**enrollment** is a new node row and starts without one.)
+
+`ever-works-node status` prints the ceiling the running service last heard and the limits it enforces under it; `doctor --json` carries `limitCeiling` and `effectiveLimits`. An older daemon ignores the ceiling and keeps running on its own flags; Fleet then shows the ceiling next to limits that daemon does not report.
 
 ## Pinning an Agent to a machine
 
@@ -447,7 +492,7 @@ The drawer shows **Above floor** / **Below floor** / **Unknown** with both figur
 
 **Unknown is never a verdict.** A node with plenty of space but no floor reported reads _Unknown_, not _Above floor_: with the floor off, or on a daemon older than these fields, there is no line to be above, and saying otherwise would be a reassurance nobody earned. Likewise `null` and "never reported" are indistinguishable for the floor by design — both mean there is nothing to compare the free-space figure against.
 
-These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The CPU and memory ceilings are **not** reported at all: they have no companion reading on the wire, so a ceiling on its own would be a number with nothing to compare it against.
+These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The concurrency, CPU and memory limits are the exception: since self-build slice AS they are reported, and the owner can lower them from Fleet — see "Remote node limits" below.
 
 `lastReclaimAt` is the one instant on a node row the platform does not stamp itself, so it is treated as untrusted: an unparseable value, or one implausibly far in the future, is recorded as unknown rather than rejected — rejecting it would fail the heartbeat, and a failed heartbeat is a live node swept `offline`. A node that has never reported a figure shows **unknown**, never `0`: "no workspaces" and "we have never been told" are different facts, and only the first is reassuring.
 

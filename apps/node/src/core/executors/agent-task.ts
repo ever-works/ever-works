@@ -70,6 +70,7 @@ import {
 import {
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
+	unsupportedOptionalModelCliFlags,
 	buildModelCliStep,
 	collectModelOutputProtectedValues,
 	ModelCliCommandError,
@@ -369,6 +370,21 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	onProvisionDeclined?: (reason: string) => void;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
+	/**
+	 * Node lifecycle (self-build slice AR) — what the PINNED binary for a
+	 * provider is and which flags it advertises, asked right before the
+	 * model step. An optional flag it does not advertise (`--effort`,
+	 * `--max-budget-usd`) is then left off the command and recorded on the
+	 * result as `droppedFlags`, instead of failing the run after the lease
+	 * and the worktree were already spent.
+	 *
+	 * Optional: absent (or answering null, or throwing) means "could not
+	 * tell", and the command is built exactly as it always was.
+	 */
+	modelCliCompat?: (
+		provider: FleetAgentModelExecution['provider'],
+		executable: string
+	) => Promise<{ version: string | null; supportedFlags: ReadonlySet<string> | null } | null>;
 	/**
 	 * Self-build slice Z (EW-796) — the node's redacting logger.
 	 *
@@ -1295,6 +1311,10 @@ async function runModelStep(
 	// node's OWN enrollment id.
 	const resumeDecision = decideSessionResume(execution, io);
 	try {
+		// Node lifecycle (slice AR): ask the pinned binary what it supports
+		// BEFORE building its command line. A probe that cannot answer drops
+		// nothing — the command is then exactly what it always was.
+		const droppedFlags = await optionalFlagsToDrop(jobId, execution, executable, io);
 		// ONE model invocation: write the prompt, build and gate the command,
 		// spawn, parse. Run once for a fresh session — or, slice AU, once with
 		// `--resume` and, only when the CLI could not open that session at
@@ -1317,7 +1337,8 @@ async function runModelStep(
 					...(bridge.cli ? { mcp: bridge.cli } : {}),
 					...(resumeSessionId ? { resumeSessionId } : {}),
 					...(io.platform ? { platform: io.platform } : {}),
-					...(streamClaude ? { stream: true } : {})
+					...(streamClaude ? { stream: true } : {}),
+					...(droppedFlags.length > 0 ? { omitFlags: droppedFlags } : {})
 				});
 				// Last gate before the spawn: the grant has to be in the string
 				// that is actually run, not merely computed. Nothing downstream
@@ -1391,6 +1412,11 @@ async function runModelStep(
 					? { ...fresh, resume: { outcome: 'skipped', reason: resumeDecision.reason } }
 					: fresh;
 		}
+		// Node lifecycle (slice AR): recorded on the run, not only logged: a
+		// dropped `--max-budget-usd` means the CLI enforced no per-run budget,
+		// and whoever reads the run should not have to find that in a node's
+		// log file.
+		if (droppedFlags.length > 0) model = { ...model, droppedFlags };
 		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
@@ -1418,6 +1444,36 @@ async function runModelStep(
 			);
 		}
 	}
+}
+
+/**
+ * Node lifecycle (self-build slice AR) — the optional flags this run would
+ * pass that the pinned binary does not advertise. Never throws and never
+ * blocks the run: any failure to ask reads as "could not tell", which drops
+ * nothing.
+ */
+async function optionalFlagsToDrop(
+	jobId: string,
+	execution: FleetAgentModelExecution,
+	executable: string,
+	io: AgentTaskIo
+): Promise<string[]> {
+	if (!io.modelCliCompat) return [];
+	let compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null = null;
+	try {
+		compat = await io.modelCliCompat(execution.provider, executable);
+	} catch {
+		return [];
+	}
+	const dropped = unsupportedOptionalModelCliFlags(execution, compat?.supportedFlags ?? null);
+	if (dropped.length > 0) {
+		io.logger?.warn(
+			`[fleet-node] job ${jobId}: the pinned ${execution.provider} CLI (${compat?.version ?? 'version unknown'}) ` +
+				`does not advertise ${dropped.join(', ')} — running without ${dropped.length === 1 ? 'it' : 'them'}. ` +
+				'Upgrade the CLI on this machine to restore them (`ever-works-node doctor` lists what it supports).'
+		);
+	}
+	return dropped;
 }
 
 /**

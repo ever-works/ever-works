@@ -112,7 +112,13 @@ describe('FleetJobsController', () => {
             const lease = jest.fn(async () => []);
             const controller = makeController({ lease });
             await controller.lease({ nodeId: NODE_ID, secret: SECRET });
-            expect(lease).toHaveBeenCalledWith({ nodeId: NODE_ID, secret: SECRET });
+            // `onUpgradeRequired` (slice AR) is the controller's own listener,
+            // not a knob the node supplied — it rides every call.
+            expect(lease).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                onUpgradeRequired: expect.any(Function),
+            });
 
             await controller.lease({
                 nodeId: NODE_ID,
@@ -127,6 +133,7 @@ describe('FleetJobsController', () => {
                 max: 3,
                 leaseTtlSec: 120,
                 capabilities: ['workspace'],
+                onUpgradeRequired: expect.any(Function),
             });
         });
 
@@ -142,6 +149,7 @@ describe('FleetJobsController', () => {
                 nodeId: NODE_ID,
                 secret: SECRET,
                 kinds: ['computer-session'],
+                onUpgradeRequired: expect.any(Function),
             });
 
             await controller.lease({
@@ -153,7 +161,38 @@ describe('FleetJobsController', () => {
                 nodeId: NODE_ID,
                 secret: SECRET,
                 excludeKinds: ['computer-session'],
+                onUpgradeRequired: expect.any(Function),
             });
+        });
+
+        it('says WHY when the service refused the daemon version (slice AR) — a 200, never a 401', async () => {
+            const lease = jest.fn(
+                async (input: {
+                    onUpgradeRequired?: (refusal: {
+                        minNodeVersion: string;
+                        reportedVersion: string | null;
+                    }) => void;
+                }) => {
+                    input.onUpgradeRequired?.({
+                        minNodeVersion: '0.3.0',
+                        reportedVersion: '0.2.0',
+                    });
+                    return [];
+                },
+            );
+            const controller = makeController({ lease } as never);
+            await expect(controller.lease({ nodeId: NODE_ID, secret: SECRET })).resolves.toEqual({
+                jobs: [],
+                upgradeRequired: true,
+                minNodeVersion: '0.3.0',
+            });
+        });
+
+        it('keeps the exact empty shape when nothing was refused', async () => {
+            // The kill-switch pin depends on it: `{ jobs: [] }`, no extra keys.
+            const controller = makeController({ lease: jest.fn(async () => []) });
+            const answer = await controller.lease({ nodeId: NODE_ID, secret: SECRET });
+            expect(Object.keys(answer)).toEqual(['jobs']);
         });
     });
 

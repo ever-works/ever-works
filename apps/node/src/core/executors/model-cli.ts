@@ -175,6 +175,53 @@ function assertModelId(model: string | undefined): string | null {
 }
 
 /**
+ * Node lifecycle (self-build slice AR) — the command-line flags this
+ * builder may DROP when the pinned CLI binary does not advertise them.
+ *
+ * Optional means: the run is still the run the tenant asked for without
+ * it, only less tuned. `--effort` is a quality knob and `--max-budget-usd`
+ * a per-run spend cap the platform's own daily ceilings back up. Before
+ * this list both were emitted unconditionally, so ONE upstream CLI release
+ * that renamed either failed every run on every PC at once — after the
+ * plan, the lease and the provisioning were already spent.
+ *
+ * Nothing else is droppable, on purpose: `--strict-mcp-config`,
+ * `--add-dir`, `--permission-mode`, the sandbox flags and the rest decide
+ * WHAT the model may touch, and a run that silently lost one would be a
+ * different, less contained run that still reports success. A binary that
+ * lacks one of those is reported by `doctor` as incompatible instead.
+ */
+export const MODEL_CLI_OPTIONAL_FLAGS: Readonly<Record<'claude-code' | 'codex', readonly string[]>> = {
+	'claude-code': ['--effort', '--max-budget-usd'],
+	codex: []
+};
+
+/**
+ * The optional flags THIS execution would emit that the pinned binary does
+ * not advertise — i.e. the ones the builder should drop.
+ *
+ * `supportedFlags === null` means "could not tell" (the probe failed, or
+ * the help text was not recognisable), and then nothing is dropped: that
+ * is exactly the behaviour before this existed, and guessing would trade a
+ * loud failure for a silent downgrade.
+ */
+export function unsupportedOptionalModelCliFlags(
+	execution: Pick<FleetAgentModelExecution, 'provider' | 'effort' | 'maxBudgetUsd'>,
+	supportedFlags: ReadonlySet<string> | null | undefined
+): string[] {
+	if (!supportedFlags) return [];
+	const wanted: string[] = [];
+	if (execution.provider === 'claude-code') {
+		if (execution.effort) wanted.push('--effort');
+		if (execution.maxBudgetUsd !== undefined) wanted.push('--max-budget-usd');
+	}
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	return wanted.filter((flag) => droppable.has(flag) && !supportedFlags.has(flag));
+}
+
+/**
  * Self-build slice AU — the session id a command may carry, or null for a
  * fresh run. Throws for an id that is not the contracts' strict UUID shape
  * (it is interpolated into a shell command line) and for a provider the
@@ -244,6 +291,15 @@ export function buildModelCliCommand(input: {
 	resumeSessionId?: string;
 	platform?: NodeJS.Platform;
 	/**
+	 * Node lifecycle (slice AR) — optional flags to leave off because the
+	 * pinned binary does not advertise them (see
+	 * {@link unsupportedOptionalModelCliFlags}). Only members of
+	 * {@link MODEL_CLI_OPTIONAL_FLAGS} are honoured: a containment flag can
+	 * never be dropped through this, whatever a caller passes. Absent (the
+	 * default) produces byte-for-byte the command this step always built.
+	 */
+	omitFlags?: readonly string[];
+	/**
 	 * Self-build slice AP — ask Claude Code for its LINE-DELIMITED event
 	 * stream (`--output-format stream-json --verbose`) instead of the one
 	 * result document `--output-format json` prints at exit. The stream is
@@ -261,6 +317,10 @@ export function buildModelCliCommand(input: {
 	const platform = input.platform ?? process.platform;
 	const { execution } = input;
 	const resumeSessionId = assertResumableSession(execution.provider, input.resumeSessionId);
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	const omitted = new Set((input.omitFlags ?? []).filter((flag) => droppable.has(flag)));
 	const exe = quoteShellPath(input.executable, platform);
 	const stdin = quoteShellPath(input.scratch.instructionsPath, platform);
 	const stdout = quoteShellPath(input.scratch.resultPath, platform);
@@ -355,8 +415,8 @@ export function buildModelCliCommand(input: {
 		// half-finished first attempt. The id is a validated UUID by now.
 		if (resumeSessionId) args.push('--resume', resumeSessionId, '--fork-session');
 		if (model) args.push('--model', model);
-		if (execution.effort) args.push('--effort', execution.effort);
-		if (budget) args.push('--max-budget-usd', budget);
+		if (execution.effort && !omitted.has('--effort')) args.push('--effort', execution.effort);
+		if (budget && !omitted.has('--max-budget-usd')) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
 		// ── Slice Z: the platform MCP bridge ────────────────────────────
 		//

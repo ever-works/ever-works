@@ -3713,6 +3713,34 @@
                     "lastReclaim": "Last reclaimed {time}, freed {freed}",
                     "neverReclaimed": "No reclaim reported yet — this node has never swept its workspaces.",
                     "notReported": "Housekeeping not reported by this node."
+                },
+                "lifecycle": {
+                    "title": "Daemon & model CLIs",
+                    "upgradeRequired": "Upgrade required",
+                    "upgradeRequiredHint": "This machine runs {version}, below the platform minimum {minimum}. It keeps reporting and finishes the work it holds, but is offered no new work until it is upgraded. On that machine run {command} (or, for a node built from a monorepo checkout, pull and run pnpm build:node), then restart the node service.",
+                    "minimum": "Daemon {version} · platform minimum {minimum}",
+                    "cliVersions": "Pinned CLIs: {list}",
+                    "cliVersionsNone": "No model CLI pinned on this machine.",
+                    "cliVersionsNotReported": "Pinned CLI versions not reported by this node (older daemon)."
+                },
+                "limits": {
+                    "title": "Resource limits",
+                    "hint": "The node enforces the lower of its own start flags (--concurrency, --max-cpu, --max-memory) and this ceiling, from its next heartbeat. A ceiling can only lower what the machine does, and a reinstall on that machine cannot undo it. Leave a field empty for no ceiling on it.",
+                    "enforcing": "Enforcing {jobs} job(s) at once · CPU {cpu} · memory {memory}",
+                    "notReported": "Limits not reported by this node (an older daemon, or one not started with --work).",
+                    "noCeilingValue": "no ceiling",
+                    "ceilingSummary": "Platform ceiling: {jobs} job(s) · CPU {cpu} · memory {memory}",
+                    "noCeiling": "No platform ceiling — the node runs on its own limits.",
+                    "fields": {
+                        "maxConcurrentJobs": "Max jobs at once (1–16)",
+                        "maxCpuPercent": "CPU ceiling, % (5–100)",
+                        "maxMemoryMb": "Memory ceiling, MB (256–1048576)"
+                    },
+                    "save": "Save ceiling",
+                    "clear": "Clear ceiling",
+                    "saved": "Limit ceiling saved — the node applies it on its next heartbeat",
+                    "cleared": "Limit ceiling cleared — the node returns to its own limits on its next heartbeat",
+                    "invalid": "Enter a whole number within the range shown, or leave the field empty."
                 }
             },
             "jobRuntime": {

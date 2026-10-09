@@ -34,6 +34,8 @@ describe('FleetController', () => {
         renameForUser: jest.Mock;
         setDisabledForUser: jest.Mock;
         setDailyCostCeilingForUser: jest.Mock;
+        // Remote node limits (slice AS).
+        setLimitCeilingForUser: jest.Mock;
         deleteForUser: jest.Mock;
         enroll: jest.Mock;
         heartbeat: jest.Mock;
@@ -92,6 +94,10 @@ describe('FleetController', () => {
                 ...nodeView,
                 dailyCostCeilingCents: 2_500,
             })),
+            setLimitCeilingForUser: jest.fn(async () => ({
+                ...nodeView,
+                limitCeiling: { maxConcurrentJobs: 2, maxCpuPercent: null, maxMemoryMb: null },
+            })),
             deleteForUser: jest.fn(async () => undefined),
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
@@ -122,6 +128,31 @@ describe('FleetController', () => {
             // EW-799 — the audit reader behind GET /nodes/:id/audit.
             auditStub as never,
         );
+    });
+
+    describe('PUT /api/fleet/nodes/:id/limits (remote node limits, slice AS)', () => {
+        it('forwards the whole ceiling, owner-scoped, nulls included', async () => {
+            const view = await controller.setLimitCeiling(auth, nodeView.id, {
+                maxConcurrentJobs: 2,
+                maxCpuPercent: null,
+                maxMemoryMb: null,
+            });
+            expect(service.setLimitCeilingForUser).toHaveBeenCalledWith('user-1', nodeView.id, {
+                maxConcurrentJobs: 2,
+                maxCpuPercent: null,
+                maxMemoryMb: null,
+            });
+            // The KEY SET, because `toHaveBeenCalledWith` treats `{a: undefined}`
+            // and `{}` as equal: a field dropped from the mapping must fail here.
+            expect(
+                Object.keys(service.setLimitCeilingForUser.mock.calls[0][2] as object).sort(),
+            ).toEqual(['maxConcurrentJobs', 'maxCpuPercent', 'maxMemoryMb']);
+            expect(view.limitCeiling).toEqual({
+                maxConcurrentJobs: 2,
+                maxCpuPercent: null,
+                maxMemoryMb: null,
+            });
+        });
     });
 
     describe('cost ceilings (fleet cost accounting, EW-777)', () => {
@@ -411,6 +442,7 @@ describe('FleetController', () => {
                 version: undefined,
                 capabilities: undefined,
                 cliVersion: undefined,
+                cliVersions: undefined,
                 diskFreeBytes: undefined,
                 modelIdentity: undefined,
                 workerState: undefined,
@@ -421,6 +453,10 @@ describe('FleetController', () => {
                 workspaceBytes: undefined,
                 lastReclaimAt: undefined,
                 lastReclaimFreedBytes: undefined,
+                // Remote node limits (slice AS).
+                maxConcurrentJobs: undefined,
+                maxCpuPercent: undefined,
+                maxMemoryMb: undefined,
             });
             // …and the KEY SET, because the assertion above does not check
             // it (review AO-12). `toHaveBeenCalledWith` uses the same
@@ -436,6 +472,7 @@ describe('FleetController', () => {
                     'version',
                     'capabilities',
                     'cliVersion',
+                    'cliVersions',
                     'diskFreeBytes',
                     'modelIdentity',
                     'workerState',
@@ -445,6 +482,9 @@ describe('FleetController', () => {
                     'workspaceBytes',
                     'lastReclaimAt',
                     'lastReclaimFreedBytes',
+                    'maxConcurrentJobs',
+                    'maxCpuPercent',
+                    'maxMemoryMb',
                 ].sort(),
             );
             expect(result.secret).toBe('node-secret');
@@ -533,6 +573,111 @@ describe('FleetController', () => {
                     workerStateReason: 'cpu ceiling',
                 }),
             );
+        });
+
+        it('forwards the pinned CLI versions on BOTH enroll and heartbeat (slice AR)', async () => {
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                cliVersions: ['claude-code 2.1.3'],
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({ cliVersions: ['claude-code 2.1.3'] }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                // An EMPTY list is a report ("nothing pinned any more") and
+                // must reach the service as one, not be dropped as falsy.
+                cliVersions: [],
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({ cliVersions: [] }),
+            );
+        });
+
+        it('carries the daemon version floor on an accepted beat, and never refuses the beat for it (slice AR)', async () => {
+            service.heartbeat.mockResolvedValue({
+                node: nodeView,
+                rotationRequested: false,
+                minNodeVersion: '0.3.0',
+                upgradeRequired: true,
+            });
+            const result = await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+            } as FleetHeartbeatDto);
+            expect(result).toMatchObject({
+                ok: true,
+                node: nodeView,
+                minNodeVersion: '0.3.0',
+                upgradeRequired: true,
+            });
+        });
+
+        it('forwards the enforced limits on BOTH enroll and heartbeat, an explicit null included (slice AS)', async () => {
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                maxConcurrentJobs: 2,
+                maxCpuPercent: 80,
+                maxMemoryMb: null,
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({
+                    maxConcurrentJobs: 2,
+                    maxCpuPercent: 80,
+                    maxMemoryMb: null,
+                }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                maxConcurrentJobs: 1,
+                maxCpuPercent: null,
+                maxMemoryMb: 4096,
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({
+                    maxConcurrentJobs: 1,
+                    maxCpuPercent: null,
+                    maxMemoryMb: 4096,
+                }),
+            );
+        });
+
+        it('carries the owner limit ceiling on an accepted beat (slice AS)', async () => {
+            const ceiling = { maxConcurrentJobs: 2, maxCpuPercent: null, maxMemoryMb: null };
+            service.heartbeat.mockResolvedValue({
+                node: nodeView,
+                rotationRequested: false,
+                minNodeVersion: '0.1.0',
+                upgradeRequired: false,
+                limitCeiling: ceiling,
+            });
+            const result = await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+            } as FleetHeartbeatDto);
+            expect(result.limitCeiling).toEqual(ceiling);
         });
 
         it('heartbeat maps a rejected credential to 401 and success to ok', async () => {
