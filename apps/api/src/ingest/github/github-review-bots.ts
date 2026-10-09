@@ -286,9 +286,14 @@ const LINE_START = '^[ \\t]*(?:>[ \\t]*)?';
  * inside a code sample is not mistaken for the real one either. The bots'
  * own markers never sit inside a fence (CodeRabbit's placeholder carries
  * an ```` ```ascii ```` banner, but its markers are outside it).
+ *
+ * As in CommonMark, a block closes only on a fence of the SAME character,
+ * at least as long as the opener, with nothing but whitespace after it —
+ * one alternative per character, so a ```` ```~~~ ```` line inside a
+ * backtick block does not close it early.
  */
 const FENCED_CODE_BLOCK =
-    /^[ \t]*(?:>[ \t]*)?(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*(?:>[ \t]*)?\1[`~]*[ \t]*$|(?![\s\S]))/gm;
+    /^[ \t]*(?:>[ \t]*)?(?:(`{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*(?:>[ \t]*)?\1`*[ \t]*$|(?![\s\S]))|(~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*(?:>[ \t]*)?\2~*[ \t]*$|(?![\s\S])))/gm;
 
 /**
  * CodeRabbit stamps every machine-generated block with an HTML comment of

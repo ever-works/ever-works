@@ -428,6 +428,19 @@ describe('github-review-bots', () => {
                     ),
                 ).toBe('findings');
             }
+            // A fence closes only on the SAME character (CodeRabbit, round
+            // 3): a mixed ```~~~ line inside a backtick sample, or ~~~```
+            // inside a tilde one, must not end the block early and expose
+            // the quoted marker that follows it.
+            for (const sample of [
+                '```\n```~~~\n<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n```',
+                '~~~\n~~~```\n<!-- greptile_summary -->\n~~~',
+                '```\n~~~\n<!-- This is an auto-generated comment: review in progress by coderabbit.ai -->\n```',
+            ]) {
+                expect(created(`_🟡 Minor_\n\nQuoted:\n\n${sample}\n\nStill a finding.`)).toBe(
+                    'findings',
+                );
+            }
             // …while a finding that is NOTHING but a code sample is still
             // not "empty": the fence is removed for marker matching only.
             expect(created('```ts\nconst retries = Infinity;\n```')).toBe('findings');
