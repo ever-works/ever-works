@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { CONSTANTS, STATS_RETRY_DELAYS_S } from '@ever-co/connect-sdk';
 import type { StatsSendResult } from '@ever-works/contracts';
 import type { EverStatsLease } from '@ever-works/agent/entities';
 import {
@@ -32,8 +33,13 @@ import {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-/** The retry ladder after a `failed` send: +1 h, +4 h, +12 h, then the next day's slot. */
-export const INSTANCE_STATS_RETRY_LADDER_MS = [HOUR_MS, 4 * HOUR_MS, 12 * HOUR_MS] as const;
+/**
+ * The retry ladder after a `failed` send: +1 h, +4 h, +12 h (the contract's
+ * `STATS_RETRY_DELAYS_S`), then the next day's slot.
+ */
+export const INSTANCE_STATS_RETRY_LADDER_MS: readonly number[] = STATS_RETRY_DELAYS_S.filter(
+    (delayS) => delayS < DAY_MS / 1000,
+).map((delayS) => delayS * 1000);
 /** A first boot that is overdue by more than a day sends 10 minutes after boot. */
 export const INSTANCE_STATS_OVERDUE_DELAY_MS = 10 * 60 * 1000;
 /**
@@ -45,12 +51,12 @@ export const INSTANCE_STATS_OVERDUE_DELAY_MS = 10 * 60 * 1000;
 export const INSTANCE_STATS_REJECTED_RETRY_MS = 7 * DAY_MS;
 /** *Send now* is allowed once per 10 minutes. */
 export const INSTANCE_STATS_SEND_NOW_INTERVAL_MS = 10 * 60 * 1000;
-/** Upper bound of one delivery. */
-export const INSTANCE_STATS_SEND_TIMEOUT_MS = 10_000;
+/** Upper bound of one delivery (the contract's write timeout). */
+export const INSTANCE_STATS_SEND_TIMEOUT_MS: number = CONSTANTS.timeouts_ms.write;
 
 /**
- * Why a run sent nothing. `env`: `EVER_STATS_ENABLED` switches the module off
- * (it should not even be loaded then; the sender refuses all the same).
+ * Why a run sent nothing. `env`: `EVER_STATS_ENABLED` does not switch the
+ * module on (it should not even be loaded then; the sender refuses all the same).
  */
 export type InstanceStatsSkipReason = 'env' | 'ui' | 'not_due' | 'parked' | 'lease_busy';
 

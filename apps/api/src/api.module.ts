@@ -113,8 +113,8 @@ import { AppBuildsModule } from './app-builds/app-builds.module';
 // handover, and the durable store the handover writes. Agent-side, so the whole
 // epic's later routes reach it by importing the agent module directly.
 import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
-// Anonymous usage statistics — imported only when EVER_STATS_ENABLED is not
-// `false`; with it off the module is absent (no route, no timer, no request).
+// Anonymous usage statistics — imported only when EVER_STATS_ENABLED is `true`
+// (off by default); with it off the module is absent (no route, no timer, no request).
 import { instanceStatsModuleImports } from './instance-stats';
 import {
     PluginsModule as AgentPluginsModule,
@@ -425,8 +425,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // enforcement point every side-effectful action passes through.
         SafetyApiModule,
         // Anonymous usage statistics — additive and conditional: the module is
-        // in the graph only when EVER_STATS_ENABLED is not `false` (read once,
-        // here, at boot). Nothing above moves.
+        // in the graph only when EVER_STATS_ENABLED is `true` (off by default;
+        // read once, here, at boot). Nothing above moves.
         ...instanceStatsModuleImports(),
     ],
     providers: [

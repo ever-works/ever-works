@@ -82,14 +82,3 @@ docs/specs/features/app-works/_build-artifacts/apw-03-schema/app-spec.schema.jso
 docs/specs/features/app-works/_build-artifacts/templates-catalog/ever-works-templates/schema/templates-manifest.schema.json
 docs/specs/features/app-works/_build-artifacts/expected-outputs/golden/.generated-files.json
 docs/specs/features/app-works/_build-artifacts/expected-outputs/golden/__negative-control__/.variants.json
-
-# The published anonymous usage statistics contract (`ever.stats.v1` schema and
-# fixtures), vendored BYTE FOR BYTE from the public ever-connect-sdk repository.
-# `drift.spec.ts` checks every file's SHA-256 against `VENDOR.json` and the
-# schema's against the published value, so reformatting any of them would
-# break that check (and the fixtures are deliberately malformed in places).
-packages/agent/src/ever-instance/contract
-
-# Vendored byte for byte from the published statistics contract (a drift test
-# compares their SHA-256): formatting them would break that copy.
-packages/agent/src/ever-instance/contract/

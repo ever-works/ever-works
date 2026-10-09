@@ -12,6 +12,14 @@
 	"wait_s": 120,
 	"allowed_external_hosts": [],
 	"modes": {
+		"default_off": {
+			"description": "Nothing about statistics configured, in the container environment or the API's .env file (a fresh self-hosted installation): statistics are off by default, so the module is not loaded, no call, no Ever host looked up, every module route 404.",
+			"env": { "EVER_STATS_SEND_INTERVAL_S": "5" },
+			"mock": false,
+			"module_routes": "404",
+			"allowed_rows": [],
+			"required_rows": []
+		},
 		"off_env_file": {
 			"description": "Statistics switched off ONLY in the API's .env file (mounted at the API's working directory), nothing about them in the container environment: the module is not loaded, no call, no Ever host looked up, every module route 404.",
 			"env": { "EVER_STATS_SEND_INTERVAL_S": "5" },

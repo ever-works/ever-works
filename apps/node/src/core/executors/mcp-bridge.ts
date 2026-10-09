@@ -110,6 +110,16 @@ export type McpBridgeFetch = (
 		headers: Record<string, string>;
 		body?: string | Uint8Array;
 		signal?: AbortSignal;
+		/**
+		 * Always `'manual'`. The request carries the run token in
+		 * `x-ever-works-jwt`, and a followed redirect would re-send that
+		 * header to whatever host the upstream named — handing the credential
+		 * to a host nobody vetted. Setting it `'manual'` makes `fetch` RETURN
+		 * the 3xx (which this proxy forwards back to the model as-is) instead
+		 * of chasing it. Optional on the type only so a test double may ignore
+		 * it; the production call site always sets it.
+		 */
+		redirect?: 'manual';
 	}
 ) => Promise<McpBridgeUpstreamResponse>;
 
@@ -236,6 +246,10 @@ export async function startMcpLoopbackProxy(options: McpLoopbackProxyOptions): P
 		const upstreamResponse = await fetchFn(upstream, {
 			method,
 			headers,
+			// Never follow a redirect with the run token attached — see
+			// {@link McpBridgeFetch}. A 3xx is returned and forwarded to the
+			// model as-is rather than re-issued to the redirect target.
+			redirect: 'manual',
 			...(body !== undefined ? { body } : {})
 		});
 

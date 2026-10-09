@@ -759,6 +759,13 @@ The run's result records whether the bridge was up and how many tool calls went 
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
 tool channel that fails never fails a Task.
 
+> An earlier design (slice C) described a fleet session as having "no platform tools." That was
+> always a **default**, not an invariant: the bridge is off until an operator and the Agent's own
+> permission both turn it on, and even then the model reaches only a bounded tool surface through a
+> credential it never sees, with the bound enforced by the platform's route allow-list. The two
+> designs are reconciled in one place — the
+> [fleet session trust model](../specs/security/fleet-session-trust-model.md) §3.
+
 ### How a fleet node pushes (scoped push credentials)
 
 A fleet node used to push **token-free**: `git push` ran against the plain remote and the machine's
@@ -861,3 +868,5 @@ is worse than no trailer at all. If you see that failure, rename the Task.
 - [Job Runtimes](./job-runtimes.md) · [Agents](./agents.md) · [Tasks](./tasks.md) · [Quality Gates](./quality-gates.md)
 - [Task Isolation](./task-isolation.md) · [Agent Terminals](./agent-terminals.md) · [Sessions & Steering](./sessions-and-steering.md)
 - [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
+- [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
+  what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)

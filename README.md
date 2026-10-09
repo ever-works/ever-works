@@ -238,7 +238,7 @@ Notes:
 
 ### Anonymous usage statistics
 
-A self-hosted installation sends a small, signed, anonymous report once a day — and on days 1–3 of a month one more, for the month that just closed — with counts, monthly totals and feature switches only, never a name, an address, a URL or any of your content — so the maintainers can see which versions and features are in use. Switch it off with `EVER_STATS_ENABLED=false` (in `.env.compose` with Docker Compose, in `apps/api/.env` when you run the API from source, or in the container environment) or in **Settings → Ever Platform**, where you can also see every byte that was sent. See [Anonymous usage statistics](docs/ever-platform/anonymous-statistics.md).
+Anonymous usage statistics are **off by default** for now: a self-hosted installation sends nothing unless you opt in. Switch them on with `EVER_STATS_ENABLED=true` (in `.env.compose` with Docker Compose, in `apps/api/.env` when you run the API from source, or in the container environment). Once on, the installation sends a small, signed, anonymous report once a day — and on days 1–3 of a month one more, for the month that just closed — with counts, monthly totals and feature switches only, never a name, an address, a URL or any of your content — so the maintainers can see which versions and features are in use. You can switch it off again with `EVER_STATS_ENABLED=false` or in **Settings → Ever Platform**, where you can also see every byte that was sent. See [Anonymous usage statistics](docs/ever-platform/anonymous-statistics.md).
 
 ## ☁️ One-Click Deploy
 
