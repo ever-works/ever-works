@@ -237,6 +237,30 @@ describe('status and doctor read the recorded verdict', () => {
 		expect(JSON.parse(json.output())).toMatchObject({ upgradeRequired: false, localBinaryBelowFloor: true });
 	});
 
+	it('never recommends a restart that would DOWNGRADE the running service (review)', async () => {
+		const older = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[RECORD_PATH]: record({ daemonVersion: '0.4.0', minNodeVersion: '0.2.0', upgradeRequired: false })
+			},
+			version: '0.3.0'
+		});
+		expect(await runCli(['status'], older.deps)).toBe(EXIT_OK);
+		expect(older.output()).not.toContain('restart the node service');
+		expect(older.output()).toContain("this command's binary is 0.3.0, older than the running service");
+
+		// …while a NEWER binary still gets the restart advice.
+		const newer = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[RECORD_PATH]: record({ daemonVersion: '0.3.0', minNodeVersion: '0.2.0', upgradeRequired: false })
+			},
+			version: '0.4.0'
+		});
+		expect(await runCli(['status'], newer.deps)).toBe(EXIT_OK);
+		expect(newer.output()).toContain("this command's binary is 0.4.0 — restart the node service to run it");
+	});
+
 	it('status before the service has ever beaten says the floor is not known yet', async () => {
 		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
 		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);

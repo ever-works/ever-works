@@ -55,7 +55,11 @@ import {
 	type NodeWorkspaceGcPolicy
 } from '../core/types';
 import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../core/api-base';
-import { FLEET_NODE_UPGRADE_COMMAND, isFleetNodeVersionBelowFloor } from '@ever-works/contracts';
+import {
+	compareFleetNodeVersions,
+	FLEET_NODE_UPGRADE_COMMAND,
+	isFleetNodeVersionBelowFloor
+} from '@ever-works/contracts';
 import { isModelCliCompatible, ModelCliCompatibilityProbe, type ModelCliCompatibility } from '../core/model-cli-compat';
 import type { ModelCliPaths } from '../core/executors/model-cli';
 import { readNodeLifecycleRecord, writeNodeLifecycleRecord, type NodeLifecycleRecord } from '../core/node-lifecycle';
@@ -1182,12 +1186,17 @@ function describeDaemonLifecycle(deps: CliDeps, record: NodeLifecycleRecord | nu
 				: `Run \`${FLEET_NODE_UPGRADE_COMMAND}\` ${NODE_SOURCE_UPGRADE_HINT}, then restart the node service`;
 		return `${service} (running service) — UPGRADE REQUIRED: below the platform's minimum ${floor ?? '(not named)'} (${asOf}); it is offered no new work. ${fix}`;
 	}
+	// A restart is only advice when this binary is NEWER than the service
+	// (review): recommending one for an older binary would be a downgrade.
+	const localVsService = compareFleetNodeVersions(local, service);
 	const note =
 		local === service
 			? ''
 			: localBelow
 				? `; this command's binary is ${local}, below that minimum — another install on PATH? The running service itself is admitted`
-				: `; this command's binary is ${local} — restart the node service to run it`;
+				: localVsService === 1
+					? `; this command's binary is ${local} — restart the node service to run it`
+					: `; this command's binary is ${local}, ${localVsService === -1 ? 'older than' : 'not comparable with'} the running service — another install on PATH? No restart needed`;
 	return `${service} (running service; platform minimum ${floor ?? 'not named'}, ${asOf})${note}`;
 }
 
