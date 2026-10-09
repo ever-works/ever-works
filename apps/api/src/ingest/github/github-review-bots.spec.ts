@@ -1,11 +1,17 @@
 import {
+    classifyReviewBotComment,
     classifyReviewer,
     formatInlineFinding,
     isReviewBotNoise,
     normalizeReviewerLogin,
     parseReviewBotSeverity,
     stripReviewBotMarkup,
+    type ReviewBotCommentVerdict,
 } from './github-review-bots';
+import {
+    reviewBotCommentFixture,
+    reviewBotCommentFixtures,
+} from './__fixtures__/review-bot-comments.helper-spec';
 
 /**
  * Trusted review bots (self-build fleet, finding R16) — the pure policy.
@@ -221,6 +227,205 @@ describe('github-review-bots', () => {
         it('tolerates an empty or missing body', () => {
             expect(stripReviewBotMarkup('')).toBe('');
             expect(stripReviewBotMarkup(undefined)).toBe('');
+        });
+    });
+
+    /**
+     * Prod, 2026-10-09 12:42Z: the first fleet-made PR
+     * (ever-works/ever-works#2575) received CodeRabbit's automatic
+     * "Currently processing new changes in this PR" placeholder, the
+     * bridge recorded it as a REJECTION, and the fix loop resumed the agent
+     * on a fleet PC — which found nothing to do. Every case below is a body
+     * one of the trusted bots actually posted on this repository.
+     */
+    describe('classifyReviewBotComment', () => {
+        const label = (verdict: ReviewBotCommentVerdict): string =>
+            verdict.kind === 'findings' ? 'findings' : `ignore:${verdict.reason}`;
+        const created = (body: string | null | undefined) =>
+            label(classifyReviewBotComment({ action: 'created', body }));
+
+        describe('the captured corpus', () => {
+            it.each(reviewBotCommentFixtures().map((fixture) => [fixture.name, fixture] as const))(
+                '%s',
+                (_name, fixture) => {
+                    expect(created(fixture.body)).toBe(fixture.expected);
+                },
+            );
+
+            it('covers every reason a NEW comment can be ignored, and real findings on both events', () => {
+                // A corpus that silently lost its placeholder sample would
+                // keep every case above green while proving nothing.
+                const expected = new Set(reviewBotCommentFixtures().map((f) => f.expected));
+                for (const reason of [
+                    'ignore:in-progress',
+                    'ignore:nothing-actionable',
+                    'ignore:rate-limited',
+                    'ignore:command-ack',
+                    'ignore:summary',
+                    'ignore:status',
+                    'findings',
+                ]) {
+                    expect(expected).toContain(reason);
+                }
+                const findingEvents = new Set(
+                    reviewBotCommentFixtures()
+                        .filter((f) => f.expected === 'findings')
+                        .map((f) => f.event),
+                );
+                expect(findingEvents).toEqual(
+                    new Set(['issue_comment', 'pull_request_review_comment']),
+                );
+            });
+        });
+
+        it('⭐ ignores the exact placeholder production recorded on #2575', () => {
+            const placeholder = reviewBotCommentFixture(
+                'coderabbit-summary-in-progress-placeholder',
+            ).body;
+            expect(placeholder).toContain('Currently processing new changes in this PR');
+            expect(classifyReviewBotComment({ action: 'created', body: placeholder })).toEqual({
+                kind: 'ignore',
+                reason: 'in-progress',
+            });
+            // The bug: the old status filter let it through, and the
+            // stripped text was non-empty — so it became a rejection row.
+            expect(isReviewBotNoise(placeholder)).toBe(false);
+            expect(stripReviewBotMarkup(placeholder).length).toBeGreaterThan(0);
+        });
+
+        it('recognises the placeholder by its marker alone, and by its sentence alone', () => {
+            expect(
+                created(
+                    '<!-- This is an auto-generated comment: review in progress by coderabbit.ai -->\n\n> [!NOTE]\n> Reviewing.',
+                ),
+            ).toBe('ignore:in-progress');
+            expect(
+                created(
+                    '> [!NOTE]\n> Currently processing new changes in this PR. This may take a few minutes, please wait...',
+                ),
+            ).toBe('ignore:in-progress');
+        });
+
+        it('treats the CodeRabbit summary comment as chatter whatever it says — findings never live there', () => {
+            const summary =
+                '<!-- This is an auto-generated comment: summarize by coderabbit.ai -->';
+            expect(created(`${summary}\n\n## Walkthrough\n\nAdds severity.`)).toBe(
+                'ignore:summary',
+            );
+            expect(
+                created(
+                    `${summary}\n\nNo actionable comments were generated in the recent review. 🎉`,
+                ),
+            ).toBe('ignore:nothing-actionable');
+            expect(
+                created(
+                    `${summary}\n<!-- This is an auto-generated comment: skip review by coderabbit.ai -->\n\n> ## Review skipped`,
+                ),
+            ).toBe('ignore:status');
+            expect(
+                created(
+                    `${summary}\n<!-- This is an auto-generated comment: rate limited by coderabbit.ai -->\n\n> ## Review limit reached`,
+                ),
+            ).toBe('ignore:rate-limited');
+        });
+
+        it('only an ack WITHOUT an analysis is a command acknowledgement', () => {
+            const ack =
+                '<details>\n<summary>⚠️ Action not completed</summary>\n\nReview rate limited.\n\n</details>';
+            expect(created(`<!-- This is an auto-generated reply by CodeRabbit -->\n${ack}`)).toBe(
+                'ignore:command-ack',
+            );
+            expect(
+                created(
+                    `<details>\n<summary>🧩 Analysis chain</summary>\n\nscript\n\n</details>\n\nThe retry loop still never backs off.\n\n${ack}`,
+                ),
+            ).toBe('findings');
+        });
+
+        it('a Greptile summary is a finding only when it carries a P-badge', () => {
+            const head = '<!-- greptile_summary -->\n\n<h2>Confidence Score: 3/5</h2>\n\n';
+            expect(created(`${head}This PR is safe to merge.`)).toBe('ignore:summary');
+            expect(
+                created(
+                    `${head}<h2>Findings</h2>\n\n1. <img alt="P1" src="p1.svg" align="top">&nbsp;**Older platforms reject enrollment**`,
+                ),
+            ).toBe('findings');
+            // The Retrigger button is an <img> too — not a badge.
+            expect(created(`${head}<img alt="Retrigger" src="Retrigger.svg" align="right">`)).toBe(
+                'ignore:summary',
+            );
+        });
+
+        it('a TREX run is a finding unless it found nothing or could not run', () => {
+            const head = '<!-- greptile_trex_summary -->\n\n<h2>TREX</h2>\n\n';
+            expect(created(`${head}Tested 1 flow, found no issues.`)).toBe('ignore:summary');
+            expect(created(`${head}No flows tested, and faced 2 obstacles.`)).toBe(
+                'ignore:summary',
+            );
+            expect(created(`${head}Tested 2 flows, found 1 issue.\n\n- **Fail** — Login`)).toBe(
+                'findings',
+            );
+        });
+
+        it('never guesses from prose — an inline finding that MENTIONS these words is still a finding', () => {
+            for (const body of [
+                'The walkthrough in docs/fleet.md still says affinity has no UI.',
+                'This retry ignores the rate limit header, so a 429 is retried at once.',
+                'Review in progress states are never cleared when the job is cancelled.',
+                'The summary row drops the actionable comments count.',
+                '_🔒 Security & Privacy_ | _🟠 Major_ | _⚡ Quick win_\n\n**No actionable comments were generated** is printed even on failure.',
+            ]) {
+                expect(created(body)).toBe('findings');
+            }
+        });
+
+        it('keeps every real inline finding shape as a finding', () => {
+            for (const body of [
+                reviewBotCommentFixture('coderabbit-inline-major-finding').body,
+                reviewBotCommentFixture('greptile-inline-p2-finding').body,
+                '**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Cast metadata before using JSON operator**\n\nOn the Postgres schema…',
+                'The retry loop never backs off, so a flaky provider is hammered.',
+            ]) {
+                expect(created(body)).toBe('findings');
+            }
+        });
+
+        it('⭐ an edit is never a new finding — whatever the body now says', () => {
+            for (const action of ['edited', 'deleted', 'EDITED', '', undefined, null]) {
+                for (const fixture of reviewBotCommentFixtures()) {
+                    expect(classifyReviewBotComment({ action, body: fixture.body })).toEqual({
+                        kind: 'ignore',
+                        reason: 'not-created',
+                    });
+                }
+            }
+            // …while `created` is matched without regard to case or padding.
+            expect(created(reviewBotCommentFixture('coderabbit-inline-major-finding').body)).toBe(
+                'findings',
+            );
+            expect(
+                label(
+                    classifyReviewBotComment({
+                        action: ' Created ',
+                        body: 'The retry loop never backs off.',
+                    }),
+                ),
+            ).toBe('findings');
+        });
+
+        it('falls back to the existing status filter, and to "nothing left once stripped"', () => {
+            expect(created('**Actionable comments posted: 0**')).toBe('ignore:nothing-actionable');
+            expect(created('<!-- greptile-status -->\nToo many files changed for review.')).toBe(
+                'ignore:status',
+            );
+            expect(created('You have reached your Codex usage limits for code reviews.')).toBe(
+                'ignore:rate-limited',
+            );
+            expect(created('<!-- x -->\n<details>\n<summary>y</summary>\nz\n</details>')).toBe(
+                'ignore:empty',
+            );
+            expect(created('')).toBe('ignore:empty');
+            expect(created(undefined)).toBe('ignore:empty');
         });
     });
 

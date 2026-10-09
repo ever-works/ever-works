@@ -29,6 +29,15 @@
  *
  * `P1` (and `P0`) map to `critical`, `P2` to `major`, `P3` to `minor`, so
  * "P2+" is exactly `critical | major` on every bot.
+ *
+ * ## Which comments are findings
+ *
+ * Being allow-listed says who may speak, not that everything said is a
+ * finding. {@link classifyReviewBotComment} decides whether one trusted
+ * bot COMMENT is review feedback at all — CodeRabbit's "review in
+ * progress" placeholder, its walkthrough summary, command
+ * acknowledgements and limit notices are not, and each one recorded is a
+ * full model run on a fleet PC.
  */
 
 export type ReviewBotSeverity = 'critical' | 'major' | 'minor';
@@ -126,16 +135,26 @@ export function parseReviewBotSeverity(body: string | null | undefined): ReviewB
 }
 
 /**
+ * The review / usage LIMIT notices among the status chatter below, named
+ * on their own so {@link classifyReviewBotComment} can say which kind of
+ * chatter it saw. {@link NOISE_MARKERS} spreads this list, so the two
+ * cannot drift apart.
+ */
+const RATE_LIMIT_MARKERS: readonly RegExp[] = [
+    /rate limited by coderabbit\.ai/i,
+    /^\s*>?\s*#{1,6}\s*Review limit reached/im,
+    /reached your Codex usage limits/i,
+];
+
+/**
  * Status chatter the bots post that carries no finding: rate-limit
  * notices, "too many files" refusals, usage-cap messages. Recording these
  * would seed a resumed run with an instruction to do nothing.
  */
 const NOISE_MARKERS: readonly RegExp[] = [
-    /rate limited by coderabbit\.ai/i,
-    /^\s*>?\s*#{1,6}\s*Review limit reached/im,
+    ...RATE_LIMIT_MARKERS,
     /<!--\s*greptile-status\s*-->/i,
     /Too many files changed for review/i,
-    /reached your Codex usage limits/i,
 ];
 
 /** `**Actionable comments posted: 0**` with nothing else left to say. */
@@ -205,4 +224,182 @@ export function formatInlineFinding(
     const line = comment.line ?? comment.original_line;
     const location = typeof line === 'number' ? `${path}:${line}` : path;
     return `${location} — ${body}`;
+}
+
+/**
+ * Why a trusted reviewer bot's COMMENT was not recorded as rejection
+ * feedback (and must not wake the fix loop). See
+ * {@link classifyReviewBotComment}.
+ *
+ *   * `not-created`        — an `edited` / `deleted` delivery. A finding is
+ *                            new exactly once, when it is created; the bots
+ *                            edit the SAME comment over and over (CodeRabbit
+ *                            rewrites its summary on every push), and each
+ *                            edit recorded would be a duplicate row and a
+ *                            duplicate model run.
+ *   * `in-progress`        — CodeRabbit's "Currently processing new
+ *                            changes" placeholder.
+ *   * `nothing-actionable` — "No actionable comments were generated".
+ *   * `rate-limited`       — a review / usage limit notice.
+ *   * `command-ack`        — CodeRabbit acknowledging an `@coderabbitai`
+ *                            command ("Review finished", "Review rate
+ *                            limited", "Already reviewed the last commit").
+ *   * `summary`            — a walkthrough / summary / test-run digest that
+ *                            carries no finding of its own.
+ *   * `status`             — other status chatter (review skipped, too many
+ *                            files, the bot's own failure notice).
+ *   * `empty`              — nothing left once presentation markup is
+ *                            stripped.
+ */
+export type ReviewBotCommentIgnoreReason =
+    | 'not-created'
+    | 'in-progress'
+    | 'nothing-actionable'
+    | 'rate-limited'
+    | 'command-ack'
+    | 'summary'
+    | 'status'
+    | 'empty';
+
+export type ReviewBotCommentVerdict =
+    | { readonly kind: 'findings' }
+    | { readonly kind: 'ignore'; readonly reason: ReviewBotCommentIgnoreReason };
+
+/**
+ * CodeRabbit stamps every machine-generated block with an HTML comment of
+ * the form `<!-- This is an auto-generated comment: <kind> by coderabbit.ai -->`.
+ * Those markers — not the prose around them, which CodeRabbit rewords
+ * freely — are what the classifier keys on.
+ */
+function coderabbitMarker(kind: string): RegExp {
+    return new RegExp(
+        `<!--\\s*This is an auto-generated comment: ${kind} by coderabbit\\.ai\\s*-->`,
+        'i',
+    );
+}
+
+/** The per-PR summary comment CodeRabbit creates once and edits forever. */
+const CODERABBIT_SUMMARY = coderabbitMarker('summarize');
+
+/** Its first revision: the "review in progress" placeholder. */
+const CODERABBIT_IN_PROGRESS = coderabbitMarker('review in progress');
+
+/** …and the visible sentence inside it, should the marker ever be dropped. */
+const CODERABBIT_IN_PROGRESS_TEXT = /Currently processing new changes in this PR\b/i;
+
+/** A review skipped on purpose (draft PR, non-default base branch, …). */
+const CODERABBIT_SKIPPED = coderabbitMarker('skip review');
+
+/** The summary's verdict when the review produced nothing to fix. */
+const CODERABBIT_NOTHING_ACTIONABLE = /\bNo actionable comments were generated\b/i;
+
+/** A plan-level limit notice posted as a reply instead of a review. */
+const CODERABBIT_PLAN_LIMIT = /\bincludes PR reviews subject to \[?rate limits\b/i;
+
+/**
+ * CodeRabbit answering a command collapses its verdict into
+ * `<summary>✅ Action performed</summary>` or
+ * `<summary>⚠️ Action not completed</summary>`.
+ */
+const CODERABBIT_COMMAND_ACK = /<summary>[^<]*\bAction (?:performed|not completed)\s*<\/summary>/i;
+
+/**
+ * A chat answer that actually reasoned about the code carries a
+ * `<summary>🧩 Analysis chain</summary>` block; it may END with a command
+ * acknowledgement, and it is still an answer, so it is never an ack.
+ */
+const CODERABBIT_ANALYSIS = /<summary>[^<]*\bAnalysis chain\s*<\/summary>/i;
+
+/** Greptile's per-PR summary comment (edited on every review). */
+const GREPTILE_SUMMARY = /<!--\s*greptile_summary\s*-->/i;
+
+/** Greptile's TREX (test-run) summary comment. */
+const GREPTILE_TREX_SUMMARY = /<!--\s*greptile_trex_summary\s*-->/i;
+
+/** A TREX run that found nothing to fix, or could not run at all. */
+const GREPTILE_TREX_NOTHING = /\b(?:found no issues|No flows tested)\b/i;
+
+/** A Greptile finding badge anywhere in the body (`<img alt="P1" …>`). */
+const GREPTILE_FINDING_BADGE = /<img\b[^>]*\balt="P[0-3]"/i;
+
+/**
+ * Does this trusted reviewer bot's COMMENT carry a review finding?
+ *
+ * The bridge used to record every allow-listed bot comment that survived
+ * the status-chatter filter, and on 2026-10-09 the first fleet-made PR
+ * (ever-works/ever-works#2575) paid for it: CodeRabbit's automatic
+ * "Currently processing new changes in this PR" placeholder became a
+ * rejection row, the fix loop resumed the agent on a fleet PC, and the
+ * agent correctly concluded there was nothing to do. A full model run for
+ * a progress bar — and Greptile's "safe to merge" summary on the same PR
+ * was the same shape.
+ *
+ * So the rule is the other way round now: a bot comment is feedback only
+ * when it is a NEW comment that is not one of the bots' own machine
+ * shapes. Everything below was read off this repository's PR history with
+ * `gh api` (issue comments, inline comments, and the GraphQL
+ * `userContentEdits` history of the #2575 summary); the fixture corpus in
+ * `__fixtures__/review-bot-comments.json` is the literal set.
+ *
+ * What is deliberately NOT here: a guess from prose. An inline finding
+ * that happens to say "walkthrough" or "rate limit" is still a finding —
+ * only the bots' machine markers, and a handful of fixed sentences they
+ * print verbatim, can make a comment chatter. Unknown shapes from a
+ * trusted bot stay findings, exactly as before.
+ *
+ * Pure: a function of the delivery's `action` and the comment body.
+ */
+export function classifyReviewBotComment(input: {
+    action?: string | null;
+    body?: string | null;
+}): ReviewBotCommentVerdict {
+    const ignore = (reason: ReviewBotCommentIgnoreReason): ReviewBotCommentVerdict => ({
+        kind: 'ignore',
+        reason,
+    });
+
+    // A finding is new once. Every later delivery for the same comment
+    // id is an edit of something already seen (or never worth seeing).
+    if ((input.action ?? '').trim().toLowerCase() !== 'created') return ignore('not-created');
+
+    const body = input.body ?? '';
+
+    // The placeholder is checked FIRST: its first revision also carries
+    // the summary marker, and "in progress" is the more precise reason.
+    if (CODERABBIT_IN_PROGRESS.test(body) || CODERABBIT_IN_PROGRESS_TEXT.test(body)) {
+        return ignore('in-progress');
+    }
+    if (
+        RATE_LIMIT_MARKERS.some((marker) => marker.test(body)) ||
+        CODERABBIT_PLAN_LIMIT.test(body)
+    ) {
+        return ignore('rate-limited');
+    }
+    if (CODERABBIT_COMMAND_ACK.test(body) && !CODERABBIT_ANALYSIS.test(body)) {
+        return ignore('command-ack');
+    }
+    if (CODERABBIT_SUMMARY.test(body)) {
+        if (CODERABBIT_NOTHING_ACTIONABLE.test(body)) return ignore('nothing-actionable');
+        if (CODERABBIT_SKIPPED.test(body)) return ignore('status');
+        // A walkthrough, a pre-merge check table, a merge-risk note, a
+        // tool-failure appendix: CodeRabbit's findings arrive as review
+        // comments, never inside this one.
+        return ignore('summary');
+    }
+    // Greptile's summary restates its inline findings with a P-badge each
+    // (and those inline comments are recorded on their own); one with no
+    // badge at all is a "safe to merge" digest.
+    if (GREPTILE_SUMMARY.test(body) && !GREPTILE_FINDING_BADGE.test(body)) {
+        return ignore('summary');
+    }
+    if (GREPTILE_TREX_SUMMARY.test(body) && GREPTILE_TREX_NOTHING.test(body)) {
+        return ignore('summary');
+    }
+    if (isReviewBotNoise(body)) {
+        return NOTHING_ACTIONABLE.test(stripReviewBotMarkup(body))
+            ? ignore('nothing-actionable')
+            : ignore('status');
+    }
+    if (stripReviewBotMarkup(body).length === 0) return ignore('empty');
+    return { kind: 'findings' };
 }
