@@ -3304,7 +3304,7 @@
                     "breakdown": "{members} people · {agents} agents",
                     "included": "{included} included + {purchased} added",
                     "totalLabel": "Total seats",
-                    "price": "{price} per additional seat / month",
+                    "price": "Chaque membre supplémentaire - {price} par mois.",
                     "notManageable": "Seats are adjusted on a paid plan once card payments are enabled.",
                     "save": "Save",
                     "saved": "Seats updated",
