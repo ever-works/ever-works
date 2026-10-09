@@ -388,6 +388,21 @@ describe('github-review-bots', () => {
             ).toBe('ignore:in-progress');
         });
 
+        it('the sentence alone counts only as the first line of a `> [!NOTE]` callout, never as a quote', () => {
+            // CodeRabbit's risk note on this PR: a substantive finding that
+            // block-quotes the sentence must not be silenced by it.
+            expect(
+                created(
+                    '_🟠 Major_\n\nThe classifier silences any comment whose line reads\n\n> Currently processing new changes in this PR\n\neven when a real finding precedes it.',
+                ),
+            ).toBe('findings');
+            expect(
+                created(
+                    '_🟠 Major_\n\n> [!WARNING]\n> Currently processing new changes in this PR is matched too broadly.',
+                ),
+            ).toBe('findings');
+        });
+
         it('treats the CodeRabbit summary comment as chatter whatever it says — findings never live there', () => {
             const summary =
                 '<!-- This is an auto-generated comment: summarize by coderabbit.ai -->';

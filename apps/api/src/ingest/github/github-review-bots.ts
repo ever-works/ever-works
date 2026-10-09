@@ -366,13 +366,14 @@ const CODERABBIT_SUMMARY = coderabbitMarker('summarize');
 const CODERABBIT_IN_PROGRESS = coderabbitMarker('review in progress');
 
 /**
- * …and the visible sentence inside it, should the marker ever be dropped.
- * Anchored to the start of a (block-quoted) line, the way CodeRabbit
- * prints it, so a finding that QUOTES the sentence mid-line — a review of
- * this very classifier, say — is not mistaken for the placeholder.
+ * …and the visible sentence inside it, should the marker ever be dropped —
+ * matched only in the exact shape CodeRabbit prints: the first line of a
+ * `> [!NOTE]` callout. A finding that QUOTES the sentence — mid-line, in
+ * its own `>` block quote, or in a code sample — is therefore not
+ * mistaken for the placeholder.
  */
 const CODERABBIT_IN_PROGRESS_TEXT = new RegExp(
-    `${LINE_START}Currently processing new changes in this PR\\b`,
+    `${LINE_START}\\[!NOTE\\][ \\t]*\\r?\\n${LINE_START}Currently processing new changes in this PR\\b`,
     'im',
 );
 
