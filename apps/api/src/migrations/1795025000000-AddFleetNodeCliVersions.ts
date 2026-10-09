@@ -28,8 +28,8 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * (never a raw `ALTER TABLE ... DROP COLUMN`, which sqlite only learned in
  * 3.35 and which desynchronises the query runner's metadata).
  */
-export class AddFleetNodeCliVersions1795020000000 implements MigrationInterface {
-    name = 'AddFleetNodeCliVersions1795020000000';
+export class AddFleetNodeCliVersions1795025000000 implements MigrationInterface {
+    name = 'AddFleetNodeCliVersions1795025000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const nodes = await queryRunner.getTable('fleet_nodes');

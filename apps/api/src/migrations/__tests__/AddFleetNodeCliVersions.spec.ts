@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AddFleetNodeCliVersions1795020000000 } from '../1795020000000-AddFleetNodeCliVersions';
+import { AddFleetNodeCliVersions1795025000000 } from '../1795025000000-AddFleetNodeCliVersions';
 
 /**
  * Migration test for the pinned model-CLI versions (self-build slice AR).
@@ -9,9 +9,9 @@ import { AddFleetNodeCliVersions1795020000000 } from '../1795020000000-AddFleetN
  * — the PHYSICAL schema — rather than the query runner's own metadata,
  * which a raw `DROP COLUMN` can desynchronise.
  */
-describe('AddFleetNodeCliVersions1795020000000', () => {
+describe('AddFleetNodeCliVersions1795025000000', () => {
     let dataSource: DataSource;
-    const migration = new AddFleetNodeCliVersions1795020000000();
+    const migration = new AddFleetNodeCliVersions1795025000000();
 
     const physicalColumns = async (): Promise<
         Array<{ name: string; type: string; notnull: number; dflt_value: string | null }>
