@@ -1,5 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Logger, UnauthorizedException } from '@nestjs/common';
+import { AxiosError } from 'axios';
+import { of, throwError } from 'rxjs';
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
+import { GitHubAppService } from './github-app.service';
 
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
@@ -274,6 +277,265 @@ describe('GitHubAppOnboardingService', () => {
                 'user-2',
                 'gh-user-2',
             );
+        });
+
+        // Prod 2026-10-09 — the App had no "Email addresses: read" permission, so
+        // the email is the unverified public profile email. Identity must come
+        // from the GitHub user id, never from that email.
+        describe('identity resolution with an UNVERIFIED (profile-fallback) email', () => {
+            const installation = {
+                id: 'installation-row-1',
+                installationId: '12345',
+                accountLogin: 'acme',
+                accountType: 'Organization',
+                targetType: 'Organization',
+            };
+            const existingUser = {
+                id: 'user-owner',
+                username: 'owner',
+                email: 'owner@example.com',
+                emailVerified: true,
+                registrationProvider: 'github',
+                avatar: null,
+            };
+
+            const arrange = (overrides: { githubUserId?: string } = {}) => {
+                const ctx = createService();
+                const state = (ctx.service as any).signState({
+                    installationId: '12345',
+                    issuedAt: Date.now(),
+                });
+                ctx.gitHubAppService.exchangeUserCode.mockResolvedValue({
+                    access_token: 'ghu_token',
+                    scope: '',
+                });
+                ctx.gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                    githubUserId: overrides.githubUserId ?? '4242',
+                    login: 'octo-owner',
+                    email: 'owner@example.com',
+                    emailVerified: false,
+                    avatarUrl: null,
+                    nodeId: 'NODE_4242',
+                });
+                ctx.gitHubAppService.getInstallation.mockResolvedValue({
+                    id: 12345,
+                    app_slug: 'ever-works',
+                    account: { login: 'acme', type: 'Organization' },
+                    target_type: 'Organization',
+                });
+                ctx.installationRepository.upsertFromGithub.mockResolvedValue(installation);
+                ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(
+                    installation,
+                );
+                ctx.userRepository.update.mockImplementation(async (id: string, patch: object) => ({
+                    ...existingUser,
+                    ...patch,
+                    id,
+                }));
+                return { ...ctx, state };
+            };
+
+            it('resolves the user via the `github` auth account (accountId = GitHub id) before any email lookup', async () => {
+                const ctx = arrange();
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+                ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue({
+                    userId: existingUser.id,
+                    providerId: 'github',
+                    accountId: '4242',
+                });
+                ctx.userRepository.findById.mockResolvedValue(existingUser);
+
+                const result = await ctx.service.completeUserAuth({
+                    code: 'code',
+                    state: ctx.state,
+                });
+
+                expect(
+                    ctx.authAccountRepository.findProviderAccountByAccountId,
+                ).toHaveBeenCalledWith('github', '4242');
+                expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+                expect(result.user.id).toBe(existingUser.id);
+                // An unverified email never downgrades an already-verified account.
+                expect(ctx.userRepository.update).toHaveBeenCalledWith(
+                    existingUser.id,
+                    expect.objectContaining({ emailVerified: true }),
+                );
+                expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                    '12345',
+                    existingUser.id,
+                    '4242',
+                );
+            });
+
+            it('resolves the user via the GitHub App user link first (no auth-account or email lookup)', async () => {
+                const ctx = arrange();
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue({
+                    userId: existingUser.id,
+                    githubUserId: '4242',
+                });
+                ctx.userRepository.findById.mockResolvedValue(existingUser);
+
+                const result = await ctx.service.completeUserAuth({
+                    code: 'code',
+                    state: ctx.state,
+                });
+
+                expect(result.user.id).toBe(existingUser.id);
+                expect(
+                    ctx.authAccountRepository.findProviderAccountByAccountId,
+                ).not.toHaveBeenCalled();
+                expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+            });
+
+            it('never creates a duplicate user when the `github` auth account exists but its user cannot be loaded', async () => {
+                const ctx = arrange();
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+                ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue({
+                    userId: 'user-gone',
+                    providerId: 'github',
+                    accountId: '4242',
+                });
+                ctx.userRepository.findById.mockResolvedValue(null);
+                ctx.userRepository.findByEmail.mockResolvedValue(null);
+
+                await expect(
+                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                ).rejects.toBeInstanceOf(ConflictException);
+
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+                expect(ctx.authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
+                expect(ctx.userLinkRepository.upsertLink).not.toHaveBeenCalled();
+                expect(
+                    ctx.installationRepository.claimOwnershipIfUnassigned,
+                ).not.toHaveBeenCalled();
+            });
+
+            it('still refuses to LINK the unverified email to an existing user with no GitHub identity', async () => {
+                const ctx = arrange();
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+                ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+                ctx.userRepository.findByEmail.mockResolvedValue({
+                    ...existingUser,
+                    registrationProvider: 'local',
+                });
+
+                await expect(
+                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                ).rejects.toBeInstanceOf(UnauthorizedException);
+
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+                expect(ctx.authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
+            });
+
+            it('creates a fresh user with emailVerified=false for a never-seen GitHub id', async () => {
+                const ctx = arrange({ githubUserId: '9999' });
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+                ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+                ctx.userRepository.findByEmail.mockResolvedValue(null);
+                ctx.userRepository.create.mockImplementation(async (data: object) => ({
+                    id: 'user-new',
+                    ...data,
+                }));
+
+                const result = await ctx.service.completeUserAuth({
+                    code: 'code',
+                    state: ctx.state,
+                });
+
+                expect(ctx.userRepository.create).toHaveBeenCalledTimes(1);
+                expect(ctx.userRepository.create).toHaveBeenCalledWith(
+                    expect.objectContaining({ email: 'owner@example.com', emailVerified: false }),
+                );
+                expect(result.user.id).toBe('user-new');
+            });
+        });
+
+        // Incident replay through the REAL GitHubAppService: /user/emails answers
+        // 403 (App installed without "Email addresses: read"). The callback must
+        // complete and claim the installation for the owner's existing account.
+        it('incident replay: /user/emails 403 no longer fails the callback; the installation is claimed', async () => {
+            const ctx = createService();
+            const httpService = { get: jest.fn(), post: jest.fn() };
+            const realGitHubAppService = new GitHubAppService(httpService as any);
+            jest.spyOn(realGitHubAppService, 'exchangeUserCode').mockResolvedValue({
+                access_token: 'ghu_token',
+            });
+            jest.spyOn(realGitHubAppService, 'getInstallation').mockResolvedValue({
+                id: 169597044,
+                app_slug: 'ever-works',
+                account: { login: 'ever-co', type: 'Organization' },
+                target_type: 'Organization',
+            });
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
+            httpService.get
+                .mockReturnValueOnce(
+                    of({
+                        data: { id: 4242, login: 'octo-owner', email: 'owner@example.com' },
+                    }),
+                )
+                .mockReturnValueOnce(
+                    throwError(
+                        () =>
+                            new AxiosError(
+                                'Request failed with status code 403',
+                                AxiosError.ERR_BAD_REQUEST,
+                                undefined,
+                                {},
+                                {
+                                    status: 403,
+                                    statusText: 'Forbidden',
+                                    data: { message: 'Resource not accessible by integration' },
+                                    headers: {},
+                                    config: { headers: {} } as never,
+                                },
+                            ),
+                    ),
+                );
+            const service = new GitHubAppOnboardingService(
+                realGitHubAppService,
+                ctx.installationRepository as any,
+                ctx.userLinkRepository as any,
+                ctx.authAccountRepository as any,
+                ctx.userRepository as any,
+                ctx.usernameAllocator as any,
+            );
+            const owner = { id: 'user-owner', username: 'owner', emailVerified: true };
+            const claimed = { id: 'row-1', installationId: '169597044' };
+            ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+            ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue({
+                userId: owner.id,
+            });
+            ctx.userRepository.findById.mockResolvedValue(owner);
+            ctx.userRepository.update.mockResolvedValue(owner);
+            ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(claimed);
+
+            try {
+                const result = await service.completeUserAuth({
+                    code: 'code',
+                    state: (service as any).signState({
+                        installationId: '169597044',
+                        issuedAt: Date.now(),
+                    }),
+                });
+
+                expect(result.installation).toBe(claimed);
+                expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                    '169597044',
+                    owner.id,
+                    '4242',
+                );
+                expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Email addresses: read'),
+                );
+            } finally {
+                warnSpy.mockRestore();
+            }
         });
     });
 });

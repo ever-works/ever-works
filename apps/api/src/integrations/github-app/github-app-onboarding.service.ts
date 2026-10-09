@@ -5,7 +5,12 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import { GitHubAppInstallation, User } from '@ever-works/agent/entities';
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { config } from '@src/config/constants';
 import * as bcrypt from 'bcrypt';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -129,6 +134,12 @@ export class GitHubAppOnboardingService {
         scope: string | null;
         nodeId: string | null;
     }) {
+        // Identity resolution order matters: the GitHub user id is the only
+        // identifier GitHub guarantees, so the App user link and the `github`
+        // auth account (accountId = GitHub user id, written by both this flow
+        // and the OAuth sign-in) are consulted BEFORE any email. The email path
+        // below is reached only for a GitHub id we have never seen, and it can
+        // never link an unverified email to an existing user.
         const existingLink = await this.gitHubAppUserLinkRepository.findByGithubUserId(
             input.githubUserId,
         );
@@ -142,6 +153,16 @@ export class GitHubAppOnboardingService {
                 );
             if (existingAuthAccount) {
                 user = await this.userRepository.findById(existingAuthAccount.userId);
+                if (!user) {
+                    // This GitHub id is already bound to a local account we cannot
+                    // load. Falling through would create a second user for the
+                    // same GitHub identity (and then fail the provider-account
+                    // upsert with a conflict, leaving that user orphaned) — refuse
+                    // before anything is written.
+                    throw new ConflictException(
+                        'This GitHub account is linked to a local account that could not be loaded',
+                    );
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import {
     createGitHubAppJwt,
     createGitHubAppHeaders,
@@ -58,6 +58,8 @@ type GitHubUserResponse = {
 
 @Injectable()
 export class GitHubAppService {
+    private readonly logger = new Logger(GitHubAppService.name);
+
     constructor(private readonly httpService: HttpService) {}
 
     getConfiguration() {
@@ -124,10 +126,18 @@ export class GitHubAppService {
             this.httpService.get<GitHubUserResponse>('https://api.github.com/user', { headers }),
         );
 
+        // A GitHub App user-to-server token can only read `/user/emails` when the
+        // App requests the account permission "Email addresses: read". Without it
+        // GitHub answers 403/404 — degrade to the (unverified) profile email rather
+        // than failing the whole installation callback. The onboarding service
+        // resolves the user by GitHub id first and never links an unverified email
+        // to an existing account (2026-10-09 prod incident: the callback 5xx'd and
+        // the installation stayed unclaimed).
         const { email, emailVerified } = await resolveGitHubAccountEmail(
             this.httpService,
             accessToken,
             data.email || null,
+            { allowMissingEmailPermission: true, logger: this.logger },
         );
 
         return {

@@ -1,6 +1,7 @@
-import { of } from 'rxjs';
+import { AxiosError } from 'axios';
+import { of, throwError } from 'rxjs';
 import { GitHubAppService } from './github-app.service';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/common';
 
 describe('GitHubAppService', () => {
     const createService = () => {
@@ -47,6 +48,112 @@ describe('GitHubAppService', () => {
             await expect(service.exchangeUserCode('bad-code')).rejects.toBeInstanceOf(
                 BadRequestException,
             );
+        });
+    });
+
+    // Prod 2026-10-09: the App was installed without the account permission
+    // "Email addresses: read", GET /user/emails answered 403, and the whole
+    // installation callback failed — the installation stayed unclaimed.
+    describe('getAuthenticatedGithubUser', () => {
+        const axiosHttpError = (status: number) =>
+            new AxiosError(
+                `Request failed with status code ${status}`,
+                AxiosError.ERR_BAD_REQUEST,
+                { headers: {} } as never,
+                {},
+                {
+                    status,
+                    statusText: 'error',
+                    data: { message: 'Resource not accessible by integration' },
+                    headers: {},
+                    config: { headers: {} } as never,
+                },
+            );
+        const githubProfile = {
+            id: 4242,
+            login: 'octo-owner',
+            name: 'Octo Owner',
+            email: 'owner@example.com',
+            avatar_url: 'https://avatars.example.com/u/4242',
+            node_id: 'MDQ6VXNlcjQyNDI=',
+        };
+
+        let warnSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+            warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            warnSpy.mockRestore();
+        });
+
+        it.each([403, 404])(
+            'degrades a %i from /user/emails to the UNVERIFIED profile email instead of failing',
+            async (status) => {
+                const { service, httpService } = createService();
+                httpService.get
+                    .mockReturnValueOnce(of({ data: githubProfile }))
+                    .mockReturnValueOnce(throwError(() => axiosHttpError(status)));
+
+                const user = await service.getAuthenticatedGithubUser('ghu_user_token');
+
+                expect(user).toEqual(
+                    expect.objectContaining({
+                        githubUserId: '4242',
+                        login: 'octo-owner',
+                        email: 'owner@example.com',
+                        emailVerified: false,
+                    }),
+                );
+                expect(httpService.get).toHaveBeenNthCalledWith(
+                    2,
+                    'https://api.github.com/user/emails',
+                    expect.anything(),
+                );
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Email addresses: read'),
+                );
+            },
+        );
+
+        it('still fails on a 5xx from /user/emails (a broken upstream is not a missing permission)', async () => {
+            const { service, httpService } = createService();
+            const upstream = new AxiosError(
+                'boom',
+                AxiosError.ERR_BAD_RESPONSE,
+                undefined,
+                {},
+                {
+                    status: 502,
+                    statusText: 'error',
+                    data: {},
+                    headers: {},
+                    config: { headers: {} } as never,
+                },
+            );
+            httpService.get
+                .mockReturnValueOnce(of({ data: githubProfile }))
+                .mockReturnValueOnce(throwError(() => upstream));
+
+            await expect(service.getAuthenticatedGithubUser('ghu_user_token')).rejects.toBe(
+                upstream,
+            );
+        });
+
+        it('returns the verified email when the App can read /user/emails', async () => {
+            const { service, httpService } = createService();
+            httpService.get.mockReturnValueOnce(of({ data: githubProfile })).mockReturnValueOnce(
+                of({
+                    data: [{ email: 'owner@example.com', primary: true, verified: true }],
+                }),
+            );
+
+            const user = await service.getAuthenticatedGithubUser('ghu_user_token');
+
+            expect(user.email).toBe('owner@example.com');
+            expect(user.emailVerified).toBe(true);
+            expect(warnSpy).not.toHaveBeenCalled();
         });
     });
 
