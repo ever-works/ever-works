@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runAgentTaskJob, type AgentTaskIo, type AgentTaskScratchFs } from './agent-task';
 import type { AgentTaskQuestionFs } from './agent-task-question';
 import type { McpLoopbackProxy } from './mcp-bridge';
-import { MODEL_CLI_EMPTY_MCP_CONFIG } from './model-cli';
+import { claudeManagedMcpConfigPath, MODEL_CLI_EMPTY_MCP_CONFIG } from './model-cli';
 
 /**
  * A fleet model run is isolated from the MACHINE OWNER's own MCP servers,
@@ -29,6 +29,9 @@ import { MODEL_CLI_EMPTY_MCP_CONFIG } from './model-cli';
  *      fails the job before anything is spawned.
  *   4. A run that cannot write the empty config does not run.
  *   5. Codex is unchanged (no supported switch — a documented gap).
+ *   6. A machine whose administrator deployed a Claude Code `managed-mcp.json`
+ *      (where the CLI exits at startup on the isolation flags) is refused
+ *      with a reason before the spawn — never run without the flags.
  */
 
 const stub = vi.hoisted(() => ({ dropIsolation: false }));
@@ -338,5 +341,104 @@ describe('runAgentTaskJob — MCP isolation from the machine owner’s servers',
 		expect(commands[0]).not.toContain('mcp');
 		expect(scratch.writes.some((write) => write.path.endsWith('mcp.json'))).toBe(false);
 		expect(spellings(envs[0], 'ENABLE_CLAUDEAI_MCP_SERVERS')).toEqual([]);
+	});
+});
+
+/**
+ * A machine whose administrator deployed Claude Code's `managed-mcp.json`.
+ * Under it the CLI takes exclusive control of MCP and exits at startup on
+ * `--mcp-config` / `--strict-mcp-config` (code.claude.com/docs/en/managed-mcp)
+ * — the two flags every fleet Claude Code run carries. The node refuses such
+ * a run with a reason before the spawn and never "falls back" to a run
+ * without the flags, which would load a server set the platform never vetted.
+ */
+describe('runAgentTaskJob — a machine with a Claude Code managed MCP config', () => {
+	const MANAGED_PATH = claudeManagedMcpConfigPath(process.platform);
+	const managedFs = (content: string | null | Error) => ({
+		readFile: vi.fn(async (path: string) => {
+			if (path !== MANAGED_PATH) return null;
+			if (content instanceof Error) throw content;
+			return content;
+		})
+	});
+
+	it('refuses the run naming the file, spawns nothing, and still removes scratch', async () => {
+		stub.dropIsolation = false;
+		const scratch = scratchFs();
+		const { commands, spawnFn } = recordingSpawn();
+		const fs = managedFs('{"mcpServers":{"github":{"type":"http","url":"https://example.com/mcp"}}}');
+
+		await expect(
+			runAgentTaskJob(job(basePayload), io({ spawnFn, scratchFs: scratch.fs, managedMcpConfigFs: fs }))
+		).rejects.toThrowError(/managed MCP configuration .*managed-mcp\.json.*Remove that file/s);
+		expect(fs.readFile).toHaveBeenCalledWith(MANAGED_PATH);
+		expect(commands).toHaveLength(0);
+		expect(scratch.removed.some((path) => path.startsWith(SCRATCH))).toBe(true);
+	});
+
+	it('refuses a bridge run too — and the bridge credential is still revoked', async () => {
+		stub.dropIsolation = false;
+		const { commands, spawnFn } = recordingSpawn();
+		const revoke = vi.fn(async () => undefined);
+
+		await expect(
+			runAgentTaskJob(
+				job({ ...basePayload, mcp: bridgeBlock }),
+				io({
+					spawnFn,
+					scratchFs: scratchFs().fs,
+					managedMcpConfigFs: managedFs('{"mcpServers":{}}'),
+					mcpBridge: {
+						mint: async () => ({ token: TOKEN, expiresAt: 'x', serverUrl: 'https://mcp.example.com/mcp' }),
+						start: proxyStart(),
+						revoke,
+						scheduleRenewal: () => ({ cancel: () => undefined })
+					}
+				})
+			)
+		).rejects.toThrowError(/managed MCP configuration/);
+		expect(commands).toHaveLength(0);
+		expect(revoke).toHaveBeenCalledWith('job-81');
+	});
+
+	it.each([[null], [''], ['not json'], ['[]']])(
+		'runs normally when the file is absent or not one the CLI would apply (%j)',
+		async (content) => {
+			stub.dropIsolation = false;
+			const { commands, spawnFn } = recordingSpawn();
+			const outcome = await runAgentTaskJob(
+				job(basePayload),
+				io({ spawnFn, scratchFs: scratchFs().fs, managedMcpConfigFs: managedFs(content) })
+			);
+			expect(outcome.status).toBe('succeeded');
+			expect(commands[0]).toMatch(STRICT_PAIR);
+		}
+	);
+
+	it('runs normally when the file cannot be read — the CLI cannot apply it either', async () => {
+		stub.dropIsolation = false;
+		const { commands, spawnFn } = recordingSpawn();
+		const outcome = await runAgentTaskJob(
+			job(basePayload),
+			io({
+				spawnFn,
+				scratchFs: scratchFs().fs,
+				managedMcpConfigFs: managedFs(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }))
+			})
+		);
+		expect(outcome.status).toBe('succeeded');
+		expect(commands[0]).toMatch(STRICT_PAIR);
+	});
+
+	it('never consults it for codex, which is not given the flags', async () => {
+		stub.dropIsolation = false;
+		const { commands, spawnFn } = recordingSpawn();
+		const fs = managedFs('{"mcpServers":{}}');
+		await runAgentTaskJob(
+			job({ ...basePayload, execution: { ...basePayload.execution, provider: 'codex' } }),
+			io({ spawnFn, scratchFs: scratchFs().fs, managedMcpConfigFs: fs })
+		);
+		expect(fs.readFile).not.toHaveBeenCalled();
+		expect(commands).toHaveLength(1);
 	});
 });

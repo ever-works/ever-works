@@ -741,6 +741,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// record then says the isolation was declined rather than
 						// silently claiming one that was never proved.
 						sessionConfigFs: defaultSessionConfigFs,
+						// The same read-only reader, for Claude Code's machine-wide
+						// `managed-mcp.json`: a machine that deploys one refuses
+						// every fleet Claude Code run with a reason instead of the
+						// CLI's startup exit. Wired here for the same reason as
+						// above — a hand-built `io` never reads a developer's PC.
+						managedMcpConfigFs: defaultSessionConfigFs,
 						// Self-build slice AU — this node's enrollment id, from the
 						// LOCAL config, so a job offering an earlier CLI session can
 						// tell whether that session lives on this machine. Never

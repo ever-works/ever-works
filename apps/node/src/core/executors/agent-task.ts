@@ -70,6 +70,8 @@ import {
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
+	claudeManagedMcpConfigInEffect,
+	claudeManagedMcpConfigPath,
 	ModelCliCommandError,
 	modelCliMcpIsolationEnv,
 	parseModelCliResult,
@@ -436,6 +438,16 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 * supplies its own so the check is deterministic.
 	 */
 	sessionConfigFs?: AgentTaskSessionConfigFs;
+	/**
+	 * Reads Claude Code's machine-wide `managed-mcp.json` (an enterprise
+	 * policy file) so a Claude Code run on a machine that deploys one is
+	 * refused with a reason BEFORE the spawn — the CLI itself exits at
+	 * startup on the `--mcp-config` / `--strict-mcp-config` every fleet run
+	 * carries. Reads only. Wired by the runtime to {@link defaultSessionConfigFs};
+	 * a hand-built `io` gets none and the check is skipped, which costs only
+	 * the message: the CLI still refuses the run on its own.
+	 */
+	managedMcpConfigFs?: AgentTaskSessionConfigFs;
 	/**
 	 * Self-build slice Q: reads / removes the owner-question file in the
 	 * worktree (and in writable mounts). Defaults to `node:fs`.
@@ -1251,6 +1263,13 @@ async function runModelStep(
 		// cannot be isolated does not run, exactly as a run whose instructions
 		// file cannot be written does not run. A bridge that degraded leaves
 		// `bridge.cli` null, so its run is isolated the same way.
+		//
+		// Refused up front, never "fallen back" from, on a machine whose
+		// administrator deployed a managed MCP config: Claude Code exits at
+		// startup on the isolation flags there, so the run could not start
+		// isolated — and starting it WITHOUT them would hand the model a
+		// server set the platform never vetted.
+		await refuseUnderClaudeManagedMcpConfig(execution.provider, io);
 		let emptyMcpConfigPath: string | undefined;
 		if (!bridge.cli && execution.provider === 'claude-code') {
 			await scratchFs.writeFile(mcpConfigPath, MODEL_CLI_EMPTY_MCP_CONFIG);
@@ -1377,6 +1396,50 @@ async function runModelStep(
 			);
 		}
 	}
+}
+
+/**
+ * Refuse a Claude Code run on a machine whose administrator deployed a
+ * managed MCP config (`managed-mcp.json`), naming the file and the way out.
+ *
+ * Under that file Claude Code takes exclusive control of MCP and exits at
+ * startup when a session passes `--mcp-config` or `--strict-mcp-config`
+ * (code.claude.com/docs/en/managed-mcp). Every fleet Claude Code run carries
+ * both — the empty strict config, or the bridge's — so such a run cannot
+ * start isolated. The CLI would refuse it anyway; this turns its startup
+ * exit into a reason an operator can act on. It does NOT fall back to a
+ * run without the flags: that run would load the managed server set, which
+ * the platform never vetted.
+ *
+ * Mirrors what the CLI applies: an absent, unreadable or unparseable file
+ * is not in effect for the CLI either, so it does not refuse here.
+ */
+async function refuseUnderClaudeManagedMcpConfig(
+	provider: FleetAgentExecutionProvider,
+	io: AgentTaskIo
+): Promise<void> {
+	if (provider !== 'claude-code') return;
+	const read = io.managedMcpConfigFs?.readFile?.bind(io.managedMcpConfigFs);
+	if (!read) return;
+	const path = claudeManagedMcpConfigPath(io.platform ?? process.platform);
+	let raw: string | null;
+	try {
+		raw = await read(path);
+	} catch (error) {
+		io.logger?.warn(
+			`[fleet-node] could not read ${path} to check for a managed MCP config; continuing, since Claude ` +
+				`Code cannot apply a file it cannot read: ${describeContainmentError(error)}`
+		);
+		return;
+	}
+	if (!claudeManagedMcpConfigInEffect(raw)) return;
+	throw new AgentTaskPayloadError(
+		`This machine deploys a Claude Code managed MCP configuration (${path}), which gives its ` +
+			'administrator exclusive control of MCP servers: Claude Code refuses the per-run --mcp-config / ' +
+			'--strict-mcp-config every fleet run needs to be isolated from MCP servers the platform did not ' +
+			'vet, and would exit at startup. Remove that file from this machine, or do not run claude-code ' +
+			'fleet jobs on it.'
+	);
 }
 
 /**

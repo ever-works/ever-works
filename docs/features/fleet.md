@@ -720,6 +720,14 @@ run whose command line does not carry that isolation. Your own interactive Claud
 unaffected. This matters most for an Agent allowed to skip permission prompts: without it, a
 prompt-injected run could call any of those tools with your credentials.
 
+A machine whose administrator deployed Claude Code's enterprise `managed-mcp.json`
+(`C:\Program Files\ClaudeCode\managed-mcp.json`, `/Library/Application Support/ClaudeCode/` or
+`/etc/claude-code/`) cannot run Claude Code fleet jobs: that file gives the administrator exclusive
+control of MCP, and Claude Code exits at startup when a session passes the per-run MCP config a fleet
+run needs. The node refuses such a run before starting the CLI and names the file, rather than
+running it without the isolation. Remove the file from that machine, or keep Claude Code fleet jobs
+off it.
+
 > **Codex is not isolated yet.** A Codex fleet run still loads the `[mcp_servers.*]` entries in that
 > machine's `~/.codex/config.toml` and the servers of enabled Codex plugins: Codex has no switch that
 > limits a run to the servers given on its command line, and the one option that drops them all

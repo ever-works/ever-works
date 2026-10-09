@@ -120,6 +120,40 @@ export function modelCliMcpIsolationEnv(provider: FleetAgentExecutionProvider): 
 	return provider === 'claude-code' ? { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } : null;
 }
 
+/**
+ * Where Claude Code looks for an enterprise `managed-mcp.json`
+ * (code.claude.com/docs/en/managed-mcp, "Deploy managed-mcp.json").
+ *
+ * A machine-wide, administrator-deployed file that takes EXCLUSIVE control
+ * of MCP. While a readable, parseable one is present, Claude Code "exits at
+ * startup" when given `--mcp-config` ("You cannot dynamically configure MCP
+ * servers when an enterprise MCP config is present") or
+ * `--strict-mcp-config` — the two flags every fleet Claude Code run now
+ * carries. See {@link claudeManagedMcpConfigInEffect}.
+ */
+export function claudeManagedMcpConfigPath(platform: NodeJS.Platform = process.platform): string {
+	if (platform === 'win32') return 'C:\\Program Files\\ClaudeCode\\managed-mcp.json';
+	if (platform === 'darwin') return '/Library/Application Support/ClaudeCode/managed-mcp.json';
+	return '/etc/claude-code/managed-mcp.json';
+}
+
+/**
+ * Whether the contents read from {@link claudeManagedMcpConfigPath} are a
+ * managed MCP config Claude Code would APPLY — i.e. one it can parse. The
+ * CLI only takes exclusive control for a file it "can read and parse"; an
+ * absent (`null`) or unparseable one is ignored by the CLI, so it is ignored
+ * here too rather than refusing a run that would have started.
+ */
+export function claudeManagedMcpConfigInEffect(raw: string | null): boolean {
+	if (typeof raw !== 'string' || !raw.trim()) return false;
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+	} catch {
+		return false;
+	}
+}
+
 export class ModelCliCommandError extends Error {
 	constructor(message: string) {
 		super(message);

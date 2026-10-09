@@ -6,6 +6,8 @@ import {
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
+	claudeManagedMcpConfigInEffect,
+	claudeManagedMcpConfigPath,
 	MODEL_CLI_EMPTY_MCP_CONFIG,
 	MODEL_CLI_STEP_ID,
 	ModelCliCommandError,
@@ -799,6 +801,27 @@ describe('modelCliMcpIsolationEnv / MODEL_CLI_EMPTY_MCP_CONFIG', () => {
 
 	it('the empty config declares no server at all', () => {
 		expect(JSON.parse(MODEL_CLI_EMPTY_MCP_CONFIG)).toEqual({ mcpServers: {} });
+	});
+});
+
+describe('claudeManagedMcpConfigPath / claudeManagedMcpConfigInEffect', () => {
+	it('names the documented machine-wide path on each platform', () => {
+		expect(claudeManagedMcpConfigPath('win32')).toBe('C:\\Program Files\\ClaudeCode\\managed-mcp.json');
+		expect(claudeManagedMcpConfigPath('darwin')).toBe('/Library/Application Support/ClaudeCode/managed-mcp.json');
+		expect(claudeManagedMcpConfigPath('linux')).toBe('/etc/claude-code/managed-mcp.json');
+	});
+
+	it.each([
+		['{"mcpServers":{}}', true],
+		['{ "mcpServers": { "github": { "type": "http", "url": "https://x" } } }', true],
+		[null, false],
+		['', false],
+		['   ', false],
+		['not json', false],
+		['[]', false],
+		['null', false]
+	])('treats %j as in effect: %s', (raw, expected) => {
+		expect(claudeManagedMcpConfigInEffect(raw)).toBe(expected);
 	});
 });
 
