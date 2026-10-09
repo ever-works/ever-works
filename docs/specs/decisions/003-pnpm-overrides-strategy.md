@@ -144,19 +144,21 @@ the root `package.json`. The bar is both of:
 2. The vulnerable code path is not reachable with attacker-controlled
    input in our usage.
 
-Current entries. The first two are `image-size`, reached via
-`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the next two are
-`extract-zip`, reached via `packages/plugins/opencode`; the last two are
-`http-cache-semantics` and `braces` (see below):
+Current entries. The first two rows (struck through) are `image-size`, reached via
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`, and are kept for the record only — they
+are no longer ignored; the next two are `extract-zip`, reached via `packages/plugins/opencode`;
+the last two are `http-cache-semantics` and `braces` (see below):
 
-| GHSA                  | Issue                                                          | Why it's ignored                                                                                                          |
-| --------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)                     | Runs only while **building** the docs site, over images committed to this repo                                            |
-| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS)                 | Same path — no request-time, attacker-supplied image ever reaches it                                                      |
-| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal                    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below         |
-| `GHSA-7pqw-9j4j-h8q3` | `extract-zip` write through a planted same-name symlink entry  | No fix exists (`patched_versions` is `<0.0.0`); same call site, same symlink vector — see below                           |
-| `GHSA-ch52-4w7c-c8xp` | `http-cache-semantics` `max-stale` cross-user cache disclosure | No fix exists (`<=4.2.0`, `patched_versions` `<0.0.0`); no shared cache serves one user's response to another — see below |
-| `GHSA-vfj7-8cjw-p6xm` | `braces` stack exhaustion on deeply nested patterns            | No fix exists (`<=3.0.3`, `patched_versions` `<0.0.0`); every pattern is ours or the docs build's — see below             |
+| GHSA                      | Issue                                                          | Why it's ignored                                                                                                             |
+| ------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| ~~`GHSA-w3rx-r6r6-pgpr`~~ | ICNS parser infinite loop (event-loop DoS)                     | **Removed 2026-10-09** (fixed in 2.0.3). Was: runs only while **building** the docs site, over images committed to this repo |
+| ~~`GHSA-5p2g-fcmc-qvqq`~~ | JXL/HEIF parser infinite loop (event-loop DoS)                 | **Removed 2026-10-09** (fixed in 2.0.3). Was: same path — no request-time, attacker-supplied image ever reaches it           |
+| `GHSA-jmr9-qjv8-65gv`     | `extract-zip` unvalidated symlink traversal                    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below            |
+| `GHSA-7pqw-9j4j-h8q3`     | `extract-zip` write through a planted same-name symlink entry  | No fix exists (`patched_versions` is `<0.0.0`); same call site, same symlink vector — see below                              |
+| `GHSA-ch52-4w7c-c8xp`     | `http-cache-semantics` `max-stale` cross-user cache disclosure | No fix exists (`<=4.2.0`, `patched_versions` `<0.0.0`); no shared cache serves one user's response to another — see below    |
+| `GHSA-vfj7-8cjw-p6xm`     | `braces` stack exhaustion on deeply nested patterns            | No fix exists (`<=3.0.3`, `patched_versions` `<0.0.0`); every pattern is ours or the docs build's — see below                |
+
+**Removed 2026-10-09:** `GHSA-w3rx-r6r6-pgpr` and `GHSA-5p2g-fcmc-qvqq` (`image-size`) came out of `ignoreGhsas` — `image-size` 2.0.3 fixed both and the lockfile now resolves 2.0.4, inside `@docusaurus/mdx-loader`'s `^2.0.2`.
 
 **On `GHSA-ch52-4w7c-c8xp`.** Added 2026-10-05. The advisory needs a cache
 that stores one client's response and serves it to a different client that
@@ -170,6 +172,11 @@ server's own registry fetches). Nothing serves a cached response back to a
 user. **Re-check trigger:** drop this entry when `http-cache-semantics` ships a
 release above 4.2.0, or if anything starts passing a shared `cache` to `got` or
 serving responses out of `make-fetch-happen`'s cache.
+
+**Update 2026-10-09:** `http-cache-semantics` 4.3.0 now resolves this advisory (it is outside
+`<=4.2.0`), and the `http-cache-semantics@<4.3.0` override moves every consumer to it. The entry
+stays for now in case the advisory's range is widened to cover 4.3.x; drop it at the next sweep if
+it is not.
 
 **On `GHSA-vfj7-8cjw-p6xm`.** Added 2026-10-05. The advisory needs an
 attacker-chosen glob pattern. `braces` 3.0.3 is reached through
