@@ -93,6 +93,57 @@ export function classifyReviewer(
     return 'untrusted-bot';
 }
 
+/**
+ * The `author_association` values GitHub stamps on a review or comment
+ * whose author can steer a fleet run: the repository owner, a member of
+ * the owning organization, and an invited collaborator. Everyone else —
+ * `CONTRIBUTOR` (a merged PR once), `FIRST_TIME_CONTRIBUTOR`,
+ * `FIRST_TIMER`, `MANNEQUIN`, `NONE`, and a missing value — is an
+ * outsider.
+ */
+export const STEERING_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+    'OWNER',
+    'MEMBER',
+    'COLLABORATOR',
+]);
+
+/**
+ * Who wrote a review / comment, once the repository relationship of a
+ * HUMAN author is known: {@link ReviewerClass}, plus `outside-human` for
+ * a person with no write relationship to the repository.
+ */
+export type ReviewAuthorClass = ReviewerClass | 'outside-human';
+
+/**
+ * Classify the author of a `pull_request_review` (`body.review`) or of a
+ * comment (`body.comment`) — both carry `user` and `author_association`.
+ *
+ * A public repository accepts a "Request changes" review, or a comment,
+ * from ANY GitHub account. Before this, every non-bot was `human`, so a
+ * stranger's review on a fleet-made pull request became rejection
+ * feedback, and the CI-feedback / fix loop resumed the agent on the
+ * owner's PC with that stranger's text as its instructions — a prompt
+ * injection with somebody else's model bill attached. A human steers a
+ * run only as an OWNER, MEMBER or COLLABORATOR of the repository; any
+ * other association, or none at all, is `outside-human` (fail closed).
+ *
+ * Bot classification is untouched and comes first, so `self` still wins
+ * over everything and a trusted reviewer bot (whose association is
+ * typically `NONE`) is still a trusted reviewer bot.
+ */
+export function classifyReviewAuthor(
+    author:
+        | { user?: ReviewerIdentity | null; author_association?: string | null }
+        | null
+        | undefined,
+    policy: ReviewBotPolicy,
+): ReviewAuthorClass {
+    const who = classifyReviewer(author?.user, policy);
+    if (who !== 'human') return who;
+    const association = (author?.author_association ?? '').trim().toUpperCase();
+    return STEERING_AUTHOR_ASSOCIATIONS.has(association) ? 'human' : 'outside-human';
+}
+
 /** Severity markers sit on the first line; this is more than enough of it. */
 const SEVERITY_SCAN_CHARS = 600;
 

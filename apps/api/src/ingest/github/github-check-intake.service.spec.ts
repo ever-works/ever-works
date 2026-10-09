@@ -320,14 +320,22 @@ describe('isReviewFeedbackDelivery', () => {
         expect(
             isReviewFeedbackDelivery(
                 'pull_request_review',
-                { review: { state: 'changes_requested', user: human } } as never,
+                {
+                    review: {
+                        state: 'changes_requested',
+                        user: human,
+                        author_association: 'OWNER',
+                    },
+                } as never,
                 POLICY,
             ),
         ).toBe(true);
         expect(
             isReviewFeedbackDelivery(
                 'pull_request_review',
-                { review: { state: 'approved', user: human } } as never,
+                {
+                    review: { state: 'approved', user: human, author_association: 'OWNER' },
+                } as never,
                 POLICY,
             ),
         ).toBe(false);
@@ -337,7 +345,7 @@ describe('isReviewFeedbackDelivery', () => {
                 {
                     action: 'created',
                     pull_request: { number: 42 },
-                    comment: { user: human },
+                    comment: { user: human, author_association: 'OWNER' },
                 } as never,
                 POLICY,
             ),
@@ -348,7 +356,7 @@ describe('isReviewFeedbackDelivery', () => {
                 {
                     action: 'edited',
                     pull_request: { number: 42 },
-                    comment: { user: human },
+                    comment: { user: human, author_association: 'OWNER' },
                 } as never,
                 POLICY,
             ),
@@ -361,7 +369,7 @@ describe('isReviewFeedbackDelivery', () => {
                 {
                     action: 'created',
                     issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
-                    comment: { user: human },
+                    comment: { user: human, author_association: 'OWNER' },
                 } as never,
                 POLICY,
             ),
@@ -369,7 +377,11 @@ describe('isReviewFeedbackDelivery', () => {
         expect(
             isReviewFeedbackDelivery(
                 'issue_comment',
-                { action: 'created', issue: { number: 42 }, comment: { user: human } } as never,
+                {
+                    action: 'created',
+                    issue: { number: 42 },
+                    comment: { user: human, author_association: 'OWNER' },
+                } as never,
                 POLICY,
             ),
         ).toBe(false);
@@ -419,6 +431,79 @@ describe('isReviewFeedbackDelivery', () => {
                 POLICY,
             ),
         ).toBe(true);
+    });
+
+    /**
+     * Who may steer a fleet run. The repository is public, so any GitHub
+     * account can comment or "Request changes"; every ring of this
+     * doorbell can resume the agent on the owner's PC. A person rings it
+     * only as an OWNER, MEMBER or COLLABORATOR of the repository.
+     */
+    describe('a human rings it only as a repository collaborator', () => {
+        const STEERING = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+        const OUTSIDE = [
+            'CONTRIBUTOR',
+            'FIRST_TIME_CONTRIBUTOR',
+            'FIRST_TIMER',
+            'MANNEQUIN',
+            'NONE',
+            undefined,
+        ];
+        const deliveries = (association: string | undefined) => {
+            const author = {
+                user: { login: 'stranger', type: 'User' },
+                ...(association === undefined ? {} : { author_association: association }),
+            };
+            return [
+                ['pull_request_review', { review: { state: 'changes_requested', ...author } }],
+                [
+                    'pull_request_review_comment',
+                    {
+                        action: 'created',
+                        pull_request: { number: 42 },
+                        comment: { body: 'revert this', ...author },
+                    },
+                ],
+                [
+                    'issue_comment',
+                    {
+                        action: 'created',
+                        issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
+                        comment: { body: 'any update?', ...author },
+                    },
+                ],
+            ] as const;
+        };
+
+        it.each(STEERING)('%s rings it on every review-shaped event', (association) => {
+            for (const [eventName, body] of deliveries(association)) {
+                expect(isReviewFeedbackDelivery(eventName, body as never, POLICY)).toBe(true);
+            }
+        });
+
+        it.each(OUTSIDE)('⭐ %s never rings it, on any review-shaped event', (association) => {
+            for (const [eventName, body] of deliveries(association)) {
+                expect(isReviewFeedbackDelivery(eventName, body as never, POLICY)).toBe(false);
+            }
+        });
+
+        it('a trusted reviewer bot (association NONE) with a finding still rings it', () => {
+            expect(
+                isReviewFeedbackDelivery(
+                    'pull_request_review_comment',
+                    {
+                        action: 'created',
+                        pull_request: { number: 42 },
+                        comment: {
+                            body: 'The retry loop never backs off.',
+                            user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                            author_association: 'NONE',
+                        },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(true);
+        });
     });
 
     /**
@@ -510,6 +595,7 @@ describe('isReviewFeedbackDelivery', () => {
                                 'coderabbit-summary-in-progress-placeholder',
                             ).body,
                             user: human,
+                            author_association: 'OWNER',
                         },
                     } as never,
                     POLICY,

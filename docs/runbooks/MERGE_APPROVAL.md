@@ -242,6 +242,13 @@ Bots are dropped, all of them:
 Their _rejections_ are still trusted (finding R16). A bot saying "looks
 good" is not a person having looked.
 
+So are people with no write relationship to the repository. An approval
+counts only when GitHub's `author_association` on the review is `OWNER`,
+`MEMBER` or `COLLABORATOR`; on a public repository anyone can click
+"Approve", and a stranger having read the diff is not what this signal
+means. (Withdrawing works for the same login whatever its association
+is now — clearing only ever removes the signal.)
+
 ---
 
 ## Where things live

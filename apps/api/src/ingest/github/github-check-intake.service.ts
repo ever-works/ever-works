@@ -31,6 +31,7 @@ import {
     type GitHubWebhookConsumer,
 } from './github-webhook-dispatcher.service';
 import {
+    classifyReviewAuthor,
     classifyReviewBotComment,
     classifyReviewer,
     type ReviewBotPolicy,
@@ -374,7 +375,7 @@ export function isReviewFeedbackDelivery(
 ): boolean {
     if (eventName === 'pull_request_review') {
         if (body.review?.state?.toLowerCase() !== 'changes_requested') return false;
-        return isDoorbellAuthor(body.review?.user, policy);
+        return isDoorbellAuthor(body.review, policy);
     }
     if (eventName === 'pull_request_review_comment') {
         if (body.action !== 'created' || typeof body.pull_request?.number !== 'number')
@@ -402,11 +403,11 @@ export function isReviewFeedbackDelivery(
  * the doorbell otherwise looks up the Task and may cash in an unrelated
  * pending row on the bot's say-so: a model run on a fleet PC triggered by
  * a progress bar. The same pure classifier the bridge records with makes
- * the call, so the two halves cannot disagree. A human's comment rings it
- * exactly as before.
+ * the call, so the two halves cannot disagree. A collaborator's comment
+ * rings it exactly as before.
  */
 function isDoorbellComment(body: GitHubWebhookBody, policy: ReviewBotPolicy): boolean {
-    if (!isDoorbellAuthor(body.comment?.user, policy)) return false;
+    if (!isDoorbellAuthor(body.comment, policy)) return false;
     if (classifyReviewer(body.comment?.user, policy) !== 'trusted-bot') return true;
     return (
         classifyReviewBotComment({ action: body.action, body: body.comment?.body }).kind ===
@@ -425,12 +426,24 @@ function isDoorbellComment(body: GitHubWebhookBody, policy: ReviewBotPolicy): bo
  * `classifyReviewer` exists to protect. `untrusted-bot` is dropped for
  * the same reason it is dropped upstream: nothing it says was recorded,
  * so there is nothing of its to act on.
+ *
+ * And a person rings it only as an OWNER, MEMBER or COLLABORATOR of the
+ * repository (`classifyReviewAuthor`, the same rule the bridge records
+ * with): on a public repository anyone can comment or "Request changes",
+ * and every ring can resume the agent on the owner's PC. An outsider's
+ * delivery is refused before the Task lookup — fail closed when GitHub
+ * sends no association at all.
  */
 function isDoorbellAuthor(
-    user: { login?: string; type?: string } | undefined,
+    author:
+        | {
+              user?: { login?: string; type?: string };
+              author_association?: string;
+          }
+        | undefined,
     policy: ReviewBotPolicy,
 ): boolean {
-    const who = classifyReviewer(user, policy);
+    const who = classifyReviewAuthor(author, policy);
     return who === 'human' || who === 'trusted-bot';
 }
 

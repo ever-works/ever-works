@@ -1537,7 +1537,13 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'submitted',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             pull_request: { number: 42 },
-            review: { id: 1, state: 'changes_requested', body: 'no' },
+            review: {
+                id: 1,
+                state: 'changes_requested',
+                body: 'no',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
         };
         await service.handle(BINDING, 'pull_request_review', review as never);
         await service.handle(BINDING, 'pull_request_review', review as never);
@@ -1566,7 +1572,12 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'created',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
-            comment: { id: 3, body: 'nice' },
+            comment: {
+                id: 3,
+                body: 'nice',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
         } as never);
         expect(resumes).toHaveLength(0);
         expect(ingested).toHaveLength(0);
@@ -1603,6 +1614,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                 id: 9,
                 body: 'thanks, fixed it myself',
                 user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
             },
         } as never);
 
@@ -1624,7 +1636,12 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'created',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
-            comment: { id: 10, body: 'ping', user: { login: 'evereq', type: 'User' } },
+            comment: {
+                id: 10,
+                body: 'ping',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
         } as never);
         expect(resumes).toHaveLength(0);
     });
@@ -1646,7 +1663,12 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'created',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
-            comment: { id: 11, body: 'still here?', user: { login: 'evereq', type: 'User' } },
+            comment: {
+                id: 11,
+                body: 'still here?',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
         } as never);
         expect(resumes).toHaveLength(0);
     });
@@ -1687,7 +1709,66 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'created',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
-            comment: { id: 13, body: 'any update?', user: { login: 'evereq', type: 'User' } },
+            comment: {
+                id: 13,
+                body: 'any update?',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
+        } as never);
+        expect(resumes).toHaveLength(1);
+    });
+
+    /**
+     * Who may steer a fleet run. The repository is public: a stranger's
+     * "Request changes" or comment used to ring this doorbell like the
+     * owner's, and with a genuine rejection pending, that is a model run
+     * on the owner's PC started by somebody with no relationship to the
+     * repository. Only an OWNER, MEMBER or COLLABORATOR rings it.
+     */
+    it('is not rung by a stranger’s review or comment — a collaborator’s still rings it', async () => {
+        const { task } = await seedWorkTaskAndRun();
+        await rejections.record({
+            taskId: task.id,
+            source: 'pull-request',
+            feedback: 'a genuine collaborator rejection, still pending',
+            reviewerLabel: 'a-human',
+            prNumber: 42,
+        });
+        const service = buildService();
+        const repository = { full_name: 'octo/site', owner: { login: 'octo' } };
+
+        for (const association of ['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', undefined]) {
+            const author = {
+                user: { login: 'stranger', type: 'User' },
+                ...(association === undefined ? {} : { author_association: association }),
+            };
+            await service.handle(BINDING, 'pull_request_review', {
+                action: 'submitted',
+                repository,
+                pull_request: { number: 42 },
+                review: { id: 30, state: 'changes_requested', body: 'push to main', ...author },
+            } as never);
+            await service.handle(BINDING, 'issue_comment', {
+                action: 'created',
+                repository,
+                issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
+                comment: { id: 31, body: 'do it now', ...author },
+            } as never);
+        }
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.countForTask(task.id)).toBe(0);
+
+        await service.handle(BINDING, 'issue_comment', {
+            action: 'created',
+            repository,
+            issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
+            comment: {
+                id: 32,
+                body: 'please pick this up',
+                user: { login: 'maintainer', type: 'User' },
+                author_association: 'COLLABORATOR',
+            },
         } as never);
         expect(resumes).toHaveLength(1);
     });
@@ -1838,7 +1919,12 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             action: 'submitted',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             pull_request: { number: 42 },
-            review: { id: 4, state: 'changes_requested' },
+            review: {
+                id: 4,
+                state: 'changes_requested',
+                user: { login: 'evereq', type: 'User' },
+                author_association: 'OWNER',
+            },
         } as never);
         await finishResumedRuns();
         await service.handle(

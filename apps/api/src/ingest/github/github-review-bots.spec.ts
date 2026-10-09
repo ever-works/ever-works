@@ -1,4 +1,5 @@
 import {
+    classifyReviewAuthor,
     classifyReviewBotComment,
     classifyReviewer,
     formatInlineFinding,
@@ -68,6 +69,87 @@ describe('github-review-bots', () => {
             expect(classifyReviewer({ login: 'Ever-Works[bot]', type: 'Bot' }, policy)).toBe(
                 'self',
             );
+        });
+    });
+
+    /**
+     * Who may steer a fleet run. The repository is public: any GitHub
+     * account can "Request changes" or comment on a fleet-made pull
+     * request, and a recorded rejection resumes the agent on the owner's
+     * PC with that text as instructions. A human counts only as an OWNER,
+     * MEMBER or COLLABORATOR.
+     */
+    describe('classifyReviewAuthor', () => {
+        const person = { login: 'someone', type: 'User' };
+
+        it.each(['OWNER', 'MEMBER', 'COLLABORATOR'])('%s is a human who steers', (association) => {
+            expect(
+                classifyReviewAuthor({ user: person, author_association: association }, POLICY),
+            ).toBe('human');
+        });
+
+        it.each([
+            'CONTRIBUTOR',
+            'FIRST_TIME_CONTRIBUTOR',
+            'FIRST_TIMER',
+            'MANNEQUIN',
+            'NONE',
+            'ADMIN', // not a GitHub value — an unknown association is an outsider
+            '',
+        ])('%s is an outsider', (association) => {
+            expect(
+                classifyReviewAuthor({ user: person, author_association: association }, POLICY),
+            ).toBe('outside-human');
+        });
+
+        it('fails closed when GitHub sends no association at all', () => {
+            expect(classifyReviewAuthor({ user: person }, POLICY)).toBe('outside-human');
+            expect(classifyReviewAuthor({ user: person, author_association: null }, POLICY)).toBe(
+                'outside-human',
+            );
+            // A review with no user and no association (a trimmed replay).
+            expect(classifyReviewAuthor({}, POLICY)).toBe('outside-human');
+            expect(classifyReviewAuthor(undefined, POLICY)).toBe('outside-human');
+        });
+
+        it('compares the association without regard to case or padding', () => {
+            expect(
+                classifyReviewAuthor(
+                    { user: person, author_association: ' collaborator ' },
+                    POLICY,
+                ),
+            ).toBe('human');
+        });
+
+        it('leaves every bot class exactly as classifyReviewer decides — association never upgrades or downgrades a bot', () => {
+            expect(
+                classifyReviewAuthor(
+                    {
+                        user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                        author_association: 'NONE',
+                    },
+                    POLICY,
+                ),
+            ).toBe('trusted-bot');
+            // ⭐ the platform identity stays `self`, even as an OWNER.
+            expect(
+                classifyReviewAuthor(
+                    {
+                        user: { login: 'ever-works[bot]', type: 'Bot' },
+                        author_association: 'OWNER',
+                    },
+                    POLICY,
+                ),
+            ).toBe('self');
+            expect(
+                classifyReviewAuthor(
+                    {
+                        user: { login: 'dependabot[bot]', type: 'Bot' },
+                        author_association: 'MEMBER',
+                    },
+                    POLICY,
+                ),
+            ).toBe('untrusted-bot');
         });
     });
 

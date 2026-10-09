@@ -97,12 +97,13 @@ A webhook delivery is a one-shot: refusing it (because a run was still in flight
 
 ## Reviewer rejections
 
-The same loop acts on the other half of the feedback: when a human requests changes on the pull request, or an allow-listed [reviewer bot](community-pr-processing.md) leaves a finding, the review bridge records a durable rejection — and this loop resumes the run to answer it, instead of parking the row until somebody presses Resume.
+The same loop acts on the other half of the feedback: when a repository collaborator (`OWNER`, `MEMBER` or `COLLABORATOR` — anyone else's review or comment is ignored, since a public repository accepts them from any GitHub account) requests changes on the pull request, or an allow-listed [reviewer bot](community-pr-processing.md) leaves a finding, the review bridge records a durable rejection — and this loop resumes the run to answer it, instead of parking the row until somebody presses Resume.
 
 It reads the recorded rejection, not the delivery, so a review that recorded nothing (an approval, a plain comment) resumes nothing. The claim is keyed on the rejection row, so a redelivery cannot double it, and the attempt comes out of the same budget as a CI failure.
 
 A comment is only a doorbell — it carries no link to the row it is meant to answer — so the row it rings for is checked rather than merely fetched:
 
+- a person rings it only as an `OWNER`, `MEMBER` or `COLLABORATOR` of the repository — a stranger's comment or review on a public repository never starts a run on your PC;
 - the platform's **own** identity and any **untrusted bot** never ring it, so the loop cannot wake itself on its own status comment (the same rule the review bridge applies before it records anything);
 - a **trusted reviewer bot** rings it only with a comment that carries a finding — never with CodeRabbit's "review in progress" placeholder, its walkthrough summary, a command acknowledgement, a rate-limit notice, a finding-less Greptile summary, or an **edit** of any comment (see [Which bot comments count](integrations.md#which-bot-comments-count)). The review bridge records nothing for those either, so they cost no model run;
 - a `gate` row (this loop's own record of a CI failure) is never cashed in by a comment — the CI half owns those;
