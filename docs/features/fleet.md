@@ -660,27 +660,59 @@ What happens next:
   Task, the branch (and the mounted repository, if the agent asked from one), and a link to an
   existing pull request. The Inbox body also says what the run managed before asking (pushed,
   committed but not pushed, no changes, a failed push) and which required checks did not pass.
+  **From your fleet** above the Active and Archived lists narrows the Inbox to these messages
+  (`/inbox?source=fleet`, or `GET /api/inbox?sourceType=fleet-run`).
 - **Replying starts a new run for the same Task** — same Agent, same pinned node when the Agent is
   pinned, same branch. The new run's instructions carry your question and answer under
   **`# OWNER ANSWER`**, tell the model its earlier commits are on the branch (and whether they were
   pushed), and ask it to continue from the answer rather than redo committed work or ask again. The
   reply toast says "a new run is answering it".
+- **The answer run continues the conversation that asked the question** when it can. The platform
+  keeps the CLI session id the node reported for the asking run and the node it ran on. If the answer
+  run lands on that same node and the provider is Claude Code, the node runs
+  `claude -p --resume <session> --fork-session` and feeds it only your answer and a reminder of the
+  rules (on stdin, as always). The model picks up with its own reasoning still in context, so it
+  does not re-read the branch or reopen settled decisions. `--fork-session` leaves the original
+  session untouched, so a retried attempt starts from the same point. In every other case the run
+  starts a **fresh session** on the full instructions, which now replay every question this Task's
+  earlier runs asked and the answers you gave, oldest first, under
+  **`# EARLIER QUESTIONS AND ANSWERS`**. That happens when the run lands on another node, when the
+  provider is Codex, or when the CLI no longer has the session (for example "No conversation found"
+  after the CLI's history was cleared). In that last case the node runs fresh within the same job,
+  but only when the CLI itself said it could not open the session ("No conversation found", or a
+  CLI too old to know the resume flags) and no model turn ran. A resumed session that crashed
+  without saying why is reported as a failed run rather than run a second time, because it may
+  already have changed the worktree. The job result records what happened as
+  `model.resume`: `resumed`, `fell-back` or `skipped`, with the reason.
+  Codex is never resumed: `codex exec resume` does not take `--sandbox`, `-C` or `--add-dir`, so a
+  resumed Codex run could not be held to the sandbox and mount grants it was planned with.
 - The **Task page** shows the open question with an _Answer it in the Inbox_ link and hides the
   free-text _Resume_ while a question is open: a resume from there would start a run that never sees
-  your answer.
+  your answer. In the **Runs** history the parked run carries an **awaiting input** chip, so it does
+  not read as simply _completed_.
+- While a fleet run is **live**, the Task page offers no _Steer_ box. A node runs the model on
+  instructions fixed when the job was dispatched and never reads messages sent mid-run, so a steer
+  would never reach the agent. The run is recorded as executing on the fleet (its `runnerKind` is
+  `fleet-node:<provider>`), and the strip says how it reaches you instead: with a question in your
+  Inbox. _Interrupt_ is still shown.
 - **Archiving** (or deleting) the open question drops the parked run — it stops waiting and the Task
   page returns to normal. Moving the question back to Active parks it again.
 
 Limits: one question per run (the answer run can ask a new one, which files a new Inbox message);
-answers are free text — a fleet question offers no option buttons; earlier questions and answers are
-not replayed into later runs, only the reply that resumed the run travels with it; asking needs an
+answers are free text — a fleet question offers no option buttons; the replayed history covers the
+answers found on the Task's 50 most recent runs (capped at 16 KiB, oldest dropped first, and left out
+entirely when the Task brief alone fills the job); a session is resumed only on the node that holds it
+and only for Claude Code; asking needs an
 edit-capable permission mode — under `plan` the model cannot write the file and is not offered the
 protocol; a Task that is _Done_ or _Cancelled_ cannot be resumed — the reply is refused with the
 reason, the question stays open until you archive it; an Agent whose git policy forbids pushing may
 lose uncommitted work when the answer run lands on a different node, because that node starts from
 the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
-written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
-but is not reported as a question.
+written somewhere other than the repository root (or a mounted repository's root), for example
+`apps/api/.ever-works/QUESTION.md` after the model changed directory, is kept out of Git and is not
+asked as a question. The node finds it (it searches up to 8 levels deep and skips `node_modules`,
+`.git`, `.mounts` and links), removes it, and reports it on the run. The Task chat then says where
+the agent tried to ask, so a question is never lost without a trace.
 
 ### Platform tools from a fleet run (MCP bridge)
 
@@ -728,6 +760,13 @@ the token's own scope wins and a mismatch is refused.
 The run's result records whether the bridge was up and how many tool calls went through it. If the
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
 tool channel that fails never fails a Task.
+
+> An earlier design (slice C) described a fleet session as having "no platform tools." That was
+> always a **default**, not an invariant: the bridge is off until an operator and the Agent's own
+> permission both turn it on, and even then the model reaches only a bounded tool surface through a
+> credential it never sees, with the bound enforced by the platform's route allow-list. The two
+> designs are reconciled in one place — the
+> [fleet session trust model](../specs/security/fleet-session-trust-model.md) §3.
 
 ### How a fleet node pushes (scoped push credentials)
 
@@ -859,3 +898,5 @@ Uploading a node's own log when a run fails is not built: the node has no authen
 - [Job Runtimes](./job-runtimes.md) · [Agents](./agents.md) · [Tasks](./tasks.md) · [Quality Gates](./quality-gates.md)
 - [Task Isolation](./task-isolation.md) · [Agent Terminals](./agent-terminals.md) · [Sessions & Steering](./sessions-and-steering.md)
 - [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
+- [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
+  what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)

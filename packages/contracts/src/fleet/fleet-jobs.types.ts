@@ -747,6 +747,115 @@ export interface FleetAgentModelExecution {
 	 * granted, which the node admits through the platform-owned refusal.
 	 */
 	envGrants?: string[];
+	/**
+	 * Self-build slice AU — continue the CLI session an earlier run of this
+	 * Task left on ONE node, instead of starting the model from zero.
+	 *
+	 * An OPTIMISATION with a guaranteed fallback, never a requirement:
+	 * `instructions` above is always the complete fresh-session prompt
+	 * (with the answered Q&A trail replayed in it), and that is what runs
+	 * whenever this block is absent, malformed, names another node, names
+	 * a provider that cannot resume, or the CLI cannot find the session.
+	 * A node that predates the field drops it in
+	 * {@link normalizeFleetAgentModelExecution} and runs fresh, exactly as
+	 * it always did.
+	 */
+	resume?: FleetAgentModelResume;
+}
+
+/**
+ * Self-build slice AU — which CLI session a run may continue, and where.
+ *
+ * Every field reaches a node over the untrusted wire and two of them go
+ * onto a command line or into a comparison, so all three are validated by
+ * {@link normalizeFleetAgentModelResume} and the block is DROPPED (never
+ * honoured, never fatal) when any of them fails.
+ */
+export interface FleetAgentModelResume {
+	/**
+	 * The CLI's own session id the earlier run reported
+	 * (`FleetAgentTaskModelResult.sessionId`). Held to
+	 * {@link FLEET_AGENT_MODEL_SESSION_ID_PATTERN} because the node passes
+	 * it to `claude --resume` on argv.
+	 */
+	sessionId: string;
+	/**
+	 * The fleet node that ran that session. A CLI keeps its sessions in the
+	 * machine's own config home, so the session exists on this node and
+	 * nowhere else; any other node runs fresh.
+	 */
+	nodeId: string;
+	/**
+	 * The continuation prompt fed on stdin INSTEAD of `instructions` when
+	 * the node actually resumes: the owner's answer and a reminder of the
+	 * contract, without re-sending the brief the session already holds.
+	 * Same rule as `instructions` — stdin, never argv.
+	 */
+	instructions: string;
+}
+
+/**
+ * Self-build slice AU — the only shape a CLI session id may have before a
+ * node interpolates it into `--resume <id>`.
+ *
+ * Both CLIs the fleet drives mint UUIDs: Claude Code's `session_id` is a
+ * v4 UUID and Codex's `thread_id` a v7 one. Anything else — a value with
+ * a space, a quote, a shell metacharacter, a path, or simply too long —
+ * is refused rather than escaped, the same posture as
+ * {@link FLEET_AGENT_EXECUTION_MODEL_PATTERN}.
+ */
+export const FLEET_AGENT_MODEL_SESSION_ID_PATTERN =
+	/^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+
+/** True when `value` is a CLI session id a node may put on a command line (slice AU). */
+export function isFleetAgentModelSessionId(value: unknown): value is string {
+	return typeof value === 'string' && FLEET_AGENT_MODEL_SESSION_ID_PATTERN.test(value);
+}
+
+/**
+ * Self-build slice AU — whether the node may continue an earlier CLI
+ * session for this provider.
+ *
+ *   - `claude-code` — yes: `claude -p --resume <id> --fork-session` reads
+ *     the prompt from stdin and takes every flag a fresh run takes, so the
+ *     resumed session runs under exactly the permission mode, mount grants
+ *     and MCP bridge the job was planned with. `--fork-session` keeps the
+ *     session the question was asked in untouched, so a retried attempt
+ *     branches from the same point instead of from a half-finished one.
+ *   - `codex` — NO, deliberately. `codex exec resume [SESSION_ID] [PROMPT]`
+ *     exists and reads `-` from stdin, but (codex-cli 0.130.0,
+ *     `codex exec resume --help`) the subcommand does not accept
+ *     `--sandbox`, `-C/--cd` or `--add-dir` — the three flags the node uses
+ *     to map the permission mode onto the sandbox and to grant a
+ *     multi-repo run its writable mounts. A resumed Codex run could not be
+ *     held to the sandbox the job was planned with, so it always runs
+ *     fresh, with the answered Q&A replayed in its instructions.
+ */
+export function fleetAgentExecutionProviderSupportsSessionResume(provider: FleetAgentExecutionProvider): boolean {
+	return provider === 'claude-code';
+}
+
+/**
+ * Validate the slice-AU resume block off the wire.
+ *
+ * Unlike the rest of {@link normalizeFleetAgentModelExecution} this does
+ * NOT refuse the job: resuming is an optimisation whose fallback (a fresh
+ * session on the complete `instructions`) is always correct, so a block
+ * that fails any check is dropped — `null` — and the run goes ahead fresh.
+ * Failing the whole job over a bad optimisation hint would cost the owner
+ * a re-answer for nothing.
+ */
+export function normalizeFleetAgentModelResume(raw: unknown): FleetAgentModelResume | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const input = raw as Record<string, unknown>;
+	if (!isFleetAgentModelSessionId(input.sessionId)) return null;
+	// Node ids are `fleet_nodes.id` UUIDs; the same strict shape keeps the
+	// comparison on the node from ever being fed anything else.
+	if (!isFleetAgentModelSessionId(input.nodeId)) return null;
+	const instructions = typeof input.instructions === 'string' ? input.instructions : '';
+	if (!instructions.trim()) return null;
+	if (byteLength(instructions) > FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES) return null;
+	return { sessionId: input.sessionId, nodeId: input.nodeId, instructions };
 }
 
 /** What the node does with the working tree after the model ran. */
@@ -864,6 +973,11 @@ export function normalizeFleetAgentModelExecution(raw: unknown): FleetAgentModel
 		const grants = normalizeFleetRunEnvGrants(input.envGrants);
 		if (grants.length > 0) out.envGrants = grants;
 	}
+	// Slice AU — dropped, never refused, when it does not validate (see
+	// `normalizeFleetAgentModelResume`); the fresh `instructions` above are
+	// always complete on their own.
+	const resume = normalizeFleetAgentModelResume(input.resume);
+	if (resume) out.resume = resume;
 	return out;
 }
 
@@ -963,6 +1077,41 @@ export interface FleetAgentTaskModelResult {
 	transcript?: string;
 	/** Bytes of CLI output the transcript was built from, before elision and capping. */
 	transcriptSourceBytes?: number;
+	/**
+	 * Self-build slice AU — what the node did with the job's
+	 * `execution.resume` block. Present ONLY when the job carried one, so a
+	 * run that was never offered a session reports exactly what it always
+	 * did; an older platform ignores the field.
+	 */
+	resume?: FleetAgentTaskModelResumeRecord;
+}
+
+/**
+ * Self-build slice AU — how a run that was offered an earlier CLI session
+ * actually started.
+ *
+ *   - `resumed`   — the CLI continued that session on this node.
+ *   - `fell-back` — the node tried, the CLI could not open the session
+ *                   (it reported no session at all — `claude` answers an
+ *                   unknown id with "No conversation found" and exit 1), so
+ *                   the node ran a fresh session on the full instructions.
+ *   - `skipped`   — the node never tried: another node holds the session,
+ *                   the provider cannot resume, or this node does not know
+ *                   its own enrollment id. Fresh session, full instructions.
+ */
+export type FleetAgentTaskModelResumeOutcome = 'resumed' | 'fell-back' | 'skipped';
+
+export const FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES: readonly FleetAgentTaskModelResumeOutcome[] = [
+	'resumed',
+	'fell-back',
+	'skipped'
+];
+
+/** The `model.resume` record of a {@link FleetAgentTaskModelResult} (slice AU). */
+export interface FleetAgentTaskModelResumeRecord {
+	outcome: FleetAgentTaskModelResumeOutcome;
+	/** Node-written, one sentence, never a value — why it fell back or was skipped. */
+	reason?: string;
 }
 
 /** Self-build slice AP — the two kinds of step a fleet run's timeline records. */
@@ -1614,6 +1763,18 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 * non-zero model exit and that verdict is still true.
 	 */
 	question?: FleetAgentTaskQuestion | null;
+	/**
+	 * Self-build slice AU (a slice-Q follow-up): owner-question files the
+	 * model wrote somewhere OTHER than a repository root — e.g.
+	 * `apps/api/.ever-works/QUESTION.md` after it `cd`-ed into a package.
+	 * The exclude rule keeps such a file out of Git, but the node only
+	 * READS the root one, so without this the question was lost in silence.
+	 * Workspace-relative POSIX paths (a mount's prefixed with
+	 * `.mounts/<dir>/`), bounded in count and length, never content; the
+	 * node removes each file after reporting it. Absent when there were
+	 * none, so a normal run reports exactly what it always did.
+	 */
+	misplacedQuestionFiles?: string[];
 	/**
 	 * Self-build slice Z: what the MCP bridge did, when the payload asked
 	 * for one. Reports whether it actually ran and how many `tools/call`

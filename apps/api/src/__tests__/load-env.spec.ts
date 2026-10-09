@@ -27,8 +27,12 @@ import { join } from 'path';
  *   - `@scalar/nestjs-api-reference`, which jest cannot load (an ESM-only
  *     dependency) and which `main.ts` uses only after `NestFactory.create`.
  *
- * With `main.ts` loading `.env` after importing `./api.module`, the first case
- * fails: the module is in the graph although the file says `false`.
+ * With `main.ts` loading `.env` after importing `./api.module`, the switch is
+ * blind to the file. Statistics are off by default (`EVER_STATS_DEFAULT_ENABLED`),
+ * so the case that catches that order is `EVER_STATS_ENABLED=true` in `.env`:
+ * the module would be missing from the graph although the file opts in. (While
+ * the default was on, the `false` case failed instead: the module stayed in the
+ * graph although the file said `false`.)
  */
 
 const STATS_SWITCH = 'EVER_STATS_ENABLED';
@@ -111,20 +115,27 @@ describe('API boot order: the .env file is loaded before ApiModule is evaluated'
         expect(imports).toEqual([]);
     });
 
-    it('control: EVER_STATS_ENABLED=true in .env — the module is in the graph', () => {
+    it('EVER_STATS_ENABLED=true in .env: the module is in the graph (the opt-in survives the boot order)', () => {
         const { imports, statsModule } = bootMain(`${STATS_SWITCH}=true\n`);
+        expect(statsModule).toBeDefined();
         expect(imports).toEqual([statsModule]);
     });
 
-    it('control: no .env at all — on by default', () => {
+    it('no .env at all: off by default — the module is NOT in the graph', () => {
         const { imports, statsModule } = bootMain(null);
-        expect(imports).toEqual([statsModule]);
+        expect(statsModule).toBeDefined();
+        expect(imports).toEqual([]);
     });
 
-    it('a value already in the environment still wins over the file', () => {
-        const { imports, statsModule } = bootMain(`${STATS_SWITCH}=false\n`, {
-            [STATS_SWITCH]: 'true',
-        });
-        expect(imports).toEqual([statsModule]);
+    it('a .env that does not mention the switch: off by default', () => {
+        const { imports } = bootMain('# settings of this installation, none about statistics\n');
+        expect(imports).toEqual([]);
+    });
+
+    it('a value already in the environment still wins over the file, both ways', () => {
+        const on = bootMain(`${STATS_SWITCH}=false\n`, { [STATS_SWITCH]: 'true' });
+        expect(on.imports).toEqual([on.statsModule]);
+        const off = bootMain(`${STATS_SWITCH}=true\n`, { [STATS_SWITCH]: 'false' });
+        expect(off.imports).toEqual([]);
     });
 });

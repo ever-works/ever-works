@@ -362,6 +362,7 @@
     },
     "dependencies": {
         "@ai-sdk/openai-compatible": "^2.0.41",
+        "@ever-co/connect-sdk": "1.0.0-rc.2",
         "@ever-works/agent-plugins": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",

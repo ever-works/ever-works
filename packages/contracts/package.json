@@ -65,7 +65,9 @@
 		"vitest": "^4.1.0"
 	},
 	"peerDependencies": {},
-	"dependencies": {},
+	"dependencies": {
+		"@ever-co/connect-contracts": "1.0.0-rc.2"
+	},
 	"publishConfig": {
 		"access": "public"
 	}

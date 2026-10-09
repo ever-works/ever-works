@@ -156,7 +156,16 @@ const AGENT_EXECUTION_EXPORTS = [
 	'FLEET_BYO_MODEL_PLUGIN_ID_PREFIX',
 	'fleetModelCostUsdToCents',
 	'fleetModelPluginId',
-	'isFleetModelPluginId'
+	'isFleetModelPluginId',
+	// Fleet run continuity (self-build slice AU): the session-id shape a
+	// node may put on argv, which providers may resume, the drop-don't-
+	// refuse reader of the resume block, and the outcome vocabulary.
+	// Covered in `fleet-agent-execution.spec.ts`.
+	'FLEET_AGENT_MODEL_SESSION_ID_PATTERN',
+	'isFleetAgentModelSessionId',
+	'fleetAgentExecutionProviderSupportsSessionResume',
+	'normalizeFleetAgentModelResume',
+	'FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES'
 ] as const;
 
 const RUNNER_STATUS_EXPORTS = [
@@ -328,6 +337,9 @@ const FUNCTION_EXPORTS = [
 	'isFleetAgentExecutionEffort',
 	'isFleetAgentExecutionPermissionMode',
 	'normalizeFleetAgentModelExecution',
+	'isFleetAgentModelSessionId',
+	'fleetAgentExecutionProviderSupportsSessionResume',
+	'normalizeFleetAgentModelResume',
 	'fleetModelCostUsdToCents',
 	'fleetModelPluginId',
 	'isFleetModelPluginId',
@@ -369,7 +381,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 194 runtime symbols', () => {
+	it('exposes exactly these 199 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -409,8 +421,12 @@ describe('fleet barrel', () => {
 		// three retention-window bounds, the six timeline / transcript caps
 		// and the timeline's coercing reader. All in `fleet-jobs.types.ts`,
 		// an existing module, so the witness table needs no new row.
+		// → 199 with fleet run continuity (self-build slice AU): the session-
+		// id pattern and its guard, the resume-capable provider rule, the
+		// resume-block reader and the resume-outcome list. All in
+		// `fleet-jobs.types.ts`, an existing module — no new witness row.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(194);
+		expect(Object.keys(fleet)).toHaveLength(199);
 	});
 
 	it.each([

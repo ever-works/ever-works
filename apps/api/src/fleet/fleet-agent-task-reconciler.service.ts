@@ -26,14 +26,18 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
 import {
+    FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES,
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
     FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
     fleetModelCostUsdToCents,
     fleetModelPluginId,
+    isFleetAgentExecutionProvider,
+    isFleetAgentModelSessionId,
     normalizeFleetAgentTaskContainment,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
+    type FleetAgentExecutionProvider,
     type FleetAgentTaskGitResult,
     type FleetAgentTaskPayload,
     type FleetAgentTaskQuestion,
@@ -305,6 +309,12 @@ export class FleetAgentTaskReconcilerService {
             );
         }
 
+        // Self-build slice AU — keep the CLI session this run reported, and
+        // the node that holds it, BEFORE the three-way split: the question
+        // branch files the Inbox item the owner answers, and the answer's
+        // resume carries whatever is on the row at that moment.
+        await this.recordCliSession(event, ctx, run, result);
+
         // Fleet cost accounting (EW-777) — BEFORE the three-way split, so
         // the usage row exists when the terminal CAS settles it, whichever
         // of markCompleted / markFailed / tryMarkCompleted that is.
@@ -398,7 +408,10 @@ export class FleetAgentTaskReconcilerService {
                 task,
                 event.userId,
                 agentId,
-                composeFailureMessage(reason, result, queueExpired),
+                withMisplacedQuestionNote(
+                    composeFailureMessage(reason, result, queueExpired),
+                    result,
+                ),
             );
             // Exactly ONE Inbox notice per settled job: this is the single
             // producer, and the emitting CAS fires the event once.
@@ -615,7 +628,7 @@ export class FleetAgentTaskReconcilerService {
             task,
             event.userId,
             agentId,
-            composeSuccessMessage(summary, finalizeNote, result),
+            withMisplacedQuestionNote(composeSuccessMessage(summary, finalizeNote, result), result),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
     }
@@ -854,9 +867,78 @@ export class FleetAgentTaskReconcilerService {
             task,
             event.userId,
             agentId,
-            composeQuestionMessage(question, result, mountNotes),
+            withMisplacedQuestionNote(composeQuestionMessage(question, result, mountNotes), result),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
+    }
+
+    /**
+     * Self-build slice AU — persist the CLI session a node reported, so an
+     * answered owner question continues the model that asked it instead of
+     * restarting it from zero (`result.model.sessionId` used to ride the
+     * wire and be dropped right here).
+     *
+     * Three facts, three sources, because the wire is untrusted:
+     *
+     *   - the SESSION id from the report, but only in the one shape a node
+     *     may later put on `claude --resume <id>`
+     *     ({@link isFleetAgentModelSessionId}) — anything else is dropped;
+     *   - the NODE from the event, i.e. the reporter `completeJob` just
+     *     authenticated as the job's holder — never a field of the result;
+     *   - the PROVIDER from the plan on the job, and only when the report
+     *     agrees with it: a session minted by another CLI than the one the
+     *     platform asked for is not one the next job can resume.
+     *
+     * A run that reported NO usable session has its carried record retired
+     * (`recordFleetCliSession(null)`): a successor inherits its source's
+     * session through `resume`, and keeping that inheritance after this run
+     * ran would hand the NEXT run a conversation that never saw this run's
+     * work. Only node reports count — a synthetic settlement (queue expiry,
+     * lease budget) says nothing about a CLI.
+     *
+     * Best-effort: a session that cannot be recorded costs the next run a
+     * fresh session with the answered questions replayed, never a failure.
+     */
+    private async recordCliSession(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+        run: AgentRun,
+        result: FleetAgentTaskResult | null,
+    ): Promise<void> {
+        if (event.source !== 'node-report') return;
+        // What the node did with a session it was offered — operator
+        // visibility only (the job row keeps the full result). Vocabulary-
+        // checked and truncated: the reason is node-written text.
+        const offered = result?.model?.resume;
+        if (offered && FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES.includes(offered.outcome)) {
+            this.logger.log(
+                `Run ${ctx.runId}: fleet CLI session ${offered.outcome}${
+                    typeof offered.reason === 'string' && offered.reason.trim()
+                        ? ` — ${truncate(offered.reason.trim(), MAX_VERDICT_CHARS)}`
+                        : ''
+                }`,
+            );
+        }
+        const reported = result?.model?.sessionId;
+        const nodeId = event.nodeId ?? event.job.nodeId ?? null;
+        const planned = plannedProvider(event.job);
+        if (
+            isFleetAgentModelSessionId(reported) &&
+            isFleetAgentModelSessionId(nodeId) &&
+            planned !== null &&
+            result?.model?.provider === planned
+        ) {
+            const session = { sessionId: reported, nodeId, provider: planned };
+            await this.bestEffort('cli session', () =>
+                this.runs.recordFleetCliSession(ctx.runId, session),
+            );
+            return;
+        }
+        if (run.fleetCliSession) {
+            await this.bestEffort('retire carried cli session', () =>
+                this.runs.recordFleetCliSession(ctx.runId, null),
+            );
+        }
     }
 
     /**
@@ -1224,7 +1306,67 @@ export function parseAgentTaskResult(
         // never leak an untyped (or smuggled-field) question into the
         // parked-run path.
         question: normalizeFleetAgentTaskQuestion(redactQuestionFields(raw.question)),
+        // Self-build slice AU: question files the model wrote outside a
+        // repository root. Narrowed here like every other block — paths a
+        // node wrote are quoted back to a human, so only bounded, relative,
+        // printable strings survive.
+        misplacedQuestionFiles: normalizeMisplacedQuestionFiles(raw.misplacedQuestionFiles),
     };
+}
+
+/** Most misplaced question paths the reconciler will quote (slice AU). */
+const MAX_MISPLACED_QUESTION_FILES = 5;
+
+/**
+ * Self-build slice AU — the node's list of misplaced question files, or
+ * `undefined` when it sent none. Each entry must be a relative path of
+ * printable (Unicode) characters (no drive, no leading slash, no `..`
+ * segment, no backtick) and is capped at {@link MAX_QUOTED_CHARS}; anything
+ * else is dropped.
+ */
+function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const paths = raw
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(
+            (entry) =>
+                entry.length > 0 &&
+                entry.length <= MAX_QUOTED_CHARS &&
+                // Printable Unicode is a real path (`资源/.ever-works/QUESTION.md`)
+                // and must still be reported (review). Refused: every `\p{C}`
+                // code point — controls, newlines, bidi overrides and other
+                // format characters that could disguise a path in the chat —
+                // and the backtick, which would close the code span the note
+                // quotes the path in.
+                !/\p{C}/u.test(entry) &&
+                !entry.includes('`') &&
+                !entry.startsWith('/') &&
+                !entry.startsWith('\\') &&
+                !/^[A-Za-z]:/.test(entry) &&
+                !entry.split(/[\\/]/).includes('..'),
+        )
+        .slice(0, MAX_MISPLACED_QUESTION_FILES);
+    return paths.length > 0 ? paths : undefined;
+}
+
+/**
+ * Self-build slice AU — the line the Task chat gets when the model wrote a
+ * question file from a subdirectory: the node removed it unread, so this is
+ * the only way the owner learns the agent wanted to ask something.
+ */
+function withMisplacedQuestionNote(message: string, result: FleetAgentTaskResult | null): string {
+    const files = result?.misplacedQuestionFiles;
+    if (!files || files.length === 0) return message;
+    return [
+        message,
+        '',
+        `Note: the agent wrote a question file outside the repository root (${files
+            .map((file) => `\`${file}\``)
+            .join(
+                ', ',
+            )}). Only \`.ever-works/QUESTION.md\` at a repository root is read as a question, so it was not asked — the node removed it. If the agent needed a decision, re-run the Task or answer in its chat.`,
+    ].join('\n');
 }
 
 /**
@@ -1385,6 +1527,18 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
     const git = result?.git;
     if (!git || !git.pushed || git.empty) return null;
     return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
+}
+
+/**
+ * Self-build slice AU — the model-CLI provider the PLATFORM put on this job
+ * (`payload.execution.provider`), or `null` for a legacy command-mode job or
+ * a payload that does not say. The job row is the platform's own record of
+ * what it asked for; the node's report only ever gets compared against it.
+ */
+function plannedProvider(job: FleetJobView): FleetAgentExecutionProvider | null {
+    const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+    const provider = payload?.execution?.provider;
+    return isFleetAgentExecutionProvider(provider) ? provider : null;
 }
 
 function describeFinalize(outcome: TaskWorkspaceFinalizeOutcome, branch: string): string {

@@ -9,7 +9,7 @@ import {
     EVER_STATS_SIGNATURE_HEADER,
     EVER_STATS_SIGNATURE_PREFIX,
 } from '@ever-works/contracts';
-import { validateStatsReportBody } from '@ever-works/agent/ever-instance';
+import { validateStatsReportBytes } from '@ever-co/connect-sdk';
 
 /** One request the receiver saw, with its verdict. */
 export interface ReceivedReport {
@@ -107,13 +107,14 @@ export class LocalStatsReceiver {
         if (!cryptoVerify(null, body, publicKey, signature)) {
             return { status: 400, answer: { code: 'signature_invalid' } };
         }
-        const check = validateStatsReportBody(body);
-        if ('errors' in check) {
+        // The ingest's own checks on the exact bytes (the Ever Platform SDK's).
+        const check = validateStatsReportBytes(new Uint8Array(body));
+        if ('error' in check) {
             return {
-                status: 422,
+                status: check.error.status,
                 answer: {
-                    code: 'schema_violation',
-                    errors: check.errors.map((error) => ({ path: error.path, code: error.code })),
+                    code: check.error.code,
+                    errors: check.error.errors.map(({ path, code }) => ({ path, code })),
                 },
             };
         }

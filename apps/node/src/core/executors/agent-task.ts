@@ -27,12 +27,14 @@ import type { WorkspacePublishFence } from '@ever-works/plugin';
 import {
 	FLEET_AGENT_TASK_MAX_SETUP_STEPS,
 	FLEET_AGENT_TASK_MAX_STEPS,
+	FLEET_AGENT_TASK_QUESTION_FILE,
 	FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC,
 	FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES,
 	FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
 	FLEET_RUN_SECRETS_UNAVAILABLE_REASON,
 	FLEET_RUN_SECRETS_UNRESOLVED_REASON,
 	FleetAgentExecutionError,
+	fleetAgentExecutionProviderSupportsSessionResume,
 	normalizeFleetAgentModelExecution,
 	REPO_DECLARED_COMMAND_ID_PREFIX
 } from '@ever-works/contracts';
@@ -59,6 +61,7 @@ import {
 } from '../model-execution/isolated-home';
 import { resolveCommandRoot, type CommandRootFs } from './command-roots';
 import {
+	collectMisplacedOwnerQuestions,
 	collectOwnerQuestion,
 	defaultQuestionFs,
 	discardOwnerQuestion,
@@ -483,6 +486,16 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 * command is spawned in it. Defaults to `node:fs`.
 	 */
 	commandRootFs?: CommandRootFs;
+	/**
+	 * Self-build slice AU — this node's own enrollment id, from its local
+	 * config (never from the wire). The ONE fact that decides whether a
+	 * job's `execution.resume` names a session that lives on THIS machine:
+	 * a CLI keeps its sessions in the machine's own config home, so only
+	 * the node that ran a session can continue it. Absent (an embedder that
+	 * did not wire it) means every offered session is skipped and the run
+	 * starts fresh — the safe direction.
+	 */
+	nodeId?: string;
 	platform?: NodeJS.Platform;
 }
 
@@ -890,6 +903,10 @@ async function runResolvedAgentTask(
 	// NEVER pushes to `failures` — the platform decides what a paused run
 	// means, and the model / check / git verdicts below stay honest.
 	let question: FleetAgentTaskQuestion | null = null;
+	// Slice AU — question files written from a subdirectory: reported (and
+	// removed) so the owner learns the agent wanted to ask, instead of the
+	// question vanishing behind the exclude rule. Never a failure.
+	let misplacedQuestionFiles: string[] = [];
 	if (execution && !setupBlocked) {
 		question = await collectOwnerQuestion(
 			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
@@ -897,6 +914,19 @@ async function runResolvedAgentTask(
 			signal
 		);
 		throwIfAgentTaskAborted(signal);
+		misplacedQuestionFiles = await collectMisplacedOwnerQuestions(
+			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
+			questionFs,
+			signal
+		);
+		throwIfAgentTaskAborted(signal);
+		if (misplacedQuestionFiles.length > 0) {
+			io.logger?.warn(
+				`[fleet-node] job ${job.id}: the model wrote ${FLEET_AGENT_TASK_QUESTION_FILE} outside the ` +
+					`repository root (${misplacedQuestionFiles.join(', ')}); only the root file is read as a ` +
+					`question — reported on the run and removed`
+			);
+		}
 	}
 
 	const stepResults = setupBlocked ? [] : await runCommandPhase(steps, context, io, signal, undefined, reported);
@@ -1012,6 +1042,8 @@ async function runResolvedAgentTask(
 		// Conditional key: a run without a question reports exactly what it
 		// always did (`question: null` would be a wire change for nothing).
 		...(question ? { question } : {}),
+		// Slice AU: same posture — absent unless a misplaced file was found.
+		...(misplacedQuestionFiles.length > 0 ? { misplacedQuestionFiles } : {}),
 		// Same posture for the MCP bridge: absent unless the job actually
 		// asked for one. NEVER carries the token — only whether the bridge
 		// ran and how many tool calls went through it.
@@ -1258,57 +1290,107 @@ async function runModelStep(
 	const recordEvidence = io.modelTranscript !== 'off';
 	const streamClaude = recordEvidence && execution.provider === 'claude-code';
 	const lineDelimitedOutput = streamClaude || execution.provider === 'codex';
+	// Slice AU — whether this run continues an earlier CLI session. Decided
+	// before anything is spawned, from the job's (validated) offer and this
+	// node's OWN enrollment id.
+	const resumeDecision = decideSessionResume(execution, io);
 	try {
-		await scratchFs.writeFile(scratch.instructionsPath, execution.instructions);
-		let command: string;
-		try {
-			command = buildModelCliCommand({
+		// ONE model invocation: write the prompt, build and gate the command,
+		// spawn, parse. Run once for a fresh session — or, slice AU, once with
+		// `--resume` and, only when the CLI could not open that session at
+		// all, once more fresh. Every attempt shares the scratch files, the
+		// containment overlay and the MCP bridge: the fallback is the run the
+		// job would have been without the offer, not a second job. Each
+		// attempt is ONE {@link invokeModelCliStep} (slice AP), so the run
+		// evidence reported is the evidence of the attempt whose verdict is
+		// reported.
+		const invoke = async (instructions: string, resumeSessionId?: string): Promise<FleetAgentTaskModelResult> => {
+			await scratchFs.writeFile(scratch.instructionsPath, instructions);
+			let command: string;
+			try {
+				command = buildModelCliCommand({
+					execution,
+					executable,
+					workspacePath,
+					scratch,
+					...(mounts && mounts.length > 0 ? { mounts } : {}),
+					...(bridge.cli ? { mcp: bridge.cli } : {}),
+					...(resumeSessionId ? { resumeSessionId } : {}),
+					...(io.platform ? { platform: io.platform } : {}),
+					...(streamClaude ? { stream: true } : {})
+				});
+				// Last gate before the spawn: the grant has to be in the string
+				// that is actually run, not merely computed. Nothing downstream
+				// can tell a discarded cross-repository edit from a model that
+				// chose not to make one, so a missing grant fails the job here.
+				assertMountGrantsInCommand({
+					command,
+					execution,
+					...(mounts && mounts.length > 0 ? { mounts } : {}),
+					...(io.platform ? { platform: io.platform } : {})
+				});
+			} catch (error) {
+				if (error instanceof ModelCliCommandError) throw new AgentTaskPayloadError(error.message);
+				throw error;
+			}
+			// `execution.envPassthrough` is unchanged and deliberately so: the
+			// run token is NOT in it, is not in the child's environment, and
+			// could not be even if a payload asked — `EVER_WORKS_` is refused
+			// by `NODE_PLATFORM_OWNED_ENV_PATTERN` whatever a grant says.
+			const step = buildModelCliStep(execution, command, execution.envPassthrough, execution.envGrants);
+			// Slice AK: the ONE call on this node that carries a containment
+			// overlay (inside {@link invokeModelCliStep}). The setup phase and
+			// the acceptance checks deliberately do not — see
+			// {@link establishModelContainment}.
+			return invokeModelCliStep({
+				jobId,
 				execution,
-				executable,
+				step,
 				workspacePath,
 				scratch,
-				...(mounts && mounts.length > 0 ? { mounts } : {}),
-				...(bridge.cli ? { mcp: bridge.cli } : {}),
-				...(io.platform ? { platform: io.platform } : {}),
-				...(streamClaude ? { stream: true } : {})
+				scratchFs,
+				io,
+				signal,
+				envOverlay: containment.envOverlay,
+				runSecretValues,
+				recordEvidence,
+				lineDelimitedOutput
 			});
-			// Last gate before the spawn: the grant has to be in the string
-			// that is actually run, not merely computed. Nothing downstream
-			// can tell a discarded cross-repository edit from a model that
-			// chose not to make one, so a missing grant fails the job here.
-			assertMountGrantsInCommand({
-				command,
-				execution,
-				...(mounts && mounts.length > 0 ? { mounts } : {}),
-				...(io.platform ? { platform: io.platform } : {})
-			});
-		} catch (error) {
-			if (error instanceof ModelCliCommandError) throw new AgentTaskPayloadError(error.message);
-			throw error;
+		};
+
+		let model: FleetAgentTaskModelResult;
+		if (resumeDecision?.kind === 'attempt') {
+			// Slice AU — the continuation prompt only: the session already
+			// holds the brief, the workspace facts and every earlier exchange.
+			const resumed = await invoke(resumeDecision.instructions, resumeDecision.sessionId);
+			throwIfAgentTaskAborted(signal);
+			if (resumeNeverOpened(resumed)) {
+				// The CLI never opened the session — `claude` answers an id it
+				// does not have with "No conversation found" and exit 1, before
+				// any model turn and at no cost. Run the job as it would have
+				// run without the offer: a fresh session on the FULL
+				// instructions, which carry the answered questions replayed.
+				const reason =
+					`the CLI could not open the earlier session on this node (exit ${resumed.exitCode ?? 'unknown'}); ` +
+					'a fresh session ran on the full instructions';
+				io.logger?.warn(`[fleet-node] job ${jobId}: session resume fell back — ${reason}`);
+				// Slice AP × AU: the fresh attempt writes the SAME output file.
+				// Empty it first, so the live evidence reader of this attempt can
+				// never read the failed attempt's bytes as its own.
+				await scratchFs.writeFile(scratch.resultPath, '');
+				const fresh = await invoke(execution.instructions);
+				model = { ...fresh, resume: { outcome: 'fell-back', reason } };
+			} else {
+				io.logger?.info(`[fleet-node] job ${jobId}: continued the earlier CLI session on this node`);
+				model = { ...resumed, resume: { outcome: 'resumed' } };
+			}
+		} else {
+			const fresh = await invoke(execution.instructions);
+			model =
+				resumeDecision?.kind === 'skip'
+					? { ...fresh, resume: { outcome: 'skipped', reason: resumeDecision.reason } }
+					: fresh;
 		}
-		// `execution.envPassthrough` is unchanged and deliberately so: the
-		// run token is NOT in it, is not in the child's environment, and
-		// could not be even if a payload asked — `EVER_WORKS_` is refused
-		// by `NODE_PLATFORM_OWNED_ENV_PATTERN` whatever a grant says.
-		const step = buildModelCliStep(execution, command, execution.envPassthrough, execution.envGrants);
-		// Slice AK: the ONE call on this node that carries a containment
-		// overlay (inside {@link invokeModelCliStep}). The setup phase and
-		// the acceptance checks deliberately do not — see
-		// {@link establishModelContainment}.
-		const model = await invokeModelCliStep({
-			jobId,
-			execution,
-			step,
-			workspacePath,
-			scratch,
-			scratchFs,
-			io,
-			signal,
-			envOverlay: containment.envOverlay,
-			runSecretValues,
-			recordEvidence,
-			lineDelimitedOutput
-		});
 		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
@@ -1906,6 +1988,85 @@ async function finalizeMounts(
 		const message = error instanceof Error ? error.message : String(error);
 		return writable.map((mount) => ({ ...toBase(mount), error: message }));
 	}
+}
+
+/**
+ * Self-build slice AU — what this node does with a job's offer to continue
+ * an earlier CLI session: `null` when the job made no offer, `attempt`
+ * with the session and the continuation prompt, or `skip` with the one
+ * sentence the run reports.
+ *
+ * A CLI keeps its sessions in the machine's own config home, so the only
+ * node that can continue one is the node that ran it — compared against
+ * THIS node's enrollment id from its local config, never against anything
+ * the wire says about who it is. Case-insensitive because both are UUIDs.
+ * The provider check repeats the planner's on purpose: an older or a
+ * tampered platform must not talk a node into `codex exec resume`, which
+ * cannot be held to the run's sandbox.
+ */
+function decideSessionResume(
+	execution: FleetAgentModelExecution,
+	io: Pick<AgentTaskIo, 'nodeId'>
+): { kind: 'attempt'; sessionId: string; instructions: string } | { kind: 'skip'; reason: string } | null {
+	const offer = execution.resume;
+	if (!offer) return null;
+	if (!fleetAgentExecutionProviderSupportsSessionResume(execution.provider)) {
+		return {
+			kind: 'skip',
+			reason: `${execution.provider} cannot continue a session on the fleet; a fresh session ran on the full instructions`
+		};
+	}
+	const self = typeof io.nodeId === 'string' ? io.nodeId.trim().toLowerCase() : '';
+	if (!self) {
+		return {
+			kind: 'skip',
+			reason: 'this node does not know its own enrollment id; a fresh session ran on the full instructions'
+		};
+	}
+	if (offer.nodeId.toLowerCase() !== self) {
+		return {
+			kind: 'skip',
+			reason: 'the earlier session lives on another fleet node; a fresh session ran on the full instructions'
+		};
+	}
+	return { kind: 'attempt', sessionId: offer.sessionId, instructions: offer.instructions };
+}
+
+/**
+ * Self-build slice AU — the CLI's own words for "I could not open that
+ * session", which is the ONLY thing allowed to trigger a fresh retry:
+ *
+ *   - `No conversation found with session ID: <id>` — what `claude -p
+ *     --resume <unknown id>` prints on stderr before exiting 1 (probed against
+ *     Claude Code 2.1.294): the id is not in this machine's CLI home, or not
+ *     under this worktree's project directory;
+ *   - `unknown option '--resume'` / `'--fork-session'` — a CLI too old for
+ *     the flags (commander's wording), which also exits before any model turn.
+ */
+const RESUME_NEVER_OPENED_SIGNATURES: readonly RegExp[] = [
+	/No conversation found with session ID/i,
+	/unknown option ['"]?--(?:resume|fork-session)\b/i
+];
+
+/**
+ * Self-build slice AU — the resumed invocation demonstrably never opened the
+ * session: it failed, reported no session id and no model turn, AND the CLI
+ * said why in one of {@link RESUME_NEVER_OPENED_SIGNATURES}. Only then is a
+ * fresh retry safe — nothing ran, nothing was spent, the worktree is as the
+ * offer found it.
+ *
+ * Missing result fields alone are NOT proof (review, PR #2571): a resumed
+ * CLI that edited files and was then killed or crashed before printing its
+ * final JSON reports no session and no turns either, and re-running the
+ * model then would spend it twice on an already-changed worktree while the
+ * first attempt's cost went unreported. An unexplained failure is reported
+ * as the failure it is. A timeout never falls back either: the budget is gone.
+ */
+function resumeNeverOpened(model: FleetAgentTaskModelResult): boolean {
+	if (model.status !== 'failed') return false;
+	if (model.sessionId || (typeof model.turns === 'number' && model.turns > 0)) return false;
+	const said = typeof model.outputTail === 'string' ? model.outputTail : '';
+	return RESUME_NEVER_OPENED_SIGNATURES.some((signature) => signature.test(said));
 }
 
 function describeModelFailure(model: FleetAgentTaskModelResult): string {
