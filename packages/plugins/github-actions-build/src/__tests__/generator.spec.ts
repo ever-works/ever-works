@@ -23,6 +23,7 @@ import {
 	generateWorkflow,
 	normaliseBuildBlock,
 	secretNamesFor,
+	stripTrailingNewlines,
 	yamlString,
 	type WorkflowGeneratorInput
 } from '../workflow/generator.js';
@@ -921,32 +922,35 @@ describe('generator — the checks-only file (T42, R-9, ACC-05-30, FR-70)', () =
  * care what it is handed.
  */
 describe('the embedded verify script', () => {
-	it('drops only the trailing newlines, in linear time', () => {
-		const scriptWith = (newlines: number) => `echo first${'\n'.repeat(newlines)}echo last\n\n\n`;
-		const generate = (newlines: number) =>
-			generateWorkflow({ ...fixtures.minimal, verifyRunnerScript: scriptWith(newlines) });
+	it('drops only the trailing newlines', () => {
+		const script = `echo first${'\n'.repeat(50_000)}echo last\n\n\n`;
+		const file = generateWorkflow({ ...fixtures.minimal, verifyRunnerScript: script });
 
-		const file = generate(50_000);
 		expect(file).toContain(`          echo first\n${'\n'.repeat(49_999)}          echo last\n`);
 		expect(file).not.toContain('          echo last\n\n');
+	});
 
-		// Linear time is judged by how the cost SCALES, not by a wall-clock budget: an absolute
-		// "< 200 ms" over the whole generator went red at 205 ms on a loaded shared runner
-		// (develop CI 2026-10-09) with the linear implementation in place. Quadrupling the input
-		// multiplies a linear pass by ~4 and the old backtracking `/\n+$/` by ~16, so a ratio
-		// under 8 separates the two regardless of how busy the machine is. Best of three runs
-		// per size, so one scheduler stall cannot decide it.
-		const bestMs = (newlines: number) => {
-			let best = Number.POSITIVE_INFINITY;
-			for (let run = 0; run < 3; run += 1) {
-				const started = performance.now();
-				generate(newlines);
-				best = Math.min(best, performance.now() - started);
-			}
-			return best;
-		};
-		const small = bestMs(25_000);
-		const large = bestMs(100_000);
-		expect(large / Math.max(small, 1)).toBeLessThan(8);
+	// The complexity guard tests the trim ITSELF, on an input so large that the two
+	// implementations are orders of magnitude apart — never a tight timing of the whole generator.
+	// Two earlier versions of this test timed `generateWorkflow` and both went red on the shared,
+	// CPU-quota-throttled CI runners with the linear code in place: an absolute "< 200 ms" (205 ms,
+	// develop CI 2026-10-09) and a 4x-input scaling ratio "< 8" (19.9, because a throttled runner
+	// penalises the longer measurement disproportionately). Here the run of 2,000,000 newlines is
+	// NOT at the end, which is the shape `/\n+$/` backtracks on: the old regex needs ~10^12 steps
+	// (hours), the linear trim inspects two characters and slices once (milliseconds). The bound
+	// leaves three orders of magnitude of headroom for any runner, and the vitest timeout catches
+	// a regression long before the regex would finish.
+	it('trims a huge interior run of newlines in linear time', () => {
+		const interior = '\n'.repeat(2_000_000);
+		const text = `echo first${interior}echo last\n\n`;
+
+		const started = performance.now();
+		const trimmed = stripTrailingNewlines(text);
+		const elapsedMs = performance.now() - started;
+
+		expect(trimmed).toBe(`echo first${interior}echo last`);
+		expect(stripTrailingNewlines('\n\n\n')).toBe('');
+		expect(stripTrailingNewlines('no newline')).toBe('no newline');
+		expect(elapsedMs).toBeLessThan(2_000);
 	});
 });
