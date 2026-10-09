@@ -510,6 +510,64 @@ export class MailService {
     }
 
     /**
+     * Trial-ending reminder (2026-10 repricing: 90-day Cloud trial) — sent 7 days and ~3 days
+     * before the trial ends, once each (deduplicated upstream by `TrialReminderService`).
+     *
+     * Transactional, like an invoice: it is not gated by notification preferences, because it
+     * announces a charge. Rides the shared `notification` template so it carries the same
+     * branding as every other account email. Never throws: a failed send is logged and the
+     * in-app reminder (written upstream) still stands.
+     */
+    async sendTrialEndingEmail(
+        toEmail: string | null,
+        recipientName: string,
+        context: { planName: string; trialEnd: Date; lead: '7d' | '3d' },
+    ): Promise<boolean> {
+        const recipient = this.requireEmail(toEmail, 'trial-ending reminder');
+        if (!recipient) {
+            return false;
+        }
+        try {
+            const appName = config.branding.appName();
+            const webAppUrl = config.webAppUrl().replace(/\/+$/, '');
+            const planName = this.stripHtmlTags(context.planName) || 'paid plan';
+            const dateLabel = new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'UTC',
+            }).format(context.trialEnd);
+            const title = `Your free trial ends on ${dateLabel}`;
+            await this.mailerService.sendMail({
+                to: recipient,
+                subject: `[${appName}] ${title}`,
+                template: 'notification',
+                context: {
+                    ...this.getBrandingContext(),
+                    firstName: recipientName,
+                    title,
+                    message:
+                        `Your ${planName} free trial ends on ${dateLabel}. On that date the card you ` +
+                        `added at checkout is charged for the plan and billing period you chose, and the ` +
+                        `plan continues without interruption. If you do not want to continue, cancel ` +
+                        `from Settings → Billing before then and you will not be charged.`,
+                    eventTitle: 'Billing',
+                    actionUrl: toWebAppLink(webAppUrl, '/settings/billing'),
+                    actionLabel: 'Manage billing',
+                    settingsUrl: toWebAppLink(webAppUrl, '/settings/billing') ?? webAppUrl,
+                },
+            });
+            return true;
+        } catch (error) {
+            this.logger.error(
+                `Failed to send trial-ending reminder (${context.lead})`,
+                (error as Error)?.stack ?? error,
+            );
+            return false;
+        }
+    }
+
+    /**
      * Attention controls (AW-13) — one notification email to the account's
      * own address, for the built-in `email` delivery target of the
      * notification matrix.

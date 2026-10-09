@@ -216,11 +216,23 @@ describe('scrubString on hostile input', () => {
 			seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
 			return (seed >>> 8) % bound;
 		};
+		// Compare first, assert once: 20,000 `expect()` calls (each building a JSON message) cost far more
+		// than the scrubbing itself, and on a CPU-throttled CI runner that overhead alone ran past the 10 s
+		// test timeout (develop CI 2026-10-09). Same corpus, same coverage; a failure still names every
+		// offending message (the first 20, with the total).
+		const mismatches: { message: string; actual: string; expected: string }[] = [];
+		let mismatchCount = 0;
 		for (let run = 0; run < 20_000; run += 1) {
 			let message = '';
 			const length = 1 + next(14);
 			for (let index = 0; index < length; index += 1) message += fragments[next(fragments.length)];
-			expect(scrubString(message), JSON.stringify(message)).toBe(referenceScrub(message));
+			const actual = scrubString(message);
+			const expected = referenceScrub(message);
+			if (actual !== expected) {
+				mismatchCount += 1;
+				if (mismatches.length < 20) mismatches.push({ message, actual, expected });
+			}
 		}
+		expect({ mismatchCount, mismatches }).toEqual({ mismatchCount: 0, mismatches: [] });
 	});
 });

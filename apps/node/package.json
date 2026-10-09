@@ -1,6 +1,6 @@
 {
 	"name": "ever-works-node",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Ever Works Node - headless execution node (CLI + long-running service): fleet enrollment, heartbeat and capability reporting",
 	"author": {
 		"name": "Ever Co. LTD",
