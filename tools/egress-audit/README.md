@@ -34,7 +34,7 @@ together in one pull request and refresh the lockfile; the audit runs on it.
 This directory holds only Works' inputs:
 
 - `egress-audit.config.json` — the compose files, the API service, the statistics routes probed
-  in the off modes, and the Works mode `off_env_file`;
+  in the off modes, and the Works modes `default_off` and `off_env_file`;
 - `adapter.mjs` — what an operator does: for `loaded_off`, register the platform admin and switch
   statistics off in Settings; in the off modes, call all six statistics routes with their own
   method (the harness's probe sends GET only) and require 404 from each; per mode, `CI=true` so
@@ -46,10 +46,11 @@ This directory holds only Works' inputs:
 
 | Mode             | The API                                                             | Passes when                                                                    |
 | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `off`            | `EVER_STATS_ENABLED=false` in the container environment             | no Ever host looked up, no connection attempt out, `/api/instance-stats/*` 404 |
+| `default_off`    | nothing about statistics configured (off by default)                | no Ever host looked up, no connection attempt out, `/api/instance-stats/*` 404 |
+| `off`            | `EVER_STATS_ENABLED=false` in the container environment             | the same                                                                       |
 | `off_env_file`   | the same switch written ONLY in the API's `.env` file (`/app/.env`) | the same                                                                       |
-| `loaded_off`     | module loaded, switched off in Settings by the platform admin       | no request at all                                                              |
-| `positive_stats` | module on, `EVER_STATS_API_URL` = the mock platform                 | reports accepted (`202`), and no call but the statistics report                |
+| `loaded_off`     | module loaded (`EVER_STATS_ENABLED=true`), switched off in Settings | no request at all                                                              |
+| `positive_stats` | module on (`EVER_STATS_ENABLED=true`), `EVER_STATS_API_URL` = mock  | reports accepted (`202`), and no call but the statistics report                |
 | control          | `positive_stats` with the mock platform left out                    | must **fail** (exit 1): a green run is not a blind one                         |
 
 In every mode the send interval is a few seconds, so a module that should be silent but is not
@@ -75,6 +76,8 @@ docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:egress-audit .
 : > /tmp/api-empty.env
 printf 'EVER_STATS_ENABLED=false\n' > /tmp/api-stats-off.env
 
+EVER_WORKS_AUDIT_DOTENV=/tmp/api-empty.env \
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode default_off
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-empty.env \
   tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode off
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-stats-off.env \

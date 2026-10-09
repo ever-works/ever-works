@@ -21,18 +21,22 @@ const STATS_ROUTES = [
 	['POST', '/api/instance-stats/reset-identity']
 ];
 
-/** The modes in which the module is switched off by configuration. */
-const OFF_MODES = new Set(['off', 'off_env_file']);
+/**
+ * The modes in which the module is switched off by configuration — explicitly (`off`,
+ * `off_env_file`) or by the default, with nothing configured (`default_off`).
+ */
+const OFF_MODES = new Set(['off', 'off_env_file', 'default_off']);
 
 export default {
 	// Extra environment per mode (the harness adds it to the API container).
 	//
 	// `CI=true` lets the statistics module honour the modes' short send interval (it is raised to
-	// one hour otherwise): in `off` and `off_env_file` a module that were loaded by mistake would
-	// then try to send within the watched window, and be seen doing it.
+	// one hour otherwise): in `off`, `off_env_file` and `default_off` a module that were loaded by
+	// mistake would then try to send within the watched window, and be seen doing it.
 	env: {
 		off: { CI: 'true' },
 		off_env_file: { CI: 'true' },
+		default_off: { CI: 'true' },
 		// Loaded, switched off in Settings. The first send is due a minute after first boot, well
 		// after the switch is off (the driver acts as soon as the API answers); an installation
 		// whose switch did not hold would then try the default endpoint and be seen doing it.

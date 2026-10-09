@@ -132,7 +132,7 @@ describe('SettingsLayoutClient — the App Launcher tab', () => {
 
 /**
  * The Ever Platform tab exists only where the API has the anonymous usage
- * statistics module: with `EVER_STATS_ENABLED=false` the status route answers
+ * statistics module: unless `EVER_STATS_ENABLED=true` the status route answers
  * 404, the server layout passes `everPlatformEnabled={false}`, and the nav has
  * no entry to a page that would itself be a 404.
  */

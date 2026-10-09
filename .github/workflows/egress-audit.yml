@@ -6,12 +6,14 @@ name: Egress audit
 # no route out; CoreDNS is its only resolver and a capture sees every connection attempt and DNS
 # query from before the process starts. Modes (tools/egress-audit/README.md):
 #
-#   off             EVER_STATS_ENABLED=false in the container environment: no Ever host looked
-#                   up, no connection attempt out, every statistics route 404
+#   default_off     nothing about statistics configured (the self-hosted default is off): no
+#                   Ever host looked up, no connection attempt out, every statistics route 404
+#   off             EVER_STATS_ENABLED=false in the container environment: the same
 #   off_env_file    the same switch written ONLY in the API's .env file
-#   loaded_off      module loaded, switched off in Settings by the platform admin: no request
-#   positive_stats  module on against the mock platform: reports accepted (202), and no call
-#                   other than the statistics report
+#   loaded_off      module loaded (EVER_STATS_ENABLED=true), switched off in Settings by the
+#                   platform admin: no request
+#   positive_stats  module on (EVER_STATS_ENABLED=true) against the mock platform: reports
+#                   accepted (202), and no call other than the statistics report
 #   control         positive_stats without the mock must FAIL, so a green run is not a blind one
 #
 # A second job runs the real sender against the same mock platform (202, every published
@@ -133,6 +135,12 @@ jobs:
           printf 'EVER_STATS_ENABLED=false\n' > "$RUNNER_TEMP/api-stats-off.env"
           docker image ls "$EVER_WORKS_API_IMAGE"
           df -h /
+
+      - name: 'default_off: nothing configured, statistics off by default'
+        if: ${{ !cancelled() }}
+        env:
+          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode default_off --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'off: EVER_STATS_ENABLED=false in the container environment'
         if: ${{ !cancelled() }}

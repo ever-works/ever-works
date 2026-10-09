@@ -29,14 +29,16 @@ import {
  * `ever.stats.v1` report a day, with instance-wide counts, feature switches
  * and monthly aggregates — nothing that names a person or an organization.
  *
- * On by default for an installation; off with `EVER_STATS_ENABLED=false`
- * (then this module is not imported at all — see {@link instanceStatsModuleImports})
- * or with the operator switch in Settings (the module stays loaded and makes
- * no request). Delivery goes through the `stats-sink` capability.
+ * Off by default for an installation (`EVER_STATS_DEFAULT_ENABLED`): this
+ * module is imported only with `EVER_STATS_ENABLED=true` — unset, empty,
+ * `false` or anything else and it is not imported at all (see
+ * {@link instanceStatsModuleImports}). Once on, the operator switch in Settings
+ * can still turn it off (the module stays loaded and makes no request).
+ * Delivery goes through the `stats-sink` capability.
  *
- * Should the module be in the graph although `EVER_STATS_ENABLED` switches it
- * off (the import decision runs when `ApiModule` is imported, so it depends on
- * the environment being loaded first), it still does nothing: the routes
+ * Should the module be in the graph although `EVER_STATS_ENABLED` does not
+ * switch it on (the import decision runs when `ApiModule` is imported, so it
+ * depends on the environment being loaded first), it still does nothing: the routes
  * answer 404 ({@link InstanceStatsOffMiddleware}), the scheduler starts no
  * timer and the sender refuses, all from the configuration read when the
  * module is created.
@@ -67,8 +69,8 @@ export class InstanceStatsModule implements NestModule {
 
 /**
  * What `ApiModule` imports for the statistics module: `[InstanceStatsModule]`
- * unless `EVER_STATS_ENABLED` switches it off, in which case NOTHING — no
- * route, no timer, no identity row, no client object.
+ * when `EVER_STATS_ENABLED=true`; otherwise — by default, or switched off —
+ * NOTHING: no route, no timer, no identity row, no client object.
  */
 export function instanceStatsModuleImports(
     env: Readonly<Record<string, string | undefined>> = process.env,

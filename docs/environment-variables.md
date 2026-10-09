@@ -267,11 +267,11 @@ any other origin, or from none, is refused (`403`), and an invalid entry stops a
 
 ## Anonymous Usage Statistics
 
-One small, signed report a day (plus one for the closed month on days 1–3 of a month) with counts, monthly totals and feature switches only — never a name, an address, a URL or any content. See [Anonymous usage statistics](./ever-platform/anonymous-statistics.md) for exactly what is sent and how to verify it.
+Off by default: nothing is sent unless you set `EVER_STATS_ENABLED=true`. Once on, one small, signed report a day (plus one for the closed month on days 1–3 of a month) with counts, monthly totals and feature switches only — never a name, an address, a URL or any content. See [Anonymous usage statistics](./ever-platform/anonymous-statistics.md) for exactly what is sent and how to verify it.
 
 | Variable                     | Description                                                                                    | Type     | Default                 | Required |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- | -------- | ----------------------- | -------- |
-| `EVER_STATS_ENABLED`         | `false` (or any value other than empty / `true`) switches the module off entirely              | `string` | on                      | No       |
+| `EVER_STATS_ENABLED`         | `true` switches the module on; unset, empty, `false` or any other value keeps it off entirely  | `string` | off                     | No       |
 | `EVER_STATS_API_URL`         | Base URL of the statistics endpoint (`https`; `http` only for a private or local host)         | `string` | `EVER_PLATFORM_API_URL` | No       |
 | `EVER_PLATFORM_API_URL`      | Ever Platform base URL                                                                         | `string` | `https://api.ever.co`   | No       |
 | `EVER_STATS_COUNTRY`         | The country you declare (ISO 3166-1 alpha-2); unset sends `ZZ`                                 | `string` | --                      | No       |
@@ -279,11 +279,11 @@ One small, signed report a day (plus one for the closed month on days 1–3 of a
 | `EVER_STATS_SEND_INTERVAL_S` | Seconds between reports; below 3600 only in tests                                              | `number` | `86400`                 | No       |
 | `EVER_WORKS_STATS_SINK`      | The `stats-sink` plugin that delivers reports                                                  | `string` | `ever-stats-sink`       | No       |
 
-Set `EVER_STATS_ENABLED=false` where the API reads its settings: `.env.compose` with the Docker Compose files (a
-`.env` next to them never reaches the containers), `apps/api/.env` when you run the API from source, or the
+Set `EVER_STATS_ENABLED=true` (or `false`) where the API reads its settings: `.env.compose` with the Docker Compose
+files (a `.env` next to them never reaches the containers), `apps/api/.env` when you run the API from source, or the
 container / pod environment. A value already in the environment wins over the `.env` file.
 
-The operator can also switch statistics off in **Settings → Ever Platform** without a restart.
+Once statistics are on, the operator can also switch them off in **Settings → Ever Platform** without a restart.
 
 ---
 

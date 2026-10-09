@@ -11,7 +11,7 @@ import {
  *
  * | Variable                     | Default                       | Meaning |
  * |------------------------------|-------------------------------|---------|
- * | `EVER_STATS_ENABLED`         | unset ⇒ on                    | `false` (or any value other than empty / `true`) ⇒ the module is not loaded: no route, no timer, no request |
+ * | `EVER_STATS_ENABLED`         | unset ⇒ off (`EVER_STATS_DEFAULT_ENABLED`) | `true` ⇒ the module is loaded; unset, empty, `false` or any other value ⇒ it is not loaded: no route, no timer, no request |
  * | `EVER_STATS_API_URL`         | `EVER_PLATFORM_API_URL`       | base URL of the statistics endpoint |
  * | `EVER_PLATFORM_API_URL`      | `https://api.ever.co`         | shared Ever Platform base URL |
  * | `EVER_STATS_COUNTRY`         | unset ⇒ `ZZ`                  | ISO 3166-1 alpha-2 country the operator declares |
@@ -58,16 +58,34 @@ const PLUGIN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 type Env = Readonly<Record<string, string | undefined>>;
 
 /**
- * The module switch. Unset, empty or `true` ⇒ on (anonymous statistics are on
- * by default). `false` ⇒ off. ANY other value ⇒ off as well: an operator who
- * writes `0`, `no` or `False` means off, and a switch that guards outbound
- * traffic fails closed.
+ * Whether the module runs when `EVER_STATS_ENABLED` is unset or empty.
+ *
+ * `false` for now: an installation sends no statistics unless its operator
+ * opts in with `EVER_STATS_ENABLED=true`, until the Ever Platform statistics
+ * endpoint is publicly available. This constant is the only place the default
+ * lives — setting it back to `true` restores "on unless switched off" with no
+ * other change, and `EVER_STATS_ENABLED` overrides it either way.
  */
-export function isEverStatsModuleEnabled(env: Env = process.env): boolean {
+export const EVER_STATS_DEFAULT_ENABLED = false;
+
+/**
+ * The module switch. `true` ⇒ on. Unset or empty ⇒ the default
+ * ({@link EVER_STATS_DEFAULT_ENABLED}: off). `false` ⇒ off. ANY other value ⇒
+ * off as well: an operator who writes `0`, `no` or `False` means off, and a
+ * switch that guards outbound traffic fails closed.
+ *
+ * `defaultEnabled` exists for tests that pin what the default does; the
+ * application always uses {@link EVER_STATS_DEFAULT_ENABLED}.
+ */
+export function isEverStatsModuleEnabled(
+    env: Env = process.env,
+    defaultEnabled: boolean = EVER_STATS_DEFAULT_ENABLED,
+): boolean {
     const raw = env.EVER_STATS_ENABLED;
-    if (raw === undefined) return true;
+    if (raw === undefined) return defaultEnabled;
     const value = raw.trim();
-    return value === '' || value === 'true';
+    if (value === '') return defaultEnabled;
+    return value === 'true';
 }
 
 export function readEverStatsConfig(env: Env = process.env): EverStatsConfig {

@@ -2,7 +2,7 @@
 id: anonymous-statistics
 title: Anonymous usage statistics
 sidebar_label: Anonymous usage statistics
-description: The one small, signed, anonymous report an Ever Works installation sends each day — exactly what is in it, what never is, when it is sent, how to switch it off and how to check every byte yourself.
+description: The one small, signed, anonymous report an Ever Works installation can send each day — off by default; exactly what is in it, what never is, when it is sent, how to switch it on or off and how to check every byte yourself.
 ---
 
 # Anonymous usage statistics
@@ -10,7 +10,7 @@ description: The one small, signed, anonymous report an Ever Works installation 
 **Audience:** operators of self-hosted Ever Works installations; privacy and security reviewers.
 **Prerequisites:** the platform admin account of the installation (for the settings page), and shell access if you want to change environment variables.
 
-The statistics module sends **one small, signed, anonymous report a day** so the maintainers can learn which versions and features are in use. It is on by default, it can be switched off in two ways, you can see every byte it sent, and it can never carry your business data: the report format is a closed schema, and every string in it must match an allow-list.
+The statistics module sends **one small, signed, anonymous report a day** so the maintainers can learn which versions and features are in use. It is **off by default** for now — until the Ever Platform statistics endpoint is publicly available, an installation sends nothing unless its operator switches statistics on with `EVER_STATS_ENABLED=true` (§4). Once on, it can be switched off again in two ways, you can see every byte it sent, and it can never carry your business data: the report format is a closed schema, and every string in it must match an allow-list.
 
 ## 1. What is sent
 
@@ -82,7 +82,7 @@ One JSON document per day, schema `ever.stats.v1`, at most 16 KiB, integers only
 
 | Field                                | Meaning                                                                                                                                                                                      |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `instance_id`                        | a random UUID your installation generates on first boot; not derived from a URL, host name or licence; you can reset it (§5)                                                                 |
+| `instance_id`                        | a random UUID your installation generates when statistics are first switched on; not derived from a URL, host name or licence; you can reset it (§5)                                         |
 | `product`, `instance_kind`, `serves` | always `works`, `backend`, `["works"]` for Ever Works                                                                                                                                        |
 | `sent_at`                            | the UTC date the report was built; no time of day, so a report cannot be matched to a request log line                                                                                       |
 | `version`, `module_version`          | the product version and the statistics module version, both `major.minor.patch` only — a build suffix (for example `1.2.3-acme-corp`) could name a company, so it is never sent              |
@@ -104,7 +104,7 @@ Names of people or companies, e-mail addresses, phone numbers, postal addresses,
 
 ## 2. When it is sent
 
-- Once per UTC day, at a second drawn at random for each report, starting one day after the installation's first boot (ten minutes after boot if the installation was down so long that a report is overdue by more than a day).
+- Once per UTC day, at a second drawn at random for each report, starting one day after the installation's first boot with statistics switched on (ten minutes after boot if the installation was down so long that a report is overdue by more than a day).
 - On days 1–3 of a month, one more report: the `final: true` report for the previous month.
 - If the receiver cannot be reached or answers with a server error, a rate limit or a request timeout (`408`), the module retries after 1 h, 4 h and 12 h, then at the next day's slot.
 - A report the receiver refuses as invalid (`422`), or because another key holds the `instance_id` (`409`), is not retried until a release changes the Ever Works version or the statistics module version — or, for `409`, until you reset the identity (§5). Any other refusal (a redirect, `401`, `403`, `404`, …) is retried after 7 days at the earliest.
@@ -121,7 +121,7 @@ The request is `POST <EVER_STATS_API_URL>/v1/stats/reports` with `Content-Type: 
 | `Ever-Stats-Signature` | `ed25519=` and the base64url signature over the exact request body            |
 | `Ever-Stats-Key-Id`    | base64url of the first 8 bytes of SHA-256 over the public key                 |
 
-The statistics key is an Ed25519 key pair your installation generates on first boot for statistics only. Its private half never leaves the installation. It is stored encrypted when `PLUGIN_SECRET_ENCRYPTION_KEY` is set — set it in production; a key stored before you set it is encrypted at the next restart. Without it the key is stored unencrypted in the database: the API logs `key_stored_unencrypted` at boot and the settings page says so. If you later remove or change `PLUGIN_SECRET_ENCRYPTION_KEY`, the stored key cannot be read: nothing is sent, the page shows the reason, and restoring the key or _Reset instance identity_ fixes it. Ever Platform remembers the public key the first time it sees an `instance_id`, so nobody else can send reports under that id. The key proves continuity, not identity: nothing about it says who you are.
+The statistics key is an Ed25519 key pair your installation generates, for statistics only, the first time statistics are switched on. Its private half never leaves the installation. It is stored encrypted when `PLUGIN_SECRET_ENCRYPTION_KEY` is set — set it in production; a key stored before you set it is encrypted at the next restart. Without it the key is stored unencrypted in the database: the API logs `key_stored_unencrypted` at boot and the settings page says so. If you later remove or change `PLUGIN_SECRET_ENCRYPTION_KEY`, the stored key cannot be read: nothing is sent, the page shows the reason, and restoring the key or _Reset instance identity_ fixes it. Ever Platform remembers the public key the first time it sees an `instance_id`, so nobody else can send reports under that id. The key proves continuity, not identity: nothing about it says who you are.
 
 The `User-Agent` is `ever-stats/<module version> (works/<version>)`.
 
@@ -129,22 +129,24 @@ The `User-Agent` is `ever-stats/<module version> (works/<version>)`.
 
 | Where                    | Default                                               | Who can change it                                           |
 | ------------------------ | ----------------------------------------------------- | ----------------------------------------------------------- |
-| Self-hosted installation | **on**                                                | the operator: the environment variable or the settings page |
+| Self-hosted installation | **off** (on with `EVER_STATS_ENABLED=true`)           | the operator: the environment variable or the settings page |
 | Ever Works cloud         | managed by Ever ("Managed by Ever Cloud" on the page) | Ever                                                        |
 
 People and organization admins inside an installation cannot change it: it is a setting of the whole installation, held by its platform admin. The settings page tells everyone else who manages it: "managed by the instance operator", or "managed by Ever Cloud" on an installation that declares `EVER_INSTALL_SOURCE=cloud`.
 
-## 4. How to switch it off
+## 4. How to switch it on or off
 
-### 4.1 Environment: the module is not loaded
+### 4.1 Environment: on with `true`, otherwise the module is not loaded
 
-Set `EVER_STATS_ENABLED=false` and restart the API. The module is not loaded at all: no route, no timer, no request; every `/api/instance-stats/*` route answers 404, and the **Ever Platform** settings tab is not shown. Any value other than empty or `true` also switches it off.
+Statistics are off unless `EVER_STATS_ENABLED=true`. To switch them on, set `EVER_STATS_ENABLED=true` and restart the API: the module is loaded, the **Ever Platform** settings tab appears, and the first report is sent about a day later (§2).
+
+Unset (the default), empty, `false` or any other value, and the module is not loaded at all: no route, no timer, no request; every `/api/instance-stats/*` route answers 404, and the **Ever Platform** settings tab is not shown. To switch statistics off again, remove the setting or set `EVER_STATS_ENABLED=false` and restart the API.
 
 Set it where the API reads its settings: in `.env.compose` with the Docker Compose files (a `.env` next to them only fills in placeholders of the compose file and never reaches the containers), in `apps/api/.env` when you run the API from source, or in the container or pod environment. A value already in the environment wins over the `.env` file.
 
 ### 4.2 Settings: the module is loaded and sends nothing
 
-**Settings → Ever Platform** (`/settings/ever-platform`) → _Send anonymous usage statistics_. With the switch off, the module makes **no** request at all and _Send now_ is disabled. The switch, _Send now_ and _Reset instance identity_ each add an entry to the Activity log with who did it and nothing else, and each needs the platform admin signed in to the web app: an API key or an automation acting as the admin is refused (`403`), so nothing but a person can switch statistics back on.
+Once statistics are switched on through the environment: **Settings → Ever Platform** (`/settings/ever-platform`) → _Send anonymous usage statistics_. With the switch off, the module makes **no** request at all and _Send now_ is disabled. The switch, _Send now_ and _Reset instance identity_ each add an entry to the Activity log with who did it and nothing else, and each needs the platform admin signed in to the web app: an API key or an automation acting as the admin is refused (`403`), so nothing but a person can switch statistics back on.
 
 ## 5. How to see what is sent
 
@@ -161,10 +163,10 @@ Anyone else signed in to the installation sees only whether statistics are on, a
 
 ## 6. Verify it yourself
 
-Watch every connection attempt of the API container, for example with statistics switched off:
+Watch every connection attempt of the API container, for example with statistics off (the default):
 
 ```sh
-# In .env.compose (or your environment): EVER_STATS_ENABLED=false, then
+# In .env.compose (or your environment): nothing about statistics, or EVER_STATS_ENABLED=false, then
 docker compose up -d
 # Every new outgoing TCP connection and DNS query of the API container:
 docker run --rm --net container:ever-works-api nicolaka/netshoot tcpdump -n '(tcp[tcpflags] & tcp-syn != 0) or udp port 53'
@@ -172,7 +174,7 @@ docker run --rm --net container:ever-works-api nicolaka/netshoot tcpdump -n '(tc
 
 With statistics off you will see no query for an Ever host and no connection to one. With them on, you will see the connections §2 lists — one a day to the statistics endpoint, a second one on days 1–3 of a month, retries after a failed delivery and those of each _Send now_ — and nothing else from this module.
 
-The repository runs the same check in CI on every push to `develop`, `stage` and `main`: an egress audit boots the API image on a Docker network with no route out and records every DNS query and connection attempt, with statistics off through the environment and through `.env`, and on against a mock receiver (where the only call allowed is the report itself).
+The repository runs the same check in CI on every push to `develop`, `stage` and `main`: an egress audit boots the API image on a Docker network with no route out and records every DNS query and connection attempt, with statistics off by default (nothing configured), off through the environment and through `.env`, and on against a mock receiver (where the only call allowed is the report itself).
 
 You can also run the stack on a Docker network created with `docker network create --internal`, which has no route out at all: the installation keeps working, and the settings page shows the daily report as not delivered.
 

@@ -55,8 +55,8 @@ export const INSTANCE_STATS_SEND_NOW_INTERVAL_MS = 10 * 60 * 1000;
 export const INSTANCE_STATS_SEND_TIMEOUT_MS: number = CONSTANTS.timeouts_ms.write;
 
 /**
- * Why a run sent nothing. `env`: `EVER_STATS_ENABLED` switches the module off
- * (it should not even be loaded then; the sender refuses all the same).
+ * Why a run sent nothing. `env`: `EVER_STATS_ENABLED` does not switch the
+ * module on (it should not even be loaded then; the sender refuses all the same).
  */
 export type InstanceStatsSkipReason = 'env' | 'ui' | 'not_due' | 'parked' | 'lease_busy';
 

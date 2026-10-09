@@ -33,19 +33,23 @@ import {
  * simulated seconds with every way out of the process watched — `fetch`,
  * `http(s).request`, `net` sockets, `tls` and DNS lookups.
  *
- * 1. `EVER_STATS_ENABLED=false` — the module is absent: nothing to boot, no
- *    connection attempt, and `/api/instance-stats/status` answers 404.
- * 2. Statistics ON (the self-hosted default) on a fresh installation — the
- *    module is loaded with the REAL sender plugin, yet nothing leaves the
- *    process during boot: the first report is a day away, and the plugin opens
- *    no connection when loaded.
- * 3. Control — the same boot with a report due: exactly one request, to the
- *    statistics endpoint. Without it, (1) and (2) could pass because the spies
- *    were blind.
- * 4. The module in the graph although `EVER_STATS_ENABLED=false` (the import
- *    decision is taken when `ApiModule` is imported, so it depends on the
- *    environment being loaded first): it still does nothing — no identity, no
- *    schedule, no request, every route 404, and the sender refuses.
+ * 1. `EVER_STATS_ENABLED` unset — the default: statistics are off unless the
+ *    operator opts in — and `EVER_STATS_ENABLED=false`: the module is absent,
+ *    nothing to boot, no connection attempt, and `/api/instance-stats/status`
+ *    answers 404.
+ * 2. Statistics switched ON (`EVER_STATS_ENABLED=true`) on a fresh
+ *    installation — the module is loaded with the REAL sender plugin, yet
+ *    nothing leaves the process during boot: the first report is a day away,
+ *    and the plugin opens no connection when loaded.
+ * 3. Control — the same opted-in boot with a report due: exactly one request,
+ *    to the statistics endpoint. Without it, (1) and (2) could pass because
+ *    the spies were blind; it is also the proof that `EVER_STATS_ENABLED=true`
+ *    still sends.
+ * 4. The module in the graph although the switch is off (unset or `false`;
+ *    the import decision is taken when `ApiModule` is imported, so it depends
+ *    on the environment being loaded first): it still does nothing — no
+ *    identity, no schedule, no request, every route 404, and the sender
+ *    refuses.
  *
  * The real `ApiModule` cannot be imported under this app's jest (see
  * `app-works-di-reachability.spec.ts`); it reaches the statistics module ONLY
@@ -198,6 +202,22 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
         }
     }
 
+    it('EVER_STATS_ENABLED unset (the default): nothing is booted, nothing goes out, the routes are 404', async () => {
+        const clock = { now: new Date() };
+        // Nothing about statistics but where reports would go: off by default.
+        const env = { EVER_STATS_API_URL: 'https://stats.example.test' };
+        expect(instanceStatsModuleImports(env)).toEqual([]);
+        const app = await boot(env, clock);
+        try {
+            await run30s(clock);
+            expect(outbound()).toEqual([]);
+            jest.useRealTimers();
+            await request(app.getHttpServer()).get('/api/instance-stats/status').expect(404);
+        } finally {
+            await app.close();
+        }
+    });
+
     it('EVER_STATS_ENABLED=false: nothing is booted, nothing goes out, the routes are 404', async () => {
         const clock = { now: new Date() };
         const env = {
@@ -216,9 +236,14 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
         }
     });
 
-    it('statistics on, fresh installation: the loaded module and plugin stay silent for 30 s', async () => {
+    it('statistics switched on, fresh installation: the loaded module and plugin stay silent for 30 s', async () => {
         const clock = { now: new Date() };
-        const app = await boot({ EVER_STATS_API_URL: 'https://stats.example.test' }, clock);
+        const env = {
+            EVER_STATS_ENABLED: 'true',
+            EVER_STATS_API_URL: 'https://stats.example.test',
+        };
+        expect(instanceStatsModuleImports(env)).toEqual([InstanceStatsModule]);
+        const app = await boot(env, clock);
         try {
             await run30s(clock);
             expect(outbound()).toEqual([]);
@@ -235,9 +260,14 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
         }
     });
 
-    it('control: the same boot with a report due makes one request, to the statistics endpoint only', async () => {
+    it('control: EVER_STATS_ENABLED=true with a report due makes one request, to the statistics endpoint only', async () => {
         const clock = { now: new Date() };
-        const app = await boot({ EVER_STATS_API_URL: 'https://stats.example.test' }, clock);
+        const env = {
+            EVER_STATS_ENABLED: 'true',
+            EVER_STATS_API_URL: 'https://stats.example.test',
+        };
+        expect(instanceStatsModuleImports(env)).toEqual([InstanceStatsModule]);
+        const app = await boot(env, clock);
         try {
             await jest.advanceTimersByTimeAsync(0);
             const dataSource = app.get<DataSource>(getDataSourceToken());
@@ -296,6 +326,34 @@ describe('Ever modules off — 30 s boot without an outbound call', () => {
             ] as const) {
                 await request(app.getHttpServer())[method](path).expect(404);
             }
+            expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
+        } finally {
+            await app.close();
+        }
+    });
+
+    it('loaded although EVER_STATS_ENABLED is unset (off by default): no identity, no request, the routes 404', async () => {
+        const clock = { now: new Date() };
+        const env = {
+            EVER_STATS_API_URL: 'https://stats.example.test',
+            EVER_STATS_SEND_INTERVAL_S: '5',
+        };
+        const app = await boot(env, clock, { forceModule: true });
+        try {
+            await run30s(clock);
+            expect(outbound()).toEqual([]);
+            const dataSource = app.get<DataSource>(getDataSourceToken());
+            expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
+            expect(await dataSource.getRepository(EverStatsLease).count()).toBe(0);
+
+            const sender = app.get(InstanceStatsSenderService);
+            expect(await sender.runDue()).toEqual({ ran: false, reason: 'env' });
+            expect(await sender.sendNow()).toEqual({ ran: false, reason: 'env' });
+            expect(outbound()).toEqual([]);
+
+            jest.useRealTimers();
+            await request(app.getHttpServer()).get('/api/instance-stats/status').expect(404);
+            await request(app.getHttpServer()).put('/api/instance-stats/toggle').expect(404);
             expect(await dataSource.getRepository(EverInstance).count()).toBe(0);
         } finally {
             await app.close();

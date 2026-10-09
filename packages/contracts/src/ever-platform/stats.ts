@@ -262,8 +262,8 @@ export interface StatsSendResult {
  * Settings (`ui`), the statistics key cannot be read (`key_unreadable`: the
  * encryption key it was stored with is missing or changed), the sender plugin
  * is not available (`sink_unavailable`), or the instance is operated by Ever
- * Cloud (`cloud-managed`, reported while on). `env` (switched off by
- * `EVER_STATS_ENABLED=false`) never reaches the API — the module is not
+ * Cloud (`cloud-managed`, reported while on). `env` (not switched on by
+ * `EVER_STATS_ENABLED`, the default) never reaches the API — the module is not
  * loaded, so its routes answer 404 — and is listed so the page can name that
  * state.
  */

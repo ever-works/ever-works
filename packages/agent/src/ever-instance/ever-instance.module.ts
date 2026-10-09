@@ -8,7 +8,7 @@ import { InstanceStatsRepository } from './instance-stats.repository';
  * anonymous usage statistics module.
  *
  * Imported ONLY by the API's statistics module, which itself is imported only
- * when `EVER_STATS_ENABLED` is not `false`: with statistics switched off this
+ * when `EVER_STATS_ENABLED=true` (off by default): with statistics off this
  * module is not in the graph, so no identity row is created and no key is
  * generated. It has no route, no timer and no network code.
  *

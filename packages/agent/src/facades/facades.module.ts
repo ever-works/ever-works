@@ -93,7 +93,7 @@ const FACADES = [
     // Anonymous usage statistics — the `stats-sink` facade: resolves the one
     // delivery plugin named by `EVER_WORKS_STATS_SINK`. Depends only on the
     // global PluginRegistryService; constructing it does nothing, and only the
-    // statistics module (absent when `EVER_STATS_ENABLED=false`) ever calls it.
+    // statistics module (absent unless `EVER_STATS_ENABLED=true`) ever calls it.
     StatsSinkFacadeService,
 ];
 
