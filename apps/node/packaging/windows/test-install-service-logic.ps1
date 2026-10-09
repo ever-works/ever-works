@@ -604,6 +604,53 @@ finally {
     Remove-Item -LiteralPath $rotationDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# --- NSSM log retention (self-build slice AP, review) ----------------------
+
+# NSSM rotates but never deletes a rotated generation, so the service branch
+# registers a prune task. Its script must keep the newest Keep generations of
+# EACH log under BOTH naming schemes, and touch nothing else.
+$pruneSpec = New-ScheduledTaskPruneActionSpec `
+    -PowerShellExe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+    -LogPaths @('C:\ProgramData\ever-works-node\node.log', 'C:\ProgramData\ever-works-node\node.err.log') `
+    -Keep 5
+Assert-True ($pruneSpec.Argument.StartsWith('-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ')) 'the prune script travels encoded'
+$decodedPrune = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($pruneSpec.Argument.Substring($pruneSpec.Argument.LastIndexOf(' ') + 1)))
+Assert-Equal $decodedPrune $pruneSpec.Script 'the encoded prune command must decode to exactly the reviewed script'
+Assert-False ($decodedPrune.Contains('Move-Item')) 'the prune script must never rotate the live log - NSSM owns that'
+Assert-True ($decodedPrune.TrimEnd().EndsWith('exit 0')) 'a prune problem must never surface as a task failure'
+$pruneParseErrors = $null
+[void][Management.Automation.Language.Parser]::ParseInput($decodedPrune, [ref]$null, [ref]$pruneParseErrors)
+Assert-Equal @($pruneParseErrors).Count 0 'the generated prune script must parse under Windows PowerShell'
+
+$pruneDir = Join-Path ([IO.Path]::GetTempPath()) ('ew-prune-test-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $pruneDir | Out-Null
+try {
+    $liveLog = Join-Path $pruneDir 'node.log'
+    $liveErr = Join-Path $pruneDir 'node.err.log'
+    Set-Content -LiteralPath $liveLog -Value 'live' -Encoding Ascii
+    Set-Content -LiteralPath $liveErr -Value 'live' -Encoding Ascii
+    # NSSM's own names, written NEWEST FIRST so modification time disagrees
+    # with the timestamp in the name: the name must win.
+    foreach ($stamp in @('20260104T000000.400', '20260103T000000.300', '20260102T000000.200', '20260101T000000.100')) {
+        Set-Content -LiteralPath (Join-Path $pruneDir "node-$stamp.log") -Value 'old' -Encoding Ascii
+        Set-Content -LiteralPath (Join-Path $pruneDir "node.err-$stamp.log") -Value 'old' -Encoding Ascii
+    }
+    Set-Content -LiteralPath (Join-Path $pruneDir 'node-notes.log') -Value 'not a rotation' -Encoding Ascii
+    $smallPrune = New-LogPruneScript -LogPaths @($liveLog, $liveErr) -Keep 2
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    & $psExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($smallPrune)))
+    Assert-Equal $LASTEXITCODE 0 'the prune script must exit 0'
+    $left = @(Get-ChildItem -LiteralPath $pruneDir -File | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True ($left -contains 'node.log') 'the live stdout log is never pruned'
+    Assert-True ($left -contains 'node.err.log') 'the live stderr log is never pruned'
+    Assert-True ($left -contains 'node-notes.log') 'a file that is not a rotation must never be touched'
+    Assert-Equal (@($left | Where-Object { $_ -match '^node-\d{8}T' }) -join ',') 'node-20260103T000000.300.log,node-20260104T000000.400.log' 'NSSM stdout generations: the newest two BY NAME survive'
+    Assert-Equal (@($left | Where-Object { $_ -match '^node\.err-\d{8}T' }) -join ',') 'node.err-20260103T000000.300.log,node.err-20260104T000000.400.log' 'NSSM stderr generations: the newest two survive, counted per log'
+}
+finally {
+    Remove-Item -LiteralPath $pruneDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # --- Preflight ------------------------------------------------------------
 
 Assert-Equal (Invoke-Preflight).Count 0 'a fully healthy service install must produce no findings at all'

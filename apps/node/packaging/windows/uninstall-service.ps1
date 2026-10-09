@@ -58,6 +58,15 @@ if ($null -ne $task) {
     $removed = $true
 }
 
+# Self-build slice AP (review): the service branch's log-prune task. It is
+# this installer's own artefact and means nothing without the service.
+$pruneTaskName = "$Name-LogPrune"
+$pruneTask = Get-ScheduledTask -TaskName $pruneTaskName -ErrorAction SilentlyContinue
+if ($null -ne $pruneTask) {
+    Unregister-ScheduledTask -TaskName $pruneTaskName -Confirm:$false
+    Write-Host "Removed scheduled task '$pruneTaskName'."
+}
+
 if (-not $removed) {
     Write-Host "Nothing named '$Name' is registered on this machine."
 }

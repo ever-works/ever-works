@@ -825,6 +825,35 @@ if ($mechanism -eq 'service') {
         throw "$reason The service '$Name' was created by this run and has been removed again, so this machine is as it was found. A wrong -ServicePassword shows up here as SCM error 1069."
     }
 
+    # Self-build slice AP (review): NSSM rotates the logs but never deletes a
+    # rotated generation. A small SYSTEM task prunes them, daily and at boot,
+    # to the same number the scheduled-task branch keeps. Registered with
+    # -Force so a re-run converges it. A failure here WARNS rather than
+    # undoing the service: rotation still bounds each file, and an operator
+    # can re-run the installer once the cause is fixed.
+    $pruneTaskName = "$Name-LogPrune"
+    $pruneKeep = (Get-NodeLogRotationPolicy).Keep
+    $pruneSpec = New-ScheduledTaskPruneActionSpec `
+        -PowerShellExe (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -LogPaths @($stdoutLog, $stderrLog) `
+        -Keep $pruneKeep
+    if ($commitChanges) {
+        try {
+            $pruneAction = New-ScheduledTaskAction -Execute $pruneSpec.Execute -Argument $pruneSpec.Argument -WorkingDirectory $stateDir
+            $pruneTriggers = @((New-ScheduledTaskTrigger -Daily -At '04:30'), (New-ScheduledTaskTrigger -AtStartup))
+            $prunePrincipal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+            $pruneSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+            Register-ScheduledTask -TaskName $pruneTaskName -Action $pruneAction -Trigger $pruneTriggers -Principal $prunePrincipal -Settings $pruneSettings -Force | Out-Null
+            Write-Host "Registered scheduled task '$pruneTaskName' (keeps the newest $pruneKeep rotated generations of each log)."
+        }
+        catch {
+            Write-Warning "Could not register the log-prune task '$pruneTaskName': $($_.Exception.Message). NSSM still rotates the logs, but rotated generations will accumulate until the installer is re-run."
+        }
+    }
+    else {
+        Write-Host "  Register-ScheduledTask -TaskName $pruneTaskName -Action <powershell -EncodedCommand: keep the newest $pruneKeep rotated logs> -Trigger <daily 04:30, atStartup> -Principal SYSTEM -Force"
+    }
+
     Write-Host "  Application:   $nodeExe"
     Write-Host "  AppParameters: $argumentLine"
     Write-Host "  RunAs:         $($identity.ServiceLogonName)"
