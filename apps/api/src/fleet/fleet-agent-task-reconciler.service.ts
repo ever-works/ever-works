@@ -1286,7 +1286,8 @@ const MAX_MISPLACED_QUESTION_PATH_CHARS = 4096;
  */
 function abbreviateMisplacedQuestionPath(path: string): string {
     if (path.length <= MAX_QUOTED_CHARS) return path;
-    const kept: string[] = [];
+    // `let`: a mutable accumulator (team convention, review).
+    let kept: string[] = [];
     let units = 1; // the leading ellipsis
     for (const codePoint of Array.from(path).reverse()) {
         if (units + codePoint.length > MAX_QUOTED_CHARS) break;
