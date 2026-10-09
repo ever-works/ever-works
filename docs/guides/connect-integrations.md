@@ -171,6 +171,15 @@ Self-hosting? You register your own GitHub App and wire it through environment v
 | `GITHUB_APP_SETUP_URL`      | Overrides the default `<web app URL>/api/github-app/setup`.            |
 | `GITHUB_APP_CALLBACK_URL`   | Overrides the default `<web app URL>/api/github-app/callback`.         |
 
+When you register the App, also give it the **account permission "Email addresses: read"**. The setup callback uses it to read your _verified_ GitHub email addresses, which is what lets a GitHub identity the platform has never seen be matched to an existing Ever Works account by email.
+
+The App works without that permission. GitHub then refuses `GET /user/emails` (`403`/`404`), and the callback falls back to the public profile email, treats it as **unverified**, and logs a warning naming the missing permission. What that changes:
+
+- A GitHub identity that has signed in before is matched by its GitHub user id (the App user link, or the `github` sign-in account), never by email, so it is unaffected.
+- A brand-new GitHub identity gets a fresh account. An unverified email is never used to link it to an existing account; if one already uses that email, the callback refuses and you land on the auth error page.
+
+The setup and callback routes redirect the browser to the web app's public origin, `NEXT_PUBLIC_WEB_URL` (or `WEB_URL`) on the web deployment. Set it to the browser-facing URL. The address the web server listens on is never used.
+
 ### How to: turn on review for a single repository, without the App
 
 1. Enable the **GitHub** plugin at `/plugins` and open its settings.

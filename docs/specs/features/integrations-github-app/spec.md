@@ -129,6 +129,21 @@ setup URL, and callback URL are derived with sensible defaults from
   returns no email, the onboarding service synthesises
   `github-app-${githubUserId}@users.noreply.ever.works` and creates
   the user with `emailVerified: false`.
+- **Given** the App lacks the account permission "Email addresses: read",
+  so GitHub answers `GET /user/emails` with `403` or `404`, **when**
+  `GitHubAppService.getAuthenticatedGithubUser` resolves the email,
+  **then** it calls `resolveGitHubAccountEmail(..., { allowMissingEmailPermission: true })`,
+  which falls back to the `/user` profile email with
+  `emailVerified: false` and logs a warning naming the missing
+  permission, and the callback completes instead of failing. `401`,
+  `5xx` and network failures still throw. The OAuth-App sign-in path
+  (`SocialAuthService`) does not opt in, so it keeps failing on a
+  missing `user:email` scope.
+- **Given** a `github` auth account already exists for the GitHub user
+  id but its local user cannot be loaded, **when**
+  `findOrCreateLocalUser` runs, **then** the service throws
+  `ConflictException` before anything is written, rather than creating
+  a second user for the same GitHub identity.
 - **Given** an existing local user is found by email but the
   GitHub-resolved email is NOT verified, **when**
   `findOrCreateLocalUser` checks the link/auth-account chain,
