@@ -139,6 +139,11 @@ setup URL, and callback URL are derived with sensible defaults from
   `5xx` and network failures still throw. The OAuth-App sign-in path
   (`SocialAuthService`) does not opt in, so it keeps failing on a
   missing `user:email` scope.
+- **Given** the HMAC state names an installation the authorizing GitHub
+  user cannot access (it is absent from that user's
+  `GET /user/installations`), **when** `completeUserAuth` runs, **then**
+  it throws `ForbiddenException` before any user, auth-account, user-link
+  or installation row is written or claimed.
 - **Given** a `github` auth account already exists for the GitHub user
   id but its local user cannot be loaded, **when**
   `findOrCreateLocalUser` runs, **then** the service throws

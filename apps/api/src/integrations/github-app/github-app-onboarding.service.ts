@@ -8,6 +8,7 @@ import { GitHubAppInstallation, User } from '@ever-works/agent/entities';
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     UnauthorizedException,
 } from '@nestjs/common';
@@ -70,6 +71,22 @@ export class GitHubAppOnboardingService {
         const githubUser = await this.gitHubAppService.getAuthenticatedGithubUser(
             tokenResult.access_token,
         );
+
+        // The signed state names an installation id chosen by whoever called the
+        // public setup endpoint; the HMAC proves only that WE issued the state.
+        // Before anything is written or the installation is bound to a local
+        // user, prove the GitHub user who just authorized can actually access
+        // that installation — otherwise anyone with a GitHub login and a known,
+        // still-unclaimed installation id could claim it.
+        const canAccessInstallation = await this.gitHubAppService.userCanAccessInstallation(
+            tokenResult.access_token,
+            state.installationId,
+        );
+        if (!canAccessInstallation) {
+            throw new ForbiddenException(
+                'The authorizing GitHub user cannot access this GitHub App installation',
+            );
+        }
 
         const user = await this.findOrCreateLocalUser({
             githubUserId: githubUser.githubUserId,

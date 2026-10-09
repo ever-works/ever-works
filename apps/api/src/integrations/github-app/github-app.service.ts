@@ -47,6 +47,11 @@ type GitHubAccessTokenResponse = {
     error_description?: string;
 };
 
+type GitHubUserInstallationsResponse = {
+    total_count?: number;
+    installations?: Array<{ id: number }>;
+};
+
 type GitHubUserResponse = {
     id: number;
     login: string;
@@ -150,6 +155,39 @@ export class GitHubAppService {
             nodeId: data.node_id || null,
             accessToken,
         };
+    }
+
+    /**
+     * Whether the GitHub user behind a user-to-server token can access the given
+     * installation of THIS App. `GET /user/installations` lists exactly the
+     * installations of the App that issued the token on which the user has
+     * explicit access (installation owner, or org owner/member with access); no
+     * extra App permission is needed.
+     */
+    async userCanAccessInstallation(accessToken: string, installationId: string): Promise<boolean> {
+        if (!/^\d+$/.test(installationId)) {
+            return false;
+        }
+        const headers = createGitHubOAuthHeaders(accessToken);
+        const perPage = 100;
+        // Bounded: a user with access to more than 5,000 installations of one App
+        // is not a real onboarding case.
+        for (let page = 1; page <= 50; page++) {
+            const { data } = await firstValueFrom(
+                this.httpService.get<GitHubUserInstallationsResponse>(
+                    'https://api.github.com/user/installations',
+                    { headers, params: { per_page: perPage, page } },
+                ),
+            );
+            const installations = data.installations || [];
+            if (installations.some((installation) => String(installation.id) === installationId)) {
+                return true;
+            }
+            if (installations.length < perPage) {
+                return false;
+            }
+        }
+        return false;
     }
 
     async getInstallation(installationId: string): Promise<GitHubInstallationResponse> {

@@ -135,7 +135,7 @@ A delivery with no `x-github-event` header is rejected outright, and bot-authore
 ### How to: install the GitHub App
 
 1. Install the Ever Works GitHub App on the user account or organization, and choose the repositories it may see.
-2. Complete the setup redirect. GitHub hands off to `GET /api/github-app/setup` and then `GET /api/github-app/callback`, which bind the installation to your Ever Works account and sign you in.
+2. Complete the setup redirect. GitHub hands off to `GET /api/github-app/setup` and then `GET /api/github-app/callback`, which bind the installation to your Ever Works account and sign you in. The callback first checks, through GitHub's `GET /user/installations`, that the GitHub user who authorized can access that installation, and refuses otherwise. A link to someone else's setup URL cannot claim their installation.
 3. Open **Settings → GitHub App** (`/settings/github-app`). Each installation card shows its status (**Active** / **Suspended**), the account and target type, the repository count, the last sync and the app slug. With nothing linked yet the page says: _"Install the Ever Works GitHub App on a repository or organization, then complete the setup redirect to have the installation linked to this workspace."_
 4. Press **Sync** on the installation to refresh the repository snapshot from GitHub. A fresh installation shows _"This installation has no repositories stored yet. Run sync to refresh the snapshot from GitHub."_ until you do.
 5. Press **Onboard** next to a repository to register it as a Work.

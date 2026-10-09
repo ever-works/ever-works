@@ -1,4 +1,9 @@
-import { ConflictException, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+    ConflictException,
+    ForbiddenException,
+    Logger,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { AxiosError } from 'axios';
 import { of, throwError } from 'rxjs';
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
@@ -20,6 +25,7 @@ describe('GitHubAppOnboardingService', () => {
             getUserAuthorizationUrl: jest.fn(),
             exchangeUserCode: jest.fn(),
             getAuthenticatedGithubUser: jest.fn(),
+            userCanAccessInstallation: jest.fn().mockResolvedValue(true),
         };
         const installationRepository = {
             findByInstallationId: jest.fn(),
@@ -279,6 +285,51 @@ describe('GitHubAppOnboardingService', () => {
             );
         });
 
+        // Review (CodeRabbit security note on #2578): the signed state carries an
+        // installation id chosen by whoever called the PUBLIC setup endpoint.
+        // Making the callback succeed without "Email addresses: read" must not
+        // let any GitHub login claim a known, still-unclaimed installation.
+        it('refuses before any write when the authorizing GitHub user cannot access the installation', async () => {
+            const {
+                service,
+                gitHubAppService,
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            } = createService();
+            const state = (service as any).signState({
+                installationId: '12345',
+                issuedAt: Date.now(),
+            });
+            gitHubAppService.exchangeUserCode.mockResolvedValue({ access_token: 'ghu_token' });
+            gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                githubUserId: 'gh-attacker',
+                login: 'attacker',
+                email: 'attacker@example.com',
+                emailVerified: false,
+                avatarUrl: null,
+                nodeId: null,
+            });
+            gitHubAppService.userCanAccessInstallation.mockResolvedValue(false);
+
+            await expect(service.completeUserAuth({ code: 'code', state })).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+
+            expect(gitHubAppService.userCanAccessInstallation).toHaveBeenCalledWith(
+                'ghu_token',
+                '12345',
+            );
+            expect(userLinkRepository.findByGithubUserId).not.toHaveBeenCalled();
+            expect(userRepository.create).not.toHaveBeenCalled();
+            expect(userRepository.update).not.toHaveBeenCalled();
+            expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
+            expect(userLinkRepository.upsertLink).not.toHaveBeenCalled();
+            expect(installationRepository.upsertFromGithub).not.toHaveBeenCalled();
+            expect(installationRepository.claimOwnershipIfUnassigned).not.toHaveBeenCalled();
+        });
+
         // Prod 2026-10-09 — the App had no "Email addresses: read" permission, so
         // the email is the unverified public profile email. Identity must come
         // from the GitHub user id, never from that email.
@@ -494,6 +545,9 @@ describe('GitHubAppOnboardingService', () => {
                                 },
                             ),
                     ),
+                )
+                .mockReturnValueOnce(
+                    of({ data: { total_count: 1, installations: [{ id: 169597044 }] } }),
                 );
             const service = new GitHubAppOnboardingService(
                 realGitHubAppService,
@@ -527,6 +581,11 @@ describe('GitHubAppOnboardingService', () => {
                     '169597044',
                     owner.id,
                     '4242',
+                );
+                expect(httpService.get).toHaveBeenNthCalledWith(
+                    3,
+                    'https://api.github.com/user/installations',
+                    expect.anything(),
                 );
                 expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();
                 expect(ctx.userRepository.create).not.toHaveBeenCalled();

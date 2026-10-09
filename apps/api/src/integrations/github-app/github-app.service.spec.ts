@@ -157,6 +157,52 @@ describe('GitHubAppService', () => {
         });
     });
 
+    describe('userCanAccessInstallation', () => {
+        const page = (ids: number[]) => of({ data: { installations: ids.map((id) => ({ id })) } });
+
+        it('is true when GET /user/installations lists the installation', async () => {
+            const { service, httpService } = createService();
+            httpService.get.mockReturnValueOnce(page([7, 169597044]));
+
+            await expect(service.userCanAccessInstallation('ghu_token', '169597044')).resolves.toBe(
+                true,
+            );
+            expect(httpService.get).toHaveBeenCalledWith(
+                'https://api.github.com/user/installations',
+                expect.objectContaining({ params: { per_page: 100, page: 1 } }),
+            );
+        });
+
+        it('follows pagination until the installation is found', async () => {
+            const { service, httpService } = createService();
+            httpService.get
+                .mockReturnValueOnce(page(Array.from({ length: 100 }, (_, index) => index + 1)))
+                .mockReturnValueOnce(page([500]));
+
+            await expect(service.userCanAccessInstallation('ghu_token', '500')).resolves.toBe(true);
+            expect(httpService.get).toHaveBeenCalledTimes(2);
+        });
+
+        it('is false when the user cannot see the installation (a foreign, unclaimed one)', async () => {
+            const { service, httpService } = createService();
+            httpService.get.mockReturnValueOnce(page([7, 8]));
+
+            await expect(service.userCanAccessInstallation('ghu_token', '169597044')).resolves.toBe(
+                false,
+            );
+            expect(httpService.get).toHaveBeenCalledTimes(1);
+        });
+
+        it('is false for a non-numeric id without calling GitHub', async () => {
+            const { service, httpService } = createService();
+
+            await expect(service.userCanAccessInstallation('ghu_token', '../meta')).resolves.toBe(
+                false,
+            );
+            expect(httpService.get).not.toHaveBeenCalled();
+        });
+    });
+
     describe('listInstallationRepositories', () => {
         it('fetches all installation repositories across paginated responses', async () => {
             const { service, httpService } = createService();
