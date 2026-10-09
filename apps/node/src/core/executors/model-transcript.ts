@@ -293,7 +293,7 @@ export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOp
 				if (!block) continue;
 				if (block.type === 'text') addMessage(block.text, atMs);
 				else if (block.type === 'tool_use' && typeof block.name === 'string') {
-					openCall(stringOrNull(block.id), block.name, summarizeArgs(block.input), atMs);
+					openCall(stringOrNull(block.id), block.name, summarizeArgs(block.input, clean), atMs);
 				}
 			}
 		} else if (event.type === 'user') {
@@ -309,7 +309,7 @@ export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOp
 		const item = asRecord(event.item);
 		if (!item) return;
 		const id = stringOrNull(item.id);
-		const tool = codexTool(item);
+		const tool = codexTool(item, clean);
 		if (event.type === 'item.started') {
 			if (tool) openCall(id, tool.name, tool.summary, atMs);
 			return;
@@ -460,29 +460,39 @@ export function createModelTranscriptRecorder(options: ModelTranscriptRecorderOp
  * `key=value`, every other key by NAME only. Never a value of a key outside
  * {@link SUMMARY_ARG_KEYS}, so a file body cannot reach a summary however
  * the tool names its parameters.
+ *
+ * `clean` is applied to every value and key name BEFORE it is cut to its
+ * share of the summary (review): a secret straddling the cut would
+ * otherwise survive as a prefix no verbatim scrub can match any more.
  */
-export function summarizeArgs(input: unknown): string {
+export function summarizeArgs(input: unknown, clean: (text: string) => string = (text) => text): string {
 	const record = asRecord(input);
 	if (!record) return '';
 	const parts: string[] = [];
 	for (const key of SUMMARY_ARG_KEYS) {
 		const value = record[key];
-		if (typeof value === 'string' && value.trim()) parts.push(`${key}=${oneLine(value, 120)}`);
-		else if (typeof value === 'number' || typeof value === 'boolean') parts.push(`${key}=${String(value)}`);
+		if (typeof value === 'string' && value.trim()) parts.push(`${key}=${oneLine(clean(value), 120)}`);
+		else if (typeof value === 'number' || typeof value === 'boolean') parts.push(`${key}=${clean(String(value))}`);
 	}
 	const quoted = new Set<string>(SUMMARY_ARG_KEYS);
-	const others = Object.keys(record).filter((key) => !quoted.has(key));
+	const others = Object.keys(record)
+		.filter((key) => !quoted.has(key))
+		.map((key) => clean(key));
 	if (others.length > 0) parts.push(`+${others.slice(0, 8).join(',')}${others.length > 8 ? ',…' : ''}`);
 	return parts.join(' ');
 }
 
 /** A codex event item that is a tool call, as a name and an argument summary. */
-function codexTool(item: Record<string, unknown>): { name: string; summary: string } | null {
+function codexTool(
+	item: Record<string, unknown>,
+	clean: (text: string) => string
+): { name: string; summary: string } | null {
+	// Every value is cleaned BEFORE it is cut (see `summarizeArgs`).
 	switch (item.type) {
 		case 'command_execution':
 			return {
 				name: 'shell',
-				summary: typeof item.command === 'string' ? `command=${oneLine(item.command, 160)}` : ''
+				summary: typeof item.command === 'string' ? `command=${oneLine(clean(item.command), 160)}` : ''
 			};
 		case 'file_change': {
 			const changes = Array.isArray(item.changes) ? item.changes : [];
@@ -490,7 +500,7 @@ function codexTool(item: Record<string, unknown>): { name: string; summary: stri
 				.map((raw) => {
 					const change = asRecord(raw);
 					if (!change || typeof change.path !== 'string') return null;
-					return `${typeof change.kind === 'string' ? change.kind : 'change'} ${change.path}`;
+					return `${typeof change.kind === 'string' ? change.kind : 'change'} ${clean(change.path)}`;
 				})
 				.filter((entry): entry is string => entry !== null);
 			return { name: 'file_change', summary: described.length > 0 ? `changes=${described.join(', ')}` : '' };
@@ -498,12 +508,12 @@ function codexTool(item: Record<string, unknown>): { name: string; summary: stri
 		case 'mcp_tool_call': {
 			const server = typeof item.server === 'string' ? item.server : 'mcp';
 			const tool = typeof item.tool === 'string' ? item.tool : 'tool';
-			return { name: `mcp__${server}__${tool}`, summary: summarizeArgs(item.arguments) };
+			return { name: `mcp__${server}__${tool}`, summary: summarizeArgs(item.arguments, clean) };
 		}
 		case 'web_search':
 			return {
 				name: 'web_search',
-				summary: typeof item.query === 'string' ? `query=${oneLine(item.query, 160)}` : ''
+				summary: typeof item.query === 'string' ? `query=${oneLine(clean(item.query), 160)}` : ''
 			};
 		default:
 			return null;

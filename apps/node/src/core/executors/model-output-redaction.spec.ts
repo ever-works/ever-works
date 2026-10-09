@@ -163,6 +163,39 @@ describe('createModelTranscriptRecorder — keys and call ids are cleaned (revie
 	});
 });
 
+describe('summaries are scrubbed BEFORE they are cut (CodeRabbit risk note, review round 2)', () => {
+	const SECRET = 'straddle-7Qm2x9Vt4Lp8Rk1Wc6Hz3Nd5Bf0Gy';
+	const longCommand = `${'x'.repeat(105)} ${SECRET}`;
+
+	it('a protected value straddling the Claude summary cut never survives as a prefix', () => {
+		const recorder = createModelTranscriptRecorder({ provider: 'claude-code', protectedValues: [SECRET] });
+		recorder.feed(
+			`${JSON.stringify({
+				type: 'assistant',
+				message: { content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: longCommand } }] }
+			})}
+`,
+			null
+		);
+		const [step] = recorder.finish(null).timeline;
+		expect(step.argsSummary).not.toContain('straddle-');
+		expect(step.argsSummary).toContain('[redacted]');
+	});
+
+	it('…and the same for a Codex command', () => {
+		const recorder = createModelTranscriptRecorder({ provider: 'codex', protectedValues: [SECRET] });
+		const codexCommand = `${'y'.repeat(140)} ${SECRET}`;
+		recorder.feed(
+			`${JSON.stringify({ type: 'item.started', item: { id: 'c1', type: 'command_execution', command: codexCommand } })}
+`,
+			null
+		);
+		const [step] = recorder.finish(null).timeline;
+		expect(step.argsSummary).not.toContain('straddle-');
+		expect(step.argsSummary).toContain('[redacted]');
+	});
+});
+
 describe('runAgentTaskJob — the bounded reader fails open to readFile (review)', () => {
 	const ABSOLUTE = process.platform === 'win32' ? 'C:\\workspace' : '/workspace';
 	const SCRATCH = process.platform === 'win32' ? String.raw`C:\scratch` : '/tmp/ew-scratch';

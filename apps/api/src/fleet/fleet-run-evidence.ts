@@ -48,10 +48,13 @@ export interface FleetTimelineLogRow {
 export function fleetModelTimelineLogRows(result: unknown): FleetTimelineLogRow[] {
     const model = asRecord(asRecord(result)?.model);
     if (!model) return [];
-    const { steps, dropped } = normalizeFleetAgentTaskTimeline(
-        model.timeline,
-        model.timelineDropped,
-    );
+    // The platform's scanner runs on the node's FULL strings, before the
+    // contract caps them (review): a token straddling a cap would otherwise
+    // reach the scanner as a fragment its patterns no longer match.
+    const timeline = Array.isArray(model.timeline)
+        ? model.timeline.map(scrubWireStep)
+        : model.timeline;
+    const { steps, dropped } = normalizeFleetAgentTaskTimeline(timeline, model.timelineDropped);
     const rows: FleetTimelineLogRow[] = [];
     for (const step of steps) {
         if (step.kind === 'assistant-message') {
@@ -98,6 +101,18 @@ export function fleetModelTimelineLogRows(result: unknown): FleetTimelineLogRow[
         });
     }
     return rows;
+}
+
+/** One wire step with every text field scanned at full length; anything else passes through. */
+function scrubWireStep(entry: unknown): unknown {
+    const record = asRecord(entry);
+    if (!record) return entry;
+    const out: Record<string, unknown> = { ...record };
+    for (const key of ['text', 'argsSummary', 'toolName', 'callId'] as const) {
+        const value = record[key];
+        if (typeof value === 'string') out[key] = redactSecrets(value).cleaned;
+    }
+    return out;
 }
 
 function clean(text: string, maxChars: number): string {
