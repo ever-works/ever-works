@@ -7,7 +7,7 @@ The built-in provider of the `stats-sink` capability: it delivers the anonymous 
 - **What it answers:** `sent` (202), `rejected` (a redirect, 400, 409, 413, 415, 422 — with the refused field paths for a 422 — and any other 4xx), or `failed` (408, 429, 5xx, network, timeout). It reads at most 64 KiB of an answer.
 - **What it never does:** open a connection when it is loaded, start a timer, read or log the body, or add anything to the report.
 
-The plugin is hidden and has no settings. With statistics switched off (`EVER_STATS_ENABLED=false`, or the switch in **Settings → Ever Platform**) nothing ever calls it.
+The plugin is hidden and has no settings. With statistics off — the default, unless `EVER_STATS_ENABLED=true` — or switched off in **Settings → Ever Platform**, nothing ever calls it.
 
 To deliver reports somewhere else, write a plugin that declares the `stats-sink` capability and set `EVER_WORKS_STATS_SINK` to its id.
 
