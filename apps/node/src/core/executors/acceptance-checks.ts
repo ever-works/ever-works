@@ -529,8 +529,23 @@ const SHRINKABLE_RESULT_TEXT_KEYS: readonly string[] = [
 	'summary',
 	'stdoutExcerpt',
 	'stderrExcerpt',
-	'failureReason'
+	'failureReason',
+	// Self-build slice AP: the model step's redacted transcript. Evidence,
+	// never a verdict — and kept from its END when shrunk, like every tail.
+	'transcript'
 ];
+
+/**
+ * Self-build slice AP — whole ARRAYS a node outcome may drop, as a last
+ * resort, when shedding every text field above still left it over the cap.
+ * Each is bounded on its own (the model step's `timeline` is held to
+ * `FLEET_AGENT_TASK_TIMELINE_MAX_BYTES`), so this only fires when the rest
+ * of the result is already enormous — and then the run's verdict, its
+ * branch and its question still win over its step records. A dropped
+ * array is replaced by a count beside it (`<key>Dropped`), so the reader
+ * learns how much evidence was lost rather than that there was none.
+ */
+const SHEDDABLE_RESULT_ARRAY_KEYS: readonly string[] = ['timeline'];
 
 /** Below this, a tail is noise; drop the key rather than keep shaving it. */
 const MIN_KEPT_TEXT_BYTES = 192;
@@ -605,7 +620,38 @@ export function fitNodeOutcomeToResultBudget<T>(outcome: T, budgetBytes = FLEET_
 		if (largest.bytes <= MIN_KEPT_TEXT_BYTES) delete largest.owner[largest.key];
 		else largest.owner[largest.key] = tailUtf8Bytes(String(largest.owner[largest.key]), largest.bytes >> 1);
 	}
+	if (measured(clone) <= budgetBytes) return clone;
+	for (const holder of collectArrayHolders(clone, SHEDDABLE_RESULT_ARRAY_KEYS)) {
+		const lost = (holder.owner[holder.key] as unknown[]).length;
+		delete holder.owner[holder.key];
+		const countKey = `${holder.key}Dropped`;
+		const already = holder.owner[countKey];
+		holder.owner[countKey] = (typeof already === 'number' && Number.isFinite(already) ? already : 0) + lost;
+		if (measured(clone) <= budgetBytes) return clone;
+	}
 	return clone;
+}
+
+/** Every array under one of `keys`, anywhere in a (JSON-shaped) outcome. */
+function collectArrayHolders(
+	root: unknown,
+	keys: readonly string[]
+): Array<{ owner: Record<string, unknown>; key: string }> {
+	const holders: Array<{ owner: Record<string, unknown>; key: string }> = [];
+	const walk = (node: unknown, depth: number): void => {
+		if (depth > 8 || node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const entry of node) walk(entry, depth + 1);
+			return;
+		}
+		const record = node as Record<string, unknown>;
+		for (const [key, value] of Object.entries(record)) {
+			if (Array.isArray(value) && keys.includes(key)) holders.push({ owner: record, key });
+			else walk(value, depth + 1);
+		}
+	};
+	walk(root, 0);
+	return holders;
 }
 
 /**

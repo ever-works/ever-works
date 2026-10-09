@@ -338,6 +338,8 @@ You can also hand-edit a node's tags under **Settings → Fleet → Capability t
 
 `ever-works-node start` is a foreground process. The repo ships three ways to keep it alive across reboots — a systemd template unit (`ever-works-node@<user>.service`, which runs as the user whose commands the node executes, not root), a Windows service or scheduled task, and a container image. Enrollment is never part of installation: it consumes a one-time token and stays an explicit, interactive act.
 
+The node's own log rotates. Under systemd it goes to the journal (`journalctl -u ever-works-node@<user>`), which journald already bounds. On Windows, `node.log` / `node.err.log` in `%ProgramData%\ever-works-node` rotate past 10 MB: the NSSM service rotates them online and at every start (`AppRotateFiles`, `AppRotateOnline`, `AppRotateBytes`), and since NSSM never deletes a rotated file, the installer also registers a daily `<Name>-LogPrune` task that keeps the newest five rotated generations of each log, and the scheduled-task fallback rotates them each time the task starts — at boot and on every restart — keeping the newest five generations. Re-run the installer on a machine installed before this to pick it up.
+
 :::note Build it yourself for now
 `ever-works-node` is not published to npm yet, and the Fleet handoff panel says as much: "Node app downloads ship in an upcoming release." Build it from a monorepo checkout with `pnpm build:node` — the app is deliberately excluded from the default root build — or build the desktop node shell with `pnpm build:desktop-node`, the Electron packaging of the same shared core, with a setup wizard, a status window, a tray and auto-start.
 :::
@@ -861,6 +863,34 @@ answer that names a machine other than itself. The `Ever-Works-` trailer namespa
 a commit message that already contains one — a Task title can reach the message — fails the run
 rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
 is worse than no trailer at all. If you see that failure, rename the Task.
+
+### What a fleet run leaves behind
+
+A fleet run used to leave the owner one 8 KB output tail and a job row; the CLI's own record of every turn and tool call was deleted with the run's scratch directory. Now the node reads the model CLI's event stream — Claude Code runs with `--output-format stream-json --verbose`, Codex's `exec --json` already is one — **while the CLI writes it**, and reports two bounded, redacted artefacts on the job result:
+
+- **Step records** — one per assistant message and per tool call: the tool's name, a short argument summary (paths and commands; any other argument is listed by **name only**, so a file body never reaches it), whether the call succeeded, and how long it took (to the node's one-second poll). At most 200 steps and 48 KB; anything past that is counted, not silently lost. The platform writes them into the run's ordinary timeline, so **Agents → Activity → the run** shows a fleet run exactly the way it shows a cloud run.
+- **A transcript** — the CLI's stream, one JSON document per line, with every tool output, file body and reasoning block replaced by `[elided N chars]`, capped at 64 KB by keeping its beginning and its end. It lives on the fleet job row only.
+
+Both are redacted on the node before they leave it — the values behind every granted env name, the run's delivered `.env` contents (which live in no environment, so a name-based redactor would miss them), each also in the escaped spelling JSON gives it, and anything the shared secret-pattern scanner recognises — and the platform runs its scanner over the step records again before storing them. The run's short output tail — what the Task chat quotes when a run fails — stays what the model last said plus the CLI's stderr; it never becomes the raw stream with its tool output. A stream that outgrows the node's 8 MB output ceiling no longer fails the run: its end is read for the verdict, and the step records were already taken from the whole stream as it was written.
+
+A node older than this simply reports no step records, and the platform writes none.
+
+### How long fleet jobs keep their bodies
+
+A fleet job carries the whole assembled prompt (`payload`, up to 256 KB) and the run's result (up to 256 KB, now including the transcript). A nightly pass (03:35 UTC, one replica at a time under the distributed task lock) **NULLs both bodies on terminal jobs older than the retention window** and keeps the row itself — status, node, attempts, timings, cost, error. What the run did survives where it belongs: on the run, its timeline and the Task.
+
+| Env                        | Default | Meaning                                                                                         |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `FLEET_JOB_RETENTION_DAYS` | `30`    | days a terminal job keeps its `payload` and `result`; clamped to 1–3650, a nonsense value is 30 |
+| `FLEET_JOB_PURGE_ENABLED`  | `true`  | `false` switches the purge off entirely (an audit hold)                                         |
+
+The pass works in batches of 200 and stops after 50 batches, leaving any remainder to the next night. Purged rows carry `bodiesPurgedAt`, so no row is purged twice.
+
+### Fleet run telemetry
+
+Each lifecycle transition emits one event through the platform's existing analytics and error-monitoring services — PostHog (`fleet_run_leased`, `fleet_run_completed`, `fleet_run_failed`, `fleet_run_cancelled`) and Sentry structured logs (`fleet.run.*`; a failed run is a warning, never an exception). The properties are identifiers, the job kind, the completion source, queue wait and duration, attempts, the CLI's provider and verdict, the reported cost, tokens and turns, and the number of step records — **never** the prompt, the result's text or the node's error string. A deployment without PostHog or Sentry configured sends nothing.
+
+Uploading a node's own log when a run fails is not built: the node has no authenticated upload channel to put it on. Read `node.log` on the machine, or the journal on Linux.
 
 ## Related
 

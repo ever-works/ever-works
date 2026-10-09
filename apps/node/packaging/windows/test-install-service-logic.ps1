@@ -452,6 +452,23 @@ foreach ($required in @('Application', 'AppParameters', 'AppDirectory', 'Start',
 # command-line argument, which process-creation telemetry records.
 Assert-False ($planSettings -contains 'ObjectName') 'the password must not reach nssm as an ObjectName argument'
 
+# Self-build slice AP: both logs rotate - at start AND online - past the
+# shared policy, on a fresh install and on a re-run over an old service.
+$rotationPolicy = Get-NodeLogRotationPolicy
+Assert-Equal $rotationPolicy.Bytes 10485760 'the rotation threshold is 10 MB'
+foreach ($case in @(
+        @{ Label = 'fresh install'; Plan = $freshPlan },
+        @{ Label = 're-run over an existing service'; Plan = $existingPlan }
+    )) {
+    $rotateSettings = @{}
+    foreach ($step in @($case.Plan | Where-Object { $_.Kind -eq 'nssm' -and $_.Arguments[0] -eq 'set' -and $_.Arguments[2] -like 'AppRotate*' })) {
+        $rotateSettings[$step.Arguments[2]] = $step.Arguments[3]
+    }
+    Assert-Equal $rotateSettings['AppRotateFiles'] '1' "$($case.Label) must rotate the logs at service start"
+    Assert-Equal $rotateSettings['AppRotateOnline'] '1' "$($case.Label) must rotate the logs while the service runs"
+    Assert-Equal $rotateSettings['AppRotateBytes'] '10485760' "$($case.Label) must rotate past the shared size policy"
+}
+
 # --- Redaction ------------------------------------------------------------
 
 $renderedSecret = Format-ServicePlanStep -NssmPath 'C:\nssm.exe' -Step $identityStep
@@ -537,6 +554,102 @@ $spacedLogSpec = New-ScheduledTaskActionSpec `
     -StdoutPath 'C:\log dir\node.log' `
     -StderrPath 'C:\log dir\node.err.log'
 Assert-True ($spacedLogSpec.Argument -like '*>> "C:\log dir\node.log"*') 'a spaced log path must be quoted for cmd.exe'
+
+# --- Scheduled-task log rotation (self-build slice AP) ---------------------
+
+$rotationSpec = New-ScheduledTaskRotationActionSpec `
+    -PowerShellExe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+    -LogPaths @('C:\ProgramData\ever-works-node\node.log', "C:\it's here\node.err.log") `
+    -RotateBytes 10485760 `
+    -Keep 5
+Assert-Equal $rotationSpec.Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' 'the rotation action runs Windows PowerShell'
+Assert-True ($rotationSpec.Argument.StartsWith('-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ')) 'the rotation script travels encoded, never as a re-parsed command line'
+$encodedScript = $rotationSpec.Argument.Substring($rotationSpec.Argument.LastIndexOf(' ') + 1)
+$decodedScript = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($encodedScript))
+Assert-Equal $decodedScript $rotationSpec.Script 'the encoded command must decode to exactly the reviewed script'
+Assert-True ($decodedScript.Contains("'C:\ProgramData\ever-works-node\node.log'")) 'stdout log must be rotated'
+Assert-True ($decodedScript.Contains("'C:\it''s here\node.err.log'")) 'a quote in a log path must be doubled inside its single-quoted literal'
+Assert-True ($decodedScript.Contains('-lt 10485760')) 'the threshold must be the policy bytes'
+Assert-True ($decodedScript.TrimEnd().EndsWith('exit 0')) 'a rotation problem must never stop the node action'
+$parseErrors = $null
+[void][Management.Automation.Language.Parser]::ParseInput($decodedScript, [ref]$null, [ref]$parseErrors)
+Assert-Equal @($parseErrors).Count 0 'the generated rotation script must parse under Windows PowerShell'
+
+# Run the generated script for real, against a scratch directory under TEMP
+# (the only thing in this file that touches a disk, and it removes it).
+$rotationDir = Join-Path ([IO.Path]::GetTempPath()) ('ew-rotation-test-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $rotationDir | Out-Null
+try {
+    $bigLog = Join-Path $rotationDir 'node.log'
+    $smallLog = Join-Path $rotationDir 'node.err.log'
+    Set-Content -LiteralPath $bigLog -Value ('x' * 64) -Encoding Ascii
+    Set-Content -LiteralPath $smallLog -Value 'x' -Encoding Ascii
+    foreach ($stamp in @('20260101T000000', '20260102T000000', '20260103T000000')) {
+        Set-Content -LiteralPath (Join-Path $rotationDir "node.log.$stamp") -Value 'old' -Encoding Ascii
+    }
+    Set-Content -LiteralPath (Join-Path $rotationDir 'node.log.keep-me') -Value 'not a rotation' -Encoding Ascii
+    $smallScript = New-LogRotationScript -LogPaths @($bigLog, $smallLog, (Join-Path $rotationDir 'missing.log')) -RotateBytes 32 -Keep 2
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $encodedSmall = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($smallScript))
+    & $psExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encodedSmall
+    Assert-Equal $LASTEXITCODE 0 'the rotation script must exit 0'
+    Assert-False (Test-Path -LiteralPath $bigLog) 'a log past the threshold must be rotated away'
+    Assert-True (Test-Path -LiteralPath $smallLog) 'a log under the threshold must be left alone'
+    $rotatedNames = @(Get-ChildItem -LiteralPath $rotationDir -File | Where-Object { $_.Name -match '^node\.log\.\d{8}T\d{6}$' } | ForEach-Object { $_.Name })
+    Assert-Equal $rotatedNames.Count 2 'only the newest Keep rotated generations survive'
+    Assert-False ($rotatedNames -contains 'node.log.20260101T000000') 'the oldest generation is the one dropped'
+    Assert-True (Test-Path -LiteralPath (Join-Path $rotationDir 'node.log.keep-me')) 'a file that is not a rotation must never be touched'
+}
+finally {
+    Remove-Item -LiteralPath $rotationDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --- NSSM log retention (self-build slice AP, review) ----------------------
+
+# NSSM rotates but never deletes a rotated generation, so the service branch
+# registers a prune task. Its script must keep the newest Keep generations of
+# EACH log under BOTH naming schemes, and touch nothing else.
+$pruneSpec = New-ScheduledTaskPruneActionSpec `
+    -PowerShellExe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+    -LogPaths @('C:\ProgramData\ever-works-node\node.log', 'C:\ProgramData\ever-works-node\node.err.log') `
+    -Keep 5
+Assert-True ($pruneSpec.Argument.StartsWith('-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ')) 'the prune script travels encoded'
+$decodedPrune = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($pruneSpec.Argument.Substring($pruneSpec.Argument.LastIndexOf(' ') + 1)))
+Assert-Equal $decodedPrune $pruneSpec.Script 'the encoded prune command must decode to exactly the reviewed script'
+Assert-False ($decodedPrune.Contains('Move-Item')) 'the prune script must never rotate the live log - NSSM owns that'
+Assert-True ($decodedPrune.TrimEnd().EndsWith('exit 0')) 'a prune problem must never surface as a task failure'
+$pruneParseErrors = $null
+[void][Management.Automation.Language.Parser]::ParseInput($decodedPrune, [ref]$null, [ref]$pruneParseErrors)
+Assert-Equal @($pruneParseErrors).Count 0 'the generated prune script must parse under Windows PowerShell'
+
+$pruneDir = Join-Path ([IO.Path]::GetTempPath()) ('ew-prune-test-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $pruneDir | Out-Null
+try {
+    $liveLog = Join-Path $pruneDir 'node.log'
+    $liveErr = Join-Path $pruneDir 'node.err.log'
+    Set-Content -LiteralPath $liveLog -Value 'live' -Encoding Ascii
+    Set-Content -LiteralPath $liveErr -Value 'live' -Encoding Ascii
+    # NSSM's own names, written NEWEST FIRST so modification time disagrees
+    # with the timestamp in the name: the name must win.
+    foreach ($stamp in @('20260104T000000.400', '20260103T000000.300', '20260102T000000.200', '20260101T000000.100')) {
+        Set-Content -LiteralPath (Join-Path $pruneDir "node-$stamp.log") -Value 'old' -Encoding Ascii
+        Set-Content -LiteralPath (Join-Path $pruneDir "node.err-$stamp.log") -Value 'old' -Encoding Ascii
+    }
+    Set-Content -LiteralPath (Join-Path $pruneDir 'node-notes.log') -Value 'not a rotation' -Encoding Ascii
+    $smallPrune = New-LogPruneScript -LogPaths @($liveLog, $liveErr) -Keep 2
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    & $psExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($smallPrune)))
+    Assert-Equal $LASTEXITCODE 0 'the prune script must exit 0'
+    $left = @(Get-ChildItem -LiteralPath $pruneDir -File | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True ($left -contains 'node.log') 'the live stdout log is never pruned'
+    Assert-True ($left -contains 'node.err.log') 'the live stderr log is never pruned'
+    Assert-True ($left -contains 'node-notes.log') 'a file that is not a rotation must never be touched'
+    Assert-Equal (@($left | Where-Object { $_ -match '^node-\d{8}T' }) -join ',') 'node-20260103T000000.300.log,node-20260104T000000.400.log' 'NSSM stdout generations: the newest two BY NAME survive'
+    Assert-Equal (@($left | Where-Object { $_ -match '^node\.err-\d{8}T' }) -join ',') 'node.err-20260103T000000.300.log,node.err-20260104T000000.400.log' 'NSSM stderr generations: the newest two survive, counted per log'
+}
+finally {
+    Remove-Item -LiteralPath $pruneDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 # --- Preflight ------------------------------------------------------------
 

@@ -89,11 +89,14 @@ function envelope(over: Record<string, unknown> = {}): string {
 function scratchFs(outputs: Array<string | null>) {
 	const queue = [...outputs];
 	const instructions: string[] = [];
-	const fs: AgentTaskScratchFs & { instructions: string[] } = {
+	const fs: AgentTaskScratchFs & { instructions: string[]; outputResets: number } = {
 		instructions,
+		outputResets: 0,
 		createScratchDir: async (root, prefix) => join(root, `${prefix}-scratch`),
 		writeFile: async (path, content) => {
 			if (path.endsWith('instructions.md')) instructions.push(content);
+			// Slice AP × AU: the fallback empties the shared output file first.
+			if (path.endsWith('model-output.json') && content === '') fs.outputResets += 1;
 		},
 		readFile: async (path) => (path.endsWith('model-output.json') ? (queue.shift() ?? null) : null),
 		remove: async () => undefined,
@@ -191,8 +194,9 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 		const model = modelCommands(commands);
 		expect(model).toHaveLength(1);
 		expect(model[0]).toContain(`--resume ${SESSION} --fork-session`);
-		// Every flag a fresh run gets still applies to the continued session.
-		expect(model[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		// Every flag a fresh run gets still applies to the continued session —
+		// including slice AP's line-delimited event stream, the node default.
+		expect(model[0]).toContain('-p --output-format stream-json --verbose --permission-mode acceptEdits');
 		// The continuation travels on stdin — never on argv.
 		expect(model[0]).not.toContain('Use Postgres');
 		expect(fs.instructions).toEqual([CONTINUATION]);
@@ -213,6 +217,49 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 		expect(modelCommands(commands)[0]).toContain(`--resume ${SESSION}`);
 	});
 
+	it('⭐ takes the forked session id from the FINAL `result` line of a stream-json run (slice AP × AU)', async () => {
+		// The stream's init line still names the session that was resumed;
+		// only the closing `result` envelope carries the id `--fork-session`
+		// wrote the continuation to — the one the next answer must resume.
+		const stream = [
+			JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION }),
+			JSON.stringify({
+				type: 'assistant',
+				session_id: FORKED,
+				message: { content: [{ type: 'text', text: 'Picking up from the answer.' }] }
+			}),
+			envelope()
+		].join('\n');
+		const fs = scratchFs([stream]);
+		const { commands, spawnFn } = recordingSpawn([]);
+
+		const outcome = await runAgentTaskJob(job(payload(offer())), io({ fs, spawnFn }));
+
+		const model = modelCommands(commands);
+		expect(model).toHaveLength(1);
+		expect(model[0]).toContain('--output-format stream-json --verbose');
+		expect(model[0]).toContain(`--resume ${SESSION} --fork-session`);
+		expect(outcome.model).toMatchObject({
+			status: 'succeeded',
+			sessionId: FORKED,
+			resume: { outcome: 'resumed' }
+		});
+	});
+
+	it('with run evidence off, a resumed run keeps the single-document json command (slice AP × AU)', async () => {
+		const fs = scratchFs([envelope()]);
+		const { commands, spawnFn } = recordingSpawn([]);
+
+		const outcome = await runAgentTaskJob(job(payload(offer())), io({ fs, spawnFn, modelTranscript: 'off' }));
+
+		const model = modelCommands(commands);
+		expect(model).toHaveLength(1);
+		expect(model[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		expect(model[0]).not.toContain('stream-json');
+		expect(model[0]).toContain(`--resume ${SESSION} --fork-session`);
+		expect(outcome.model).toMatchObject({ sessionId: FORKED, resume: { outcome: 'resumed' } });
+	});
+
 	it('⭐ falls back to a FRESH session on the full instructions when the CLI cannot open the session', async () => {
 		// `claude --resume <unknown>` prints "No conversation found" on stderr,
 		// nothing on stdout, and exits 1 — before any model turn.
@@ -231,6 +278,9 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 		expect(model[1]).not.toContain('--fork-session');
 		// The fallback read the COMPLETE prompt, answered trail included.
 		expect(fs.instructions).toEqual([CONTINUATION, FULL]);
+		// …and started from an EMPTY output file, so the live evidence reader
+		// could not mistake the failed attempt's bytes for its own (AP × AU).
+		expect(fs.outputResets).toBe(1);
 		expect(outcome.status).toBe('succeeded');
 		expect(outcome.model).toMatchObject({
 			status: 'succeeded',

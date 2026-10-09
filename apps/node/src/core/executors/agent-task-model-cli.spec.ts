@@ -260,7 +260,9 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		// The model command came FIRST, then the acceptance check.
 		expect(commands).toHaveLength(2);
 		expect(commands[0]).toContain(CLAUDE);
-		expect(commands[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		// Self-build slice AP: the line-delimited stream, which is what carries
+		// the turns the run's step records are built from.
+		expect(commands[0]).toContain('-p --output-format stream-json --verbose --permission-mode acceptEdits');
 		expect(commands[0]).toContain('--model claude-opus-5');
 		expect(commands[0]).toContain('--effort high');
 		expect(commands[0]).toContain('instructions.md');
@@ -293,7 +295,12 @@ describe('runAgentTaskJob — model-cli execution', () => {
 				summary: 'Implemented the change.',
 				costUsd: 0.5,
 				turns: 3,
-				sessionId: 'sess-1'
+				sessionId: 'sess-1',
+				// Self-build slice AP: the run's redacted transcript rides with
+				// the verdict. This CLI output is one `result` line and no
+				// turns, so there is a transcript and no step record.
+				transcript: claudeEnvelope,
+				transcriptSourceBytes: Buffer.byteLength(claudeEnvelope, 'utf8')
 			},
 			checks: [{ id: 'unit', status: 'green', exitCode: 0, durationMs: expect.any(Number) }],
 			gateStatus: 'green',
