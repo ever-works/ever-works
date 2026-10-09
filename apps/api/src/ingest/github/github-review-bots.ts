@@ -275,6 +275,17 @@ export type ReviewBotCommentVerdict =
 const LINE_START = '^[ \\t]*(?:>[ \\t]*)?';
 
 /**
+ * A fenced code block (```` ``` ```` or `~~~`, optionally inside a `>`
+ * block quote), up to its closing fence or the end of the body. Removed
+ * before any marker is matched, so a marker QUOTED on a line of its own
+ * inside a code sample is not mistaken for the real one either. The bots'
+ * own markers never sit inside a fence (CodeRabbit's placeholder carries
+ * an ```` ```ascii ```` banner, but its markers are outside it).
+ */
+const FENCED_CODE_BLOCK =
+    /^[ \t]*(?:>[ \t]*)?(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*(?:>[ \t]*)?\1[`~]*[ \t]*$|(?![\s\S]))/gm;
+
+/**
  * CodeRabbit stamps every machine-generated block with an HTML comment of
  * the form `<!-- This is an auto-generated comment: <kind> by coderabbit.ai -->`.
  * Those markers — not the prose around them, which CodeRabbit rewords
@@ -392,7 +403,11 @@ export function classifyReviewBotComment(input: {
     // id is an edit of something already seen (or never worth seeing).
     if ((input.action ?? '').trim().toLowerCase() !== 'created') return ignore('not-created');
 
-    const body = input.body ?? '';
+    const raw = input.body ?? '';
+    // Every marker below is matched OUTSIDE fenced code: a finding that
+    // shows a marker on a line of its own inside a ``` sample is quoting
+    // it, not being it.
+    const body = raw.replace(FENCED_CODE_BLOCK, '');
 
     // The placeholder is checked FIRST: its first revision also carries
     // the summary marker, and "in progress" is the more precise reason.
@@ -430,6 +445,8 @@ export function classifyReviewBotComment(input: {
             ? ignore('nothing-actionable')
             : ignore('status');
     }
-    if (stripReviewBotMarkup(body).length === 0) return ignore('empty');
+    // The RAW body here: a finding that is nothing but a code sample is
+    // still a finding.
+    if (stripReviewBotMarkup(raw).length === 0) return ignore('empty');
     return { kind: 'findings' };
 }

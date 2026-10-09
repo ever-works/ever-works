@@ -410,6 +410,29 @@ describe('github-review-bots', () => {
             }
         });
 
+        it('a finding that shows a marker on its OWN line inside a fenced code sample is still a finding', () => {
+            // CodeRabbit (round 2): line-anchoring alone still matched a
+            // marker standing alone on a line of a ``` sample.
+            for (const sample of [
+                '```html\n<!-- This is an auto-generated comment: review in progress by coderabbit.ai -->\n```',
+                '```\n<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n```',
+                '> ```md\n> <!-- greptile_summary -->\n> ```',
+                '~~~\n<summary>Action performed</summary>\n~~~',
+                '````\nYour [plan](x) includes PR reviews subject to [rate limits](y)\n````',
+                // An unclosed fence runs to the end of the body.
+                '```\nCurrently processing new changes in this PR.',
+            ]) {
+                expect(
+                    created(
+                        `_🟡 Minor_\n\nThe classifier drops a finding that contains:\n\n${sample}\n\nExclude code samples from marker matching.`,
+                    ),
+                ).toBe('findings');
+            }
+            // …while a finding that is NOTHING but a code sample is still
+            // not "empty": the fence is removed for marker matching only.
+            expect(created('```ts\nconst retries = Infinity;\n```')).toBe('findings');
+        });
+
         it('keeps every real inline finding shape as a finding', () => {
             for (const body of [
                 reviewBotCommentFixture('coderabbit-inline-major-finding').body,
