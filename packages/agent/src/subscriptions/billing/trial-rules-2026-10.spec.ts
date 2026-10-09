@@ -442,3 +442,103 @@ describe('BillingService — trial_will_end webhook', () => {
         );
     });
 });
+
+describe('Trial end on the subscription row: gates and anchors the plan allowance', () => {
+    const trialEnd = new Date('2026-12-30T00:00:00Z');
+    function harness(row: Record<string, unknown>) {
+        const creditLedgerService = {
+            hasEntry: jest.fn().mockResolvedValue(false),
+            record: jest.fn(async (opts: any) => ({ id: 'entry-1', ...opts })),
+        };
+        const userSubscriptionRepository = {
+            findActiveByUser: jest.fn().mockResolvedValue({
+                id: 'row-1',
+                userId: 'u1',
+                status: SubscriptionStatus.ACTIVE,
+                providerSubscriptionId: 'sub_1',
+                createdAt: new Date('2026-10-01T00:00:00Z'),
+                plan: {
+                    code: 'standard',
+                    displayName: 'Pro',
+                    hosting: 'cloud',
+                    monthlyCredits: 3000,
+                },
+                ...row,
+            }),
+        };
+        const service = new (PlanCreditGrantService as any)(
+            creditLedgerService,
+            userSubscriptionRepository,
+            { findByUserId: jest.fn().mockResolvedValue(null) },
+        ) as PlanCreditGrantService;
+        return { service, creditLedgerService };
+    }
+
+    it('grants nothing before trialEndsAt even with no profile status (return route raced the webhook)', async () => {
+        const { service, creditLedgerService } = harness({ trialEndsAt: trialEnd });
+        await expect(
+            service.grantCurrentAllowance('u1', new Date('2026-11-15T00:00:00Z')),
+        ).resolves.toBe('not-eligible');
+        expect(creditLedgerService.record).not.toHaveBeenCalled();
+    });
+
+    it('anchors the first paid allowance month on the trial end, so it lasts a full month', async () => {
+        const { service, creditLedgerService } = harness({ trialEndsAt: trialEnd });
+        await expect(
+            service.grantCurrentAllowance('u1', new Date('2026-12-30T00:05:00Z')),
+        ).resolves.toBe('granted');
+        expect(creditLedgerService.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                amountCredits: 3000,
+                expiresAt: new Date('2027-01-30T00:00:00Z'),
+            }),
+        );
+    });
+
+    it('keeps the createdAt anchor for a subscription that never trialled', async () => {
+        const { service, creditLedgerService } = harness({ trialEndsAt: null });
+        await service.grantCurrentAllowance('u1', new Date('2026-10-10T00:00:00Z'));
+        expect(creditLedgerService.record).toHaveBeenCalledWith(
+            expect.objectContaining({ expiresAt: new Date('2026-11-01T00:00:00Z') }),
+        );
+    });
+});
+
+describe('Out-of-order Stripe events cannot hold back the paid allowance', () => {
+    it('ignores a stale trialing profile once the row says the trial has ended', async () => {
+        const creditLedgerService = {
+            hasEntry: jest.fn().mockResolvedValue(false),
+            record: jest.fn(async (opts: any) => ({ id: 'entry-1', ...opts })),
+        };
+        const service = new (PlanCreditGrantService as any)(
+            creditLedgerService,
+            {
+                findActiveByUser: jest.fn().mockResolvedValue({
+                    id: 'row-1',
+                    userId: 'u1',
+                    status: SubscriptionStatus.ACTIVE,
+                    providerSubscriptionId: 'sub_1',
+                    createdAt: new Date('2026-10-01T00:00:00Z'),
+                    trialEndsAt: new Date('2026-12-30T00:00:00Z'),
+                    plan: {
+                        code: 'standard',
+                        displayName: 'Pro',
+                        hosting: 'cloud',
+                        monthlyCredits: 3000,
+                    },
+                }),
+            },
+            {
+                findByUserId: jest
+                    .fn()
+                    .mockResolvedValue({
+                        subscriptionStatus: 'trialing',
+                        providerSubscriptionId: 'sub_1',
+                    }),
+            },
+        ) as PlanCreditGrantService;
+        await expect(
+            service.grantCurrentAllowance('u1', new Date('2027-01-05T00:00:00Z')),
+        ).resolves.toBe('granted');
+    });
+});

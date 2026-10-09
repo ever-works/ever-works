@@ -204,6 +204,8 @@ export const STRIPE_CLIENT_FACTORY = Symbol('STRIPE_CLIENT_FACTORY');
  * request body. The client only ever names a PACK ID.
  */
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Stripe's ceiling for `subscription_data.trial_period_days`. */
 const STRIPE_MAX_TRIAL_PERIOD_DAYS = 730;
 
@@ -598,6 +600,15 @@ export class StripeBillingProvider extends BillingProvider {
                 subscription && typeof subscription === 'object'
                     ? (subscription as Stripe.Subscription).status === 'trialing'
                     : Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0,
+            trialEnd:
+                subscription &&
+                typeof subscription === 'object' &&
+                (subscription as Stripe.Subscription).status === 'trialing' &&
+                (subscription as Stripe.Subscription).trial_end
+                    ? new Date(((subscription as Stripe.Subscription).trial_end as number) * 1000)
+                    : Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0
+                      ? new Date(Date.now() + Number(meta[STRIPE_METADATA_KEYS.trialDays]) * DAY_MS)
+                      : null,
         };
     }
 
@@ -1081,6 +1092,15 @@ export class StripeBillingProvider extends BillingProvider {
                         // The checkout was created with a free trial: the subscription it just
                         // created is trialing, so no plan credits are granted yet.
                         inTrial: Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0,
+                        // Best estimate until the subscription's own events carry `trial_end`:
+                        // the session completed at `created`, the trial runs N days from there.
+                        trialEnd:
+                            Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0
+                                ? new Date(
+                                      event.created * 1000 +
+                                          Number(meta[STRIPE_METADATA_KEYS.trialDays]) * DAY_MS,
+                                  )
+                                : null,
                         planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
                         subscriptionId: asId(session.subscription),
                         paymentId: asId(session.payment_intent),
@@ -1235,6 +1255,10 @@ export class StripeBillingProvider extends BillingProvider {
                         ...shared,
                         kind: 'subscription.activated',
                         inTrial: subscription.status === 'trialing',
+                        trialEnd:
+                            subscription.status === 'trialing' && subscription.trial_end
+                                ? new Date(subscription.trial_end * 1000)
+                                : null,
                     };
                 }
                 // `incomplete` / `past_due` are transient dunning states —

@@ -260,6 +260,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
                     'UsageSummaryService',
                     'addMonthsClamped',
+                    'allowanceAnchor',
                     'catalogDailyFreeCredits',
                     'creditsPricingView',
                     'resolveUsageSummaryWindow',

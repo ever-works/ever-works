@@ -118,7 +118,7 @@ export class PlanCreditGrantService {
             return 'already-reversed';
         }
 
-        const anchor = subscription.createdAt ?? now;
+        const anchor = allowanceAnchor(subscription, now);
         const period = PlanCreditGrantService.allowancePeriodFor(anchor, now);
         const granted = await this.creditLedgerService.sumByRefTypeInWindow(
             subscription.userId,
@@ -200,11 +200,24 @@ export class PlanCreditGrantService {
         if (isPastDueSubscriptionStatus(billingProfile?.subscriptionStatus)) {
             return 'not-eligible';
         }
+        // Still inside the free trial on the subscription's own record: Free-plan credits only.
+        if (
+            subscription.trialEndsAt &&
+            now.getTime() < new Date(subscription.trialEndsAt).getTime()
+        ) {
+            return 'not-eligible';
+        }
         // 🛑 A free trial gets Free-plan credits only (owner, 2026-10-09): no monthly allowance
         // while the provider says this subscription is `trialing`. It starts with the first paid
         // period, when the status turns `active`. A profile tracking a DIFFERENT subscription
-        // (an older one) does not block this one.
+        // (an older one) does not block this one. Once the row's own `trialEndsAt` has passed, the
+        // trial is over whatever the profile says: Stripe events can arrive out of order, and a
+        // stale `trialing` snapshot must not stop the paid allowance.
+        const trialOverOnRow =
+            !!subscription.trialEndsAt &&
+            now.getTime() >= new Date(subscription.trialEndsAt).getTime();
         if (
+            !trialOverOnRow &&
             billingProfile?.subscriptionStatus === 'trialing' &&
             (!billingProfile.providerSubscriptionId ||
                 !subscription.providerSubscriptionId ||
@@ -213,7 +226,7 @@ export class PlanCreditGrantService {
             return 'not-eligible';
         }
 
-        const anchor = subscription.createdAt ?? now;
+        const anchor = allowanceAnchor(subscription, now);
         const period = PlanCreditGrantService.allowancePeriodFor(anchor, now);
         const periodKey = period.start.toISOString().slice(0, 10);
         const planCode = String(plan.code ?? 'unknown');
@@ -247,6 +260,18 @@ export class PlanCreditGrantService {
         });
         return entry ? 'granted' : 'already-granted';
     }
+}
+
+/**
+ * Where a subscription's allowance months start: the end of its free trial when it had one (so the
+ * first PAID month's credits last a full month - owner, 2026-10-09), else its start.
+ */
+export function allowanceAnchor(
+    subscription: Pick<UserSubscription, 'createdAt' | 'trialEndsAt'>,
+    now: Date,
+): Date {
+    if (subscription.trialEndsAt) return new Date(subscription.trialEndsAt);
+    return subscription.createdAt ?? now;
 }
 
 /** Add `months` to `anchor` in UTC, clamping the day to the target month. */

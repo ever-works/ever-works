@@ -1139,6 +1139,47 @@ describe('applyWebhook — activation and revocation', () => {
         expect(trialing.planCreditGrantService.grantCurrentAllowance).toHaveBeenCalledWith('u1');
     });
 
+    it('records the trial end on the row + the trialing status on the profile, and pulls it forward on an early conversion', async () => {
+        const trialEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        const profileRepository = makeProfileRepository({
+            findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            updateSubscriptionState: jest.fn().mockResolvedValue(undefined),
+        });
+        const subscriptionRepository = makeSubscriptionRepository();
+        const { service } = build({
+            profileRepository,
+            subscriptionRepository,
+            userRepository: makeUserRepository({
+                findById: jest.fn().mockResolvedValue({ id: 'u1', tenantId: 't1' }),
+            }),
+        });
+
+        await service.applyWebhook({ ...event(), inTrial: true, trialEnd });
+
+        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ trialEndsAt: trialEnd, tenantId: 't1' }),
+        );
+        expect(profileRepository.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ subscriptionStatus: 'trialing', currentPeriodEnd: trialEnd }),
+        );
+
+        // Early conversion of the SAME subscription: the recorded trial end moves to now.
+        subscriptionRepository.findActiveByUser.mockResolvedValue({
+            providerSubscriptionId: event().subscriptionId,
+            trialEndsAt: trialEnd,
+            tenantId: 't1',
+        });
+        subscriptionRepository.createOrUpdate.mockClear();
+        const before = Date.now();
+        await service.applyWebhook({ ...event(), inTrial: false });
+        const written = subscriptionRepository.createOrUpdate.mock.calls[0][1];
+        expect(written.trialEndsAt.getTime()).toBeGreaterThanOrEqual(before);
+        expect(written.trialEndsAt.getTime()).toBeLessThan(trialEnd.getTime());
+        expect(written.tenantId).toBeUndefined();
+    });
+
     it('does not grant an allowance for a self-hosted licence purchase', async () => {
         const { service, planCreditGrantService } = build({
             planRepository: makePlanRepository({

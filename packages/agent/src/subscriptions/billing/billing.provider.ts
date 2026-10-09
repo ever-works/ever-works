@@ -223,6 +223,8 @@ export interface CheckoutSessionSnapshot {
     readonly currentPeriodEnd: Date | null;
     /** The plan subscription is in its free trial (no plan credits until the first paid invoice). */
     readonly inTrial?: boolean;
+    /** When that trial ends (provider value, or checkout time + trial days). */
+    readonly trialEnd?: Date | null;
 }
 
 /** Off-session charge for auto-recharge (PRD §3.4). */

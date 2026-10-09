@@ -534,6 +534,7 @@ export class PlanSubscriptionService {
         const activated = await this.activate({
             userId,
             inTrial: snapshot.inTrial === true,
+            trialEnd: snapshot.trialEnd ?? null,
             planCode: snapshot.planCode,
             providerSubscriptionId: snapshot.subscriptionId,
             currentPeriodEnd: snapshot.currentPeriodEnd,
@@ -570,6 +571,7 @@ export class PlanSubscriptionService {
             const activated = await this.activate({
                 userId,
                 inTrial: event.inTrial === true,
+                trialEnd: event.trialEnd ?? null,
                 planCode: event.planCode ?? null,
                 providerSubscriptionId: event.subscriptionId ?? null,
                 currentPeriodEnd: event.currentPeriodEnd ?? null,
@@ -687,6 +689,8 @@ export class PlanSubscriptionService {
         userId: string;
         /** In the free trial: grant the tier, NOT the monthly credits (owner, 2026-10-09). */
         inTrial?: boolean;
+        /** When the trial ends, when `inTrial`. */
+        trialEnd?: Date | null;
         planCode: string | null;
         providerSubscriptionId: string | null;
         currentPeriodEnd: Date | null;
@@ -763,7 +767,39 @@ export class PlanSubscriptionService {
             return true;
         }
 
+        // Trial bookkeeping on the row (owner, 2026-10-09): the trial end gates and anchors the
+        // plan's monthly credits. A trial that converts EARLY is pulled forward to now; a different
+        // (non-trial) subscription replacing this row clears it.
+        const now = new Date();
+        // A `trialing` delivery whose trial end has already passed is a stale, out-of-order event
+        // (Stripe does not guarantee ordering): the trial is over, treat it as a paid activation.
+        if (input.inTrial && input.trialEnd && input.trialEnd.getTime() <= now.getTime()) {
+            input = { ...input, inTrial: false };
+        }
+        const existingRow = await this.userSubscriptionRepository.findActiveByUser(input.userId);
+        const sameSubscription =
+            !!existingRow &&
+            !!input.providerSubscriptionId &&
+            existingRow.providerSubscriptionId === input.providerSubscriptionId;
+        let trialEndsAt: Date | null | undefined;
+        if (input.inTrial) {
+            trialEndsAt =
+                input.trialEnd ??
+                input.currentPeriodEnd ??
+                new Date(now.getTime() + CLOUD_PLAN_TRIAL_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+        } else if (sameSubscription) {
+            const recorded = existingRow?.trialEndsAt ? new Date(existingRow.trialEndsAt) : null;
+            trialEndsAt = recorded && recorded.getTime() > now.getTime() ? now : undefined;
+        } else {
+            trialEndsAt = null;
+        }
+        const owner = await this.userRepository.findById(input.userId);
+
         await this.userSubscriptionRepository.createOrUpdate(input.userId, {
+            ...(trialEndsAt === undefined ? {} : { trialEndsAt }),
+            // Stamp the scope so the one-trial-per-organization check still finds this
+            // subscription after its owner leaves the Tenant (users.tenantId is cleared then).
+            ...(owner?.tenantId && !existingRow?.tenantId ? { tenantId: owner.tenantId } : {}),
             planCode: plan.code,
             planId: plan.id,
             status: SubscriptionStatus.ACTIVE,
@@ -800,6 +836,22 @@ export class PlanSubscriptionService {
         // daily credits, whichever plan is trialled. The allowance is granted when the trial
         // converts — the provider's `trialing → active` update re-enters here with `inTrial`
         // false — and the daily sweep backs that up (it skips `trialing` profiles too).
+        if (input.inTrial && input.providerSubscriptionId) {
+            // Record the trial on the billing profile right away, so neither the sweep nor the
+            // 7-day reminder has to wait for the provider's `customer.subscription.*` delivery.
+            // That delivery overwrites this with the provider's truth.
+            try {
+                await this.billingProfileRepository.updateSubscriptionState(input.userId, {
+                    providerSubscriptionId: input.providerSubscriptionId,
+                    subscriptionStatus: 'trialing',
+                    ...(trialEndsAt ? { currentPeriodEnd: trialEndsAt } : {}),
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `Recording the trial on the billing profile failed for user ${input.userId}: ${(error as Error).message}`,
+                );
+            }
+        }
         if (this.planCreditGrantService && !input.inTrial) {
             try {
                 await this.planCreditGrantService.grantCurrentAllowance(input.userId);
