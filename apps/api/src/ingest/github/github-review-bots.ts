@@ -266,6 +266,15 @@ export type ReviewBotCommentVerdict =
     | { readonly kind: 'ignore'; readonly reason: ReviewBotCommentIgnoreReason };
 
 /**
+ * Every structural marker below must START a line (optionally inside a
+ * `>` block quote), which is where the bots print them. A finding that
+ * QUOTES a marker — in a code span, mid-sentence, as a reviewer of this
+ * very file would — therefore stays a finding instead of being mistaken
+ * for the chatter it names.
+ */
+const LINE_START = '^[ \\t]*(?:>[ \\t]*)?';
+
+/**
  * CodeRabbit stamps every machine-generated block with an HTML comment of
  * the form `<!-- This is an auto-generated comment: <kind> by coderabbit.ai -->`.
  * Those markers — not the prose around them, which CodeRabbit rewords
@@ -273,8 +282,8 @@ export type ReviewBotCommentVerdict =
  */
 function coderabbitMarker(kind: string): RegExp {
     return new RegExp(
-        `<!--\\s*This is an auto-generated comment: ${kind} by coderabbit\\.ai\\s*-->`,
-        'i',
+        `${LINE_START}<!--\\s*This is an auto-generated comment: ${kind} by coderabbit\\.ai\\s*-->`,
+        'im',
     );
 }
 
@@ -290,7 +299,10 @@ const CODERABBIT_IN_PROGRESS = coderabbitMarker('review in progress');
  * prints it, so a finding that QUOTES the sentence mid-line — a review of
  * this very classifier, say — is not mistaken for the placeholder.
  */
-const CODERABBIT_IN_PROGRESS_TEXT = /^\s*(?:>\s*)?Currently processing new changes in this PR\b/im;
+const CODERABBIT_IN_PROGRESS_TEXT = new RegExp(
+    `${LINE_START}Currently processing new changes in this PR\\b`,
+    'im',
+);
 
 /** A review skipped on purpose (draft PR, non-default base branch, …). */
 const CODERABBIT_SKIPPED = coderabbitMarker('skip review');
@@ -303,28 +315,36 @@ const CODERABBIT_NOTHING_ACTIONABLE = /\bNo actionable comments were generated\b
  * ("Your [plan](…) includes PR reviews subject to [rate limits](…)").
  * Line-anchored for the same reason as the placeholder sentence.
  */
-const CODERABBIT_PLAN_LIMIT =
-    /^\s*Your \[?plan\]?(?:\([^)\n]*\))? includes PR reviews subject to \[?rate limits\b/im;
+const CODERABBIT_PLAN_LIMIT = new RegExp(
+    `${LINE_START}Your \\[?plan\\]?(?:\\([^)\\n]*\\))? includes PR reviews subject to \\[?rate limits\\b`,
+    'im',
+);
 
 /**
  * CodeRabbit answering a command collapses its verdict into
  * `<summary>✅ Action performed</summary>` or
  * `<summary>⚠️ Action not completed</summary>`.
  */
-const CODERABBIT_COMMAND_ACK = /<summary>[^<]*\bAction (?:performed|not completed)\s*<\/summary>/i;
+const CODERABBIT_COMMAND_ACK = new RegExp(
+    `${LINE_START}<summary>[^<\\n]*\\bAction (?:performed|not completed)[ \\t]*</summary>`,
+    'im',
+);
 
 /**
  * A chat answer that actually reasoned about the code carries a
  * `<summary>🧩 Analysis chain</summary>` block; it may END with a command
  * acknowledgement, and it is still an answer, so it is never an ack.
  */
-const CODERABBIT_ANALYSIS = /<summary>[^<]*\bAnalysis chain\s*<\/summary>/i;
+const CODERABBIT_ANALYSIS = new RegExp(
+    `${LINE_START}<summary>[^<\\n]*\\bAnalysis chain[ \\t]*</summary>`,
+    'im',
+);
 
 /** Greptile's per-PR summary comment (edited on every review). */
-const GREPTILE_SUMMARY = /<!--\s*greptile_summary\s*-->/i;
+const GREPTILE_SUMMARY = new RegExp(`${LINE_START}<!--\\s*greptile_summary\\s*-->`, 'im');
 
 /** Greptile's TREX (test-run) summary comment. */
-const GREPTILE_TREX_SUMMARY = /<!--\s*greptile_trex_summary\s*-->/i;
+const GREPTILE_TREX_SUMMARY = new RegExp(`${LINE_START}<!--\\s*greptile_trex_summary\\s*-->`, 'im');
 
 /** A TREX run that found nothing to fix, or could not run at all. */
 const GREPTILE_TREX_NOTHING = /\b(?:found no issues|No flows tested)\b/i;

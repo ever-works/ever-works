@@ -393,6 +393,21 @@ describe('github-review-bots', () => {
                     'The notice text "Your [plan](x) includes PR reviews subject to [rate limits](y)" is matched anywhere in a body.',
                 ),
             ).toBe('findings');
+            // …and the same for every structural marker: they count only
+            // where the bots print them, at the start of a line.
+            for (const quoted of [
+                '`<!-- This is an auto-generated comment: summarize by coderabbit.ai -->`',
+                '`<!-- This is an auto-generated comment: review in progress by coderabbit.ai -->`',
+                '`<!-- greptile_summary -->`',
+                '`<!-- greptile_trex_summary -->` with found no issues',
+                '`<summary>✅ Action performed</summary>`',
+            ]) {
+                expect(
+                    created(
+                        `_🟠 Major_\n\nThe classifier keys on ${quoted}, so a quote of it must not drop this finding.`,
+                    ),
+                ).toBe('findings');
+            }
         });
 
         it('keeps every real inline finding shape as a finding', () => {
