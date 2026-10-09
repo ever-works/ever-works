@@ -16,6 +16,7 @@ import {
     type InboxItemDto,
     type InboxItemOption,
     type InboxItemSourceMeta,
+    type InboxItemSourceType,
     type InboxItemStatus,
 } from '@ever-works/contracts';
 import {
@@ -77,9 +78,15 @@ export interface ListInboxOptions {
     status?: InboxItemStatus;
     /** Only items linked to this Task (the Task page's open-question lookup, slice Q). */
     taskId?: string;
+    /** Only items from this producer — `fleet-run` for the fleet filter (slice AU). */
+    sourceType?: InboxItemSourceType;
     limit?: number;
     offset?: number;
 }
+
+/** The two fixed parts of {@link composeFleetAnswerMessage} — shared with its parser. */
+const FLEET_ANSWER_QUESTION_PREFIX = 'Your question from the previous run: ';
+const FLEET_ANSWER_SEPARATOR = "\n\nOwner's answer: ";
 
 /**
  * Self-build slice Q — the message a resumed FLEET run receives for an
@@ -91,7 +98,35 @@ export interface ListInboxOptions {
  * is gone, and the run may land on another machine.
  */
 export function composeFleetAnswerMessage(questionTitle: string, answer: string): string {
-    return `Your question from the previous run: ${questionTitle}\n\nOwner's answer: ${answer}`;
+    return `${FLEET_ANSWER_QUESTION_PREFIX}${questionTitle}${FLEET_ANSWER_SEPARATOR}${answer}`;
+}
+
+/**
+ * Self-build slice AU — the inverse of {@link composeFleetAnswerMessage}:
+ * the question and the owner's answer back out of one resumed run's
+ * `pendingInput` entry, or `null` for any entry that is not one (a
+ * reviewer rejection block, a plain steer, a Resume note).
+ *
+ * The fleet planner reads it to replay a Task's answered questions into a
+ * run that starts a FRESH CLI session — the answers it was resumed for
+ * earlier live only in those runs' rows, because `TasksModule` cannot
+ * reach the Inbox repository. Split on the FIRST separator: the question
+ * is an Inbox title (one line, never a blank line), while the answer is
+ * free text that may contain anything, the separator included.
+ */
+export function parseFleetAnswerMessage(
+    message: unknown,
+): { question: string; answer: string } | null {
+    if (typeof message !== 'string' || !message.startsWith(FLEET_ANSWER_QUESTION_PREFIX)) {
+        return null;
+    }
+    const rest = message.slice(FLEET_ANSWER_QUESTION_PREFIX.length);
+    const at = rest.indexOf(FLEET_ANSWER_SEPARATOR);
+    if (at < 0) return null;
+    const question = rest.slice(0, at).trim();
+    const answer = rest.slice(at + FLEET_ANSWER_SEPARATOR.length).trim();
+    if (!question || !answer) return null;
+    return { question, answer };
 }
 
 /**

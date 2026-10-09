@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import type { AgentRunSession, AgentRunSessionStatus } from '@/lib/api/agents.shared';
+import {
+    isFleetRun,
+    type AgentRunSession,
+    type AgentRunSessionStatus,
+} from '@/lib/api/agents.shared';
 
 /**
  * Run-driven lifecycle (kanban run cockpit M7) — the Runs history on
@@ -49,6 +54,8 @@ export function formatDuration(ms: number | null | undefined): string | null {
 }
 
 function RunRow({ run }: { run: AgentRunSession }) {
+    // Slice AU (review): the parked chip reuses the run controls' own strings.
+    const t = useTranslations('dashboard.tasksPage.detail.runControls');
     const tokens = formatTokens(run.totalTokens);
     const duration = formatDuration(run.durationMs);
     const started = run.startedAt ?? run.createdAt;
@@ -68,6 +75,21 @@ function RunRow({ run }: { run: AgentRunSession }) {
                 >
                     {run.status}
                 </span>
+                {/* Self-build slice AU — a run PARKED on the owner: finished
+                    (so its status chip reads "completed") but waiting for an
+                    answer, typically a fleet run that asked a question. The
+                    status alone made it look done. Not shown on a live run:
+                    a live run that is awaiting input is the run's controls'
+                    business, not the history's. */}
+                {run.awaitingInput && run.status !== 'queued' && run.status !== 'running' && (
+                    <span
+                        className="text-[10px] px-1.5 py-0.5 rounded shrink-0 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                        data-testid="task-run-history-parked"
+                        title={isFleetRun(run) ? t('parkedHintQuestion') : t('parkedHint')}
+                    >
+                        {t('awaitingInput')}
+                    </span>
+                )}
                 <Link
                     href={ROUTES.DASHBOARD_AGENT(run.agentId)}
                     className="text-[11px] font-mono text-text-muted hover:text-primary truncate"

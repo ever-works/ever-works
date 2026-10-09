@@ -58,7 +58,7 @@ interface SettingsLayoutClientProps {
     /**
      * Whether the API has the anonymous usage statistics module, resolved on
      * the server (`instanceStatsAPI.isAvailable`): `false` when its status
-     * route answers 404 (`EVER_STATS_ENABLED=false`), so a switched-off
+     * route answers 404 (not switched on by `EVER_STATS_ENABLED`), so a switched-off
      * installation shows no tab for a feature that does not run. Defaults to
      * true: only a definite 404 hides it.
      */

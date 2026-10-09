@@ -14,22 +14,27 @@ allow.
 
 ## The harness
 
-The harness is the public egress audit of the Ever Platform SDK,
-[`ever-co/ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk) (Apache-2.0),
-`tools/egress-audit` with the mock platform from `tools/mock-platform`. It is not copied here and
-not installed from a registry: the workflow checks the SDK out at a **pinned commit** and installs
-the harness's own dependencies from the SDK's lockfile.
+The harness is the egress audit of the Ever Platform SDK, with its mock platform: the dev-only
+[`@ever-co/connect-tools`](https://www.npmjs.com/package/@ever-co/connect-tools) package (Apache-2.0,
+source in [`ever-co/ever-connect-sdk`](https://github.com/ever-co/ever-connect-sdk)). Nothing of it
+is copied here: this directory is a small workspace package (`@ever-works/egress-audit`) whose only
+dependency is that package, **pinned to one exact version** and installed from the repository's
+lockfile. The workflow runs its `ever-egress-audit` bin; the statistics job against the mock runs
+its `ever-mock-platform` bin.
 
-| Pinned commit                              | Where it is set                                                |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| `2fd74dad9357a18471292f38012a5f5e4e6d2938` | `EVER_CONNECT_SDK_SHA` in `.github/workflows/egress-audit.yml` |
+| Pinned version | Where it is set                                               |
+| -------------- | ------------------------------------------------------------- |
+| `1.0.0-rc.2`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
 
-To move to a newer harness, change that one value in a pull request; the audit runs on it.
+The module itself uses `@ever-co/connect-sdk` and `@ever-co/connect-contracts` at the same
+version (`apps/api`, `packages/agent`, `packages/contracts`); `drift.spec.ts` in the statistics
+module fails when the pins in these four manifests differ. To move to a newer release, change them
+together in one pull request and refresh the lockfile; the audit runs on it.
 
 This directory holds only Works' inputs:
 
 - `egress-audit.config.json` — the compose files, the API service, the statistics routes probed
-  in the off modes, and the Works mode `off_env_file`;
+  in the off modes, and the Works modes `default_off` and `off_env_file`;
 - `adapter.mjs` — what an operator does: for `loaded_off`, register the platform admin and switch
   statistics off in Settings; in the off modes, call all six statistics routes with their own
   method (the harness's probe sends GET only) and require 404 from each; per mode, `CI=true` so
@@ -41,10 +46,11 @@ This directory holds only Works' inputs:
 
 | Mode             | The API                                                             | Passes when                                                                    |
 | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `off`            | `EVER_STATS_ENABLED=false` in the container environment             | no Ever host looked up, no connection attempt out, `/api/instance-stats/*` 404 |
+| `default_off`    | nothing about statistics configured (off by default)                | no Ever host looked up, no connection attempt out, `/api/instance-stats/*` 404 |
+| `off`            | `EVER_STATS_ENABLED=false` in the container environment             | the same                                                                       |
 | `off_env_file`   | the same switch written ONLY in the API's `.env` file (`/app/.env`) | the same                                                                       |
-| `loaded_off`     | module loaded, switched off in Settings by the platform admin       | no request at all                                                              |
-| `positive_stats` | module on, `EVER_STATS_API_URL` = the mock platform                 | reports accepted (`202`), and no call but the statistics report                |
+| `loaded_off`     | module loaded (`EVER_STATS_ENABLED=true`), switched off in Settings | no request at all                                                              |
+| `positive_stats` | module on (`EVER_STATS_ENABLED=true`), `EVER_STATS_API_URL` = mock  | reports accepted (`202`), and no call but the statistics report                |
 | control          | `positive_stats` with the mock platform left out                    | must **fail** (exit 1): a green run is not a blind one                         |
 
 In every mode the send interval is a few seconds, so a module that should be silent but is not
@@ -63,9 +69,7 @@ pcaps, the DNS log, the API log and the mock's call record per mode — is uploa
 Linux with Docker (the sniffer needs `NET_RAW` and `NET_ADMIN`), Node.js 20 or later:
 
 ```sh
-git clone https://github.com/ever-co/ever-connect-sdk .egress-audit/sdk
-git -C .egress-audit/sdk checkout 2fd74dad9357a18471292f38012a5f5e4e6d2938
-(cd .egress-audit/sdk && corepack enable && pnpm install --frozen-lockfile --filter ./tools/egress-audit)
+pnpm install --frozen-lockfile --filter @ever-works/egress-audit
 
 docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:egress-audit .
 
@@ -73,9 +77,24 @@ docker build -f .deploy/docker/api/Dockerfile -t ever-works-api:egress-audit .
 printf 'EVER_STATS_ENABLED=false\n' > /tmp/api-stats-off.env
 
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-empty.env \
-  node .egress-audit/sdk/tools/egress-audit/run.mjs --config tools/egress-audit/egress-audit.config.json --mode off
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode default_off
+EVER_WORKS_AUDIT_DOTENV=/tmp/api-empty.env \
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode off
 EVER_WORKS_AUDIT_DOTENV=/tmp/api-stats-off.env \
-  node .egress-audit/sdk/tools/egress-audit/run.mjs --config tools/egress-audit/egress-audit.config.json --mode off_env_file
+  tools/egress-audit/node_modules/.bin/ever-egress-audit --config tools/egress-audit/egress-audit.config.json --mode off_env_file
+```
+
+In the positive mode the harness points the API at the mock platform's fixed address on the
+sealed network (`__MOCK_URL__`, a private address the module accepts over `http`); the mock's
+documents name the issuer `https://mock-platform.test` (`__MOCK_ISSUER__`), which the statistics
+module does not read.
+
+The real sender against the mock outside the audit (what the workflow's second job runs):
+
+```sh
+tools/egress-audit/node_modules/.bin/ever-mock-platform --host 127.0.0.1 --port 18080 &
+(cd apps/api && EVER_STATS_MOCK_URL=http://127.0.0.1:18080 \
+  npx jest src/instance-stats/__tests__/instance-stats.mock.itest.spec.ts)
 ```
 
 Exit codes: `0` pass, `1` a violation, `2` the harness could not prove anything (for example the

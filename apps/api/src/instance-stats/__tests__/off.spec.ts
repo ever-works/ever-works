@@ -9,9 +9,11 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
 /**
  * Off means off.
  *
- * - `EVER_STATS_ENABLED=false` (or any value other than empty / `true`): the
- *   module is not imported at all — `ApiModule` gets nothing to import, so
- *   there is no route, no timer and no identity row.
+ * - `EVER_STATS_ENABLED` unset or empty (the default, see
+ *   `EVER_STATS_DEFAULT_ENABLED`), `false`, or any value other than `true`:
+ *   the module is not imported at all — `ApiModule` gets nothing to import, so
+ *   there is no route, no timer and no identity row. Only
+ *   `EVER_STATS_ENABLED=true` imports it.
  * - The operator switch in Settings off: the module is loaded, its timer
  *   ticks, and two simulated minutes with a 5-second send interval make no
  *   request. Switching it back on sends (the control that the run could send).
@@ -19,10 +21,12 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
 describe('instance statistics — off', () => {
     describe('EVER_STATS_ENABLED', () => {
         it.each([
-            [undefined, true],
-            ['', true],
+            [undefined, false],
+            ['', false],
             ['true', true],
             ['false', false],
+            ['TRUE', false],
+            ['1', false],
             ['FALSE', false],
             ['0', false],
             ['no', false],

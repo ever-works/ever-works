@@ -1,22 +1,32 @@
 import {
+    EVER_STATS_DEFAULT_ENABLED,
     isEverStatsModuleEnabled,
     readEverStatsConfig,
     readWorksStatsFeatures,
 } from '../ever-stats-config';
 
 /**
- * The environment of the statistics module, read once: default on, off with
- * anything but empty/`true`; the base URL policy (https, or http for a private
- * host only, never with credentials); install source and country declared,
- * never inferred; the interval floor outside tests; strict feature booleans.
+ * The environment of the statistics module, read once: default OFF (opt in
+ * with `EVER_STATS_ENABLED=true`), off with anything but `true`; the base URL
+ * policy (https, or http for a private host only, never with credentials);
+ * install source and country declared, never inferred; the interval floor
+ * outside tests; strict feature booleans.
  */
 describe('ever-stats-config', () => {
+    it('is off by default: EVER_STATS_DEFAULT_ENABLED is false', () => {
+        expect(EVER_STATS_DEFAULT_ENABLED).toBe(false);
+    });
+
     it.each([
-        [{}, true],
-        [{ EVER_STATS_ENABLED: '' }, true],
+        [{}, false],
+        [{ EVER_STATS_ENABLED: '' }, false],
+        [{ EVER_STATS_ENABLED: '  ' }, false],
         [{ EVER_STATS_ENABLED: 'true' }, true],
+        [{ EVER_STATS_ENABLED: ' true ' }, true],
         [{ EVER_STATS_ENABLED: 'false' }, false],
         [{ EVER_STATS_ENABLED: 'False' }, false],
+        [{ EVER_STATS_ENABLED: 'TRUE' }, false],
+        [{ EVER_STATS_ENABLED: '1' }, false],
         [{ EVER_STATS_ENABLED: '0' }, false],
         [{ EVER_STATS_ENABLED: 'off' }, false],
     ])('%j ⇒ enabled %s', (env, enabled) => {
@@ -24,8 +34,27 @@ describe('ever-stats-config', () => {
         expect(readEverStatsConfig(env).enabled).toBe(enabled);
     });
 
-    it('defaults to the Ever Platform API, self-hosted, ZZ, daily, ever-stats-sink', () => {
+    it.each([
+        [{}, true],
+        [{ EVER_STATS_ENABLED: '' }, true],
+        [{ EVER_STATS_ENABLED: 'true' }, true],
+        [{ EVER_STATS_ENABLED: 'false' }, false],
+        [{ EVER_STATS_ENABLED: '0' }, false],
+    ])(
+        'with the default flipped back to on, %j ⇒ enabled %s (the previous behaviour)',
+        (env, enabled) => {
+            expect(isEverStatsModuleEnabled(env, true)).toBe(enabled);
+        },
+    );
+
+    it('EVER_STATS_ENABLED overrides the default in both directions', () => {
+        expect(isEverStatsModuleEnabled({ EVER_STATS_ENABLED: 'true' }, false)).toBe(true);
+        expect(isEverStatsModuleEnabled({ EVER_STATS_ENABLED: 'false' }, true)).toBe(false);
+    });
+
+    it('defaults to off, the Ever Platform API, self-hosted, ZZ, daily, ever-stats-sink', () => {
         expect(readEverStatsConfig({})).toMatchObject({
+            enabled: false,
             apiBaseUrl: 'https://api.ever.co',
             apiBaseUrlUsable: true,
             installSource: 'self-hosted',

@@ -340,6 +340,8 @@ You can also hand-edit a node's tags under **Settings → Fleet → Capability t
 
 `ever-works-node start` is a foreground process. The repo ships three ways to keep it alive across reboots — a systemd template unit (`ever-works-node@<user>.service`, which runs as the user whose commands the node executes, not root), a Windows service or scheduled task, and a container image. Enrollment is never part of installation: it consumes a one-time token and stays an explicit, interactive act.
 
+The node's own log rotates. Under systemd it goes to the journal (`journalctl -u ever-works-node@<user>`), which journald already bounds. On Windows, `node.log` / `node.err.log` in `%ProgramData%\ever-works-node` rotate past 10 MB: the NSSM service rotates them online and at every start (`AppRotateFiles`, `AppRotateOnline`, `AppRotateBytes`), and since NSSM never deletes a rotated file, the installer also registers a daily `<Name>-LogPrune` task that keeps the newest five rotated generations of each log, and the scheduled-task fallback rotates them each time the task starts — at boot and on every restart — keeping the newest five generations. Re-run the installer on a machine installed before this to pick it up.
+
 :::note Build it yourself for now
 `ever-works-node` is not published to npm yet, and the Fleet handoff panel says as much: "Node app downloads ship in an upcoming release." Build it from a monorepo checkout with `pnpm build:node` — the app is deliberately excluded from the default root build — or build the desktop node shell with `pnpm build:desktop-node`, the Electron packaging of the same shared core, with a setup wizard, a status window, a tray and auto-start.
 :::
@@ -703,27 +705,59 @@ What happens next:
   Task, the branch (and the mounted repository, if the agent asked from one), and a link to an
   existing pull request. The Inbox body also says what the run managed before asking (pushed,
   committed but not pushed, no changes, a failed push) and which required checks did not pass.
+  **From your fleet** above the Active and Archived lists narrows the Inbox to these messages
+  (`/inbox?source=fleet`, or `GET /api/inbox?sourceType=fleet-run`).
 - **Replying starts a new run for the same Task** — same Agent, same pinned node when the Agent is
   pinned, same branch. The new run's instructions carry your question and answer under
   **`# OWNER ANSWER`**, tell the model its earlier commits are on the branch (and whether they were
   pushed), and ask it to continue from the answer rather than redo committed work or ask again. The
   reply toast says "a new run is answering it".
+- **The answer run continues the conversation that asked the question** when it can. The platform
+  keeps the CLI session id the node reported for the asking run and the node it ran on. If the answer
+  run lands on that same node and the provider is Claude Code, the node runs
+  `claude -p --resume <session> --fork-session` and feeds it only your answer and a reminder of the
+  rules (on stdin, as always). The model picks up with its own reasoning still in context, so it
+  does not re-read the branch or reopen settled decisions. `--fork-session` leaves the original
+  session untouched, so a retried attempt starts from the same point. In every other case the run
+  starts a **fresh session** on the full instructions, which now replay every question this Task's
+  earlier runs asked and the answers you gave, oldest first, under
+  **`# EARLIER QUESTIONS AND ANSWERS`**. That happens when the run lands on another node, when the
+  provider is Codex, or when the CLI no longer has the session (for example "No conversation found"
+  after the CLI's history was cleared). In that last case the node runs fresh within the same job,
+  but only when the CLI itself said it could not open the session ("No conversation found", or a
+  CLI too old to know the resume flags) and no model turn ran. A resumed session that crashed
+  without saying why is reported as a failed run rather than run a second time, because it may
+  already have changed the worktree. The job result records what happened as
+  `model.resume`: `resumed`, `fell-back` or `skipped`, with the reason.
+  Codex is never resumed: `codex exec resume` does not take `--sandbox`, `-C` or `--add-dir`, so a
+  resumed Codex run could not be held to the sandbox and mount grants it was planned with.
 - The **Task page** shows the open question with an _Answer it in the Inbox_ link and hides the
   free-text _Resume_ while a question is open: a resume from there would start a run that never sees
-  your answer.
+  your answer. In the **Runs** history the parked run carries an **awaiting input** chip, so it does
+  not read as simply _completed_.
+- While a fleet run is **live**, the Task page offers no _Steer_ box. A node runs the model on
+  instructions fixed when the job was dispatched and never reads messages sent mid-run, so a steer
+  would never reach the agent. The run is recorded as executing on the fleet (its `runnerKind` is
+  `fleet-node:<provider>`), and the strip says how it reaches you instead: with a question in your
+  Inbox. _Interrupt_ is still shown.
 - **Archiving** (or deleting) the open question drops the parked run — it stops waiting and the Task
   page returns to normal. Moving the question back to Active parks it again.
 
 Limits: one question per run (the answer run can ask a new one, which files a new Inbox message);
-answers are free text — a fleet question offers no option buttons; earlier questions and answers are
-not replayed into later runs, only the reply that resumed the run travels with it; asking needs an
+answers are free text — a fleet question offers no option buttons; the replayed history covers the
+answers found on the Task's 50 most recent runs (capped at 16 KiB, oldest dropped first, and left out
+entirely when the Task brief alone fills the job); a session is resumed only on the node that holds it
+and only for Claude Code; asking needs an
 edit-capable permission mode — under `plan` the model cannot write the file and is not offered the
 protocol; a Task that is _Done_ or _Cancelled_ cannot be resumed — the reply is refused with the
 reason, the question stays open until you archive it; an Agent whose git policy forbids pushing may
 lose uncommitted work when the answer run lands on a different node, because that node starts from
 the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
-written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
-but is not reported as a question.
+written somewhere other than the repository root (or a mounted repository's root), for example
+`apps/api/.ever-works/QUESTION.md` after the model changed directory, is kept out of Git and is not
+asked as a question. The node finds it (it searches up to 8 levels deep and skips `node_modules`,
+`.git`, `.mounts` and links), removes it, and reports it on the run. The Task chat then says where
+the agent tried to ask, so a question is never lost without a trace.
 
 ### Platform tools from a fleet run (MCP bridge)
 
@@ -771,6 +805,13 @@ the token's own scope wins and a mismatch is refused.
 The run's result records whether the bridge was up and how many tool calls went through it. If the
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
 tool channel that fails never fails a Task.
+
+> An earlier design (slice C) described a fleet session as having "no platform tools." That was
+> always a **default**, not an invariant: the bridge is off until an operator and the Agent's own
+> permission both turn it on, and even then the model reaches only a bounded tool surface through a
+> credential it never sees, with the bound enforced by the platform's route allow-list. The two
+> designs are reconciled in one place — the
+> [fleet session trust model](../specs/security/fleet-session-trust-model.md) §3.
 
 ### How a fleet node pushes (scoped push credentials)
 
@@ -868,9 +909,39 @@ a commit message that already contains one — a Task title can reach the messag
 rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
 is worse than no trailer at all. If you see that failure, rename the Task.
 
+### What a fleet run leaves behind
+
+A fleet run used to leave the owner one 8 KB output tail and a job row; the CLI's own record of every turn and tool call was deleted with the run's scratch directory. Now the node reads the model CLI's event stream — Claude Code runs with `--output-format stream-json --verbose`, Codex's `exec --json` already is one — **while the CLI writes it**, and reports two bounded, redacted artefacts on the job result:
+
+- **Step records** — one per assistant message and per tool call: the tool's name, a short argument summary (paths and commands; any other argument is listed by **name only**, so a file body never reaches it), whether the call succeeded, and how long it took (to the node's one-second poll). At most 200 steps and 48 KB; anything past that is counted, not silently lost. The platform writes them into the run's ordinary timeline, so **Agents → Activity → the run** shows a fleet run exactly the way it shows a cloud run.
+- **A transcript** — the CLI's stream, one JSON document per line, with every tool output, file body and reasoning block replaced by `[elided N chars]`, capped at 64 KB by keeping its beginning and its end. It lives on the fleet job row only.
+
+Both are redacted on the node before they leave it — the values behind every granted env name, the run's delivered `.env` contents (which live in no environment, so a name-based redactor would miss them), each also in the escaped spelling JSON gives it, and anything the shared secret-pattern scanner recognises — and the platform runs its scanner over the step records again before storing them. The run's short output tail — what the Task chat quotes when a run fails — stays what the model last said plus the CLI's stderr; it never becomes the raw stream with its tool output. A stream that outgrows the node's 8 MB output ceiling no longer fails the run: its end is read for the verdict, and the step records were already taken from the whole stream as it was written.
+
+A node older than this simply reports no step records, and the platform writes none.
+
+### How long fleet jobs keep their bodies
+
+A fleet job carries the whole assembled prompt (`payload`, up to 256 KB) and the run's result (up to 256 KB, now including the transcript). A nightly pass (03:35 UTC, one replica at a time under the distributed task lock) **NULLs both bodies on terminal jobs older than the retention window** and keeps the row itself — status, node, attempts, timings, cost, error. What the run did survives where it belongs: on the run, its timeline and the Task.
+
+| Env                        | Default | Meaning                                                                                         |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `FLEET_JOB_RETENTION_DAYS` | `30`    | days a terminal job keeps its `payload` and `result`; clamped to 1–3650, a nonsense value is 30 |
+| `FLEET_JOB_PURGE_ENABLED`  | `true`  | `false` switches the purge off entirely (an audit hold)                                         |
+
+The pass works in batches of 200 and stops after 50 batches, leaving any remainder to the next night. Purged rows carry `bodiesPurgedAt`, so no row is purged twice.
+
+### Fleet run telemetry
+
+Each lifecycle transition emits one event through the platform's existing analytics and error-monitoring services — PostHog (`fleet_run_leased`, `fleet_run_completed`, `fleet_run_failed`, `fleet_run_cancelled`) and Sentry structured logs (`fleet.run.*`; a failed run is a warning, never an exception). The properties are identifiers, the job kind, the completion source, queue wait and duration, attempts, the CLI's provider and verdict, the reported cost, tokens and turns, and the number of step records — **never** the prompt, the result's text or the node's error string. A deployment without PostHog or Sentry configured sends nothing.
+
+Uploading a node's own log when a run fails is not built: the node has no authenticated upload channel to put it on. Read `node.log` on the machine, or the journal on Linux.
+
 ## Related
 
 - [Desktop App](./desktop-app.md) · [Workers](./workers.md) · [Kubernetes Deployment](./k8s-deployment.md)
 - [Job Runtimes](./job-runtimes.md) · [Agents](./agents.md) · [Tasks](./tasks.md) · [Quality Gates](./quality-gates.md)
 - [Task Isolation](./task-isolation.md) · [Agent Terminals](./agent-terminals.md) · [Sessions & Steering](./sessions-and-steering.md)
 - [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
+- [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
+  what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)

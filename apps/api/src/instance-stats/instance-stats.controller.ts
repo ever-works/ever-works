@@ -49,8 +49,8 @@ import {
  * also need the admin's interactive session (`SessionOnlyGuard`): an API key
  * or a fleet-run credential acting as the admin is refused with 403, so an
  * automation can never switch statistics back on, send or reset the identity.
- * The module is not loaded at all with `EVER_STATS_ENABLED=false`, so every
- * route then answers 404. Responses are never cached.
+ * The module is not loaded at all unless `EVER_STATS_ENABLED=true` (it is off
+ * by default), so every route then answers 404. Responses are never cached.
  */
 @ApiTags('instance-stats')
 @ApiBearerAuth('JWT-auth')

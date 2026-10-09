@@ -327,6 +327,37 @@ describe('agent/config', () => {
                 expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
             });
         });
+
+        describe('fleet job retention (self-build slice AP)', () => {
+            it('keeps terminal job bodies for 30 days by default, purge ON', () => {
+                expect(config.fleet.getJobRetentionDays()).toBe(30);
+                expect(config.fleet.isJobPurgeEnabled()).toBe(true);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = '90';
+                expect(config.fleet.getJobRetentionDays()).toBe(90);
+            });
+
+            it('floors at one day and caps at ten years', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = '0';
+                expect(config.fleet.getJobRetentionDays()).toBe(1);
+                process.env.FLEET_JOB_RETENTION_DAYS = '100000';
+                expect(config.fleet.getJobRetentionDays()).toBe(3650);
+            });
+
+            it('degrades a nonsense value to the default rather than purging everything now', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = 'forever';
+                expect(config.fleet.getJobRetentionDays()).toBe(30);
+            });
+
+            it('switches the purge off only for an explicit false', () => {
+                process.env.FLEET_JOB_PURGE_ENABLED = 'false';
+                expect(config.fleet.isJobPurgeEnabled()).toBe(false);
+                process.env.FLEET_JOB_PURGE_ENABLED = '0';
+                expect(config.fleet.isJobPurgeEnabled()).toBe(true);
+            });
+        });
     });
 
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {

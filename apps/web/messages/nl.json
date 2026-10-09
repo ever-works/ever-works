@@ -700,6 +700,12 @@
                 "active": "Active",
                 "archived": "Archived"
             },
+            "sourceFilter": {
+                "label": "Show",
+                "all": "All messages",
+                "fleet": "From your fleet",
+                "empty": "No messages from your fleet here."
+            },
             "kind": {
                 "question": "Question",
                 "approval": "Approval",
@@ -1596,6 +1602,7 @@
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
+                    "fleetLiveHint": "This run is executing on a fleet node, which cannot take messages mid-run. If the agent needs you it pauses with a question in your Inbox; otherwise let it finish.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
                     "waitingForAnswer": "The agent paused this run with a question for you.",
                     "answerInInbox": "Answer it in the Inbox",
@@ -3120,8 +3127,8 @@
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
                     "payAsYouGo": "Pay-as-you-go from your credits balance",
-                    "seatsIncluded": "{count} medewerkers of agents inbegrepen",
-                    "trial": "{days} dagen gratis proberen bij je eerste abonnement",
+                    "seatsIncluded": "{count} leden (medewerkers en AI-agents) inbegrepen",
+                    "trial": "{days} dagen gratis proberen bij je eerste abonnement (tegoed van het Free-abonnement tijdens de proefperiode)",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",

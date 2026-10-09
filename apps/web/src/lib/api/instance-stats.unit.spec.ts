@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * `instanceStatsAPI.isAvailable` decides whether Settings shows the Ever
  * Platform tab: `false` ONLY for a 404 (the API has the statistics module
- * switched off by `EVER_STATS_ENABLED`). Any other failure keeps the tab, so
+ * not switched on by `EVER_STATS_ENABLED`). Any other failure keeps the tab, so
  * the page can say the status could not be read instead of vanishing.
  */
 const serverFetch = vi.fn();

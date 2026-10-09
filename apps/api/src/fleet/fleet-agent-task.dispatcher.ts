@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import type { AgentRunRepository } from '@ever-works/agent/database';
 import type { NotificationService } from '@ever-works/agent/notifications';
 import type {
     AgentTaskExecuteDispatcher,
@@ -13,6 +14,7 @@ import type {
     FleetTaskWorkspaceSpec,
     TaskAcceptanceCheck,
 } from '@ever-works/contracts';
+import { FLEET_BYO_MODEL_PLUGIN_ID_PREFIX, fleetModelPluginId } from '@ever-works/contracts';
 import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
 import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
 import {
@@ -205,6 +207,14 @@ export interface FleetAwareDispatcherDeps {
      * (the dispatch gate upstream still parks every run).
      */
     killSwitch?: Pick<FleetKillSwitchService, 'isStopped'>;
+    /**
+     * Self-build slice AU — records on the run row where it was dispatched
+     * (`runnerKind`: `fleet-node:<provider>` for a fleet job, a fleet tag
+     * cleared for a cloud dispatch), so the Task page can stop offering a
+     * steer no node can deliver. Best-effort and display-only: absent, or a
+     * failed write, never changes a dispatch.
+     */
+    runs?: Pick<AgentRunRepository, 'recordDispatchRunner'>;
 }
 
 /**
@@ -365,7 +375,22 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                 }
                 const plan = deps.planner ? await deps.planner.plan(payload) : null;
                 markDelegationScopeCleared(payload);
-                return router.enqueueAgentTask(payload, decision.queuedReason ?? null, plan);
+                const handle = await router.enqueueAgentTask(
+                    payload,
+                    decision.queuedReason ?? null,
+                    plan,
+                );
+                // Slice AU — only once the job exists: the run now executes on
+                // a node, and the Task page must stop offering a steer no
+                // node can deliver.
+                await recordDispatchRunner(
+                    deps,
+                    payload,
+                    plan
+                        ? fleetModelPluginId(plan.execution.provider)
+                        : `${FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}command`,
+                );
+                return handle;
             }
 
             // Notify ONLY on a real fallback — a decision carrying a
@@ -405,9 +430,35 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                     );
                 }
             }
+            // Slice AU — a successor of a fleet run inherits its `runnerKind`
+            // through resume; a cloud dispatch must not keep reading as one.
+            await recordDispatchRunner(deps, payload, null);
             return delegate.enqueue(payload);
         },
     };
+}
+
+/**
+ * Slice AU — best-effort write of where a run was dispatched (see
+ * {@link FleetAwareDispatcherDeps.runs}). Display-only: a missing seam, a
+ * payload with no run id, or a failed write changes nothing about the
+ * dispatch, and is at most a debug line.
+ */
+async function recordDispatchRunner(
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+    runnerKind: string | null,
+): Promise<void> {
+    if (!deps.runs || !payload.runId) return;
+    try {
+        await deps.runs.recordDispatchRunner(payload.runId, runnerKind);
+    } catch (err) {
+        logger.debug(
+            `Run ${payload.runId}: dispatch target not recorded (${runnerKind ?? 'cloud'}): ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+    }
 }
 
 /**

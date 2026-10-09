@@ -1,9 +1,9 @@
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import type { DataSource } from 'typeorm';
-import { validateStatsReportBody } from '@ever-works/agent/ever-instance';
+import { validateStatsReportBytes, walkStrings } from '@ever-co/connect-sdk';
 import {
-    CONTRACT_DIR,
+    STATS_FIXTURES_DIR,
     contractBytes,
     contractJson,
     type ExpectedRecord,
@@ -13,8 +13,10 @@ import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-see
 
 /**
  * Every string in a report sits at an allow-listed path and matches that
- * path's form; there is no other string anywhere. And every invalid fixture
- * the SDK publishes is refused, at the path its `expected.json` names.
+ * path's form; there is no other string anywhere (the strings are listed by
+ * the SDK's `walkStrings`, keys included). And every invalid fixture the
+ * contract publishes is refused by the SDK's checks with the platform's answer:
+ * the status, the path and the code its `expected.json` names.
  */
 const STRING_PATHS: ReadonlyArray<[RegExp, RegExp]> = [
     [/^\/schema$/, /^ever\.stats\.v1$/],
@@ -36,22 +38,16 @@ const STRING_PATHS: ReadonlyArray<[RegExp, RegExp]> = [
     [/^\/period$/, /^20[0-9]{2}-(0[1-9]|1[0-2])$/],
 ];
 
-/** Every string value with its JSON pointer that is NOT allow-listed or does not match its form. */
-function strayStrings(value: unknown, path = ''): string[] {
-    if (typeof value === 'string') {
+/** Every string with its JSON pointer that is NOT allow-listed or does not match its form. */
+function strayStrings(value: unknown): string[] {
+    return walkStrings(value).flatMap(({ path, value: text, kind }) => {
+        // A key is a string too: it must be a plain schema identifier or a currency code.
+        if (kind === 'key') {
+            return /^[a-z][a-z0-9_]{0,40}$|^[A-Z]{3}$/.test(text) ? [] : [`${path} (key)`];
+        }
         const rule = STRING_PATHS.find(([pathPattern]) => pathPattern.test(path));
-        return rule && rule[1].test(value) && value.length <= 64 ? [] : [path];
-    }
-    if (Array.isArray(value))
-        return value.flatMap((item, index) => strayStrings(item, `${path}/${index}`));
-    if (value && typeof value === 'object') {
-        return Object.entries(value).flatMap(([key, item]) => [
-            // A key is a string too: it must be a plain schema identifier or a currency code.
-            ...(/^[a-z][a-z0-9_]{0,40}$|^[A-Z]{3}$/.test(key) ? [] : [`${path}/${key} (key)`]),
-            ...strayStrings(item, `${path}/${key}`),
-        ]);
-    }
-    return [];
+        return rule && rule[1].test(text) && text.length <= 64 ? [] : [path];
+    });
 }
 
 describe('ever.stats.v1 — string walker', () => {
@@ -90,31 +86,37 @@ describe('ever.stats.v1 — string walker', () => {
     });
 
     const expected = contractJson<ExpectedRecord>(join('fixtures', 'stats', 'expected.json'));
-    const invalid = readdirSync(join(CONTRACT_DIR, 'fixtures', 'stats', 'invalid')).sort();
+    const invalid = readdirSync(join(STATS_FIXTURES_DIR, 'invalid')).sort();
 
-    it('covers every invalid fixture the SDK publishes', () => {
+    /** The bytes of one statistics fixture, as a plain `Uint8Array`. */
+    const fixture = (name: string) =>
+        new Uint8Array(contractBytes(join('fixtures', 'stats', ...name.split('/'))));
+
+    it('covers every invalid fixture the contract publishes', () => {
         expect(invalid.length).toBeGreaterThanOrEqual(12);
         for (const name of invalid) expect(expected.fixtures[`invalid/${name}`]).toBeDefined();
     });
 
-    it.each(invalid)('refuses invalid/%s at the published path', (name) => {
+    it.each(invalid)('refuses invalid/%s with the published answer', (name) => {
         const outcome = expected.fixtures[`invalid/${name}`];
-        const result = validateStatsReportBody(
-            contractBytes(join('fixtures', 'stats', 'invalid', name)),
-        );
+        const result = validateStatsReportBytes(fixture(`invalid/${name}`));
         expect(result.ok).toBe(false);
         // `in` narrows whatever the compiler's null checks (this app runs without them).
-        const errors = 'errors' in result ? result.errors : [];
-        expect(errors[0]?.path).toBe(outcome.path ?? '');
+        const error = 'error' in result ? result.error : null;
+        expect({
+            status: error?.status,
+            code: error?.code,
+            path: error?.errors[0]?.path,
+            error: error?.errors[0]?.code,
+        }).toEqual({
+            status: outcome.status,
+            code: outcome.code,
+            path: outcome.path ?? '',
+            error: outcome.error,
+        });
     });
 
     it.each(['gauzy', 'teams', 'works', 'rec', 'traduora'])('accepts valid/%s.json', (product) => {
-        expect(
-            validateStatsReportBody(
-                contractBytes(join('fixtures', 'stats', 'valid', `${product}.json`)),
-            ),
-        ).toEqual({
-            ok: true,
-        });
+        expect(validateStatsReportBytes(fixture(`valid/${product}.json`)).ok).toBe(true);
     });
 });

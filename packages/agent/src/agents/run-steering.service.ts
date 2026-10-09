@@ -585,6 +585,13 @@ export class RunSteeringService implements RunSteeringPort {
             await this.runs.seedResumeContext(next.id, {
                 cliSessionId: run.cliSessionId ?? null,
                 pendingInput: seeded.length > 0 ? seeded : null,
+                // Self-build slice AU — which fleet node holds that session.
+                // Carried beside the id so the fleet planner can offer the
+                // successor's job a `--resume` on the same node. Conditional
+                // key: a cloud run (no record) seeds exactly what it always
+                // did. The planner re-checks it against `cliSessionId`, so
+                // carrying it verbatim can never resume the wrong session.
+                ...(run.fleetCliSession ? { fleetCliSession: run.fleetCliSession } : {}),
             });
 
             if (admission.admitted && this.dispatcher) {

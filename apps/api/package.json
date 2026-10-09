@@ -33,6 +33,7 @@
     },
     "dependencies": {
         "@composio/core": "^0.10.0",
+        "@ever-co/connect-sdk": "1.0.0-rc.2",
         "@ever-co/legal": "^0.1.0",
         "@ever-works/agent": "workspace:*",
         "@ever-works/contracts": "workspace:*",
@@ -68,7 +69,7 @@
         "class-validator": "^0.14.3",
         "dotenv": "^17.2.3",
         "express": "^5.2.1",
-        "handlebars": "^4.7.9",
+        "handlebars": "^4.7.10",
         "helmet": "^8.1.0",
         "ioredis": "^5.10.1",
         "multer": "^2.4.0",
@@ -90,6 +91,7 @@
         "ws": "^8.21.0"
     },
     "devDependencies": {
+        "@ever-co/connect-contracts": "1.0.0-rc.2",
         "@ever-works/aws-s3-plugin": "workspace:*",
         "@ever-works/ever-stats-sink-plugin": "workspace:*",
         "@ever-works/github-storage-plugin": "workspace:*",
@@ -115,6 +117,7 @@
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
         "typescript": "^5.9.3",
-        "@types/ws": "^8.18.0"
+        "@types/ws": "^8.18.0",
+        "ajv": "^8.18.0"
     }
 }

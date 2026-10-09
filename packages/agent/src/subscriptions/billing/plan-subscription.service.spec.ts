@@ -89,6 +89,8 @@ function makeProvider(overrides: Record<string, unknown> = {}) {
         retrieveCheckoutSession: jest.fn(),
         findPlanSubscriptionIdForPayment: jest.fn().mockResolvedValue(null),
         findPerpetualLicenceForPayment: jest.fn().mockResolvedValue(null),
+        // Provider-side trial history: none by default (a first-time buyer).
+        hasHadPlanSubscription: jest.fn().mockResolvedValue(false),
         ...overrides,
     } as any;
 }
@@ -117,6 +119,8 @@ function makeSubscriptionRepository(overrides: Record<string, unknown> = {}) {
         findActiveByUser: jest.fn().mockResolvedValue(null),
         // No subscription history: a first-time buyer, so a cloud paid checkout gets the trial.
         listByUser: jest.fn().mockResolvedValue([]),
+        // Nobody else in the buyer's Tenant / Organization has held one either.
+        existsProviderSubscriptionInScope: jest.fn().mockResolvedValue(false),
         cancel: jest.fn().mockResolvedValue(undefined),
         ...overrides,
     } as any;
@@ -126,6 +130,7 @@ function makeProfileRepository(overrides: Record<string, unknown> = {}) {
     return {
         findByUserId: jest.fn().mockResolvedValue(null),
         findByCustomerId: jest.fn().mockResolvedValue(null),
+        existsPlanSubscriptionInScope: jest.fn().mockResolvedValue(false),
         ensure: jest.fn().mockResolvedValue({ userId: 'u1', providerCustomerId: 'cus_1' }),
         ...overrides,
     } as any;
@@ -713,6 +718,107 @@ describe('startPlanCheckout — the 90-day trial is Cloud paid plans only', () =
         expect(provider.createPlanCheckoutSession.mock.calls[0][0].plan.trialPeriodDays).toBe(90);
     });
 
+    // ── One trial per account AND per organization (owner, 2026-10-09) ──────────────────────
+    it('gives no trial when someone in the same Tenant / Organization already held one', async () => {
+        const subscriptionRepository = makeSubscriptionRepository({
+            existsProviderSubscriptionInScope: jest.fn().mockResolvedValue(true),
+        });
+        const { service, provider } = build({
+            subscriptionRepository,
+            userRepository: makeUserRepository({
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: 'u1', tenantId: 't1', email: 'b@x.test' }),
+            }),
+        });
+
+        const started = await service.startPlanCheckout({
+            ...checkoutOptions,
+            organizationId: 'o1',
+        });
+
+        expect(subscriptionRepository.existsProviderSubscriptionInScope).toHaveBeenCalledWith({
+            tenantId: 't1',
+            organizationIds: ['o1'],
+        });
+        expect(provider.createPlanCheckoutSession.mock.calls[0][0].plan.trialPeriodDays).toBe(0);
+        expect(started.trialPeriodDays).toBe(0);
+    });
+
+    it('gives no trial when an organization billing profile already carried a plan subscription', async () => {
+        const profileRepository = makeProfileRepository({
+            existsPlanSubscriptionInScope: jest.fn().mockResolvedValue(true),
+        });
+        const { service, provider } = build({ profileRepository });
+
+        await service.startPlanCheckout({
+            ...checkoutOptions,
+            organizationId: 'o1',
+            tenantId: 't9',
+        });
+
+        expect(profileRepository.existsPlanSubscriptionInScope).toHaveBeenCalledWith({
+            tenantId: 't9',
+            organizationIds: ['o1'],
+        });
+        expect(provider.createPlanCheckoutSession.mock.calls[0][0].plan.trialPeriodDays).toBe(0);
+    });
+
+    it('gives no trial when the payment provider remembers one for this customer (local rows gone)', async () => {
+        const provider = makeProvider({
+            hasHadPlanSubscription: jest.fn().mockResolvedValue(true),
+        });
+        const { service } = build({
+            provider,
+            profileRepository: makeProfileRepository({
+                findByUserId: jest
+                    .fn()
+                    .mockResolvedValue({ userId: 'u1', providerCustomerId: 'cus_old' }),
+            }),
+        });
+
+        const started = await service.startPlanCheckout(checkoutOptions);
+
+        expect(provider.hasHadPlanSubscription).toHaveBeenCalledWith('cus_old');
+        expect(started.trialPeriodDays).toBe(0);
+    });
+
+    it('fails the checkout (no guessed trial) when the provider history cannot be read', async () => {
+        const provider = makeProvider({
+            hasHadPlanSubscription: jest.fn().mockRejectedValue(new Error('provider down')),
+        });
+        const { service } = build({
+            provider,
+            profileRepository: makeProfileRepository({
+                findByUserId: jest
+                    .fn()
+                    .mockResolvedValue({ userId: 'u1', providerCustomerId: 'cus_old' }),
+            }),
+        });
+
+        await expect(service.startPlanCheckout(checkoutOptions)).rejects.toThrow('provider down');
+        expect(provider.createPlanCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('does not ask the provider for history on a self-hosted checkout (no trial to give)', async () => {
+        const provider = makeProvider();
+        const { service } = build({
+            provider,
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+            profileRepository: makeProfileRepository({
+                findByUserId: jest
+                    .fn()
+                    .mockResolvedValue({ userId: 'u1', providerCustomerId: 'cus_old' }),
+            }),
+        });
+
+        await service.startPlanCheckout({ ...checkoutOptions, planCode: 'selfhosted_pro' });
+
+        expect(provider.hasHadPlanSubscription).not.toHaveBeenCalled();
+    });
+
     describe('planCheckoutTrialPeriodDays (pure rule)', () => {
         const base = {
             mode: 'subscription' as const,
@@ -1009,6 +1115,69 @@ describe('applyWebhook — activation and revocation', () => {
         });
         await expect(failing.service.applyWebhook(event())).resolves.toBe('subscription-activated');
         expect(failing.subscriptionService.assignPlanToUser).toHaveBeenCalled();
+    });
+
+    // Owner, 2026-10-09: a free trial runs on Free-plan credits only. The tier is granted; the
+    // monthly allowance waits for the trial to convert (`trialing -> active`).
+    it('activates the tier but grants NO plan credits while the subscription is trialing', async () => {
+        const trialing = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockResolvedValue('granted'),
+            },
+        });
+        await expect(trialing.service.applyWebhook({ ...event(), inTrial: true })).resolves.toBe(
+            'subscription-activated',
+        );
+        expect(trialing.subscriptionService.assignPlanToUser).toHaveBeenCalled();
+        expect(trialing.planCreditGrantService.grantCurrentAllowance).not.toHaveBeenCalled();
+
+        // The conversion: same subscription, now active -> the allowance lands.
+        await trialing.service.applyWebhook({ ...event(), inTrial: false });
+        expect(trialing.planCreditGrantService.grantCurrentAllowance).toHaveBeenCalledWith('u1');
+    });
+
+    it('records the trial end on the row + the trialing status on the profile, and pulls it forward on an early conversion', async () => {
+        const trialEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        const profileRepository = makeProfileRepository({
+            findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            updateSubscriptionState: jest.fn().mockResolvedValue(undefined),
+        });
+        const subscriptionRepository = makeSubscriptionRepository();
+        const { service } = build({
+            profileRepository,
+            subscriptionRepository,
+            userRepository: makeUserRepository({
+                findById: jest.fn().mockResolvedValue({ id: 'u1', tenantId: 't1' }),
+            }),
+        });
+
+        await service.applyWebhook({ ...event(), inTrial: true, trialEnd });
+
+        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ trialEndsAt: trialEnd, tenantId: 't1' }),
+        );
+        expect(profileRepository.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ subscriptionStatus: 'trialing', currentPeriodEnd: trialEnd }),
+        );
+
+        // Early conversion of the SAME subscription: the recorded trial end moves to now.
+        subscriptionRepository.findActiveByUser.mockResolvedValue({
+            providerSubscriptionId: event().subscriptionId,
+            trialEndsAt: trialEnd,
+            tenantId: 't1',
+        });
+        subscriptionRepository.createOrUpdate.mockClear();
+        const before = Date.now();
+        await service.applyWebhook({ ...event(), inTrial: false });
+        const written = subscriptionRepository.createOrUpdate.mock.calls[0][1];
+        expect(written.trialEndsAt.getTime()).toBeGreaterThanOrEqual(before);
+        expect(written.trialEndsAt.getTime()).toBeLessThan(trialEnd.getTime());
+        expect(written.tenantId).toBeUndefined();
     });
 
     it('does not grant an allowance for a self-hosted licence purchase', async () => {

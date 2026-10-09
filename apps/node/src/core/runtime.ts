@@ -858,6 +858,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// record then says the isolation was declined rather than
 						// silently claiming one that was never proved.
 						sessionConfigFs: defaultSessionConfigFs,
+						// Self-build slice AU — this node's enrollment id, from the
+						// LOCAL config, so a job offering an earlier CLI session can
+						// tell whether that session lives on this machine. Never
+						// read from the wire: a job cannot talk a node into
+						// believing it is another one.
+						nodeId: config.nodeId,
 						// Self-build slice Z (EW-796) — the platform side of the
 						// MCP bridge, wired through the SAME authenticated job
 						// client the lease protocol uses. No new endpoint, no new

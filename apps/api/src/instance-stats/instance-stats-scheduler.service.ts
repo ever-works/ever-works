@@ -15,7 +15,7 @@ export function instanceStatsTickMs(sendIntervalS: number): number {
 
 /**
  * The timer of the anonymous usage statistics module. It exists only when the
- * module is loaded (`EVER_STATS_ENABLED` is not `false`).
+ * module is loaded (`EVER_STATS_ENABLED=true`; off by default).
  *
  * Every tick reads the operator switch and the shared schedule from the
  * database and calls {@link InstanceStatsSenderService.runDue}, which sends
@@ -38,7 +38,7 @@ export class InstanceStatsSchedulerService implements OnApplicationBootstrap, On
         for (const warning of this.config.warnings) {
             this.logger.warn(`ever-stats: ${warning}`);
         }
-        // Switched off by `EVER_STATS_ENABLED` although the module was loaded:
+        // Not switched on by `EVER_STATS_ENABLED` although the module was loaded:
         // no identity, no schedule, no timer — nothing runs.
         if (!this.config.enabled) {
             this.logger.warn('ever-stats: loaded_while_switched_off (nothing runs)');

@@ -21,6 +21,7 @@ import {
 import { CREDIT_PACKS, findCreditPack, type CreditPack } from './credit-packs';
 import { PlanSubscriptionService } from './plan-subscription.service';
 import { PaygService, type PaygStateView } from './payg.service';
+import { TrialReminderService } from './trial-reminder.service';
 
 /** Correlation refType stamped on every purchase/refund ledger movement. */
 export const BILLING_PAYMENT_REF_TYPE = 'billing-payment';
@@ -132,6 +133,9 @@ export interface WebhookOutcome {
         | 'subscription-reconciled'
         // Pay-as-you-go usage subscription lifecycle (billing spec §3.5).
         | 'payg-reconciled'
+        // Trial-ending reminder sent now / already sent earlier (2026-10 repricing).
+        | 'trial-reminder-sent'
+        | 'trial-reminder-idempotent'
         | 'ignored'
         | 'unattributed';
     creditsDelta?: number;
@@ -184,6 +188,12 @@ export class BillingService {
          */
         @Optional()
         private readonly paygService?: PaygService,
+        /**
+         * Trial-ending reminders (2026-10 repricing). Appended LAST + `@Optional()` for the same
+         * arity reason; without it a `trial_will_end` delivery is acknowledged and ignored.
+         */
+        @Optional()
+        private readonly trialReminderService?: TrialReminderService,
     ) {}
 
     /** Server-side pack table — the only source of prices. */
@@ -495,6 +505,8 @@ export class BillingService {
                 return this.applySubscription(event);
             case 'payg.updated':
                 return this.applyPayg(event);
+            case 'subscription.trial_will_end':
+                return this.applyTrialWillEnd(event);
             case 'ignored':
             default:
                 return { eventId: event.id, kind: event.kind, action: 'ignored' };
@@ -540,6 +552,35 @@ export class BillingService {
             return this.unattributed(event);
         }
         return { eventId: event.id, kind: event.kind, action: 'subscription-reconciled' };
+    }
+
+    /**
+     * The provider's ~3-day "trial ends soon" notice → the trial-ending reminder (in-app + email,
+     * once per subscription). Moves NOTHING else: no tier, no snapshot, no ledger. Attribution is
+     * the owner WE stamped (the billing profile of the provider customer); an unattributable
+     * delivery is acknowledged, never retried forever.
+     */
+    private async applyTrialWillEnd(event: BillingWebhookEvent): Promise<WebhookOutcome> {
+        if (!this.trialReminderService || !event.subscriptionId || !event.trialEnd) {
+            return { eventId: event.id, kind: event.kind, action: 'ignored' };
+        }
+        const profile = await this.resolveProfile(event);
+        if (!profile) {
+            return this.unattributed(event);
+        }
+        const sent = await this.trialReminderService.remind({
+            userId: profile.userId,
+            subscriptionId: event.subscriptionId,
+            planCode: event.planCode ?? null,
+            trialEnd: event.trialEnd,
+            lead: '3d',
+            cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
+        });
+        return {
+            eventId: event.id,
+            kind: event.kind,
+            action: sent ? 'trial-reminder-sent' : 'trial-reminder-idempotent',
+        };
     }
 
     /**

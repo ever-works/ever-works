@@ -29,6 +29,9 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_DEFAULT_MIN_NODE_VERSION,
     normalizeFleetNodeVersionFloor,
+    FLEET_JOB_DEFAULT_RETENTION_DAYS,
+    FLEET_JOB_MAX_RETENTION_DAYS,
+    FLEET_JOB_MIN_RETENTION_DAYS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
     FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
@@ -579,6 +582,30 @@ export const config = {
          * restart; the 24h ceiling is where a handover window would stop
          * being a handover and become a second permanent credential.
          */
+        /**
+         * Self-build slice AP — days a TERMINAL fleet job keeps its
+         * `payload` (the assembled prompt) and `result` (including the
+         * run's redacted transcript) before the nightly purge NULLs them
+         * (`FLEET_JOB_RETENTION_DAYS`, default 30, clamped to [1, 3650]).
+         * The row and its metadata are kept; a nonsense value degrades to
+         * the default rather than to "purge everything now".
+         */
+        getJobRetentionDays(): number {
+            return clampedIntEnv(
+                process.env.FLEET_JOB_RETENTION_DAYS,
+                FLEET_JOB_DEFAULT_RETENTION_DAYS,
+                FLEET_JOB_MIN_RETENTION_DAYS,
+                FLEET_JOB_MAX_RETENTION_DAYS,
+            );
+        },
+        /**
+         * Self-build slice AP — the purge's off switch. Default ON: an
+         * operator who must keep every prompt and result (an audit hold)
+         * sets `FLEET_JOB_PURGE_ENABLED=false` explicitly.
+         */
+        isJobPurgeEnabled(): boolean {
+            return process.env.FLEET_JOB_PURGE_ENABLED !== 'false';
+        },
         getCredentialRotationOverlapMs(): number {
             return clampedIntEnv(
                 process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,

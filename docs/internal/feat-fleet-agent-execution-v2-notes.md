@@ -41,7 +41,10 @@ tenant alike.
    platform calls anyway.
 3. **No platform tools inside the CLI session.** The instructions say so explicitly and ask the
    model to leave the tree untouched and explain when the Task cannot be completed. `ask_human`
-   / task chat from a node run is slice **G** (MCP tools for Tasks/Inbox).
+   / task chat from a node run is slice **G** (MCP tools for Tasks/Inbox). **Superseded as an
+   invariant by slice Z's MCP bridge** — it is now a DEFAULT (off until an operator + the Agent's
+   own permission both enable it), reconciled in the
+   [fleet session trust model](../specs/security/fleet-session-trust-model.md) §3.
 
 ## Verification
 
