@@ -379,6 +379,22 @@ describe('github-review-bots', () => {
             }
         });
 
+        it('a finding that QUOTES the placeholder or plan-limit sentence mid-line is still a finding', () => {
+            // A review of this very classifier would do exactly this. The
+            // two verbatim sentences only count where CodeRabbit prints
+            // them: at the start of a (block-quoted) line.
+            expect(
+                created(
+                    '_🟠 Major_\n\nThe regex for `Currently processing new changes in this PR` is unanchored, so a quote of it is dropped.',
+                ),
+            ).toBe('findings');
+            expect(
+                created(
+                    'The notice text "Your [plan](x) includes PR reviews subject to [rate limits](y)" is matched anywhere in a body.',
+                ),
+            ).toBe('findings');
+        });
+
         it('keeps every real inline finding shape as a finding', () => {
             for (const body of [
                 reviewBotCommentFixture('coderabbit-inline-major-finding').body,

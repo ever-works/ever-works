@@ -284,8 +284,13 @@ const CODERABBIT_SUMMARY = coderabbitMarker('summarize');
 /** Its first revision: the "review in progress" placeholder. */
 const CODERABBIT_IN_PROGRESS = coderabbitMarker('review in progress');
 
-/** …and the visible sentence inside it, should the marker ever be dropped. */
-const CODERABBIT_IN_PROGRESS_TEXT = /Currently processing new changes in this PR\b/i;
+/**
+ * …and the visible sentence inside it, should the marker ever be dropped.
+ * Anchored to the start of a (block-quoted) line, the way CodeRabbit
+ * prints it, so a finding that QUOTES the sentence mid-line — a review of
+ * this very classifier, say — is not mistaken for the placeholder.
+ */
+const CODERABBIT_IN_PROGRESS_TEXT = /^\s*(?:>\s*)?Currently processing new changes in this PR\b/im;
 
 /** A review skipped on purpose (draft PR, non-default base branch, …). */
 const CODERABBIT_SKIPPED = coderabbitMarker('skip review');
@@ -293,8 +298,13 @@ const CODERABBIT_SKIPPED = coderabbitMarker('skip review');
 /** The summary's verdict when the review produced nothing to fix. */
 const CODERABBIT_NOTHING_ACTIONABLE = /\bNo actionable comments were generated\b/i;
 
-/** A plan-level limit notice posted as a reply instead of a review. */
-const CODERABBIT_PLAN_LIMIT = /\bincludes PR reviews subject to \[?rate limits\b/i;
+/**
+ * A plan-level limit notice posted as a reply instead of a review
+ * ("Your [plan](…) includes PR reviews subject to [rate limits](…)").
+ * Line-anchored for the same reason as the placeholder sentence.
+ */
+const CODERABBIT_PLAN_LIMIT =
+    /^\s*Your \[?plan\]?(?:\([^)\n]*\))? includes PR reviews subject to \[?rate limits\b/im;
 
 /**
  * CodeRabbit answering a command collapses its verdict into
