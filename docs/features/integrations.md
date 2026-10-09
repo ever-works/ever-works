@@ -53,11 +53,27 @@ Point a repository webhook at `POST /api/ingest/github/events` and Agents review
 
 On `pull_request` opened/synchronize — and on `@ever-works` mentions in PR comments — the reviewer matches the repository to a Work (across all three repo roles), builds a byte-capped diff, adds Knowledge-Base context and memory recall, makes one structured AI call, and posts the review. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once.
 
-The platform's own replies and unknown bots are never ingested — the loop must not echo its own output. Reviews, inline findings and summary comments from **trusted reviewer bots** (CodeRabbit, Copilot, Codex and Greptile by default; `GITHUB_TRUSTED_REVIEW_BOTS` to change the list, `none` to disable) become Task rejection feedback with a severity (`critical | major | minor`, mapped from CodeRabbit's Major/Minor/Critical and Codex/Greptile P1–P3) so the next resumed run fixes P2+ first. A `changes_requested` review from a trusted bot is recorded exactly as a human's would be; a bot comment is recorded, never reviewed. The platform's own `<GITHUB_APP_SLUG>[bot]` identity stays excluded even if it is listed. A trusted-bot finding with no recognisable marker is stored with no severity and the resumed run is told to treat it as major — an unrecognised marker is never read as a nit.
+The platform's own replies and unknown bots are never ingested — the loop must not echo its own output. Reviews, inline findings and other finding-bearing comments from **trusted reviewer bots** (CodeRabbit, Copilot, Codex and Greptile by default; `GITHUB_TRUSTED_REVIEW_BOTS` to change the list, `none` to disable) become Task rejection feedback (their placeholders, summaries and status notices do not — see [Which bot comments count](#which-bot-comments-count)) with a severity (`critical | major | minor`, mapped from CodeRabbit's Major/Minor/Critical and Codex/Greptile P1–P3) so the next resumed run fixes P2+ first. A `changes_requested` review from a trusted bot is recorded exactly as a human's would be; a bot comment is recorded, never reviewed. The platform's own `<GITHUB_APP_SLUG>[bot]` identity stays excluded even if it is listed. A trusted-bot finding with no recognisable marker is stored with no severity and the resumed run is told to treat it as major — an unrecognised marker is never read as a nit.
 
 Deliveries are verified with the configured webhook secret (HMAC SHA-256 over the raw body, constant-time compare) and the endpoint fails closed the same way. A missing `x-github-event` header is rejected outright.
 
 > This per-repository receiver is distinct from the platform **GitHub App** webhook (`/api/github-app/webhooks`), which handles installation and push sync.
+
+### Which bot comments count
+
+Being on the trusted list says who may speak, not that everything said is a finding — each recorded rejection can resume the Agent, and every resume is a full model run. A trusted bot's comment becomes rejection feedback only when it is a **new** comment (`created`) that is not one of the bots' own machine-generated shapes. Recognised by the bots' fixed HTML markers and a few verbatim sentences — never by guessing from prose — these record nothing and resume nothing:
+
+| Shape                                                                                                | Why                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| CodeRabbit's "Currently processing new changes in this PR" placeholder                               | a progress note; it is later edited into the summary                                                                                       |
+| CodeRabbit's summary comment — walkthrough, "No actionable comments", review skipped, tool failures  | CodeRabbit's findings arrive as review comments, never in it                                                                               |
+| CodeRabbit's command acknowledgements ("Review finished", "Review rate limited", "Already reviewed") | an answer to `@coderabbitai review`, not a review                                                                                          |
+| Rate-limit and usage-limit notices (CodeRabbit, Codex)                                               | nothing to fix                                                                                                                             |
+| A Greptile summary with no P-badge finding, a TREX run that found nothing or could not run           | a "safe to merge" digest                                                                                                                   |
+| Greptile "too many files" status                                                                     | nothing to fix                                                                                                                             |
+| Any **edit** of a bot comment                                                                        | a finding is new once; CodeRabbit re-edits its summary on every push, and each edit would otherwise be a duplicate row and a duplicate run |
+
+Inline findings, a Greptile summary that lists P-badge findings, a CodeRabbit chat answer that reasons about the code, and every `changes_requested` review are recorded exactly as before. Human comments and reviews are never filtered this way.
 
 ## Issue and incident intake
 

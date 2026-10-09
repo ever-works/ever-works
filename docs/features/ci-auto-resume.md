@@ -104,6 +104,7 @@ It reads the recorded rejection, not the delivery, so a review that recorded not
 A comment is only a doorbell — it carries no link to the row it is meant to answer — so the row it rings for is checked rather than merely fetched:
 
 - the platform's **own** identity and any **untrusted bot** never ring it, so the loop cannot wake itself on its own status comment (the same rule the review bridge applies before it records anything);
+- a **trusted reviewer bot** rings it only with a comment that carries a finding — never with CodeRabbit's "review in progress" placeholder, its walkthrough summary, a command acknowledgement, a rate-limit notice, a finding-less Greptile summary, or an **edit** of any comment (see [Which bot comments count](integrations.md#which-bot-comments-count)). The review bridge records nothing for those either, so they cost no model run;
 - a `gate` row (this loop's own record of a CI failure) is never cashed in by a comment — the CI half owns those;
 - the row has to be about **this** pull request, and less than a week old. A rejection nobody consumed for a week was handled by a human or abandoned.
 
