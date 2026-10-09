@@ -181,6 +181,20 @@ export interface WorkspaceFinalizeOptions {
 	/** Author / committer identity for this commit; see {@link WorkspaceCommitIdentity}. */
 	identity?: WorkspaceCommitIdentity;
 	/**
+	 * Neutralise repository-supplied Git config on the finalize's OWN
+	 * `add` / `status` / `commit` (self-build slice AL): `commit --no-verify`,
+	 * `core.hooksPath` pointed at an empty dir, and `core.fsmonitor=false`, so a
+	 * `core.hooksPath` / fsmonitor an untrusted checkout (or a model with a
+	 * shell) set in the shared pool config cannot run a `pre-commit` or
+	 * fsmonitor hook under the committer's identity. The credentialed PUSH
+	 * already does this; this extends it to the commit.
+	 *
+	 * Opt-in and additive: the fleet node sets it (its checkout is attacker-
+	 * authored and the model holds `acceptEdits` over it); the cloud runner
+	 * leaves it unset and its finalize is byte-for-byte unchanged.
+	 */
+	hardenRepoHooks?: boolean;
+	/**
 	 * Publish THIS already-committed commit instead of committing the tree:
 	 * nothing is staged or committed, and `<publishSha>:refs/heads/<branch>` is
 	 * pushed with the same fence, credential and cancellation handling as a
