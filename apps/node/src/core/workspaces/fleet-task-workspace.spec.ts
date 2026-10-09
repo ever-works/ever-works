@@ -756,8 +756,14 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 			// author/committer split and the scoped write credential, and a
 			// finalize that reached the provider without them would be one
 			// that pushed with the machine's own credential helper.
+			//
+			// `hardenRepoHooks` joined in slice AL: a fleet finalize ALWAYS
+			// asks the provider to neutralise repo hooks / fsmonitor on the
+			// node's own commit, lease or no lease, because the checkout is
+			// attacker-authored on every run.
 			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual([
 				'commitMessage',
+				'hardenRepoHooks',
 				'identity',
 				'push',
 				'pushCredential'

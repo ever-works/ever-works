@@ -1,24 +1,37 @@
+import Ajv2020 from 'ajv/dist/2020';
 import type { DataSource } from 'typeorm';
-import {
-    EVER_STATS_V1_SCHEMA,
-    compileStrictStatsSchema,
-    validateStatsReport,
-} from '@ever-works/agent/ever-instance';
+import { SCHEMAS } from '@ever-co/connect-contracts';
+import { validateStatsReport } from '@ever-co/connect-sdk';
 import { createHarness } from './fixtures/harness.helper-spec';
 import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 type Json = Record<string, unknown>;
 
+/** The published schema, from the pinned `@ever-co/connect-contracts`. */
+const EVER_STATS_V1_SCHEMA = SCHEMAS.stats as Json;
+
+/**
+ * Another copy of a statistics schema compiled strictly (an unknown keyword or
+ * an ambiguous schema is a compile error): the control below proves that a
+ * weakened schema would let a field through.
+ */
+function compileStrict(schema: Json): (value: unknown) => boolean {
+    const validate = new Ajv2020({ strict: true, allErrors: true }).compile(schema);
+    return (value: unknown) => validate(value) === true;
+}
+
 /**
  * Every object level of the published schema is closed, and the builder's
- * output validates against it strictly.
+ * output passes the published checks (the Ever Platform SDK's
+ * `validateStatsReport`, the platform's own).
  *
  * "Closed" means `additionalProperties: false`, or — for the currency maps,
  * the one place keys are not a fixed list — `additionalProperties` limited to
  * an integer schema AND `propertyNames` bound by a pattern AND
  * `maxProperties`. The meta-test walks every subschema; the control removes
- * one `additionalProperties: false` and shows both the meta-test and the
- * validator then let an unknown field through.
+ * one `additionalProperties: false` and shows both the meta-test and a
+ * validator compiled from the weakened schema then let an unknown field
+ * through, while the SDK still refuses it.
  */
 /** Keywords whose subschemas apply to the SAME instance as the node that holds them. */
 const IN_PLACE_ARRAYS = ['allOf', 'anyOf', 'oneOf'];
@@ -100,7 +113,7 @@ describe('ever.stats.v1 — strict schema', () => {
         // the contract would, and the field gets through.
         const generic = (mutated.properties as Json).counts as Json;
         delete generic.additionalProperties;
-        const validateMutated = compileStrictStatsSchema(mutated);
+        const validateMutated = compileStrict(mutated);
         const leaking = {
             ...JSON.parse(JSON.stringify(validReport)),
             counts: { ...validReport.counts, company_name: 1 },
@@ -128,16 +141,24 @@ describe('ever.stats.v1 — strict schema', () => {
     });
 
     it('accepts the builder output strictly', () => {
-        expect(validateStatsReport(validReport)).toEqual({ ok: true });
+        expect(validateStatsReport(validReport).ok).toBe(true);
     });
 
+    /** The field errors of a refused report (`[]` when it is accepted). */
+    const refusal = (report: unknown) => {
+        const result = validateStatsReport(report);
+        // `in` narrows whatever the compiler's null checks (this app runs without them).
+        return 'error' in result
+            ? result.error.errors.map(({ path, code }) => ({ path, code }))
+            : [];
+    };
+
     it('refuses a report with any extra field, at any level', () => {
-        expect(validateStatsReport({ ...validReport, hostname: 'x' })).toMatchObject({
-            ok: false,
-            errors: [{ path: '/hostname', code: 'unknown_field' }],
-        });
-        expect(
-            validateStatsReport({ ...validReport, counts: { ...validReport.counts, emails: 3 } }),
-        ).toMatchObject({ ok: false, errors: [{ path: '/counts/emails', code: 'unknown_field' }] });
+        expect(refusal({ ...validReport, hostname: 'x' })).toEqual([
+            { path: '/hostname', code: 'unknown_field' },
+        ]);
+        expect(refusal({ ...validReport, counts: { ...validReport.counts, emails: 3 } })).toEqual([
+            { path: '/counts/emails', code: 'unknown_field' },
+        ]);
     });
 });

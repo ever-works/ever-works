@@ -1,7 +1,6 @@
-import { generateKeyPairSync } from 'crypto';
 import type { DataSource } from 'typeorm';
 import { EverInstance } from '@ever-works/agent/entities';
-import { keyIdOf, publicKeyBytes, toBase64Url } from '@ever-works/agent/ever-instance';
+import { newStoredStatsKey } from '@ever-works/agent/ever-instance';
 import { StatsSinkFacadeService } from '@ever-works/agent/facades';
 import { PluginSecretEncService, type PluginRegistryService } from '@ever-works/agent/plugins';
 import EverStatsSinkPlugin from '@ever-works/ever-stats-sink-plugin';
@@ -130,20 +129,9 @@ describe('instance statistics — delivery to a contract receiver', () => {
 
         // Another key for the SAME instance id: what a copied database with a
         // regenerated key would look like.
-        const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-        const raw = publicKeyBytes(publicKey);
-        await dataSource.getRepository(EverInstance).update(
-            { id: 'self' },
-            {
-                statsPublicKey: toBase64Url(raw),
-                statsKeyId: keyIdOf(raw),
-                statsPrivateKeyEncrypted: new PluginSecretEncService().encryptValue(
-                    (privateKey.export({ format: 'der', type: 'pkcs8' }) as Buffer).toString(
-                        'base64',
-                    ),
-                ),
-            },
-        );
+        await dataSource
+            .getRepository(EverInstance)
+            .update({ id: 'self' }, newStoredStatsKey(new PluginSecretEncService()));
         h.clock.now = new Date('2026-10-16T09:00:00Z');
         await h.lease.updateSchedule({ nextSendAt: h.clock.now });
         const mismatch = await h.sender.runDue();

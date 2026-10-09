@@ -1,12 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { validateStatsReport, type StatsValidationError } from '@ever-co/connect-sdk';
 import { EVER_STATS_V1_SCHEMA_ID, type WorksStatsV1Report } from '@ever-works/contracts';
-import {
-    EverInstanceService,
-    InstanceStatsRepository,
-    validateStatsReport,
-    type StatsReportValidationError,
-} from '@ever-works/agent/ever-instance';
+import { EverInstanceService, InstanceStatsRepository } from '@ever-works/agent/ever-instance';
 import { getBuildInfo } from '../health/build-info';
 import {
     INSTANCE_STATS_MODULE_VERSION,
@@ -18,11 +14,20 @@ import {
 } from './instance-stats.mapping';
 import { INSTANCE_STATS_CONFIG, type InstanceStatsRuntimeConfig } from './instance-stats.tokens';
 
-/** The builder produced something the published schema refuses: nothing is signed or sent. */
+/**
+ * The builder produced something the published schema refuses (the Ever
+ * Platform SDK's checks, the platform's own): nothing is signed or sent.
+ */
 export class InstanceStatsBuildError extends Error {
-    constructor(readonly errors: StatsReportValidationError[]) {
-        // Machine tokens only: the paths name schema fields, never a value.
-        super(`report failed validation at ${errors.map((error) => error.path || '/').join(', ')}`);
+    constructor(readonly refusal: StatsValidationError) {
+        // Machine tokens only: the SDK's log form names schema fields and shows
+        // any segment the schema does not name as `*`, never a value.
+        super(
+            `report failed validation at ${refusal
+                .toJSON()
+                .errors.map((error) => error.path || '/')
+                .join(', ')}`,
+        );
         this.name = 'InstanceStatsBuildError';
     }
 }
@@ -30,8 +35,9 @@ export class InstanceStatsBuildError extends Error {
 /**
  * Builds one `ever.stats.v1` report for Ever Works from the instance-wide
  * aggregates, the feature switches read at boot and the declared install
- * source and country — and validates it against the vendored schema before
- * returning it. A report that does not validate is never returned.
+ * source and country — and runs the published schema's checks on it (the Ever
+ * Platform SDK's `validateStatsReport`) before returning it. A report that
+ * does not validate is never returned.
  *
  * Every instance reports full counts and aggregates, whatever its size: there
  * is no small-instance rule.
@@ -92,7 +98,7 @@ export class InstanceStatsBuilderService {
 
         const validation = validateStatsReport(report);
         // `in` narrows here whatever the compiler's null checks (this app runs without them).
-        if ('errors' in validation) throw new InstanceStatsBuildError(validation.errors);
+        if ('error' in validation) throw new InstanceStatsBuildError(validation.error);
         return report;
     }
 }

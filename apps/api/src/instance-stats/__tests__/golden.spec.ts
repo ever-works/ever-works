@@ -7,9 +7,9 @@ import { createStatsDataSource } from './fixtures/works-seed.helper-spec';
 
 /**
  * The builder's output equals the published Works golden report
- * (`valid/works.json`), modulo the three values minted per report or per
- * installation (`report_id`, `instance_id`, `sent_at`), when it is fed the
- * numbers that golden describes.
+ * (`fixtures/stats/valid/works.json` of `@ever-co/connect-contracts`), modulo
+ * the three values minted per report or per installation (`report_id`,
+ * `instance_id`, `sent_at`), when it is fed the numbers that golden describes.
  *
  * The aggregate queries are proven against a real database elsewhere
  * (builder, canary and receiver specs); here the repository answers the
