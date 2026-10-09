@@ -1318,11 +1318,40 @@ export function parseAgentTaskResult(
 const MAX_MISPLACED_QUESTION_FILES = 5;
 
 /**
+ * Longest misplaced question path the reconciler will inspect at all — a
+ * deep but real relative path, never a payload (slice AU, review). Anything
+ * longer is dropped; anything up to it is validated IN FULL and only then
+ * abbreviated for display by {@link abbreviateMisplacedQuestionPath}.
+ */
+const MAX_MISPLACED_QUESTION_PATH_CHARS = 4096;
+
+/**
+ * Self-build slice AU (review) — a validated path shortened to at most
+ * {@link MAX_QUOTED_CHARS} UTF-16 units for the Task chat. The END is kept:
+ * the file and the directories nearest it are what the owner needs to find
+ * it. Whole code points only, so a surrogate pair is never split.
+ */
+function abbreviateMisplacedQuestionPath(path: string): string {
+    if (path.length <= MAX_QUOTED_CHARS) return path;
+    // `let`: a mutable accumulator (team convention, review).
+    let kept: string[] = [];
+    let units = 1; // the leading ellipsis
+    for (const codePoint of Array.from(path).reverse()) {
+        if (units + codePoint.length > MAX_QUOTED_CHARS) break;
+        kept.unshift(codePoint);
+        units += codePoint.length;
+    }
+    return `…${kept.join('')}`;
+}
+
+/**
  * Self-build slice AU — the node's list of misplaced question files, or
  * `undefined` when it sent none. Each entry must be a relative path of
  * printable (Unicode) characters (no drive, no leading slash, no `..`
- * segment, no backtick) and is capped at {@link MAX_QUOTED_CHARS}; anything
- * else is dropped.
+ * segment, no backtick) of at most {@link MAX_MISPLACED_QUESTION_PATH_CHARS};
+ * anything else is dropped. A valid path longer than
+ * {@link MAX_QUOTED_CHARS} is kept and abbreviated rather than dropped, so a
+ * deeply nested question file still warns the owner (review).
  */
 function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
     if (!Array.isArray(raw)) return undefined;
@@ -1332,7 +1361,7 @@ function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
         .filter(
             (entry) =>
                 entry.length > 0 &&
-                entry.length <= MAX_QUOTED_CHARS &&
+                entry.length <= MAX_MISPLACED_QUESTION_PATH_CHARS &&
                 // Printable Unicode is a real path (`资源/.ever-works/QUESTION.md`)
                 // and must still be reported (review). Refused: every `\p{C}`
                 // code point — controls, newlines, bidi overrides and other
@@ -1346,7 +1375,8 @@ function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
                 !/^[A-Za-z]:/.test(entry) &&
                 !entry.split(/[\\/]/).includes('..'),
         )
-        .slice(0, MAX_MISPLACED_QUESTION_FILES);
+        .slice(0, MAX_MISPLACED_QUESTION_FILES)
+        .map(abbreviateMisplacedQuestionPath);
     return paths.length > 0 ? paths : undefined;
 }
 
