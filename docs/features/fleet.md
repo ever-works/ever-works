@@ -15,7 +15,7 @@ Shipped: enrollment, heartbeats, the registry and the **Settings → Fleet** pag
 
 Verify before you rely on it: **live scheduling behaviour on your own deployment.** Two things are worth checking on a real install before you route production work at your machines — that `EVER_WORKS_JOB_RUNTIME=node` (or an organization overlay) is actually in force, and that the node you enrolled advertises every capability tag the jobs you enqueue require. A node that advertises nothing is eligible only for work that names no requirements.
 
-Not yet built: **a UI for node affinity.** Pinning an Agent to a specific machine is API-only today — there is no picker on the Agent page. Everything else on this page has a screen.
+Node affinity has a screen too: pin an Agent to a specific machine from the Agent page (**Capabilities** → **Execution** → **Preferred node**, see [Pin an agent to a node](#pin-an-agent-to-a-node)) or through the API. Everything on this page has a screen.
 
 :::
 
@@ -358,8 +358,8 @@ How it behaves:
 - **Clearing is idempotent, and does not rewrite history.** Jobs already queued keep the node they were enqueued for; only future jobs become unbound.
 - **Nodes stay user-owned; only the binding is Organization-scoped.** Setting an affinity requires an active [Organization](./organizations.md), and both the Agent and the node must be yours — a foreign or unknown id answers `404`, whether or not a binding exists.
 
-:::caution API-only today
-There is no node picker on the Agent page. Set, read and clear affinity through the endpoints above, the [REST API](../api/index.md) or an [MCP](./mcp-server.md) client until the UI lands.
+:::tip From the Agent page or the API
+Pick a **Preferred node** on the agent's **Capabilities** → **Execution** section (see [Pin an agent to a node](#pin-an-agent-to-a-node)), or set, read and clear affinity through the endpoints above, the [REST API](../api/index.md) or an [MCP](./mcp-server.md) client.
 :::
 
 ## Choosing where runs execute
