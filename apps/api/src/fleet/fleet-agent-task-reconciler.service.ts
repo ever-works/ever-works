@@ -22,14 +22,18 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
 import {
+    FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES,
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
     FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
     fleetModelCostUsdToCents,
     fleetModelPluginId,
+    isFleetAgentExecutionProvider,
+    isFleetAgentModelSessionId,
     normalizeFleetAgentTaskContainment,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
+    type FleetAgentExecutionProvider,
     type FleetAgentTaskGitResult,
     type FleetAgentTaskPayload,
     type FleetAgentTaskQuestion,
@@ -285,6 +289,12 @@ export class FleetAgentTaskReconcilerService {
                 }),
             );
         }
+
+        // Self-build slice AU — keep the CLI session this run reported, and
+        // the node that holds it, BEFORE the three-way split: the question
+        // branch files the Inbox item the owner answers, and the answer's
+        // resume carries whatever is on the row at that moment.
+        await this.recordCliSession(event, ctx, run, result);
 
         // Fleet cost accounting (EW-777) — BEFORE the three-way split, so
         // the usage row exists when the terminal CAS settles it, whichever
@@ -841,6 +851,75 @@ export class FleetAgentTaskReconcilerService {
     }
 
     /**
+     * Self-build slice AU — persist the CLI session a node reported, so an
+     * answered owner question continues the model that asked it instead of
+     * restarting it from zero (`result.model.sessionId` used to ride the
+     * wire and be dropped right here).
+     *
+     * Three facts, three sources, because the wire is untrusted:
+     *
+     *   - the SESSION id from the report, but only in the one shape a node
+     *     may later put on `claude --resume <id>`
+     *     ({@link isFleetAgentModelSessionId}) — anything else is dropped;
+     *   - the NODE from the event, i.e. the reporter `completeJob` just
+     *     authenticated as the job's holder — never a field of the result;
+     *   - the PROVIDER from the plan on the job, and only when the report
+     *     agrees with it: a session minted by another CLI than the one the
+     *     platform asked for is not one the next job can resume.
+     *
+     * A run that reported NO usable session has its carried record retired
+     * (`recordFleetCliSession(null)`): a successor inherits its source's
+     * session through `resume`, and keeping that inheritance after this run
+     * ran would hand the NEXT run a conversation that never saw this run's
+     * work. Only node reports count — a synthetic settlement (queue expiry,
+     * lease budget) says nothing about a CLI.
+     *
+     * Best-effort: a session that cannot be recorded costs the next run a
+     * fresh session with the answered questions replayed, never a failure.
+     */
+    private async recordCliSession(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+        run: AgentRun,
+        result: FleetAgentTaskResult | null,
+    ): Promise<void> {
+        if (event.source !== 'node-report') return;
+        // What the node did with a session it was offered — operator
+        // visibility only (the job row keeps the full result). Vocabulary-
+        // checked and truncated: the reason is node-written text.
+        const offered = result?.model?.resume;
+        if (offered && FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES.includes(offered.outcome)) {
+            this.logger.log(
+                `Run ${ctx.runId}: fleet CLI session ${offered.outcome}${
+                    typeof offered.reason === 'string' && offered.reason.trim()
+                        ? ` — ${truncate(offered.reason.trim(), MAX_VERDICT_CHARS)}`
+                        : ''
+                }`,
+            );
+        }
+        const reported = result?.model?.sessionId;
+        const nodeId = event.nodeId ?? event.job.nodeId ?? null;
+        const planned = plannedProvider(event.job);
+        if (
+            isFleetAgentModelSessionId(reported) &&
+            isFleetAgentModelSessionId(nodeId) &&
+            planned !== null &&
+            result?.model?.provider === planned
+        ) {
+            const session = { sessionId: reported, nodeId, provider: planned };
+            await this.bestEffort('cli session', () =>
+                this.runs.recordFleetCliSession(ctx.runId, session),
+            );
+            return;
+        }
+        if (run.fleetCliSession) {
+            await this.bestEffort('retire carried cli session', () =>
+                this.runs.recordFleetCliSession(ctx.runId, null),
+            );
+        }
+    }
+
+    /**
      * Fleet cost accounting (EW-777) — carry the node's CLI-reported cost
      * and tokens onto the platform's own books, the way a cloud run's are.
      *
@@ -1338,6 +1417,18 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
     const git = result?.git;
     if (!git || !git.pushed || git.empty) return null;
     return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
+}
+
+/**
+ * Self-build slice AU — the model-CLI provider the PLATFORM put on this job
+ * (`payload.execution.provider`), or `null` for a legacy command-mode job or
+ * a payload that does not say. The job row is the platform's own record of
+ * what it asked for; the node's report only ever gets compared against it.
+ */
+function plannedProvider(job: FleetJobView): FleetAgentExecutionProvider | null {
+    const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+    const provider = payload?.execution?.provider;
+    return isFleetAgentExecutionProvider(provider) ? provider : null;
 }
 
 function describeFinalize(outcome: TaskWorkspaceFinalizeOutcome, branch: string): string {

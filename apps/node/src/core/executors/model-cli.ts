@@ -8,8 +8,10 @@ import {
 	FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
 	FLEET_AGENT_EXECUTION_MODEL_PATTERN,
 	fleetAgentExecutionProviderSupportsMountGrants,
+	fleetAgentExecutionProviderSupportsSessionResume,
 	isFleetAgentExecutionEffort,
-	isFleetAgentExecutionPermissionMode
+	isFleetAgentExecutionPermissionMode,
+	isFleetAgentModelSessionId
 } from '@ever-works/contracts';
 import type { NodeCheckResult, WireCheck } from './acceptance-checks';
 
@@ -172,6 +174,27 @@ function assertModelId(model: string | undefined): string | null {
 	return model;
 }
 
+/**
+ * Self-build slice AU — the session id a command may carry, or null for a
+ * fresh run. Throws for an id that is not the contracts' strict UUID shape
+ * (it is interpolated into a shell command line) and for a provider the
+ * fleet never resumes: `codex exec resume` takes neither `--sandbox`,
+ * `-C` nor `--add-dir`, so a resumed Codex run could not be held to the
+ * sandbox its job was planned with (see
+ * `fleetAgentExecutionProviderSupportsSessionResume`). The executor never
+ * asks for either; this is the last gate if something ever does.
+ */
+function assertResumableSession(provider: FleetAgentExecutionProvider, sessionId: string | undefined): string | null {
+	if (sessionId === undefined) return null;
+	if (!fleetAgentExecutionProviderSupportsSessionResume(provider)) {
+		throw new ModelCliCommandError(`Provider '${String(provider)}' cannot resume a CLI session on the fleet`);
+	}
+	if (!isFleetAgentModelSessionId(sessionId)) {
+		throw new ModelCliCommandError('CLI session id is not an opaque identifier');
+	}
+	return sessionId;
+}
+
 function formatBudget(value: number | undefined): string | null {
 	if (value === undefined) return null;
 	if (!Number.isFinite(value) || value <= 0) {
@@ -211,10 +234,19 @@ export function buildModelCliCommand(input: {
 	 * always built.
 	 */
 	mcp?: ModelCliMcpBridge;
+	/**
+	 * Self-build slice AU — continue this CLI session instead of starting
+	 * one. Absent (the default) produces byte-for-byte the command this step
+	 * has always built. Validated against the contracts' session-id shape
+	 * HERE, at the last point before it reaches argv, whatever validated it
+	 * upstream — refused, never escaped.
+	 */
+	resumeSessionId?: string;
 	platform?: NodeJS.Platform;
 }): string {
 	const platform = input.platform ?? process.platform;
 	const { execution } = input;
+	const resumeSessionId = assertResumableSession(execution.provider, input.resumeSessionId);
 	const exe = quoteShellPath(input.executable, platform);
 	const stdin = quoteShellPath(input.scratch.instructionsPath, platform);
 	const stdout = quoteShellPath(input.scratch.resultPath, platform);
@@ -292,6 +324,16 @@ export function buildModelCliCommand(input: {
 	const args: string[] = [];
 	if (execution.provider === 'claude-code') {
 		args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
+		// ── Slice AU: continue the session the earlier run left here ────
+		//
+		// `--resume <id>` reopens that conversation and `-p` still reads the
+		// NEW prompt (the owner's answer) from stdin, under every flag below
+		// exactly as a fresh run would get them. `--fork-session` writes the
+		// continuation to a NEW session id: the session the question was
+		// asked in stays exactly as it was, so a retried attempt (a lapsed
+		// lease, a crash) branches from the same point instead of from a
+		// half-finished first attempt. The id is a validated UUID by now.
+		if (resumeSessionId) args.push('--resume', resumeSessionId, '--fork-session');
 		if (model) args.push('--model', model);
 		if (execution.effort) args.push('--effort', execution.effort);
 		if (budget) args.push('--max-budget-usd', budget);

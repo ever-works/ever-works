@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 import { PortableDateColumn } from './_types';
 import type {
     AgentRunModelRouting,
+    FleetAgentExecutionProvider,
     GateStatus,
     SubAgentScope,
     TaskAcceptanceCheck,
@@ -26,6 +27,19 @@ export type AgentRunTriggerKind =
     | 'chat'
     | 'event'
     | 'conversation';
+
+/**
+ * Self-build slice AU — the fleet node a run's CLI session lives on (see
+ * {@link AgentRun.fleetCliSession}). Ids only, never content.
+ */
+export interface AgentRunFleetCliSession {
+    /** The CLI's own session id — equal to the run's `cliSessionId` while valid. */
+    sessionId: string;
+    /** `fleet_nodes.id` of the node whose CLI config home holds the session. */
+    nodeId: string;
+    /** The provider that minted it (`claude-code` / `codex`), from the job's plan. */
+    provider: FleetAgentExecutionProvider;
+}
 
 /**
  * Run lifecycle. Mirrors `WorkGenerationHistory` semantics:
@@ -214,6 +228,32 @@ export class AgentRun {
      */
     @Column({ type: 'varchar', length: 128, nullable: true })
     cliSessionId?: string | null;
+
+    /**
+     * Self-build slice AU — WHERE {@link cliSessionId} lives when a FLEET
+     * node minted it, so an answered owner question can continue the model
+     * session that asked it instead of restarting the model from zero.
+     *
+     * A model CLI keeps its sessions in the machine's own config home, so
+     * the id alone resumes nothing: the next job has to land on the same
+     * node, run the same provider, and know it. Written by the fleet
+     * reconciler from a node's completion report (the session id validated
+     * against `FLEET_AGENT_MODEL_SESSION_ID_PATTERN`, the node id from the
+     * authenticated report, the provider from the PLAN on the job — never
+     * from the node's own claim), carried onto the successor by
+     * `RunSteeringService.resume` beside `cliSessionId`, and read by the
+     * fleet planner, which offers the session to the next job.
+     *
+     * Carries its own copy of the session id on purpose: the planner only
+     * trusts this record while `sessionId === cliSessionId`. A cloud
+     * terminal that later writes a session of its own into `cliSessionId`
+     * therefore retires this record without anyone having to clear it.
+     *
+     * NULL on every cloud run and every pre-existing row. Migration:
+     * `1795010000000-AddAgentRunFleetCliSession`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    fleetCliSession?: AgentRunFleetCliSession | null;
 
     /** Sweeper input: stale heartbeat + live terminalState ⇒ crashed. */
     // MUST be @PortableDateColumn, not a raw `type: 'timestamp'` column: the
