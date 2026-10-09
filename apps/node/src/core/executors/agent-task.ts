@@ -66,13 +66,16 @@ import {
 	type AgentTaskQuestionFs
 } from './agent-task-question';
 import {
+	assertMcpIsolationInCommand,
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
 	ModelCliCommandError,
+	modelCliMcpIsolationEnv,
 	parseModelCliResult,
 	redactCommandResult,
 	type ModelCliPaths,
+	MODEL_CLI_EMPTY_MCP_CONFIG,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 import { startMcpLoopbackProxy, type McpBridgeFetch, type McpLoopbackProxy } from './mcp-bridge';
@@ -1228,7 +1231,31 @@ async function runModelStep(
 	// before anything is spawned, from the job's (validated) offer and this
 	// node's OWN enrollment id.
 	const resumeDecision = decideSessionResume(execution, io);
+	// What the model step's env must say on top of the containment overlay so
+	// the CLI never fetches the account's remote MCP connectors (Claude Code:
+	// `ENABLE_CLAUDEAI_MCP_SERVERS=false`). Merged LAST so it wins whether or
+	// not the run got an isolated home, and the ONE overlay the command runner
+	// applies after its scrub carries both.
+	const mcpIsolationEnv = modelCliMcpIsolationEnv(execution.provider);
+	const modelEnvOverlay: NodeCommandEnvOverlay | undefined = mcpIsolationEnv
+		? { ...(containment.envOverlay ?? {}), ...mcpIsolationEnv }
+		: containment.envOverlay;
 	try {
+		// ── MCP isolation when there is no bridge ───────────────────────
+		//
+		// A run the platform gave no tools must not inherit the machine
+		// owner's instead. With no live bridge, Claude Code is handed an EMPTY
+		// config at the bridge's own scratch path and `--strict-mcp-config`
+		// (see `MODEL_CLI_EMPTY_MCP_CONFIG`). Written inside the `try` so a
+		// failure still removes scratch; NOT degraded on failure — a run that
+		// cannot be isolated does not run, exactly as a run whose instructions
+		// file cannot be written does not run. A bridge that degraded leaves
+		// `bridge.cli` null, so its run is isolated the same way.
+		let emptyMcpConfigPath: string | undefined;
+		if (!bridge.cli && execution.provider === 'claude-code') {
+			await scratchFs.writeFile(mcpConfigPath, MODEL_CLI_EMPTY_MCP_CONFIG);
+			emptyMcpConfigPath = mcpConfigPath;
+		}
 		// ONE model invocation: write the prompt, build and gate the command,
 		// spawn, parse. Run once for a fresh session — or, slice AU, once with
 		// `--resume` and, only when the CLI could not open that session at
@@ -1246,9 +1273,13 @@ async function runModelStep(
 					scratch,
 					...(mounts && mounts.length > 0 ? { mounts } : {}),
 					...(bridge.cli ? { mcp: bridge.cli } : {}),
+					...(emptyMcpConfigPath ? { emptyMcpConfigPath } : {}),
 					...(resumeSessionId ? { resumeSessionId } : {}),
 					...(io.platform ? { platform: io.platform } : {})
 				});
+				// Same gate, for MCP: a Claude Code command that would load the
+				// owner's own MCP servers is refused, not spawned.
+				assertMcpIsolationInCommand({ command, execution });
 				// Last gate before the spawn: the grant has to be in the string
 				// that is actually run, not merely computed. Nothing downstream
 				// can tell a discarded cross-repository edit from a model that
@@ -1271,7 +1302,7 @@ async function runModelStep(
 			// Slice AK: the ONE call on this node that carries a containment
 			// overlay. The setup phase and the acceptance checks deliberately do
 			// not — see {@link establishModelContainment}.
-			const result = await runNodeCommandStep(step, workspacePath, io, signal, undefined, containment.envOverlay);
+			const result = await runNodeCommandStep(step, workspacePath, io, signal, undefined, modelEnvOverlay);
 			const rawOutput = await scratchFs.readFile(scratch.resultPath);
 			// `envPassthrough` names the credential env vars this CLI was handed;
 			// their values are scrubbed out of the summary and output tail before

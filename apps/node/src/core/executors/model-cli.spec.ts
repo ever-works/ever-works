@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { FleetAgentModelExecution, FleetTaskWorkspaceMountDescriptor } from '@ever-works/contracts';
 import type { NodeCheckResult } from './acceptance-checks';
 import {
+	assertMcpIsolationInCommand,
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
+	MODEL_CLI_EMPTY_MCP_CONFIG,
 	MODEL_CLI_STEP_ID,
 	ModelCliCommandError,
+	modelCliMcpIsolationEnv,
 	parseModelCliResult,
 	quoteShellPath,
 	MODEL_CLI_REDACTED
@@ -619,6 +622,183 @@ describe('buildModelCliCommand — MCP bridge (self-build slice Z)', () => {
 				platform: POSIX
 			})
 		).toThrowError(ModelCliCommandError);
+	});
+});
+
+/**
+ * MCP isolation from the machine owner's own servers.
+ *
+ * Measured on a fleet PC (2026-10-09): a no-bridge `claude -p` run loaded
+ * every MCP server in the owner's `~/.claude.json` plus the account's
+ * claude.ai connectors, because `--strict-mcp-config` was only emitted with
+ * the bridge. What is pinned here:
+ *
+ *   1. No bridge → `--mcp-config <empty scratch config> --strict-mcp-config`,
+ *      and nothing else MCP-shaped (no `--allowedTools`: there is no server).
+ *   2. Bridge → exactly today's three flags, once; the empty config is not
+ *      on the command line at all.
+ *   3. Ordering: the variadic `--mcp-config` list is closed by the strict
+ *      flag, and `--add-dir` stays LAST.
+ *   4. Codex: argv unchanged — it has no supported switch (documented gap).
+ */
+describe('buildModelCliCommand — MCP isolation from the owner’s own servers', () => {
+	const EMPTY_CONFIG = '/tmp/job/mcp.json';
+	const bridge = {
+		configPath: '/tmp/job/mcp.json',
+		serverName: 'ever-works',
+		serverUrl: 'http://127.0.0.1:54321/mcp/aaaabbbbccccdddd0000111122223333'
+	};
+	const build = (over: Partial<Parameters<typeof buildModelCliCommand>[0]> = {}): string =>
+		buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			platform: POSIX,
+			...over
+		});
+
+	it('no bridge: claude-code is pointed at the EMPTY scratch config under --strict-mcp-config', () => {
+		expect(build({ emptyMcpConfigPath: EMPTY_CONFIG })).toBe(
+			'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits ' +
+				'--mcp-config "/tmp/job/mcp.json" --strict-mcp-config ' +
+				'< "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+	});
+
+	it('no bridge: allows no MCP tool — there is no server whose tools to allow', () => {
+		const command = build({ emptyMcpConfigPath: EMPTY_CONFIG });
+		expect(command).not.toContain('--allowedTools');
+		expect(command).not.toContain('mcp__');
+		expect(command.match(/--mcp-config/g)).toHaveLength(1);
+	});
+
+	it('no bridge on Windows: the scratch config path is quoted verbatim', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: 'C:\\npm\\claude.cmd',
+			workspacePath: 'C:\\work\\ws',
+			scratch: scratchWin,
+			emptyMcpConfigPath: 'C:\\tmp\\job\\mcp.json',
+			platform: WIN
+		});
+		expect(command).toContain(' --mcp-config "C:\\tmp\\job\\mcp.json" --strict-mcp-config <');
+	});
+
+	it('bridge: exactly today’s flags, once — the empty config never reaches the command line', () => {
+		const withBoth = build({ mcp: bridge, emptyMcpConfigPath: '/tmp/job/never-used.json' });
+		expect(withBoth).toBe(build({ mcp: bridge }));
+		expect(withBoth).toContain(
+			' --mcp-config "/tmp/job/mcp.json" --strict-mcp-config --allowedTools mcp__ever-works <'
+		);
+		expect(withBoth).not.toContain('never-used.json');
+		expect(withBoth.match(/--mcp-config/g)).toHaveLength(1);
+		expect(withBoth.match(/--strict-mcp-config/g)).toHaveLength(1);
+	});
+
+	it('ordering: every other flag first, the strict pair closes the MCP list, --add-dir stays last', () => {
+		const command = build({
+			execution: execution({
+				model: 'claude-opus-5',
+				effort: 'high',
+				maxBudgetUsd: 3,
+				skipPermissions: true
+			}),
+			mounts: [WRITABLE_MOUNT, READ_ONLY_MOUNT],
+			resumeSessionId: '3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b',
+			emptyMcpConfigPath: EMPTY_CONFIG
+		});
+		expect(command).toBe(
+			'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits ' +
+				'--resume 3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b --fork-session --model claude-opus-5 ' +
+				'--effort high --max-budget-usd 3 --dangerously-skip-permissions ' +
+				'--mcp-config "/tmp/job/mcp.json" --strict-mcp-config ' +
+				'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" ' +
+				'"/fleet/repositories/docs-pool/worktrees/fleet-docs" ' +
+				'< "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+	});
+
+	it('codex: argv is unchanged — codex has no supported strict switch (documented gap)', () => {
+		const codex = (over: Partial<Parameters<typeof buildModelCliCommand>[0]> = {}): string =>
+			build({
+				execution: execution({ provider: 'codex', model: 'gpt-5.3-codex' }),
+				executable: '/usr/local/bin/codex',
+				...over
+			});
+		expect(codex({ emptyMcpConfigPath: EMPTY_CONFIG })).toBe(codex());
+		expect(codex({ emptyMcpConfigPath: EMPTY_CONFIG })).not.toContain('mcp');
+	});
+
+	it('refuses an empty-config path the shell could interpret rather than escaping it', () => {
+		for (const emptyMcpConfigPath of ['/tmp/job/mcp.json; rm -rf /', 'relative/mcp.json', '']) {
+			expect(() => build({ emptyMcpConfigPath })).toThrowError(ModelCliCommandError);
+		}
+	});
+});
+
+describe('assertMcpIsolationInCommand', () => {
+	const bridge = {
+		configPath: '/tmp/job/mcp.json',
+		serverName: 'ever-works',
+		serverUrl: 'http://127.0.0.1:54321/mcp/aaaabbbbccccdddd0000111122223333'
+	};
+	const built = (over: Partial<Parameters<typeof buildModelCliCommand>[0]> = {}): string =>
+		buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			platform: POSIX,
+			...over
+		});
+
+	it('passes what the builder produces with the empty config and with the bridge', () => {
+		for (const command of [
+			built({ emptyMcpConfigPath: '/tmp/job/mcp.json' }),
+			built({ mcp: bridge }),
+			built({ emptyMcpConfigPath: '/tmp/job/mcp.json', mounts: [WRITABLE_MOUNT, READ_ONLY_MOUNT] })
+		]) {
+			expect(() => assertMcpIsolationInCommand({ command, execution: execution() })).not.toThrow();
+		}
+	});
+
+	it('refuses a claude-code command that would load the owner’s MCP servers', () => {
+		expect(() => assertMcpIsolationInCommand({ command: built(), execution: execution() })).toThrowError(
+			/does not carry --mcp-config <file> --strict-mcp-config/
+		);
+	});
+
+	it.each([
+		['strict flag without a config', '"/bin/claude" -p --strict-mcp-config < "/i" > "/o"'],
+		['config without the strict flag', '"/bin/claude" -p --mcp-config "/tmp/job/mcp.json" < "/i" > "/o"'],
+		[
+			'the pair split by another config file',
+			'"/bin/claude" -p --mcp-config "/tmp/job/mcp.json" "/home/me/.mcp.json" --strict-mcp-config < "/i" > "/o"'
+		],
+		['the flags reversed', '"/bin/claude" -p --strict-mcp-config --mcp-config "/tmp/job/mcp.json" < "/i" > "/o"']
+	])('refuses %s', (_label, command) => {
+		expect(() => assertMcpIsolationInCommand({ command, execution: execution() })).toThrowError(
+			ModelCliCommandError
+		);
+	});
+
+	it('does not gate codex, which has no switch to check for', () => {
+		const command = built({ execution: execution({ provider: 'codex' }), executable: '/usr/local/bin/codex' });
+		expect(() =>
+			assertMcpIsolationInCommand({ command, execution: execution({ provider: 'codex' }) })
+		).not.toThrow();
+	});
+});
+
+describe('modelCliMcpIsolationEnv / MODEL_CLI_EMPTY_MCP_CONFIG', () => {
+	it('turns the account’s claude.ai connectors off for claude-code, and asks nothing of codex', () => {
+		expect(modelCliMcpIsolationEnv('claude-code')).toEqual({ ENABLE_CLAUDEAI_MCP_SERVERS: 'false' });
+		expect(modelCliMcpIsolationEnv('codex')).toBeNull();
+	});
+
+	it('the empty config declares no server at all', () => {
+		expect(JSON.parse(MODEL_CLI_EMPTY_MCP_CONFIG)).toEqual({ mcpServers: {} });
 	});
 });
 
