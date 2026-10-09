@@ -922,14 +922,31 @@ describe('generator — the checks-only file (T42, R-9, ACC-05-30, FR-70)', () =
  */
 describe('the embedded verify script', () => {
 	it('drops only the trailing newlines, in linear time', () => {
-		const script = `echo first${'\n'.repeat(50_000)}echo last\n\n\n`;
+		const scriptWith = (newlines: number) => `echo first${'\n'.repeat(newlines)}echo last\n\n\n`;
+		const generate = (newlines: number) =>
+			generateWorkflow({ ...fixtures.minimal, verifyRunnerScript: scriptWith(newlines) });
 
-		const started = performance.now();
-		const file = generateWorkflow({ ...fixtures.minimal, verifyRunnerScript: script });
-		const elapsedMs = performance.now() - started;
-
-		expect(elapsedMs).toBeLessThan(200);
+		const file = generate(50_000);
 		expect(file).toContain(`          echo first\n${'\n'.repeat(49_999)}          echo last\n`);
 		expect(file).not.toContain('          echo last\n\n');
+
+		// Linear time is judged by how the cost SCALES, not by a wall-clock budget: an absolute
+		// "< 200 ms" over the whole generator went red at 205 ms on a loaded shared runner
+		// (develop CI 2026-10-09) with the linear implementation in place. Quadrupling the input
+		// multiplies a linear pass by ~4 and the old backtracking `/\n+$/` by ~16, so a ratio
+		// under 8 separates the two regardless of how busy the machine is. Best of three runs
+		// per size, so one scheduler stall cannot decide it.
+		const bestMs = (newlines: number) => {
+			let best = Number.POSITIVE_INFINITY;
+			for (let run = 0; run < 3; run += 1) {
+				const started = performance.now();
+				generate(newlines);
+				best = Math.min(best, performance.now() - started);
+			}
+			return best;
+		};
+		const small = bestMs(25_000);
+		const large = bestMs(100_000);
+		expect(large / Math.max(small, 1)).toBeLessThan(8);
 	});
 });
