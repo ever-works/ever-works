@@ -110,7 +110,12 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    # GitHub-HOSTED on purpose. npm verifies the provenance bundle and refuses one minted on a
+    # self-hosted runner: the first real release (node-v0.2.0, run 37966885221) failed with
+    # `E422 ... Unsupported GitHub Actions runner environment: "self-hosted". Only "github-hosted"
+    # runners are supported when publishing with provenance.` The heavy build stays on our ARC
+    # runners; this job only downloads the staged bundle and runs `npm publish`, so it is cheap.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
