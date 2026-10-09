@@ -142,7 +142,12 @@ export function parseReviewBotSeverity(body: string | null | undefined): ReviewB
  */
 const RATE_LIMIT_MARKERS: readonly RegExp[] = [
     /rate limited by coderabbit\.ai/i,
-    /^\s*>?\s*#{1,6}\s*Review limit reached/im,
+    // `[ \t]` and an optional `>` GROUP, never `\s*>?\s*`: `\s` crosses
+    // newlines and the two adjacent `\s*` split any whitespace run every
+    // possible way, so a body of a few thousand blank lines took MINUTES
+    // to test (4 000 chars: 58 s, measured) — on the webhook path, which
+    // blocks the event loop. Same matches on every real notice.
+    /^[ \t]*(?:>[ \t]*)?#{1,6}[ \t]*Review limit reached/im,
     /reached your Codex usage limits/i,
 ];
 
@@ -360,8 +365,11 @@ const GREPTILE_TREX_SUMMARY = new RegExp(`${LINE_START}<!--\\s*greptile_trex_sum
 /** A TREX run that found nothing to fix, or could not run at all. */
 const GREPTILE_TREX_NOTHING = /\b(?:found no issues|No flows tested)\b/i;
 
-/** A Greptile finding badge anywhere in the body (`<img alt="P1" …>`). */
-const GREPTILE_FINDING_BADGE = /<img\b[^>]*\balt="P[0-3]"/i;
+/**
+ * A Greptile finding badge anywhere in the body (`<img alt="P1" …>`). The
+ * scan inside the tag is bounded so a run of unclosed `<img` stays linear.
+ */
+const GREPTILE_FINDING_BADGE = /<img\b[^>]{0,1000}\balt="P[0-3]"/i;
 
 /**
  * Does this trusted reviewer bot's COMMENT carry a review finding?

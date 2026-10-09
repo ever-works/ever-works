@@ -433,6 +433,28 @@ describe('github-review-bots', () => {
             expect(created('```ts\nconst retries = Infinity;\n```')).toBe('findings');
         });
 
+        it('stays fast on pathological bodies — this runs on the webhook path, in the event loop', () => {
+            // GitHub caps a comment at 65 536 characters. The old
+            // `^\s*>?\s*#{1,6}…` rate-limit pattern needed ~58 s for 4 000
+            // blank characters (and minutes for more); a regression here
+            // blows Jest's timeout long before it would be noticed in prod.
+            const CAP = 65_536;
+            const bodies = [
+                '\n'.repeat(CAP),
+                ' \n'.repeat(CAP / 2),
+                '> \n'.repeat(Math.floor(CAP / 3)),
+                '```\n~~~\n'.repeat(Math.floor(CAP / 8)),
+                `<!-- greptile_summary -->\n${'<img '.repeat(Math.floor(CAP / 5) - 6)}`,
+            ];
+            const started = Date.now();
+            for (const body of bodies) {
+                expect(['findings', 'ignore:empty', 'ignore:summary']).toContain(created(body));
+                expect(isReviewBotNoise(body)).toBe(false);
+            }
+            // Generous: the whole set takes well under a second today.
+            expect(Date.now() - started).toBeLessThan(10_000);
+        });
+
         it('keeps every real inline finding shape as a finding', () => {
             for (const body of [
                 reviewBotCommentFixture('coderabbit-inline-major-finding').body,
