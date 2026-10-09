@@ -151,7 +151,10 @@ export interface WireCheck {
  *
  * Node-owned values only. Nothing on the wire reaches this: the model
  * step builds it from a directory it just created under its own scratch
- * root, and no payload field feeds it.
+ * root, and no payload field feeds it. The one non-path entry is a fixed
+ * provider switch the model step adds on top (`modelCliMcpIsolationEnv`:
+ * `ENABLE_CLAUDEAI_MCP_SERVERS=false`, so a fleet run never fetches the
+ * account's claude.ai connectors) — a constant, not an input.
  */
 export type NodeCommandEnvOverlay = Readonly<Record<string, string>>;
 
