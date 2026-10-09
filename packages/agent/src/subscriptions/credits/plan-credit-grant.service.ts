@@ -200,6 +200,18 @@ export class PlanCreditGrantService {
         if (isPastDueSubscriptionStatus(billingProfile?.subscriptionStatus)) {
             return 'not-eligible';
         }
+        // 🛑 A free trial gets Free-plan credits only (owner, 2026-10-09): no monthly allowance
+        // while the provider says this subscription is `trialing`. It starts with the first paid
+        // period, when the status turns `active`. A profile tracking a DIFFERENT subscription
+        // (an older one) does not block this one.
+        if (
+            billingProfile?.subscriptionStatus === 'trialing' &&
+            (!billingProfile.providerSubscriptionId ||
+                !subscription.providerSubscriptionId ||
+                billingProfile.providerSubscriptionId === subscription.providerSubscriptionId)
+        ) {
+            return 'not-eligible';
+        }
 
         const anchor = subscription.createdAt ?? now;
         const period = PlanCreditGrantService.allowancePeriodFor(anchor, now);

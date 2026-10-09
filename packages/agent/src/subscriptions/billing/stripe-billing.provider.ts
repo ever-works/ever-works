@@ -73,6 +73,13 @@ export const STRIPE_METADATA_KEYS = {
      * has settled — an unpaid session has a payment intent and no charge yet.
      */
     licence: 'ever_works_licence',
+    /**
+     * Free-trial length (days) the checkout was created with, when > 0. Stamped on the session
+     * AND mirrored onto `subscription_data.metadata`, so `checkout.session.completed` and the
+     * return route both know the new subscription starts in a trial — during which the plan's
+     * monthly credits are NOT granted (owner, 2026-10-09: a trial gets Free-plan credits only).
+     */
+    trialDays: 'ever_works_trial_days',
 } as const;
 
 /** The only value {@link STRIPE_METADATA_KEYS.licence} ever takes. */
@@ -353,6 +360,10 @@ export class StripeBillingProvider extends BillingProvider {
 
         const lineItems = await this.buildPlanLineItems(request);
         const trialDays = isPerpetual ? null : planTrialPeriodDays(request.plan);
+        if (trialDays !== null) {
+            (metadata as Record<string, string>)[STRIPE_METADATA_KEYS.trialDays] =
+                String(trialDays);
+        }
 
         const params: Stripe.Checkout.SessionCreateParams = {
             mode: isPerpetual ? 'payment' : 'subscription',
@@ -583,6 +594,10 @@ export class StripeBillingProvider extends BillingProvider {
                 subscription && typeof subscription === 'object'
                     ? readCurrentPeriodEnd(subscription as Stripe.Subscription)
                     : null,
+            inTrial:
+                subscription && typeof subscription === 'object'
+                    ? (subscription as Stripe.Subscription).status === 'trialing'
+                    : Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0,
         };
     }
 
@@ -628,6 +643,42 @@ export class StripeBillingProvider extends BillingProvider {
         const userId = metadata[STRIPE_METADATA_KEYS.userId];
         const planCode = metadata[STRIPE_METADATA_KEYS.planCode];
         return userId && planCode ? { userId, planCode } : null;
+    }
+
+    /**
+     * Provider half of "one free trial per account" (see the base class). Walks the customer's
+     * subscriptions in EVERY status — `all` includes `canceled` and `incomplete_expired`, which is
+     * exactly what an abandoned or cancelled trial becomes — and counts only the ones this
+     * application sold as a plan (our metadata kind). The PAYG usage subscription never trials and
+     * is not a plan, so it does not count. Errors propagate: the caller fails the checkout rather
+     * than guess.
+     */
+    async hasHadPlanSubscription(customerId: string): Promise<boolean> {
+        if (!nonEmpty(customerId)) return false;
+        const stripe = this.requireClient();
+        let startingAfter: string | undefined;
+        // Bounded: 10 pages x 100 is far beyond any real customer's history.
+        for (let page = 0; page < 10; page++) {
+            const list = await stripe.subscriptions.list({
+                customer: customerId,
+                status: 'all',
+                limit: 100,
+                ...(startingAfter ? { starting_after: startingAfter } : {}),
+            });
+            const data = list.data ?? [];
+            if (
+                data.some(
+                    (sub) =>
+                        sub.metadata?.[STRIPE_METADATA_KEYS.kind] ===
+                        STRIPE_PURCHASE_KINDS.planSubscription,
+                )
+            ) {
+                return true;
+            }
+            if (!list.has_more || data.length === 0) return false;
+            startingAfter = data[data.length - 1].id;
+        }
+        return false;
     }
 
     /**
@@ -1027,6 +1078,9 @@ export class StripeBillingProvider extends BillingProvider {
                         kind: 'subscription.activated',
                         customerId: asId(session.customer),
                         referenceId: session.client_reference_id ?? null,
+                        // The checkout was created with a free trial: the subscription it just
+                        // created is trialing, so no plan credits are granted yet.
+                        inTrial: Number(meta[STRIPE_METADATA_KEYS.trialDays] ?? 0) > 0,
                         planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
                         subscriptionId: asId(session.subscription),
                         paymentId: asId(session.payment_intent),
@@ -1177,7 +1231,11 @@ export class StripeBillingProvider extends BillingProvider {
                     subscription: toSubscriptionSnapshot(subscription),
                 };
                 if (live) {
-                    return { ...shared, kind: 'subscription.activated' };
+                    return {
+                        ...shared,
+                        kind: 'subscription.activated',
+                        inTrial: subscription.status === 'trialing',
+                    };
                 }
                 // `incomplete` / `past_due` are transient dunning states —
                 // the plan is not revoked until the provider says it is.
@@ -1210,6 +1268,34 @@ export class StripeBillingProvider extends BillingProvider {
                 // B07/B08 surfaces them as a snapshot instead. The tier is
                 // still moved only by the two branches above.
                 return { ...shared, kind: 'subscription.updated' };
+            }
+
+            case 'customer.subscription.trial_will_end': {
+                // Sent by the provider ~3 days before a trial ends. A REMINDER trigger only: it
+                // never grants, revokes or reconciles anything, so it is normalized to its own kind
+                // and only for subscriptions WE sold (the PAYG usage subscription never trials).
+                const subscription = event.data.object as Stripe.Subscription;
+                const meta = subscription.metadata ?? {};
+                if (meta[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.planSubscription) {
+                    return { ...base, kind: 'ignored' };
+                }
+                // A trial that was ended early, or a subscription already gone, has nothing left to
+                // remind anyone about.
+                if (subscription.status !== 'trialing' || !subscription.trial_end) {
+                    return { ...base, kind: 'ignored' };
+                }
+                return {
+                    ...base,
+                    kind: 'subscription.trial_will_end',
+                    customerId: asId(subscription.customer),
+                    planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
+                    referenceId: meta[STRIPE_METADATA_KEYS.referenceId] ?? null,
+                    subscriptionId: subscription.id,
+                    currentPeriodEnd: readCurrentPeriodEnd(subscription),
+                    cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                    currency: subscription.currency ?? null,
+                    trialEnd: new Date(subscription.trial_end * 1000),
+                };
             }
 
             case 'payment_method.detached': {

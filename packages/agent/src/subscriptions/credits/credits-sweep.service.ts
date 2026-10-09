@@ -1,15 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
     CreditLedgerService,
     type DailyGrantSummary,
     type ExpirySweepSummary,
 } from './credit-ledger.service';
 import { PlanCreditGrantService, type PlanGrantSummary } from './plan-credit-grant.service';
+import {
+    TrialReminderService,
+    type TrialReminderSweepSummary,
+} from '../billing/trial-reminder.service';
 
 export interface DailySweepSummary {
     expiry: ExpirySweepSummary;
     daily: DailyGrantSummary;
     plan: PlanGrantSummary;
+    /** 7-day trial-ending reminders (absent when the reminder service is not wired). */
+    trialReminders?: TrialReminderSweepSummary;
 }
 
 /**
@@ -34,6 +40,11 @@ export class CreditsSweepService {
     constructor(
         private readonly creditLedgerService: CreditLedgerService,
         private readonly planCreditGrantService: PlanCreditGrantService,
+        /**
+         * 4th pass, after the money passes: the 7-day trial-ending reminder (2026-10 repricing).
+         * `@Optional()` and appended last so existing constructions keep working.
+         */
+        @Optional() private readonly trialReminderService?: TrialReminderService,
     ) {}
 
     async runDailySweep(now: Date = new Date()): Promise<DailySweepSummary> {
@@ -56,6 +67,16 @@ export class CreditsSweepService {
             summary.plan = await this.planCreditGrantService.dispatchPlanGrants(now);
         } catch (error) {
             this.logger.warn(`Credits sweep: plan-grant pass failed: ${(error as Error).message}`);
+        }
+        if (this.trialReminderService) {
+            try {
+                summary.trialReminders =
+                    await this.trialReminderService.sweepSevenDayReminders(now);
+            } catch (error) {
+                this.logger.warn(
+                    `Credits sweep: trial-reminder pass failed: ${(error as Error).message}`,
+                );
+            }
         }
         return summary;
     }

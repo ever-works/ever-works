@@ -221,6 +221,8 @@ export interface CheckoutSessionSnapshot {
     readonly amountCents: number | null;
     readonly currency: string | null;
     readonly currentPeriodEnd: Date | null;
+    /** The plan subscription is in its free trial (no plan credits until the first paid invoice). */
+    readonly inTrial?: boolean;
 }
 
 /** Off-session charge for auto-recharge (PRD §3.4). */
@@ -469,6 +471,12 @@ export type BillingWebhookEventKind =
      * snapshot. NEVER touches the plan tier; handled by `PaygService`.
      */
     | 'payg.updated'
+    /**
+     * A plan subscription's free trial ends in about three days (Stripe
+     * `customer.subscription.trial_will_end`). Carries `trialEnd`. Drives the
+     * trial-ending reminder only — NEVER a grant, a revoke or a snapshot move.
+     */
+    | 'subscription.trial_will_end'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -516,6 +524,14 @@ export interface BillingWebhookEvent {
     readonly currentPeriodEnd?: Date | null;
     /** The provider will not renew at `currentPeriodEnd`. */
     readonly cancelAtPeriodEnd?: boolean | null;
+    /** When the free trial ends — populated for `subscription.trial_will_end`. */
+    readonly trialEnd?: Date | null;
+    /**
+     * `subscription.activated` only: the subscription is in its FREE TRIAL. The tier is granted
+     * (the plan is live) but its monthly credits are not — a trial gets Free-plan credits only
+     * (owner, 2026-10-09). The credits arrive when the trial converts to a paid subscription.
+     */
+    readonly inTrial?: boolean;
 }
 
 export interface PerpetualLicencePaymentReference {
@@ -594,6 +610,21 @@ export abstract class BillingProvider {
      */
     async findPlanSubscriptionIdForPayment(_paymentId: string): Promise<string | null> {
         return null;
+    }
+
+    /**
+     * Has this provider customer EVER held a recurring PLAN subscription sold by this
+     * application (any status, including cancelled and expired trials)?
+     *
+     * The provider-side half of "one free trial per account": the local `user_subscriptions`
+     * rows are checked first, but they are not the only record — a row can be missing (a
+     * database restored from an older backup, a deployment reset) while the provider still
+     * remembers the trial. Providers without a subscription history answer `false`; a
+     * provider that cannot answer must THROW rather than guess, so the checkout fails instead
+     * of handing out a second trial.
+     */
+    async hasHadPlanSubscription(_customerId: string): Promise<boolean> {
+        return false;
     }
 
     /** Resolve a one-off perpetual licence PaymentIntent stamped by us. */

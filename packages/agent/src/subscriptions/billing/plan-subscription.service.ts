@@ -310,18 +310,31 @@ export class PlanSubscriptionService {
 
         const mode: 'subscription' | 'payment' =
             catalogSku?.mode ?? (interval === 'lifetime' ? 'payment' : 'subscription');
+        const user = await this.userRepository.findById(options.userId);
+        const existing = await this.billingProfileRepository.findByUserId(options.userId);
+
+        // One free trial per account AND per organization, decided here on the server only when
+        // there is a trial to give away at all (a cloud, recurring, paid plan).
+        const trialEligibleByPlan =
+            planCheckoutTrialPeriodDays({
+                hosting: plan.hosting,
+                mode,
+                basePriceCents,
+                hadProviderSubscription: false,
+            }) > 0;
         const trialPeriodDays = planCheckoutTrialPeriodDays({
             hosting: plan.hosting,
             mode,
             basePriceCents,
-            hadProviderSubscription:
-                mode === 'subscription'
-                    ? await this.hasHadProviderSubscription(options.userId)
-                    : false,
+            hadProviderSubscription: trialEligibleByPlan
+                ? await this.hasTrialBeenUsed({
+                      userId: options.userId,
+                      tenantId: options.tenantId ?? user?.tenantId ?? null,
+                      organizationId: options.organizationId ?? null,
+                      existingCustomerId: existing?.providerCustomerId ?? null,
+                  })
+                : false,
         });
-
-        const user = await this.userRepository.findById(options.userId);
-        const existing = await this.billingProfileRepository.findByUserId(options.userId);
 
         const customerId = await this.billingProvider.ensureCustomer({
             userId: options.userId,
@@ -390,6 +403,46 @@ export class PlanSubscriptionService {
     private async hasHadProviderSubscription(userId: string): Promise<boolean> {
         const rows = await this.userSubscriptionRepository.listByUser(userId);
         return (rows ?? []).some((row) => Boolean(row.providerSubscriptionId));
+    }
+
+    /**
+     * 🛑 "One free trial per account and per organization" (owner, 2026-10-09), enforced on the
+     * SERVER — the browser never says whether a trial applies. A trial is already used when ANY of:
+     *
+     *  1. **this account** has ever held a provider plan subscription (trialing, active, past due,
+     *     cancelled — cancelling and starting again never renews a trial);
+     *  2. **its organization** has: anyone in the same Tenant (access is tenant-wide), or any
+     *     subscription / billing profile stamped with that Tenant or the named Organization, has
+     *     ever held one — a second member does not get a second trial for the same organization;
+     *  3. **the payment provider** remembers one for this account's customer, even if the local
+     *     rows are gone (an older database restore, a reset deployment).
+     *
+     * Checked cheapest first and short-circuited. A provider error PROPAGATES: the checkout fails
+     * (and can be retried) rather than handing out a trial nobody could verify.
+     */
+    private async hasTrialBeenUsed(input: {
+        userId: string;
+        tenantId: string | null;
+        organizationId: string | null;
+        existingCustomerId: string | null;
+    }): Promise<boolean> {
+        if (await this.hasHadProviderSubscription(input.userId)) return true;
+
+        const scope = {
+            tenantId: input.tenantId,
+            organizationIds: input.organizationId ? [input.organizationId] : [],
+        };
+        if (await this.userSubscriptionRepository.existsProviderSubscriptionInScope(scope)) {
+            return true;
+        }
+        if (await this.billingProfileRepository.existsPlanSubscriptionInScope(scope)) {
+            return true;
+        }
+
+        if (input.existingCustomerId) {
+            return this.billingProvider.hasHadPlanSubscription(input.existingCustomerId);
+        }
+        return false;
     }
 
     /**
@@ -480,6 +533,7 @@ export class PlanSubscriptionService {
 
         const activated = await this.activate({
             userId,
+            inTrial: snapshot.inTrial === true,
             planCode: snapshot.planCode,
             providerSubscriptionId: snapshot.subscriptionId,
             currentPeriodEnd: snapshot.currentPeriodEnd,
@@ -515,6 +569,7 @@ export class PlanSubscriptionService {
         if (event.kind === 'subscription.activated') {
             const activated = await this.activate({
                 userId,
+                inTrial: event.inTrial === true,
                 planCode: event.planCode ?? null,
                 providerSubscriptionId: event.subscriptionId ?? null,
                 currentPeriodEnd: event.currentPeriodEnd ?? null,
@@ -630,6 +685,8 @@ export class PlanSubscriptionService {
      */
     private async activate(input: {
         userId: string;
+        /** In the free trial: grant the tier, NOT the monthly credits (owner, 2026-10-09). */
+        inTrial?: boolean;
         planCode: string | null;
         providerSubscriptionId: string | null;
         currentPeriodEnd: Date | null;
@@ -739,7 +796,11 @@ export class PlanSubscriptionService {
         // effort and idempotent (`grant:plan:{userId}:{monthStart}`): a
         // failure here is logged, never un-activates the tier, and the
         // sweep catches up.
-        if (this.planCreditGrantService) {
+        // 🛑 Not during a free trial (owner, 2026-10-09): a 90-day trial runs on the Free plan's
+        // daily credits, whichever plan is trialled. The allowance is granted when the trial
+        // converts — the provider's `trialing → active` update re-enters here with `inTrial`
+        // false — and the daily sweep backs that up (it skips `trialing` profiles too).
+        if (this.planCreditGrantService && !input.inTrial) {
             try {
                 await this.planCreditGrantService.grantCurrentAllowance(input.userId);
             } catch (error) {

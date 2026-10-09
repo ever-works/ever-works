@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Brackets, Repository } from 'typeorm';
 import {
     BillingProfile,
     type BillingSubscriptionStatus,
@@ -77,6 +77,60 @@ export class BillingProfileRepository {
 
     findByCustomerId(provider: string, providerCustomerId: string): Promise<BillingProfile | null> {
         return this.repository.findOne({ where: { provider, providerCustomerId } });
+    }
+
+    /**
+     * Does any billing profile stamped with this Tenant / these Organizations carry a provider
+     * PLAN subscription (a recorded id or a reconciled status)? Complements
+     * `UserSubscriptionRepository.existsProviderSubscriptionInScope` for the one-trial-per-
+     * organization rule: the profile keeps the scope it was checked out under even after the
+     * subscribing member left. The PAYG usage subscription lives in its own columns and never
+     * counts. Empty scope answers `false` without a query.
+     */
+    async existsPlanSubscriptionInScope(scope: {
+        tenantId?: string | null;
+        organizationIds?: readonly string[];
+    }): Promise<boolean> {
+        const tenantId = scope.tenantId ?? null;
+        const organizationIds = (scope.organizationIds ?? []).filter(Boolean);
+        if (!tenantId && organizationIds.length === 0) return false;
+        const qb = this.repository
+            .createQueryBuilder('profile')
+            .where(
+                new Brackets((sub) => {
+                    sub.where('profile.providerSubscriptionId IS NOT NULL').orWhere(
+                        'profile.subscriptionStatus IS NOT NULL',
+                    );
+                }),
+            )
+            .andWhere(
+                new Brackets((scoped) => {
+                    if (tenantId) scoped.orWhere('profile.tenantId = :tenantId', { tenantId });
+                    if (organizationIds.length > 0) {
+                        scoped.orWhere('profile.organizationId IN (:...organizationIds)', {
+                            organizationIds,
+                        });
+                    }
+                }),
+            );
+        return (await qb.getCount()) > 0;
+    }
+
+    /**
+     * Profiles whose plan subscription is TRIALING, not set to cancel, and whose current period —
+     * which, during a trial, IS the trial — ends between `from` and `to` (inclusive). Drives the 7-day
+     * trial-ending reminder pass of the daily credits sweep. Bounded by `take`.
+     */
+    findTrialsEndingBetween(from: Date, to: Date, take = 500): Promise<BillingProfile[]> {
+        return this.repository.find({
+            where: {
+                subscriptionStatus: 'trialing',
+                cancelAtPeriodEnd: false,
+                currentPeriodEnd: Between(from, to),
+            },
+            order: { currentPeriodEnd: 'ASC', id: 'ASC' },
+            take,
+        });
     }
 
     /** Create-or-return; never overwrites an existing customer mapping. */
