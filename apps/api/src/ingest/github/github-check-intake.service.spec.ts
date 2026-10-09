@@ -53,6 +53,10 @@ import {
     isReviewFeedbackDelivery,
     normalizeGitHubCheck,
 } from './github-check-intake.service';
+import {
+    reviewBotCommentFixture,
+    reviewBotCommentFixtures,
+} from './__fixtures__/review-bot-comments.helper-spec';
 
 const HEAD = '9f3c1a2b9f3c1a2b9f3c1a2b9f3c1a2b9f3c1a2b';
 
@@ -399,17 +403,119 @@ describe('isReviewFeedbackDelivery', () => {
                 ),
             ).toBe(false);
         }
-        // …an allow-listed reviewer bot still rings it.
+        // …an allow-listed reviewer bot still rings it — with a finding.
+        // (The body is required since the #2575 fix below: a trusted
+        // bot's comment rings only when it carries one.)
         expect(
             isReviewFeedbackDelivery(
                 'issue_comment',
                 {
                     ...thread,
-                    comment: { user: { login: 'coderabbitai[bot]', type: 'Bot' } },
+                    comment: {
+                        body: 'The retry loop never backs off, so a flaky provider is hammered.',
+                        user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                    },
                 } as never,
                 POLICY,
             ),
         ).toBe(true);
+    });
+
+    /**
+     * Prod, 2026-10-09 — ever-works/ever-works#2575. CodeRabbit's "review
+     * in progress" placeholder rang this doorbell and a fleet PC spent a
+     * full model run on it. The bridge no longer records such a comment,
+     * and the doorbell must not ring for it either: nothing of it was
+     * recorded, so there is nothing of ITS to act on, and ringing anyway
+     * lets the bot's progress bar cash in some other pending row.
+     */
+    describe('a trusted bot comment that carries no finding (prod incident, #2575)', () => {
+        const prThread = {
+            issue: { number: 42, pull_request: { url: 'https://api.github.com/x' } },
+        };
+        const coderabbit = { login: 'coderabbitai[bot]', type: 'Bot' };
+
+        it.each(
+            reviewBotCommentFixtures()
+                .filter((f) => f.expected.startsWith('ignore:'))
+                .map((fixture) => [fixture.name, fixture] as const),
+        )('does not ring for %s', (_name, fixture) => {
+            expect(
+                isReviewFeedbackDelivery(
+                    'issue_comment',
+                    {
+                        ...prThread,
+                        action: 'created',
+                        comment: { body: fixture.body, user: coderabbit },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(false);
+        });
+
+        it('rings for a real finding on both comment events', () => {
+            const finding = reviewBotCommentFixture('coderabbit-inline-major-finding').body;
+            expect(
+                isReviewFeedbackDelivery(
+                    'issue_comment',
+                    {
+                        ...prThread,
+                        action: 'created',
+                        comment: { body: finding, user: coderabbit },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(true);
+            expect(
+                isReviewFeedbackDelivery(
+                    'pull_request_review_comment',
+                    {
+                        action: 'created',
+                        pull_request: { number: 42 },
+                        comment: { body: finding, user: coderabbit },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(true);
+        });
+
+        it('a placeholder on the INLINE event does not ring either', () => {
+            expect(
+                isReviewFeedbackDelivery(
+                    'pull_request_review_comment',
+                    {
+                        action: 'created',
+                        pull_request: { number: 42 },
+                        comment: {
+                            body: reviewBotCommentFixture(
+                                'coderabbit-summary-in-progress-placeholder',
+                            ).body,
+                            user: coderabbit,
+                        },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(false);
+        });
+
+        it('leaves a HUMAN comment ringing exactly as before, whatever it says', () => {
+            expect(
+                isReviewFeedbackDelivery(
+                    'issue_comment',
+                    {
+                        ...prThread,
+                        action: 'created',
+                        comment: {
+                            body: reviewBotCommentFixture(
+                                'coderabbit-summary-in-progress-placeholder',
+                            ).body,
+                            user: human,
+                        },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(true);
+        });
     });
 
     it('refuses a `changes_requested` review submitted by the platform itself', () => {

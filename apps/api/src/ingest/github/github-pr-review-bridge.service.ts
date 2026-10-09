@@ -18,6 +18,7 @@ import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
 import { config } from '../../config/constants';
 import {
+    classifyReviewBotComment,
     classifyReviewer,
     formatInlineFinding,
     isReviewBotNoise,
@@ -679,9 +680,16 @@ export class GitHubPrReviewBridgeService {
         // here, BEFORE normalize(), for the same reason a review is: the
         // loop must never review its reviewers, so the comment cannot
         // become a `github.mention` no matter what it says.
+        //
+        // EVERY action is routed here, not only `created`: whether this
+        // delivery is a finding at all - a new comment, not an edit, and
+        // not one of the bot's own placeholders or summaries - is ONE
+        // decision, made by `classifyReviewBotComment` inside the
+        // recorder. An edit used to fall through to normalize(), which
+        // refused it for being an edit; it now stops here, which refuses
+        // it for the same reason with nothing else downstream to consult.
         if (
             (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') &&
-            body.action === 'created' &&
             classifyReviewer(body.comment?.user, this.reviewBotPolicy()) === 'trusted-bot'
         ) {
             await this.recordBotCommentFeedback(binding, eventName, body);
@@ -899,14 +907,23 @@ export class GitHubPrReviewBridgeService {
      * (`pull_request_review_comment`) or summary comment (`issue_comment`)
      * from an allow-listed reviewer bot as rejection feedback for the
      * Task the PR belongs to. The caller has already classified the
-     * author as `trusted-bot` and checked `action === 'created'`.
+     * author as `trusted-bot`.
      *
-     * Status chatter (rate limits, "too many files", usage caps) is
-     * dropped: it carries nothing to fix. Presentation markup — HTML
-     * comments, collapsed static-analysis dumps, badges — is stripped
-     * BEFORE the text cap so the finding itself survives the budget, and
-     * an inline finding is prefixed with its `path:line` anchor. Same
-     * best-effort posture as {@link recordReviewRejection}.
+     * Only a comment that actually carries a finding is recorded —
+     * {@link classifyReviewBotComment} is the whole decision. An edit is
+     * never a new finding (CodeRabbit rewrites its summary comment on
+     * every push, and each recorded edit would be a duplicate row and a
+     * duplicate model run); CodeRabbit's "review in progress" placeholder,
+     * its walkthrough summary, its command acknowledgements, Greptile's
+     * finding-less summaries and every rate-limit / status notice carry
+     * nothing to fix. Production paid a full fleet model run for the
+     * placeholder on ever-works/ever-works#2575 (2026-10-09).
+     *
+     * Presentation markup — HTML comments, collapsed static-analysis
+     * dumps, badges — is stripped BEFORE the text cap so the finding
+     * itself survives the budget, and an inline finding is prefixed with
+     * its `path:line` anchor. Same best-effort posture as
+     * {@link recordReviewRejection}.
      */
     private async recordBotCommentFeedback(
         binding: GitHubEventsBinding,
@@ -916,7 +933,15 @@ export class GitHubPrReviewBridgeService {
         const comment = body.comment;
         if (!comment || typeof comment.id !== 'number') return;
         const raw = comment.body ?? '';
-        if (isReviewBotNoise(raw)) return;
+        const verdict = classifyReviewBotComment({ action: body.action, body: raw });
+        if (verdict.kind === 'ignore') {
+            this.logger.debug(
+                `Reviewer-bot ${eventName} ${comment.id} (${body.action ?? 'no action'}) by ${
+                    comment.user?.login ?? 'unknown'
+                } on ${body.repository?.full_name ?? 'unknown repo'} is not a finding: ${verdict.reason}`,
+            );
+            return;
+        }
         // issue_comment fires for plain issues too — only PR threads carry
         // review feedback.
         const prNumber =

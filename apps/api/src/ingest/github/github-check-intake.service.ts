@@ -30,7 +30,11 @@ import {
     GitHubWebhookDispatcherService,
     type GitHubWebhookConsumer,
 } from './github-webhook-dispatcher.service';
-import { classifyReviewer, type ReviewBotPolicy } from './github-review-bots';
+import {
+    classifyReviewBotComment,
+    classifyReviewer,
+    type ReviewBotPolicy,
+} from './github-review-bots';
 import { config } from '../../config/constants';
 
 /** The ingested-event kind for CI results (sibling of `github.pr`). */
@@ -356,6 +360,12 @@ export function normalizeGitHubCheck(
  * bridge's decision and it has already been made. This only avoids
  * pointless Task lookups for plain issue comments and for the review
  * states (`approved`, `commented`) that record nothing.
+ *
+ * (Two judgements ARE re-made here, by the same pure functions the bridge
+ * uses, because a doorbell that disagrees with the recorder spends money
+ * on nothing: who wrote the comment — {@link isDoorbellAuthor} — and, for
+ * a trusted reviewer bot, whether the comment is a finding at all —
+ * {@link isDoorbellComment}.)
  */
 export function isReviewFeedbackDelivery(
     eventName: string,
@@ -369,15 +379,39 @@ export function isReviewFeedbackDelivery(
     if (eventName === 'pull_request_review_comment') {
         if (body.action !== 'created' || typeof body.pull_request?.number !== 'number')
             return false;
-        return isDoorbellAuthor(body.comment?.user, policy);
+        return isDoorbellComment(body, policy);
     }
     if (eventName === 'issue_comment') {
         // GitHub reports PR threads as issues; only those carry
         // `issue.pull_request`, and only they can be a Task's PR.
         if (body.action !== 'created' || !body.issue?.pull_request) return false;
-        return isDoorbellAuthor(body.comment?.user, policy);
+        return isDoorbellComment(body, policy);
     }
     return false;
+}
+
+/**
+ * May THIS comment wake the fix loop? The author first
+ * ({@link isDoorbellAuthor}), then — for an allow-listed reviewer bot —
+ * what it said.
+ *
+ * A trusted bot's comment that the bridge refused to record (CodeRabbit's
+ * "review in progress" placeholder, its walkthrough summary, a command
+ * acknowledgement, a rate-limit notice) must not ring the doorbell either.
+ * Nothing of it was recorded, so there is nothing of ITS to act on — and
+ * the doorbell otherwise looks up the Task and may cash in an unrelated
+ * pending row on the bot's say-so: a model run on a fleet PC triggered by
+ * a progress bar. The same pure classifier the bridge records with makes
+ * the call, so the two halves cannot disagree. A human's comment rings it
+ * exactly as before.
+ */
+function isDoorbellComment(body: GitHubWebhookBody, policy: ReviewBotPolicy): boolean {
+    if (!isDoorbellAuthor(body.comment?.user, policy)) return false;
+    if (classifyReviewer(body.comment?.user, policy) !== 'trusted-bot') return true;
+    return (
+        classifyReviewBotComment({ action: body.action, body: body.comment?.body }).kind ===
+        'findings'
+    );
 }
 
 /**
