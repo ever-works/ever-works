@@ -17,6 +17,8 @@ import { ScopeContextService } from '../scope';
 import { FleetApiModule } from './fleet.module';
 import { FleetJobsController } from './fleet-jobs.controller';
 import { FleetPushCredentialService } from './fleet-push-credential.service';
+import { FleetJobRetentionService } from './fleet-job-retention.service';
+import { FleetRunTelemetryListener } from './fleet-run-telemetry.listener';
 
 /**
  * `FleetApiModule` against a REAL Nest container.
@@ -95,6 +97,26 @@ describe('FleetApiModule — dependency injection', () => {
         expect(moduleRef.get(FleetPushCredentialService, { strict: false })).toBeInstanceOf(
             FleetPushCredentialService,
         );
+
+        await moduleRef.close();
+    });
+
+    it('resolves the run-evidence retention purge and the run telemetry listener (self-build slice AP)', async () => {
+        // The purge needs `FleetJobRepository` (from the agent-side fleet
+        // module) and `DistributedTaskLockService` (provided here, over the
+        // `CacheEntry` repository `DatabaseModule` supplies). A missing
+        // provider would compile every unit spec and fail API boot.
+        // MUTATION CHECK, executed: removing `DistributedTaskLockService`
+        // from `FleetApiModule`'s providers fails this compile.
+        const moduleRef = await compile();
+
+        const purge = moduleRef.get(FleetJobRetentionService);
+        expect(purge).toBeInstanceOf(FleetJobRetentionService);
+        // A real purge against the real in-memory schema: no rows, no throw.
+        await expect(purge.purge(new Date())).resolves.toBe(0);
+        // Its two monitoring dependencies are @Optional and absent here,
+        // exactly like a deployment with no PostHog / Sentry configured.
+        expect(moduleRef.get(FleetRunTelemetryListener)).toBeInstanceOf(FleetRunTelemetryListener);
 
         await moduleRef.close();
     });

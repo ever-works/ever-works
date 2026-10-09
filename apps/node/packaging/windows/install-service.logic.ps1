@@ -462,6 +462,35 @@ function Test-PathUnder {
     secret; the step is FLAGGED RequiresPassword and the plan stays safe to
     print and to assert on.
 #>
+<#
+.SYNOPSIS
+    How big node.log / node.err.log may grow before they are rotated, and
+    how many rotated generations the scheduled-task branch keeps.
+
+.DESCRIPTION
+    Self-build slice AP. Both mechanisms used to append to the same two
+    files forever: the NSSM service had no AppRotate* settings at all, and
+    the scheduled task redirected through cmd.exe with nothing ever
+    trimming the target. On a node that runs for months that is the log
+    eating the very disk the workspace floor guards.
+
+    One policy, read by both branches, so the two cannot drift: 10 MB per
+    file. The service rotates with NSSM's own AppRotateFiles /
+    AppRotateOnline / AppRotateBytes (online, while running); NSSM never
+    deletes a rotated file, so the service branch also registers a daily
+    prune task that keeps the newest Keep generations (New-LogPruneScript).
+    The scheduled task rotates when it STARTS (boot, and every
+    restart-on-failure) and keeps the newest Keep generations - see
+    New-ScheduledTaskRotationActionSpec for why it cannot rotate while
+    running.
+#>
+function Get-NodeLogRotationPolicy {
+    return [pscustomobject]@{
+        Bytes = 10485760
+        Keep  = 5
+    }
+}
+
 function New-ServiceConfigurationPlan {
     param(
         [Parameter(Mandatory = $true)][string] $Name,
@@ -503,6 +532,14 @@ function New-ServiceConfigurationPlan {
 
     & $addNssm @('set', $Name, 'AppStdout', (Join-Path $StateDir 'node.log')) 'redirect stdout'
     & $addNssm @('set', $Name, 'AppStderr', (Join-Path $StateDir 'node.err.log')) 'redirect stderr'
+    # Self-build slice AP: rotate both logs - when the service starts, and
+    # ONLINE while it runs - past the shared size policy. Re-applied on every
+    # run like every other setting, so re-running the installer converges a
+    # service installed before rotation existed.
+    $rotation = Get-NodeLogRotationPolicy
+    & $addNssm @('set', $Name, 'AppRotateFiles', '1') 'rotate the logs when the service starts'
+    & $addNssm @('set', $Name, 'AppRotateOnline', '1') 'rotate the logs while the service runs'
+    & $addNssm @('set', $Name, 'AppRotateBytes', [string]$rotation.Bytes) "rotate a log once it passes $($rotation.Bytes) bytes"
     & $addNssm @('set', $Name, 'AppStopMethodConsole', '900000') 'give the drain 15 minutes'
     & $addNssm @('set', $Name, 'AppExit', 'Default', 'Restart') 'restart on exit'
     & $addNssm @('set', $Name, 'AppRestartDelay', '10000') 'back off 10s between restarts'
@@ -682,6 +719,172 @@ function New-ScheduledTaskActionSpec {
     return [pscustomobject]@{
         Execute  = $ComSpec
         Argument = "/s /c `"$inner $redirect`""
+    }
+}
+
+<#
+.SYNOPSIS
+    The PowerShell that rotates node.log / node.err.log, as text.
+
+.DESCRIPTION
+    Self-build slice AP. A log at or past RotateBytes is renamed to
+    <name>.<yyyyMMddTHHmmss> - a timestamp, like NSSM's own rotated names -
+    and only the newest Keep rotated generations of that log are kept. A missing log, a locked log or any
+    other failure is swallowed and the script exits 0: a rotation problem
+    must never stop the node from starting.
+
+    Paths are embedded as single-quoted literals with every quote doubled,
+    which is PowerShell's only escape inside single quotes - no expansion of
+    $, backtick or anything else can happen to them.
+#>
+function New-LogRotationScript {
+    param(
+        [Parameter(Mandatory = $true)][string[]] $LogPaths,
+        [Parameter(Mandatory = $true)][long] $RotateBytes,
+        [Parameter(Mandatory = $true)][int] $Keep
+    )
+    $quoted = @($LogPaths | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ', '
+    $lines = @(
+        '$ErrorActionPreference = ''Stop''',
+        "foreach (`$log in @($quoted)) {",
+        '    try {',
+        '        $item = Get-Item -LiteralPath $log -ErrorAction SilentlyContinue',
+        "        if (`$null -eq `$item -or `$item.Length -lt $RotateBytes) { continue }",
+        '        $stamp = (Get-Date).ToString(''yyyyMMddTHHmmss'')',
+        '        Move-Item -LiteralPath $log -Destination ($log + ''.'' + $stamp) -Force'
+    ) + (Get-LogPruneScriptLines -Keep $Keep) + @(
+        '    }',
+        '    catch { }',
+        '}',
+        'exit 0'
+    )
+    return ($lines -join "`r`n")
+}
+
+<#
+.SYNOPSIS
+    The lines that delete all but the newest Keep rotated generations of
+    the log in $log, as script text for the generated scripts.
+
+.DESCRIPTION
+    Self-build slice AP (review). Matches BOTH naming schemes a rotated log
+    can have in the state directory, and nothing else:
+
+      * <leaf>.<yyyyMMddTHHmmss>              - this installer's task branch
+                                               (node.log.20261008T034500);
+      * <base>-<yyyyMMddTHHmmss>[.fff]<ext>   - NSSM's own AppRotate names
+                                               (node-20261008T034500.123.log,
+                                               node.err-20261008T034500.123.log).
+
+    Ordered by the timestamp IN THE NAME, newest first, not by
+    LastWriteTime: a rename keeps the file's old modification time, so the
+    generation just rotated would otherwise sort as the oldest and be the
+    one deleted. The live log itself never matches either pattern.
+#>
+function Get-LogPruneScriptLines {
+    param([Parameter(Mandatory = $true)][int] $Keep)
+    return @(
+        '        $leaf = Split-Path -Leaf $log',
+        '        $base = [IO.Path]::GetFileNameWithoutExtension($leaf)',
+        '        $ext = [IO.Path]::GetExtension($leaf)',
+        '        $pattern = ''^(?:'' + [regex]::Escape($leaf) + ''\.\d{8}T\d{6}|'' + [regex]::Escape($base) + ''-\d{8}T\d{6}(?:\.\d{3})?'' + [regex]::Escape($ext) + '')$''',
+        '        $rotated = @(Get-ChildItem -LiteralPath (Split-Path -Parent $log) -File | Where-Object { $_.Name -match $pattern } | Sort-Object { [regex]::Match($_.Name, ''\d{8}T\d{6}'').Value } -Descending)',
+        "        if (`$rotated.Count -gt $Keep) { `$rotated | Select-Object -Skip $Keep | Remove-Item -Force }"
+    )
+}
+
+<#
+.SYNOPSIS
+    The PowerShell that ONLY prunes old rotated generations of the logs
+    (it never rotates the live file), as text.
+
+.DESCRIPTION
+    Self-build slice AP (review). NSSM's AppRotate* settings rotate the
+    service's logs but never delete a rotated generation, so on a node that
+    runs for months they accumulate without bound - the disk the workspace
+    floor guards. The service branch therefore also registers a small
+    scheduled task (New-ScheduledTaskPruneActionSpec) that runs this daily
+    and at boot, keeping the newest Keep generations of each log, the same
+    number the scheduled-task branch keeps. Every failure is swallowed and
+    the script exits 0.
+#>
+function New-LogPruneScript {
+    param(
+        [Parameter(Mandatory = $true)][string[]] $LogPaths,
+        [Parameter(Mandatory = $true)][int] $Keep
+    )
+    $quoted = @($LogPaths | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ', '
+    $lines = @(
+        '$ErrorActionPreference = ''Stop''',
+        "foreach (`$log in @($quoted)) {",
+        '    try {'
+    ) + (Get-LogPruneScriptLines -Keep $Keep) + @(
+        '    }',
+        '    catch { }',
+        '}',
+        'exit 0'
+    )
+    return ($lines -join "`r`n")
+}
+
+<#
+.SYNOPSIS
+    The service branch's log-prune task action (self-build slice AP review).
+
+.DESCRIPTION
+    Same encoding as New-ScheduledTaskRotationActionSpec: -EncodedCommand,
+    so no path or quote in the script survives a second round of
+    command-line parsing.
+#>
+function New-ScheduledTaskPruneActionSpec {
+    param(
+        [Parameter(Mandatory = $true)][string] $PowerShellExe,
+        [Parameter(Mandatory = $true)][string[]] $LogPaths,
+        [Parameter(Mandatory = $true)][int] $Keep
+    )
+    $script = New-LogPruneScript -LogPaths $LogPaths -Keep $Keep
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    return [pscustomobject]@{
+        Execute  = $PowerShellExe
+        Argument = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded"
+        Script   = $script
+    }
+}
+
+<#
+.SYNOPSIS
+    The scheduled task's FIRST action: rotate the logs, then let the node
+    action start.
+
+.DESCRIPTION
+    Self-build slice AP. The task branch writes through cmd.exe's >> (see
+    New-ScheduledTaskActionSpec), and a file cmd.exe holds open can be
+    neither renamed (no FILE_SHARE_DELETE) nor safely truncated (cmd keeps
+    its own write offset and would leave a hole of NULs). So this branch
+    rotates when the task STARTS - at boot and on every restart-on-failure -
+    as a separate action that runs to completion before the node action:
+    the Task Scheduler runs a task's actions one after another, in order.
+    Between starts the log still grows; NSSM's online rotation is one more
+    reason the service stays the recommended shape.
+
+    -EncodedCommand (base64 of the UTF-16LE script) rather than -Command so
+    no path, quote or $ in the script has to survive a second round of
+    command-line parsing. Windows PowerShell 5.1 is assumed and is in-box on
+    every supported Windows.
+#>
+function New-ScheduledTaskRotationActionSpec {
+    param(
+        [Parameter(Mandatory = $true)][string] $PowerShellExe,
+        [Parameter(Mandatory = $true)][string[]] $LogPaths,
+        [Parameter(Mandatory = $true)][long] $RotateBytes,
+        [Parameter(Mandatory = $true)][int] $Keep
+    )
+    $script = New-LogRotationScript -LogPaths $LogPaths -RotateBytes $RotateBytes -Keep $Keep
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    return [pscustomobject]@{
+        Execute  = $PowerShellExe
+        Argument = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded"
+        Script   = $script
     }
 }
 
