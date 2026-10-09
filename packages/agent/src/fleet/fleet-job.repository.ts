@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
-import { FLEET_JOB_ACTIVE_STATUSES, QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
+import {
+    FLEET_JOB_ACTIVE_STATUSES,
+    FLEET_JOB_TERMINAL_STATUSES,
+    QUEUED_REASON_WAITING_FOR_RUNNER,
+} from '@ever-works/contracts';
 import { FleetJob } from '../entities/fleet-job.entity';
 
 export interface CreateFleetJobData {
@@ -535,6 +539,44 @@ export class FleetJobRepository {
      * BEFORE the daily ceilings are evaluated, so the sums below include
      * the job that just finished.
      */
+    /**
+     * Self-build slice AP — the retention purge, one bounded batch.
+     *
+     * NULLs `payload` and `result` on at most `limit` TERMINAL jobs that
+     * completed before `cutoff` and were never purged, oldest first, and
+     * stamps `bodiesPurgedAt`. Keeps every other column. Returns how many
+     * rows it purged, so the caller can stop on a short batch.
+     *
+     * Two statements rather than `UPDATE … LIMIT`, which neither Postgres
+     * nor a default sqlite build supports. The UPDATE re-checks every
+     * predicate, so a row that changed between the two (it cannot leave a
+     * terminal status, but a concurrent pass could have purged it) is not
+     * written twice, and the count is what was actually purged.
+     */
+    async purgeTerminalBodies(cutoff: Date, limit: number, purgedAt: Date): Promise<number> {
+        const candidates = await this.repository.find({
+            select: { id: true },
+            where: {
+                status: In([...FLEET_JOB_TERMINAL_STATUSES]),
+                completedAt: LessThan(cutoff),
+                bodiesPurgedAt: IsNull(),
+            },
+            order: { completedAt: 'ASC' },
+            take: Math.max(1, Math.floor(limit)),
+        });
+        if (candidates.length === 0) return 0;
+        const result = await this.repository.update(
+            {
+                id: In(candidates.map((row) => row.id)),
+                status: In([...FLEET_JOB_TERMINAL_STATUSES]),
+                completedAt: LessThan(cutoff),
+                bodiesPurgedAt: IsNull(),
+            },
+            { payload: null, result: null, bodiesPurgedAt: purgedAt },
+        );
+        return result.affected ?? candidates.length;
+    }
+
     async stampCostCents(id: string, costCents: number): Promise<void> {
         await this.repository.update({ id }, { costCents });
     }

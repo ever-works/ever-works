@@ -49,6 +49,17 @@ interface NodeContractBaseline {
 	selfDescription: { nodeEmits: string[]; nodeEmitsOptional: string[] };
 	nodeStatusBranches: { fleet: Record<string, string>; job: Record<string, string> };
 	killSwitch: { leaseWhenStopped: { status: number; body: Record<string, unknown> } };
+	versionFloor: {
+		heartbeatResponseFields: Array<{ path: string; type: string }>;
+		heartbeatWhenBelowFloor: { status: number; minNodeVersion: string; upgradeRequired: boolean };
+		leaseWhenBelowFloor: { status: number; minNodeVersion: string; body: Record<string, unknown> };
+	};
+	limitCeiling: {
+		heartbeatResponseFields: Array<{ path: string; type: string }>;
+		heartbeatWithCeiling: { ceiling: Record<string, number | null> };
+		heartbeatWithoutCeiling: { ceiling: Record<string, number | null> };
+		reportedLimits: Record<string, number | null>;
+	};
 }
 
 const API_URL = 'https://api.ever.works';
@@ -125,7 +136,11 @@ describe('what the node actually puts on the wire', () => {
 		// enforcing plus the four reclaim figures. All conditional for the
 		// same reason as slice T's pair — a node that has never reported one
 		// sends nothing rather than a null, so an older platform is unaffected.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(7);
+		// 7 → 8 with the node lifecycle (slice AR): the pinned per-provider CLI
+		// versions, sent only by a node whose telemetry has a compat probe.
+		// 8 → 11 with remote node limits (slice AS): the limits the worker
+		// enforces, sent only by a node that HAS a worker.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(11);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -208,6 +223,8 @@ describe('what the node actually puts on the wire', () => {
 			cliVersion: '1.4.2',
 			diskFreeBytes: 1,
 			modelIdentity: 'x',
+			// Node lifecycle (slice AR).
+			cliVersions: ['claude-code 2.1.3', 'codex 0.48.0'],
 			workerState: 'quarantined',
 			workerStateReason: 'helper trust check failed',
 			// Node housekeeping (EW-803). Supplied here for the same reason as
@@ -219,7 +236,12 @@ describe('what the node actually puts on the wire', () => {
 			workspaceCount: 3,
 			workspaceBytes: 12_000_000_000,
 			lastReclaimAt: '2026-09-06T00:00:00.000Z',
-			lastReclaimFreedBytes: 4_000_000_000
+			lastReclaimFreedBytes: 4_000_000_000,
+			// Remote node limits (slice AS) — the null on memory must survive
+			// the projection: it means "no ceiling in force", not "said nothing".
+			maxConcurrentJobs: 2,
+			maxCpuPercent: 70,
+			maxMemoryMb: null
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(
@@ -229,6 +251,9 @@ describe('what the node actually puts on the wire', () => {
 		expect(bodyOf(sent).workerStateReason).toBe('helper trust check failed');
 		expect(bodyOf(sent).workspaceCount).toBe(3);
 		expect(bodyOf(sent).lastReclaimAt).toBe('2026-09-06T00:00:00.000Z');
+		expect(bodyOf(sent).cliVersions).toEqual(['claude-code 2.1.3', 'codex 0.48.0']);
+		expect(bodyOf(sent)).toMatchObject(baseline.limitCeiling.reportedLimits);
+		expect(bodyOf(sent)).toHaveProperty('maxMemoryMb', null);
 	});
 
 	it('pause and unenroll send exactly the pinned bodies', async () => {
@@ -325,6 +350,79 @@ describe('what the node reads back', () => {
 		const stopped = baseline.killSwitch.leaseWhenStopped;
 		const jobs = await jobClient(recorder(stopped.status, stopped.body).fetchFn).lease();
 		expect(jobs).toEqual([]);
+	});
+
+	it('reads the version-floor refusal as "upgrade required", never as an error (slice AR)', async () => {
+		// The pinned refusal is a 200 with an empty list. Today's client must
+		// (a) not throw — a throw backs the worker off as if the platform were
+		// down — (b) see no jobs, and (c) learn WHY, so the work lane holds
+		// itself and `status` / `doctor` can say "upgrade required".
+		const refusal = baseline.versionFloor.leaseWhenBelowFloor;
+		const outcome = await jobClient(recorder(refusal.status, refusal.body).fetchFn).leaseOutcome();
+		expect(outcome).toEqual({ jobs: [], upgradeRequired: true, minNodeVersion: refusal.minNodeVersion });
+
+		// …and the plain `lease()` an older embedder calls reads it as an
+		// empty poll, exactly like the global stop flag.
+		const jobs = await jobClient(recorder(refusal.status, refusal.body).fetchFn).lease();
+		expect(jobs).toEqual([]);
+	});
+
+	it('an ordinary empty poll is NOT read as a refusal', async () => {
+		const outcome = await jobClient(
+			recorder(200, baseline.routes['jobs-lease'].emptyResponse).fetchFn
+		).leaseOutcome();
+		expect(outcome.upgradeRequired).toBe(false);
+		expect(outcome.minNodeVersion).toBeNull();
+	});
+
+	it('reads the version floor off every heartbeat answer (slice AR)', async () => {
+		const pinned = baseline.versionFloor;
+		// ANTI-VACUITY: the fields this case reads are the fields the fixture pins.
+		expect(pinned.heartbeatResponseFields.map((field) => field.path).sort()).toEqual([
+			'minNodeVersion',
+			'upgradeRequired'
+		]);
+		const answer = {
+			...baseline.routes.heartbeat.response,
+			minNodeVersion: pinned.heartbeatWhenBelowFloor.minNodeVersion,
+			upgradeRequired: pinned.heartbeatWhenBelowFloor.upgradeRequired
+		};
+		const beat = await fleetClient(recorder(200, answer).fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		expect(beat.minNodeVersion).toBe(pinned.heartbeatWhenBelowFloor.minNodeVersion);
+		expect(beat.upgradeRequired).toBe(true);
+
+		// An older platform's answer (no fields) stays exactly what it was.
+		const legacy = await fleetClient(recorder(200, baseline.routes.heartbeat.response).fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET
+		});
+		expect(legacy).not.toHaveProperty('minNodeVersion');
+		expect(legacy).not.toHaveProperty('upgradeRequired');
+	});
+
+	it('reads the owner limit ceiling off every heartbeat answer, and an all-null one too (slice AS)', async () => {
+		const pinned = baseline.limitCeiling;
+		expect(pinned.heartbeatResponseFields.map((field) => field.path).sort()).toEqual([
+			'limitCeiling',
+			'limitCeiling.maxConcurrentJobs',
+			'limitCeiling.maxCpuPercent',
+			'limitCeiling.maxMemoryMb'
+		]);
+		for (const variant of [pinned.heartbeatWithCeiling, pinned.heartbeatWithoutCeiling]) {
+			const answer = { ...baseline.routes.heartbeat.response, limitCeiling: variant.ceiling };
+			const beat = await fleetClient(recorder(200, answer).fetchFn).heartbeat({
+				nodeId: NODE_ID,
+				secret: SECRET
+			});
+			// The all-null ceiling must be READ, not dropped: it is how a lifted
+			// ceiling reaches the machine.
+			expect(beat.limitCeiling).toEqual(variant.ceiling);
+		}
+		const legacy = await fleetClient(recorder(200, baseline.routes.heartbeat.response).fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET
+		});
+		expect(legacy).not.toHaveProperty('limitCeiling');
 	});
 
 	it('rejects a lease answer that is not a list, rather than treating it as empty', async () => {

@@ -7,6 +7,13 @@ import {
 	type SelfDescriptionTelemetry
 } from './capabilities';
 import { cacheProbe, detectAgentCliVersion, detectModelIdentity, type DiskProbeIo } from './telemetry-probe';
+import {
+	describeCliVersions,
+	ModelCliCompatibilityProbe,
+	primaryPinnedCliVersion,
+	type ModelCliFileStamp
+} from './model-cli-compat';
+import { NodeLifecycleTracker, type NodeLifecycleRecord, type UpgradeHoldable } from './node-lifecycle';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
@@ -45,6 +52,7 @@ import {
 	type FleetEnrollableNodeKind,
 	type FleetNodeView,
 	type NodeConfig,
+	type NodeLimitCeiling,
 	type NodeResourceLimits
 } from './types';
 
@@ -81,6 +89,14 @@ export interface NodeIo {
 	diskProbe?: DiskProbeIo;
 	/** Path whose volume the disk probe measures. Defaults to the node's cwd. */
 	workspacePath?: string;
+	/**
+	 * Node lifecycle (self-build slice AR) — file stamp (mtime + size) of a
+	 * pinned model-CLI binary, the cache key of the compatibility probe so an
+	 * in-place CLI upgrade is re-probed at once. Optional: without it the
+	 * probe falls back to a time-boxed cache. `node-io.ts` supplies the real
+	 * `fs.stat`-backed one.
+	 */
+	statFile?: (path: string) => Promise<ModelCliFileStamp | null> | ModelCliFileStamp | null;
 }
 
 /**
@@ -99,11 +115,28 @@ export interface NodeIo {
  * which account they are logged in as, and is cached for a few minutes:
  * a login changes once a month, a beat happens twice a minute.
  */
-export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTelemetry {
+export function buildSelfDescriptionTelemetry(
+	io: NodeIo,
+	/**
+	 * Node lifecycle (self-build slice AR) — the compatibility probe of the
+	 * PINNED model CLIs. When supplied, `cliVersion` comes from the binary a
+	 * run would actually spawn (falling back to the PATH scan only when no
+	 * pinned binary answers, e.g. a visibility-only machine with gemini) and
+	 * `cliVersions` reports every pinned provider.
+	 */
+	cliCompat?: ModelCliCompatibilityProbe
+): SelfDescriptionTelemetry {
+	const pinned = () => io.environment.modelCli ?? {};
 	const telemetry: SelfDescriptionTelemetry = {
-		cliVersion: () => detectAgentCliVersion(io.runner),
+		cliVersion: cliCompat
+			? async () =>
+					primaryPinnedCliVersion(await cliCompat.probeAll(pinned())) ?? detectAgentCliVersion(io.runner)
+			: () => detectAgentCliVersion(io.runner),
 		modelIdentity: cacheProbe(() => detectModelIdentity(io.runner, io.environment.modelCli ?? {}))
 	};
+	if (cliCompat) {
+		telemetry.cliVersions = async () => describeCliVersions(await cliCompat.probeAll(pinned()));
+	}
 	if (io.diskProbe) {
 		const probe = io.diskProbe;
 		const path = io.workspacePath ?? process.cwd();
@@ -174,6 +207,12 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 		options.environment,
 		options.version,
 		options.capabilitySelection ?? null,
+		// Deliberately WITHOUT the pinned-CLI compat probe (review, slice AR):
+		// that probe adds `cliVersions`, an optional field an older platform's
+		// `forbidNonWhitelisted` pipe answers with a 400 — and enrollment, unlike
+		// the heartbeat, has no strip-and-retry fallback, so a new node could
+		// never enroll against it. The first heartbeat reports the pinned
+		// versions, behind the heartbeat's own fallback.
 		buildSelfDescriptionTelemetry(options)
 	);
 	logger.info(`Enrolling with ${client.baseUrl} as ${description.platform} [${description.capabilities.join(', ')}]`);
@@ -297,6 +336,13 @@ export interface NodeRuntime {
 	client: FleetClient;
 	loop: HeartbeatLoop;
 	/**
+	 * Node lifecycle (self-build slice AR) — the platform's verdict on this
+	 * daemon's version, and the holds it places on the lanes.
+	 */
+	lifecycle: NodeLifecycleTracker;
+	/** Node lifecycle (slice AR) — what the pinned model CLIs are and understand. */
+	cliCompat: ModelCliCompatibilityProbe;
+	/**
 	 * The worker host, present when this node is configured to EXECUTE
 	 * work (`workerEnabled`). Absent means the node only reports liveness
 	 * and capabilities — the pre-M4 behaviour, preserved so a machine can
@@ -402,6 +448,12 @@ export interface CreateNodeRuntimeOptions {
 	agentTaskScratchRoot?: string;
 	/** Persist a fail-closed worker quarantine into the node config. */
 	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
+	/**
+	 * Node lifecycle (self-build slice AR) — record what the platform last
+	 * said about this daemon (the version floor), beside the config, so
+	 * `status` and `doctor` can show it. Best-effort; a failure is logged.
+	 */
+	persistLifecycle?: (record: NodeLifecycleRecord) => Promise<void> | void;
 	/** Durable write-ahead crash guard; acquired before the first job lease. */
 	workerSafetyGate?: WorkerSafetyGate;
 
@@ -480,7 +532,24 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// holds the WORKSPACES — the one that fills up — not on whatever volume
 	// the service manager's cwd happens to be on (OPS-12).
 	const workspaceRoot = options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot();
-	const telemetry = buildSelfDescriptionTelemetry({ ...io, workspacePath: io.workspacePath ?? workspaceRoot });
+	// Node lifecycle (slice AR): ONE probe per process, shared by the
+	// heartbeat telemetry and every model step, so the version Fleet shows
+	// and the flags a run is built with come from the same answer.
+	const cliCompat = new ModelCliCompatibilityProbe({
+		runner: io.runner,
+		platform: io.environment.platform,
+		...(io.statFile ? { statFile: io.statFile } : {}),
+		...(io.now ? { now: io.now } : {})
+	});
+	const pinnedModelCli = options.modelCli ?? io.environment.modelCli ?? {};
+	const telemetry = buildSelfDescriptionTelemetry(
+		{
+			...io,
+			workspacePath: io.workspacePath ?? workspaceRoot,
+			environment: { ...io.environment, modelCli: pinnedModelCli }
+		},
+		cliCompat
+	);
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
 	// `attended` (and `screen`) are advertised only by a process started with it.
@@ -497,6 +566,20 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		: io.environment;
 	// Set once the attended lane exists (below); the heartbeat hint wakes it.
 	let attendedWake: ((pending: readonly string[] | undefined) => void) | null = null;
+	// Node lifecycle (slice AR): the lanes the version floor holds. Filled in
+	// as they are built below; the tracker resolves them per verdict.
+	const holdableLanes: UpgradeHoldable[] = [];
+	// Remote node limits (slice AS): where an owner's ceiling lands — the
+	// work lane, once it exists below. Unset on a visibility-only node.
+	let limitTarget: ((ceiling: NodeLimitCeiling) => void) | null = null;
+	const lifecycle = new NodeLifecycleTracker({
+		daemonVersion: io.version,
+		logger: io.logger,
+		lanes: () => holdableLanes,
+		onLimitCeiling: (ceiling) => limitTarget?.(ceiling),
+		...(options.persistLifecycle ? { persist: options.persistLifecycle } : {}),
+		...(io.now ? { now: io.now } : {})
+	});
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
@@ -509,11 +592,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),
 		...(io.now ? { now: io.now } : {}),
-		onAccepted: (response: { pendingComputerSessions?: string[] }) =>
-			attendedWake?.(response.pendingComputerSessions)
+		onAccepted: (response: {
+			pendingComputerSessions?: string[];
+			minNodeVersion?: string;
+			upgradeRequired?: boolean;
+			limitCeiling?: NodeLimitCeiling;
+		}) => {
+			attendedWake?.(response.pendingComputerSessions);
+			lifecycle.applyHeartbeat(response);
+		}
 	};
 
-	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions) };
+	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions), lifecycle, cliCompat };
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.
@@ -565,6 +655,24 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			// body is exactly what it always was.
 			...(options.attendEnabled ? { excludeKinds: ['computer-session' as const] } : {})
 		});
+		// Node lifecycle (slice AR): the version floor holds this lane, and a
+		// LEASE refusal (the other channel that can say it) is folded into
+		// the same tracker so both lanes and the record agree.
+		holdableLanes.push(worker);
+		worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
+		// Remote node limits (self-build slice AS): the owner's ceiling clamps
+		// THIS lane — the work lane — to min(its own limits, the ceiling),
+		// from the next lease. The live-view lane keeps its fixed two views:
+		// a view is the owner watching, not work the ceiling is about. The
+		// heartbeat reports the result back as the effective limits.
+		limitTarget = (ceiling) => {
+			if (worker.applyLimitCeiling(ceiling)) {
+				io.logger.info(
+					`Platform limit ceiling applied — this node now enforces ${describeEnforcedLimits(worker.resourceLimits)} (its own limits: ${describeEnforcedLimits(worker.localResourceLimits)})`
+				);
+			}
+		};
+		telemetry.limits = () => worker.resourceLimits;
 		// Fleet health signals (EW-776). Wired onto the SAME telemetry
 		// object `describe` already closed over above, so the heartbeat
 		// starts reporting worker state without the loop having to be
@@ -732,6 +840,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 								}
 							: {}),
 						modelCli,
+						// Node lifecycle (slice AR): what the pinned binary
+						// understands, asked right before the model step so an
+						// optional flag it does not advertise is dropped rather
+						// than failing the run after the lease and the worktree
+						// were spent. Cached per binary + mtime: a stat, not a spawn.
+						modelCliCompat: (provider, executable) =>
+							provider === 'claude-code' || provider === 'codex'
+								? cliCompat.probe(provider, executable)
+								: Promise.resolve(null),
 						// Self-build slice AK — the reader that decides whether
 						// relocating `CLAUDE_CONFIG_DIR` is safe on THIS machine.
 						// Wired here rather than defaulted inside the executor so
@@ -826,6 +943,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	if (attendedCapture) {
 		const lane = createAttendedLane(config, io, options, environment, jobClientFor(), attendedCapture);
 		runtime.attended = lane;
+		// The live-view lane leases through the same endpoint, so the same
+		// floor refuses it; hold it with the work lane.
+		holdableLanes.push(lane.worker);
+		lane.worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
 		runtime.jobClient ??= jobClientFor();
 		attendedWake = (pending) => {
 			if (lane.cadence.notePendingSessions(pending)) lane.worker.pollSoon();
@@ -833,6 +954,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	}
 
 	return runtime;
+}
+
+/** `2 concurrent job(s), CPU < 80%, no memory ceiling` — for the log line a ceiling change writes. */
+export function describeEnforcedLimits(
+	limits: Pick<NodeResourceLimits, 'maxConcurrentJobs' | 'maxCpuPercent' | 'maxMemoryMb'>
+): string {
+	return [
+		`${limits.maxConcurrentJobs} concurrent job(s)`,
+		limits.maxCpuPercent === null ? 'no CPU ceiling' : `CPU < ${limits.maxCpuPercent}%`,
+		limits.maxMemoryMb === null ? 'no memory ceiling' : `memory < ${limits.maxMemoryMb}MB`
+	].join(', ');
 }
 
 /** Most live views one machine serves at once — the platform's per-machine default. */

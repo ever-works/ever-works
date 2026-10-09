@@ -179,6 +179,19 @@ export const FLEET_JOB_MAX_LEASE_BATCH = 5;
 export const FLEET_JOB_MAX_PAYLOAD_BYTES = 256 * 1024;
 export const FLEET_JOB_MAX_RESULT_BYTES = 256 * 1024;
 export const FLEET_JOB_MAX_ERROR_LENGTH = 4096;
+
+/**
+ * Self-build slice AP — how long a TERMINAL job keeps its `payload` (the
+ * whole assembled prompt, up to {@link FLEET_JOB_MAX_PAYLOAD_BYTES}) and its
+ * `result` (up to {@link FLEET_JOB_MAX_RESULT_BYTES}, including the run's
+ * redacted transcript). Past the window a nightly purge NULLs both bodies
+ * and keeps the row's metadata — status, node, timings, cost, error.
+ * Operator override: `FLEET_JOB_RETENTION_DAYS`, clamped to
+ * [{@link FLEET_JOB_MIN_RETENTION_DAYS}, {@link FLEET_JOB_MAX_RETENTION_DAYS}].
+ */
+export const FLEET_JOB_DEFAULT_RETENTION_DAYS = 30;
+export const FLEET_JOB_MIN_RETENTION_DAYS = 1;
+export const FLEET_JOB_MAX_RETENTION_DAYS = 3650;
 export const FLEET_JOB_MAX_REQUIRED_CAPABILITIES = 8;
 
 /**
@@ -1035,6 +1048,48 @@ export interface FleetAgentTaskModelResult {
 	/** Last bytes of combined stdout/stderr, for the run report. */
 	outputTail?: string;
 	/**
+	 * Node lifecycle (self-build slice AR) — OPTIONAL command-line flags the
+	 * run asked for that the node DROPPED because the pinned CLI binary does
+	 * not advertise them (`--effort`, `--max-budget-usd`). A flag this
+	 * binary does not know used to fail every run on every PC the moment an
+	 * upstream release removed or renamed it — after the plan, the lease and
+	 * the provisioning were already spent. Recorded here so the drop is
+	 * visible on the run rather than silent: a dropped `--max-budget-usd`
+	 * means the CLI enforced no per-run budget (the platform's daily
+	 * ceilings still apply). Absent when nothing was dropped.
+	 */
+	droppedFlags?: string[];
+	/**
+	 * Self-build slice AP — the run's bounded STEP RECORDS: what the model
+	 * said and which tools it called, parsed out of the CLI's own JSON
+	 * stream. Names, short argument summaries, statuses and durations; never
+	 * file contents and never a tool's output. Redacted on the node before
+	 * it leaves the machine (granted env values, delivered `.env` values,
+	 * and the shared secret-pattern scanner), capped by
+	 * {@link FLEET_AGENT_TASK_TIMELINE_MAX_STEPS} /
+	 * {@link FLEET_AGENT_TASK_TIMELINE_MAX_BYTES}.
+	 *
+	 * The platform writes these into the run's ordinary `agent_run_logs`
+	 * timeline, so the Sessions view renders a fleet run exactly like a
+	 * cloud one. Absent on nodes older than the slice and on a node that
+	 * switched transcript capture off. Read through
+	 * {@link normalizeFleetAgentTaskTimeline}.
+	 */
+	timeline?: FleetAgentTaskModelStep[];
+	/** Steps the node observed past the timeline caps and did not record. */
+	timelineDropped?: number;
+	/**
+	 * Self-build slice AP — the CLI's JSON transcript, REDACTED and capped
+	 * at {@link FLEET_AGENT_TASK_TRANSCRIPT_MAX_BYTES}: one JSON document
+	 * per line, every tool output, file body and reasoning block replaced
+	 * by an `[elided N chars]` marker, the head and the tail of a long run
+	 * kept with an elision line between them. Lives on the job row only,
+	 * so it is subject to the fleet job retention purge.
+	 */
+	transcript?: string;
+	/** Bytes of CLI output the transcript was built from, before elision and capping. */
+	transcriptSourceBytes?: number;
+	/**
 	 * Self-build slice AU — what the node did with the job's
 	 * `execution.resume` block. Present ONLY when the job carried one, so a
 	 * run that was never offered a session reports exactly what it always
@@ -1069,6 +1124,159 @@ export interface FleetAgentTaskModelResumeRecord {
 	outcome: FleetAgentTaskModelResumeOutcome;
 	/** Node-written, one sentence, never a value — why it fell back or was skipped. */
 	reason?: string;
+}
+
+/** Self-build slice AP — the two kinds of step a fleet run's timeline records. */
+export type FleetAgentTaskModelStepKind = 'assistant-message' | 'tool-call';
+
+/**
+ * Self-build slice AP — how a recorded tool call ended. `unknown` means the
+ * node saw the call but never its result (the CLI was killed mid-call, or
+ * the result fell past a cap).
+ */
+export type FleetAgentTaskModelStepStatus = 'ok' | 'error' | 'unknown';
+
+/** Self-build slice AP — one bounded step record of a fleet model run. */
+export interface FleetAgentTaskModelStep {
+	kind: FleetAgentTaskModelStepKind;
+	/**
+	 * Milliseconds after the model step started at which the node SAW this
+	 * step in the CLI's output stream — the node polls the stream, so the
+	 * resolution is its poll interval. `null` when the stream was only read
+	 * after the CLI exited (no live observation).
+	 */
+	atMs: number | null;
+	/** `assistant-message`: the model's text, redacted and capped. */
+	text?: string;
+	/** `tool-call`: the tool's name as the CLI reported it. */
+	toolName?: string;
+	/** `tool-call`: the CLI's own id for the call, when it gave one. */
+	callId?: string;
+	/** `tool-call`: a short, redacted summary of the arguments — paths and commands, never file bodies. */
+	argsSummary?: string;
+	/** `tool-call`: how the call ended. */
+	status?: FleetAgentTaskModelStepStatus;
+	/** `tool-call`: observed call-to-result time; null when it could not be observed. */
+	durationMs?: number | null;
+	/** True when `text` / `argsSummary` was cut to its cap. */
+	truncated?: boolean;
+}
+
+/** Self-build slice AP — most step records one run reports (parity with the cloud run capture cap). */
+export const FLEET_AGENT_TASK_TIMELINE_MAX_STEPS = 200;
+/** Self-build slice AP — serialized-size budget of one run's whole timeline. */
+export const FLEET_AGENT_TASK_TIMELINE_MAX_BYTES = 48 * 1024;
+/** Self-build slice AP — cap on one assistant-message step's text. */
+export const FLEET_AGENT_TASK_TIMELINE_TEXT_MAX_CHARS = 1000;
+/** Self-build slice AP — cap on a tool call's argument summary. */
+export const FLEET_AGENT_TASK_TIMELINE_ARGS_MAX_CHARS = 200;
+/** Self-build slice AP — cap on a tool name / call id as recorded. */
+export const FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS = 80;
+/** Self-build slice AP — cap on the redacted transcript a run reports. */
+export const FLEET_AGENT_TASK_TRANSCRIPT_MAX_BYTES = 64 * 1024;
+
+/** Largest number a node may claim it dropped — a sanity bound, not a budget. */
+const TIMELINE_MAX_DROPPED = 1_000_000_000;
+
+/**
+ * Read a node's step records without trusting them (self-build slice AP).
+ *
+ * COERCING, never throwing, like {@link normalizeFleetAgentTaskContainment}:
+ * the timeline rides next to the run's verdict, and a malformed entry must
+ * never cost the run that verdict. Every text field is control-stripped and
+ * re-capped here (Postgres rejects a NUL in `text`), an unrecognised entry
+ * is COUNTED into `dropped` rather than silently disappearing, and entries
+ * past {@link FLEET_AGENT_TASK_TIMELINE_MAX_STEPS} join the same count — so
+ * "how many steps did this run take" can never shrink on the way through.
+ */
+export function normalizeFleetAgentTaskTimeline(
+	raw: unknown,
+	reportedDropped?: unknown
+): { steps: FleetAgentTaskModelStep[]; dropped: number } {
+	const entries = Array.isArray(raw) ? raw : [];
+	const steps: FleetAgentTaskModelStep[] = [];
+	let dropped = timelineCount(reportedDropped);
+	for (const entry of entries) {
+		if (steps.length >= FLEET_AGENT_TASK_TIMELINE_MAX_STEPS) {
+			dropped += 1;
+			continue;
+		}
+		const step = normalizeTimelineStep(entry);
+		if (step) steps.push(step);
+		else dropped += 1;
+	}
+	return { steps, dropped: Math.min(dropped, TIMELINE_MAX_DROPPED) };
+}
+
+function normalizeTimelineStep(entry: unknown): FleetAgentTaskModelStep | null {
+	if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+	const record = entry as Record<string, unknown>;
+	const atMs = timelineMillis(record.atMs);
+	if (record.kind === 'assistant-message') {
+		const text =
+			typeof record.text === 'string'
+				? timelineText(record.text, FLEET_AGENT_TASK_TIMELINE_TEXT_MAX_CHARS)
+				: null;
+		if (!text || !text.value) return null;
+		return {
+			kind: 'assistant-message',
+			atMs,
+			text: text.value,
+			...(text.cut || record.truncated === true ? { truncated: true } : {})
+		};
+	}
+	if (record.kind === 'tool-call') {
+		const name =
+			typeof record.toolName === 'string'
+				? timelineText(record.toolName, FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS)
+				: null;
+		if (!name || !name.value) return null;
+		const callId =
+			typeof record.callId === 'string'
+				? timelineText(record.callId, FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS).value
+				: '';
+		const args =
+			typeof record.argsSummary === 'string'
+				? timelineText(record.argsSummary, FLEET_AGENT_TASK_TIMELINE_ARGS_MAX_CHARS)
+				: null;
+		const status: FleetAgentTaskModelStepStatus =
+			record.status === 'ok' || record.status === 'error' ? record.status : 'unknown';
+		return {
+			kind: 'tool-call',
+			atMs,
+			toolName: name.value,
+			...(callId ? { callId } : {}),
+			...(args && args.value ? { argsSummary: args.value } : {}),
+			status,
+			durationMs: timelineMillis(record.durationMs),
+			...(args?.cut || record.truncated === true ? { truncated: true } : {})
+		};
+	}
+	return null;
+}
+
+function timelineText(value: string, maxChars: number): { value: string; cut: boolean } {
+	const clean = stripControlCharacters(value).trim();
+	const points = Array.from(clean);
+	if (points.length <= maxChars) return { value: clean, cut: false };
+	return {
+		value: `${points
+			.slice(0, maxChars - 1)
+			.join('')
+			.trimEnd()}…`,
+		cut: true
+	};
+}
+
+/** A non-negative whole number of milliseconds, or null. */
+function timelineMillis(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
+}
+
+function timelineCount(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) && value > 0
+		? Math.min(Math.floor(value), TIMELINE_MAX_DROPPED)
+		: 0;
 }
 
 /**
@@ -1568,6 +1776,18 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 */
 	question?: FleetAgentTaskQuestion | null;
 	/**
+	 * Self-build slice AU (a slice-Q follow-up): owner-question files the
+	 * model wrote somewhere OTHER than a repository root — e.g.
+	 * `apps/api/.ever-works/QUESTION.md` after it `cd`-ed into a package.
+	 * The exclude rule keeps such a file out of Git, but the node only
+	 * READS the root one, so without this the question was lost in silence.
+	 * Workspace-relative POSIX paths (a mount's prefixed with
+	 * `.mounts/<dir>/`), bounded in count and length, never content; the
+	 * node removes each file after reporting it. Absent when there were
+	 * none, so a normal run reports exactly what it always did.
+	 */
+	misplacedQuestionFiles?: string[];
+	/**
 	 * Self-build slice Z: what the MCP bridge did, when the payload asked
 	 * for one. Reports whether it actually ran and how many `tools/call`
 	 * requests the loopback proxy forwarded. NEVER the token — the whole
@@ -1670,6 +1890,22 @@ export interface FleetJobLeaseRequest {
 /** Response body for `POST /api/fleet/jobs/lease`. */
 export interface FleetJobLeaseResponse {
 	jobs: FleetJobView[];
+	/**
+	 * Node lifecycle (self-build slice AR) — present, and `true`, ONLY when
+	 * the platform refused this poll because the node's daemon is below the
+	 * minimum version (`minNodeVersion`). `jobs` is then empty.
+	 *
+	 * Deliberately a 200 with an empty list, exactly like the global stop
+	 * flag, and never a 401/403/426: `job-client.ts` reads a lease 401 as a
+	 * revoked credential and `heartbeat.ts` makes that sticky, so a refusal
+	 * shaped like an auth failure would turn a reversible floor into a
+	 * fleet-wide re-enrollment. A daemon built before this field reads the
+	 * same answer as "nothing to do" — it is refused all the same, it just
+	 * cannot say why (the Fleet drawer can).
+	 */
+	upgradeRequired?: true;
+	/** The floor the refusal was judged against. Present with `upgradeRequired`. */
+	minNodeVersion?: string;
 }
 
 /** Request body for `POST /api/fleet/jobs/:id/heartbeat`. */

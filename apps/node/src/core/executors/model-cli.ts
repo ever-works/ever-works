@@ -250,6 +250,53 @@ function assertModelId(model: string | undefined): string | null {
 }
 
 /**
+ * Node lifecycle (self-build slice AR) — the command-line flags this
+ * builder may DROP when the pinned CLI binary does not advertise them.
+ *
+ * Optional means: the run is still the run the tenant asked for without
+ * it, only less tuned. `--effort` is a quality knob and `--max-budget-usd`
+ * a per-run spend cap the platform's own daily ceilings back up. Before
+ * this list both were emitted unconditionally, so ONE upstream CLI release
+ * that renamed either failed every run on every PC at once — after the
+ * plan, the lease and the provisioning were already spent.
+ *
+ * Nothing else is droppable, on purpose: `--strict-mcp-config`,
+ * `--add-dir`, `--permission-mode`, the sandbox flags and the rest decide
+ * WHAT the model may touch, and a run that silently lost one would be a
+ * different, less contained run that still reports success. A binary that
+ * lacks one of those is reported by `doctor` as incompatible instead.
+ */
+export const MODEL_CLI_OPTIONAL_FLAGS: Readonly<Record<'claude-code' | 'codex', readonly string[]>> = {
+	'claude-code': ['--effort', '--max-budget-usd'],
+	codex: []
+};
+
+/**
+ * The optional flags THIS execution would emit that the pinned binary does
+ * not advertise — i.e. the ones the builder should drop.
+ *
+ * `supportedFlags === null` means "could not tell" (the probe failed, or
+ * the help text was not recognisable), and then nothing is dropped: that
+ * is exactly the behaviour before this existed, and guessing would trade a
+ * loud failure for a silent downgrade.
+ */
+export function unsupportedOptionalModelCliFlags(
+	execution: Pick<FleetAgentModelExecution, 'provider' | 'effort' | 'maxBudgetUsd'>,
+	supportedFlags: ReadonlySet<string> | null | undefined
+): string[] {
+	if (!supportedFlags) return [];
+	const wanted: string[] = [];
+	if (execution.provider === 'claude-code') {
+		if (execution.effort) wanted.push('--effort');
+		if (execution.maxBudgetUsd !== undefined) wanted.push('--max-budget-usd');
+	}
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	return wanted.filter((flag) => droppable.has(flag) && !supportedFlags.has(flag));
+}
+
+/**
  * Self-build slice AU — the session id a command may carry, or null for a
  * fresh run. Throws for an id that is not the contracts' strict UUID shape
  * (it is interpolated into a shell command line) and for a provider the
@@ -332,10 +379,37 @@ export function buildModelCliCommand(input: {
 	 */
 	resumeSessionId?: string;
 	platform?: NodeJS.Platform;
+	/**
+	 * Node lifecycle (slice AR) — optional flags to leave off because the
+	 * pinned binary does not advertise them (see
+	 * {@link unsupportedOptionalModelCliFlags}). Only members of
+	 * {@link MODEL_CLI_OPTIONAL_FLAGS} are honoured: a containment flag can
+	 * never be dropped through this, whatever a caller passes. Absent (the
+	 * default) produces byte-for-byte the command this step always built.
+	 */
+	omitFlags?: readonly string[];
+	/**
+	 * Self-build slice AP — ask Claude Code for its LINE-DELIMITED event
+	 * stream (`--output-format stream-json --verbose`) instead of the one
+	 * result document `--output-format json` prints at exit. The stream is
+	 * what carries every turn and tool call, which is the only place the
+	 * run's step records can come from, and — unlike the single document —
+	 * it is written AS the run goes, so a run killed at its timeout still
+	 * leaves the steps it took. Its last line is the same `result` envelope
+	 * the parser already reads (see `parseClaudeEnvelope`'s JSONL branch).
+	 *
+	 * Absent (the default) produces byte-for-byte the command this step has
+	 * always built. Codex is unaffected: `exec --json` is already a stream.
+	 */
+	stream?: boolean;
 }): string {
 	const platform = input.platform ?? process.platform;
 	const { execution } = input;
 	const resumeSessionId = assertResumableSession(execution.provider, input.resumeSessionId);
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	const omitted = new Set((input.omitFlags ?? []).filter((flag) => droppable.has(flag)));
 	const exe = quoteShellPath(input.executable, platform);
 	const stdin = quoteShellPath(input.scratch.instructionsPath, platform);
 	const stdout = quoteShellPath(input.scratch.resultPath, platform);
@@ -412,7 +486,13 @@ export function buildModelCliCommand(input: {
 
 	const args: string[] = [];
 	if (execution.provider === 'claude-code') {
-		args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
+		if (input.stream === true) {
+			// `--verbose` is REQUIRED by `-p` with `stream-json`; the CLI
+			// refuses the combination without it.
+			args.push('-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', permissionMode);
+		} else {
+			args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
+		}
 		// ── Slice AU: continue the session the earlier run left here ────
 		//
 		// `--resume <id>` reopens that conversation and `-p` still reads the
@@ -424,8 +504,8 @@ export function buildModelCliCommand(input: {
 		// half-finished first attempt. The id is a validated UUID by now.
 		if (resumeSessionId) args.push('--resume', resumeSessionId, '--fork-session');
 		if (model) args.push('--model', model);
-		if (execution.effort) args.push('--effort', execution.effort);
-		if (budget) args.push('--max-budget-usd', budget);
+		if (execution.effort && !omitted.has('--effort')) args.push('--effort', execution.effort);
+		if (budget && !omitted.has('--max-budget-usd')) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
 		// ── Slice Z: the platform MCP bridge ────────────────────────────
 		//
@@ -796,11 +876,37 @@ export function parseModelCliResult(
 ): FleetAgentTaskModelResult {
 	return redactModelResult(
 		parseModelCliOutcome(provider, rawOutput, step),
-		mergeProtectedValues(
-			collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
-			extraValues
-		)
+		collectModelOutputProtectedValues(envPassthrough, envGrants, parentEnv, extraValues)
 	);
+}
+
+/**
+ * The credential VALUES a model run's reported text is scrubbed of — the
+ * values behind the granted env NAMES (`envPassthrough`, `envGrants`), read
+ * from this process, plus values that live in no environment at all (the
+ * run's delivered `.env` file contents, self-build slice Y). Longest first,
+ * 8-character floor.
+ *
+ * Exported so every channel a model run reports through — the summary and
+ * output tail here, and the step records and transcript of self-build slice
+ * AP — is scrubbed of exactly the SAME set. Two channels computing the set
+ * two ways is how one of them ends up scrubbing nothing.
+ */
+export function collectModelOutputProtectedValues(
+	envPassthrough?: readonly string[],
+	envGrants?: readonly string[],
+	parentEnv?: NodeJS.ProcessEnv,
+	extraValues?: readonly string[]
+): string[] {
+	return mergeProtectedValues(
+		collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
+		extraValues
+	);
+}
+
+/** Replace every protected value in `text` with {@link MODEL_CLI_REDACTED}. */
+export function scrubModelOutputText(text: string, values: readonly string[]): string {
+	return scrub(text, values) ?? text;
 }
 
 /** Placeholder left where a credential value was removed. */
@@ -842,12 +948,36 @@ export function redactCommandResult(
  * ordinary prose out of every tail the node reports.
  */
 function mergeProtectedValues(values: readonly string[], extra?: readonly string[]): string[] {
-	if (!extra?.length) return [...values];
 	const merged = new Set<string>(values);
-	for (const value of extra) {
+	for (const value of extra ?? []) {
 		if (typeof value === 'string' && value.trim().length >= 8) merged.add(value);
 	}
-	return [...merged].sort((a, b) => b.length - a.length);
+	return withJsonEscapedSpellings([...merged]);
+}
+
+/**
+ * Self-build slice AP (review) — `values` plus the spellings JSON gives them.
+ *
+ * Every text this node reports that came out of a CLI's JSON stream — the
+ * raw output tail of a run that wrote no verdict line, a Codex event tail,
+ * the half-written last line of a killed run — carries a value the way JSON
+ * wrote it: a quote as `\"`, a backslash as `\\`, a control character as
+ * `\uXXXX`. A `.env` value like `pa"ss\word` is then in the report in a
+ * spelling a verbatim match never finds. So each value is also protected in
+ * its JSON-escaped spelling, and in the doubly escaped one a JSON document
+ * quoted inside another (a tool result holding a JSON file) produces.
+ * Longest first, so a value that contains another is replaced whole.
+ */
+export function withJsonEscapedSpellings(values: readonly string[]): string[] {
+	const all = new Set<string>(values);
+	for (const value of values) {
+		const once = JSON.stringify(value).slice(1, -1);
+		if (once !== value) {
+			all.add(once);
+			all.add(JSON.stringify(once).slice(1, -1));
+		}
+	}
+	return [...all].sort((a, b) => b.length - a.length);
 }
 
 /**
@@ -941,6 +1071,15 @@ function parseModelCliOutcome(
 	const combinedTail = tail([output, step.logTail ?? ''].filter((part) => part.trim()).join('\n'));
 
 	if (provider === 'claude-code') {
+		// Self-build slice AP (review): Claude Code's `stream-json` output is
+		// every turn of the run — tool RESULTS included, i.e. file bodies and
+		// command output. The `json` document it replaced held only the final
+		// envelope, and a run that died before writing one left an empty
+		// stdout, so its tail was the CLI's stderr. Keep that: for a stream,
+		// the tail is what the model SAID last plus stderr, never the raw
+		// stream (it reaches the Task chat on failure).
+		const streamTail = claudeStreamTail(output, step.logTail);
+		const outputTail = streamTail ?? combinedTail;
 		const envelope = parseClaudeEnvelope(output);
 		if (envelope) {
 			const summary = nonEmptyString(envelope.result);
@@ -957,9 +1096,10 @@ function parseModelCliOutcome(
 				// travel with the cost, so the run row and the Costs dashboard
 				// read a fleet run exactly like a cloud one.
 				...tokenFields(parseClaudeUsage(envelope.usage), dominantClaudeModel(envelope.modelUsage)),
-				...(summary ? {} : { outputTail: combinedTail })
+				...(summary ? {} : outputTail ? { outputTail } : {})
 			};
 		}
+		return { ...base, ...(outputTail ? { outputTail } : {}) };
 	} else if (provider === 'codex') {
 		const parsed = parseCodexEvents(output);
 		if (parsed) {
@@ -978,6 +1118,51 @@ function parseModelCliOutcome(
 		}
 	}
 	return { ...base, ...(combinedTail ? { outputTail: combinedTail } : {}) };
+}
+
+/**
+ * The output tail of a Claude Code `stream-json` run, or null when the
+ * output is not such a stream (the single `json` document, nothing, noise).
+ *
+ * The last assistant TEXT the model wrote (decoded, newest last) followed by
+ * the CLI's stderr, cut to {@link MODEL_CLI_OUTPUT_TAIL_BYTES}. Never a tool
+ * result and never a tool's arguments: the stream carries both, and the tail
+ * is what the reconciler quotes back into the Task chat when a run fails.
+ *
+ * A stream is recognised by at least one line that parses to an event of
+ * the stream's own vocabulary (`system` / `assistant` / `user` / `result`)
+ * that is NOT the lone `result` document `json` mode prints — so a `json`
+ * run keeps exactly the tail it always had.
+ */
+function claudeStreamTail(output: string, stderrTail: string | null | undefined): string | null {
+	const lines = output.split(/\r?\n/).filter((line) => line.trim());
+	let streamEvents = 0;
+	const said: string[] = [];
+	for (const line of lines) {
+		let event: Record<string, unknown> | null = null;
+		try {
+			const parsed = JSON.parse(line) as unknown;
+			event =
+				parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+					? (parsed as Record<string, unknown>)
+					: null;
+		} catch {
+			continue;
+		}
+		if (!event) continue;
+		if (event.type === 'system' || event.type === 'assistant' || event.type === 'user') streamEvents += 1;
+		if (event.type !== 'assistant') continue;
+		const message = event.message as Record<string, unknown> | undefined;
+		const blocks = message && Array.isArray(message.content) ? message.content : [];
+		for (const block of blocks) {
+			const record = block as Record<string, unknown> | null;
+			if (record && record.type === 'text' && typeof record.text === 'string' && record.text.trim()) {
+				said.push(record.text.trim());
+			}
+		}
+	}
+	if (streamEvents === 0) return null;
+	return tail([...said, stderrTail ?? ''].filter((part) => part.trim()).join('\n'));
 }
 
 /** Claude Code `--output-format json` prints ONE JSON document; be tolerant of leading noise. */

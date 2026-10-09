@@ -735,10 +735,13 @@ export function BillingSettings({
                                         2026-10-05 repricing). Unbounded rows carry null. */}
                                     {typeof plan.seatsIncluded === 'number' &&
                                     plan.seatsIncluded > 0 ? (
+                                        // COPY-RULES-2026-10-09: the included Members count is bold.
                                         <li data-testid={`billing-plan-seats-${plan.code}`}>
-                                            {t('plans.seatsIncluded', {
-                                                count: plan.seatsIncluded,
-                                            })}
+                                            <strong className="font-semibold text-text dark:text-text-dark">
+                                                {t('plans.seatsIncluded', {
+                                                    count: plan.seatsIncluded,
+                                                })}
+                                            </strong>
                                         </li>
                                     ) : null}
                                     <li>

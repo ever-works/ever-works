@@ -23,6 +23,12 @@ import {
 	FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
 	FLEET_MAX_PLATFORM_LENGTH,
 	FLEET_MAX_VERSION_LENGTH,
+	FLEET_NODE_MAX_CONCURRENT_JOBS,
+	FLEET_NODE_MAX_CPU_PERCENT,
+	FLEET_NODE_MAX_MEMORY_MB,
+	FLEET_NODE_MIN_CONCURRENT_JOBS,
+	FLEET_NODE_MIN_CPU_PERCENT,
+	FLEET_NODE_MIN_MEMORY_MB,
 	type FleetEnrollableNodeKind,
 	type FleetNodeSelfDescription
 } from '@ever-works/contracts';
@@ -122,17 +128,24 @@ export interface NodeResourceLimits {
 	minFreeDiskBytes?: number | null;
 }
 
-/** Concurrency bounds. The upper bound matches the server's max lease batch. */
-export const MIN_CONCURRENT_JOBS = 1;
-export const MAX_CONCURRENT_JOBS = 16;
+/**
+ * Concurrency bounds. The upper bound matches the server's max lease batch.
+ *
+ * Remote node limits (self-build slice AS): these six are now the SHARED
+ * contract bounds (`FLEET_NODE_*` in `@ever-works/contracts`), so the
+ * platform validates an owner's ceiling against exactly the range this node
+ * clamps its own flags into. Same names, same values.
+ */
+export const MIN_CONCURRENT_JOBS = FLEET_NODE_MIN_CONCURRENT_JOBS;
+export const MAX_CONCURRENT_JOBS = FLEET_NODE_MAX_CONCURRENT_JOBS;
 
 /** CPU ceiling bounds, in percent of total host CPU. */
-export const MIN_CPU_PERCENT = 5;
-export const MAX_CPU_PERCENT = 100;
+export const MIN_CPU_PERCENT = FLEET_NODE_MIN_CPU_PERCENT;
+export const MAX_CPU_PERCENT = FLEET_NODE_MAX_CPU_PERCENT;
 
 /** Memory ceiling bounds, in MB of host memory in use. */
-export const MIN_MEMORY_MB = 256;
-export const MAX_MEMORY_MB = 1_024 * 1_024;
+export const MIN_MEMORY_MB = FLEET_NODE_MIN_MEMORY_MB;
+export const MAX_MEMORY_MB = FLEET_NODE_MAX_MEMORY_MB;
 
 /**
  * Disk floor: the default is 2 GiB, which is comfortably more than a git
@@ -212,6 +225,63 @@ function clampDiskFloor(value: unknown): number | null | undefined {
 		return undefined;
 	}
 	return Math.min(Math.max(Math.round(value), MIN_MIN_FREE_DISK_BYTES), MAX_MIN_FREE_DISK_BYTES);
+}
+
+/**
+ * The owner's platform-side ceiling as the heartbeat answer carries it
+ * (remote node limits, self-build slice AS). Null = no ceiling on that
+ * dimension.
+ */
+export interface NodeLimitCeiling {
+	maxConcurrentJobs: number | null;
+	maxCpuPercent: number | null;
+	maxMemoryMb: number | null;
+}
+
+/** `min(a, b)` where null means "no ceiling" — i.e. +infinity. */
+function minCeiling(local: number | null, ceiling: number | null): number | null {
+	if (ceiling === null) return local;
+	if (local === null) return ceiling;
+	return Math.min(local, ceiling);
+}
+
+/**
+ * Remote node limits (self-build slice AS) — the limits this node actually
+ * enforces: the LOWER of its own start flags and the owner's platform-side
+ * ceiling, per dimension.
+ *
+ * The local flags stay the upper bound, so a ceiling can only ever lower
+ * what the machine does — whoever lent it keeps the last word — and a
+ * ceiling the owner lifts (all null) hands the machine straight back to its
+ * own flags. The ceiling is clamped into the node's own bounds first, the
+ * same way a flag is, so a malformed answer can never produce a limit the
+ * node would not accept from its keyboard. The disk floor is not part of it
+ * and passes through untouched.
+ */
+export function applyNodeLimitCeiling(
+	local: NodeResourceLimits,
+	ceiling: NodeLimitCeiling | null | undefined
+): NodeResourceLimits {
+	const effective: NodeResourceLimits = { ...local };
+	if (!ceiling) return effective;
+	if (ceiling.maxConcurrentJobs !== null && ceiling.maxConcurrentJobs !== undefined) {
+		const bounded = clampInt(
+			ceiling.maxConcurrentJobs,
+			MIN_CONCURRENT_JOBS,
+			MAX_CONCURRENT_JOBS,
+			MAX_CONCURRENT_JOBS
+		);
+		effective.maxConcurrentJobs = Math.min(local.maxConcurrentJobs, bounded);
+	}
+	effective.maxCpuPercent = minCeiling(
+		local.maxCpuPercent,
+		clampOptional(ceiling.maxCpuPercent, MIN_CPU_PERCENT, MAX_CPU_PERCENT)
+	);
+	effective.maxMemoryMb = minCeiling(
+		local.maxMemoryMb,
+		clampOptional(ceiling.maxMemoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)
+	);
+	return effective;
 }
 
 /**

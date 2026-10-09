@@ -51,6 +51,10 @@ longest expected job.
 `systemctl reload` is wired to `ever-works-node pause` — a drain, not a
 restart.
 
+Logs go to the journal (`StandardOutput=journal`), which journald already
+rotates and bounds (`SystemMaxUse=` in `journald.conf`), so the unit needs
+nothing of its own.
+
 ## Windows
 
 Enroll first, **as the account the node will run as**, then install from an
@@ -193,6 +197,21 @@ and `node.err.log`; the task branch reaches them through `cmd.exe`, which is
 acceptable there only because `Stop-ScheduledTask` terminates the task
 outright and delivers no console event for `cmd.exe` to swallow — that branch
 never drained.
+
+Both logs **rotate past 10 MB** (one policy, `Get-NodeLogRotationPolicy`). The
+service rotates them with NSSM's own `AppRotateFiles` / `AppRotateOnline` /
+`AppRotateBytes` — at start and online while it runs. NSSM never deletes a
+rotated file, so the service install also registers `<Name>-LogPrune`, a
+small `SYSTEM` scheduled task that runs daily at 04:30 and at boot and keeps
+the newest five rotated generations of each log (NSSM's `node-<timestamp>.log`
+names and this installer's own); `uninstall-service.ps1` removes it with the
+service. The task cannot rotate while the node runs (`cmd.exe` holds
+the file open without delete sharing, and truncating under its write offset
+would leave a hole), so it rotates when the task STARTS — at boot and on every
+restart-on-failure — as a first action that runs to completion before the
+node action, renaming a full log to `<name>.<yyyyMMddTHHmmss>` and keeping
+the newest five. Re-run the installer to add rotation to a machine
+installed before it existed.
 
 Without `-ServicePassword` the task falls back to an **S4U** logon, which is
 minted without the account's password and therefore never unlocks its DPAPI

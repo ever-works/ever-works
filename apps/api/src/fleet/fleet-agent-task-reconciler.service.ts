@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { RunDispatchGateService } from '@ever-works/agent/agents';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import {
+    AgentRepository,
+    AgentRunLogRepository,
+    AgentRunRepository,
+} from '@ever-works/agent/database';
 import type { AgentRun, FleetNode, Task } from '@ever-works/agent/entities';
 import { PluginUsageCapability } from '@ever-works/agent/entities';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
@@ -47,6 +51,7 @@ import {
     correlateAgentTaskJob,
     type FleetAgentTaskCorrelation,
 } from './fleet-agent-task.correlation';
+import { FLEET_TIMELINE_LOG_STEPS, fleetModelTimelineLogRows } from './fleet-run-evidence';
 
 /** What an `agent-task` job correlates to on the platform side (declared in the leaf). */
 export type { FleetAgentTaskCorrelation };
@@ -143,6 +148,12 @@ export class FleetAgentTaskReconcilerService {
         @Optional() private readonly pluginUsage?: PluginUsageService,
         @Optional() private readonly jobs?: FleetJobRepository,
         @Optional() private readonly costCeiling?: FleetCostCeilingService,
+        // Self-build slice AP — the run's step records land in the SAME
+        // `agent_run_logs` timeline the cloud tool loop writes, so the
+        // Sessions view renders a fleet run unchanged. Appended LAST and
+        // @Optional() per the positional-construction rule (handover §5.2):
+        // absent, a fleet run simply has no timeline, as before the slice.
+        @Optional() private readonly runLogs?: AgentRunLogRepository,
     ) {}
 
     /**
@@ -209,6 +220,14 @@ export class FleetAgentTaskReconcilerService {
             );
             return;
         }
+
+        // Self-build slice AP — the run's step records, for EVERY verdict
+        // (a cancelled run's are as interesting as anyone's). Taken before
+        // the cancelled-run guard below on purpose: that guard exists to
+        // stop side effects nobody can undo — a pull request, a chat
+        // message, an inbox notice — and appending the evidence of what the
+        // node actually did is none of those.
+        await this.recordModelTimeline(ctx.runId, event.result);
 
         // A cancelled run gets the board mirror and NOTHING else.
         //
@@ -389,7 +408,10 @@ export class FleetAgentTaskReconcilerService {
                 task,
                 event.userId,
                 agentId,
-                composeFailureMessage(reason, result, queueExpired),
+                withMisplacedQuestionNote(
+                    composeFailureMessage(reason, result, queueExpired),
+                    result,
+                ),
             );
             // Exactly ONE Inbox notice per settled job: this is the single
             // producer, and the emitting CAS fires the event once.
@@ -606,7 +628,7 @@ export class FleetAgentTaskReconcilerService {
             task,
             event.userId,
             agentId,
-            composeSuccessMessage(summary, finalizeNote, result),
+            withMisplacedQuestionNote(composeSuccessMessage(summary, finalizeNote, result), result),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
     }
@@ -845,7 +867,7 @@ export class FleetAgentTaskReconcilerService {
             task,
             event.userId,
             agentId,
-            composeQuestionMessage(question, result, mountNotes),
+            withMisplacedQuestionNote(composeQuestionMessage(question, result, mountNotes), result),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
     }
@@ -1180,6 +1202,34 @@ export class FleetAgentTaskReconcilerService {
         }
     }
 
+    /**
+     * Self-build slice AP — append the node's step records to the run's
+     * `agent_run_logs` timeline, in the shape the cloud capture writes (see
+     * `fleet-run-evidence.ts`).
+     *
+     * Best-effort like every other side effect here: evidence is a report
+     * about the run, never a verdict on it. Idempotent: a run that already
+     * has timeline rows is left alone, because nothing else writes these
+     * step names for a fleet-executed run (the cloud tool loop never runs
+     * one), so rows already there mean this completion was seen before.
+     * Rows are appended ONE AT A TIME, in order — the timeline is read back
+     * by (createdAt, insertion order), and a batch insert sharing one
+     * transaction timestamp would come back in random-uuid order on
+     * Postgres.
+     */
+    private async recordModelTimeline(runId: string, result: unknown): Promise<void> {
+        const runLogs = this.runLogs;
+        if (!runLogs) return;
+        const rows = fleetModelTimelineLogRows(result);
+        if (rows.length === 0) return;
+        await this.bestEffort('model timeline', async () => {
+            if ((await runLogs.countByRunSteps(runId, FLEET_TIMELINE_LOG_STEPS)) > 0) return;
+            for (const row of rows) {
+                await runLogs.append({ runId, ...row });
+            }
+        });
+    }
+
     private async bestEffort(what: string, fn: () => Promise<unknown>): Promise<void> {
         try {
             await fn();
@@ -1256,7 +1306,97 @@ export function parseAgentTaskResult(
         // never leak an untyped (or smuggled-field) question into the
         // parked-run path.
         question: normalizeFleetAgentTaskQuestion(redactQuestionFields(raw.question)),
+        // Self-build slice AU: question files the model wrote outside a
+        // repository root. Narrowed here like every other block — paths a
+        // node wrote are quoted back to a human, so only bounded, relative,
+        // printable strings survive.
+        misplacedQuestionFiles: normalizeMisplacedQuestionFiles(raw.misplacedQuestionFiles),
     };
+}
+
+/** Most misplaced question paths the reconciler will quote (slice AU). */
+const MAX_MISPLACED_QUESTION_FILES = 5;
+
+/**
+ * Longest misplaced question path the reconciler will inspect at all — a
+ * deep but real relative path, never a payload (slice AU, review). Anything
+ * longer is dropped; anything up to it is validated IN FULL and only then
+ * abbreviated for display by {@link abbreviateMisplacedQuestionPath}.
+ */
+const MAX_MISPLACED_QUESTION_PATH_CHARS = 4096;
+
+/**
+ * Self-build slice AU (review) — a validated path shortened to at most
+ * {@link MAX_QUOTED_CHARS} UTF-16 units for the Task chat. The END is kept:
+ * the file and the directories nearest it are what the owner needs to find
+ * it. Whole code points only, so a surrogate pair is never split.
+ */
+function abbreviateMisplacedQuestionPath(path: string): string {
+    if (path.length <= MAX_QUOTED_CHARS) return path;
+    // `let`: a mutable accumulator (team convention, review).
+    let kept: string[] = [];
+    let units = 1; // the leading ellipsis
+    for (const codePoint of Array.from(path).reverse()) {
+        if (units + codePoint.length > MAX_QUOTED_CHARS) break;
+        kept.unshift(codePoint);
+        units += codePoint.length;
+    }
+    return `…${kept.join('')}`;
+}
+
+/**
+ * Self-build slice AU — the node's list of misplaced question files, or
+ * `undefined` when it sent none. Each entry must be a relative path of
+ * printable (Unicode) characters (no drive, no leading slash, no `..`
+ * segment, no backtick) of at most {@link MAX_MISPLACED_QUESTION_PATH_CHARS};
+ * anything else is dropped. A valid path longer than
+ * {@link MAX_QUOTED_CHARS} is kept and abbreviated rather than dropped, so a
+ * deeply nested question file still warns the owner (review).
+ */
+function normalizeMisplacedQuestionFiles(raw: unknown): string[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const paths = raw
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(
+            (entry) =>
+                entry.length > 0 &&
+                entry.length <= MAX_MISPLACED_QUESTION_PATH_CHARS &&
+                // Printable Unicode is a real path (`资源/.ever-works/QUESTION.md`)
+                // and must still be reported (review). Refused: every `\p{C}`
+                // code point — controls, newlines, bidi overrides and other
+                // format characters that could disguise a path in the chat —
+                // and the backtick, which would close the code span the note
+                // quotes the path in.
+                !/\p{C}/u.test(entry) &&
+                !entry.includes('`') &&
+                !entry.startsWith('/') &&
+                !entry.startsWith('\\') &&
+                !/^[A-Za-z]:/.test(entry) &&
+                !entry.split(/[\\/]/).includes('..'),
+        )
+        .slice(0, MAX_MISPLACED_QUESTION_FILES)
+        .map(abbreviateMisplacedQuestionPath);
+    return paths.length > 0 ? paths : undefined;
+}
+
+/**
+ * Self-build slice AU — the line the Task chat gets when the model wrote a
+ * question file from a subdirectory: the node removed it unread, so this is
+ * the only way the owner learns the agent wanted to ask something.
+ */
+function withMisplacedQuestionNote(message: string, result: FleetAgentTaskResult | null): string {
+    const files = result?.misplacedQuestionFiles;
+    if (!files || files.length === 0) return message;
+    return [
+        message,
+        '',
+        `Note: the agent wrote a question file outside the repository root (${files
+            .map((file) => `\`${file}\``)
+            .join(
+                ', ',
+            )}). Only \`.ever-works/QUESTION.md\` at a repository root is read as a question, so it was not asked — the node removed it. If the agent needed a decision, re-run the Task or answer in its chat.`,
+    ].join('\n');
 }
 
 /**

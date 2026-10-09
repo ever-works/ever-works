@@ -1,5 +1,9 @@
 import 'server-only';
-import type { FleetEnrollableNodeKind, FleetNodeView } from '@ever-works/contracts';
+import type {
+    FleetEnrollableNodeKind,
+    FleetNodeLimitCeiling,
+    FleetNodeView,
+} from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -240,6 +244,25 @@ export const fleetAPI = {
      */
     getCostCeiling: async () => {
         return serverFetch<FleetCostCeilingView>(`${BASE}/cost-ceiling`);
+    },
+
+    /**
+     * Remote node limits (self-build slice AS) — the owner's platform-side
+     * ceiling on one node's resource limits. Every field is sent (null
+     * clears that dimension); the node clamps itself to it on its next
+     * heartbeat.
+     */
+    setNodeLimitCeiling: async (nodeId: string, ceiling: FleetNodeLimitCeiling) => {
+        return serverMutation<FleetNodeView>({
+            endpoint: `${BASE}/nodes/${nodeId}/limits`,
+            data: {
+                maxConcurrentJobs: ceiling.maxConcurrentJobs,
+                maxCpuPercent: ceiling.maxCpuPercent,
+                maxMemoryMb: ceiling.maxMemoryMb,
+            },
+            method: 'PUT',
+            wrapInData: false,
+        });
     },
 
     /** `null` clears the owner's ceiling back to the deployment default. */
