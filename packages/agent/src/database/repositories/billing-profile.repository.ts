@@ -121,7 +121,7 @@ export class BillingProfileRepository {
      * which, during a trial, IS the trial — ends between `from` and `to` (inclusive). Drives the 7-day
      * trial-ending reminder pass of the daily credits sweep. Bounded by `take`.
      */
-    findTrialsEndingBetween(from: Date, to: Date, take = 500): Promise<BillingProfile[]> {
+    findTrialsEndingBetween(from: Date, to: Date, take = 500, skip = 0): Promise<BillingProfile[]> {
         return this.repository.find({
             where: {
                 subscriptionStatus: 'trialing',
@@ -130,6 +130,7 @@ export class BillingProfileRepository {
             },
             order: { currentPeriodEnd: 'ASC', id: 'ASC' },
             take,
+            skip,
         });
     }
 

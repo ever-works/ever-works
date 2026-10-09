@@ -1,4 +1,5 @@
 import { SubscriptionStatus } from '@src/entities/user-subscription.entity';
+import { NotificationService } from '@src/notifications/notification.service';
 import type { BillingWebhookEvent } from './billing.provider';
 import { BillingService } from './billing.service';
 import {
@@ -303,6 +304,24 @@ describe('TrialReminderService', () => {
         );
     });
 
+    it('NotificationService: a dismissed reminder does not re-arm (once per subscription and lead, ever)', async () => {
+        const repository = {
+            findByDeduplicationKey: jest.fn().mockResolvedValue({ id: 'n1', isDismissed: true }),
+            create: jest.fn(),
+        };
+        const notifications = new NotificationService(repository as any);
+        await expect(
+            notifications.notifyTrialEnding({
+                userId: 'u1',
+                subscriptionId: 'sub_1',
+                lead: '7d',
+                planName: 'Pro plan',
+                trialEnd,
+            }),
+        ).resolves.toBe(false);
+        expect(repository.create).not.toHaveBeenCalled();
+    });
+
     it('sends no second email when the reminder row already exists (webhook re-delivery)', async () => {
         const { service, eventEmitter } = harness({ created: false });
         await expect(
@@ -331,7 +350,7 @@ describe('TrialReminderService', () => {
         expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
-    it('sweeps the 24 h window starting 6 days out and reminds each trial with lead 7d', async () => {
+    it('sweeps trials ending 3-7 days out (so a failed reminder is retried) and reminds each with lead 7d', async () => {
         const now = new Date('2026-12-23T00:05:00Z');
         const { service, billingProfileRepository, eventEmitter } = harness({
             profiles: [
@@ -345,8 +364,10 @@ describe('TrialReminderService', () => {
         });
         const summary = await service.sweepSevenDayReminders(now);
         expect(billingProfileRepository.findTrialsEndingBetween).toHaveBeenCalledWith(
-            new Date(now.getTime() + 6 * DAY),
+            new Date(now.getTime() + 3 * DAY),
             new Date(now.getTime() + 7 * DAY),
+            500,
+            0,
         );
         expect(summary).toEqual({ scanned: 1, reminded: 1, alreadyReminded: 0, failed: 0 });
         expect(eventEmitter.emit).toHaveBeenCalledWith(
@@ -529,12 +550,10 @@ describe('Out-of-order Stripe events cannot hold back the paid allowance', () =>
                 }),
             },
             {
-                findByUserId: jest
-                    .fn()
-                    .mockResolvedValue({
-                        subscriptionStatus: 'trialing',
-                        providerSubscriptionId: 'sub_1',
-                    }),
+                findByUserId: jest.fn().mockResolvedValue({
+                    subscriptionStatus: 'trialing',
+                    providerSubscriptionId: 'sub_1',
+                }),
             },
         ) as PlanCreditGrantService;
         await expect(

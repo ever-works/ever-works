@@ -484,6 +484,12 @@ export class NotificationService {
         trialEnd: Date;
     }): Promise<boolean> {
         const dateLabel = args.trialEnd.toISOString().slice(0, 10);
+        const deduplicationKey = `trial_ending_${args.subscriptionId}_${args.lead}`;
+        // Once per (subscription, lead) EVER — unlike the generic dedup, a dismissed reminder does
+        // not re-arm: the 7-day pass looks at the same trial on several consecutive days.
+        if (await this.repository.findByDeduplicationKey(args.userId, deduplicationKey)) {
+            return false;
+        }
         const inApp = await this.writeInApp({
             userId: args.userId,
             type: NotificationType.WARNING,
@@ -495,7 +501,7 @@ export class NotificationService {
             actionUrl: '/settings/billing',
             actionLabel: 'Manage billing',
             metadata: { subscriptionId: args.subscriptionId, lead: args.lead, trialEnd: dateLabel },
-            deduplicationKey: `trial_ending_${args.subscriptionId}_${args.lead}`,
+            deduplicationKey,
         });
         return inApp.created;
     }

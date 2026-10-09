@@ -25,6 +25,9 @@ export interface BillingTrialEndingEvent {
 
 /** How far ahead the sweep's reminder goes out. The provider sends its own at ~3 days. */
 export const TRIAL_REMINDER_LEAD_DAYS = 7;
+/** The sweep keeps retrying until this close to the end; the provider's notice takes over below. */
+const TRIAL_REMINDER_FLOOR_DAYS = 3;
+const SWEEP_PAGE = 500;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -44,7 +47,7 @@ export interface TrialReminderSweepSummary {
  *    normalized to `subscription.trial_will_end` and routed here by `BillingService`.
  *  - **7 days before** — a pass of the existing daily credits sweep (`credits-daily-grant` cron),
  *    over billing profiles whose subscription is `trialing`, not set to cancel, and whose current
- *    period (= the trial) ends in the 24 hours starting 6 days from now.
+ *    period (= the trial) ends 3 to 7 days from now (retried daily until sent).
  *
  * Exactly once per `(subscription, lead)`: the in-app notification's deduplication key is the
  * guard, and the email event is emitted only when THIS call created that row. A trial already set
@@ -119,9 +122,23 @@ export class TrialReminderService {
             alreadyReminded: 0,
             failed: 0,
         };
-        const from = new Date(now.getTime() + (TRIAL_REMINDER_LEAD_DAYS - 1) * DAY_MS);
+        // Every trial ending 3-7 days out, not just the 24 h at day 7: a reminder that failed (or a
+        // sweep that did not run) is retried on the next pass, and the once-per-(subscription,
+        // lead) dedup skips the ones already sent. Below 3 days the provider's own notice covers it.
+        const from = new Date(now.getTime() + TRIAL_REMINDER_FLOOR_DAYS * DAY_MS);
         const to = new Date(now.getTime() + TRIAL_REMINDER_LEAD_DAYS * DAY_MS);
-        const profiles = await this.billingProfileRepository.findTrialsEndingBetween(from, to);
+        const profiles: Awaited<ReturnType<BillingProfileRepository['findTrialsEndingBetween']>> =
+            [];
+        for (let skip = 0; ; skip += SWEEP_PAGE) {
+            const page = await this.billingProfileRepository.findTrialsEndingBetween(
+                from,
+                to,
+                SWEEP_PAGE,
+                skip,
+            );
+            profiles.push(...page);
+            if (page.length < SWEEP_PAGE) break;
+        }
         for (const profile of profiles) {
             summary.scanned++;
             if (!profile.providerSubscriptionId || !profile.currentPeriodEnd) continue;
