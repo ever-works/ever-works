@@ -300,10 +300,11 @@ spec:
             - name: EVER_WORKS_APP_WORKS_ENABLED
               value: "false"
             # Anonymous usage statistics (one signed, counts-only report a day to the
-            # Ever Platform statistics endpoint). Self-hosted installations default to
-            # on; Ever Works' own deployments keep it OFF until that endpoint is ready
-            # for them. 'false' means the module is not loaded at all: no route, no
-            # timer, no request. Pinned by
+            # Ever Platform statistics endpoint). Off by default for every installation
+            # (on only with 'true'); Ever Works' own deployments still say 'false'
+            # explicitly, so flipping that default back on never switches them on.
+            # 'false' means the module is not loaded at all: no route, no timer, no
+            # request. Pinned by
             # apps/api/src/instance-stats/__tests__/deploy-switch.spec.ts.
             - name: EVER_STATS_ENABLED
               value: "false"

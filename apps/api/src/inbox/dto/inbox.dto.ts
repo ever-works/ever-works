@@ -17,10 +17,12 @@ import {
     INBOX_DECISION_KINDS,
     INBOX_DECISION_MAX_LIMIT,
     INBOX_DECISION_PAGE_SIZE,
+    INBOX_ITEM_SOURCE_TYPES,
     INBOX_ITEM_STATUSES,
     INBOX_MAX_OPTION_ID_CHARS,
     INBOX_MAX_REPLY_CHARS,
     type InboxItemKind,
+    type InboxItemSourceType,
     type InboxItemStatus,
 } from '@ever-works/contracts';
 
@@ -58,6 +60,22 @@ export class ListInboxQueryDto {
     @IsOptional()
     @IsUUID()
     taskId?: string;
+
+    /**
+     * Only items from this producer — the Inbox's "From your fleet" filter
+     * passes `fleet-run` (self-build slice AU). Validated against the
+     * closed source vocabulary: an unknown value is a 400, never a silent
+     * "everything".
+     */
+    @ApiProperty({
+        required: false,
+        enum: [...INBOX_ITEM_SOURCE_TYPES],
+        description:
+            'Only items from this source, e.g. `fleet-run` for questions asked by fleet runs.',
+    })
+    @IsOptional()
+    @IsIn(INBOX_ITEM_SOURCE_TYPES as readonly string[])
+    sourceType?: InboxItemSourceType;
 
     @ApiProperty({
         required: false,

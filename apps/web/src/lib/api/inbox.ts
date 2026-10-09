@@ -47,6 +47,7 @@ import type {
     InboxDecisionCounts,
     InboxDecisionFilters,
     InboxItem,
+    InboxItemSourceType,
     InboxItemStatus,
     InboxReplyOutcome,
 } from './inbox.shared';
@@ -64,6 +65,11 @@ export interface ListInboxInput {
     offset?: number;
     /** Only this Task's messages (owner-scoped server-side, like everything here). */
     taskId?: string;
+    /**
+     * Only messages from this producer — `fleet-run` is the Inbox's
+     * "From your fleet" filter (self-build slice AU).
+     */
+    sourceType?: InboxItemSourceType;
 }
 
 export interface ReplyInboxInput {
@@ -126,6 +132,7 @@ function buildListEndpoint(input?: ListInboxInput): string {
     if (input?.limit) params.set('limit', String(input.limit));
     if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
     if (input?.taskId) params.set('taskId', input.taskId);
+    if (input?.sourceType) params.set('sourceType', input.sourceType);
     const qs = params.toString();
     return qs ? `/inbox?${qs}` : '/inbox';
 }

@@ -18,6 +18,7 @@ import {
 	enrollNodeWithCredentials,
 	loadConfig,
 	saveConfig,
+	statModelCliFile,
 	systemFetch,
 	type LogEntry,
 	type NodeConfig,
@@ -103,7 +104,10 @@ function bootstrap(): void {
 		// Backs the free-disk figure in the Fleet runner indicator.
 		// Optional by contract — an unreadable volume reports nothing
 		// rather than failing the heartbeat that carries everything else.
-		diskProbe: createDiskProbe()
+		diskProbe: createDiskProbe(),
+		// Node lifecycle (slice AR): the cache key of the model-CLI
+		// compatibility probe, so an upgraded CLI is re-probed at once.
+		statFile: statModelCliFile
 	};
 
 	const fs = createConfigFileSystem();

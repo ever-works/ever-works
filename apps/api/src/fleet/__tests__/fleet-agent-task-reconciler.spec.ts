@@ -100,6 +100,8 @@ describe('FleetAgentTaskReconcilerService', () => {
     let pluginUsage: { record: jest.Mock } | undefined;
     let jobsRepo: { stampCostCents: jest.Mock } | undefined;
     let costCeiling: { evaluateAfterCompletion: jest.Mock } | undefined;
+    // Self-build slice AP — the run-evidence timeline writer, the 13th slot.
+    let runLogs: { countByRunSteps: jest.Mock; append: jest.Mock } | undefined;
 
     const build = () =>
         new FleetAgentTaskReconcilerService(
@@ -115,6 +117,7 @@ describe('FleetAgentTaskReconcilerService', () => {
             pluginUsage as never,
             jobsRepo as never,
             costCeiling as never,
+            runLogs as never,
         );
 
     beforeEach(() => {
@@ -190,6 +193,153 @@ describe('FleetAgentTaskReconcilerService', () => {
                 .fn()
                 .mockResolvedValue({ drainedNodeIds: [], noticesFiled: 0 }),
         };
+        runLogs = {
+            countByRunSteps: jest.fn().mockResolvedValue(0),
+            append: jest.fn().mockResolvedValue({}),
+        };
+    });
+
+    describe('run evidence (self-build slice AP)', () => {
+        const withTimeline: FleetAgentTaskResult = {
+            ...successResult,
+            model: {
+                ...successResult.model!,
+                timeline: [
+                    { kind: 'assistant-message', atMs: 100, text: 'Reading the failing test.' },
+                    {
+                        kind: 'tool-call',
+                        atMs: 200,
+                        toolName: 'Bash',
+                        callId: 'toolu_1',
+                        argsSummary: `command=curl -H "Authorization: Bearer ${'k'.repeat(30)}"`,
+                        status: 'error',
+                        durationMs: 1500,
+                    },
+                    {
+                        kind: 'tool-call',
+                        atMs: 1800,
+                        toolName: 'Edit',
+                        argsSummary: 'file_path=./src/a.ts +old_string,new_string',
+                        status: 'ok',
+                        durationMs: 20,
+                    },
+                    // Malformed on the wire: counted, never persisted.
+                    { kind: 'thinking' } as never,
+                ],
+                timelineDropped: 4,
+                transcript: '{"type":"result"}',
+            },
+        };
+
+        const completed = (
+            result: FleetAgentTaskResult,
+            source: 'node-report' | 'cancelled' = 'node-report',
+            over: Partial<FleetJobView> = {},
+        ) =>
+            build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job(over),
+                    USER,
+                    source,
+                    NODE,
+                    result as unknown as Record<string, unknown>,
+                ),
+            );
+
+        it('writes the step records into the run timeline in the shape the Sessions view reads, in order', async () => {
+            await completed(withTimeline);
+
+            expect(runLogs!.countByRunSteps).toHaveBeenCalledWith(RUN, [
+                'assistant-message',
+                'tool-invocation',
+                'capture-truncated',
+            ]);
+            const rows = runLogs!.append.mock.calls.map(([row]) => row);
+            expect(rows).toEqual([
+                {
+                    runId: RUN,
+                    level: 'INFO',
+                    step: 'assistant-message',
+                    message: 'Reading the failing test.',
+                    metadata: { role: 'assistant', source: 'fleet-node', atMs: 100 },
+                },
+                {
+                    runId: RUN,
+                    level: 'WARN',
+                    step: 'tool-invocation',
+                    message: 'Invoked tool "Bash" (returned error).',
+                    metadata: {
+                        toolName: 'Bash',
+                        callId: 'toolu_1',
+                        durationMs: 1500,
+                        // The platform's own scanner runs again: a node is
+                        // not trusted to have redacted.
+                        argsPreview: expect.stringContaining('[redacted secret]'),
+                        status: 'error',
+                        source: 'fleet-node',
+                        atMs: 200,
+                    },
+                },
+                {
+                    runId: RUN,
+                    level: 'INFO',
+                    step: 'tool-invocation',
+                    message: 'Invoked tool "Edit".',
+                    metadata: {
+                        toolName: 'Edit',
+                        durationMs: 20,
+                        argsPreview: 'file_path=./src/a.ts +old_string,new_string',
+                        status: 'ok',
+                        source: 'fleet-node',
+                        atMs: 1800,
+                    },
+                },
+                {
+                    runId: RUN,
+                    level: 'INFO',
+                    step: 'capture-truncated',
+                    // four the node dropped + one this side could not read
+                    message: expect.stringContaining('5 further step(s)'),
+                    metadata: { source: 'fleet-node', dropped: 5 },
+                },
+            ]);
+            expect(JSON.stringify(rows)).not.toContain('k'.repeat(30));
+            // The verdict path is untouched by the evidence.
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
+
+        it('records the evidence of a CANCELLED run too — and still none of its side effects', async () => {
+            await completed(withTimeline, 'cancelled');
+            expect(runLogs!.append).toHaveBeenCalledTimes(4);
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskChat.post).not.toHaveBeenCalled();
+        });
+
+        it('is idempotent: a run that already has a timeline gets no second copy', async () => {
+            runLogs!.countByRunSteps.mockResolvedValue(4);
+            await completed(withTimeline);
+            expect(runLogs!.append).not.toHaveBeenCalled();
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
+
+        it('writes nothing for a node that reported no step records (an older node)', async () => {
+            await completed(successResult);
+            expect(runLogs!.countByRunSteps).not.toHaveBeenCalled();
+            expect(runLogs!.append).not.toHaveBeenCalled();
+        });
+
+        it('never lets a failing timeline write cost the run its verdict', async () => {
+            runLogs!.append.mockRejectedValue(new Error('db down'));
+            await completed(withTimeline);
+            expect(runs.markCompleted).toHaveBeenCalled();
+            expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalled();
+        });
+
+        it('is a no-op when the timeline writer is not bound (positional construction without slot 13)', async () => {
+            runLogs = undefined;
+            await completed(withTimeline);
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
     });
 
     describe('fleet cost accounting (EW-777)', () => {
@@ -1664,6 +1814,29 @@ describe('FleetAgentTaskReconcilerService', () => {
             await report(withSession(SESSION) as unknown as Record<string, unknown>);
             expect(runs.markCompleted).toHaveBeenCalled();
         });
+
+        // Same slice, the slice-Q follow-up: a question file the model wrote
+        // from a subdirectory was removed unread and the owner never knew.
+        it('tells the owner, in the Task chat, about a question file the model wrote from a subdirectory', async () => {
+            await report({
+                ...successResult,
+                misplacedQuestionFiles: ['apps/api/.ever-works/QUESTION.md'],
+            });
+            const body = String(taskChat.post.mock.calls[0][1].body);
+            expect(body).toContain('outside the repository root');
+            expect(body).toContain('`apps/api/.ever-works/QUESTION.md`');
+            // A warning, never a failure and never a parked run.
+            expect(runs.markCompleted).toHaveBeenCalled();
+            expect(runs.markFailed).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+
+        it('says nothing extra when the node found no misplaced file', async () => {
+            await report(successResult as unknown as Record<string, unknown>);
+            expect(String(taskChat.post.mock.calls[0][1].body)).not.toContain(
+                'outside the repository root',
+            );
+        });
     });
 
     describe('owner question (self-build slice Q)', () => {
@@ -2163,6 +2336,98 @@ describe('FleetAgentTaskReconcilerService', () => {
                 error.mockRestore();
             }
         });
+    });
+});
+
+describe('parseAgentTaskResult — misplaced question files (self-build slice AU)', () => {
+    it('keeps bounded relative paths and drops anything a human should not be shown', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                'apps/api/.ever-works/QUESTION.md',
+                '.mounts/template/src/.ever-works/QUESTION.md',
+                '/etc/passwd',
+                'C:\\Users\\owner\\secret.md',
+                '../outside/.ever-works/QUESTION.md',
+                'line\nbreak',
+                42,
+                // Past any real path length: a payload, not a path.
+                'x'.repeat(5000),
+            ],
+        });
+        expect(parsed?.misplacedQuestionFiles).toEqual([
+            'apps/api/.ever-works/QUESTION.md',
+            '.mounts/template/src/.ever-works/QUESTION.md',
+        ]);
+    });
+
+    it('keeps a deeply nested question path, validated in full and shortened from the front (review)', () => {
+        const deep = `${'packages/very-long-directory-name/'.repeat(6)}src/.ever-works/QUESTION.md`;
+        expect(deep.length).toBeGreaterThan(120);
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                deep,
+                // Long AND unsafe: the full path is what gets validated, so the
+                // `..` early in it still drops it even though display keeps the end.
+                `../${'a/'.repeat(80)}.ever-works/QUESTION.md`,
+            ],
+        });
+        const files = parsed?.misplacedQuestionFiles ?? [];
+        expect(files).toHaveLength(1);
+        expect(files[0].length).toBeLessThanOrEqual(120);
+        expect(files[0].startsWith('…')).toBe(true);
+        expect(deep.endsWith(files[0].slice(1))).toBe(true);
+        expect(files[0].endsWith('src/.ever-works/QUESTION.md')).toBe(true);
+    });
+
+    it('never splits a surrogate pair when it shortens a path (review)', () => {
+        const deep = `${'目录/'.repeat(30)}${'😀'.repeat(60)}/.ever-works/QUESTION.md`;
+        const files = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            misplacedQuestionFiles: [deep],
+        })?.misplacedQuestionFiles;
+        expect(files).toHaveLength(1);
+        expect(files?.[0].length).toBeLessThanOrEqual(120);
+        expect(files?.[0]).not.toMatch(
+            /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+        );
+    });
+
+    it('keeps a printable Unicode path, and drops bidi/format tricks and code-span breakouts (review)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            misplacedQuestionFiles: [
+                '资源/.ever-works/QUESTION.md',
+                'docs/café/.ever-works/QUESTION.md',
+                // U+202E RIGHT-TO-LEFT OVERRIDE disguises the path when shown.
+                'apps/‮txt.md/.ever-works/QUESTION.md',
+                // U+200B ZERO WIDTH SPACE — invisible.
+                'apps/a​b/.ever-works/QUESTION.md',
+                'tab\there/.ever-works/QUESTION.md',
+                'apps/`[link](https://evil.example)`/.ever-works/QUESTION.md',
+            ],
+        });
+        expect(parsed?.misplacedQuestionFiles).toEqual([
+            '资源/.ever-works/QUESTION.md',
+            'docs/café/.ever-works/QUESTION.md',
+        ]);
+    });
+
+    it('caps the list and reads nothing from a malformed field', () => {
+        const many = Array.from({ length: 9 }, (_, i) => `pkg${i}/.ever-works/QUESTION.md`);
+        expect(
+            parseAgentTaskResult({ status: 'failed', taskId: TASK, misplacedQuestionFiles: many })
+                ?.misplacedQuestionFiles,
+        ).toHaveLength(5);
+        expect(
+            parseAgentTaskResult({ status: 'failed', taskId: TASK, misplacedQuestionFiles: 'x' })
+                ?.misplacedQuestionFiles,
+        ).toBeUndefined();
     });
 });
 

@@ -10,6 +10,10 @@ import type { AgentRunSession } from '@/lib/api/agents.shared';
  * "did this ever work?" answerable without leaving the Task page.
  */
 
+vi.mock('next-intl', () => ({
+    useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
+}));
+
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, ...props }: { children: React.ReactNode }) => <a {...props}>{children}</a>,
 }));
@@ -209,5 +213,43 @@ describe('formatDuration', () => {
     it('returns null for absent or negative durations', () => {
         expect(formatDuration(null)).toBeNull();
         expect(formatDuration(-1)).toBeNull();
+    });
+});
+
+describe('TaskRunsHistory — parked runs (self-build slice AU)', () => {
+    it('chips a finished run that is parked on the owner, so it does not read as done', () => {
+        render(
+            <TaskRunsHistory
+                runs={[
+                    run({
+                        id: 'parked',
+                        awaitingInput: true,
+                        runnerKind: 'fleet-node:claude-code',
+                    }),
+                    run({ id: 'done' }),
+                ]}
+            />,
+        );
+        const chips = screen.getAllByTestId('task-run-history-parked');
+        expect(chips).toHaveLength(1);
+        // Localized through the run controls' own keys (review).
+        expect(chips[0].textContent).toBe('dashboard.tasksPage.detail.runControls.awaitingInput');
+        expect(chips[0].getAttribute('title')).toBe(
+            'dashboard.tasksPage.detail.runControls.parkedHintQuestion',
+        );
+    });
+
+    it('explains a parked CLOUD run with the generic parked hint', () => {
+        render(
+            <TaskRunsHistory runs={[run({ awaitingInput: true, runnerKind: 'claude-code' })]} />,
+        );
+        expect(screen.getByTestId('task-run-history-parked').getAttribute('title')).toBe(
+            'dashboard.tasksPage.detail.runControls.parkedHint',
+        );
+    });
+
+    it('leaves a live run awaiting input to the run controls', () => {
+        render(<TaskRunsHistory runs={[run({ status: 'running', awaitingInput: true })]} />);
+        expect(screen.queryByTestId('task-run-history-parked')).toBeNull();
     });
 });

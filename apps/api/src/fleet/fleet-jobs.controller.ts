@@ -132,9 +132,18 @@ export class FleetJobsController {
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 240, ttl: 60_000 } })
     async lease(@Body() body: LeaseFleetJobsDto): Promise<FleetJobLeaseResponse> {
+        // Node lifecycle (self-build slice AR): the service tells us when
+        // it refused this poll for the daemon version floor. It still
+        // answers `[]` — exactly like the global stop flag — so the refusal
+        // is a 200 the node can read, never a 401 it would take for a
+        // revoked credential.
+        let upgradeRequired: { minNodeVersion: string } | null = null;
         const jobs = await this.service.lease({
             nodeId: body.nodeId,
             secret: body.secret,
+            onUpgradeRequired: ({ minNodeVersion }) => {
+                upgradeRequired = { minNodeVersion };
+            },
             ...(body.max !== undefined ? { max: body.max } : {}),
             ...(body.leaseTtlSec !== undefined ? { leaseTtlSec: body.leaseTtlSec } : {}),
             ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
@@ -144,6 +153,12 @@ export class FleetJobsController {
         if (jobs === null) {
             // One undifferentiated message — never say WHICH check failed.
             throw new UnauthorizedException('Invalid node credential');
+        }
+        // Added ONLY on a floor refusal, so every other answer — an empty
+        // poll and a stopped fleet included — keeps its exact pinned shape.
+        const refused = upgradeRequired as { minNodeVersion: string } | null;
+        if (refused) {
+            return { jobs, upgradeRequired: true, minNodeVersion: refused.minNodeVersion };
         }
         return { jobs };
     }

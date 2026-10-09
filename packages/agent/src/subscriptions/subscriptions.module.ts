@@ -17,6 +17,7 @@ import { PlanSubscriptionService } from './billing/plan-subscription.service';
 import { PaymentMethodService } from './billing/payment-method.service';
 import { PaygService } from './billing/payg.service';
 import { SeatsService } from './billing/seats.service';
+import { TrialReminderService } from './billing/trial-reminder.service';
 import { CreditLedgerService } from './credits/credit-ledger.service';
 import { PlanCreditGrantService } from './credits/plan-credit-grant.service';
 import { CreditsSweepService } from './credits/credits-sweep.service';
@@ -91,6 +92,9 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // Seats — employees OR agents (billing spec §3.6): allowance, usage,
         // the admission check, and buying/releasing extras.
         SeatsService,
+        // Trial-ending reminders (2026-10 repricing): the provider's ~3-day notice and the
+        // daily sweep's 7-day pass, once per subscription, in-app + email.
+        TrialReminderService,
         // Both provider implementations are instantiable; the factory
         // below picks one PER DEPLOYMENT from configuration. Keeping
         // ManualBillingProvider as a real provider means the fallback is
@@ -125,6 +129,7 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         PaymentMethodService,
         PaygService,
         SeatsService,
+        TrialReminderService,
         BillingProvider,
         UsageModule,
     ],

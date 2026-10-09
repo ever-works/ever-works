@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+    ArrayMaxSize,
     IsArray,
     IsBoolean,
     IsIn,
@@ -20,12 +21,20 @@ import {
     FLEET_EXECUTION_MODES,
     FLEET_EXECUTION_SCOPE_TYPES,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_CLI_VERSIONS,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
     FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
+    FLEET_MAX_REPORTED_LIMIT_VALUE,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_NODE_MAX_CONCURRENT_JOBS,
+    FLEET_NODE_MAX_CPU_PERCENT,
+    FLEET_NODE_MAX_MEMORY_MB,
+    FLEET_NODE_MIN_CONCURRENT_JOBS,
+    FLEET_NODE_MIN_CPU_PERCENT,
+    FLEET_NODE_MIN_MEMORY_MB,
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
@@ -185,6 +194,59 @@ export class SetFleetCostCeilingDto {
 }
 
 /**
+ * Request body for `PUT /api/fleet/nodes/:id/limits` — the owner's
+ * platform-side ceiling on one node's resource limits (remote node limits,
+ * self-build slice AS).
+ *
+ * Every field is REQUIRED and nullable — `null` clears that dimension —
+ * so a PUT always states the whole ceiling and a retried request cannot
+ * half-apply. Bounds are the node's own (`FLEET_NODE_*`), and an
+ * out-of-range value is refused rather than clamped: a ceiling the node
+ * would silently rewrite is a setting that does not do what the owner
+ * typed. Re-validated in `FleetService`, the source of truth.
+ */
+export class SetFleetNodeLimitCeilingDto {
+    @ApiProperty({
+        nullable: true,
+        minimum: FLEET_NODE_MIN_CONCURRENT_JOBS,
+        maximum: FLEET_NODE_MAX_CONCURRENT_JOBS,
+        description:
+            'Most jobs this node may run at once; null = no ceiling (the node runs on its own --concurrency).',
+    })
+    @ValidateIf((dto: SetFleetNodeLimitCeilingDto) => dto.maxConcurrentJobs !== null)
+    @IsInt()
+    @Min(FLEET_NODE_MIN_CONCURRENT_JOBS)
+    @Max(FLEET_NODE_MAX_CONCURRENT_JOBS)
+    maxConcurrentJobs: number | null;
+
+    @ApiProperty({
+        nullable: true,
+        minimum: FLEET_NODE_MIN_CPU_PERCENT,
+        maximum: FLEET_NODE_MAX_CPU_PERCENT,
+        description:
+            'Host CPU percentage at or above which the node stops leasing; null = no ceiling from the platform.',
+    })
+    @ValidateIf((dto: SetFleetNodeLimitCeilingDto) => dto.maxCpuPercent !== null)
+    @IsInt()
+    @Min(FLEET_NODE_MIN_CPU_PERCENT)
+    @Max(FLEET_NODE_MAX_CPU_PERCENT)
+    maxCpuPercent: number | null;
+
+    @ApiProperty({
+        nullable: true,
+        minimum: FLEET_NODE_MIN_MEMORY_MB,
+        maximum: FLEET_NODE_MAX_MEMORY_MB,
+        description:
+            'Host memory in use, in MB, at or above which the node stops leasing; null = no ceiling from the platform.',
+    })
+    @ValidateIf((dto: SetFleetNodeLimitCeilingDto) => dto.maxMemoryMb !== null)
+    @IsInt()
+    @Min(FLEET_NODE_MIN_MEMORY_MB)
+    @Max(FLEET_NODE_MAX_MEMORY_MB)
+    maxMemoryMb: number | null;
+}
+
+/**
  * Request body for `POST /api/fleet/nodes/:id/drain`.
  *
  * Explicit boolean rather than two verbs: draining and undraining are
@@ -250,6 +312,31 @@ export class FleetNodeSelfDescriptionDto {
     @IsString()
     @MaxLength(FLEET_MAX_CLI_VERSION_LENGTH)
     cliVersion?: string;
+
+    /**
+     * Node lifecycle (self-build slice AR) — the PINNED model-CLI versions,
+     * one `"<provider> <version>"` entry per provider.
+     *
+     * Bounded by count and per-entry length, and NEVER by an allow-list of
+     * providers: under `whitelist + forbidNonWhitelisted` a value this build
+     * refuses fails the whole beat, and a node that cannot beat is swept
+     * offline. A newer node pinning a provider this API has never heard of
+     * must still stay alive. `FleetService` sanitizes and re-caps every
+     * entry before it is stored.
+     */
+    @ApiProperty({
+        required: false,
+        type: [String],
+        maxItems: FLEET_MAX_CLI_VERSIONS,
+        description:
+            'Version of every model CLI the node has pinned, one "<provider> <version>" entry each (e.g. "claude-code 2.1.3"). An empty list means nothing is pinned any more.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(FLEET_MAX_CLI_VERSIONS)
+    @IsString({ each: true })
+    @MaxLength(FLEET_MAX_CLI_VERSION_LENGTH, { each: true })
+    cliVersions?: string[];
 
     /** Free bytes on the node's workspace volume. Same optional contract. */
     @ApiProperty({
@@ -408,6 +495,57 @@ export class FleetNodeSelfDescriptionDto {
     @Min(0)
     @Max(FLEET_MAX_DISK_FREE_BYTES)
     lastReclaimFreedBytes?: number;
+
+    /**
+     * Remote node limits (self-build slice AS) — the limits the node's
+     * worker is ENFORCING: `min(its own start flags, the platform ceiling)`.
+     *
+     * Bounded by type and the int column only — NOT by the node-side clamp
+     * (1..16 jobs, 5..100 %, 256 MB..): under `whitelist +
+     * forbidNonWhitelisted` a refused value fails the whole beat, and a newer
+     * node that allows more must not be swept offline for it. The service
+     * stores what fits. `@IsOptional()` admits an explicit null on the two
+     * ceilings ("no ceiling in force"), which the service tells apart from
+     * absent.
+     */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_REPORTED_LIMIT_VALUE,
+        description:
+            'Jobs the node runs at once right now — the lower of its own --concurrency and the platform ceiling. Carrying it means the two below are reported too.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_REPORTED_LIMIT_VALUE)
+    maxConcurrentJobs?: number;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 0,
+        maximum: FLEET_MAX_REPORTED_LIMIT_VALUE,
+        description: 'CPU admission ceiling the node enforces, in percent; null = none in force.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_REPORTED_LIMIT_VALUE)
+    maxCpuPercent?: number | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 0,
+        maximum: FLEET_MAX_REPORTED_LIMIT_VALUE,
+        description: 'Memory admission ceiling the node enforces, in MB; null = none in force.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_REPORTED_LIMIT_VALUE)
+    maxMemoryMb?: number | null;
 }
 
 /**
