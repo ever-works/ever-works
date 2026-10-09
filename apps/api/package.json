@@ -69,7 +69,7 @@
         "class-validator": "^0.14.3",
         "dotenv": "^17.2.3",
         "express": "^5.2.1",
-        "handlebars": "^4.7.9",
+        "handlebars": "^4.7.10",
         "helmet": "^8.1.0",
         "ioredis": "^5.10.1",
         "multer": "^2.4.0",
