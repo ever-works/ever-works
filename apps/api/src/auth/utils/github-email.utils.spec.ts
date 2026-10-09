@@ -75,7 +75,7 @@ describe('resolveGitHubAccountEmail', () => {
     // addresses: read". Without it GitHub answers 403/404 and the whole
     // installation callback failed (installation left unclaimed).
     describe('when /user/emails is not readable (missing "Email addresses: read")', () => {
-        const axiosHttpError = (status: number) =>
+        const axiosHttpError = (status: number, headers: Record<string, string> = {}) =>
             new AxiosError(
                 `Request failed with status code ${status}`,
                 status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST,
@@ -85,7 +85,7 @@ describe('resolveGitHubAccountEmail', () => {
                     status,
                     statusText: 'error',
                     data: { message: 'Resource not accessible by integration' },
-                    headers: {},
+                    headers,
                     config: { headers: {} } as never,
                 },
             );
@@ -136,6 +136,25 @@ describe('resolveGitHubAccountEmail', () => {
             'GitHub App path: %i is NOT a missing permission and still throws',
             async (status) => {
                 const error = axiosHttpError(status);
+
+                await expect(
+                    resolveGitHubAccountEmail(
+                        failingHttpService(error),
+                        'token',
+                        'owner@example.com',
+                        { allowMissingEmailPermission: true },
+                    ),
+                ).rejects.toBe(error);
+            },
+        );
+
+        it.each([
+            ['primary rate limit', { 'x-ratelimit-remaining': '0' }],
+            ['secondary rate limit', { 'retry-after': '60' }],
+        ])(
+            'GitHub App path: a 403 %s is throttling, not a missing permission, and still throws',
+            async (_label, headers) => {
+                const error = axiosHttpError(403, headers);
 
                 await expect(
                     resolveGitHubAccountEmail(

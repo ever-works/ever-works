@@ -17,8 +17,9 @@ type GitHubEmailResponse = {
  *    "Email addresses: read" (403 "Resource not accessible by integration", or 404);
  *  - an OAuth App token granted without the `user:email` scope (404).
  *
- * 401 (bad/expired token), 5xx and network failures are NOT in this set — those
- * still throw, so a genuinely broken upstream is never mistaken for "no permission".
+ * 401 (bad/expired token), 5xx, rate limiting and network failures are NOT treated
+ * as a missing permission — those still throw, so a genuinely broken or throttled
+ * upstream is never mistaken for "no permission".
  */
 const MISSING_EMAIL_PERMISSION_STATUSES: ReadonlySet<number> = new Set([403, 404]);
 
@@ -38,9 +39,25 @@ export type ResolveGitHubAccountEmailOptions = {
     logger?: { warn(message: string): void };
 };
 
-/** The HTTP status of an upstream GitHub failure, or undefined for non-HTTP errors. */
-function upstreamStatus(error: unknown): number | undefined {
-    return isAxiosError(error) ? error.response?.status : undefined;
+/**
+ * The status of a GitHub answer that means "this token may not read the email
+ * addresses", or undefined for anything else. A 403 that carries GitHub's
+ * rate-limit markers (`x-ratelimit-remaining: 0`, or `retry-after` for a
+ * secondary limit) is throttling, not a missing permission, so it is excluded.
+ */
+function missingEmailPermissionStatus(error: unknown): number | undefined {
+    if (!isAxiosError(error) || !error.response) {
+        return undefined;
+    }
+    const { status, headers } = error.response;
+    if (!MISSING_EMAIL_PERMISSION_STATUSES.has(status)) {
+        return undefined;
+    }
+    const remaining = headers?.['x-ratelimit-remaining'];
+    if (status === 403 && (String(remaining) === '0' || headers?.['retry-after'] != null)) {
+        return undefined;
+    }
+    return status;
 }
 
 export async function resolveGitHubAccountEmail(
@@ -59,12 +76,8 @@ export async function resolveGitHubAccountEmail(
         );
         emails = emailsResponse.data || [];
     } catch (error) {
-        const status = upstreamStatus(error);
-        if (
-            !options.allowMissingEmailPermission ||
-            status === undefined ||
-            !MISSING_EMAIL_PERMISSION_STATUSES.has(status)
-        ) {
+        const status = missingEmailPermissionStatus(error);
+        if (!options.allowMissingEmailPermission || status === undefined) {
             throw error;
         }
 
