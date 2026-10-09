@@ -1,21 +1,16 @@
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 
-/** The vendored contract directory (`packages/agent/src/ever-instance/contract`). */
-export const CONTRACT_DIR = join(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '..',
-    '..',
-    'packages',
-    'agent',
-    'src',
-    'ever-instance',
-    'contract',
-);
+/**
+ * The installed `@ever-co/connect-contracts` package: the published
+ * `ever.stats.v1` schema (`schemas/`) and its shared fixtures (`fixtures/`).
+ * Nothing of the contract is copied into this repository.
+ */
+export const CONTRACT_DIR = dirname(require.resolve('@ever-co/connect-contracts/package.json'));
+
+/** The statistics fixtures of the package (`valid/`, `invalid/`, `expected.json`). */
+export const STATS_FIXTURES_DIR = join(CONTRACT_DIR, 'fixtures', 'stats');
 
 export function contractBytes(relative: string): Buffer {
     return readFileSync(join(CONTRACT_DIR, relative));
@@ -29,16 +24,16 @@ export function sha256(bytes: Buffer): string {
     return createHash('sha256').update(bytes).digest('hex');
 }
 
-export interface VendorRecord {
-    repository: string;
-    commit: string;
-    schema: { path: string; source: string; sha256: string };
-    fixtures: Array<{ path: string; source: string; sha256: string }>;
-}
-
 export interface ExpectedRecord {
     fixtures: Record<
         string,
-        { status: number; code?: string; path?: string; layer: 'schema' | 'ingest'; reason: string }
+        {
+            status: number;
+            code?: string;
+            path?: string;
+            error?: string;
+            layer: 'schema' | 'ingest';
+            reason: string;
+        }
     >;
 }

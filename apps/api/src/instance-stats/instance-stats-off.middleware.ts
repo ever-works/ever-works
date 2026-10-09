@@ -2,8 +2,9 @@ import { Inject, Injectable, NestMiddleware, NotFoundException } from '@nestjs/c
 import { INSTANCE_STATS_CONFIG, type InstanceStatsRuntimeConfig } from './instance-stats.tokens';
 
 /**
- * The statistics routes answer 404 whenever `EVER_STATS_ENABLED` switches the
- * module off — even if the module ended up in the graph anyway.
+ * The statistics routes answer 404 whenever `EVER_STATS_ENABLED` does not
+ * switch the module on (it is off by default) — even if the module ended up
+ * in the graph anyway.
  *
  * Normally it does not: `ApiModule` imports the module only when the switch
  * is on (see `instanceStatsModuleImports`). That decision is taken when

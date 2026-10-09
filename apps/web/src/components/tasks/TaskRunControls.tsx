@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { buildDecisionsHref } from '@/lib/api/inbox.shared';
-import type { AgentRunSession } from '@/lib/api/agents.shared';
+import { isFleetRun, type AgentRunSession } from '@/lib/api/agents.shared';
 import {
     interruptAgentRunAction,
     resumeAgentRunAction,
@@ -50,6 +50,13 @@ import {
  * instructions — so this strip shows the question and links to the Inbox
  * instead of offering a free-text Resume that would start a run which
  * never sees the answer and leaves the Inbox item open.
+ *
+ * And one state loses the Steer box (self-build slice AU): a LIVE run on a
+ * FLEET node (`runnerKind` `fleet-node:*`). A node runs a model CLI on
+ * instructions frozen at dispatch and never reads `pendingInput`, so a
+ * steer sent there was accepted, reported as "delivered", and never
+ * reached the agent. The strip says how a fleet run reaches the owner
+ * instead (a question in the Inbox) and keeps every other control.
  *
  * Renders nothing when the Task has no run yet: an empty control strip on a
  * Task that never dispatched is noise.
@@ -90,6 +97,8 @@ export function TaskRunControls({
     // qualifies: a live run with a stale question in the list (the resumed
     // run is already going) keeps its steer controls.
     const waitingOnQuestion = !isLive && run.awaitingInput === true && openQuestion !== null;
+    // Slice AU — a live fleet run cannot take a mid-run message.
+    const canSteer = isLive && !isFleetRun(run);
 
     const act = (fn: () => Promise<string | null>) => {
         setError(null);
@@ -108,7 +117,9 @@ export function TaskRunControls({
     const handleSteer = (e: React.FormEvent) => {
         e.preventDefault();
         const message = draft.trim();
-        if (!message) return;
+        // Enter in the resume box submits the form too; only a steerable
+        // run may turn that into a steer.
+        if (!message || !canSteer) return;
         act(async () => {
             const result = await steerAgentRunAction(run.agentId, run.id, message);
             setDraft('');
@@ -208,20 +219,29 @@ export function TaskRunControls({
                 </div>
             ) : (
                 <>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">
-                        {isLive ? t('liveHint') : t('parkedHint')}
+                    <p
+                        className="text-xs text-text-muted dark:text-text-muted-dark mb-3"
+                        data-testid="task-run-hint"
+                    >
+                        {isLive ? (canSteer ? t('liveHint') : t('fleetLiveHint')) : t('parkedHint')}
                     </p>
 
                     <form onSubmit={handleSteer} className="space-y-2">
-                        <textarea
-                            value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            rows={2}
-                            maxLength={16384}
-                            placeholder={isLive ? t('steerPlaceholder') : t('resumePlaceholder')}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
-                            data-testid="task-run-steer-input"
-                        />
+                        {/* No message box on a live fleet run: nothing on the
+                            node would ever read what is typed here. */}
+                        {(canSteer || !isLive) && (
+                            <textarea
+                                value={draft}
+                                onChange={(e) => setDraft(e.target.value)}
+                                rows={2}
+                                maxLength={16384}
+                                placeholder={
+                                    isLive ? t('steerPlaceholder') : t('resumePlaceholder')
+                                }
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
+                                data-testid="task-run-steer-input"
+                            />
+                        )}
                         {error && (
                             <p
                                 className="text-xs text-danger"
@@ -272,7 +292,7 @@ export function TaskRunControls({
                                     {t('resume')}
                                 </Button>
                             )}
-                            {isLive && (
+                            {canSteer && (
                                 <Button
                                     type="submit"
                                     size="sm"

@@ -2,47 +2,49 @@
  * Anonymous usage statistics (`ever.stats.v1`) — the shared vocabulary of the
  * Works statistics module, its `stats-sink` capability and the settings page.
  *
- * The contract itself is published by Ever Platform and vendored byte for byte
- * (with its fixtures) under `packages/agent/src/ever-instance/contract/`; this
- * file only carries the names, limits and shapes the code is written against.
- * Every header name and limit below comes from that contract, never from a
- * literal elsewhere.
+ * The contract itself (the schema, its fixtures and the wire constants) is the
+ * published `@ever-co/connect-contracts` package, pinned to one exact version;
+ * nothing of it is copied into this repository. This file only carries the
+ * names, limits and shapes the code is written against: the header names and
+ * limits below are read from that package's `CONSTANTS`, and the literal ids
+ * are type-checked against its types.
  *
  * Nothing in a report can identify a person or an organization: every string is
  * fixed by a constant, an enumeration or a bounded pattern, and every map key
  * comes from one of the closed lists below (an unknown value is counted under
  * `other`, never as its own key).
  */
+import { CONSTANTS, type paths, type StatsReportV1 } from '@ever-co/connect-contracts';
 
 /** The schema id, the value of the report's `schema` field. */
-export const EVER_STATS_V1_SCHEMA_ID = 'ever.stats.v1' as const;
+export const EVER_STATS_V1_SCHEMA_ID = 'ever.stats.v1' as const satisfies StatsReportV1['schema'];
 
 /** Where a report is sent, relative to the statistics base URL. */
-export const EVER_STATS_REPORTS_PATH = '/v1/stats/reports' as const;
+export const EVER_STATS_REPORTS_PATH = '/v1/stats/reports' as const satisfies keyof paths;
 
 /** The default base URL when neither `EVER_STATS_API_URL` nor `EVER_PLATFORM_API_URL` is set. */
 export const EVER_PLATFORM_DEFAULT_API_URL = 'https://api.ever.co' as const;
 
 /** Request headers of `POST /v1/stats/reports`: the public key and the signature over the exact body. */
-export const EVER_STATS_KEY_HEADER = 'Ever-Stats-Key' as const;
-export const EVER_STATS_SIGNATURE_HEADER = 'Ever-Stats-Signature' as const;
+export const EVER_STATS_KEY_HEADER = CONSTANTS.stats_headers.key;
+export const EVER_STATS_SIGNATURE_HEADER = CONSTANTS.stats_headers.signature;
 /** Optional: base64url of the first 8 bytes of SHA-256 over the 32 public key bytes. */
-export const EVER_STATS_KEY_ID_HEADER = 'Ever-Stats-Key-Id' as const;
+export const EVER_STATS_KEY_ID_HEADER = CONSTANTS.stats_headers.key_id;
 /** The signature header value is this prefix followed by the base64url (no padding) signature. */
-export const EVER_STATS_SIGNATURE_PREFIX = 'ed25519=' as const;
+export const EVER_STATS_SIGNATURE_PREFIX = CONSTANTS.stats_signature_prefix;
 
 /** The largest body Ever Platform accepts (16 KiB); a larger report is never sent. */
-export const EVER_STATS_MAX_BODY_BYTES = 16_384;
+export const EVER_STATS_MAX_BODY_BYTES: number = CONSTANTS.stats.max_bytes;
 
 /**
- * The published schema this module is built against: its SHA-256 (the value of
- * the platform's `ETag` and of the SDK's record) and the public commit the
- * vendored copy was taken from.
+ * The published schema this module is built against: the package and the file
+ * in it, and the file's SHA-256 (the value of the platform's `ETag`). A drift
+ * test fails when the installed package's file no longer hashes to this value,
+ * so a version bump that changes the schema is a deliberate change here.
  */
 export const EVER_STATS_V1_SOURCE = {
-	repository: 'https://github.com/ever-co/ever-connect-sdk',
-	commit: '2fd74dad9357a18471292f38012a5f5e4e6d2938',
-	path: 'contracts/schemas/ever.stats.v1.json',
+	package: '@ever-co/connect-contracts',
+	path: 'schemas/ever.stats.v1.json',
 	sha256: '0cd746f7dec75117a6b812b7a832f9ceca4c97a6ecf65d22d6967a6475efc6e5'
 } as const;
 
@@ -92,13 +94,17 @@ export function normaliseStatsBaseUrl(raw: string): string | null {
 	return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
 }
 
-export const EVER_STATS_PRODUCTS = ['gauzy', 'teams', 'works', 'rec', 'traduora'] as const;
+export const EVER_STATS_PRODUCTS = ['gauzy', 'teams', 'works', 'rec', 'traduora'] as const satisfies ReadonlyArray<
+	StatsReportV1['product']
+>;
 export type EverStatsProduct = (typeof EVER_STATS_PRODUCTS)[number];
 
-export const EVER_STATS_CHANNELS = ['stable', 'rc', 'beta', 'dev', 'custom'] as const;
+export const EVER_STATS_CHANNELS = ['stable', 'rc', 'beta', 'dev', 'custom'] as const satisfies ReadonlyArray<
+	StatsReportV1['channel']
+>;
 export type EverStatsChannel = (typeof EVER_STATS_CHANNELS)[number];
 
-export type EverStatsInstanceKind = 'backend' | 'frontend';
+export type EverStatsInstanceKind = StatsReportV1['instance_kind'];
 
 /** `counts.works_by_kind` keys, in the schema's order. */
 export const WORKS_STATS_WORK_KIND_KEYS = [
@@ -256,8 +262,8 @@ export interface StatsSendResult {
  * Settings (`ui`), the statistics key cannot be read (`key_unreadable`: the
  * encryption key it was stored with is missing or changed), the sender plugin
  * is not available (`sink_unavailable`), or the instance is operated by Ever
- * Cloud (`cloud-managed`, reported while on). `env` (switched off by
- * `EVER_STATS_ENABLED=false`) never reaches the API — the module is not
+ * Cloud (`cloud-managed`, reported while on). `env` (not switched on by
+ * `EVER_STATS_ENABLED`, the default) never reaches the API — the module is not
  * loaded, so its routes answer 404 — and is listed so the page can name that
  * state.
  */

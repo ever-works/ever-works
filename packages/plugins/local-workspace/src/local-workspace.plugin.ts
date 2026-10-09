@@ -461,9 +461,27 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		if (opts.publishSha !== undefined) {
 			return this.publishCommit(handle, opts.publishSha, opts);
 		}
-		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal);
+		// Repo-hostile Git config neutralised for the node's OWN finalize
+		// (self-build slice AL, EW-762 §6 AL), OPT-IN via `hardenRepoHooks`.
+		// On a fleet node the checkout is attacker-authored and the model holds
+		// `acceptEdits` over it; a model with a shell can `git config --local
+		// core.hooksPath …` into the SHARED pool config (the same scope the
+		// credentialed push already resets), so the node's own `add` / `status`
+		// / `commit` would otherwise run a repository `pre-commit` hook or an
+		// fsmonitor hook under the node's identity. `undefined` when the flag is
+		// off (the cloud runner), which keeps that path byte-for-byte unchanged.
+		const hardening = opts.hardenRepoHooks ? await this.finalizeHardeningEnv() : undefined;
+		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal, null, hardening);
 
-		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed', signal);
+		const status = await this.gitOrThrow(
+			['status', '--porcelain'],
+			dir,
+			opts.auth,
+			'git status failed',
+			signal,
+			null,
+			hardening
+		);
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
 			// Committer identity stays in `-c` flags — transient, never
@@ -473,6 +491,12 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			// machine and which agent produced the change says so
 			// (self-build slice AM), and `--author` carries the agent while
 			// `user.*` carries the machine, so `git log` answers both.
+			//
+			// `--no-verify` is the hook half of the hardening above (only when
+			// opted in): it stops the repository's `pre-commit` / `commit-msg` /
+			// `post-commit` hooks — which `core.hooksPath` could re-point at the
+			// checkout the model controls — from running on the node's own
+			// commit. Omitted on the cloud path so that finalize is unchanged.
 			const identity = opts.identity;
 			await this.gitOrThrow(
 				[
@@ -481,6 +505,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 					'-c',
 					`user.email=${identity?.committerEmail || 'agent@ever.works'}`,
 					'commit',
+					...(opts.hardenRepoHooks ? ['--no-verify'] : []),
 					...(identity ? [`--author=${identity.authorName} <${identity.authorEmail}>`] : []),
 					'-m',
 					opts.commitMessage
@@ -488,7 +513,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				dir,
 				opts.auth,
 				'git commit failed',
-				signal
+				signal,
+				null,
+				hardening
 			);
 		}
 
@@ -1387,13 +1414,60 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		auth: WorkspaceProvisionSpec['auth'],
 		what: string,
 		signal?: AbortSignal,
-		credential?: WorkspacePushCredential | null
+		credential?: WorkspacePushCredential | null,
+		// Appended LAST and optional: every existing call site keeps its arity,
+		// and only the finalize add/status/commit pass one (the hook / fsmonitor
+		// neutralisation). Never together with a credential — those are separate
+		// Git invocations, and both appending at the same `GIT_CONFIG_COUNT`
+		// index would collide.
+		extraEnv?: Readonly<Record<string, string>>
 	): Promise<GitResult> {
-		const result = await this.git(args, cwd, auth, signal, credential);
+		const result = await this.git(args, cwd, auth, signal, credential, extraEnv);
 		if (result.code !== 0) {
 			throw new Error(`${what}: ${result.stderr.trim() || `git exited ${result.code}`}`);
 		}
 		return result;
+	}
+
+	/** An empty directory the finalize points `core.hooksPath` at, created once. */
+	private emptyHooksDirPromise: Promise<string> | null = null;
+
+	private emptyHooksDir(): Promise<string> {
+		return (this.emptyHooksDirPromise ??= (async () => {
+			const dir = join(tmpdir(), `ew-no-hooks-${randomUUID()}`);
+			await fs.mkdir(dir, { recursive: true });
+			return dir;
+		})());
+	}
+
+	/**
+	 * The `GIT_CONFIG_*` overlay that neutralises repo-hostile Git config on the
+	 * node's own finalize commands (self-build slice AL).
+	 *
+	 * `core.hooksPath` is pointed at a dedicated EMPTY directory (not `''`, which
+	 * on a `commit` would resolve hooks relative to the checkout the model
+	 * controls), and `core.fsmonitor` is turned off so a persisted fsmonitor
+	 * hook cannot run on `add` / `status`. Appended to any inherited
+	 * `GIT_CONFIG_COUNT` exactly like {@link credentialEnv}, so these entries WIN
+	 * over the shared pool config a linked worktree's `--local` writes land in —
+	 * which is the scope a model with a shell can reach — while an operator's own
+	 * pinned settings are preserved.
+	 *
+	 * `--no-verify` on the commit is the companion hook switch; the two together
+	 * mean neither a `pre-commit` hook nor an fsmonitor hook runs under the
+	 * node's identity, matching what the credentialed push already does.
+	 */
+	private async finalizeHardeningEnv(inherited: NodeJS.ProcessEnv = process.env): Promise<Record<string, string>> {
+		const hooksDir = (await this.emptyHooksDir()).replace(/\\/g, '/');
+		const parsed = Number.parseInt(String(inherited.GIT_CONFIG_COUNT ?? ''), 10);
+		const base = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+		return {
+			GIT_CONFIG_COUNT: String(base + 2),
+			[`GIT_CONFIG_KEY_${base}`]: 'core.hooksPath',
+			[`GIT_CONFIG_VALUE_${base}`]: hooksDir,
+			[`GIT_CONFIG_KEY_${base + 1}`]: 'core.fsmonitor',
+			[`GIT_CONFIG_VALUE_${base + 1}`]: 'false'
+		};
 	}
 
 	/** The worktree's PRIVATE gitdir (never the shared common dir, never

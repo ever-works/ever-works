@@ -98,6 +98,17 @@ describe('InboxController', () => {
                 expect.objectContaining({ taskId: 't1', status: 'open', limit: 5 }),
             );
         });
+
+        it('forwards a sourceType filter — the Inbox "From your fleet" view (self-build slice AU)', async () => {
+            await controller.list(auth, { sourceType: 'fleet-run' });
+
+            expect(service.list).toHaveBeenCalledWith('u1', {
+                status: undefined,
+                limit: 50,
+                offset: 0,
+                sourceType: 'fleet-run',
+            });
+        });
     });
 
     describe('GET /api/inbox/:id', () => {
@@ -288,6 +299,13 @@ describe('inbox DTO validation', () => {
         expect(await errorsFor(ListInboxQueryDto, { status: 'deleted' })).toEqual(['status']);
         expect(await errorsFor(ListInboxQueryDto, { limit: '500' })).toEqual(['limit']);
         expect(await errorsFor(ListInboxQueryDto, { offset: '-1' })).toEqual(['offset']);
+    });
+
+    it('accepts a known source type and rejects anything else (self-build slice AU)', async () => {
+        expect(await errorsFor(ListInboxQueryDto, { sourceType: 'fleet-run' })).toEqual([]);
+        expect(await errorsFor(ListInboxQueryDto, { sourceType: 'agent-run' })).toEqual([]);
+        expect(await errorsFor(ListInboxQueryDto, { sourceType: 'fleet' })).toEqual(['sourceType']);
+        expect(await errorsFor(ListInboxQueryDto, { sourceType: '' })).toEqual(['sourceType']);
     });
 
     it('accepts a UUID Task id filter and rejects anything else — the column is uuid (review SR-4)', async () => {

@@ -237,6 +237,30 @@ describe('RunSteeringService', () => {
             });
         });
 
+        it('carries the fleet node that holds the session beside the id (self-build slice AU)', async () => {
+            // A FLEET run's session lives in one node's CLI home; without the
+            // node the successor's job could never be offered `--resume`.
+            const fleetCliSession = {
+                sessionId: '3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b',
+                nodeId: '11111111-1111-4111-8111-111111111111',
+                provider: 'claude-code' as const,
+            };
+            runs.findByIdAndUser.mockResolvedValue(
+                makeRun({
+                    status: 'completed',
+                    awaitingInput: true,
+                    cliSessionId: fleetCliSession.sessionId,
+                    fleetCliSession,
+                }),
+            );
+            await makeSvc().resume(runId, userId, 'use Postgres');
+            expect(runs.seedResumeContext).toHaveBeenCalledWith('run-2', {
+                cliSessionId: fleetCliSession.sessionId,
+                pendingInput: ['use Postgres'],
+                fleetCliSession,
+            });
+        });
+
         it('loads and recreates a resumed run in its exact persisted scope', async () => {
             runs.findByIdAndUser.mockResolvedValue(parked());
 

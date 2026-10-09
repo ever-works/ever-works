@@ -12,7 +12,7 @@ import { ApiResponseError, serverFetch, serverMutation } from './server-api';
  *
  * `status` answers `{enabled}` to anyone signed in and the full status to the
  * platform admin; every other call is the platform admin's. When the API has
- * the module switched off (`EVER_STATS_ENABLED=false`) every route answers 404.
+ * the module off (the default; on only with `EVER_STATS_ENABLED=true`) every route answers 404.
  */
 const BASE = '/instance-stats';
 
@@ -20,7 +20,7 @@ export const instanceStatsAPI = {
     status: () => serverFetch<InstanceStatsStatus>(`${BASE}/status`, { cache: 'no-store' }),
     /**
      * Whether this installation has the statistics module at all: `false`
-     * only when the API answers 404 (switched off by `EVER_STATS_ENABLED`).
+     * only when the API answers 404 (not switched on by `EVER_STATS_ENABLED`).
      * Any other failure answers `true`, so the page can say that the status
      * could not be read rather than vanish.
      */

@@ -162,3 +162,36 @@ describe('TaskRunControls — parked on a fleet question (slice Q)', () => {
         expect(container.firstChild).toBeNull();
     });
 });
+
+describe('TaskRunControls — a live FLEET run cannot be steered (self-build slice AU)', () => {
+    const live = (runnerKind: string | null) =>
+        run({ status: 'running', awaitingInput: false, runnerKind, finishedAt: null });
+
+    it('hides the message box and the Steer button, says why, and keeps Interrupt', () => {
+        render(<TaskRunControls run={live('fleet-node:claude-code')} />);
+        expect(screen.queryByTestId('task-run-steer-input')).toBeNull();
+        expect(screen.queryByTestId('task-run-steer-submit')).toBeNull();
+        expect(screen.getByTestId('task-run-hint').textContent).toBe(
+            'dashboard.tasksPage.detail.runControls.fleetLiveHint',
+        );
+        expect(screen.getByTestId('task-run-interrupt')).toBeTruthy();
+    });
+
+    it('keeps the steer on a live CLOUD run, and on an older API that sent no tag', () => {
+        for (const runnerKind of ['claude-code', null]) {
+            const { unmount } = render(<TaskRunControls run={live(runnerKind)} />);
+            expect(screen.getByTestId('task-run-steer-input')).toBeTruthy();
+            expect(screen.getByTestId('task-run-steer-submit')).toBeTruthy();
+            expect(screen.getByTestId('task-run-hint').textContent).toBe(
+                'dashboard.tasksPage.detail.runControls.liveHint',
+            );
+            unmount();
+        }
+    });
+
+    it('still offers Resume on a PARKED fleet run with no open question', () => {
+        render(<TaskRunControls run={run({ runnerKind: 'fleet-node:claude-code' })} />);
+        expect(screen.getByTestId('task-run-steer-input')).toBeTruthy();
+        expect(screen.getByTestId('task-run-resume')).toBeTruthy();
+    });
+});

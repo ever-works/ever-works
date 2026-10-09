@@ -7,7 +7,7 @@ import { SettingsLayoutClient } from './settings-layout-client';
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
     // The Ever Platform tab exists only where the API has the statistics
-    // module: with `EVER_STATS_ENABLED=false` its status route answers 404 and
+    // module: unless `EVER_STATS_ENABLED=true` (off by default) its status route answers 404 and
     // there is nothing to show — no tab, and the page itself answers 404.
     const [settingsMenu, everPlatformEnabled] = await Promise.all([
         pluginsAPI.listForSettingsMenu().catch((error: unknown): SettingsMenuResponse | null => {

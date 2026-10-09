@@ -34,7 +34,8 @@ import {
  * Inbox (operator message center) — API surface.
  *
  *   GET    /api/inbox                 my messages (?status= filter; default = active view;
- *                                     ?taskId= narrows to one Task) + unread count
+ *                                     ?taskId= narrows to one Task; ?sourceType= to one
+ *                                     producer, e.g. fleet-run) + unread count
  *   GET    /api/inbox/unread-count    badge count (polled by the sidebar)
  *   GET    /api/inbox/decisions       My Decisions — the questions, approvals and escalations
  *                                     waiting on me, ranked blocking-first, with filters
@@ -80,6 +81,9 @@ export class InboxController {
             // Conditional so the default call shape stays byte-identical
             // for every caller that never sends a Task filter.
             ...(query.taskId ? { taskId: query.taskId } : {}),
+            // Self-build slice AU — the "From your fleet" filter; same
+            // conditional shape.
+            ...(query.sourceType ? { sourceType: query.sourceType } : {}),
         });
         return { data: items, meta: { total, limit, offset, unreadCount } };
     }

@@ -1,14 +1,16 @@
 import { createPublicKey, verify as cryptoVerify } from 'crypto';
+import { statsKeyId } from '@ever-co/connect-sdk';
 import { DataSource } from 'typeorm';
 import { EverInstance } from '../../entities/ever-instance.entity';
 import { PluginSecretEncService } from '../../plugins/services/plugin-secret-enc.service';
-import { EverInstanceService, keyIdOf } from '../ever-instance.service';
+import { EverInstanceKeyUnreadableError, EverInstanceService } from '../ever-instance.service';
 
 /**
- * The installation identity: one row however many replicas boot at once, a
- * signature that verifies with the published public key over exactly the
- * bytes signed, a private key that is stored only wrapped, and a reset that
- * changes both the id and the key.
+ * The installation identity: one row however many replicas boot at once, the
+ * Ever Platform SDK's `StatsSigner` over the stored key (a signature that
+ * verifies with the stored public key over exactly the bytes signed), a
+ * private key that is stored only wrapped, and a reset that changes both the
+ * id and the key.
  */
 describe('EverInstanceService', () => {
     let dataSource: DataSource;
@@ -58,34 +60,49 @@ describe('EverInstanceService', () => {
         expect(rows[0].connectPublicKey ?? null).toBeNull();
     });
 
-    it('signs exactly the given bytes; the signature verifies with the public key', async () => {
+    it('signs exactly the given bytes; the signature verifies with the stored public key', async () => {
         const identity = service();
+        const row = await identity.ensure();
         const body = Buffer.from('{"schema":"ever.stats.v1"}', 'utf8');
-        const { signature, publicKey, keyId } = await identity.sign(body);
+        const signer = await identity.statsSigner();
+        const signature = Buffer.from(signer.sign(new Uint8Array(body)));
 
+        expect(signer.publicKey).toBe(row.statsPublicKey);
         const key = createPublicKey({
-            key: { kty: 'OKP', crv: 'Ed25519', x: publicKey },
+            key: { kty: 'OKP', crv: 'Ed25519', x: row.statsPublicKey },
             format: 'jwk',
         });
-        expect(cryptoVerify(null, body, key, Buffer.from(signature, 'base64url'))).toBe(true);
-        expect(
-            cryptoVerify(null, Buffer.from(`${body} `), key, Buffer.from(signature, 'base64url')),
-        ).toBe(false);
-        expect(Buffer.from(publicKey, 'base64url')).toHaveLength(32);
-        expect(Buffer.from(signature, 'base64url')).toHaveLength(64);
-        expect(keyId).toBe(keyIdOf(Buffer.from(publicKey, 'base64url')));
-        expect(keyId).toHaveLength(11);
+        expect(cryptoVerify(null, body, key, signature)).toBe(true);
+        expect(cryptoVerify(null, Buffer.from(`${body} `), key, signature)).toBe(false);
+        expect(Buffer.from(row.statsPublicKey, 'base64url')).toHaveLength(32);
+        expect(signature).toHaveLength(64);
+        expect(row.statsKeyId).toBe(statsKeyId(row.statsPublicKey));
+        expect(row.statsKeyId).toHaveLength(11);
     });
 
     it('stores the private key only in its wrapped form', async () => {
         const row = await service().ensure();
         expect(row.statsPrivateKeyEncrypted.startsWith('enc::v1::')).toBe(true);
         // A different process (another replica) reads and uses the same key.
-        const other = service();
-        const body = Buffer.from('x');
-        const a = await service().sign(body);
-        const b = await other.sign(body);
+        const body = new Uint8Array(Buffer.from('x'));
+        const a = await service().statsSigner();
+        const b = await service().statsSigner();
         expect(a.publicKey).toBe(b.publicKey);
+        expect(Buffer.from(a.sign(body))).toEqual(Buffer.from(b.sign(body)));
+    });
+
+    it('cannot sign once the encryption key is gone, and says only that', async () => {
+        await service().ensure();
+        process.env.PLUGIN_SECRET_ENCRYPTION_KEY = 'cd'.repeat(32);
+        try {
+            const identity = service();
+            await expect(identity.statsSigner()).rejects.toBeInstanceOf(
+                EverInstanceKeyUnreadableError,
+            );
+            expect(await identity.isKeyReadable()).toBe(false);
+        } finally {
+            process.env.PLUGIN_SECRET_ENCRYPTION_KEY = 'ab'.repeat(32);
+        }
     });
 
     it('reset gives a new instance id AND a new key, and counts the reset', async () => {
@@ -96,8 +113,7 @@ describe('EverInstanceService', () => {
         expect(after.statsPublicKey).not.toBe(before.statsPublicKey);
         expect(after.statsKeyId).not.toBe(before.statsKeyId);
         expect(after.resetCount).toBe(1);
-        const signed = await identity.sign(Buffer.from('y'));
-        expect(signed.publicKey).toBe(after.statsPublicKey);
+        expect((await identity.statsSigner()).publicKey).toBe(after.statsPublicKey);
     });
 
     it('keeps the operator switch', async () => {
