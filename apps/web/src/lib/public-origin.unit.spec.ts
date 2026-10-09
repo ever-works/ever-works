@@ -6,6 +6,7 @@ const INTERNAL = 'https://ever-works-web-7c47bf599d-dc74b:3000/api/github-app/ca
 describe('public-origin', () => {
     afterEach(() => {
         vi.unstubAllEnvs();
+        vi.restoreAllMocks();
     });
 
     describe('configuredPublicOrigin', () => {
@@ -19,11 +20,38 @@ describe('public-origin', () => {
         });
 
         it('returns null when unset or malformed', () => {
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             vi.stubEnv('NEXT_PUBLIC_WEB_URL', '');
             vi.stubEnv('WEB_URL', '');
             expect(configuredPublicOrigin()).toBeNull();
+            expect(errorSpy).not.toHaveBeenCalled();
 
             vi.stubEnv('WEB_URL', 'not a url');
+            expect(configuredPublicOrigin()).toBeNull();
+            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('WEB_URL is set but'));
+        });
+
+        it('a malformed NEXT_PUBLIC_WEB_URL does not hide a valid WEB_URL, and is reported by name', () => {
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            vi.stubEnv('NEXT_PUBLIC_WEB_URL', 'app.ever.works');
+            vi.stubEnv('WEB_URL', 'https://app.ever.works');
+
+            expect(configuredPublicOrigin()).toBe('https://app.ever.works');
+            expect(errorSpy).toHaveBeenCalledTimes(1);
+            expect(errorSpy.mock.calls[0][0]).toContain('NEXT_PUBLIC_WEB_URL is set but');
+            // The value itself is never logged.
+            expect(errorSpy.mock.calls[0][0]).not.toContain('app.ever.works');
+
+            // Reported once per process, not on every request.
+            configuredPublicOrigin();
+            expect(errorSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('ignores a non-http(s) URL (its origin would be the opaque "null")', () => {
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            vi.stubEnv('NEXT_PUBLIC_WEB_URL', 'javascript:alert(1)');
+            vi.stubEnv('WEB_URL', '');
+
             expect(configuredPublicOrigin()).toBeNull();
         });
     });

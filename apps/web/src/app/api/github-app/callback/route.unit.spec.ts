@@ -109,6 +109,17 @@ describe('GET /api/github-app/callback', () => {
             expect(url.pathname).toBe('/settings');
         });
 
+        it('a malformed NEXT_PUBLIC_WEB_URL falls through to a valid WEB_URL, not to the pod host', async () => {
+            vi.stubEnv('NEXT_PUBLIC_WEB_URL', 'app.ever.works');
+            vi.stubEnv('WEB_URL', PUBLIC_ORIGIN);
+            apiAnswers({ access_token: 'session-jwt' });
+
+            const url = locationOf(await GET(callbackRequest()));
+
+            expect(url.origin).toBe(PUBLIC_ORIGIN);
+            expect(url.pathname).toBe('/settings');
+        });
+
         it('falls back to the request origin only when no public origin is configured (bare local dev)', async () => {
             vi.stubEnv('NEXT_PUBLIC_WEB_URL', '');
             vi.stubEnv('WEB_URL', '');

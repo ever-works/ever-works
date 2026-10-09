@@ -27,22 +27,56 @@
  * changes are honoured. Never derived from `x-forwarded-host` — that header is
  * client-controllable.
  *
- * @returns the configured public origin, or `null` when none is configured.
+ * Each variable is tried in turn: a malformed `NEXT_PUBLIC_WEB_URL` does not hide
+ * a valid `WEB_URL`. A malformed value (not an absolute http(s) URL) is reported
+ * once per process with the variable's name, so a typo never fails silently.
+ *
+ * @returns the configured public origin, or `null` when none is usable.
  */
 export function configuredPublicOrigin(): string | null {
-    const configured = process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL;
-    if (!configured) return null;
+    // Static `process.env.X` reads (not `process.env[name]`): Next inlines
+    // NEXT_PUBLIC_* only for static member access.
+    const candidates: ReadonlyArray<readonly [string, string | undefined]> = [
+        ['NEXT_PUBLIC_WEB_URL', process.env.NEXT_PUBLIC_WEB_URL],
+        ['WEB_URL', process.env.WEB_URL],
+    ];
+    for (const [name, value] of candidates) {
+        if (!value) continue;
+        const origin = httpOrigin(value);
+        if (origin !== null) return origin;
+        reportInvalidOnce(name, value);
+    }
+    return null;
+}
+
+/** The origin of an absolute http(s) URL, or null. */
+function httpOrigin(value: string): string | null {
     try {
-        return new URL(configured).origin;
+        const url = new URL(value);
+        return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : null;
     } catch {
         return null;
     }
 }
 
+const reportedInvalid = new Set<string>();
+
+function reportInvalidOnce(name: string, value: string): void {
+    const key = `${name}=${value}`;
+    if (reportedInvalid.has(key)) return;
+    reportedInvalid.add(key);
+    console.error(
+        `${name} is set but is not an absolute http(s) URL; ignoring it for the public web ` +
+            'origin. Redirects and Referer checks fall back to the next setting, or to the ' +
+            "request's own origin when none is usable.",
+    );
+}
+
 /**
  * The browser-facing origin to build route-handler redirects on: the configured
- * public origin, falling back to the request's own origin ONLY when no public
- * origin is configured (a bare local `next dev`, where the two coincide).
+ * public origin, falling back to the request's own origin ONLY when no usable
+ * public origin is configured (a bare local `next dev`, where the two coincide;
+ * a malformed setting is reported by {@link configuredPublicOrigin}).
  */
 export function publicOriginFor(request: Request): string {
     return configuredPublicOrigin() ?? new URL(request.url).origin;
