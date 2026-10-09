@@ -247,13 +247,20 @@ describe('repo-agent-template pure guards', () => {
     // CodeQL js/polynomial-redos: `<[^>]*>` retried from every `<` of a run
     // with no `>` after it — about 2.6 s for 50,000 of them on a dev box — and
     // the SOUL file is stripped before it is capped.
-    it('strips 50,000 unclosed tag openers in well under 200 ms', () => {
+    // Sized, not tightly timed: at 200,000 openers the regex needs ~40 s on a
+    // dev box and the linear scan milliseconds, so a 2 s bound can be failed
+    // neither by a CPU-throttled CI runner nor passed by the regex. (A
+    // "< 200 ms" at 50,000 was one scheduler stall from red — develop CI,
+    // 2026-10-09.)
+    it('strips 200,000 unclosed tag openers in linear time', () => {
+        const openers = '<'.repeat(200_000);
+
         const started = performance.now();
+        const stripped = stripTemplateHtml(openers);
+        const elapsedMs = performance.now() - started;
 
-        const stripped = stripTemplateHtml('<'.repeat(50_000));
-
-        expect(performance.now() - started).toBeLessThan(200);
         expect(stripped).toBe('');
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 
     it('refuses a skills.yml with no required Skills', () => {

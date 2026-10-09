@@ -72,15 +72,21 @@ describe('EverWorksGitProvider', () => {
         // CodeQL js/polynomial-redos: the slug's edge trim was `/^-+|-+$/g`,
         // retried from every offset of a hyphen run that does not end the
         // string — about 2.4 s for 50,000 hyphens on a dev box.
-        it('slugifies a long interior run of hyphens in well under 200 ms', () => {
+        // Sized, not tightly timed: at 200,000 hyphens the regex needs ~40 s on
+        // a dev box and the linear scan milliseconds, so a 2 s bound can be
+        // failed neither by a CPU-throttled CI runner nor passed by the regex.
+        // (A "< 200 ms" at 50,000 was one scheduler stall from red — develop
+        // CI, 2026-10-09.)
+        it('slugifies a long interior run of hyphens in linear time', () => {
             const p = new EverWorksGitProvider();
-            const work = { ...WORK, slug: `a${'-'.repeat(50_000)}b` };
+            const work = { ...WORK, slug: `a${'-'.repeat(200_000)}b` };
+
             const started = performance.now();
-
             const name = p.buildRepoName(work);
+            const elapsedMs = performance.now() - started;
 
-            expect(performance.now() - started).toBeLessThan(200);
             expect(name).toBe('evereq-a-b');
+            expect(elapsedMs).toBeLessThan(2_000);
         });
 
         it.each<[string, string, string]>([

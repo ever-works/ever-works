@@ -336,12 +336,32 @@ describe('WorkQueryService', () => {
             [`${'-'.repeat(50_000)}x${'!'.repeat(50_000)}`, 'x'],
         ])('normalises %p to %p', async (rawSlug, slug) => {
             workRepository.existsByUserAndSlug.mockResolvedValue(false);
-            const started = performance.now();
 
             const result = await service.checkSlugAvailability(rawSlug, user);
 
-            expect(performance.now() - started).toBeLessThan(200);
             expect(result).toEqual({ available: true, slug });
+        });
+
+        // The linearity guard times the normaliser itself, never the whole async
+        // service call: a "< 200 ms" around `checkSlugAvailability` (mocks,
+        // promise hops) was one scheduler stall on a CPU-throttled CI runner
+        // from red (develop CI, 2026-10-09). The shape is an interior hyphen
+        // run — what `/^-+|-+$/g` is quadratic on (~40 s at 200,000 on a dev
+        // box) if it ever runs before the collapse; the collapse-then-scan
+        // answers in milliseconds, so 2 s separates the two on any runner.
+        it('normalises a 200,000-character interior hyphen run in linear time', () => {
+            const normalizeSlug = (value: string): string =>
+                (service as unknown as { normalizeSlug(value: string): string }).normalizeSlug(
+                    value,
+                );
+            const rawSlug = `a${'-'.repeat(200_000)}b`;
+
+            const started = performance.now();
+            const slug = normalizeSlug(rawSlug);
+            const elapsedMs = performance.now() - started;
+
+            expect(slug).toBe('a-b');
+            expect(elapsedMs).toBeLessThan(2_000);
         });
     });
 

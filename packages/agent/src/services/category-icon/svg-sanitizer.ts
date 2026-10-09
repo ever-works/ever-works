@@ -117,7 +117,9 @@ const DANGEROUS_URL_VALUE_RE = /\b(?:javascript|data|vbscript|file)\s*:/i;
 // Written as `\s*(?:['"]\s*)?` rather than `\s*['"]?\s*`: the same language,
 // but a whitespace run can no longer be split between two `\s*` in every
 // possible way (CodeQL js/polynomial-redos), so a match attempt is linear.
-const EXTERNAL_URL_REF_RE = /url\s*\(\s*(?:['"]\s*)?(?:[a-z][a-z0-9+.-]*:)?\/\//i;
+// Exported for its complexity guard in `svg-sanitizer.spec.ts` only — the
+// category-icon barrel does not re-export it.
+export const EXTERNAL_URL_REF_RE = /url\s*\(\s*(?:['"]\s*)?(?:[a-z][a-z0-9+.-]*:)?\/\//i;
 
 /**
  * The only elements an icon may contain, lowercased. The output is set with

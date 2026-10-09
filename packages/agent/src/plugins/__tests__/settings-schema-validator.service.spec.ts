@@ -653,17 +653,22 @@ describe('SettingsSchemaValidatorService', () => {
         });
 
         it('refuses a body with more values than any settings object, without validating it', () => {
-            const started = performance.now();
-
-            const result = service.validateSettings(
-                { tags: new Array(200_000).fill(0) },
-                schema,
-                'global',
+            // "Without validating it" is asserted on the MECHANISM — Ajv's validator is never even
+            // fetched — not on the clock. A "< 200 ms" bound here measured the machine as much as
+            // the code, and a shared, CPU-throttled CI runner can stall that long on its own
+            // (develop CI, 2026-10-09).
+            const getValidator = jest.spyOn(
+                service as unknown as { getValidator: (...args: unknown[]) => unknown },
+                'getValidator',
             );
+            const tags = new Array(200_000).fill(0);
 
-            expect(performance.now() - started).toBeLessThan(200);
+            const result = service.validateSettings({ tags }, schema, 'global');
+
             expect(result.valid).toBe(false);
             expect(result.errors).toEqual([expect.stringMatching(/too large/)]);
+            expect(getValidator).not.toHaveBeenCalled();
+            getValidator.mockRestore();
         });
 
         it('reports a bounded number of errors for a body within the limits', () => {
