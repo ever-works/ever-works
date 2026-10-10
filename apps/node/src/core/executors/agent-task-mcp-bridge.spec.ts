@@ -125,6 +125,21 @@ function recordingSpawn(onSpawn?: (command: string, env: NodeJS.ProcessEnv | und
 	return { commands, envs, spawnFn };
 }
 
+/**
+ * A run WITHOUT a live bridge. These cases used to assert "no
+ * `--mcp-config` at all", which was exactly the isolation gap measured on a
+ * fleet PC on 2026-10-09: with no strict config, `claude -p` loads the
+ * machine owner's own MCP servers and claude.ai connectors. A no-bridge run
+ * now carries an EMPTY strict config instead — still no bridge server, no
+ * tool allowance and no loopback URL, which is what these cases pin.
+ */
+function expectNoBridgeButIsolated(command: string | undefined): void {
+	expect(command).not.toContain('--allowedTools');
+	expect(command).not.toContain('mcp__');
+	expect(command).not.toContain(PROXY_URL);
+	expect(command).toMatch(/ --mcp-config "[^"]*mcp\.json" --strict-mcp-config /);
+}
+
 /** A proxy double whose lifecycle and token reads are observable. */
 function proxyDouble(events: string[]) {
 	let tokenGetter: (() => string | null) | null = null;
@@ -539,7 +554,7 @@ describe('runAgentTaskJob — MCP bridge degradation', () => {
 		);
 
 		expect(outcome.status).toBe('succeeded');
-		expect(commands[0]).not.toContain('--mcp-config');
+		expectNoBridgeButIsolated(commands[0]);
 		expect(outcome.mcp?.enabled).toBe(false);
 		expect(outcome.mcp?.unavailableReason).toContain('Invalid node credential');
 	});
@@ -560,7 +575,7 @@ describe('runAgentTaskJob — MCP bridge degradation', () => {
 			})
 		);
 		expect(outcome.status).toBe('succeeded');
-		expect(commands[0]).not.toContain('--mcp-config');
+		expectNoBridgeButIsolated(commands[0]);
 		expect(outcome.mcp).toEqual({
 			enabled: false,
 			toolCalls: null,
@@ -572,7 +587,7 @@ describe('runAgentTaskJob — MCP bridge degradation', () => {
 		const { commands, spawnFn } = recordingSpawn();
 		const outcome = await runAgentTaskJob(job(mcpPayload), baseIo({ spawnFn, scratchFs: scratchFs() }));
 		expect(outcome.status).toBe('succeeded');
-		expect(commands[0]).not.toContain('--mcp-config');
+		expectNoBridgeButIsolated(commands[0]);
 		expect(outcome.mcp?.enabled).toBe(false);
 	});
 
@@ -617,7 +632,7 @@ describe('runAgentTaskJob — no MCP block', () => {
 
 		expect(mint).not.toHaveBeenCalled();
 		expect(start).not.toHaveBeenCalled();
-		expect(commands[0]).not.toContain('--mcp-config');
+		expectNoBridgeButIsolated(commands[0]);
 		expect('mcp' in outcome).toBe(false);
 		expect(outcome.status).toBe('succeeded');
 	});
@@ -635,7 +650,7 @@ describe('runAgentTaskJob — no MCP block', () => {
 			baseIo({ spawnFn, scratchFs: scratchFs(), mcpBridge: { mint: mint as never } })
 		);
 		expect(mint).not.toHaveBeenCalled();
-		expect(commands[0]).not.toContain('--mcp-config');
+		expectNoBridgeButIsolated(commands[0]);
 		expect('mcp' in outcome).toBe(false);
 	});
 });

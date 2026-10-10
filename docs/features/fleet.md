@@ -682,7 +682,8 @@ The rules that make that trade survivable:
 ### When the agent needs you
 
 Unless the MCP bridge below is switched on, the agent on your machine has no platform tools — it
-cannot message you mid-run. What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
+cannot message you mid-run (and a Claude Code run does not get your own MCP servers either; see
+[Platform tools from a fleet run](#platform-tools-from-a-fleet-run-mcp-bridge)). What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
 requirement, a risky or irreversible step, a choice between materially different directions) it
 writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
 question, the rest is optional context and options — and stops. The node reports the question and
@@ -766,6 +767,33 @@ By default a fleet run is sealed: the model gets a Task brief, a worktree and no
 Missions, Works, Agents, Plugins and read-only Fleet status — so an agent can read the context it
 needs and record progress instead of guessing and reporting at the end.
 
+**Your own MCP servers are not part of a fleet run (Claude Code).** The machine a node runs on is
+usually someone's own PC, with their own MCP servers configured — in `~/.claude.json`, in enabled
+Claude Code plugins, in a repository's `.mcp.json`, and the claude.ai connectors of the account the
+CLI is logged in with (Slack, Claude Docs, and so on). A fleet run never loads them. Every Claude Code
+run is started with `--mcp-config <file> --strict-mcp-config`, where the file is in the run's scratch
+directory and lists **no server at all** when the bridge is off (or only the bridge when it is on), and
+with `ENABLE_CLAUDEAI_MCP_SERVERS=false` in its environment. The node refuses to start a Claude Code
+run whose command line does not carry that isolation. Your own interactive Claude Code sessions are
+unaffected. This matters most for an Agent allowed to skip permission prompts: without it, a
+prompt-injected run could call any of those tools with your credentials.
+
+A machine whose administrator deployed Claude Code's enterprise `managed-mcp.json`
+(`C:\Program Files\ClaudeCode\managed-mcp.json`, `/Library/Application Support/ClaudeCode/` or
+`/etc/claude-code/`) cannot run Claude Code fleet jobs: that file gives the administrator exclusive
+control of MCP, and Claude Code exits at startup when a session passes the per-run MCP config a fleet
+run needs. The node refuses such a run before starting the CLI and names the file, rather than
+running it without the isolation. Remove the file from that machine, or keep Claude Code fleet jobs
+off it.
+
+> **Codex is not isolated yet.** A Codex fleet run still loads the `[mcp_servers.*]` entries in that
+> machine's `~/.codex/config.toml` and the servers of enabled Codex plugins: Codex has no switch that
+> limits a run to the servers given on its command line, and the one option that drops them all
+> (`--ignore-user-config`) also drops the machine's sandbox and model settings. On a machine that runs
+> Codex fleet jobs, keep any MCP server you would not hand to an untrusted prompt out of that Codex
+> configuration. Tracked in the
+> [fleet session trust model](../specs/security/fleet-session-trust-model.md) (control 16).
+
 It is **off by default** and needs three separate yeses:
 
 1. the operator turns it on for the whole install (`FLEET_NODE_MCP_BRIDGE_ENABLED=true` plus
@@ -804,7 +832,7 @@ the token's own scope wins and a mismatch is refused.
 
 The run's result records whether the bridge was up and how many tool calls went through it. If the
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
-tool channel that fails never fails a Task.
+tool channel that fails never fails a Task, and the run is still isolated from your own MCP servers.
 
 > An earlier design (slice C) described a fleet session as having "no platform tools." That was
 > always a **default**, not an invariant: the bridge is off until an operator and the Agent's own
