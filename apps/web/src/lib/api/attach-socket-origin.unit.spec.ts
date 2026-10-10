@@ -34,7 +34,7 @@ const DEFAULT_API_URL_CONSTANT = 'http://localhost:3100/api';
  * `ws://localhost:3100` for the `https://api.ever.works` case. The cases and
  * their expectations are unchanged.
  */
-const constantsMock = vi.hoisted(() => ({ apiUrl: 'http://localhost:3100/api' }));
+let constantsMock = vi.hoisted(() => ({ apiUrl: 'http://localhost:3100/api' }));
 vi.mock('@/lib/constants', () => ({
     get API_URL() {
         return constantsMock.apiUrl;
