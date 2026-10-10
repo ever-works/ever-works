@@ -39,7 +39,7 @@
 		"@ever-works/contracts": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"@kubernetes/client-node": "^1.4.0",
-		"js-yaml": "^5.2.3"
+		"js-yaml": "^5.4.1"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.4",
