@@ -21,11 +21,17 @@ describe('GitHubAppOnboardingService', () => {
 
     const createService = () => {
         const gitHubAppService = {
-            getInstallation: jest.fn(),
+            // Default: an Organization installation (claim authority below).
+            getInstallation: jest.fn().mockResolvedValue({
+                id: 12345,
+                app_slug: 'ever-works',
+                account: { id: 999, login: 'acme', type: 'Organization' },
+                target_type: 'Organization',
+            }),
             getUserAuthorizationUrl: jest.fn(),
             exchangeUserCode: jest.fn(),
             getAuthenticatedGithubUser: jest.fn(),
-            userCanAccessInstallation: jest.fn().mockResolvedValue(true),
+            isActiveOrgAdmin: jest.fn().mockResolvedValue(true),
         };
         const installationRepository = {
             findByInstallationId: jest.fn(),
@@ -285,49 +291,170 @@ describe('GitHubAppOnboardingService', () => {
             );
         });
 
-        // Review (CodeRabbit security note on #2578): the signed state carries an
-        // installation id chosen by whoever called the PUBLIC setup endpoint.
-        // Making the callback succeed without "Email addresses: read" must not
-        // let any GitHub login claim a known, still-unclaimed installation.
-        it('refuses before any write when the authorizing GitHub user cannot access the installation', async () => {
-            const {
-                service,
-                gitHubAppService,
-                installationRepository,
-                userLinkRepository,
-                authAccountRepository,
-                userRepository,
-            } = createService();
-            const state = (service as any).signState({
-                installationId: '12345',
-                issuedAt: Date.now(),
+        // Review (CodeRabbit security notes on #2578): the signed state carries an
+        // installation id chosen by whoever called the PUBLIC setup endpoint, and
+        // `GET /user/installations` also lists installations a read-only
+        // collaborator can merely access. Only someone who could have INSTALLED
+        // the App on that account may claim the installation.
+        describe('installation claim authority (refused with 403 before any write)', () => {
+            const arrange = (
+                installation: Record<string, unknown>,
+                options: { recordedInstaller?: string | null; githubUserId?: string } = {},
+            ) => {
+                const ctx = createService();
+                const state = (ctx.service as any).signState({
+                    installationId: '12345',
+                    issuedAt: Date.now(),
+                });
+                ctx.gitHubAppService.exchangeUserCode.mockResolvedValue({
+                    access_token: 'ghu_token',
+                });
+                ctx.gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                    githubUserId: options.githubUserId ?? '4242',
+                    login: 'octo',
+                    email: null,
+                    emailVerified: false,
+                    avatarUrl: null,
+                    nodeId: null,
+                });
+                ctx.gitHubAppService.getInstallation.mockResolvedValue({
+                    id: 12345,
+                    app_slug: 'ever-works',
+                    ...installation,
+                });
+                ctx.installationRepository.findByInstallationId.mockResolvedValue(
+                    options.recordedInstaller === undefined
+                        ? null
+                        : {
+                              installationId: '12345',
+                              createdByGithubUserId: options.recordedInstaller,
+                          },
+                );
+                ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+                ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+                ctx.userRepository.findByEmail.mockResolvedValue(null);
+                ctx.userRepository.create.mockImplementation(async (data: object) => ({
+                    id: 'user-new',
+                    ...data,
+                }));
+                const row = { id: 'row-1', installationId: '12345' };
+                ctx.installationRepository.upsertFromGithub.mockResolvedValue(row);
+                ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(row);
+                const run = () => ctx.service.completeUserAuth({ code: 'code', state });
+                return { ...ctx, state, run };
+            };
+            const orgInstallation = {
+                account: { id: 999, login: 'acme', type: 'Organization' },
+                target_type: 'Organization',
+            };
+            const userInstallation = (accountId: number) => ({
+                account: { id: accountId, login: 'octo', type: 'User' },
+                target_type: 'User',
             });
-            gitHubAppService.exchangeUserCode.mockResolvedValue({ access_token: 'ghu_token' });
-            gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
-                githubUserId: 'gh-attacker',
-                login: 'attacker',
-                email: 'attacker@example.com',
-                emailVerified: false,
-                avatarUrl: null,
-                nodeId: null,
+            const expectNothingWritten = (ctx: ReturnType<typeof arrange>) => {
+                expect(ctx.userLinkRepository.findByGithubUserId).not.toHaveBeenCalled();
+                expect(ctx.userRepository.create).not.toHaveBeenCalled();
+                expect(ctx.userRepository.update).not.toHaveBeenCalled();
+                expect(ctx.authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
+                expect(ctx.userLinkRepository.upsertLink).not.toHaveBeenCalled();
+                expect(ctx.installationRepository.upsertFromGithub).not.toHaveBeenCalled();
+                expect(
+                    ctx.installationRepository.claimOwnershipIfUnassigned,
+                ).not.toHaveBeenCalled();
+            };
+
+            it('org: an active org admin may claim', async () => {
+                const ctx = arrange(orgInstallation);
+                ctx.gitHubAppService.isActiveOrgAdmin.mockResolvedValue(true);
+
+                await ctx.run();
+
+                expect(ctx.gitHubAppService.isActiveOrgAdmin).toHaveBeenCalledWith(
+                    'ghu_token',
+                    'acme',
+                );
+                expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                    '12345',
+                    'user-new',
+                    '4242',
+                );
             });
-            gitHubAppService.userCanAccessInstallation.mockResolvedValue(false);
 
-            await expect(service.completeUserAuth({ code: 'code', state })).rejects.toBeInstanceOf(
-                ForbiddenException,
-            );
+            // isActiveOrgAdmin answers false for a non-admin member, an outside
+            // (read-only) collaborator, a pending invitation and any membership
+            // lookup error alike — see github-app.service.spec.ts.
+            it.each([
+                ['an org member who is not an admin'],
+                ['an outside read-only collaborator'],
+                ['a user whose membership lookup failed'],
+            ])('org: %s is refused', async () => {
+                const ctx = arrange(orgInstallation);
+                ctx.gitHubAppService.isActiveOrgAdmin.mockResolvedValue(false);
 
-            expect(gitHubAppService.userCanAccessInstallation).toHaveBeenCalledWith(
-                'ghu_token',
-                '12345',
-            );
-            expect(userLinkRepository.findByGithubUserId).not.toHaveBeenCalled();
-            expect(userRepository.create).not.toHaveBeenCalled();
-            expect(userRepository.update).not.toHaveBeenCalled();
-            expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
-            expect(userLinkRepository.upsertLink).not.toHaveBeenCalled();
-            expect(installationRepository.upsertFromGithub).not.toHaveBeenCalled();
-            expect(installationRepository.claimOwnershipIfUnassigned).not.toHaveBeenCalled();
+                await expect(ctx.run()).rejects.toBeInstanceOf(ForbiddenException);
+
+                expectNothingWritten(ctx);
+            });
+
+            it('user installation: the account owner may claim, with no membership lookup', async () => {
+                const ctx = arrange(userInstallation(4242));
+
+                await ctx.run();
+
+                expect(ctx.gitHubAppService.isActiveOrgAdmin).not.toHaveBeenCalled();
+                expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalled();
+            });
+
+            it("user installation: anyone else (e.g. a collaborator on the owner's repos) is refused", async () => {
+                const ctx = arrange(userInstallation(5151));
+
+                await expect(ctx.run()).rejects.toBeInstanceOf(ForbiddenException);
+
+                expect(ctx.gitHubAppService.isActiveOrgAdmin).not.toHaveBeenCalled();
+                expectNothingWritten(ctx);
+            });
+
+            it('user installation without an account id is refused', async () => {
+                const ctx = arrange({
+                    account: { login: 'octo', type: 'User' },
+                    target_type: 'User',
+                });
+
+                await expect(ctx.run()).rejects.toBeInstanceOf(ForbiddenException);
+
+                expectNothingWritten(ctx);
+            });
+
+            it('recorded installer (installation webhook `sender`) equal to the user may claim, with no membership lookup', async () => {
+                const ctx = arrange(orgInstallation, { recordedInstaller: '4242' });
+                ctx.gitHubAppService.isActiveOrgAdmin.mockResolvedValue(false);
+
+                await ctx.run();
+
+                expect(ctx.gitHubAppService.isActiveOrgAdmin).not.toHaveBeenCalled();
+                expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalled();
+            });
+
+            it('recorded installer different from the user is refused, even for an org admin', async () => {
+                const ctx = arrange(orgInstallation, { recordedInstaller: '7777' });
+                ctx.gitHubAppService.isActiveOrgAdmin.mockResolvedValue(true);
+
+                await expect(ctx.run()).rejects.toBeInstanceOf(ForbiddenException);
+
+                expect(ctx.gitHubAppService.isActiveOrgAdmin).not.toHaveBeenCalled();
+                expectNothingWritten(ctx);
+            });
+
+            it('an unsupported target type (e.g. Enterprise) is refused', async () => {
+                const ctx = arrange({
+                    account: { id: 1, login: 'big-corp', type: 'Enterprise' },
+                    target_type: 'Enterprise',
+                });
+
+                await expect(ctx.run()).rejects.toBeInstanceOf(ForbiddenException);
+
+                expectNothingWritten(ctx);
+            });
         });
 
         // Prod 2026-10-09 — the App had no "Email addresses: read" permission, so
@@ -516,7 +643,7 @@ describe('GitHubAppOnboardingService', () => {
             jest.spyOn(realGitHubAppService, 'getInstallation').mockResolvedValue({
                 id: 169597044,
                 app_slug: 'ever-works',
-                account: { login: 'ever-co', type: 'Organization' },
+                account: { id: 1001, login: 'ever-co', type: 'Organization' },
                 target_type: 'Organization',
             });
             const warnSpy = jest
@@ -546,9 +673,7 @@ describe('GitHubAppOnboardingService', () => {
                             ),
                     ),
                 )
-                .mockReturnValueOnce(
-                    of({ data: { total_count: 1, installations: [{ id: 169597044 }] } }),
-                );
+                .mockReturnValueOnce(of({ data: { state: 'active', role: 'admin' } }));
             const service = new GitHubAppOnboardingService(
                 realGitHubAppService,
                 ctx.installationRepository as any,
@@ -584,7 +709,7 @@ describe('GitHubAppOnboardingService', () => {
                 );
                 expect(httpService.get).toHaveBeenNthCalledWith(
                     3,
-                    'https://api.github.com/user/installations',
+                    'https://api.github.com/user/memberships/orgs/ever-co',
                     expect.anything(),
                 );
                 expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();

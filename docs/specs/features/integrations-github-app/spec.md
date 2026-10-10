@@ -139,11 +139,25 @@ setup URL, and callback URL are derived with sensible defaults from
   `5xx` and network failures still throw. The OAuth-App sign-in path
   (`SocialAuthService`) does not opt in, so it keeps failing on a
   missing `user:email` scope.
-- **Given** the HMAC state names an installation the authorizing GitHub
-  user cannot access (it is absent from that user's
-  `GET /user/installations`), **when** `completeUserAuth` runs, **then**
-  it throws `ForbiddenException` before any user, auth-account, user-link
-  or installation row is written or claimed.
+- **Given** the HMAC state names an installation (an id chosen by whoever
+  called the public setup endpoint), **when** `completeUserAuth` runs,
+  **then** it fetches the installation with the App JWT and accepts the
+  authorizing GitHub user only if one of these holds:
+    - the installation row's `createdByGithubUserId` (the HMAC-verified
+      `installation.created` webhook's `sender`) equals that user's id;
+    - with no installer recorded, a `User` installation's `account.id`
+      equals that user's id;
+    - with no installer recorded, an `Organization` installation's org has
+      that user as an active admin (`GET /user/memberships/orgs/{org}` with
+      the user token returns `state: active`, `role: admin`).
+
+    Otherwise it throws `ForbiddenException` before any user, auth-account,
+    user-link or installation row is written or claimed. The otherwise case
+    covers a read-only collaborator, a non-admin member, a pending
+    invitation, any membership-lookup error, a different recorded installer
+    and an unsupported target type. Visibility through
+    `GET /user/installations` is NOT treated as authority.
+
 - **Given** a `github` auth account already exists for the GitHub user
   id but its local user cannot be loaded, **when**
   `findOrCreateLocalUser` runs, **then** the service throws

@@ -81,6 +81,8 @@ The platform GitHub App is configured on the API with `GITHUB_APP_ID`, `GITHUB_A
 
 Give the App the account permission **"Email addresses: read"**. With it, the setup callback reads the user's verified email addresses for account linking. Without it, the callback still completes: it uses the public profile email, treats that email as unverified, and logs a warning.
 
+Also give it the organization permission **"Members: read"**. The setup callback uses it to confirm that whoever links an organization installation is an active admin of that organization. Without it, an organization installation can only be linked by the installer named in GitHub's installation webhook. See [Who can link an installation](./guides/connect-integrations.md#who-can-link-an-installation).
+
 ### Google OAuth
 
 | Variable               | Description                | Type     | Default                                | Required |

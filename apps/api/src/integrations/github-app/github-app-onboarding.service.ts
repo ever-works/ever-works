@@ -10,12 +10,13 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     UnauthorizedException,
 } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import * as bcrypt from 'bcrypt';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { GitHubAppService } from './github-app.service';
+import { GitHubAppService, type GitHubInstallationResponse } from './github-app.service';
 import { UsernameAllocatorService } from '@src/users/services/username-allocator.service';
 
 type SetupStatePayload = {
@@ -27,6 +28,8 @@ type SetupStatePayload = {
 
 @Injectable()
 export class GitHubAppOnboardingService {
+    private readonly logger = new Logger(GitHubAppOnboardingService.name);
+
     constructor(
         private readonly gitHubAppService: GitHubAppService,
         private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
@@ -75,18 +78,17 @@ export class GitHubAppOnboardingService {
         // The signed state names an installation id chosen by whoever called the
         // public setup endpoint; the HMAC proves only that WE issued the state.
         // Before anything is written or the installation is bound to a local
-        // user, prove the GitHub user who just authorized can actually access
-        // that installation — otherwise anyone with a GitHub login and a known,
-        // still-unclaimed installation id could claim it.
-        const canAccessInstallation = await this.gitHubAppService.userCanAccessInstallation(
-            tokenResult.access_token,
+        // user, prove the GitHub user who just authorized could have INSTALLED
+        // it. Mere access is not enough: a read-only collaborator can see an
+        // installation but must never be able to claim it.
+        const installationDetails = await this.gitHubAppService.getInstallation(
             state.installationId,
         );
-        if (!canAccessInstallation) {
-            throw new ForbiddenException(
-                'The authorizing GitHub user cannot access this GitHub App installation',
-            );
-        }
+        await this.assertMayClaimInstallation({
+            installation: installationDetails,
+            githubUserId: githubUser.githubUserId,
+            accessToken: tokenResult.access_token,
+        });
 
         const user = await this.findOrCreateLocalUser({
             githubUserId: githubUser.githubUserId,
@@ -106,9 +108,6 @@ export class GitHubAppOnboardingService {
             nodeId: githubUser.nodeId,
         });
 
-        const installationDetails = await this.gitHubAppService.getInstallation(
-            state.installationId,
-        );
         await this.gitHubAppInstallationRepository.upsertFromGithub({
             installationId: String(installationDetails.id),
             appSlug: installationDetails.app_slug || config.githubApp.slug(),
@@ -136,6 +135,71 @@ export class GitHubAppOnboardingService {
             installation,
             redirectTo: state.redirectTo,
         };
+    }
+
+    /**
+     * Only someone who could have installed the App on that account may claim
+     * the installation:
+     *
+     *  1. When the `installation.created` webhook already recorded the installer
+     *     (`createdByGithubUserId`, from the HMAC-verified delivery's `sender`),
+     *     that GitHub user — and nobody else — may claim it. No extra GitHub
+     *     call or App permission is needed.
+     *  2. Otherwise (the webhook has not arrived yet): a **User** installation
+     *     may be claimed only by that account itself, and an **Organization**
+     *     installation only by an active org admin.
+     *  3. Anything else (unknown target type, missing account data) is refused.
+     *
+     * Throws 403 before any write.
+     */
+    private async assertMayClaimInstallation(input: {
+        installation: GitHubInstallationResponse;
+        githubUserId: string;
+        accessToken: string;
+    }): Promise<void> {
+        const { installation, githubUserId, accessToken } = input;
+        const installationId = String(installation.id);
+        const refuse = (reason: string): never => {
+            this.logger.warn(
+                `Refused GitHub App installation claim (installation=${installationId}, reason=${reason})`,
+            );
+            throw new ForbiddenException(
+                'Only the GitHub user who installed this GitHub App, the account it is installed on, or an organization admin can link this installation',
+            );
+        };
+
+        const stored =
+            await this.gitHubAppInstallationRepository.findByInstallationId(installationId);
+        const recordedInstaller = stored?.createdByGithubUserId;
+        if (recordedInstaller) {
+            if (recordedInstaller === githubUserId) {
+                return;
+            }
+            return refuse('not-the-recorded-installer');
+        }
+
+        const targetType = installation.target_type || installation.account?.type;
+        if (targetType === 'User') {
+            const accountId = installation.account?.id;
+            if (
+                accountId !== undefined &&
+                accountId !== null &&
+                String(accountId) === githubUserId
+            ) {
+                return;
+            }
+            return refuse('not-the-installation-account');
+        }
+
+        if (targetType === 'Organization') {
+            const orgLogin = installation.account?.login;
+            if (orgLogin && (await this.gitHubAppService.isActiveOrgAdmin(accessToken, orgLogin))) {
+                return;
+            }
+            return refuse('not-an-active-org-admin');
+        }
+
+        return refuse('unsupported-target-type');
     }
 
     private async findOrCreateLocalUser(input: {

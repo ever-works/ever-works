@@ -157,48 +157,89 @@ describe('GitHubAppService', () => {
         });
     });
 
-    describe('userCanAccessInstallation', () => {
-        const page = (ids: number[]) => of({ data: { installations: ids.map((id) => ({ id })) } });
-
-        it('is true when GET /user/installations lists the installation', async () => {
-            const { service, httpService } = createService();
-            httpService.get.mockReturnValueOnce(page([7, 169597044]));
-
-            await expect(service.userCanAccessInstallation('ghu_token', '169597044')).resolves.toBe(
-                true,
+    // Claim authority for an Organization installation (review on #2578):
+    // only an ACTIVE org ADMIN could have installed the App there.
+    describe('isActiveOrgAdmin', () => {
+        const membership = (state: string, role: string) => of({ data: { state, role } });
+        const httpError = (status: number) =>
+            new AxiosError(
+                `Request failed with status code ${status}`,
+                status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST,
+                undefined,
+                {},
+                {
+                    status,
+                    statusText: 'error',
+                    data: {},
+                    headers: {},
+                    config: { headers: {} } as never,
+                },
             );
+
+        let warnSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+            warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            warnSpy.mockRestore();
+        });
+
+        it('is true for an active admin, asking GitHub about the token user only', async () => {
+            const { service, httpService } = createService();
+            httpService.get.mockReturnValueOnce(membership('active', 'admin'));
+
+            await expect(service.isActiveOrgAdmin('ghu_token', 'ever-co')).resolves.toBe(true);
             expect(httpService.get).toHaveBeenCalledWith(
-                'https://api.github.com/user/installations',
-                expect.objectContaining({ params: { per_page: 100, page: 1 } }),
+                'https://api.github.com/user/memberships/orgs/ever-co',
+                expect.objectContaining({
+                    headers: expect.objectContaining({ Authorization: expect.any(String) }),
+                }),
             );
         });
 
-        it('follows pagination until the installation is found', async () => {
+        it('is false for an active member who is not an admin', async () => {
             const { service, httpService } = createService();
-            httpService.get
-                .mockReturnValueOnce(page(Array.from({ length: 100 }, (_, index) => index + 1)))
-                .mockReturnValueOnce(page([500]));
+            httpService.get.mockReturnValueOnce(membership('active', 'member'));
 
-            await expect(service.userCanAccessInstallation('ghu_token', '500')).resolves.toBe(true);
-            expect(httpService.get).toHaveBeenCalledTimes(2);
+            await expect(service.isActiveOrgAdmin('ghu_token', 'ever-co')).resolves.toBe(false);
         });
 
-        it('is false when the user cannot see the installation (a foreign, unclaimed one)', async () => {
+        it('is false for a pending (not yet accepted) admin invitation', async () => {
             const { service, httpService } = createService();
-            httpService.get.mockReturnValueOnce(page([7, 8]));
+            httpService.get.mockReturnValueOnce(membership('pending', 'admin'));
 
-            await expect(service.userCanAccessInstallation('ghu_token', '169597044')).resolves.toBe(
-                false,
-            );
-            expect(httpService.get).toHaveBeenCalledTimes(1);
+            await expect(service.isActiveOrgAdmin('ghu_token', 'ever-co')).resolves.toBe(false);
         });
 
-        it('is false for a non-numeric id without calling GitHub', async () => {
+        it('is false for an outside collaborator (GitHub answers 404: not a member)', async () => {
+            const { service, httpService } = createService();
+            httpService.get.mockReturnValueOnce(throwError(() => httpError(404)));
+
+            await expect(service.isActiveOrgAdmin('ghu_token', 'ever-co')).resolves.toBe(false);
+        });
+
+        it.each([403, 500, 502])(
+            'fails closed on a membership API error (%i) and warns, status only',
+            async (status) => {
+                const { service, httpService } = createService();
+                httpService.get.mockReturnValueOnce(throwError(() => httpError(status)));
+
+                await expect(service.isActiveOrgAdmin('ghu_SECRET', 'ever-co')).resolves.toBe(
+                    false,
+                );
+                expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`status=${status}`));
+                expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Members: read'));
+                expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('ghu_SECRET'));
+            },
+        );
+
+        it('is false for a malformed org login without calling GitHub', async () => {
             const { service, httpService } = createService();
 
-            await expect(service.userCanAccessInstallation('ghu_token', '../meta')).resolves.toBe(
-                false,
-            );
+            await expect(service.isActiveOrgAdmin('ghu_token', '../user')).resolves.toBe(false);
+            await expect(service.isActiveOrgAdmin('ghu_token', '')).resolves.toBe(false);
             expect(httpService.get).not.toHaveBeenCalled();
         });
     });

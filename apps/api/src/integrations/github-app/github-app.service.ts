@@ -8,13 +8,15 @@ import {
     verifyGitHubWebhookSignature,
 } from '@ever-works/agent/utils';
 import { resolveGitHubAccountEmail } from '@src/auth/utils/github-email.utils';
+import { isAxiosError } from 'axios';
 import { config } from '../../config/constants';
 import { firstValueFrom } from 'rxjs';
 
-type GitHubInstallationResponse = {
+export type GitHubInstallationResponse = {
     id: number;
     target_type?: string;
     account?: {
+        id?: number;
         login?: string;
         type?: string;
     };
@@ -47,10 +49,13 @@ type GitHubAccessTokenResponse = {
     error_description?: string;
 };
 
-type GitHubUserInstallationsResponse = {
-    total_count?: number;
-    installations?: Array<{ id: number }>;
+type GitHubOrgMembershipResponse = {
+    state?: string;
+    role?: string;
 };
+
+/** GitHub login syntax: alphanumerics and single hyphens, at most 39 characters. */
+const GITHUB_LOGIN_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
 type GitHubUserResponse = {
     id: number;
@@ -158,36 +163,37 @@ export class GitHubAppService {
     }
 
     /**
-     * Whether the GitHub user behind a user-to-server token can access the given
-     * installation of THIS App. `GET /user/installations` lists exactly the
-     * installations of the App that issued the token on which the user has
-     * explicit access (installation owner, or org owner/member with access); no
-     * extra App permission is needed.
+     * Whether the GitHub user behind a user-to-server token is an ACTIVE ADMIN
+     * (owner) of the organization — i.e. someone who could have installed this
+     * App there. `GET /user/memberships/orgs/{org}` answers for the token's own
+     * user; a GitHub App user token needs the App's organization permission
+     * "Members: read" for it.
+     *
+     * Fails closed: not a member (404), no permission (403), pending
+     * invitation, a non-admin role, or any upstream error all answer false.
+     * Only the status is logged.
      */
-    async userCanAccessInstallation(accessToken: string, installationId: string): Promise<boolean> {
-        if (!/^\d+$/.test(installationId)) {
+    async isActiveOrgAdmin(accessToken: string, orgLogin: string): Promise<boolean> {
+        if (!GITHUB_LOGIN_PATTERN.test(orgLogin)) {
             return false;
         }
-        const headers = createGitHubOAuthHeaders(accessToken);
-        const perPage = 100;
-        // Bounded: a user with access to more than 5,000 installations of one App
-        // is not a real onboarding case.
-        for (let page = 1; page <= 50; page++) {
+        try {
             const { data } = await firstValueFrom(
-                this.httpService.get<GitHubUserInstallationsResponse>(
-                    'https://api.github.com/user/installations',
-                    { headers, params: { per_page: perPage, page } },
+                this.httpService.get<GitHubOrgMembershipResponse>(
+                    `https://api.github.com/user/memberships/orgs/${encodeURIComponent(orgLogin)}`,
+                    { headers: createGitHubOAuthHeaders(accessToken) },
                 ),
             );
-            const installations = data.installations || [];
-            if (installations.some((installation) => String(installation.id) === installationId)) {
-                return true;
-            }
-            if (installations.length < perPage) {
-                return false;
-            }
+            return data?.state === 'active' && data?.role === 'admin';
+        } catch (error) {
+            const status = isAxiosError(error) ? error.response?.status : undefined;
+            this.logger.warn(
+                `GitHub org membership lookup failed (status=${status ?? 'none'}); ` +
+                    'treating the user as not an org admin. A GitHub App user token needs the ' +
+                    'organization permission "Members: read" for this lookup.',
+            );
+            return false;
         }
-        return false;
     }
 
     async getInstallation(installationId: string): Promise<GitHubInstallationResponse> {
