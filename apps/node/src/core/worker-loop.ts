@@ -8,6 +8,7 @@ import type {
 } from '@ever-works/contracts';
 import {
 	clampLeaseTtlSec,
+	FLEET_NODE_UPGRADE_COMMAND,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
 	FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON,
 	FLEET_JOB_MAX_LEASE_BATCH,
@@ -26,7 +27,7 @@ import {
 	type ResourceSample
 } from './resource-limits';
 import type { DiskProbeIo } from './telemetry-probe';
-import { clampResourceLimits, type NodeResourceLimits } from './types';
+import { applyNodeLimitCeiling, clampResourceLimits, type NodeLimitCeiling, type NodeResourceLimits } from './types';
 import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { WorkerSafetyGate } from './worker-safety-store';
 
@@ -190,6 +191,27 @@ export function isSuspendGap(gap: TimerGap): boolean {
 }
 
 /**
+ * The upgrade path for a node that was NOT installed from the npm package
+ * (review): the package's publish is tag-triggered and not every machine
+ * runs it — a node built from a monorepo checkout upgrades by rebuilding.
+ */
+export const NODE_SOURCE_UPGRADE_HINT =
+	'(or, on a node built from a monorepo checkout, pull and run `pnpm build:node`)';
+
+/**
+ * The sentence every surface prints for a daemon below the platform's
+ * minimum version (node lifecycle, self-build slice AR): what is wrong and
+ * the exact command that fixes it.
+ */
+export function describeUpgradeRequired(minNodeVersion: string | null, currentVersion?: string | null): string {
+	const current = currentVersion ? `This daemon (${currentVersion})` : 'This daemon';
+	const floor = minNodeVersion
+		? `the platform's minimum version ${minNodeVersion}`
+		: "the platform's minimum version";
+	return `Upgrade required — ${current} is below ${floor}, so it is offered no new work. Run \`${FLEET_NODE_UPGRADE_COMMAND}\` on this machine ${NODE_SOURCE_UPGRADE_HINT}, then restart the node service.`;
+}
+
+/**
  * Exponential backoff for `n` consecutive failures, capped.
  *
  * `nextBackoffMs(1)` is the base delay and each further failure doubles
@@ -224,6 +246,24 @@ export interface JobLeaseCapableClient {
 		},
 		signal?: AbortSignal
 	): Promise<FleetJobView[]>;
+	/**
+	 * Node lifecycle (self-build slice AR) — the same poll, plus the
+	 * platform's reason when it refused it because this daemon is below the
+	 * minimum version. Optional so an embedder with an older client (and
+	 * every test double that only implements `lease`) keeps working; the
+	 * loop then simply cannot learn the refusal from the lease and relies on
+	 * the heartbeat to tell it.
+	 */
+	leaseOutcome?(
+		request: {
+			max?: number;
+			leaseTtlSec?: number;
+			capabilities?: string[];
+			kinds?: FleetJobKind[];
+			excludeKinds?: FleetJobKind[];
+		},
+		signal?: AbortSignal
+	): Promise<{ jobs: FleetJobView[]; upgradeRequired: boolean; minNodeVersion: string | null }>;
 	heartbeat(jobId: string, leaseTtlSec?: number, leaseGeneration?: number): Promise<FleetJobView | null>;
 	complete(
 		jobId: string,
@@ -421,6 +461,18 @@ export interface WorkerPollCadence {
 	nextIdleDelayMs(): number;
 }
 
+/**
+ * Node lifecycle (self-build slice AR) — why this loop is not leasing
+ * because the platform says the daemon is too old. Held until a heartbeat
+ * says otherwise; in-flight work runs on and still reports.
+ */
+export interface WorkerUpgradeHold {
+	/** The floor the platform judged this daemon against, when it named one. */
+	minNodeVersion: string | null;
+	/** Operator-facing sentence: what is wrong and the exact upgrade command. */
+	reason: string;
+}
+
 /** Durable fail-closed marker stored beside the node enrollment config. */
 export interface WorkerUnsafeState {
 	since: string;
@@ -504,12 +556,23 @@ export class WorkerLoop {
 	private readonly concurrency: number;
 	private readonly leaseTtlSec: number;
 	private readonly idlePollMs: number;
-	private readonly limits: NodeResourceLimits;
+	/**
+	 * The limits this loop ENFORCES: `localLimits`, lowered by the owner's
+	 * platform ceiling when one is in force (remote node limits, slice AS).
+	 * Mutable for that reason alone — see {@link applyLimitCeiling}.
+	 */
+	private limits: NodeResourceLimits;
+	/** The operator's own limits (start flags / stored config), clamped. The upper bound. */
+	private readonly localLimits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
 	private readonly diskProbe: DiskProbeIo | undefined;
 	private readonly workspacePath: string | undefined;
 	/** Last disk refusal reason logged, so the warning fires once per episode. */
 	private lastDiskRefusal: string | null = null;
+	/** Node lifecycle (slice AR): set while the platform refuses this daemon's version. */
+	private upgradeHold: WorkerUpgradeHold | null = null;
+	/** Listeners told when the LEASE (not the heartbeat) reports an upgrade refusal. */
+	private readonly upgradeListeners = new Set<(hold: WorkerUpgradeHold) => void>();
 	private readonly now: () => number;
 	private readonly monotonicNow: () => number;
 	private readonly leasePollDrainTimeoutMs: number;
@@ -560,7 +623,8 @@ export class WorkerLoop {
 		);
 		// `limits` wins over the legacy `concurrency` option so there is
 		// exactly one number in play once an operator has set limits.
-		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.localLimits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.limits = { ...this.localLimits };
 		this.resourceProbe = options.resourceProbe;
 		this.diskProbe = options.diskProbe;
 		this.workspacePath = options.workspacePath;
@@ -589,6 +653,31 @@ export class WorkerLoop {
 	/** Max jobs this loop will ever run at once. */
 	get maxConcurrency(): number {
 		return this.limits.maxConcurrentJobs;
+	}
+
+	/** The operator's own limits, before any platform ceiling (slice AS). */
+	get localResourceLimits(): NodeResourceLimits {
+		return { ...this.localLimits };
+	}
+
+	/**
+	 * Remote node limits (self-build slice AS) — clamp this loop to
+	 * `min(its own limits, the owner's platform ceiling)`, or back to its own
+	 * limits when the ceiling is lifted (`null`, or all-null).
+	 *
+	 * Takes effect at the next lease: a lower concurrency never cancels work
+	 * already running — the loop simply leases nothing more until it is back
+	 * under the new number — and a CPU / memory ceiling joins the admission
+	 * gate on the next poll. Returns true when the enforced limits changed.
+	 */
+	applyLimitCeiling(ceiling: NodeLimitCeiling | null): boolean {
+		const next = applyNodeLimitCeiling(this.localLimits, ceiling);
+		const changed =
+			next.maxConcurrentJobs !== this.limits.maxConcurrentJobs ||
+			next.maxCpuPercent !== this.limits.maxCpuPercent ||
+			next.maxMemoryMb !== this.limits.maxMemoryMb;
+		this.limits = next;
+		return changed;
 	}
 
 	/** Lease an executor must have left before it may publish (clamped). */
@@ -721,6 +810,57 @@ export class WorkerLoop {
 		}
 	}
 
+	/**
+	 * Node lifecycle (self-build slice AR) — stop (or resume) leasing because
+	 * the platform's minimum daemon version is above this one.
+	 *
+	 * The same DRAIN, not cut, as `pause()`: leasing halts at once, every
+	 * job already in flight keeps running and keeps reporting, and the loop
+	 * keeps ticking so lifting the hold needs no restart. Distinct from
+	 * `pause()` because it is not the operator's decision and must not be
+	 * persisted as one — a restart of an upgraded daemon starts unheld, and
+	 * a restart of a still-old one is held again by its first beat.
+	 *
+	 * Reported as `throttled` with the hold's reason (the wire vocabulary
+	 * for "running, holding its jobs, not leasing more"), so Fleet shows
+	 * WHY the machine is idle next to its own "upgrade required" badge.
+	 * `null` lifts it and polls immediately.
+	 */
+	setUpgradeHold(hold: WorkerUpgradeHold | null): void {
+		const previous = this.upgradeHold;
+		this.upgradeHold = hold;
+		if (hold) {
+			if (this.unsafe || this.paused) return;
+			this.patch(
+				this.inFlight.size === 0 && this.running
+					? { state: 'throttled', throttleReason: hold.reason }
+					: { throttleReason: hold.reason }
+			);
+			return;
+		}
+		if (!previous) return;
+		if (this.state.throttleReason === previous.reason) {
+			this.patch({ throttleReason: null, state: this.nextIdleState() });
+		}
+		if (this.running && !this.stopping && !this.paused && !this.unsafe && this.activePolls.size === 0) {
+			this.cancelTimer();
+			void this.tick();
+		}
+	}
+
+	/** The current upgrade hold, or null. */
+	getUpgradeHold(): WorkerUpgradeHold | null {
+		return this.upgradeHold ? { ...this.upgradeHold } : null;
+	}
+
+	/** Be told when a LEASE answer (rather than a beat) reports the daemon is below the floor. */
+	onUpgradeRequired(listener: (hold: WorkerUpgradeHold) => void): () => void {
+		this.upgradeListeners.add(listener);
+		return () => {
+			this.upgradeListeners.delete(listener);
+		};
+	}
+
 	/** Await every in-flight job. Resolves immediately when there are none. */
 	async drained(): Promise<void> {
 		// Re-read `inFlight` each pass: a job settling can be what frees
@@ -793,6 +933,19 @@ export class WorkerLoop {
 			return;
 		}
 
+		// Node lifecycle (slice AR): the platform refuses this daemon's
+		// version. Not even a lease call — the answer is known — but the
+		// loop keeps ticking so a heartbeat that lifts the hold takes effect
+		// without a restart, and in-flight jobs keep their verdicts.
+		if (this.upgradeHold) {
+			this.patch({
+				state: this.inFlight.size > 0 ? 'working' : 'throttled',
+				throttleReason: this.upgradeHold.reason
+			});
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+
 		// `limits.maxConcurrentJobs` — not the legacy `concurrency` field.
 		// `limits` supersedes it (and is clamped), so reading the raw
 		// option here would silently ignore an operator's ceiling.
@@ -831,6 +984,27 @@ export class WorkerLoop {
 			this.scheduleNext(this.idlePollMs);
 			return;
 		}
+		// Re-read AFTER the admission await, not before it (review, slice AS):
+		// a heartbeat answer can land in that await and both lift an upgrade
+		// hold and lower the platform limit ceiling. The capacity captured at
+		// the top of this poll would then ask for the OLD batch size and run
+		// every job it was handed, past the ceiling the owner just set.
+		// Read through the accessor: TypeScript narrowed the field to null at
+		// the top of this poll and cannot see the await in between.
+		const holdAfterAdmission = this.getUpgradeHold();
+		if (holdAfterAdmission) {
+			this.patch({
+				state: this.inFlight.size > 0 ? 'working' : 'throttled',
+				throttleReason: holdAfterAdmission.reason
+			});
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+		const leaseCapacity = this.limits.maxConcurrentJobs - this.inFlight.size;
+		if (leaseCapacity <= 0) {
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
 		if (this.state.throttleReason != null) {
 			this.patch({ throttleReason: null });
 		}
@@ -838,6 +1012,7 @@ export class WorkerLoop {
 		this.patch({ state: this.inFlight.size > 0 ? 'working' : 'polling' });
 
 		let jobs: FleetJobView[];
+		let refusedForVersion: { minNodeVersion: string | null } | null = null;
 		const pollController = new AbortController();
 		this.pollControllers.add(pollController);
 		try {
@@ -848,7 +1023,7 @@ export class WorkerLoop {
 				kinds?: FleetJobKind[];
 				excludeKinds?: FleetJobKind[];
 			} = {
-				max: capacity,
+				max: leaseCapacity,
 				leaseTtlSec: this.leaseTtlSec
 			};
 			if (this.options.capabilities) request.capabilities = this.options.capabilities;
@@ -856,7 +1031,13 @@ export class WorkerLoop {
 			if (this.options.excludeKinds && this.options.excludeKinds.length > 0) {
 				request.excludeKinds = [...this.options.excludeKinds];
 			}
-			jobs = await this.options.client.lease(request, pollController.signal);
+			if (this.options.client.leaseOutcome) {
+				const outcome = await this.options.client.leaseOutcome(request, pollController.signal);
+				jobs = outcome.jobs;
+				if (outcome.upgradeRequired) refusedForVersion = { minNodeVersion: outcome.minNodeVersion };
+			} else {
+				jobs = await this.options.client.lease(request, pollController.signal);
+			}
 		} catch (error) {
 			if (pollController.signal.aborted || this.stopping || !this.running) return;
 			noticeResumeDuringPoll();
@@ -907,6 +1088,27 @@ export class WorkerLoop {
 
 		this.patch({ consecutiveFailures: 0, lastError: null });
 		this.options.pollCadence?.recordPoll(jobs.length);
+
+		// Node lifecycle (slice AR): the platform refused this poll for the
+		// daemon version floor. Hold the lane (the next tick will not even
+		// ask) and tell whoever composes this loop, so the heartbeat side —
+		// which owns lifting it — learns the same fact.
+		if (refusedForVersion && jobs.length === 0) {
+			const hold: WorkerUpgradeHold = {
+				minNodeVersion: refusedForVersion.minNodeVersion,
+				reason: describeUpgradeRequired(refusedForVersion.minNodeVersion)
+			};
+			this.setUpgradeHold(hold);
+			for (const listener of this.upgradeListeners) {
+				try {
+					listener(hold);
+				} catch {
+					// A listener's failure is its own.
+				}
+			}
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
 
 		if (jobs.length === 0) {
 			this.patch({ state: this.inFlight.size > 0 ? 'working' : 'idle' });

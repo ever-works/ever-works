@@ -11,15 +11,20 @@ import {
 	FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
 	FLEET_AGENT_EXECUTION_MODES,
 	FLEET_AGENT_EXECUTION_PROVIDERS,
+	FLEET_AGENT_MODEL_SESSION_ID_PATTERN,
+	FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES,
 	FLEET_BYO_MODEL_PLUGIN_ID_PREFIX,
 	FleetAgentExecutionError,
 	fleetAgentExecutionProviderSupportsMountGrants,
+	fleetAgentExecutionProviderSupportsSessionResume,
 	fleetModelCostUsdToCents,
 	fleetModelPluginId,
 	isFleetAgentExecutionMode,
 	isFleetAgentExecutionProvider,
+	isFleetAgentModelSessionId,
 	isFleetModelPluginId,
-	normalizeFleetAgentModelExecution
+	normalizeFleetAgentModelExecution,
+	normalizeFleetAgentModelResume
 } from '../fleet-jobs.types';
 
 /**
@@ -200,5 +205,91 @@ describe('fleet agent execution contract', () => {
 				normalizeFleetAgentModelExecution({ provider: 'claude-code', instructions: emoji })
 			).toThrowError(/bytes/);
 		});
+	});
+});
+
+/**
+ * Fleet run continuity (self-build slice AU) — the resume block a job may
+ * carry, and the one shape a session id may have before a node puts it on
+ * `claude --resume <id>`.
+ *
+ * Two properties are what these pin. The session id is held to a UUID and
+ * nothing else, because it is interpolated into a shell command line. And a
+ * bad block is DROPPED, never refused: the fresh-session instructions are
+ * always complete on their own, so failing the job over an optimisation
+ * hint would cost the owner a re-answer for nothing.
+ */
+describe('fleet run continuity — session resume (slice AU)', () => {
+	const SESSION = '3f0e9a52-7b1c-4d2e-9a8f-0c1d2e3f4a5b';
+	const NODE = '11111111-1111-4111-8111-111111111111';
+	const resume = { sessionId: SESSION, nodeId: NODE, instructions: '# OWNER ANSWER\n\nUse Postgres.' };
+
+	it('accepts the UUIDs both CLIs mint (Claude v4 session_id, Codex v7 thread_id)', () => {
+		expect(isFleetAgentModelSessionId(SESSION)).toBe(true);
+		expect(isFleetAgentModelSessionId('0199a3f1-2c4b-7d10-9e2f-3a4b5c6d7e8f')).toBe(true);
+		expect(isFleetAgentModelSessionId(SESSION.toUpperCase())).toBe(true);
+		expect(FLEET_AGENT_MODEL_SESSION_ID_PATTERN.source).toContain('{8}');
+	});
+
+	it.each([
+		['empty', ''],
+		['shell metacharacters', `${SESSION}; rm -rf /`],
+		['a leading flag', '--dangerously-skip-permissions'],
+		['a quote', `${SESSION}"`],
+		['a space', `${SESSION} x`],
+		['a newline', `${SESSION}\n`],
+		['too long', `${SESSION}0`],
+		['not hex', 'zzzzzzzz-zzzz-4zzz-8zzz-zzzzzzzzzzzz'],
+		['a path', '../../etc/passwd'],
+		['a number', 42],
+		['null', null]
+	])('refuses a session id that is %s', (_label, value) => {
+		expect(isFleetAgentModelSessionId(value)).toBe(false);
+	});
+
+	it('resumes Claude Code only — Codex cannot be held to its sandbox on `exec resume`', () => {
+		expect(fleetAgentExecutionProviderSupportsSessionResume('claude-code')).toBe(true);
+		expect(fleetAgentExecutionProviderSupportsSessionResume('codex')).toBe(false);
+	});
+
+	it('pins the outcome vocabulary a node reports', () => {
+		expect(FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES).toEqual(['resumed', 'fell-back', 'skipped']);
+	});
+
+	it('normalizes a valid block verbatim', () => {
+		expect(normalizeFleetAgentModelResume(resume)).toEqual(resume);
+	});
+
+	it.each([
+		['absent', undefined],
+		['null', null],
+		['an array', [resume]],
+		['a bad session id', { ...resume, sessionId: `${SESSION} --x` }],
+		['a missing session id', { nodeId: NODE, instructions: 'x' }],
+		['a bad node id', { ...resume, nodeId: 'node-1' }],
+		['blank instructions', { ...resume, instructions: '   ' }],
+		['non-string instructions', { ...resume, instructions: 42 }],
+		[
+			'oversize instructions',
+			{ ...resume, instructions: 'x'.repeat(FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES + 1) }
+		]
+	])('drops a resume block that is %s', (_label, raw) => {
+		expect(normalizeFleetAgentModelResume(raw)).toBeNull();
+	});
+
+	it('carries a valid block through the execution normalizer', () => {
+		const out = normalizeFleetAgentModelExecution({ provider: 'claude-code', instructions: 'full brief', resume });
+		expect(out.resume).toEqual(resume);
+		expect(out.instructions).toBe('full brief');
+	});
+
+	it('drops — never refuses — an invalid block, so the job still runs fresh', () => {
+		const out = normalizeFleetAgentModelExecution({
+			provider: 'claude-code',
+			instructions: 'full brief',
+			resume: { ...resume, sessionId: '$(curl evil)' }
+		});
+		expect(out).toEqual({ provider: 'claude-code', instructions: 'full brief' });
+		expect('resume' in out).toBe(false);
 	});
 });

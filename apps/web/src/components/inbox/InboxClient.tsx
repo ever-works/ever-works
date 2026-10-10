@@ -42,7 +42,7 @@ import {
 import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
 import { InboxReplyComposer } from './InboxReplyComposer';
-import { InboxTabs, type InboxView } from './InboxTabs';
+import { InboxSourceFilter, InboxTabs, type InboxView } from './InboxTabs';
 
 export type { InboxView };
 
@@ -50,6 +50,8 @@ interface InboxClientProps {
     items: InboxItem[];
     unreadCount: number;
     view: InboxView;
+    /** From `?source=fleet` — only fleet-run messages (self-build slice AU). */
+    fleetOnly?: boolean;
     /** From `?id=` — the deep link a notification's "Open inbox" lands on. */
     selectedId?: string;
     loadError?: string | null;
@@ -93,7 +95,14 @@ function snippet(body: string): string {
  * arrived while the tab sat open, and is paused while a reply is in
  * flight so a refresh cannot yank the textarea out from under the human.
  */
-export function InboxClient({ items, unreadCount, view, selectedId, loadError }: InboxClientProps) {
+export function InboxClient({
+    items,
+    unreadCount,
+    view,
+    fleetOnly = false,
+    selectedId,
+    loadError,
+}: InboxClientProps) {
     const t = useTranslations('dashboard.inbox');
     const router = useRouter();
 
@@ -246,7 +255,8 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                 )}
             </header>
 
-            <InboxTabs view={view} />
+            <InboxTabs view={view} fleetOnly={fleetOnly} />
+            {view !== 'decisions' && <InboxSourceFilter view={view} fleetOnly={fleetOnly} />}
 
             {loadError && (
                 <div className="mb-4 rounded-lg border border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-800 dark:text-red-300">
@@ -261,7 +271,11 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                 >
                     {rows.length === 0 && (
                         <li className="p-8 text-center text-sm text-text-secondary dark:text-text-secondary-dark">
-                            {view === 'archived' ? t('empty.archived') : t('empty.active')}
+                            {fleetOnly
+                                ? t('sourceFilter.empty')
+                                : view === 'archived'
+                                  ? t('empty.archived')
+                                  : t('empty.active')}
                         </li>
                     )}
                     {rows.map((item) => {

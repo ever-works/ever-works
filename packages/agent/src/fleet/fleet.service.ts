@@ -15,18 +15,28 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
     FLEET_ENROLLABLE_NODE_KINDS,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_CLI_VERSIONS,
     FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
+    FLEET_MAX_REPORTED_LIMIT_VALUE,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_NODE_MAX_CONCURRENT_JOBS,
+    FLEET_NODE_MAX_CPU_PERCENT,
+    FLEET_NODE_MAX_MEMORY_MB,
+    FLEET_NODE_MIN_CONCURRENT_JOBS,
+    FLEET_NODE_MIN_CPU_PERCENT,
+    FLEET_NODE_MIN_MEMORY_MB,
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    isFleetNodeVersionBelowFloor,
     normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
+    FleetNodeLimitCeiling,
     FleetNodeView,
     FleetNodeLoadView,
     FleetNodeWorkerState,
@@ -150,6 +160,13 @@ export interface EnrollInput {
      * whole compatibility story — see the comment in `heartbeat`.
      */
     cliVersion?: string;
+    /**
+     * Node lifecycle (self-build slice AR) — the PINNED model-CLI versions,
+     * one `"<provider> <version>"` entry per provider. An array (even an
+     * empty one: "nothing is pinned any more") replaces the stored list;
+     * absent leaves it alone, like every other telemetry field.
+     */
+    cliVersions?: string[];
     /** Free bytes on the node's workspace volume. Same optional contract. */
     diskFreeBytes?: number;
     /**
@@ -188,6 +205,41 @@ export interface EnrollInput {
     lastReclaimAt?: string;
     /** Bytes that sweep freed. */
     lastReclaimFreedBytes?: number;
+    /**
+     * Remote node limits (self-build slice AS) — what the node's worker is
+     * enforcing right now. A SET keyed on `maxConcurrentJobs`: a beat that
+     * carries it writes all three (CPU / memory `null` = no ceiling in
+     * force); one that omits it leaves the stored set alone.
+     */
+    maxConcurrentJobs?: number;
+    maxCpuPercent?: number | null;
+    maxMemoryMb?: number | null;
+}
+
+/** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
+type ConsumeEnrollmentPatchWithTelemetry = Parameters<FleetNodeRepository['consumeEnrollment']>[2] &
+    Partial<FleetNode>;
+
+/**
+ * What an accepted heartbeat hands back to the API edge.
+ *
+ * The two node-lifecycle fields (self-build slice AR) travel to the
+ * machine on the heartbeat response; the lease enforces the same floor
+ * independently (`FleetJobService.lease`), so a daemon that ignores them
+ * — every build older than the field — is still refused new work.
+ */
+export interface FleetHeartbeatResult {
+    node: FleetNodeView;
+    rotationRequested: boolean;
+    /** The minimum daemon version the platform admits right now. */
+    minNodeVersion: string;
+    /** True when this node's reported version is below that floor. */
+    upgradeRequired: boolean;
+    /**
+     * Remote node limits (slice AS) — the owner's ceiling for this node,
+     * all-null when none is set, so lifting one reaches the machine too.
+     */
+    limitCeiling: FleetNodeLimitCeiling;
 }
 
 export interface EnrollResult {
@@ -394,6 +446,8 @@ export class FleetService {
             // Heartbeat is the opposite case and treats absent as
             // "leave alone"; see the comment there.
             cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
+            // Node lifecycle (slice AR): the pinned per-provider versions.
+            cliVersions: sanitizeCliVersions(input.cliVersions),
             diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
             modelIdentity: sanitizeModelIdentity(input.modelIdentity),
             // Health signals (EW-776): normalized, never stored verbatim.
@@ -424,7 +478,10 @@ export class FleetService {
             workspaceBytes: sanitizeByteCount(input.workspaceBytes),
             lastReclaimAt: sanitizeReportedInstant(input.lastReclaimAt, now),
             lastReclaimFreedBytes: sanitizeByteCount(input.lastReclaimFreedBytes),
-        };
+        } as ConsumeEnrollmentPatchWithTelemetry;
+        // Remote node limits (slice AS) — the same keyed set as a beat; a
+        // fresh row starts from whatever the machine said (usually nothing).
+        applyReportedLimits(input, patch);
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
         const consumed = await this.repository.consumeEnrollment(node.id, tokenHash, patch);
@@ -477,7 +534,7 @@ export class FleetService {
         nodeId: unknown,
         secret: unknown,
         refresh: EnrollInput = {},
-    ): Promise<{ node: FleetNodeView; rotationRequested: boolean } | null> {
+    ): Promise<FleetHeartbeatResult | null> {
         const verified = verifyNodeSecret(nodeId, secret);
         if (!verified) return null;
 
@@ -518,6 +575,12 @@ export class FleetService {
         // "report nothing" to mean "erase".
         const cliVersion = sanitizeText(refresh.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH);
         if (cliVersion) patch.cliVersion = cliVersion;
+        // Node lifecycle (slice AR). `null` only when the beat carried no
+        // list at all; an EMPTY list is a real report ("nothing is pinned
+        // any more") and does overwrite, or an un-pinned CLI would be shown
+        // for ever.
+        const cliVersions = sanitizeCliVersions(refresh.cliVersions);
+        if (cliVersions !== null) patch.cliVersions = cliVersions;
         const diskFreeBytes = sanitizeByteCount(refresh.diskFreeBytes);
         if (diskFreeBytes !== null) patch.diskFreeBytes = diskFreeBytes;
         // Same additive contract (EW-777): a beat that says nothing about
@@ -530,6 +593,8 @@ export class FleetService {
         // build does not recognise, which is stored as null / "unknown".
         const workerState = this.applyWorkerState(node, refresh, patch);
         this.applyHousekeeping(refresh, patch);
+        // Remote node limits (slice AS): what the worker reports enforcing.
+        applyReportedLimits(refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -548,9 +613,19 @@ export class FleetService {
         // Inbox call then fails we log it rather than re-arming, exactly
         // as the daily-ceiling notice does.
         await this.announceWorkerTransition(node, patch, workerState);
+        const view = this.toView({ ...node, ...patch });
         return {
-            node: this.toView({ ...node, ...patch }),
+            node: view,
             rotationRequested: Boolean(node.rotationRequestedAt),
+            // Node lifecycle (slice AR). Judged on the version THIS beat
+            // stored (the patch wins over the row), so the beat a freshly
+            // upgraded daemon sends is the one that clears the flag — not
+            // the one after it.
+            minNodeVersion: view.minNodeVersion ?? config.fleet.getMinNodeVersion(),
+            upgradeRequired: view.upgradeRequired === true,
+            // Remote node limits (slice AS) — read off the ROW: a beat never
+            // writes the ceiling, only the owner does.
+            limitCeiling: toLimitCeiling(node),
         };
     }
 
@@ -804,6 +879,39 @@ export class FleetService {
                 dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
             },
             after: { dailyCostCeilingCents: ceiling, dailyCostTrippedOn: null },
+        });
+        return this.toView({ ...node, ...patch } as FleetNode);
+    }
+
+    /**
+     * Remote node limits (self-build slice AS) — set (or clear, with nulls)
+     * the owner's platform-side CEILING for one node, owner-scoped.
+     *
+     * Validated the way the cost ceilings are: each field a whole number
+     * inside the node's own bounds (`FLEET_NODE_*`), or null — refused, not
+     * clamped, because a value the node would silently rewrite is a setting
+     * that does not do what the owner typed. The node clamps itself to
+     * `min(its own flag, this)` on its next heartbeat, so a ceiling can only
+     * ever lower what a machine does. Audited as `node.limits` with the
+     * before/after, like every other lifecycle write.
+     */
+    async setLimitCeilingForUser(
+        userId: string,
+        nodeId: string,
+        input: unknown,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const ceiling = normalizeLimitCeilingInput(input);
+        const node = await this.getOwnedNode(userId, nodeId);
+        const patch: Partial<FleetNode> = {
+            ceilingMaxConcurrentJobs: ceiling.maxConcurrentJobs,
+            ceilingMaxCpuPercent: ceiling.maxCpuPercent,
+            ceilingMaxMemoryMb: ceiling.maxMemoryMb,
+        };
+        await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.limits', userId, node, ctx, {
+            before: { ...toLimitCeiling(node) },
+            after: { ...ceiling },
         });
         return this.toView({ ...node, ...patch } as FleetNode);
     }
@@ -1563,6 +1671,19 @@ export class FleetService {
             persisted: true,
             capabilitiesPinned: Boolean(node.capabilitiesPinned),
             cliVersion: node.cliVersion ?? null,
+            // Node lifecycle (slice AR): the pinned per-provider CLI
+            // versions, and whether this daemon is below the platform's
+            // floor. The floor is read per call (an env change lands
+            // without a restart) and judged by the ONE shared predicate the
+            // lease uses, so the drawer and the lease can never disagree.
+            // `this` is not used here on purpose: the conformance suite
+            // calls this method unbound.
+            cliVersions: Array.isArray(node.cliVersions) ? node.cliVersions : null,
+            minNodeVersion: config.fleet.getMinNodeVersion(),
+            upgradeRequired: isFleetNodeVersionBelowFloor(
+                node.version,
+                config.fleet.getMinNodeVersion(),
+            ),
             // `bigint` comes back as a STRING on Postgres and a number on
             // sqlite. Normalizing HERE — the one place an entity becomes
             // a wire view — is what stops `"12345" > 0` style bugs from
@@ -1591,6 +1712,10 @@ export class FleetService {
             workspaceBytes: toOptionalNumber(node.workspaceBytes),
             lastReclaimAt: node.lastReclaimAt ? toIso(node.lastReclaimAt) : null,
             lastReclaimFreedBytes: toOptionalNumber(node.lastReclaimFreedBytes),
+            // Remote node limits (self-build slice AS): what the node reports
+            // enforcing (null = never reported), and the owner's ceiling.
+            effectiveLimits: toEffectiveLimits(node),
+            limitCeiling: toLimitCeiling(node),
             // Agent computers. The lock columns surface as ONE holder object,
             // present only while the lock is held and unexpired — an expired
             // lock is free, and showing it would claim control nobody has.
@@ -1600,6 +1725,84 @@ export class FleetService {
             controlHolder: toControlHolder(node),
         };
     }
+}
+
+/**
+ * Remote node limits (self-build slice AS) — the owner's ceiling off a row.
+ * Each column through `toOptionalNumber`, which also normalizes the string a
+ * driver may hand back.
+ */
+function toLimitCeiling(node: FleetNode): FleetNodeLimitCeiling {
+    return {
+        maxConcurrentJobs: toOptionalNumber(node.ceilingMaxConcurrentJobs),
+        maxCpuPercent: toOptionalNumber(node.ceilingMaxCpuPercent),
+        maxMemoryMb: toOptionalNumber(node.ceilingMaxMemoryMb),
+    };
+}
+
+/** What the node last reported enforcing, or null when it never reported (slice AS). */
+function toEffectiveLimits(node: FleetNode): FleetNodeView['effectiveLimits'] {
+    const maxConcurrentJobs = toOptionalNumber(node.effectiveMaxConcurrentJobs);
+    if (maxConcurrentJobs === null) return null;
+    return {
+        maxConcurrentJobs,
+        maxCpuPercent: toOptionalNumber(node.effectiveMaxCpuPercent),
+        maxMemoryMb: toOptionalNumber(node.effectiveMaxMemoryMb),
+    };
+}
+
+/**
+ * Fold a beat's reported limits into the patch (slice AS).
+ *
+ * Keyed on `maxConcurrentJobs`: present and usable → the whole set is
+ * written (a CPU / memory value that is absent, null or unusable becomes
+ * null, i.e. "no ceiling in force"); absent → nothing is written, so an
+ * older daemon never blanks a reading a newer build left. A figure outside
+ * the int column is dropped rather than clamped — a clamped number is one
+ * an operator would believe.
+ */
+function applyReportedLimits(refresh: EnrollInput, patch: Partial<FleetNode>): void {
+    const concurrency = sanitizeCount(refresh.maxConcurrentJobs, FLEET_MAX_REPORTED_LIMIT_VALUE);
+    if (concurrency === null) return;
+    patch.effectiveMaxConcurrentJobs = concurrency;
+    patch.effectiveMaxCpuPercent = sanitizeCount(
+        refresh.maxCpuPercent,
+        FLEET_MAX_REPORTED_LIMIT_VALUE,
+    );
+    patch.effectiveMaxMemoryMb = sanitizeCount(refresh.maxMemoryMb, FLEET_MAX_REPORTED_LIMIT_VALUE);
+}
+
+/**
+ * Validate an owner's ceiling (slice AS). Every field must be present and
+ * be null or a whole number inside the node's own bounds; anything else is
+ * a 400 naming the field. The DTO checks the same, this is the source of
+ * truth for every caller.
+ */
+function normalizeLimitCeilingInput(input: unknown): FleetNodeLimitCeiling {
+    const body = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+    const field = (name: keyof FleetNodeLimitCeiling, min: number, max: number): number | null => {
+        const value = body[name];
+        if (value === null) return null;
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+            throw new BadRequestException(
+                `${name} must be null (no ceiling) or a whole number between ${min} and ${max}`,
+            );
+        }
+        return value;
+    };
+    return {
+        maxConcurrentJobs: field(
+            'maxConcurrentJobs',
+            FLEET_NODE_MIN_CONCURRENT_JOBS,
+            FLEET_NODE_MAX_CONCURRENT_JOBS,
+        ),
+        maxCpuPercent: field(
+            'maxCpuPercent',
+            FLEET_NODE_MIN_CPU_PERCENT,
+            FLEET_NODE_MAX_CPU_PERCENT,
+        ),
+        maxMemoryMb: field('maxMemoryMb', FLEET_NODE_MIN_MEMORY_MB, FLEET_NODE_MAX_MEMORY_MB),
+    };
 }
 
 /** The live control lock as a view, or null when it is free or has expired. */
@@ -1715,6 +1918,34 @@ function sanitizeReportedInstant(value: unknown, now: Date): Date | null {
  * unattended machine and comfortably less than a timezone mistake.
  */
 const REPORTED_INSTANT_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
+ * Node lifecycle (self-build slice AR) — the pinned model-CLI versions a
+ * node reports, one `"<provider> <version>"` entry each.
+ *
+ * `null` means "the beat said nothing" (not an array) and leaves the
+ * stored list alone. Anything else becomes a list — possibly empty — of
+ * trimmed, single-line, deduplicated entries, each capped at the
+ * single-`cliVersion` bound and at most {@link FLEET_MAX_CLI_VERSIONS} of
+ * them. Free text from the machine, so control characters are stripped
+ * and known token shapes scrubbed, exactly like `modelIdentity`: these
+ * strings are stored and rendered in the drawer.
+ */
+function sanitizeCliVersions(value: unknown): string[] | null {
+    if (!Array.isArray(value)) return null;
+    const out: string[] = [];
+    for (const entry of value) {
+        if (typeof entry !== 'string') continue;
+        // eslint-disable-next-line no-control-regex
+        const line = entry.replace(/[\u0000-\u001F\u007F]+/g, ' ').trim();
+        if (!line) continue;
+        const cleaned = redactSecrets(line).cleaned.slice(0, FLEET_MAX_CLI_VERSION_LENGTH);
+        if (out.includes(cleaned)) continue;
+        out.push(cleaned);
+        if (out.length >= FLEET_MAX_CLI_VERSIONS) break;
+    }
+    return out;
+}
 
 function sanitizeText(value: unknown, maxLength: number): string | null {
     if (typeof value !== 'string') return null;

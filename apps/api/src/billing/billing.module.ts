@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@src/auth';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { OrganizationsModule } from '@src/organizations/organizations.module';
+import { MailModule } from '@src/mail/mail.module';
 import { BillingController, CreditsCheckoutController } from './billing.controller';
 import { BillingWebhookController } from './billing-webhook.controller';
 import { PlanCheckoutController } from './plan-checkout.controller';
@@ -9,6 +11,7 @@ import { PaymentMethodController } from './payment-method.controller';
 import { PaygController } from './payg.controller';
 import { SeatsController } from './seats.controller';
 import { StripeRelayModule } from './stripe-relay/stripe-relay.module';
+import { TrialEndingMailHandler } from './trial-ending-mail.handler';
 
 /**
  * The money path (billing PRD B5) — thin API module over the agent-side
@@ -41,7 +44,11 @@ import { StripeRelayModule } from './stripe-relay/stripe-relay.module';
         // that routes each event to the directory that owns it. Ships dark
         // behind STRIPE_RELAY_ENABLED; additive beside the receiver above.
         StripeRelayModule,
+        // Trial-ending reminder emails (2026-10 repricing) — `UserRepository` + `MailService`.
+        DatabaseModule,
+        MailModule,
     ],
+    providers: [TrialEndingMailHandler],
     controllers: [
         BillingController,
         CreditsCheckoutController,

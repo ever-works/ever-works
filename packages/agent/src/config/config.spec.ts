@@ -261,6 +261,24 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getMinNodeVersion (node lifecycle, slice AR)', () => {
+        it('defaults to the first daemon ever published, so no machine is refused by default', () => {
+            expect(config.fleet.getMinNodeVersion()).toBe('0.1.0');
+        });
+
+        it('honours an operator floor, normalized', () => {
+            process.env.FLEET_MIN_NODE_VERSION = ' v0.3.0 ';
+            expect(config.fleet.getMinNodeVersion()).toBe('0.3.0');
+        });
+
+        it('falls back to the default on a value that is not a version — a typo must not idle the fleet', () => {
+            for (const value of ['latest', '', '1', 'x.y.z']) {
+                process.env.FLEET_MIN_NODE_VERSION = value;
+                expect(config.fleet.getMinNodeVersion()).toBe('0.1.0');
+            }
+        });
+    });
+
     describe('config.fleet (FLEET_* operator knobs)', () => {
         describe('getEnrollmentTokenTtlMs', () => {
             it('defaults to 15 minutes', () => {
@@ -307,6 +325,37 @@ describe('agent/config', () => {
             it('degrades a nonsense value to the default', () => {
                 process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = 'a while';
                 expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+        });
+
+        describe('fleet job retention (self-build slice AP)', () => {
+            it('keeps terminal job bodies for 30 days by default, purge ON', () => {
+                expect(config.fleet.getJobRetentionDays()).toBe(30);
+                expect(config.fleet.isJobPurgeEnabled()).toBe(true);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = '90';
+                expect(config.fleet.getJobRetentionDays()).toBe(90);
+            });
+
+            it('floors at one day and caps at ten years', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = '0';
+                expect(config.fleet.getJobRetentionDays()).toBe(1);
+                process.env.FLEET_JOB_RETENTION_DAYS = '100000';
+                expect(config.fleet.getJobRetentionDays()).toBe(3650);
+            });
+
+            it('degrades a nonsense value to the default rather than purging everything now', () => {
+                process.env.FLEET_JOB_RETENTION_DAYS = 'forever';
+                expect(config.fleet.getJobRetentionDays()).toBe(30);
+            });
+
+            it('switches the purge off only for an explicit false', () => {
+                process.env.FLEET_JOB_PURGE_ENABLED = 'false';
+                expect(config.fleet.isJobPurgeEnabled()).toBe(false);
+                process.env.FLEET_JOB_PURGE_ENABLED = '0';
+                expect(config.fleet.isJobPurgeEnabled()).toBe(true);
             });
         });
     });

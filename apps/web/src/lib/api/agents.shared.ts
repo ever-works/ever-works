@@ -109,6 +109,27 @@ export interface AgentRunSession {
     createdAt: string;
 }
 
+/**
+ * Self-build slice AU — `runnerKind` prefix the platform stamps on a run it
+ * dispatched to a FLEET node (`fleet-node:claude-code`, `fleet-node:codex`,
+ * `fleet-node:command`) — the same bring-your-own tag the run's usage row
+ * carries (`FLEET_BYO_MODEL_PLUGIN_ID_PREFIX` in the contracts).
+ */
+export const FLEET_RUNNER_KIND_PREFIX = 'fleet-node:';
+
+/**
+ * True when the run executes on one of the owner's fleet nodes. A node runs
+ * a model CLI on instructions frozen at dispatch and never reads messages
+ * sent mid-run, so a free-text steer to such a run would be undeliverable.
+ * False for an older API that never stamped the tag — the safe reading,
+ * which keeps today's controls.
+ */
+export function isFleetRun(run: Pick<AgentRunSession, 'runnerKind'>): boolean {
+    return (
+        typeof run.runnerKind === 'string' && run.runnerKind.startsWith(FLEET_RUNNER_KIND_PREFIX)
+    );
+}
+
 // ── Session detail (Feature K) ──
 // Client-safe mirror of `GET /api/agents/runs/:runId/detail`
 // (AgentsController.getRunSessionDetail).

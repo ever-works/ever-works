@@ -29,6 +29,8 @@ const PAGE_SIZE = 100;
 type InboxSearchParams = Promise<{
     view?: string | string[];
     id?: string | string[];
+    /** `fleet` = only questions and notices from fleet runs (self-build slice AU). */
+    source?: string | string[];
     /** My Decisions view filters — see `parseDecisionFilters`. */
     tab?: string | string[];
     kind?: string | string[];
@@ -105,6 +107,9 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
         );
     }
 
+    // `?source=fleet` — the "From your fleet" filter (self-build slice AU):
+    // only what fleet runs asked or reported, in the Active or Archived view.
+    const fleetOnly = firstParam(params.source) === 'fleet';
     let items: InboxItem[] = [];
     let unreadCount = 0;
     let loadError: string | null = null;
@@ -113,6 +118,7 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
             // Active = everything not archived, which the API returns when
             // `status` is omitted.
             ...(view === 'archived' ? { status: 'archived' as const } : {}),
+            ...(fleetOnly ? { sourceType: 'fleet-run' as const } : {}),
             limit: PAGE_SIZE,
         });
         items = result?.data ?? [];
@@ -126,6 +132,7 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
             items={items}
             unreadCount={unreadCount}
             view={view}
+            fleetOnly={fleetOnly}
             selectedId={selectedId}
             loadError={loadError}
         />
