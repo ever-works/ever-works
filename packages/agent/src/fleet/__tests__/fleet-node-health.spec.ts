@@ -228,14 +228,21 @@ describe('fleet health signals — Inbox notices', () => {
             const service = build();
 
             await service.listEnrolledForUser('user-1');
+            const after = Date.now();
 
             const [, announced] = repository.findStaleOnline.mock.calls[0];
             const [userId, swept] = repository.sweepOffline.mock.calls[0];
             expect(userId).toBe('user-1');
             expect((swept as Date).getTime()).toBe((announced as Date).getTime());
-            const offset = before - (swept as Date).getTime();
-            expect(offset).toBeGreaterThanOrEqual(FLEET_NODE_OFFLINE_AFTER_MS - 1000);
-            expect(offset).toBeLessThanOrEqual(FLEET_NODE_OFFLINE_AFTER_MS + 1000);
+            // `now - window`, with "now" bracketed by the clock on both sides of the
+            // call — a CPU-throttled CI runner stalling inside it cannot push the
+            // cutoff out of the 1 s tolerance (an offset from `before` alone could).
+            expect((swept as Date).getTime()).toBeGreaterThanOrEqual(
+                before - FLEET_NODE_OFFLINE_AFTER_MS - 1000,
+            );
+            expect((swept as Date).getTime()).toBeLessThanOrEqual(
+                after - FLEET_NODE_OFFLINE_AFTER_MS + 1000,
+            );
         });
 
         it('re-arms both offline markers on the next accepted beat', async () => {
@@ -321,14 +328,17 @@ describe('fleet health signals — Inbox notices', () => {
             const service = build();
 
             await service.listEnrolledForUser('user-1');
+            const after = Date.now();
 
             const [userId, longCutoff] = repository.findOfflineUnnoticed.mock.calls[0];
             expect(userId).toBe('user-1');
-            const offset = before - (longCutoff as Date).getTime();
-            expect(offset).toBeGreaterThanOrEqual(
-                FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS - 1000,
+            // Bracketed by the clock on both sides of the call (see the stale-online case).
+            expect((longCutoff as Date).getTime()).toBeGreaterThanOrEqual(
+                before - FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS - 1000,
             );
-            expect(offset).toBeLessThanOrEqual(FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS + 1000);
+            expect((longCutoff as Date).getTime()).toBeLessThanOrEqual(
+                after - FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS + 1000,
+            );
             expect(inbox.notice).toHaveBeenCalledTimes(1);
             expect(inbox.notice.mock.calls[0][1].title).toBe('Fleet node still offline: Office PC');
             expect(inbox.notice.mock.calls[0][1].body).toContain('30 minutes');

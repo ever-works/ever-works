@@ -15,7 +15,7 @@ Shipped: enrollment, heartbeats, the registry and the **Settings → Fleet** pag
 
 Verify before you rely on it: **live scheduling behaviour on your own deployment.** Two things are worth checking on a real install before you route production work at your machines — that `EVER_WORKS_JOB_RUNTIME=node` (or an organization overlay) is actually in force, and that the node you enrolled advertises every capability tag the jobs you enqueue require. A node that advertises nothing is eligible only for work that names no requirements.
 
-Not yet built: **a UI for node affinity.** Pinning an Agent to a specific machine is API-only today — there is no picker on the Agent page. Everything else on this page has a screen.
+Node affinity has a screen too: pin an Agent to a specific machine from the Agent page (**Capabilities** → **Execution** → **Preferred node**, see [Pin an agent to a node](#pin-an-agent-to-a-node)) or through the API. Everything on this page has a screen.
 
 :::
 
@@ -128,7 +128,7 @@ Every heartbeat now carries what the node's **worker** is doing, alongside the r
 Two properties are load-bearing and deliberately awkward:
 
 - **The field is a string on the wire, not an enum.** The heartbeat DTO runs under `whitelist + forbidNonWhitelisted`, so a value an older API rejects fails the whole request — and a failed heartbeat is a node that sweeps to `offline`. A node newer than the platform must be able to report a state this build has never heard of and stay alive; the server normalizes anything unrecognised to "unknown" rather than trusting it.
-- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts.
+- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts. The optional fields are dropped in tiers, newest first: a platform that predates only the pinned CLI versions and enforced limits (slices AR / AS) loses just those, and keeps receiving the worker state and housekeeping. Enrollment never sends the newest tier at all — it has no such fallback — so a new node can always enroll against an older platform.
 
 The drawer judges a job FAILED on the reconciled run outcome — the badge, the **Failed** filter chip and the endpoint’s `failures` subset all use the same rule, so a job the node called `done` whose run failed appears in all three.
 
@@ -150,10 +150,11 @@ The sweep is piggybacked on owner-scoped list reads (there is no cron): the runn
 
 ### Knobs
 
-| Env                                  | Default | Meaning                                                        |
-| ------------------------------------ | ------- | -------------------------------------------------------------- |
-| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`       |
-| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice |
+| Env                                  | Default | Meaning                                                               |
+| ------------------------------------ | ------- | --------------------------------------------------------------------- |
+| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`              |
+| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice        |
+| `FLEET_MIN_NODE_VERSION`             | `0.1.0` | minimum daemon version the lease admits (see "Keeping nodes current") |
 
 The notice window is floored at the sweep window: an escalation that could fire before the node is even considered offline would be two notices for one event.
 
@@ -284,10 +285,11 @@ Check subprocesses get an environment built **from scratch**, never the inherite
 | `ever-works-node status`                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
 | `ever-works-node capabilities`                           | Prints the tags this machine would report, without enrolling.                                                                       |
 | `ever-works-node clear-quarantine`                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
+| `ever-works-node doctor [--json]`                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
 
 `--work` is opt-in on purpose: **enrolling a machine and letting it run the owner's commands are two different consents.** A paused node keeps heartbeating, too — a drained machine that vanished from Fleet would be indistinguishable from a dead one.
 
-Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, --concurrency <count>` (jobs at once), `--max-cpu <percent>` and `--max-memory <mb>` (refuse new work while the host is above a ceiling), `--capabilities <tags>` (offer a narrower set than was detected), and `--local-only` on `pause` / `resume` / `unenroll` for a machine being drained or decommissioned offline. Exit codes are `0` ok, `1` failure, `3` not enrolled — so provisioning scripts can branch on them.
+Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, --concurrency <count>` (jobs at once), `--max-cpu <percent>` and `--max-memory <mb>` (refuse new work while the host is above a ceiling — the owner can lower all three from Fleet, see "Remote node limits"), `--capabilities <tags>` (offer a narrower set than was detected), and `--local-only` on `pause` / `resume` / `unenroll` for a machine being drained or decommissioned offline. Exit codes are `0` ok, `1` failure, `3` not enrolled — so provisioning scripts can branch on them.
 
 ### Enroll a machine end to end
 
@@ -338,9 +340,54 @@ You can also hand-edit a node's tags under **Settings → Fleet → Capability t
 
 `ever-works-node start` is a foreground process. The repo ships three ways to keep it alive across reboots — a systemd template unit (`ever-works-node@<user>.service`, which runs as the user whose commands the node executes, not root), a Windows service or scheduled task, and a container image. Enrollment is never part of installation: it consumes a one-time token and stays an explicit, interactive act.
 
+The node's own log rotates. Under systemd it goes to the journal (`journalctl -u ever-works-node@<user>`), which journald already bounds. On Windows, `node.log` / `node.err.log` in `%ProgramData%\ever-works-node` rotate past 10 MB: the NSSM service rotates them online and at every start (`AppRotateFiles`, `AppRotateOnline`, `AppRotateBytes`), and since NSSM never deletes a rotated file, the installer also registers a daily `<Name>-LogPrune` task that keeps the newest five rotated generations of each log, and the scheduled-task fallback rotates them each time the task starts — at boot and on every restart — keeping the newest five generations. Re-run the installer on a machine installed before this to pick it up.
+
 :::note Build it yourself for now
 `ever-works-node` is not published to npm yet, and the Fleet handoff panel says as much: "Node app downloads ship in an upcoming release." Build it from a monorepo checkout with `pnpm build:node` — the app is deliberately excluded from the default root build — or build the desktop node shell with `pnpm build:desktop-node`, the Electron packaging of the same shared core, with a setup wizard, a status window, a tray and auto-start.
 :::
+
+## Keeping nodes current
+
+Upgrading a node is still a manual step per machine — `npm install -g ever-works-node@latest` for a machine installed from the npm package (see `apps/node/README.md`; the package publishes on a release tag), or `git pull` + `pnpm build:node` for a node built from a monorepo checkout — then restart the node service. The platform now tells you which machines need it, and refuses the ones that are too old instead of letting them fail work.
+
+### The daemon version floor
+
+The platform publishes a **minimum daemon version** (`FLEET_MIN_NODE_VERSION`, default `0.1.0` — the first release ever published, so out of the box every daemon is admitted). Every accepted heartbeat carries it, plus a per-node verdict.
+
+A node whose reported version is below the floor:
+
+- keeps heartbeating, stays visible in Fleet, and keeps settling the work it already holds — liveness and in-flight work are never gated;
+- is offered **no new work**: the lease answers `200 { "jobs": [], "upgradeRequired": true, "minNodeVersion": "…" }`. That is deliberately the same shape as the global stop flag and **never a 401** — a node reads a lease 401 as a revoked credential and makes it sticky, so an auth-shaped refusal would turn a reversible floor into a fleet-wide re-enrollment;
+- says so itself: its worker reports `throttled` with an "Upgrade required" reason that names the exact command, the service logs it once, and `ever-works-node status` / `doctor` print it (the running service records the verdict beside its config, in `node-config.json.lifecycle.json`, for those separate processes to read).
+
+The Fleet node drawer shows **Upgrade required** with the same command, judged by the same predicate the lease uses. A daemon built before the floor existed cannot read the new fields, but the lease refuses it all the same; it simply reads the refusal as an empty poll. The floor **fails open** on a version it cannot parse (a dev build, a daemon that never reported one): it is a compatibility gate, not a security boundary. Raise it only after the fleet is upgraded — the drawer shows which machines it would refuse.
+
+After `npm install -g`, `doctor` run by the new binary tells you when the service is still the old one ("restart it to run …").
+
+### Model CLI compatibility
+
+The node now probes the **pinned** model CLI binaries — the exact paths an `agent-task` spawns (`EVER_WORKS_NODE_CLAUDE_PATH` / `--claude-path`, `EVER_WORKS_NODE_CODEX_PATH` / `--codex-path`, else the first launchable one on `PATH`) — rather than scanning `PATH` for the first of `claude` / `codex` / `gemini` / `opencode`. Each binary is asked for `--version` and its help text (`claude --help`, `codex exec --help`) once, cached per path and file modification time, so a beat or a run costs a `stat`, and a CLI upgraded in place is re-probed at once.
+
+- The heartbeat reports one `"<provider> <version>"` entry per pinned binary (`cliVersions`), and the legacy `cliVersion` now comes from the pinned binary too. The drawer lists them under **Daemon & model CLIs**.
+- Right before a model step, an **optional** flag the pinned build does not advertise — `--effort`, `--max-budget-usd` — is left off the command instead of failing the run after the lease and the worktree were spent. The drop is logged and recorded on the run as `model.droppedFlags`. A dropped `--max-budget-usd` means the CLI enforced no per-run budget; the platform's daily ceilings still apply.
+- Nothing else is ever dropped: the permission, sandbox, MCP and directory-grant flags decide what the model may touch. A binary that lacks one of the flags every run passes is reported **INCOMPATIBLE** by `doctor` and in the startup log.
+- A help text the node cannot recognise (it lists none of the flags every run passes) drops **nothing** — the command is exactly what it always was. Guessing would trade a loud failure for a silent downgrade.
+
+`ever-works-node doctor` prints one line for the daemon and one per pinned CLI; `--json` carries the same facts (`daemonVersion`, `minNodeVersion`, `upgradeRequired`, `upgradeCommand`, `modelCli[]`). `doctor` resolves the CLIs the way this shell does; a service started with `--claude-path` / `--codex-path` pins its own and logs its verdict at startup.
+
+There is no self-updater and no canary ring yet: an opt-in, reviewed self-update path is a follow-up. Until then the floor plus `doctor` is the rollout tool — upgrade a canary machine, confirm with `doctor`, upgrade the rest, then raise `FLEET_MIN_NODE_VERSION`.
+
+## Remote node limits
+
+A node's concurrency, CPU and memory limits start as local start flags (`--concurrency`, `--max-cpu`, `--max-memory`, or the enrollment wizard). Fleet can now read them and lower them, without a visit to the machine.
+
+- **Reported.** Every heartbeat from a node with a worker carries the limits it is **enforcing** right now (`maxConcurrentJobs`, `maxCpuPercent`, `maxMemoryMb`; `null` on the CPU / memory pair means no ceiling in force). The node drawer shows them under **Resource limits** — "Enforcing 2 job(s) at once · CPU 70% · memory no ceiling" — or "not reported" for an older daemon or one started without `--work`.
+- **Ceiling.** In the same drawer section the owner sets a **platform-side ceiling** per node (`PUT /api/fleet/nodes/:id/limits`, every field required, `null` clears that dimension; audited as `node.limits` like every other lifecycle write). Each value must sit inside the node's own bounds (1–16 jobs, 5–100 %, 256–1,048,576 MB) and is refused, not clamped, outside them.
+- **The node clamps itself.** Every accepted heartbeat answer carries the ceiling (all-null when none is set, so lifting one reaches the machine too). The node enforces `min(its own flag, the ceiling)` per dimension from its next lease, logs the change, and reports the new effective limits on the beat after. A lower concurrency never cancels work already running — the node simply leases nothing more until it is back under the new number. The live-view lane keeps its own fixed limit.
+- **A ceiling can only lower.** The local flags stay the upper bound: whoever lent the machine keeps the last word, and a ceiling above the local flag changes nothing.
+- **Reinstall-proof.** The ceiling lives on the platform, not in the machine's config. A service reinstall — which re-applies whatever flags the installer was given — cannot revert it; the first heartbeat hands it straight back. (A re-**enrollment** is a new node row and starts without one.)
+
+`ever-works-node status` prints the ceiling the running service last heard and the limits it enforces under it; `doctor --json` carries `limitCeiling` and `effectiveLimits`. An older daemon ignores the ceiling and keeps running on its own flags; Fleet then shows the ceiling next to limits that daemon does not report.
 
 ## Pinning an Agent to a machine
 
@@ -358,8 +405,8 @@ How it behaves:
 - **Clearing is idempotent, and does not rewrite history.** Jobs already queued keep the node they were enqueued for; only future jobs become unbound.
 - **Nodes stay user-owned; only the binding is Organization-scoped.** Setting an affinity requires an active [Organization](./organizations.md), and both the Agent and the node must be yours — a foreign or unknown id answers `404`, whether or not a binding exists.
 
-:::caution API-only today
-There is no node picker on the Agent page. Set, read and clear affinity through the endpoints above, the [REST API](../api/index.md) or an [MCP](./mcp-server.md) client until the UI lands.
+:::tip From the Agent page or the API
+Pick a **Preferred node** on the agent's **Capabilities** → **Execution** section (see [Pin an agent to a node](#pin-an-agent-to-a-node)), or set, read and clear affinity through the endpoints above, the [REST API](../api/index.md) or an [MCP](./mcp-server.md) client.
 :::
 
 ## Choosing where runs execute
@@ -445,7 +492,7 @@ The drawer shows **Above floor** / **Below floor** / **Unknown** with both figur
 
 **Unknown is never a verdict.** A node with plenty of space but no floor reported reads _Unknown_, not _Above floor_: with the floor off, or on a daemon older than these fields, there is no line to be above, and saying otherwise would be a reassurance nobody earned. Likewise `null` and "never reported" are indistinguishable for the floor by design — both mean there is nothing to compare the free-space figure against.
 
-These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The CPU and memory ceilings are **not** reported at all: they have no companion reading on the wire, so a ceiling on its own would be a number with nothing to compare it against.
+These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The concurrency, CPU and memory limits are the exception: since self-build slice AS they are reported, and the owner can lower them from Fleet — see "Remote node limits" below.
 
 `lastReclaimAt` is the one instant on a node row the platform does not stamp itself, so it is treated as untrusted: an unparseable value, or one implausibly far in the future, is recorded as unknown rather than rejected — rejecting it would fail the heartbeat, and a failed heartbeat is a live node swept `offline`. A node that has never reported a figure shows **unknown**, never `0`: "no workspaces" and "we have never been told" are different facts, and only the first is reassuring.
 
@@ -635,7 +682,8 @@ The rules that make that trade survivable:
 ### When the agent needs you
 
 Unless the MCP bridge below is switched on, the agent on your machine has no platform tools — it
-cannot message you mid-run. What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
+cannot message you mid-run (and a Claude Code run does not get your own MCP servers either; see
+[Platform tools from a fleet run](#platform-tools-from-a-fleet-run-mcp-bridge)). What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
 requirement, a risky or irreversible step, a choice between materially different directions) it
 writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
 question, the rest is optional context and options — and stops. The node reports the question and
@@ -658,27 +706,59 @@ What happens next:
   Task, the branch (and the mounted repository, if the agent asked from one), and a link to an
   existing pull request. The Inbox body also says what the run managed before asking (pushed,
   committed but not pushed, no changes, a failed push) and which required checks did not pass.
+  **From your fleet** above the Active and Archived lists narrows the Inbox to these messages
+  (`/inbox?source=fleet`, or `GET /api/inbox?sourceType=fleet-run`).
 - **Replying starts a new run for the same Task** — same Agent, same pinned node when the Agent is
   pinned, same branch. The new run's instructions carry your question and answer under
   **`# OWNER ANSWER`**, tell the model its earlier commits are on the branch (and whether they were
   pushed), and ask it to continue from the answer rather than redo committed work or ask again. The
   reply toast says "a new run is answering it".
+- **The answer run continues the conversation that asked the question** when it can. The platform
+  keeps the CLI session id the node reported for the asking run and the node it ran on. If the answer
+  run lands on that same node and the provider is Claude Code, the node runs
+  `claude -p --resume <session> --fork-session` and feeds it only your answer and a reminder of the
+  rules (on stdin, as always). The model picks up with its own reasoning still in context, so it
+  does not re-read the branch or reopen settled decisions. `--fork-session` leaves the original
+  session untouched, so a retried attempt starts from the same point. In every other case the run
+  starts a **fresh session** on the full instructions, which now replay every question this Task's
+  earlier runs asked and the answers you gave, oldest first, under
+  **`# EARLIER QUESTIONS AND ANSWERS`**. That happens when the run lands on another node, when the
+  provider is Codex, or when the CLI no longer has the session (for example "No conversation found"
+  after the CLI's history was cleared). In that last case the node runs fresh within the same job,
+  but only when the CLI itself said it could not open the session ("No conversation found", or a
+  CLI too old to know the resume flags) and no model turn ran. A resumed session that crashed
+  without saying why is reported as a failed run rather than run a second time, because it may
+  already have changed the worktree. The job result records what happened as
+  `model.resume`: `resumed`, `fell-back` or `skipped`, with the reason.
+  Codex is never resumed: `codex exec resume` does not take `--sandbox`, `-C` or `--add-dir`, so a
+  resumed Codex run could not be held to the sandbox and mount grants it was planned with.
 - The **Task page** shows the open question with an _Answer it in the Inbox_ link and hides the
   free-text _Resume_ while a question is open: a resume from there would start a run that never sees
-  your answer.
+  your answer. In the **Runs** history the parked run carries an **awaiting input** chip, so it does
+  not read as simply _completed_.
+- While a fleet run is **live**, the Task page offers no _Steer_ box. A node runs the model on
+  instructions fixed when the job was dispatched and never reads messages sent mid-run, so a steer
+  would never reach the agent. The run is recorded as executing on the fleet (its `runnerKind` is
+  `fleet-node:<provider>`), and the strip says how it reaches you instead: with a question in your
+  Inbox. _Interrupt_ is still shown.
 - **Archiving** (or deleting) the open question drops the parked run — it stops waiting and the Task
   page returns to normal. Moving the question back to Active parks it again.
 
 Limits: one question per run (the answer run can ask a new one, which files a new Inbox message);
-answers are free text — a fleet question offers no option buttons; earlier questions and answers are
-not replayed into later runs, only the reply that resumed the run travels with it; asking needs an
+answers are free text — a fleet question offers no option buttons; the replayed history covers the
+answers found on the Task's 50 most recent runs (capped at 16 KiB, oldest dropped first, and left out
+entirely when the Task brief alone fills the job); a session is resumed only on the node that holds it
+and only for Claude Code; asking needs an
 edit-capable permission mode — under `plan` the model cannot write the file and is not offered the
 protocol; a Task that is _Done_ or _Cancelled_ cannot be resumed — the reply is refused with the
 reason, the question stays open until you archive it; an Agent whose git policy forbids pushing may
 lose uncommitted work when the answer run lands on a different node, because that node starts from
 the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
-written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
-but is not reported as a question.
+written somewhere other than the repository root (or a mounted repository's root), for example
+`apps/api/.ever-works/QUESTION.md` after the model changed directory, is kept out of Git and is not
+asked as a question. The node finds it (it searches up to 8 levels deep and skips `node_modules`,
+`.git`, `.mounts` and links), removes it, and reports it on the run. The Task chat then says where
+the agent tried to ask, so a question is never lost without a trace.
 
 ### Platform tools from a fleet run (MCP bridge)
 
@@ -686,6 +766,33 @@ By default a fleet run is sealed: the model gets a Task brief, a worktree and no
 **MCP bridge** opens a narrow, temporary channel to the platform's own tools — Tasks, Inbox, Goals,
 Missions, Works, Agents, Plugins and read-only Fleet status — so an agent can read the context it
 needs and record progress instead of guessing and reporting at the end.
+
+**Your own MCP servers are not part of a fleet run (Claude Code).** The machine a node runs on is
+usually someone's own PC, with their own MCP servers configured — in `~/.claude.json`, in enabled
+Claude Code plugins, in a repository's `.mcp.json`, and the claude.ai connectors of the account the
+CLI is logged in with (Slack, Claude Docs, and so on). A fleet run never loads them. Every Claude Code
+run is started with `--mcp-config <file> --strict-mcp-config`, where the file is in the run's scratch
+directory and lists **no server at all** when the bridge is off (or only the bridge when it is on), and
+with `ENABLE_CLAUDEAI_MCP_SERVERS=false` in its environment. The node refuses to start a Claude Code
+run whose command line does not carry that isolation. Your own interactive Claude Code sessions are
+unaffected. This matters most for an Agent allowed to skip permission prompts: without it, a
+prompt-injected run could call any of those tools with your credentials.
+
+A machine whose administrator deployed Claude Code's enterprise `managed-mcp.json`
+(`C:\Program Files\ClaudeCode\managed-mcp.json`, `/Library/Application Support/ClaudeCode/` or
+`/etc/claude-code/`) cannot run Claude Code fleet jobs: that file gives the administrator exclusive
+control of MCP, and Claude Code exits at startup when a session passes the per-run MCP config a fleet
+run needs. The node refuses such a run before starting the CLI and names the file, rather than
+running it without the isolation. Remove the file from that machine, or keep Claude Code fleet jobs
+off it.
+
+> **Codex is not isolated yet.** A Codex fleet run still loads the `[mcp_servers.*]` entries in that
+> machine's `~/.codex/config.toml` and the servers of enabled Codex plugins: Codex has no switch that
+> limits a run to the servers given on its command line, and the one option that drops them all
+> (`--ignore-user-config`) also drops the machine's sandbox and model settings. On a machine that runs
+> Codex fleet jobs, keep any MCP server you would not hand to an untrusted prompt out of that Codex
+> configuration. Tracked in the
+> [fleet session trust model](../specs/security/fleet-session-trust-model.md) (control 16).
 
 It is **off by default** and needs three separate yeses:
 
@@ -725,7 +832,7 @@ the token's own scope wins and a mismatch is refused.
 
 The run's result records whether the bridge was up and how many tool calls went through it. If the
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
-tool channel that fails never fails a Task.
+tool channel that fails never fails a Task, and the run is still isolated from your own MCP servers.
 
 > An earlier design (slice C) described a fleet session as having "no platform tools." That was
 > always a **default**, not an invariant: the bridge is off until an operator and the Agent's own
@@ -829,6 +936,34 @@ answer that names a machine other than itself. The `Ever-Works-` trailer namespa
 a commit message that already contains one — a Task title can reach the message — fails the run
 rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
 is worse than no trailer at all. If you see that failure, rename the Task.
+
+### What a fleet run leaves behind
+
+A fleet run used to leave the owner one 8 KB output tail and a job row; the CLI's own record of every turn and tool call was deleted with the run's scratch directory. Now the node reads the model CLI's event stream — Claude Code runs with `--output-format stream-json --verbose`, Codex's `exec --json` already is one — **while the CLI writes it**, and reports two bounded, redacted artefacts on the job result:
+
+- **Step records** — one per assistant message and per tool call: the tool's name, a short argument summary (paths and commands; any other argument is listed by **name only**, so a file body never reaches it), whether the call succeeded, and how long it took (to the node's one-second poll). At most 200 steps and 48 KB; anything past that is counted, not silently lost. The platform writes them into the run's ordinary timeline, so **Agents → Activity → the run** shows a fleet run exactly the way it shows a cloud run.
+- **A transcript** — the CLI's stream, one JSON document per line, with every tool output, file body and reasoning block replaced by `[elided N chars]`, capped at 64 KB by keeping its beginning and its end. It lives on the fleet job row only.
+
+Both are redacted on the node before they leave it — the values behind every granted env name, the run's delivered `.env` contents (which live in no environment, so a name-based redactor would miss them), each also in the escaped spelling JSON gives it, and anything the shared secret-pattern scanner recognises — and the platform runs its scanner over the step records again before storing them. The run's short output tail — what the Task chat quotes when a run fails — stays what the model last said plus the CLI's stderr; it never becomes the raw stream with its tool output. A stream that outgrows the node's 8 MB output ceiling no longer fails the run: its end is read for the verdict, and the step records were already taken from the whole stream as it was written.
+
+A node older than this simply reports no step records, and the platform writes none.
+
+### How long fleet jobs keep their bodies
+
+A fleet job carries the whole assembled prompt (`payload`, up to 256 KB) and the run's result (up to 256 KB, now including the transcript). A nightly pass (03:35 UTC, one replica at a time under the distributed task lock) **NULLs both bodies on terminal jobs older than the retention window** and keeps the row itself — status, node, attempts, timings, cost, error. What the run did survives where it belongs: on the run, its timeline and the Task.
+
+| Env                        | Default | Meaning                                                                                         |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `FLEET_JOB_RETENTION_DAYS` | `30`    | days a terminal job keeps its `payload` and `result`; clamped to 1–3650, a nonsense value is 30 |
+| `FLEET_JOB_PURGE_ENABLED`  | `true`  | `false` switches the purge off entirely (an audit hold)                                         |
+
+The pass works in batches of 200 and stops after 50 batches, leaving any remainder to the next night. Purged rows carry `bodiesPurgedAt`, so no row is purged twice.
+
+### Fleet run telemetry
+
+Each lifecycle transition emits one event through the platform's existing analytics and error-monitoring services — PostHog (`fleet_run_leased`, `fleet_run_completed`, `fleet_run_failed`, `fleet_run_cancelled`) and Sentry structured logs (`fleet.run.*`; a failed run is a warning, never an exception). The properties are identifiers, the job kind, the completion source, queue wait and duration, attempts, the CLI's provider and verdict, the reported cost, tokens and turns, and the number of step records — **never** the prompt, the result's text or the node's error string. A deployment without PostHog or Sentry configured sends nothing.
+
+Uploading a node's own log when a run fails is not built: the node has no authenticated upload channel to put it on. Read `node.log` on the machine, or the journal on Linux.
 
 ## Related
 

@@ -225,6 +225,10 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'PaymentMethodService',
                     'PaygService',
                     'SeatsService',
+                    // Trial-ending reminders (2026-10 repricing).
+                    'TrialReminderService',
+                    'BILLING_TRIAL_ENDING_EVENT',
+                    'TRIAL_REMINDER_LEAD_DAYS',
                     'SeatLimitExceededError',
                     'SeatsNotPurchasableError',
                     'SeatsBelowUsageError',
@@ -256,6 +260,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
                     'UsageSummaryService',
                     'addMonthsClamped',
+                    'allowanceAnchor',
                     'catalogDailyFreeCredits',
                     'creditsPricingView',
                     'resolveUsageSummaryWindow',
@@ -406,6 +411,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 // /v1/checkout/sessions/search endpoint, which is why the session alone is not
                 // enough to carry it.
                 licence: 'ever_works_licence',
+                // Free-trial length the checkout was created with: no plan credits during a trial.
+                trialDays: 'ever_works_trial_days',
             });
         });
 

@@ -533,15 +533,26 @@ describe('renderRunnerJob (plan §4.8: "http jobs, http cron and every smoke run
 	 * which backtracks quadratically over a long run of `/` that is not at the end (50 000 took
 	 * ~2.4 s). No production caller declares one today (the deployer derives the URL from the
 	 * primary host), so this pins the linear trim rather than a live exploit.
+	 *
+	 * Sized, not tightly timed, and only the hairpin ConfigMap is rendered inside the timed window
+	 * (the whole plan used to be — every Deployment, Service and Job): at 200 000 slashes the regex
+	 * needs ~40 s on a dev box and the linear trim milliseconds, so a 2 s bound can be failed neither
+	 * by a CPU-throttled CI runner nor passed by the regex. (A "< 200 ms" at 50 000 was one
+	 * scheduler stall from red — develop CI, 2026-10-09.)
 	 */
 	it('trims a declared hairpin `publicUrl` in linear time, and only its trailing slashes', () => {
-		const hostile = `https://helpdesk.example.com${'/'.repeat(50_000)}x`;
+		const hostile = `https://helpdesk.example.com${'/'.repeat(200_000)}x`;
+		const input = fixtureInput() as unknown as AppRenderInput;
 
 		const started = performance.now();
-		const plan = planFor(() => undefined, { publicUrl: hostile });
+		const configMap = renderRunnerConfigMap(input, 'hairpin', { publicUrl: hostile });
 		const elapsedMs = performance.now() - started;
 
-		expect(elapsedMs).toBeLessThan(200);
+		expect(configMap).not.toBeNull();
+		expect(requestsOf(asJson(configMap))[0].url).toBe(`${hostile}/healthz`);
+		expect(elapsedMs).toBeLessThan(2_000);
+
+		const plan = planFor(() => undefined, { publicUrl: hostile });
 		expect(requestsOf(configMapFor(plan, 'hairpin'))[0].url).toBe(`${hostile}/healthz`);
 
 		const slashed = planFor(() => undefined, { publicUrl: 'https://helpdesk.example.com///' });

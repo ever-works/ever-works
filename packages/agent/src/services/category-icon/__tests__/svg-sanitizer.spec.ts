@@ -1,4 +1,9 @@
-import { MAX_SVG_INPUT_LENGTH, MAX_SVG_LENGTH, sanitizeSvg } from '../svg-sanitizer';
+import {
+    EXTERNAL_URL_REF_RE,
+    MAX_SVG_INPUT_LENGTH,
+    MAX_SVG_LENGTH,
+    sanitizeSvg,
+} from '../svg-sanitizer';
 
 describe('sanitizeSvg', () => {
     describe('rejection', () => {
@@ -315,36 +320,57 @@ describe('sanitizeSvg', () => {
             return performance.now() - started;
         };
 
-        it.each<[string, string]>([
-            ['an unterminated comment', '<!--'],
-            ['an unterminated DOCTYPE', '<!DOCTYPE'],
-            ['an unterminated processing instruction', '<?'],
-            ['an unterminated CDATA section', '<![CDATA['],
-            ['an unclosed forbidden element', '<script'],
-            ['a whitespace run before a non-attribute', ' '],
-        ])('answers for %s repeated 50,000 times in well under 200 ms', (_, unit) => {
+        // Sized, not tightly timed: each repeat count makes the old regex passes
+        // (no input cap, retried from every unterminated opener) need tens of
+        // seconds on a dev box, while today's sanitizer answers in milliseconds,
+        // so a 2 s bound can be failed neither by a CPU-throttled CI runner nor
+        // passed by the old passes. The counts differ because the old cost per
+        // repeat differs by construct (a `<?` is far cheaper than a `<script`).
+        // (A "< 200 ms" at 50,000 repeats was one scheduler stall from red —
+        // develop CI, 2026-10-09.)
+        it.each<[string, number, string]>([
+            ['an unterminated comment', 100_000, '<!--'],
+            ['an unterminated DOCTYPE', 100_000, '<!DOCTYPE'],
+            ['an unterminated processing instruction', 250_000, '<?'],
+            ['an unterminated CDATA section', 150_000, '<![CDATA['],
+            ['an unclosed forbidden element', 60_000, '<script'],
+            ['a whitespace run before a non-attribute', 100_000, ' '],
+        ])('answers for %s repeated %i times in linear time', (_, repeats, unit) => {
             // After the root, so nothing later closes the construct.
-            const input = `<svg viewBox="0 0 24 24"><circle r="1"/></svg>${unit.repeat(50_000)}x`;
+            const input = `<svg viewBox="0 0 24 24"><circle r="1"/></svg>${unit.repeat(repeats)}x`;
             let result: ReturnType<typeof sanitizeSvg> | undefined;
 
-            expect(elapsedMs(() => (result = sanitizeSvg(input)))).toBeLessThan(200);
+            const tookMs = elapsedMs(() => (result = sanitizeSvg(input)));
+
+            expect(tookMs).toBeLessThan(2_000);
             expect(result?.ok).toBe(false);
         });
 
         // `url\s*\(\s*['"]?\s*` could split a whitespace run between its two
         // `\s*` in many ways: about 85 ms (warm) for one `url(` and a run up
-        // to the input cap, the slowest pass left. Warm the path first so the
-        // budget measures the pattern, not the first call.
-        it('answers a url( followed by a whitespace run at the input cap in a few milliseconds', () => {
+        // to the input cap, the slowest pass left. The sanitizer itself never
+        // sees more than the cap, where the old spelling cost ~85 ms and
+        // today's well under one: a "< 40 ms" between them measured the runner
+        // as much as the pattern. So the pattern's complexity is guarded on its
+        // own, beyond the cap: at 150,000 whitespace characters the old
+        // spelling needs ~30 s on a dev box and today's milliseconds.
+        it('answers a url( followed by a whitespace run at the input cap', () => {
             const input = `<svg viewBox="0 0 24 24"><circle r="1"/></svg>url(${' '.repeat(
                 MAX_SVG_INPUT_LENGTH - 60,
             )}x`;
             expect(input.length).toBeLessThanOrEqual(MAX_SVG_INPUT_LENGTH);
-            sanitizeSvg(input);
 
-            let result: ReturnType<typeof sanitizeSvg> | undefined;
-            expect(elapsedMs(() => (result = sanitizeSvg(input)))).toBeLessThan(40);
-            expect(result?.ok).toBe(true);
+            expect(sanitizeSvg(input).ok).toBe(true);
+        });
+
+        it('scans a url( followed by a 150,000-character whitespace run in linear time', () => {
+            const text = `url(${' '.repeat(150_000)}x`;
+
+            let external: boolean | undefined;
+            const tookMs = elapsedMs(() => (external = EXTERNAL_URL_REF_RE.test(text)));
+
+            expect(external).toBe(false);
+            expect(tookMs).toBeLessThan(2_000);
         });
 
         it.each<[string, boolean]>([

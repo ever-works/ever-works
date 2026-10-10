@@ -330,4 +330,69 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
             expect(serialized.toLowerCase()).not.toContain('authorization');
         });
     });
+
+    /**
+     * Self-build slice AU — the run row records WHERE it was dispatched
+     * (`runnerKind`), so the Task page can stop offering a free-text steer
+     * no node can deliver. Display-only: it must never change a dispatch.
+     */
+    describe('records the dispatch target on the run (slice AU)', () => {
+        const withRuns = (
+            runs: { recordDispatchRunner: jest.Mock },
+            planner?: { plan: jest.Mock },
+        ): AgentTaskExecuteDispatcher => {
+            const factory = new NodeDispatcherFactory({ store });
+            const plugin = new NodeJobRuntimePlugin().useDispatcherFactory(factory);
+            const router = new FleetRunRouterService(factory, plugin, undefined);
+            return createFleetAwareAgentTaskExecuteDispatcher(delegate, router, {
+                ...(planner ? { planner } : {}),
+                delegationScopeGuard: {
+                    refuseUnenforceableDelegationScope: jest.fn(async () => undefined),
+                },
+                runs,
+            });
+        };
+
+        it('tags a fleet run with the provider it runs, once the job exists', async () => {
+            const runs = { recordDispatchRunner: jest.fn().mockResolvedValue(undefined) };
+            await withRuns(runs, { plan: jest.fn().mockResolvedValue(plan) }).enqueue(payload());
+            expect(runs.recordDispatchRunner).toHaveBeenCalledWith(
+                'run-1',
+                'fleet-node:claude-code',
+            );
+            expect(runs.recordDispatchRunner.mock.invocationCallOrder[0]).toBeGreaterThan(
+                store.enqueue.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('tags a legacy command-mode fleet job too', async () => {
+            const runs = { recordDispatchRunner: jest.fn().mockResolvedValue(undefined) };
+            await withRuns(runs, { plan: jest.fn().mockResolvedValue(null) }).enqueue(payload());
+            expect(runs.recordDispatchRunner).toHaveBeenCalledWith('run-1', 'fleet-node:command');
+        });
+
+        it('clears a fleet tag (only) when the run goes to the platform runtime', async () => {
+            process.env.EVER_WORKS_JOB_RUNTIME = 'trigger';
+            const runs = { recordDispatchRunner: jest.fn().mockResolvedValue(undefined) };
+            await withRuns(runs, { plan: jest.fn() }).enqueue(payload());
+            expect(delegate.enqueue).toHaveBeenCalledTimes(1);
+            expect(runs.recordDispatchRunner).toHaveBeenCalledWith('run-1', null);
+        });
+
+        it('never tags a run whose job was not written, and a failed write never fails a dispatch', async () => {
+            const refused = { recordDispatchRunner: jest.fn() };
+            store.enqueue.mockRejectedValueOnce(new Error('store down'));
+            await expect(
+                withRuns(refused, { plan: jest.fn().mockResolvedValue(plan) }).enqueue(payload()),
+            ).rejects.toThrow();
+            expect(refused.recordDispatchRunner).not.toHaveBeenCalled();
+
+            const broken = {
+                recordDispatchRunner: jest.fn().mockRejectedValue(new Error('db blip')),
+            };
+            await expect(
+                withRuns(broken, { plan: jest.fn().mockResolvedValue(plan) }).enqueue(payload()),
+            ).resolves.toEqual({ runId: 'fleet-job-1' });
+        });
+    });
 });

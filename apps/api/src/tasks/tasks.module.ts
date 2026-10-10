@@ -4,7 +4,7 @@ import {
     AGENT_TASK_EXECUTE_DISPATCHER,
     AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
-import { DatabaseModule } from '@ever-works/agent/database';
+import { AgentRunRepository, DatabaseModule } from '@ever-works/agent/database';
 import { AGENT_CONVERSATION_REPLY_DISPATCHER } from '@ever-works/agent/conversations';
 import { UsageModule } from '@ever-works/agent/usage';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
@@ -147,11 +147,15 @@ import { TaskChatController } from './task-chat.controller';
                 // fallback. Resolves through FleetApiModule's re-export of
                 // the agent-side FleetModule.
                 killSwitch: FleetKillSwitchService,
+                // Self-build slice AU — records where each run was dispatched
+                // (`runnerKind`), so the Task page can tell a fleet run from a
+                // cloud one. Display-only; from the imported DatabaseModule.
+                runs: AgentRunRepository | undefined,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications, planner, killSwitch },
+                    { scopeResolver, notifications, planner, killSwitch, runs },
                 ),
             inject: [
                 FleetRunRouterService,
@@ -159,6 +163,7 @@ import { TaskChatController } from './task-chat.controller';
                 NotificationService,
                 FleetAgentTaskPlannerService,
                 FleetKillSwitchService,
+                { token: AgentRunRepository, optional: true },
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },

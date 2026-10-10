@@ -469,6 +469,43 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Trial-ending reminder (2026-10 repricing: 90-day Cloud trial). Writes the in-app row and
+     * answers whether THIS call created it, so the caller sends the reminder EMAIL exactly once per
+     * `(subscription, lead)` — a webhook re-delivery or a second sweep tick finds the row and
+     * sends nothing. No `eventKey`: the email is sent by the billing reminder itself (it is
+     * transactional, like an invoice), not by the preference-driven fanout.
+     */
+    async notifyTrialEnding(args: {
+        userId: string;
+        subscriptionId: string;
+        lead: '7d' | '3d';
+        planName: string;
+        trialEnd: Date;
+    }): Promise<boolean> {
+        const dateLabel = args.trialEnd.toISOString().slice(0, 10);
+        const deduplicationKey = `trial_ending_${args.subscriptionId}_${args.lead}`;
+        // Once per (subscription, lead) EVER — unlike the generic dedup, a dismissed reminder does
+        // not re-arm: the 7-day pass looks at the same trial on several consecutive days.
+        if (await this.repository.findByDeduplicationKey(args.userId, deduplicationKey)) {
+            return false;
+        }
+        const inApp = await this.writeInApp({
+            userId: args.userId,
+            type: NotificationType.WARNING,
+            category: NotificationCategory.SUBSCRIPTION,
+            title: 'Your free trial ends soon',
+            message:
+                `Your ${this.sanitizeLabel(args.planName)} free trial ends on ${dateLabel}. ` +
+                `Your card will be charged then unless you cancel from Billing before that date.`,
+            actionUrl: '/settings/billing',
+            actionLabel: 'Manage billing',
+            metadata: { subscriptionId: args.subscriptionId, lead: args.lead, trialEnd: dateLabel },
+            deduplicationKey,
+        });
+        return inApp.created;
+    }
+
     async notifyAiProviderError(
         userId: string,
         provider: string,

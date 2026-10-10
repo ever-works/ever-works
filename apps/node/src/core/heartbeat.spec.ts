@@ -344,6 +344,126 @@ describe('HeartbeatLoop', () => {
 			expect(loop.getState().consecutiveFailures).toBe(0);
 		});
 
+		it('drops the pinned CLI versions too (node lifecycle, slice AR)', async () => {
+			// `cliVersions` is sent by every node with a compat probe — even as
+			// an empty list — so forgetting it here would 400 every beat of a
+			// new node against an older platform, forever.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({ platform: 'linux/x64', capabilities: [], cliVersions: [] }),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('cliVersions');
+			expect(scripted.requests[1]).not.toHaveProperty('cliVersions');
+			expect(loop.getState().state).toBe('connected');
+		});
+
+		it('strips the NEWEST tier first, so an older platform still gets worker state and housekeeping (review)', async () => {
+			// An upgraded node always sends `cliVersions`. Against a platform that
+			// knows the EW-776 / EW-803 fields but not the AR / AS ones, losing ALL
+			// optional fields would blind the owner to a quarantine for the life
+			// of the process. Only the tier the platform refused may go.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok, ok]);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					cliVersions: ['claude-code 2.1.3'],
+					maxConcurrentJobs: 1,
+					maxCpuPercent: null,
+					maxMemoryMb: null,
+					workerState: 'quarantined',
+					workerStateReason: 'process tree unproven',
+					workspaceCount: 3
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[1]).not.toHaveProperty('cliVersions');
+			expect(scripted.requests[1]).not.toHaveProperty('maxConcurrentJobs');
+			expect(scripted.requests[1]).toMatchObject({ workerState: 'quarantined', workspaceCount: 3 });
+			expect(entries.some((entry) => entry.message.includes('Still reporting worker state'))).toBe(true);
+
+			// Latched at that tier: the next beat costs one request and still
+			// carries the worker state.
+			await loop.tick();
+			expect(scripted.sent()).toBe(3);
+			expect(scripted.requests[2]).not.toHaveProperty('cliVersions');
+			expect(scripted.requests[2]).toHaveProperty('workerState', 'quarantined');
+		});
+
+		it('falls back to liveness only when the platform refuses the older tier too', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					cliVersions: [],
+					workerState: 'idle'
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(3);
+			expect(scripted.requests[2]).not.toHaveProperty('cliVersions');
+			expect(scripted.requests[2]).not.toHaveProperty('workerState');
+			expect(loop.getState().state).toBe('connected');
+		});
+
+		it('drops the reported limits too (remote node limits, slice AS)', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					maxConcurrentJobs: 2,
+					maxCpuPercent: null,
+					maxMemoryMb: null
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			for (const field of ['maxConcurrentJobs', 'maxCpuPercent', 'maxMemoryMb']) {
+				expect(scripted.requests[0]).toHaveProperty(field);
+				expect(scripted.requests[1]).not.toHaveProperty(field);
+			}
+			expect(loop.getState().state).toBe('connected');
+		});
+
 		it('treats an explicit NULL floor as a carried field, so it still triggers the fallback', async () => {
 			// `minFreeDiskBytes: null` is the one legitimate null on this
 			// payload ("the operator switched the floor off"). A truthiness

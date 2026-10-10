@@ -1611,13 +1611,20 @@ describe('TemplateCatalogService', () => {
 
         // CodeQL js/polynomial-redos: the tag pass `<[^>]*>` retried from every
         // `<` of a run with no `>` after it — about 2.6 s for 50,000 of them.
-        it('sanitizes 50,000 unclosed tag openers in well under 200 ms', () => {
+        // Sized, not tightly timed: at 200,000 openers the regex needs ~40 s on
+        // a dev box and the linear scan milliseconds, so a 2 s bound can be
+        // failed neither by a CPU-throttled CI runner nor passed by the regex.
+        // (A "< 200 ms" at 50,000 was one scheduler stall from red — develop
+        // CI, 2026-10-09.)
+        it('sanitizes 200,000 unclosed tag openers in linear time', () => {
+            const value = `${'<'.repeat(200_000)}ok`;
+
             const started = performance.now();
+            const sanitized = sanitize(value);
+            const elapsedMs = performance.now() - started;
 
-            const sanitized = sanitize(`${'<'.repeat(50_000)}ok`);
-
-            expect(performance.now() - started).toBeLessThan(200);
             expect(sanitized).toBe('ok');
+            expect(elapsedMs).toBeLessThan(2_000);
         });
     });
 });

@@ -28,6 +28,8 @@ export * from './billing/payment-method.service';
 export * from './billing/payg.service';
 // Seats — employees OR agents (billing spec §3.6)
 export * from './billing/seats.service';
+// Trial-ending reminders: provider notice + the daily sweep's 7-day pass (2026-10 repricing)
+export * from './billing/trial-reminder.service';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credits/credit-ledger.service';
 export * from './credits/entitlements.service';

@@ -188,6 +188,28 @@ export interface FleetNodeSelfDescription {
 	 */
 	cliVersion?: string;
 	/**
+	 * Node lifecycle (self-build slice AR) — the version of every model CLI
+	 * this node has PINNED for an `agent-task`, one entry per provider, as
+	 * `"<provider> <version>"` (`claude-code 2.1.3`, `codex 0.48.0`), or
+	 * `"<provider> unknown"` when the pinned binary did not answer
+	 * `--version`.
+	 *
+	 * Distinct from {@link FleetNodeSelfDescription.cliVersion}, which a
+	 * daemon built before this field derived by scanning PATH for the first
+	 * of `claude` / `codex` / `gemini` / `opencode` — not necessarily the
+	 * binary a run actually spawns. These entries come from the SAME paths
+	 * the model step executes, so "which Claude Code does this PC run" has
+	 * one answer.
+	 *
+	 * Bounded by type and length only — never by an allow-list of
+	 * providers: under `whitelist + forbidNonWhitelisted` a rejected field
+	 * fails the whole beat, and a newer node may pin a provider this API has
+	 * never heard of. At most {@link FLEET_MAX_CLI_VERSIONS} entries of at
+	 * most {@link FLEET_MAX_CLI_VERSION_LENGTH} characters each. Additive
+	 * like `cliVersion`: absent leaves the stored list alone.
+	 */
+	cliVersions?: string[];
+	/**
 	 * Free bytes on the volume the node's workspace lives on. A number,
 	 * not a formatted string, so the UI owns the units.
 	 *
@@ -280,6 +302,26 @@ export interface FleetNodeSelfDescription {
 	lastReclaimAt?: string;
 	/** Bytes that sweep reclaimed. Zero is a real answer: it ran and found nothing to take. */
 	lastReclaimFreedBytes?: number;
+	/**
+	 * Remote node limits (self-build slice AS) — the resource limits the
+	 * node's WORKER is actually enforcing right now: the lower of its own
+	 * start flags (`--concurrency`, `--max-cpu`, `--max-memory`) and the
+	 * owner's platform-side ceiling ({@link FleetHeartbeatResponse.limitCeiling}).
+	 *
+	 * The three travel together: a beat that carries `maxConcurrentJobs`
+	 * reports the whole set, and `null` on the CPU / memory pair means "no
+	 * ceiling in force on that dimension" (it overwrites). A beat without
+	 * `maxConcurrentJobs` said nothing — a visibility-only node has no
+	 * worker, an older daemon predates the fields — and leaves the stored
+	 * set alone.
+	 *
+	 * Bounded by type and the column's range only, never by the node-side
+	 * clamp (`FLEET_NODE_*` below): a newer node that allows more must not
+	 * have its beat — and with it its liveness — refused.
+	 */
+	maxConcurrentJobs?: number;
+	maxCpuPercent?: number | null;
+	maxMemoryMb?: number | null;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -317,6 +359,24 @@ export interface FleetNodeView {
 	 * the daemon's own version.
 	 */
 	cliVersion?: string | null;
+	/**
+	 * Node lifecycle (slice AR) — the pinned model-CLI versions the node
+	 * last reported, one `"<provider> <version>"` entry each, or null when
+	 * it never reported any (a daemon older than the field).
+	 */
+	cliVersions?: string[] | null;
+	/**
+	 * Node lifecycle (slice AR) — true when the daemon version this node
+	 * last reported is below the platform's minimum
+	 * ({@link FleetNodeView.minNodeVersion}). Such a node keeps
+	 * heartbeating and keeps settling the work it already holds, but the
+	 * lease refuses it new work until it is upgraded. False when the
+	 * version is at or above the floor, or could not be parsed (the floor
+	 * fails OPEN: a dev build must never be bricked by a version string).
+	 */
+	upgradeRequired?: boolean;
+	/** The minimum daemon version the platform admits, or null for a cluster row. */
+	minNodeVersion?: string | null;
 	/** Free bytes last reported for the node's workspace volume, or null. */
 	diskFreeBytes?: number | null;
 	/**
@@ -376,6 +436,22 @@ export interface FleetNodeView {
 	workspaceBytes?: number | null;
 	lastReclaimAt?: string | null;
 	lastReclaimFreedBytes?: number | null;
+
+	/**
+	 * Remote node limits (self-build slice AS) — what the node last reported
+	 * ENFORCING (`min(its own flags, the platform ceiling)`), or null when it
+	 * never reported (an older daemon, a node without a worker). Its CPU and
+	 * memory entries are null when no ceiling is in force on that dimension.
+	 */
+	effectiveLimits?: FleetNodeEffectiveLimits | null;
+	/**
+	 * Remote node limits (slice AS) — the owner's platform-side CEILING for
+	 * this node, set with `PUT /api/fleet/nodes/:id/limits`. Every field null
+	 * means no ceiling: the node runs on its own start flags. The node
+	 * clamps itself to it on its next heartbeat; its own flags stay the
+	 * upper bound, so a ceiling can only ever LOWER what a machine does.
+	 */
+	limitCeiling?: FleetNodeLimitCeiling | null;
 
 	/**
 	 * Agent computers — who may take control of this machine from a live
@@ -474,7 +550,204 @@ export interface FleetHeartbeatResponse {
 	 * with nothing pending omits it.
 	 */
 	pendingComputerSessions?: string[];
+	/**
+	 * Node lifecycle (self-build slice AR) — the minimum daemon version
+	 * this platform admits (`FLEET_MIN_NODE_VERSION`, default
+	 * {@link FLEET_DEFAULT_MIN_NODE_VERSION}). Carried on every accepted
+	 * beat so a node can show "upgrade required" in its own status and
+	 * `doctor` without a separate endpoint.
+	 *
+	 * Optional and additive: a daemon built before this field ignores it,
+	 * and is refused new work by the lease all the same (see
+	 * {@link FleetHeartbeatResponse.upgradeRequired}).
+	 */
+	minNodeVersion?: string;
+	/**
+	 * True when THIS node's reported `version` is below
+	 * {@link FleetHeartbeatResponse.minNodeVersion}. The beat itself is
+	 * still accepted — liveness, telemetry and the settling of in-flight
+	 * work are never gated on the floor — but the lease answers
+	 * `200 { jobs: [], upgradeRequired: true }` until the machine runs a
+	 * new enough daemon. NEVER a 401: that is read as a revoked credential
+	 * and turns a reversible floor into a fleet-wide re-enrollment.
+	 */
+	upgradeRequired?: boolean;
+	/**
+	 * Remote node limits (self-build slice AS) — the owner's ceiling for this
+	 * node, on EVERY accepted beat (all-null when none is set, so lifting a
+	 * ceiling reaches the machine too). The node clamps its worker to
+	 * `min(its own start flags, this)` before its next lease and reports the
+	 * result back as its effective limits.
+	 *
+	 * Optional and additive: a daemon built before this field ignores it and
+	 * keeps running on its own flags — the ceiling is then shown in Fleet
+	 * against the limits that daemon does not report.
+	 */
+	limitCeiling?: FleetNodeLimitCeiling;
 }
+
+// ─── Node lifecycle: the daemon version floor (self-build slice AR) ─────────
+
+/**
+ * Default minimum daemon version (`FLEET_MIN_NODE_VERSION` overrides it).
+ *
+ * `0.1.0` is the first `ever-works-node` ever published, so the default
+ * floor admits EVERY daemon that exists — shipping the mechanism must not
+ * brick a single machine. Raising it is an operator decision, made after
+ * the fleet has been upgraded, and the drawer shows which PCs it would
+ * refuse.
+ */
+export const FLEET_DEFAULT_MIN_NODE_VERSION = '0.1.0';
+
+/**
+ * The upgrade a node prints when it is below the floor. One string, so the
+ * daemon's log, `doctor` and the Fleet drawer all tell the operator the
+ * same thing. Followed by a service restart on that machine.
+ */
+export const FLEET_NODE_UPGRADE_COMMAND = 'npm install -g ever-works-node@latest';
+
+/** Most `cliVersions` entries one beat may carry — one per pinned provider, with room to grow. */
+export const FLEET_MAX_CLI_VERSIONS = 8;
+
+/** `1.2.3`, `v1.2`, `1.2.3-beta.1`, `1.2.3+build.5` — leading `v` and build metadata tolerated. */
+const FLEET_NODE_VERSION_PATTERN =
+	/^v?(\d{1,9})\.(\d{1,9})(?:\.(\d{1,9}))?(?:-([0-9A-Za-z.-]{1,64}))?(?:\+[0-9A-Za-z.-]{1,64})?$/;
+
+interface ParsedFleetNodeVersion {
+	core: [number, number, number];
+	prerelease: string[];
+}
+
+function parseFleetNodeVersion(value: unknown): ParsedFleetNodeVersion | null {
+	if (typeof value !== 'string') return null;
+	const match = FLEET_NODE_VERSION_PATTERN.exec(value.trim());
+	if (!match) return null;
+	return {
+		core: [Number(match[1]), Number(match[2]), Number(match[3] ?? '0')],
+		prerelease: match[4] ? match[4].split('.') : []
+	};
+}
+
+/** SemVer §11 precedence for two prerelease identifier lists (both non-empty). */
+function comparePrerelease(a: readonly string[], b: readonly string[]): number {
+	const length = Math.max(a.length, b.length);
+	for (let index = 0; index < length; index += 1) {
+		const left = a[index];
+		const right = b[index];
+		if (left === undefined) return -1;
+		if (right === undefined) return 1;
+		const leftNumeric = /^\d+$/.test(left);
+		const rightNumeric = /^\d+$/.test(right);
+		if (leftNumeric && rightNumeric) {
+			const diff = Number(left) - Number(right);
+			if (diff !== 0) return diff < 0 ? -1 : 1;
+			continue;
+		}
+		if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+		if (left !== right) return left < right ? -1 : 1;
+	}
+	return 0;
+}
+
+/**
+ * Compare two daemon versions with SemVer precedence: `-1`, `0` or `1`, or
+ * `null` when either side does not parse as a version.
+ *
+ * `null` is a real answer, not an error: the caller decides what an
+ * unparseable version means, and for the floor the answer is "admit" (see
+ * {@link isFleetNodeVersionBelowFloor}).
+ */
+export function compareFleetNodeVersions(a: unknown, b: unknown): -1 | 0 | 1 | null {
+	const left = parseFleetNodeVersion(a);
+	const right = parseFleetNodeVersion(b);
+	if (!left || !right) return null;
+	for (let index = 0; index < 3; index += 1) {
+		if (left.core[index] !== right.core[index]) return left.core[index] < right.core[index] ? -1 : 1;
+	}
+	// A prerelease sorts BELOW its release (`1.2.0-rc.1` < `1.2.0`).
+	if (left.prerelease.length === 0 && right.prerelease.length === 0) return 0;
+	if (left.prerelease.length === 0) return 1;
+	if (right.prerelease.length === 0) return -1;
+	const order = comparePrerelease(left.prerelease, right.prerelease);
+	return order === 0 ? 0 : order < 0 ? -1 : 1;
+}
+
+/**
+ * Is this daemon below the floor? The ONE predicate the lease, the
+ * heartbeat, the drawer and the node itself all ask, so the four can
+ * never disagree about which machine is refused.
+ *
+ * Fails OPEN: an absent or unparseable version (an embedder's dev build,
+ * a daemon that never reported one), or an unparseable floor, is NOT below
+ * it. The floor is a compatibility gate, not a security boundary — a
+ * machine can report any version it likes — so refusing what it cannot
+ * read would only ever brick honest machines.
+ */
+export function isFleetNodeVersionBelowFloor(version: unknown, floor: unknown): boolean {
+	return compareFleetNodeVersions(version, floor) === -1;
+}
+
+/**
+ * Normalize an operator-supplied floor (`FLEET_MIN_NODE_VERSION`), or
+ * null when it is not a version at all — the caller then falls back to
+ * {@link FLEET_DEFAULT_MIN_NODE_VERSION} rather than enforcing nonsense.
+ */
+export function normalizeFleetNodeVersionFloor(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	if (!trimmed || trimmed.length > FLEET_MAX_VERSION_LENGTH) return null;
+	return parseFleetNodeVersion(trimmed) ? trimmed.replace(/^v/, '') : null;
+}
+
+// ─── Remote node limits (self-build slice AS) ───────────────────────────────
+
+/**
+ * The resource limits a node reports enforcing (slice AS). `maxConcurrentJobs`
+ * is always a number; the CPU / memory ceilings are null when none is in
+ * force on that dimension.
+ */
+export interface FleetNodeEffectiveLimits {
+	maxConcurrentJobs: number;
+	maxCpuPercent: number | null;
+	maxMemoryMb: number | null;
+}
+
+/**
+ * The owner's platform-side ceiling for one node (slice AS). Each field is
+ * independent; null = no ceiling on that dimension. The node enforces
+ * `min(its own start flag, this)`, so a ceiling can only lower what a
+ * machine does — the person who lent the machine keeps the last word.
+ */
+export interface FleetNodeLimitCeiling {
+	maxConcurrentJobs: number | null;
+	maxCpuPercent: number | null;
+	maxMemoryMb: number | null;
+}
+
+/** Request body for `PUT /api/fleet/nodes/:id/limits` — every field required, null clears it. */
+export type FleetNodeLimitCeilingRequest = FleetNodeLimitCeiling;
+
+/**
+ * Bounds of the node's resource limits — the SAME numbers the node clamps
+ * its start flags into (`apps/node/src/core/types.ts`) and the platform
+ * validates an owner's ceiling against. A ceiling outside them is refused
+ * rather than clamped: a value the node would silently rewrite is a
+ * setting that does not do what the owner typed.
+ */
+export const FLEET_NODE_MIN_CONCURRENT_JOBS = 1;
+export const FLEET_NODE_MAX_CONCURRENT_JOBS = 16;
+export const FLEET_NODE_MIN_CPU_PERCENT = 5;
+export const FLEET_NODE_MAX_CPU_PERCENT = 100;
+export const FLEET_NODE_MIN_MEMORY_MB = 256;
+export const FLEET_NODE_MAX_MEMORY_MB = 1_024 * 1_024;
+
+/**
+ * Widest value a REPORTED limit may carry on the heartbeat: the int column
+ * it lands in. Deliberately not the node-side clamp above — a newer node
+ * that allows more must not have its beat refused (a refused beat is a node
+ * swept offline). The service stores what fits and drops what does not.
+ */
+export const FLEET_MAX_REPORTED_LIMIT_VALUE = 2_147_483_647;
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
 

@@ -27,6 +27,11 @@ import {
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
     FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+    FLEET_DEFAULT_MIN_NODE_VERSION,
+    normalizeFleetNodeVersionFloor,
+    FLEET_JOB_DEFAULT_RETENTION_DAYS,
+    FLEET_JOB_MAX_RETENTION_DAYS,
+    FLEET_JOB_MIN_RETENTION_DAYS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
     FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
@@ -577,6 +582,30 @@ export const config = {
          * restart; the 24h ceiling is where a handover window would stop
          * being a handover and become a second permanent credential.
          */
+        /**
+         * Self-build slice AP — days a TERMINAL fleet job keeps its
+         * `payload` (the assembled prompt) and `result` (including the
+         * run's redacted transcript) before the nightly purge NULLs them
+         * (`FLEET_JOB_RETENTION_DAYS`, default 30, clamped to [1, 3650]).
+         * The row and its metadata are kept; a nonsense value degrades to
+         * the default rather than to "purge everything now".
+         */
+        getJobRetentionDays(): number {
+            return clampedIntEnv(
+                process.env.FLEET_JOB_RETENTION_DAYS,
+                FLEET_JOB_DEFAULT_RETENTION_DAYS,
+                FLEET_JOB_MIN_RETENTION_DAYS,
+                FLEET_JOB_MAX_RETENTION_DAYS,
+            );
+        },
+        /**
+         * Self-build slice AP — the purge's off switch. Default ON: an
+         * operator who must keep every prompt and result (an audit hold)
+         * sets `FLEET_JOB_PURGE_ENABLED=false` explicitly.
+         */
+        isJobPurgeEnabled(): boolean {
+            return process.env.FLEET_JOB_PURGE_ENABLED !== 'false';
+        },
         getCredentialRotationOverlapMs(): number {
             return clampedIntEnv(
                 process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
@@ -618,6 +647,26 @@ export const config = {
                 FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
                 this.getNodeOfflineAfterMs(),
                 Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Node lifecycle (self-build slice AR) — the minimum DAEMON version
+         * (`ever-works-node` / desktop-node) the lease admits
+         * (`FLEET_MIN_NODE_VERSION`). A node below it keeps heartbeating
+         * and settling the work it holds, but is refused new work — with
+         * `200 { jobs: [], upgradeRequired: true }`, never a 401 — and
+         * told so on every beat.
+         *
+         * Defaults to `FLEET_DEFAULT_MIN_NODE_VERSION` (`0.1.0`, the first
+         * release ever published), so the floor admits every daemon that
+         * exists until an operator raises it on purpose. A value that is
+         * not a version falls back to that default rather than being
+         * enforced: an env typo must not idle the fleet.
+         */
+        getMinNodeVersion(): string {
+            return (
+                normalizeFleetNodeVersionFloor(process.env.FLEET_MIN_NODE_VERSION) ??
+                FLEET_DEFAULT_MIN_NODE_VERSION
             );
         },
         /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
