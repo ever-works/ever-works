@@ -316,9 +316,10 @@ nodeId: data.node_id || null, accessToken}`.
     - resolve the GitHub user (via `getAuthenticatedGithubUser`),
     - fetch the installation (`getInstallation`, App JWT) and check claim
       authority (`assertMayClaimInstallation`: recorded installer, else
-      the User account itself, else an active org admin; see §2.1). It
-      throws `ForbiddenException` BEFORE any local user, account, link or
-      installation row is resolved, written or claimed,
+      the User account itself, else an active org admin; see §2.1). The
+      check may READ the installation row to see its recorded installer.
+      It throws `ForbiddenException` before the local user, auth account
+      or user link is resolved, and before anything is written or claimed,
     - find-or-create the local user (the four-step chain in §2.1
         - email-not-verified rejection),
     - upsert the `auth_accounts` row with `providerId: 'github'`,
