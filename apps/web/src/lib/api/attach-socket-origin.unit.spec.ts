@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveBrowserApiBaseUrl, toAttachSocketUrl } from './attach-socket-origin';
 
 /**
  * The browser-reachable socket origin, walked across every deployment shape
@@ -22,21 +23,35 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const WS_PATH = '/ws/terminal/8b1f1e2c-4d5a-4e6b-9c7d-0a1b2c3d4e5f';
 const ORIGINAL_PUBLIC = process.env.NEXT_PUBLIC_API_URL;
+const DEFAULT_API_URL_CONSTANT = 'http://localhost:3100/api';
+
+/**
+ * ONE hoisted mock of `lib/constants`, whose `API_URL` is read through a
+ * getter on every access, so each case sets the constant it needs without
+ * touching the module registry. Each case used to `vi.resetModules()` +
+ * `vi.doMock()` + re-import the module under test, and on a loaded CI runner
+ * that raced: develop CI run 38009548957 minted the PREVIOUS case's
+ * `ws://localhost:3100` for the `https://api.ever.works` case. The cases and
+ * their expectations are unchanged.
+ */
+const constantsMock = vi.hoisted(() => ({ apiUrl: 'http://localhost:3100/api' }));
+vi.mock('@/lib/constants', () => ({
+    get API_URL() {
+        return constantsMock.apiUrl;
+    },
+}));
 
 async function socketUrlFor(shape: { apiUrlConstant: string; publicApiUrl?: string }) {
-    vi.resetModules();
-    vi.doMock('@/lib/constants', () => ({ API_URL: shape.apiUrlConstant }));
+    constantsMock.apiUrl = shape.apiUrlConstant;
     if (shape.publicApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
     else process.env.NEXT_PUBLIC_API_URL = shape.publicApiUrl;
-    const { toAttachSocketUrl, resolveBrowserApiBaseUrl } = await import('./attach-socket-origin');
     return { url: toAttachSocketUrl(WS_PATH), base: resolveBrowserApiBaseUrl() };
 }
 
 afterEach(() => {
     if (ORIGINAL_PUBLIC === undefined) delete process.env.NEXT_PUBLIC_API_URL;
     else process.env.NEXT_PUBLIC_API_URL = ORIGINAL_PUBLIC;
-    vi.doUnmock('@/lib/constants');
-    vi.resetModules();
+    constantsMock.apiUrl = DEFAULT_API_URL_CONSTANT;
 });
 
 describe('browser-reachable attach socket origin', () => {
@@ -113,11 +128,9 @@ describe('browser-reachable attach socket origin', () => {
         ).toBe(`ws://ever-works-api:3100${WS_PATH}`);
     });
 
-    it('normalises a wsPath that arrives without its leading slash', async () => {
-        vi.resetModules();
-        vi.doMock('@/lib/constants', () => ({ API_URL: 'http://localhost:3100/api' }));
+    it('normalises a wsPath that arrives without its leading slash', () => {
+        constantsMock.apiUrl = 'http://localhost:3100/api';
         delete process.env.NEXT_PUBLIC_API_URL;
-        const { toAttachSocketUrl } = await import('./attach-socket-origin');
         expect(toAttachSocketUrl('ws/computer/abc')).toBe('ws://localhost:3100/ws/computer/abc');
     });
 });
