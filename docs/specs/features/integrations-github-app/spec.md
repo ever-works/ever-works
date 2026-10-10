@@ -47,9 +47,11 @@ setup URL, and callback URL are derived with sensible defaults from
 - **Given** GitHub redirects me back to
   `GET /api/github-app/callback?code=<c>&state=<s>` after the user
   authorises the app, **when** the controller verifies the HMAC state
-  and exchanges the `code`, **then** the platform resolves or creates
-  a local `User` (via the GitHub user link repository → auth account
-  → email lookup chain), upserts the corresponding `auth_account`
+  and exchanges the `code`, **then** the platform first checks that the
+  authorizing GitHub user could have installed the App on that account
+  (refusing with `403` before any write otherwise), then resolves or
+  creates a local `User` (via the GitHub user link repository → auth
+  account → email lookup chain), upserts the corresponding `auth_account`
   row with `providerId: 'github'`, persists the GitHub-App user-link
   row with the OAuth-app token (separate from the app installation
   token), then claims ownership of the installation row for the
@@ -312,6 +314,11 @@ nodeId: data.node_id || null, accessToken}`.
     - verify the state (HMAC + 10-minute TTL),
     - exchange the user code,
     - resolve the GitHub user (via `getAuthenticatedGithubUser`),
+    - fetch the installation (`getInstallation`, App JWT) and check claim
+      authority (`assertMayClaimInstallation`: recorded installer, else
+      the User account itself, else an active org admin; see §2.1). It
+      throws `ForbiddenException` BEFORE any local user, account, link or
+      installation row is resolved, written or claimed,
     - find-or-create the local user (the four-step chain in §2.1
         - email-not-verified rejection),
     - upsert the `auth_accounts` row with `providerId: 'github'`,
@@ -320,9 +327,9 @@ nodeId: data.node_id || null, accessToken}`.
     - upsert the `github_app_user_links` row with the OAuth-app token
       (kept distinct from the app installation token because GitHub
       issues separate JWTs for each),
-    - re-call `getInstallation` so the row payload is fresh on the
-      second leg of the handshake,
-    - call `upsertFromGithub` again,
+    - call `upsertFromGithub` again with the installation fetched for
+      the authority check, so the row payload is fresh on the second leg
+      of the handshake,
     - call `claimOwnershipIfUnassigned(installationId, user.id, githubUserId)`
       which atomically writes `createdByUserId`/`createdByGithubUserId`
       only when the row's `createdByUserId IS NULL` (the WHERE clause
