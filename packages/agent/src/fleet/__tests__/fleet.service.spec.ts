@@ -270,12 +270,19 @@ describe('FleetService', () => {
             const service = build();
             const before = Date.now();
             await service.listForUser('user-1');
+            const after = Date.now();
 
             const [userId, cutoff] = repository.sweepOffline.mock.calls[0];
             expect(userId).toBe('user-1');
-            const offset = before - (cutoff as Date).getTime();
-            expect(offset).toBeGreaterThanOrEqual(FLEET_NODE_OFFLINE_AFTER_MS - 1000);
-            expect(offset).toBeLessThanOrEqual(FLEET_NODE_OFFLINE_AFTER_MS + 1000);
+            // `now - window`, with "now" bracketed by the clock on both sides of the
+            // call — a CPU-throttled CI runner stalling inside it cannot push the
+            // cutoff out of the 1 s tolerance (an offset from `before` alone could).
+            expect((cutoff as Date).getTime()).toBeGreaterThanOrEqual(
+                before - FLEET_NODE_OFFLINE_AFTER_MS - 1000,
+            );
+            expect((cutoff as Date).getTime()).toBeLessThanOrEqual(
+                after - FLEET_NODE_OFFLINE_AFTER_MS + 1000,
+            );
         });
 
         it('maps rows to views without ever exposing the credential hash', async () => {
