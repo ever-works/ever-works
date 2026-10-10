@@ -81,7 +81,14 @@ export function createHarness(
         sink?: StatsSinkFacadeService | FakeSink;
     } = {},
 ): StatsHarness {
-    const config = readEverStatsConfig({ NODE_ENV: 'test', ...(options.env ?? {}) });
+    // The graph exists only when the module is loaded, i.e. switched on with
+    // `EVER_STATS_ENABLED=true` (it is off by default); `options.env` can still
+    // say otherwise.
+    const config = readEverStatsConfig({
+        NODE_ENV: 'test',
+        EVER_STATS_ENABLED: 'true',
+        ...(options.env ?? {}),
+    });
     const clock = { now: options.now ?? new Date('2026-10-15T08:00:00.000Z') };
     const identity = new EverInstanceService(
         dataSource.getRepository(EverInstance),

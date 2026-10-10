@@ -36,7 +36,7 @@ function sourceFiles(dir: string): string[] {
     for (const name of readdirSync(dir)) {
         const path = join(dir, name);
         if (statSync(path).isDirectory()) {
-            if (name === '__tests__' || name === 'contract') continue;
+            if (name === '__tests__') continue;
             out.push(...sourceFiles(path));
         } else if (/\.ts$/.test(name) && !/\.spec\.ts$/.test(name)) {
             out.push(path);

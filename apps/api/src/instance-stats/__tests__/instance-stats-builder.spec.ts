@@ -1,6 +1,6 @@
 import type { DataSource } from 'typeorm';
+import { validateStatsReport } from '@ever-co/connect-sdk';
 import { WORK_KINDS, WORKS_STATS_WORK_KIND_KEYS } from '@ever-works/contracts';
-import { validateStatsReport } from '@ever-works/agent/ever-instance';
 import {
     deploymentProviderKey,
     foldDeploymentsByProvider,
@@ -38,7 +38,7 @@ describe('InstanceStatsBuilderService', () => {
         });
         const report = await builder.build('2026-10', false, new Date('2026-10-15T08:00:00Z'));
 
-        expect(validateStatsReport(report)).toEqual({ ok: true });
+        expect(validateStatsReport(report).ok).toBe(true);
         expect(report).toMatchObject({
             schema: 'ever.stats.v1',
             product: 'works',

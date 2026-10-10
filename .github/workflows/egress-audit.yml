@@ -6,20 +6,23 @@ name: Egress audit
 # no route out; CoreDNS is its only resolver and a capture sees every connection attempt and DNS
 # query from before the process starts. Modes (tools/egress-audit/README.md):
 #
-#   off             EVER_STATS_ENABLED=false in the container environment: no Ever host looked
-#                   up, no connection attempt out, every statistics route 404
+#   default_off     nothing about statistics configured (the self-hosted default is off): no
+#                   Ever host looked up, no connection attempt out, every statistics route 404
+#   off             EVER_STATS_ENABLED=false in the container environment: the same
 #   off_env_file    the same switch written ONLY in the API's .env file
-#   loaded_off      module loaded, switched off in Settings by the platform admin: no request
-#   positive_stats  module on against the mock platform: reports accepted (202), and no call
-#                   other than the statistics report
+#   loaded_off      module loaded (EVER_STATS_ENABLED=true), switched off in Settings by the
+#                   platform admin: no request
+#   positive_stats  module on (EVER_STATS_ENABLED=true) against the mock platform: reports
+#                   accepted (202), and no call other than the statistics report
 #   control         positive_stats without the mock must FAIL, so a green run is not a blind one
 #
 # A second job runs the real sender against the same mock platform (202, every published
 # fixture's 422 with its path, 409 for a second key, 202 after an identity reset):
 # apps/api/src/instance-stats/__tests__/instance-stats.mock.itest.spec.ts.
 #
-# The harness is the public Ever Platform SDK's egress audit, checked out at a pinned commit
-# (EVER_CONNECT_SDK_SHA below); nothing of it is copied into this repository.
+# The harness and the mock platform are the Ever Platform SDK's dev-only tools package,
+# `@ever-co/connect-tools`, pinned to one exact version in tools/egress-audit/package.json and
+# installed from the lockfile; nothing of either is copied into this repository.
 #
 # Runs on every push to develop, stage and main, on pull requests that touch the statistics
 # module, the API image or the self-hosting compose files, and on demand.
@@ -41,6 +44,10 @@ on:
       - 'docker-compose.infra.yml'
       - '.env.compose'
       - 'tools/egress-audit/**'
+      # The manifests that pin the Ever Connect SDK packages: a version change re-runs the audit.
+      - 'apps/api/package.json'
+      - 'packages/agent/package.json'
+      - 'packages/contracts/package.json'
       - '.github/workflows/egress-audit.yml'
   workflow_dispatch:
 
@@ -53,9 +60,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # ever-co/ever-connect-sdk (Apache-2.0), tools/egress-audit and tools/mock-platform.
-  EVER_CONNECT_SDK_REPOSITORY: ever-co/ever-connect-sdk
-  EVER_CONNECT_SDK_SHA: 2fd74dad9357a18471292f38012a5f5e4e6d2938
+  # The `ever-egress-audit` bin of @ever-co/connect-tools (Apache-2.0), installed below.
+  AUDIT_BIN: tools/egress-audit/node_modules/.bin/ever-egress-audit
   EVER_WORKS_API_IMAGE: ever-works-api:egress-audit
   AUDIT_CONFIG: tools/egress-audit/egress-audit.config.json
   AUDIT_ARTIFACTS: egress-audit-artifacts
@@ -78,27 +84,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout the egress audit harness (pinned commit)
-        uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
-          repository: ${{ env.EVER_CONNECT_SDK_REPOSITORY }}
-          ref: ${{ env.EVER_CONNECT_SDK_SHA }}
-          path: .egress-audit/sdk
-          persist-credentials: false
+          version: 10.33.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 26
 
-      - name: Install the harness dependencies (from its lockfile)
-        working-directory: .egress-audit/sdk
+      - name: Install the audit tools (pinned @ever-co/connect-tools, from the lockfile)
         run: |
-          # Node.js 25+ no longer bundles corepack; install it before enabling it.
-          npm install -g corepack@0.36.0
-          corepack enable
-          pnpm install --frozen-lockfile --filter ./tools/egress-audit
-          node tools/egress-audit/run.mjs --help > /dev/null
+          # Only the audit's own workspace package: the API is audited as the image built below.
+          pnpm install --frozen-lockfile --filter @ever-works/egress-audit
+          "$AUDIT_BIN" --help > /dev/null
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
@@ -136,29 +136,35 @@ jobs:
           docker image ls "$EVER_WORKS_API_IMAGE"
           df -h /
 
+      - name: 'default_off: nothing configured, statistics off by default'
+        if: ${{ !cancelled() }}
+        env:
+          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode default_off --artifacts "$AUDIT_ARTIFACTS" --verbose
+
       - name: 'off: EVER_STATS_ENABLED=false in the container environment'
         if: ${{ !cancelled() }}
         env:
           EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: node .egress-audit/sdk/tools/egress-audit/run.mjs --config "$AUDIT_CONFIG" --mode off --artifacts "$AUDIT_ARTIFACTS" --verbose
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode off --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'off_env_file: EVER_STATS_ENABLED=false only in the API .env file'
         if: ${{ !cancelled() }}
         env:
           EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-stats-off.env
-        run: node .egress-audit/sdk/tools/egress-audit/run.mjs --config "$AUDIT_CONFIG" --mode off_env_file --artifacts "$AUDIT_ARTIFACTS" --verbose
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode off_env_file --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'loaded_off: switched off in Settings'
         if: ${{ !cancelled() }}
         env:
           EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: node .egress-audit/sdk/tools/egress-audit/run.mjs --config "$AUDIT_CONFIG" --mode loaded_off --artifacts "$AUDIT_ARTIFACTS" --verbose
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode loaded_off --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'positive_stats: on, against the mock platform'
         if: ${{ !cancelled() }}
         env:
           EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: node .egress-audit/sdk/tools/egress-audit/run.mjs --config "$AUDIT_CONFIG" --mode positive_stats --artifacts "$AUDIT_ARTIFACTS" --verbose
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode positive_stats --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'control: positive_stats without the mock platform must fail'
         if: ${{ !cancelled() }}
@@ -166,7 +172,7 @@ jobs:
           EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
         run: |
           set +e
-          node .egress-audit/sdk/tools/egress-audit/run.mjs --config "$AUDIT_CONFIG" --mode positive_stats --no-mock --artifacts "$AUDIT_ARTIFACTS" --verbose
+          "$AUDIT_BIN" --config "$AUDIT_CONFIG" --mode positive_stats --no-mock --artifacts "$AUDIT_ARTIFACTS" --verbose
           code=$?
           set -e
           if [ "$code" -ne 1 ]; then
@@ -210,25 +216,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout the mock platform (pinned commit)
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ env.EVER_CONNECT_SDK_REPOSITORY }}
-          ref: ${{ env.EVER_CONNECT_SDK_SHA }}
-          path: .egress-audit/sdk
-          persist-credentials: false
-
-      - name: Start the mock platform
-        run: |
-          docker build -q -t ever-mock-platform:pinned .egress-audit/sdk/tools/mock-platform
-          docker run -d --name ever-mock-platform -p 127.0.0.1:18080:8080 ever-mock-platform:pinned
-          for i in $(seq 1 60); do
-            curl -sf http://127.0.0.1:18080/__mock/healthz && exit 0
-            sleep 1
-          done
-          docker logs ever-mock-platform
-          exit 1
-
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
@@ -242,6 +229,19 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The `ever-mock-platform` bin of the pinned @ever-co/connect-tools (installed above with
+      # the workspace), on loopback only, with its default https issuer.
+      - name: Start the mock platform
+        run: |
+          nohup tools/egress-audit/node_modules/.bin/ever-mock-platform --host 127.0.0.1 --port 18080 \
+            > "$RUNNER_TEMP/ever-mock-platform.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:18080/__mock/healthz && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/ever-mock-platform.log"
+          exit 1
 
       - name: Build the packages the API tests read
         env:
@@ -258,4 +258,4 @@ jobs:
         if: always()
         run: |
           curl -s http://127.0.0.1:18080/__mock/requests || true
-          docker logs ever-mock-platform 2>&1 | tail -50 || true
+          tail -50 "$RUNNER_TEMP/ever-mock-platform.log" || true

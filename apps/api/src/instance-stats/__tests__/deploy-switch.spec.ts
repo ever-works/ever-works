@@ -7,8 +7,11 @@ import { parseAllDocuments } from 'yaml';
  * (`EVER_STATS_ENABLED: "false"` on the API container of all three
  * manifests) until Ever Platform's statistics endpoint is ready for them.
  * Turning it on for an environment is a deliberate edit of this guard and the
- * manifest in the same change. Self-hosted installations keep the default (on)
- * — the env samples document the variable commented out, so the default applies.
+ * manifest in the same change. The explicit `false` stays even though the
+ * module is now off by default (`EVER_STATS_DEFAULT_ENABLED`): flipping that
+ * default back on must not switch the cloud environments on with it.
+ * Self-hosted installations get the default — the env samples document the
+ * variable commented out, so an operator opts in by uncommenting it.
  */
 const MANIFESTS = ['k8s-manifest.dev.yaml', 'k8s-manifest.stage.yaml', 'k8s-manifest.prod.yaml'];
 

@@ -1,15 +1,14 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-    createHash,
-    createPrivateKey,
-    generateKeyPairSync,
-    randomUUID,
-    sign as cryptoSign,
-    type KeyObject,
-} from 'crypto';
+import { createPrivateKey, randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
+import {
+    generateStatsKey,
+    statsKeyId,
+    statsSignerFromSeed,
+    type StatsSigner,
+} from '@ever-co/connect-sdk';
 import { EVER_INSTANCE_ROW_ID, EverInstance } from '../entities/ever-instance.entity';
 import { PluginSecretEncService } from '../plugins/services/plugin-secret-enc.service';
 
@@ -32,20 +31,38 @@ export class EverInstanceKeyUnreadableError extends Error {
     }
 }
 
-/** The detached signature of one body, ready for the report headers. */
-export interface EverInstanceSignature {
-    /** base64url (no padding) of the 64-byte Ed25519 signature. */
-    signature: string;
+/** A statistics key as the identity row stores it. */
+export interface StoredStatsKey {
     /** base64url (no padding) of the 32-byte public key. */
-    publicKey: string;
+    statsPublicKey: string;
+    /** The PKCS#8 DER private key, base64, wrapped with `PLUGIN_SECRET_ENCRYPTION_KEY` when set. */
+    statsPrivateKeyEncrypted: string;
     /** base64url of the first 8 bytes of SHA-256 over the public key bytes. */
-    keyId: string;
+    statsKeyId: string;
 }
 
-interface GeneratedStatsKey {
-    statsPublicKey: string;
-    statsPrivateKeyEncrypted: string;
-    statsKeyId: string;
+/**
+ * A new statistics key from the Ever Platform SDK (`generateStatsKey`), in the
+ * form the identity row stores it: the public key and its key id as the SDK
+ * derives them, and the private key as PKCS#8 DER (base64), wrapped by
+ * `secrets`.
+ */
+export function newStoredStatsKey(secrets: PluginSecretEncService): StoredStatsKey {
+    const { seed, signer } = generateStatsKey();
+    const pkcs8 = createPrivateKey({
+        key: {
+            kty: 'OKP',
+            crv: 'Ed25519',
+            d: Buffer.from(seed).toString('base64url'),
+            x: signer.publicKey,
+        },
+        format: 'jwk',
+    }).export({ format: 'der', type: 'pkcs8' }) as Buffer;
+    return {
+        statsPublicKey: signer.publicKey,
+        statsPrivateKeyEncrypted: secrets.encryptValue(pkcs8.toString('base64')),
+        statsKeyId: statsKeyId(signer.publicKey),
+    };
 }
 
 /**
@@ -56,8 +73,9 @@ interface GeneratedStatsKey {
  * - `ensure()` creates the row on first boot with `INSERT … ON CONFLICT DO
  *   NOTHING` (`orIgnore`), so N replicas booting at once on one database end
  *   up with ONE identity, whichever insert won.
- * - `sign(bytes)` signs exactly the bytes given (`crypto.sign(null, …)`, no
- *   dependency added). The private key is unwrapped in memory only.
+ * - `statsSigner()` answers the Ever Platform SDK's `StatsSigner` for the
+ *   stored key (`statsSignerFromSeed`), which signs exactly the bytes it is
+ *   given. The private key is unwrapped in memory only.
  * - `reset()` gives the installation a new `instanceId` and a new statistics
  *   key, so future reports cannot be joined to past ones.
  *
@@ -69,7 +87,7 @@ interface GeneratedStatsKey {
 export class EverInstanceService {
     private readonly logger = new Logger(EverInstanceService.name);
     private readonly secrets: PluginSecretEncService;
-    private cachedKey: { keyId: string; key: KeyObject } | null = null;
+    private cachedSigner: { keyId: string; signer: StatsSigner } | null = null;
 
     constructor(
         @InjectRepository(EverInstance) private readonly repository: Repository<EverInstance>,
@@ -91,7 +109,7 @@ export class EverInstanceService {
         const existing = await this.get();
         if (existing) return existing;
 
-        const key = this.generateStatsKey();
+        const key = newStoredStatsKey(this.secrets);
         const result = await this.repository
             .createQueryBuilder()
             .insert()
@@ -116,16 +134,13 @@ export class EverInstanceService {
         return row;
     }
 
-    /** Sign exactly `bytes` with the statistics key. */
-    async sign(bytes: Uint8Array): Promise<EverInstanceSignature> {
-        const row = await this.ensure();
-        const key = this.privateKey(row);
-        const signature = cryptoSign(null, Buffer.from(bytes), key);
-        return {
-            signature: toBase64Url(signature),
-            publicKey: row.statsPublicKey,
-            keyId: row.statsKeyId,
-        };
+    /**
+     * The SDK's `StatsSigner` for the stored statistics key: it signs exactly
+     * the bytes it is given. Throws {@link EverInstanceKeyUnreadableError} when
+     * the stored key cannot be read.
+     */
+    async statsSigner(): Promise<StatsSigner> {
+        return this.signerOf(await this.ensure());
     }
 
     /**
@@ -134,7 +149,7 @@ export class EverInstanceService {
      */
     async reset(): Promise<EverInstance> {
         const row = await this.ensure();
-        const key = this.generateStatsKey();
+        const key = newStoredStatsKey(this.secrets);
         await this.repository.update(
             { id: EVER_INSTANCE_ROW_ID },
             {
@@ -143,7 +158,7 @@ export class EverInstanceService {
                 resetCount: row.resetCount + 1,
             },
         );
-        this.cachedKey = null;
+        this.cachedSigner = null;
         const next = await this.ensure();
         this.logger.log('Reset the anonymous usage statistics identity of this installation');
         this.events?.emit(EVER_INSTANCE_RESET_EVENT, { resetCount: next.resetCount });
@@ -176,7 +191,7 @@ export class EverInstanceService {
     /** Whether the statistics key can be read (and so a report signed) right now. */
     async isKeyReadable(): Promise<boolean> {
         try {
-            this.privateKey(await this.ensure());
+            this.signerOf(await this.ensure());
             return true;
         } catch (error) {
             if (error instanceof EverInstanceKeyUnreadableError) return false;
@@ -191,48 +206,31 @@ export class EverInstanceService {
         return this.ensure();
     }
 
-    private generateStatsKey(): GeneratedStatsKey {
-        const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-        const raw = publicKeyBytes(publicKey);
-        const pkcs8 = privateKey.export({ format: 'der', type: 'pkcs8' }) as Buffer;
-        return {
-            statsPublicKey: toBase64Url(raw),
-            statsPrivateKeyEncrypted: this.secrets.encryptValue(pkcs8.toString('base64')),
-            statsKeyId: keyIdOf(raw),
-        };
-    }
-
-    private privateKey(row: EverInstance): KeyObject {
-        if (this.cachedKey && this.cachedKey.keyId === row.statsKeyId) return this.cachedKey.key;
-        let key: KeyObject;
+    /**
+     * The SDK signer over the stored key: the 32-byte Ed25519 seed read from
+     * the stored PKCS#8 value, handed to `statsSignerFromSeed`.
+     */
+    private signerOf(row: EverInstance): StatsSigner {
+        if (this.cachedSigner && this.cachedSigner.keyId === row.statsKeyId) {
+            return this.cachedSigner.signer;
+        }
+        let signer: StatsSigner;
         try {
             const der = Buffer.from(
                 this.secrets.decryptValue(row.statsPrivateKeyEncrypted),
                 'base64',
             );
-            key = createPrivateKey({ key: der, format: 'der', type: 'pkcs8' });
+            const jwk = createPrivateKey({ key: der, format: 'der', type: 'pkcs8' }).export({
+                format: 'jwk',
+            }) as { crv?: string; d?: string };
+            if (jwk.crv !== 'Ed25519' || !jwk.d) throw new Error('not an Ed25519 key');
+            signer = statsSignerFromSeed(new Uint8Array(Buffer.from(jwk.d, 'base64url')));
         } catch {
             // A missing or changed PLUGIN_SECRET_ENCRYPTION_KEY, or a damaged
             // value. Never echo the stored value: name the condition only.
             throw new EverInstanceKeyUnreadableError();
         }
-        this.cachedKey = { keyId: row.statsKeyId, key };
-        return key;
+        this.cachedSigner = { keyId: row.statsKeyId, signer };
+        return signer;
     }
-}
-
-/** The 32 raw bytes of an Ed25519 public key. */
-export function publicKeyBytes(publicKey: KeyObject): Buffer {
-    const jwk = publicKey.export({ format: 'jwk' }) as { x?: string };
-    if (!jwk.x) throw new Error('not an Ed25519 public key');
-    return Buffer.from(jwk.x, 'base64url');
-}
-
-/** `key_id = b64url(sha256(pub)[0:8])`. */
-export function keyIdOf(rawPublicKey: Uint8Array): string {
-    return toBase64Url(createHash('sha256').update(rawPublicKey).digest().subarray(0, 8));
-}
-
-export function toBase64Url(bytes: Uint8Array): string {
-    return Buffer.from(bytes).toString('base64url');
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { UserSubscription, SubscriptionStatus } from '@src/entities/user-subscription.entity';
 
 @Injectable()
@@ -67,6 +67,45 @@ export class UserSubscriptionRepository {
             skip,
             take,
         });
+    }
+
+    /**
+     * Has anyone in this Tenant / these Organizations EVER held a provider plan subscription
+     * (any status)? The organization-wide half of "one free trial per account and per
+     * organization" (2026-10 repricing): a second member of the same Tenant — access is
+     * tenant-wide — does not get a second 90-day trial for the same organization.
+     *
+     * Matches a row stamped with the Tenant or one of the Organizations, OR any row of a user
+     * whose `users.tenantId` is the Tenant (rows created before the scope backfill carry no
+     * stamp). Rows without a provider subscription id (a free plan switched to directly, a manual
+     * grant) never count. Empty scope answers `false` without a query.
+     */
+    async existsProviderSubscriptionInScope(scope: {
+        tenantId?: string | null;
+        organizationIds?: readonly string[];
+    }): Promise<boolean> {
+        const tenantId = scope.tenantId ?? null;
+        const organizationIds = (scope.organizationIds ?? []).filter(Boolean);
+        if (!tenantId && organizationIds.length === 0) return false;
+        const qb = this.repository
+            .createQueryBuilder('sub')
+            .leftJoin('sub.user', 'owner')
+            .where('sub.providerSubscriptionId IS NOT NULL')
+            .andWhere(
+                new Brackets((scoped) => {
+                    if (tenantId) {
+                        scoped
+                            .orWhere('sub.tenantId = :tenantId', { tenantId })
+                            .orWhere('owner.tenantId = :tenantId', { tenantId });
+                    }
+                    if (organizationIds.length > 0) {
+                        scoped.orWhere('sub.organizationId IN (:...organizationIds)', {
+                            organizationIds,
+                        });
+                    }
+                }),
+            );
+        return (await qb.getCount()) > 0;
     }
 
     async listByUser(userId: string): Promise<UserSubscription[]> {

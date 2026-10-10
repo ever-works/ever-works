@@ -899,8 +899,10 @@ function verifyInRunnerStep(verifyRunnerScript: string): string[] {
 /**
  * Drop every trailing `\n` — what `/\n+$/` removed, in linear time. That regex backtracked
  * quadratically over a long run of newlines that is not at the end (CodeQL js/polynomial-redos).
+ *
+ * Exported for its complexity guard in `generator.spec.ts` only; not part of the package API.
  */
-function stripTrailingNewlines(text: string): string {
+export function stripTrailingNewlines(text: string): string {
 	let end = text.length;
 	while (end > 0 && text.charCodeAt(end - 1) === 0x0a /* '\n' */) end -= 1;
 	return text.slice(0, end);

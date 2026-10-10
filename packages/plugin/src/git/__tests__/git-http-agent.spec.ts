@@ -23,13 +23,21 @@ const TEST_TIMEOUT_MS = 30_000;
 // leak the first server (each test starts its own), which can keep the vitest process alive in CI.
 const servers: Server[] = [];
 
-function startSlowServer(): Promise<string> {
+interface SlowServer {
+	readonly url: string;
+	/** Flips to true the moment the server starts answering — the ORDERING the control asserts on. */
+	readonly state: { answered: boolean };
+}
+
+function startSlowServer(): Promise<SlowServer> {
 	return new Promise((resolve) => {
+		const state = { answered: false };
 		const server = createServer((req, res) => {
 			// Drain the request body, then deliberately stay silent past the 5s global-agent deadline.
 			req.resume();
 			req.on('end', () => {
 				setTimeout(() => {
+					state.answered = true;
 					res.writeHead(200, { 'Content-Type': 'text/plain' });
 					res.end('ok');
 				}, SERVER_DELAY_MS);
@@ -38,7 +46,7 @@ function startSlowServer(): Promise<string> {
 		servers.push(server);
 		server.listen(0, '127.0.0.1', () => {
 			const { port } = server.address() as AddressInfo;
-			resolve(`http://127.0.0.1:${port}/slow`);
+			resolve({ url: `http://127.0.0.1:${port}/slow`, state });
 		});
 	});
 }
@@ -64,15 +72,21 @@ describe('git HTTP client agent timeout', () => {
 			const { globalAgent } = await import('node:https');
 			expect(globalAgent.options.timeout).toBe(5000);
 
-			const url = await startSlowServer();
+			const { url, state } = await startSlowServer();
 			const started = Date.now();
 
 			await expect(
 				nodeHttp.request({ url, method: 'GET', headers: {} } as Parameters<typeof nodeHttp.request>[0])
 			).rejects.toThrow(/timed out/i);
 
-			const elapsed = Date.now() - started;
-			expect(elapsed).toBeLessThan(SERVER_DELAY_MS);
+			// The client gave up BEFORE the slow server answered — asserted as an ORDERING, not a wall-clock
+			// bound. An upper bound (`elapsed < 8000`) went red at 10,977 ms on a CPU-throttled CI runner
+			// (develop run 37949660418) although the timeout had fired first: on such a runner every timer
+			// fires late, the client's 5s deadline and the server's 8s reply alike, but never out of order.
+			expect(state.answered).toBe(false);
+			// And it was the ~5s idle deadline, not an instant failure. A lower bound is safe on any runner:
+			// throttling only ever makes timers later.
+			expect(Date.now() - started).toBeGreaterThanOrEqual(4_500);
 		},
 		TEST_TIMEOUT_MS
 	);
@@ -80,7 +94,7 @@ describe('git HTTP client agent timeout', () => {
 	it(
 		'SUBJECT: the wrapped client supplies an agent and survives a slow server',
 		async () => {
-			const url = await startSlowServer();
+			const { url } = await startSlowServer();
 			const started = Date.now();
 
 			const response = await http.request({

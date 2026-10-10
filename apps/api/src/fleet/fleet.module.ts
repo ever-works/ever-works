@@ -5,6 +5,7 @@ import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { AgentsModule as AgentAgentsModule } from '@ever-works/agent/agents';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { IsPlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 import { FleetController } from './fleet.controller';
 import { FleetJobsController } from './fleet-jobs.controller';
@@ -13,6 +14,8 @@ import { FleetKillSwitchController } from './fleet-kill-switch.controller';
 import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetMcpCredentialListener } from './fleet-mcp-credential.listener';
+import { FleetJobRetentionService } from './fleet-job-retention.service';
+import { FleetRunTelemetryListener } from './fleet-run-telemetry.listener';
 import { FleetPushCredentialService } from './fleet-push-credential.service';
 import { FleetRunRouterService } from './fleet-run-router.service';
 import { FleetRunSecretsService } from './fleet-run-secrets.service';
@@ -141,6 +144,16 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // completion event they all emit. Additive: no edit to
         // `FleetJobService` was needed to make revocation guaranteed.
         FleetMcpCredentialListener,
+        // Self-build slice AP — fleet run lifecycle events to PostHog and
+        // Sentry through the app-wide `MonitoringModule` services (both
+        // @Optional, so a deployment without them boots unchanged).
+        FleetRunTelemetryListener,
+        // Self-build slice AP — the nightly retention purge of terminal job
+        // bodies, guarded by the same distributed task lock its sibling
+        // retention passes use (`SafetyApiModule` provides it the same way:
+        // it only needs the `CacheEntry` repository `DatabaseModule` supplies).
+        FleetJobRetentionService,
+        DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetNodeAuthGuard,

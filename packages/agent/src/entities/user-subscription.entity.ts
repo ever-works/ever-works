@@ -11,7 +11,7 @@ import {
 import type { ClassToObject, SubscriptionPlanCode } from './types';
 import { User } from './user.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
-import { TimestampColumn } from './_types';
+import { PortableDateColumn, TimestampColumn } from './_types';
 
 export enum SubscriptionStatus {
     ACTIVE = 'active',
@@ -97,6 +97,16 @@ export class UserSubscription {
 
     @Column({ type: 'boolean', default: false })
     cancelAtPeriodEnd: boolean;
+
+    /**
+     * End of this subscription's free trial (2026-10 repricing: 90-day Cloud trial), NULL when it
+     * had none. Two jobs (owner, 2026-10-09): until it passes, the plan's monthly credits are NOT
+     * granted (a trial runs on Free-plan credits); after it, the allowance months are anchored on it
+     * - not on the trial start - so the first paid month's credits last a full month. Set from the
+     * provider at activation; pulled forward to the conversion time if the trial ends early.
+     */
+    @PortableDateColumn({ nullable: true })
+    trialEndsAt?: Date | null;
 
     @Column({ type: 'json', nullable: true })
     paymentMethodMeta?: Record<string, any> | null;

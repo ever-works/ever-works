@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * (state, what is sent, the last payload, Send now, the switch, Reset
  * identity); anyone else gets whether statistics are on and who manages them.
  * When the API answers 404 the module is switched off for this installation by
- * its configuration (`EVER_STATS_ENABLED=false`): there is no feature to show,
+ * its configuration (off unless `EVER_STATS_ENABLED=true`): there is no feature to show,
  * so the page answers 404 too (and the settings nav has no tab for it).
  */
 export default async function EverPlatformSettingsPage() {

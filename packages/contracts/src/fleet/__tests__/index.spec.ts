@@ -58,6 +58,11 @@ const JOB_EXPORTS = [
 	'FLEET_JOB_MAX_PAYLOAD_BYTES',
 	'FLEET_JOB_MAX_RESULT_BYTES',
 	'FLEET_JOB_MAX_ERROR_LENGTH',
+	// Fleet job retention (self-build slice AP) — the window after which a
+	// terminal job's payload and result bodies are purged.
+	'FLEET_JOB_DEFAULT_RETENTION_DAYS',
+	'FLEET_JOB_MIN_RETENTION_DAYS',
+	'FLEET_JOB_MAX_RETENTION_DAYS',
 	'FLEET_JOB_MAX_REQUIRED_CAPABILITIES',
 	'clampLeaseTtlSec',
 	'clampMaxAttempts',
@@ -151,7 +156,16 @@ const AGENT_EXECUTION_EXPORTS = [
 	'FLEET_BYO_MODEL_PLUGIN_ID_PREFIX',
 	'fleetModelCostUsdToCents',
 	'fleetModelPluginId',
-	'isFleetModelPluginId'
+	'isFleetModelPluginId',
+	// Fleet run continuity (self-build slice AU): the session-id shape a
+	// node may put on argv, which providers may resume, the drop-don't-
+	// refuse reader of the resume block, and the outcome vocabulary.
+	// Covered in `fleet-agent-execution.spec.ts`.
+	'FLEET_AGENT_MODEL_SESSION_ID_PATTERN',
+	'isFleetAgentModelSessionId',
+	'fleetAgentExecutionProviderSupportsSessionResume',
+	'normalizeFleetAgentModelResume',
+	'FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES'
 ] as const;
 
 const RUNNER_STATUS_EXPORTS = [
@@ -208,6 +222,16 @@ const QUESTION_EXPORTS = [
 	'FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS',
 	'FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS',
 	'normalizeFleetAgentTaskContainment',
+	// Run evidence of a fleet run (self-build slice AP,
+	// `fleet-jobs.types.js`) — the bounded step records and the redacted
+	// transcript's caps, and the coercing reader the reconciler uses.
+	'FLEET_AGENT_TASK_TIMELINE_MAX_STEPS',
+	'FLEET_AGENT_TASK_TIMELINE_MAX_BYTES',
+	'FLEET_AGENT_TASK_TIMELINE_TEXT_MAX_CHARS',
+	'FLEET_AGENT_TASK_TIMELINE_ARGS_MAX_CHARS',
+	'FLEET_AGENT_TASK_TIMELINE_NAME_MAX_CHARS',
+	'FLEET_AGENT_TASK_TRANSCRIPT_MAX_BYTES',
+	'normalizeFleetAgentTaskTimeline',
 	// Panic controls (EW-778) — fleet-panic.types.ts
 	'FLEET_AUDIT_ACTIONS',
 	'FLEET_AUDIT_DEFAULT_LIMIT',
@@ -313,6 +337,9 @@ const FUNCTION_EXPORTS = [
 	'isFleetAgentExecutionEffort',
 	'isFleetAgentExecutionPermissionMode',
 	'normalizeFleetAgentModelExecution',
+	'isFleetAgentModelSessionId',
+	'fleetAgentExecutionProviderSupportsSessionResume',
+	'normalizeFleetAgentModelResume',
 	'fleetModelCostUsdToCents',
 	'fleetModelPluginId',
 	'isFleetModelPluginId',
@@ -327,6 +354,7 @@ const FUNCTION_EXPORTS = [
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
 	'normalizeFleetAgentTaskContainment',
+	'normalizeFleetAgentTaskTimeline',
 	'normalizeFleetNodeWorkerState',
 	'isFleetRunTokenRouteAllowed',
 	'fleetRunTokenExpiryFromLease',
@@ -353,7 +381,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 184 runtime symbols', () => {
+	it('exposes exactly these 199 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -389,8 +417,16 @@ describe('fleet barrel', () => {
 		// node's claim about how contained its own run was. All in
 		// `fleet-jobs.types.ts`, an existing module, so the witness table
 		// below needs no new row.
+		// → 194 with run evidence + retention (self-build slice AP): the
+		// three retention-window bounds, the six timeline / transcript caps
+		// and the timeline's coercing reader. All in `fleet-jobs.types.ts`,
+		// an existing module, so the witness table needs no new row.
+		// → 199 with fleet run continuity (self-build slice AU): the session-
+		// id pattern and its guard, the resume-capable provider rule, the
+		// resume-block reader and the resume-outcome list. All in
+		// `fleet-jobs.types.ts`, an existing module — no new witness row.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(184);
+		expect(Object.keys(fleet)).toHaveLength(199);
 	});
 
 	it.each([

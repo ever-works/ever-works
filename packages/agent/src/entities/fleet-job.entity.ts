@@ -59,6 +59,10 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 // `WHERE nodeId = ? AND completedAt >= dayStart`. Migration
 // `1788300000000-AddFleetCostAccounting` adds the index with the column.
 @Index('idx_fleet_jobs_node_completed', ['nodeId', 'completedAt'])
+// Self-build slice AP: the retention purge is
+// `bodiesPurgedAt IS NULL AND completedAt < cutoff`. Migration
+// `1795040000000-AddFleetJobBodiesPurgedAt` adds the index with the column.
+@Index('idx_fleet_jobs_bodies_purge', ['bodiesPurgedAt', 'completedAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -207,6 +211,16 @@ export class FleetJob {
 
     @PortableDateColumn({ nullable: true })
     completedAt?: Date | null;
+
+    /**
+     * Self-build slice AP — when the retention purge NULLed this TERMINAL
+     * job's `payload` and `result` bodies (`FleetJobRetentionService`, after
+     * `FLEET_JOB_RETENTION_DAYS`, default 30). NULL = never purged; the
+     * column is what keeps the nightly pass idempotent and off rows it has
+     * already done. Every other column of the row is kept.
+     */
+    @PortableDateColumn({ nullable: true })
+    bodiesPurgedAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

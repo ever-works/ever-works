@@ -260,7 +260,9 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		// The model command came FIRST, then the acceptance check.
 		expect(commands).toHaveLength(2);
 		expect(commands[0]).toContain(CLAUDE);
-		expect(commands[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		// Self-build slice AP: the line-delimited stream, which is what carries
+		// the turns the run's step records are built from.
+		expect(commands[0]).toContain('-p --output-format stream-json --verbose --permission-mode acceptEdits');
 		expect(commands[0]).toContain('--model claude-opus-5');
 		expect(commands[0]).toContain('--effort high');
 		expect(commands[0]).toContain('instructions.md');
@@ -293,7 +295,12 @@ describe('runAgentTaskJob — model-cli execution', () => {
 				summary: 'Implemented the change.',
 				costUsd: 0.5,
 				turns: 3,
-				sessionId: 'sess-1'
+				sessionId: 'sess-1',
+				// Self-build slice AP: the run's redacted transcript rides with
+				// the verdict. This CLI output is one `result` line and no
+				// turns, so there is a transcript and no step record.
+				transcript: claudeEnvelope,
+				transcriptSourceBytes: Buffer.byteLength(claudeEnvelope, 'utf8')
 			},
 			checks: [{ id: 'unit', status: 'green', exitCode: 0, durationMs: expect.any(Number) }],
 			gateStatus: 'green',
@@ -1095,6 +1102,52 @@ describe('runAgentTaskJob — owner question (self-build slice Q)', () => {
 		expect('question' in outcome).toBe(false);
 		expect(qfs.files.has(QUESTION_PATH)).toBe(true);
 		expect(qfs.events).toEqual([]);
+	});
+
+	it('reports a question file written from a SUBDIRECTORY on the run, and warns (self-build slice AU)', async () => {
+		// The scan itself is pinned against the real filesystem in
+		// `agent-task-misplaced-question.spec.ts`; this pins the wiring: it
+		// runs after the model, its finding rides the result, and it is a
+		// warning, never a failure and never a question.
+		const qfs = questionFs();
+		const nestedDir = join(ABSOLUTE, 'apps', 'api', '.ever-works');
+		const dirs: Record<string, Array<{ name: string; kind: 'dir' | 'file' | 'other' }>> = {
+			[ABSOLUTE]: [{ name: 'apps', kind: 'dir' }],
+			[join(ABSOLUTE, 'apps')]: [{ name: 'api', kind: 'dir' }],
+			[join(ABSOLUTE, 'apps', 'api')]: [{ name: '.ever-works', kind: 'dir' }],
+			[nestedDir]: [{ name: 'QUESTION.md', kind: 'file' }]
+		};
+		qfs.readDir = async (path: string) => dirs[path] ?? [];
+		const warnings: string[] = [];
+		const { spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(
+			job(payload),
+			baseIo({
+				spawnFn,
+				questionFs: qfs,
+				logger: {
+					info: () => undefined,
+					warn: (line: string) => warnings.push(line),
+					error: () => undefined,
+					protect: () => undefined,
+					unprotect: () => undefined
+				} as unknown as AgentTaskIo['logger']
+			})
+		);
+
+		expect(outcome.misplacedQuestionFiles).toEqual(['apps/api/.ever-works/QUESTION.md']);
+		expect(outcome.status).toBe('succeeded');
+		expect('question' in outcome).toBe(false);
+		expect(qfs.events).toContain(`remove:${join(nestedDir, 'QUESTION.md')}`);
+		expect(warnings.some((line) => line.includes('outside the repository root'))).toBe(true);
+	});
+
+	it('reports nothing extra when no misplaced file exists (byte-for-byte as before)', async () => {
+		const qfs = questionFs();
+		qfs.readDir = async () => [];
+		const { spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, questionFs: qfs }));
+		expect('misplacedQuestionFiles' in outcome).toBe(false);
 	});
 });
 

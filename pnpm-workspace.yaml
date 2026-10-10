@@ -2,6 +2,8 @@ packages:
   - apps/*
   - packages/*
   - packages/plugins/*
+  # Ever Works' egress audit inputs and the pinned audit tools (@ever-co/connect-tools)
+  - tools/egress-audit
 
 onlyBuiltDependencies:
   - '@nestjs/core'
