@@ -49,8 +49,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | ---------------------- | ----------------------------------------- | -------- | ----------------------- | -------- |
 | `APP_NAME`             | Application name (fallback for site name) | `string` | `Ever Works`            | No       |
 | `NEXT_PUBLIC_APP_NAME` | Public application name                   | `string` | `Ever Works`            | No       |
-| `NEXT_PUBLIC_WEB_URL`  | Public web application URL                | `string` | `http://localhost:3000` | Yes      |
+| `NEXT_PUBLIC_WEB_URL`  | Public, browser-facing web app URL        | `string` | `http://localhost:3000` | Yes      |
 | `API_URL`              | Backend API URL (server-side)             | `string` | `http://localhost:3100` | Yes      |
+
+Route handlers that redirect to an absolute URL, such as the GitHub App setup and callback routes, build it on `NEXT_PUBLIC_WEB_URL` (falling back to `WEB_URL`), never on the address the web server listens on. Inside a container that address is the pod's own hostname, which a browser cannot resolve.
 
 ---
 
@@ -72,6 +74,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `GH_CLIENT_ID`     | GitHub OAuth application Client ID     | `string` | --                                     | No       |
 | `GH_CLIENT_SECRET` | GitHub OAuth application Client Secret | `string` | --                                     | No       |
 | `GH_CALLBACK_URL`  | GitHub OAuth callback URL              | `string` | `${WEB_URL}/api/oauth/github/callback` | No       |
+
+### GitHub App
+
+The platform GitHub App is configured on the API with `GITHUB_APP_ID`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_SLUG`, `GITHUB_APP_SETUP_URL` and `GITHUB_APP_CALLBACK_URL`. The [Connect Integrations guide](./guides/connect-integrations.md#2-github) has the table.
+
+Give the App the account permission **"Email addresses: read"**. With it, the setup callback reads the user's verified email addresses for account linking. Without it, the callback still completes: it uses the public profile email, treats that email as unverified, and logs a warning.
+
+Also give it the organization permission **"Members: read"**. The setup callback uses it to confirm that whoever links an organization installation is an active admin of that organization. Without it, an organization installation can only be linked by the installer named in GitHub's installation webhook. See [Who can link an installation](./guides/connect-integrations.md#who-can-link-an-installation).
 
 ### Google OAuth
 

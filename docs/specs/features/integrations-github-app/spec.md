@@ -47,9 +47,11 @@ setup URL, and callback URL are derived with sensible defaults from
 - **Given** GitHub redirects me back to
   `GET /api/github-app/callback?code=<c>&state=<s>` after the user
   authorises the app, **when** the controller verifies the HMAC state
-  and exchanges the `code`, **then** the platform resolves or creates
-  a local `User` (via the GitHub user link repository → auth account
-  → email lookup chain), upserts the corresponding `auth_account`
+  and exchanges the `code`, **then** the platform first checks that the
+  authorizing GitHub user could have installed the App on that account
+  (refusing with `403` before any write otherwise), then resolves or
+  creates a local `User` (via the GitHub user link repository → auth
+  account → email lookup chain), upserts the corresponding `auth_account`
   row with `providerId: 'github'`, persists the GitHub-App user-link
   row with the OAuth-app token (separate from the app installation
   token), then claims ownership of the installation row for the
@@ -129,6 +131,40 @@ setup URL, and callback URL are derived with sensible defaults from
   returns no email, the onboarding service synthesises
   `github-app-${githubUserId}@users.noreply.ever.works` and creates
   the user with `emailVerified: false`.
+- **Given** the App lacks the account permission "Email addresses: read",
+  so GitHub answers `GET /user/emails` with `403` or `404`, **when**
+  `GitHubAppService.getAuthenticatedGithubUser` resolves the email,
+  **then** it calls `resolveGitHubAccountEmail(..., { allowMissingEmailPermission: true })`,
+  which falls back to the `/user` profile email with
+  `emailVerified: false` and logs a warning naming the missing
+  permission, and the callback completes instead of failing. `401`,
+  `5xx` and network failures still throw. The OAuth-App sign-in path
+  (`SocialAuthService`) does not opt in, so it keeps failing on a
+  missing `user:email` scope.
+- **Given** the HMAC state names an installation (an id chosen by whoever
+  called the public setup endpoint), **when** `completeUserAuth` runs,
+  **then** it fetches the installation with the App JWT and accepts the
+  authorizing GitHub user only if one of these holds:
+    - the installation row's `createdByGithubUserId` (the HMAC-verified
+      `installation.created` webhook's `sender`) equals that user's id;
+    - with no installer recorded, a `User` installation's `account.id`
+      equals that user's id;
+    - with no installer recorded, an `Organization` installation's org has
+      that user as an active admin (`GET /user/memberships/orgs/{org}` with
+      the user token returns `state: active`, `role: admin`).
+
+    Otherwise it throws `ForbiddenException` before any user, auth-account,
+    user-link or installation row is written or claimed. The otherwise case
+    covers a read-only collaborator, a non-admin member, a pending
+    invitation, any membership-lookup error, a different recorded installer
+    and an unsupported target type. Visibility through
+    `GET /user/installations` is NOT treated as authority.
+
+- **Given** a `github` auth account already exists for the GitHub user
+  id but its local user cannot be loaded, **when**
+  `findOrCreateLocalUser` runs, **then** the service throws
+  `ConflictException` before anything is written, rather than creating
+  a second user for the same GitHub identity.
 - **Given** an existing local user is found by email but the
   GitHub-resolved email is NOT verified, **when**
   `findOrCreateLocalUser` checks the link/auth-account chain,
@@ -278,6 +314,12 @@ nodeId: data.node_id || null, accessToken}`.
     - verify the state (HMAC + 10-minute TTL),
     - exchange the user code,
     - resolve the GitHub user (via `getAuthenticatedGithubUser`),
+    - fetch the installation (`getInstallation`, App JWT) and check claim
+      authority (`assertMayClaimInstallation`: recorded installer, else
+      the User account itself, else an active org admin; see §2.1). The
+      check may READ the installation row to see its recorded installer.
+      It throws `ForbiddenException` before the local user, auth account
+      or user link is resolved, and before anything is written or claimed,
     - find-or-create the local user (the four-step chain in §2.1
         - email-not-verified rejection),
     - upsert the `auth_accounts` row with `providerId: 'github'`,
@@ -286,9 +328,9 @@ nodeId: data.node_id || null, accessToken}`.
     - upsert the `github_app_user_links` row with the OAuth-app token
       (kept distinct from the app installation token because GitHub
       issues separate JWTs for each),
-    - re-call `getInstallation` so the row payload is fresh on the
-      second leg of the handshake,
-    - call `upsertFromGithub` again,
+    - call `upsertFromGithub` again with the installation fetched for
+      the authority check, so the row payload is fresh on the second leg
+      of the handshake,
     - call `claimOwnershipIfUnassigned(installationId, user.id, githubUserId)`
       which atomically writes `createdByUserId`/`createdByGithubUserId`
       only when the row's `createdByUserId IS NULL` (the WHERE clause

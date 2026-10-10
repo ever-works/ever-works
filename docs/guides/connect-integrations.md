@@ -135,7 +135,7 @@ A delivery with no `x-github-event` header is rejected outright, and bot-authore
 ### How to: install the GitHub App
 
 1. Install the Ever Works GitHub App on the user account or organization, and choose the repositories it may see.
-2. Complete the setup redirect. GitHub hands off to `GET /api/github-app/setup` and then `GET /api/github-app/callback`, which bind the installation to your Ever Works account and sign you in.
+2. Complete the setup redirect. GitHub hands off to `GET /api/github-app/setup` and then `GET /api/github-app/callback`, which bind the installation to your Ever Works account and sign you in. Before it writes anything, the callback checks that the GitHub user who authorized could have installed the App on that account. If not, it refuses with a `403`. Being able to see the installation, as a read-only collaborator can, is not enough. See [Who can link an installation](#who-can-link-an-installation).
 3. Open **Settings → GitHub App** (`/settings/github-app`). Each installation card shows its status (**Active** / **Suspended**), the account and target type, the repository count, the last sync and the app slug. With nothing linked yet the page says: _"Install the Ever Works GitHub App on a repository or organization, then complete the setup redirect to have the installation linked to this workspace."_
 4. Press **Sync** on the installation to refresh the repository snapshot from GitHub. A fresh installation shows _"This installation has no repositories stored yet. Run sync to refresh the snapshot from GitHub."_ until you do.
 5. Press **Onboard** next to a repository to register it as a Work.
@@ -170,6 +170,29 @@ Self-hosting? You register your own GitHub App and wire it through environment v
 | `GITHUB_APP_SLUG`           | The App's slug. Defaults to `ever-works`.                              |
 | `GITHUB_APP_SETUP_URL`      | Overrides the default `<web app URL>/api/github-app/setup`.            |
 | `GITHUB_APP_CALLBACK_URL`   | Overrides the default `<web app URL>/api/github-app/callback`.         |
+
+When you register the App, also give it the **account permission "Email addresses: read"**. The setup callback uses it to read your _verified_ GitHub email addresses, which is what lets a GitHub identity the platform has never seen be matched to an existing Ever Works account by email.
+
+The App works without that permission. GitHub then refuses `GET /user/emails` (`403`/`404`), and the callback falls back to the public profile email, treats it as **unverified**, and logs a warning naming the missing permission. What that changes:
+
+- A GitHub identity that has signed in before is matched by its GitHub user id (the App user link, or the `github` sign-in account), never by email, so it is unaffected.
+- A brand-new GitHub identity gets a fresh account. An unverified email is never used to link it to an existing account; if one already uses that email, the callback refuses and you land on the auth error page.
+
+#### Who can link an installation
+
+The setup callback binds an installation to the Ever Works account of the GitHub user who completed it. It accepts that user only if one of these holds:
+
+| Installation                                          | Who may link it                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Any, once GitHub's `installation` webhook has arrived | Only the GitHub user that delivery names as the installer (its `sender`), nobody else      |
+| On a personal account, before the webhook arrives     | Only that account itself                                                                   |
+| On an organization, before the webhook arrives        | Only an active organization admin (owner), checked with `GET /user/memberships/orgs/{org}` |
+
+Anyone else is refused, including a read-only collaborator who can see the installation, an organization member who is not an admin, and an admin of an organization whose webhook named a different installer. Installations on enterprise accounts are refused.
+
+For the organization check, also give the App the **organization permission "Members: read"**. Without it, GitHub refuses the membership lookup. In that case an organization installation can only be linked by its installer, after the installation webhook has arrived.
+
+The setup and callback routes redirect the browser to the web app's public origin, `NEXT_PUBLIC_WEB_URL` (or `WEB_URL`) on the web deployment. Set it to the browser-facing URL. The address the web server listens on is never used.
 
 ### How to: turn on review for a single repository, without the App
 
