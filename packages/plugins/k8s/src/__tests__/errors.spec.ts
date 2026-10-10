@@ -133,11 +133,19 @@ describe('buildSecretPattern', () => {
  * as an oracle below).
  */
 describe('scrubString on hostile input', () => {
+	/**
+	 * Sized, not tightly timed: each count makes the old patterns need tens of seconds on a dev box
+	 * (the kubeconfig one ~16 s at 100 000 openers, the PEM one ~30 s at 50 000 headers) while the
+	 * scanners answer in milliseconds, so a 2 s bound can be failed neither by a CPU-throttled CI
+	 * runner nor passed by the regexes. (A "< 200 ms" was one scheduler stall from red — develop CI,
+	 * 2026-10-09.) The middle shape is linear for the old regex too; it pins that the scanner
+	 * reads the blob once, however many `kind: Config` follow.
+	 */
 	it.each([
-		['many kubeconfig openers with no `kind: Config`', 'apiVersion:v1'.repeat(50_000)],
+		['many kubeconfig openers with no `kind: Config`', 'apiVersion:v1'.repeat(100_000)],
 		[
 			'one kubeconfig blob followed by many `kind: Config`',
-			`apiVersion:v1akind:Config${'akind:Config'.repeat(50_000)}`
+			`apiVersion:v1akind:Config${'akind:Config'.repeat(200_000)}`
 		],
 		['many PEM headers with no END line', '-----BEGIN ,-----'.repeat(50_000)]
 	])('scrubs %s in linear time', (_label, hostile) => {
@@ -145,7 +153,7 @@ describe('scrubString on hostile input', () => {
 		scrubString(hostile);
 		const elapsedMs = performance.now() - started;
 
-		expect(elapsedMs).toBeLessThan(200);
+		expect(elapsedMs).toBeLessThan(2_000);
 	});
 
 	/** The four patterns `scrubString` applied before the scanners — the oracle for the rewrite. */

@@ -266,17 +266,23 @@ describe('deriveThreadKey', () => {
 
     // The subject is sender-controlled (any inbound email). CodeQL flagged the
     // prefix pattern as polynomial on whitespace runs; these are the shapes it
-    // names, pinned under a tight budget.
+    // names. V8 answers them in linear time with the old pattern too (well
+    // under 10 ms at 20,000 characters, measured 2026-10-09), so this pins
+    // linearity against a later rewrite that really does backtrack — e.g. a
+    // regex trim, `/\s+$/` over an interior whitespace run, needs ~40 s at this
+    // size on a dev box. Sized rather than tightly timed: a "< 200 ms" at
+    // 50,000 was one scheduler stall on a CPU-throttled CI runner from red
+    // (develop CI, 2026-10-09); 2 s at 200,000 is neither.
     it.each<[string, string]>([
-        ['whitespace before a non-prefix', `${' '.repeat(50_000)}x`],
-        ['a prefix, then whitespace, then a partial prefix', `re:${' '.repeat(50_000)}r`],
-        ['many prefixes', 're: '.repeat(50_000)],
-        ['a prefix word and whitespace with no colon', `re${' '.repeat(50_000)}x`],
-    ])('keys a subject of %s in well under 200 ms', (_, subject) => {
+        ['whitespace before a non-prefix', `${' '.repeat(200_000)}x`],
+        ['a prefix, then whitespace, then a partial prefix', `re:${' '.repeat(200_000)}r`],
+        ['many prefixes', 're: '.repeat(200_000)],
+        ['a prefix word and whitespace with no colon', `re${' '.repeat(200_000)}x`],
+    ])('keys a subject of %s in linear time', (_, subject) => {
         const started = performance.now();
-
         deriveThreadKey(subject);
+        const elapsedMs = performance.now() - started;
 
-        expect(performance.now() - started).toBeLessThan(200);
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 });

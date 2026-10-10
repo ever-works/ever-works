@@ -65,6 +65,26 @@ import {
  * every sample asserts `patternMismatch`, so a fast short-circuit cannot become the
  * winning run. Nothing here retries a *failing* assertion: the five evaluations all
  * happen, all are asserted, and one of them being slow is reported, not hidden.
+ *
+ * ## Sized to the catastrophe, not to a dev box (2026-10-09)
+ *
+ * Two bounds here still measured the machine. The flat match's 150 ms ceiling was a
+ * 3.75x slowdown away from red, and the shared, CPU-quota-throttled CI runners run
+ * every measured duration 5–15x slower than a dev box, unpredictably (develop went
+ * red three times on 2026-10-09 on such bounds, none caused by the code under test).
+ * And the "adversarial ≤ 2 × flat" ratio sat inside RE2's own spread: best-of-five
+ * ratios of 1.6–3.9 on Node 26 (eight rounds on one idle Windows box, timed one
+ * series after the other and interleaved alike, with the code unchanged), against
+ * the 1.43 measured on 2026-09-18.
+ *
+ * What this case must catch lands orders of magnitude away, not a factor of two: a
+ * backtracking engine does not return at all for `(a+)+$` on this input, while RE2
+ * needs tens of milliseconds. So the assertion is now the adversarial pattern itself
+ * under {@link PATTERN_CATASTROPHE_CEILING_MS} = 2 s — out of reach of a throttled
+ * runner, and never met by a backtracking engine — with the flat match under the same
+ * ceiling as the calibration. The ratio is still printed with the samples, so a drift
+ * stays visible in the CI log; the plan's 50 ms stays reported, not asserted
+ * (APW07-G29).
  */
 
 /** A value distinctive enough that "is it in the message?" is a real question (FR-19). */
@@ -96,18 +116,14 @@ const PATTERN_TIMING_SAMPLES = 5;
 const FLAT_PATTERN = 'a+';
 
 /**
- * How much more the adversarial pattern may cost than the flat one. Measured
- * 1.43× (best) / 1.52× (median) on 2026-09-18; the factor is deliberately
- * generous, because the thing it must catch is not a 20% drift — it is an engine
- * whose cost is exponential in the input, which lands orders of magnitude away.
+ * The ceiling the adversarial match — and the same-size flat match, its calibration —
+ * must stay under. A backtracking engine does not return in 2 s for 65,536 bytes of
+ * `(a+)+$`; it does not return at all. RE2 needs tens of milliseconds, so 2 s is out
+ * of reach of a CPU-throttled CI runner while a 50x regression of the engine still
+ * fails it. (It was 150 ms on the flat match alone, with an "adversarial ≤ 2 × flat"
+ * ratio beside it: see "Sized to the catastrophe" above.)
  */
-const PATTERN_BLOWUP_FACTOR = 2;
-
-/**
- * The ceiling a same-size flat match must stay under. A backtracking engine does
- * not return in 150 ms for 65,536 bytes of `(a+)+$`; it does not return at all.
- */
-const PATTERN_CATASTROPHE_CEILING_MS = 150;
+const PATTERN_CATASTROPHE_CEILING_MS = 2_000;
 
 /** One timed evaluation, with the outcome it produced — never a bare number. */
 interface PatternTimingSample {
@@ -348,7 +364,7 @@ describe('AppEnv validation (T11, plan §4.4:404-411)', () => {
             expect(result.ok === false && result.code).toBe('patternMismatch');
         });
 
-        it('evaluates the adversarial pattern without blow-up — the plan budget, normalised by a same-size flat match', () => {
+        it('evaluates the adversarial pattern without blow-up — inside a ceiling no backtracking engine meets, beside a same-size flat match', () => {
             // Warm-up: the first call compiles each pattern, and compiling is not
             // what FR-17 bounds.
             validateAppEnvValue('SLOW', `${'a'.repeat(999)}!`, {
@@ -362,7 +378,8 @@ describe('AppEnv validation (T11, plan §4.4:404-411)', () => {
             // eslint-disable-next-line no-console -- durations, never a value
             console.log(
                 `[T11] ${APP_ENV_VALUE_MAX_BYTES}-byte value: (a+)+$ ${formatSamples(adversarial)} · ` +
-                    `a+ ${formatSamples(flat)} · plan budget ${APP_ENV_PATTERN_BUDGET_MS} ms (see APW07-G29)`,
+                    `a+ ${formatSamples(flat)} · ratio ${(adversarial.best / Math.max(flat.best, 1)).toFixed(2)} · ` +
+                    `plan budget ${APP_ENV_PATTERN_BUDGET_MS} ms (see APW07-G29)`,
             );
 
             // Every sample is the matcher's own answer, so a fast short-circuit
@@ -372,16 +389,16 @@ describe('AppEnv validation (T11, plan §4.4:404-411)', () => {
             }
 
             // FR-17's property, expressed so that a loaded machine cannot fail it
-            // and a backtracking engine cannot pass it: the adversarial pattern may
-            // cost a small constant multiple of a same-size literal-ish match, and
-            // no more. The plan's absolute 50 ms is reported above and tracked as
-            // APW07-G29 — `re2js` needs ~38-43 ms for a FLAT pattern at this size,
-            // so the budget is at the engine's throughput edge rather than a
-            // property of this module (measured 2026-09-18).
-            expect(adversarial.best).toBeLessThan(Math.max(flat.best, 1) * PATTERN_BLOWUP_FACTOR);
+            // and a backtracking engine cannot pass it: the adversarial pattern
+            // comes back, inside a ceiling a linear engine clears by orders of
+            // magnitude on any runner. The plan's absolute 50 ms is reported above
+            // and tracked as APW07-G29 — `re2js` needs ~38-43 ms for a FLAT pattern
+            // at this size, so the budget is at the engine's throughput edge rather
+            // than a property of this module (measured 2026-09-18).
+            expect(adversarial.best).toBeLessThan(PATTERN_CATASTROPHE_CEILING_MS);
 
-            // The catastrophe ceiling: an engine with backtracking does not come
-            // back in 150 ms for this input, it does not come back at all.
+            // The calibration under the same ceiling: an engine with backtracking
+            // does not come back in 2 s for this input, it does not come back at all.
             expect(flat.best).toBeLessThan(PATTERN_CATASTROPHE_CEILING_MS);
         });
 

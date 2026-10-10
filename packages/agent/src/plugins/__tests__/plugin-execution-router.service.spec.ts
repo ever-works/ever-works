@@ -19,6 +19,28 @@ import { PLUGIN_OPERATION_DEFAULT_WAIT_MS } from '../../tasks/plugin-operation-d
 import { createLazyPluginProxy } from '../services/lazy-plugin-proxy';
 
 /**
+ * A timer armed before the wait under test, used as an ORDERING reference instead
+ * of a wall-clock bound: `stop()` clears it and reports whether it had already
+ * fired. On a shared, CPU-throttled CI runner every timer fires late — the
+ * router's deadline or abort and this reference alike — but never out of order,
+ * so "the wait ended before the reference fired" holds on any runner, where
+ * `Date.now() - started < N` measured the runner as well as the code (develop CI
+ * went red on such bounds three times on 2026-10-09).
+ */
+function referenceTimer(ms: number): { stop(): boolean } {
+    let fired = false;
+    const timer = setTimeout(() => {
+        fired = true;
+    }, ms);
+    return {
+        stop() {
+            clearTimeout(timer);
+            return fired;
+        },
+    };
+}
+
+/**
  * EW-693 / T25-T28 — execution router.
  *
  * Pinned behaviours:
@@ -989,7 +1011,7 @@ describe('PluginExecutionRouterService (EW-693)', () => {
 
             it('a stalled read cannot hold the caller past its deadline', async () => {
                 const runtime = stalledRuntime();
-                const started = Date.now();
+                const reference = referenceTimer(5_000);
 
                 await expect(
                     routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
@@ -1004,14 +1026,16 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                         message: expect.stringContaining('NOT cancelled'),
                     },
                 });
-                expect(Date.now() - started).toBeLessThan(5_000);
+                // The 300 ms deadline won the race against a 5 s reference timer armed
+                // first: ORDERING, not `Date.now() - started < 5_000` — see referenceTimer.
+                expect(reference.stop()).toBe(false);
             });
 
             it('an abort during a stalled read ends the wait at once', async () => {
                 const runtime = stalledRuntime();
                 const controller = new AbortController();
                 setTimeout(() => controller.abort(), 50);
-                const started = Date.now();
+                const reference = referenceTimer(5_000);
 
                 await expect(
                     routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
@@ -1023,7 +1047,8 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     runId: 'run_7',
                     error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
                 });
-                expect(Date.now() - started).toBeLessThan(5_000);
+                // The 50 ms abort ended the wait before a 5 s reference timer armed with it.
+                expect(reference.stop()).toBe(false);
                 expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
             });
 
@@ -1031,7 +1056,9 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 const runtime = makeRuntime([]); // running forever
                 const controller = new AbortController();
                 setTimeout(() => controller.abort(), 100);
-                const started = Date.now();
+                // Armed with the abort, and due before the wait's first 1 s sleep between
+                // reads would end: only an abort that interrupts the sleep beats it.
+                const reference = referenceTimer(900);
 
                 await expect(
                     routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
@@ -1043,7 +1070,7 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     ok: false,
                     error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
                 });
-                expect(Date.now() - started).toBeLessThan(900);
+                expect(reference.stop()).toBe(false);
             });
 
             it('leaves no abort listener on the caller’s signal once the wait is over', async () => {

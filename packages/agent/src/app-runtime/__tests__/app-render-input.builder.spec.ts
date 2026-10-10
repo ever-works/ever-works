@@ -1594,14 +1594,21 @@ describe('memoryLimit default (APW-03 schema §10)', () => {
     // `/^(\d+(?:\.\d+)?)(.*)$/`, which backtracks every digit against a `.*`
     // that stops at a line break — about 3 s for 50,000 digits on a dev box —
     // and the quantity is App spec content from the member's repository.
-    it('answers for 50,000 digits and a line break in well under 200 ms, leaving it as it is', () => {
-        const memory = `${'0'.repeat(50_000)}\nx`;
+    // Sized, not tightly timed: at 200,000 digits the regex needs ~50 s on a
+    // dev box and the two linear steps milliseconds, so a 2 s bound can be
+    // failed neither by a CPU-throttled CI runner nor passed by the regex. (A
+    // "< 200 ms" at 50,000 was one scheduler stall from red — develop CI,
+    // 2026-10-09.) Only `componentInputs` is timed; the spec is built first.
+    it('answers for 200,000 digits and a line break in linear time, leaving it as it is', () => {
+        const memory = `${'0'.repeat(200_000)}\nx`;
+        const spec = appSpec({ components: [{ name: 'web', role: 'web', resources: { memory } }] });
+
         const started = performance.now();
+        const memoryLimit = componentInputs(spec, LIVE_NAMESPACE)[0]?.resources.memoryLimit;
+        const elapsedMs = performance.now() - started;
 
-        const memoryLimit = memoryLimitFor(memory);
-
-        expect(performance.now() - started).toBeLessThan(200);
         expect(memoryLimit).toBe(memory);
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 
     it.each<[string, string]>([
