@@ -221,10 +221,17 @@ describe('GitHubApiService.forkRepository — non-blocking requests', () => {
 	it('waitForReady:false answers from the create response and never polls', async () => {
 		// First (and only) lookup misses; any further repos.get would be the readiness poll.
 		reposGetMock.mockRejectedValue(notFound());
+		// A pending answer is immediate: a poll loop would have slept 5 s per attempt. Asserted as an
+		// ORDERING against a 1 s reference timer armed first, not as `elapsed < 1000`: on a
+		// CPU-throttled CI runner the call itself can be descheduled that long, but no timer can fire
+		// ahead of an answer that waits on none.
+		let referenceFired = false;
+		const reference = setTimeout(() => {
+			referenceFired = true;
+		}, 1_000);
 
-		const started = Date.now();
 		const result = await svc.forkRepository(UPSTREAM_OWNER, UPSTREAM_REPO, { waitForReady: false }, 'ghp_secret');
-		const elapsed = Date.now() - started;
+		clearTimeout(reference);
 
 		expect(createForkMock).toHaveBeenCalledTimes(1);
 		expect(createForkMock).toHaveBeenCalledWith({
@@ -238,8 +245,7 @@ describe('GitHubApiService.forkRepository — non-blocking requests', () => {
 		expect(reposGetMock).toHaveBeenCalledTimes(1);
 		expect(result!.forkReadiness).toBe('pending');
 		expect(result!.fullName).toBe(`${TARGET_OWNER}/${UPSTREAM_REPO}`);
-		// A pending answer is immediate: a poll loop would have slept 5 s per attempt.
-		expect(elapsed).toBeLessThan(1000);
+		expect(referenceFired).toBe(false);
 	});
 
 	it('the default still waits for the fork to become readable', async () => {

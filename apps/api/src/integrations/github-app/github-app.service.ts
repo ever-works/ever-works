@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import {
     createGitHubAppJwt,
     createGitHubAppHeaders,
@@ -8,13 +8,15 @@ import {
     verifyGitHubWebhookSignature,
 } from '@ever-works/agent/utils';
 import { resolveGitHubAccountEmail } from '@src/auth/utils/github-email.utils';
+import { isAxiosError } from 'axios';
 import { config } from '../../config/constants';
 import { firstValueFrom } from 'rxjs';
 
-type GitHubInstallationResponse = {
+export type GitHubInstallationResponse = {
     id: number;
     target_type?: string;
     account?: {
+        id?: number;
         login?: string;
         type?: string;
     };
@@ -47,6 +49,14 @@ type GitHubAccessTokenResponse = {
     error_description?: string;
 };
 
+type GitHubOrgMembershipResponse = {
+    state?: string;
+    role?: string;
+};
+
+/** GitHub login syntax: alphanumerics and single hyphens, at most 39 characters. */
+const GITHUB_LOGIN_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+
 type GitHubUserResponse = {
     id: number;
     login: string;
@@ -58,6 +68,8 @@ type GitHubUserResponse = {
 
 @Injectable()
 export class GitHubAppService {
+    private readonly logger = new Logger(GitHubAppService.name);
+
     constructor(private readonly httpService: HttpService) {}
 
     getConfiguration() {
@@ -124,10 +136,18 @@ export class GitHubAppService {
             this.httpService.get<GitHubUserResponse>('https://api.github.com/user', { headers }),
         );
 
+        // A GitHub App user-to-server token can only read `/user/emails` when the
+        // App requests the account permission "Email addresses: read". Without it
+        // GitHub answers 403/404 — degrade to the (unverified) profile email rather
+        // than failing the whole installation callback. The onboarding service
+        // resolves the user by GitHub id first and never links an unverified email
+        // to an existing account (2026-10-09 prod incident: the callback 5xx'd and
+        // the installation stayed unclaimed).
         const { email, emailVerified } = await resolveGitHubAccountEmail(
             this.httpService,
             accessToken,
             data.email || null,
+            { allowMissingEmailPermission: true, logger: this.logger },
         );
 
         return {
@@ -140,6 +160,40 @@ export class GitHubAppService {
             nodeId: data.node_id || null,
             accessToken,
         };
+    }
+
+    /**
+     * Whether the GitHub user behind a user-to-server token is an ACTIVE ADMIN
+     * (owner) of the organization — i.e. someone who could have installed this
+     * App there. `GET /user/memberships/orgs/{org}` answers for the token's own
+     * user; a GitHub App user token needs the App's organization permission
+     * "Members: read" for it.
+     *
+     * Fails closed: not a member (404), no permission (403), pending
+     * invitation, a non-admin role, or any upstream error all answer false.
+     * Only the status is logged.
+     */
+    async isActiveOrgAdmin(accessToken: string, orgLogin: string): Promise<boolean> {
+        if (!GITHUB_LOGIN_PATTERN.test(orgLogin)) {
+            return false;
+        }
+        try {
+            const { data } = await firstValueFrom(
+                this.httpService.get<GitHubOrgMembershipResponse>(
+                    `https://api.github.com/user/memberships/orgs/${encodeURIComponent(orgLogin)}`,
+                    { headers: createGitHubOAuthHeaders(accessToken) },
+                ),
+            );
+            return data?.state === 'active' && data?.role === 'admin';
+        } catch (error) {
+            const status = isAxiosError(error) ? error.response?.status : undefined;
+            this.logger.warn(
+                `GitHub org membership lookup failed (status=${status ?? 'none'}); ` +
+                    'treating the user as not an org admin. A GitHub App user token needs the ' +
+                    'organization permission "Members: read" for this lookup.',
+            );
+            return false;
+        }
     }
 
     async getInstallation(installationId: string): Promise<GitHubInstallationResponse> {

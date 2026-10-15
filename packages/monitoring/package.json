@@ -57,8 +57,8 @@
         "rxjs": "^7.8"
     },
     "dependencies": {
-        "@sentry/nestjs": "^10.76.0",
-        "@sentry/profiling-node": "^10.76.0",
+        "@sentry/nestjs": "^11.7.0",
+        "@sentry/profiling-node": "^11.7.0",
         "posthog-node": "^5.18.0"
     },
     "devDependencies": {

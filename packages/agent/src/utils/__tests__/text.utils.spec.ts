@@ -116,14 +116,20 @@ describe('trimEdgeChars', () => {
         }
     });
 
-    it('trims around a long interior run in well under 200 ms', () => {
-        const value = `-a${'-'.repeat(50_000)}b-`;
+    // Sized, not tightly timed: at 200,000 the regex trim needs ~40 s on a dev
+    // box (1.7 s at 40,000, quadratic) and the two-pointer scan microseconds,
+    // so a 2 s bound can be failed neither by a CPU-throttled CI runner nor
+    // passed by the regex. (A "< 200 ms" at 50,000 was one scheduler stall from
+    // red — develop CI, 2026-10-09.)
+    it('trims around a long interior run in linear time', () => {
+        const value = `-a${'-'.repeat(200_000)}b-`;
+
         const started = performance.now();
-
         const trimmed = trimEdgeChars(value, '-', '-');
+        const elapsedMs = performance.now() - started;
 
-        expect(performance.now() - started).toBeLessThan(200);
         expect(trimmed).toBe(value.slice(1, -1));
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 });
 
@@ -141,13 +147,19 @@ describe('stripHtmlTags', () => {
         expect(stripHtmlTags(value)).toBe(stripped);
     });
 
-    it('strips 50,000 unclosed openers in well under 200 ms', () => {
-        const value = `${'<'.repeat(50_000)}ok`;
+    // Sized, not tightly timed: at 200,000 unclosed openers `<[^>]*>` needs
+    // ~40 s on a dev box and the scan milliseconds, so a 2 s bound can be
+    // failed neither by a CPU-throttled CI runner nor passed by the regex. (A
+    // "< 200 ms" at 50,000 was one scheduler stall from red — develop CI,
+    // 2026-10-09.)
+    it('strips 200,000 unclosed openers in linear time', () => {
+        const value = `${'<'.repeat(200_000)}ok`;
+
         const started = performance.now();
-
         const stripped = stripHtmlTags(value);
+        const elapsedMs = performance.now() - started;
 
-        expect(performance.now() - started).toBeLessThan(200);
         expect(stripped).toBe(value);
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 });

@@ -267,14 +267,21 @@ describe('object name helpers', () => {
 	 * backtracks quadratically over a long inner run of `-`. Dash runs were already collapsed
 	 * before that trim, so no such run reached it; the trim is now a linear scan regardless, and
 	 * these cases pin that the names did not move.
+	 *
+	 * Sized, not tightly timed: `/^-+|-+$/g` on an UNcollapsed 200 000-dash run needs ~40 s on a
+	 * dev box and the collapse-then-scan milliseconds, so a 2 s bound can be failed neither by a
+	 * CPU-throttled CI runner nor passed by a reordering that trims before collapsing. (A
+	 * "< 200 ms" at 50 000 was one scheduler stall from red — develop CI, 2026-10-09.)
 	 */
 	it('sanitises a component name with a long inner run of "-" in linear time', () => {
+		const hostile = `a${'-'.repeat(200_000)}a`;
+
 		const started = performance.now();
-		const name = componentObjectName(`a${'-'.repeat(50_000)}a`);
+		const name = componentObjectName(hostile);
 		const elapsedMs = performance.now() - started;
 
 		expect(name).toBe('a-a');
-		expect(elapsedMs).toBeLessThan(200);
+		expect(elapsedMs).toBeLessThan(2_000);
 	});
 
 	it.each([

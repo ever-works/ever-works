@@ -78,6 +78,8 @@ export type FleetAuditAction =
 	| 'node.capabilities'
 	/** Per-node daily model-spend ceiling set or cleared. */
 	| 'node.cost-ceiling'
+	/** Per-node resource-limit ceiling set or cleared (self-build slice AS). */
+	| 'node.limits'
 	/** Pause / resume — by the owner, or by the node itself. */
 	| 'node.pause'
 	/** Disable / re-enable (the owner's harder stop). */
@@ -123,6 +125,7 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.rename',
 	'node.capabilities',
 	'node.cost-ceiling',
+	'node.limits',
 	'node.pause',
 	'node.disable',
 	'node.drain',

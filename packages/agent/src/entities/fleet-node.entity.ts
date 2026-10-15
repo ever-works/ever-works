@@ -234,6 +234,22 @@ export class FleetNode {
     cliVersion?: string | null;
 
     /**
+     * Node lifecycle (self-build slice AR) — the version of every model CLI
+     * the node has PINNED, one `"<provider> <version>"` entry per provider
+     * (`claude-code 2.1.3`), as last reported. Unlike {@link cliVersion}
+     * these come from the exact binaries an `agent-task` spawns, not from a
+     * PATH scan.
+     *
+     * NULL = never reported (a daemon older than the field). Same additive
+     * contract as `cliVersion`: a beat that omits the list leaves it alone.
+     * Sanitized and capped (`FLEET_MAX_CLI_VERSIONS` ×
+     * `FLEET_MAX_CLI_VERSION_LENGTH`) in `FleetService` before it lands.
+     * Migration: `1795025000000-AddFleetNodeCliVersions`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    cliVersions?: string[] | null;
+
+    /**
      * Free bytes on the volume the node's workspace lives on, as last
      * reported.
      *
@@ -412,6 +428,50 @@ export class FleetNode {
     /** Bytes that sweep freed. 0 is a real answer — it ran and found nothing to take. */
     @Column({ type: 'bigint', nullable: true })
     lastReclaimFreedBytes?: string | number | null;
+
+    /**
+     * Remote node limits (self-build slice AS) — the resource limits the
+     * node last reported ENFORCING: `min(its own start flags, the owner's
+     * ceiling below)`. Written as a SET by the heartbeat (all three or none),
+     * so a CPU / memory NULL beside a non-null concurrency means "no ceiling
+     * in force on that dimension", while concurrency NULL means "never
+     * reported" (an older daemon, a node without a worker).
+     *
+     * Reported for visibility, like the housekeeping figures above: the
+     * platform never routes on these. Migration: `1795030000000-AddFleetNodeLimits`.
+     */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxConcurrentJobs?: number | null;
+
+    /** See {@link effectiveMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxCpuPercent?: number | null;
+
+    /** See {@link effectiveMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    effectiveMaxMemoryMb?: number | null;
+
+    /**
+     * Remote node limits (slice AS) — the OWNER's platform-side ceiling for
+     * this node, set only through `FleetService.setLimitCeilingForUser`
+     * (audited as `node.limits`). NULL = no ceiling on that dimension.
+     *
+     * The node clamps itself to `min(local flag, this)` on its next beat,
+     * so a ceiling can only lower what a machine does. Stored HERE, on the
+     * platform, precisely so that a service reinstall on the machine — which
+     * re-applies whatever flags the installer was given — cannot silently
+     * revert it: the next beat hands it straight back.
+     */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxConcurrentJobs?: number | null;
+
+    /** See {@link ceilingMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxCpuPercent?: number | null;
+
+    /** See {@link ceilingMaxConcurrentJobs}. */
+    @Column({ type: 'int', nullable: true })
+    ceilingMaxMemoryMb?: number | null;
 
     /**
      * Agent computers — who may take control of this machine from a live

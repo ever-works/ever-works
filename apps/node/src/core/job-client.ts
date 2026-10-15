@@ -1,4 +1,4 @@
-import { isComputerCloseReason } from '@ever-works/contracts';
+import { isComputerCloseReason, normalizeFleetNodeVersionFloor } from '@ever-works/contracts';
 import type {
 	ComputerCloseReason,
 	ComputerNodeToServerFrame,
@@ -71,6 +71,19 @@ export interface FleetJobClientOptions {
 
 export const DEFAULT_JOB_REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * One lease poll, with the platform's reason when it refused it (node
+ * lifecycle, self-build slice AR). `upgradeRequired` is true ONLY when the
+ * answer said so: this daemon is below the platform's minimum version and
+ * will be offered nothing until it is upgraded.
+ */
+export interface LeaseOutcome {
+	jobs: FleetJobView[];
+	upgradeRequired: boolean;
+	/** The floor the refusal was judged against, when the platform named one. */
+	minNodeVersion: string | null;
+}
+
 /** The platform's answer to one live-view publish. */
 export interface ComputerPublishAnswer {
 	accepted: number;
@@ -131,6 +144,28 @@ export class FleetJobClient {
 		} = {},
 		signal?: AbortSignal
 	): Promise<FleetJobView[]> {
+		return (await this.leaseOutcome(request, signal)).jobs;
+	}
+
+	/**
+	 * {@link lease}, plus WHY the platform handed out nothing when it says
+	 * so (node lifecycle, self-build slice AR): `upgradeRequired` means this
+	 * daemon is below the platform's minimum version. That answer is a 200
+	 * with an empty list — the same shape as the global stop flag — so an
+	 * older daemon reads it as "nothing to do" rather than as the revoked
+	 * credential a 401 would mean. The request body is byte-for-byte the
+	 * one {@link lease} has always sent.
+	 */
+	async leaseOutcome(
+		request: {
+			max?: number;
+			leaseTtlSec?: number;
+			capabilities?: string[];
+			kinds?: FleetJobKind[];
+			excludeKinds?: FleetJobKind[];
+		} = {},
+		signal?: AbortSignal
+	): Promise<LeaseOutcome> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (request.max !== undefined) body.max = request.max;
 		if (request.leaseTtlSec !== undefined) body.leaseTtlSec = request.leaseTtlSec;
@@ -147,7 +182,15 @@ export class FleetJobClient {
 		if (!payload || !Array.isArray(payload.jobs)) {
 			throw new FleetClientError('malformed', 'Lease response did not contain a job list');
 		}
-		return payload.jobs;
+		// `=== true` only: a malformed flag must never idle a machine.
+		const upgradeRequired = (payload as { upgradeRequired?: unknown }).upgradeRequired === true;
+		return {
+			jobs: payload.jobs,
+			upgradeRequired,
+			minNodeVersion: upgradeRequired
+				? normalizeFleetNodeVersionFloor((payload as { minNodeVersion?: unknown }).minNodeVersion)
+				: null
+		};
 	}
 
 	/**

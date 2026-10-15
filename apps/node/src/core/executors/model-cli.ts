@@ -13,7 +13,7 @@ import {
 	isFleetAgentExecutionPermissionMode,
 	isFleetAgentModelSessionId
 } from '@ever-works/contracts';
-import type { NodeCheckResult, WireCheck } from './acceptance-checks';
+import type { NodeCheckResult, NodeCommandEnvOverlay, WireCheck } from './acceptance-checks';
 
 /**
  * Model-CLI step of an `agent-task` — agent execution v2.
@@ -77,6 +77,81 @@ export interface ModelCliMcpBridge {
 	serverName: string;
 	/** Loopback URL the CLI connects to. */
 	serverUrl: string;
+}
+
+/**
+ * The MCP config a fleet Claude Code run is handed when the platform MCP
+ * bridge is NOT on: no servers at all.
+ *
+ * Written to the run's SCRATCH directory (the same `mcp.json` path the
+ * bridge would have used, so it never lands in the worktree) and passed as
+ * `--mcp-config <file> --strict-mcp-config`. The flag pair is what keeps a
+ * fleet run from loading the MACHINE OWNER's own MCP servers: without
+ * `--strict-mcp-config`, `claude -p` loads every server in `~/.claude.json`,
+ * every enabled plugin's servers and the account's claude.ai connectors.
+ * Measured 2026-10-09 (Claude Code 2.1.295, Windows): a no-bridge fleet run
+ * loaded the owner's `mcp-atlassian`, `trigger`, `posthog` and `sentry`,
+ * the `claude.ai Claude Docs` connector and, on a machine with plugins, 21
+ * plugin-bundled servers — tools the platform never vetted, callable with
+ * the owner's credentials by a prompt-injected run that carries
+ * `--dangerously-skip-permissions`. With this file and the flag the same
+ * run's init event lists zero MCP servers.
+ */
+export const MODEL_CLI_EMPTY_MCP_CONFIG = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`;
+
+/**
+ * Environment a fleet model step is FORCED to see so the CLI never fetches
+ * the account's own remote MCP connectors, or null when the provider has
+ * no such switch.
+ *
+ * Claude Code: `ENABLE_CLAUDEAI_MCP_SERVERS=false` is the documented
+ * per-process form of `disableClaudeAiConnectors` ("Disable claude.ai
+ * connectors", code.claude.com/docs/en/mcp) and leaves servers passed with
+ * `--mcp-config` — the platform bridge — untouched. `--strict-mcp-config`
+ * already drops the connectors on the CLI version this was measured on;
+ * this is the connector-specific switch on top of it, so the property
+ * does not rest on one flag's reading of "all other MCP configurations".
+ *
+ * Applied through the command runner's containment overlay, which runs
+ * LAST and deletes every case-spelling first — so an owner-exported
+ * `ENABLE_CLAUDEAI_MCP_SERVERS=true` cannot re-open it.
+ */
+export function modelCliMcpIsolationEnv(provider: FleetAgentExecutionProvider): NodeCommandEnvOverlay | null {
+	return provider === 'claude-code' ? { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } : null;
+}
+
+/**
+ * Where Claude Code looks for an enterprise `managed-mcp.json`
+ * (code.claude.com/docs/en/managed-mcp, "Deploy managed-mcp.json").
+ *
+ * A machine-wide, administrator-deployed file that takes EXCLUSIVE control
+ * of MCP. While a readable, parseable one is present, Claude Code "exits at
+ * startup" when given `--mcp-config` ("You cannot dynamically configure MCP
+ * servers when an enterprise MCP config is present") or
+ * `--strict-mcp-config` — the two flags every fleet Claude Code run now
+ * carries. See {@link claudeManagedMcpConfigInEffect}.
+ */
+export function claudeManagedMcpConfigPath(platform: NodeJS.Platform = process.platform): string {
+	if (platform === 'win32') return 'C:\\Program Files\\ClaudeCode\\managed-mcp.json';
+	if (platform === 'darwin') return '/Library/Application Support/ClaudeCode/managed-mcp.json';
+	return '/etc/claude-code/managed-mcp.json';
+}
+
+/**
+ * Whether the contents read from {@link claudeManagedMcpConfigPath} are a
+ * managed MCP config Claude Code would APPLY — i.e. one it can parse. The
+ * CLI only takes exclusive control for a file it "can read and parse"; an
+ * absent (`null`) or unparseable one is ignored by the CLI, so it is ignored
+ * here too rather than refusing a run that would have started.
+ */
+export function claudeManagedMcpConfigInEffect(raw: string | null): boolean {
+	if (typeof raw !== 'string' || !raw.trim()) return false;
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+	} catch {
+		return false;
+	}
 }
 
 export class ModelCliCommandError extends Error {
@@ -175,6 +250,53 @@ function assertModelId(model: string | undefined): string | null {
 }
 
 /**
+ * Node lifecycle (self-build slice AR) — the command-line flags this
+ * builder may DROP when the pinned CLI binary does not advertise them.
+ *
+ * Optional means: the run is still the run the tenant asked for without
+ * it, only less tuned. `--effort` is a quality knob and `--max-budget-usd`
+ * a per-run spend cap the platform's own daily ceilings back up. Before
+ * this list both were emitted unconditionally, so ONE upstream CLI release
+ * that renamed either failed every run on every PC at once — after the
+ * plan, the lease and the provisioning were already spent.
+ *
+ * Nothing else is droppable, on purpose: `--strict-mcp-config`,
+ * `--add-dir`, `--permission-mode`, the sandbox flags and the rest decide
+ * WHAT the model may touch, and a run that silently lost one would be a
+ * different, less contained run that still reports success. A binary that
+ * lacks one of those is reported by `doctor` as incompatible instead.
+ */
+export const MODEL_CLI_OPTIONAL_FLAGS: Readonly<Record<'claude-code' | 'codex', readonly string[]>> = {
+	'claude-code': ['--effort', '--max-budget-usd'],
+	codex: []
+};
+
+/**
+ * The optional flags THIS execution would emit that the pinned binary does
+ * not advertise — i.e. the ones the builder should drop.
+ *
+ * `supportedFlags === null` means "could not tell" (the probe failed, or
+ * the help text was not recognisable), and then nothing is dropped: that
+ * is exactly the behaviour before this existed, and guessing would trade a
+ * loud failure for a silent downgrade.
+ */
+export function unsupportedOptionalModelCliFlags(
+	execution: Pick<FleetAgentModelExecution, 'provider' | 'effort' | 'maxBudgetUsd'>,
+	supportedFlags: ReadonlySet<string> | null | undefined
+): string[] {
+	if (!supportedFlags) return [];
+	const wanted: string[] = [];
+	if (execution.provider === 'claude-code') {
+		if (execution.effort) wanted.push('--effort');
+		if (execution.maxBudgetUsd !== undefined) wanted.push('--max-budget-usd');
+	}
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	return wanted.filter((flag) => droppable.has(flag) && !supportedFlags.has(flag));
+}
+
+/**
  * Self-build slice AU — the session id a command may carry, or null for a
  * fresh run. Throws for an id that is not the contracts' strict UUID shape
  * (it is interpolated into a shell command line) and for a provider the
@@ -231,9 +353,23 @@ export function buildModelCliCommand(input: {
 	/**
 	 * Slice Z — the loopback MCP bridge, when this run has one. Absent
 	 * (the default) produces byte-for-byte the command this step has
-	 * always built.
+	 * always built, unless `emptyMcpConfigPath` is given.
 	 */
 	mcp?: ModelCliMcpBridge;
+	/**
+	 * Absolute path of the EMPTY MCP config ({@link MODEL_CLI_EMPTY_MCP_CONFIG})
+	 * the node wrote to this run's scratch directory. With no bridge, a
+	 * Claude Code run is pointed at it under `--strict-mcp-config`, so it
+	 * loads NO MCP server rather than the machine owner's own. Ignored when
+	 * `mcp` is given (the bridge config is then the one strict config) and
+	 * for Codex, which has no equivalent switch (see the codex branch).
+	 *
+	 * Optional so a direct caller keeps the command it always had; the
+	 * fleet's model step always passes it and then refuses to spawn a
+	 * Claude Code command that does not carry the isolation — see
+	 * {@link assertMcpIsolationInCommand}.
+	 */
+	emptyMcpConfigPath?: string;
 	/**
 	 * Self-build slice AU — continue this CLI session instead of starting
 	 * one. Absent (the default) produces byte-for-byte the command this step
@@ -243,6 +379,15 @@ export function buildModelCliCommand(input: {
 	 */
 	resumeSessionId?: string;
 	platform?: NodeJS.Platform;
+	/**
+	 * Node lifecycle (slice AR) — optional flags to leave off because the
+	 * pinned binary does not advertise them (see
+	 * {@link unsupportedOptionalModelCliFlags}). Only members of
+	 * {@link MODEL_CLI_OPTIONAL_FLAGS} are honoured: a containment flag can
+	 * never be dropped through this, whatever a caller passes. Absent (the
+	 * default) produces byte-for-byte the command this step always built.
+	 */
+	omitFlags?: readonly string[];
 	/**
 	 * Self-build slice AP — ask Claude Code for its LINE-DELIMITED event
 	 * stream (`--output-format stream-json --verbose`) instead of the one
@@ -261,6 +406,10 @@ export function buildModelCliCommand(input: {
 	const platform = input.platform ?? process.platform;
 	const { execution } = input;
 	const resumeSessionId = assertResumableSession(execution.provider, input.resumeSessionId);
+	const droppable = new Set(
+		MODEL_CLI_OPTIONAL_FLAGS[execution.provider as keyof typeof MODEL_CLI_OPTIONAL_FLAGS] ?? []
+	);
+	const omitted = new Set((input.omitFlags ?? []).filter((flag) => droppable.has(flag)));
 	const exe = quoteShellPath(input.executable, platform);
 	const stdin = quoteShellPath(input.scratch.instructionsPath, platform);
 	const stdout = quoteShellPath(input.scratch.resultPath, platform);
@@ -355,8 +504,8 @@ export function buildModelCliCommand(input: {
 		// half-finished first attempt. The id is a validated UUID by now.
 		if (resumeSessionId) args.push('--resume', resumeSessionId, '--fork-session');
 		if (model) args.push('--model', model);
-		if (execution.effort) args.push('--effort', execution.effort);
-		if (budget) args.push('--max-budget-usd', budget);
+		if (execution.effort && !omitted.has('--effort')) args.push('--effort', execution.effort);
+		if (budget && !omitted.has('--max-budget-usd')) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
 		// ── Slice Z: the platform MCP bridge ────────────────────────────
 		//
@@ -391,6 +540,20 @@ export function buildModelCliCommand(input: {
 				'--allowedTools',
 				`mcp__${assertMcpServerName(mcp.serverName)}`
 			);
+		} else if (input.emptyMcpConfigPath !== undefined) {
+			// ── No bridge: an EMPTY strict MCP config ──────────────────
+			//
+			// The `--strict-mcp-config` reasoning above holds with or
+			// without a bridge: a run the platform gave NO tools must not
+			// pick up the owner's instead. So the no-bridge run gets the
+			// same flag pair pointed at `{"mcpServers":{}}` — every MCP
+			// source the CLI would otherwise consult (`~/.claude.json`,
+			// enabled plugins, a repository's `.mcp.json`, the account's
+			// claude.ai connectors) is ignored. Same ordering rules:
+			// `--mcp-config` is variadic, so `--strict-mcp-config` follows
+			// it to close the list, and both precede `--add-dir`. No
+			// `--allowedTools`: there is no server whose tools to allow.
+			args.push('--mcp-config', quoteShellPath(input.emptyMcpConfigPath, platform), '--strict-mcp-config');
 		}
 		// `--add-dir <directories...>` is variadic — ONE flag, every granted
 		// directory after it. Emitted LAST so it can never swallow another
@@ -416,6 +579,20 @@ export function buildModelCliCommand(input: {
 		// FILE is still written (it is the record of what the run was
 		// given, and keeps both providers on one code path), but for codex
 		// the override on argv is what actually takes effect.
+		//
+		// NOT isolated from the owner's own MCP servers, and stated rather
+		// than papered over. Codex loads every `[mcp_servers.*]` table in
+		// `~/.codex/config.toml` plus every enabled plugin's servers, and
+		// it has no `--strict-mcp-config`. Measured on codex-cli 0.130.0
+		// (2026-10-09): `-c mcp_servers={}` is a no-op — overrides are
+		// DEEP-MERGED into the user layer, so an empty table leaves every
+		// server in place; `-c mcp_servers.<name>.enabled=false` works for
+		// a config-file server but needs its name and refuses to start
+		// ("invalid transport") for a plugin-provided one; and
+		// `--ignore-user-config`, the one switch that drops them all, also
+		// drops the owner's `[windows] sandbox` mode and model default —
+		// a sandbox change this fix must not make. Tracked as a follow-up
+		// in the fleet session trust model (control 16).
 		if (mcp) {
 			args.push(
 				'-c',
@@ -476,6 +653,39 @@ export function assertMountGrantsInCommand(input: {
 					`would be silently discarded`
 			);
 		}
+	}
+}
+
+/**
+ * `--mcp-config "<file>" --strict-mcp-config`, adjacent and in that order:
+ * the variadic config list closed by the strict flag, which is itself
+ * followed by another token (every command ends in its stdin redirect).
+ */
+const STRICT_MCP_CONFIG_IN_COMMAND = / --mcp-config "[^"]+" --strict-mcp-config /;
+
+/**
+ * Refuse to spawn a Claude Code run that is not isolated from the machine
+ * owner's own MCP servers.
+ *
+ * The fleet's model step always hands {@link buildModelCliCommand} either
+ * the bridge or an empty config; this checks the property on the real
+ * string the node is about to hand the shell, immediately before the spawn
+ * — the same reason {@link assertMountGrantsInCommand} lives here. A
+ * refactor that computes the isolation and then fails to emit it would
+ * otherwise go unnoticed: the run still succeeds, it just succeeds with the
+ * owner's Atlassian, Sentry or claude.ai tools in reach of an untrusted
+ * prompt.
+ *
+ * Codex is exempt because it has no switch to check for, not because it is
+ * isolated — see the codex branch of {@link buildModelCliCommand}.
+ */
+export function assertMcpIsolationInCommand(input: { command: string; execution: FleetAgentModelExecution }): void {
+	if (input.execution.provider !== 'claude-code') return;
+	if (!STRICT_MCP_CONFIG_IN_COMMAND.test(input.command)) {
+		throw new ModelCliCommandError(
+			'The claude-code command line does not carry --mcp-config <file> --strict-mcp-config, so the run ' +
+				"would load the machine owner's own MCP servers"
+		);
 	}
 }
 

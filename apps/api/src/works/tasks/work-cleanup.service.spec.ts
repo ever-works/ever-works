@@ -108,11 +108,13 @@ describe('WorkCleanupService', () => {
         expect(workRepository.getUnfinishedGenerations).toHaveBeenCalledTimes(1);
         const arg = workRepository.getUnfinishedGenerations.mock.calls[0][0] as Date;
         expect(arg).toBeInstanceOf(Date);
-        const diffMs = before - arg.getTime();
-        // staleTimeoutHours mock returns 2 → threshold ≈ now - 2h
+        // staleTimeoutHours mock returns 2 → threshold ≈ now - 2h, where "now" is
+        // somewhere between `before` and `after`. Bracketed on both sides, so a
+        // CPU-throttled CI runner stalling inside the call cannot move it out of
+        // the 1 s tolerance (`before - threshold >= 2h - 1s` alone could).
         const expectedMs = 2 * 60 * 60 * 1000;
-        expect(diffMs).toBeGreaterThanOrEqual(expectedMs - 1000);
-        expect(diffMs).toBeLessThanOrEqual(after - arg.getTime());
+        expect(arg.getTime()).toBeGreaterThanOrEqual(before - expectedMs - 1000);
+        expect(arg.getTime()).toBeLessThanOrEqual(after - expectedMs + 1000);
     });
 
     it('does not log when there are no stalled works and no orphaned history records', async () => {

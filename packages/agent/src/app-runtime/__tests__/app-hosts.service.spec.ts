@@ -276,14 +276,20 @@ describe('appUrlScheme (APW-06 T26, plan §4.11:621-626)', () => {
     // CodeQL js/polynomial-redos: the trailing-dot trim was `/\.+$/`, retried
     // from every offset of a dot run that does not end the name — about 2.4 s
     // for 50,000 dots on a dev box — and a custom domain is member input.
-    it('normalises a host with a long interior run of dots in well under 200 ms', () => {
-        const host = `a${'.'.repeat(50_000)}b`;
+    // Sized, not tightly timed: at 200,000 dots the regex needs ~40 s on a dev
+    // box and the linear scan milliseconds, so a 2 s bound can be failed
+    // neither by a CPU-throttled CI runner nor passed by the regex. (A
+    // "< 200 ms" at 50,000 was one scheduler stall from red — develop CI,
+    // 2026-10-09.)
+    it('normalises a host with a long interior run of dots in linear time', () => {
+        const host = `a${'.'.repeat(200_000)}b`;
+
         const started = performance.now();
-
         const normalised = normaliseHost(host);
+        const elapsedMs = performance.now() - started;
 
-        expect(performance.now() - started).toBeLessThan(200);
         expect(normalised).toBe(host);
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 
     it.each<[string | null | undefined, string]>([

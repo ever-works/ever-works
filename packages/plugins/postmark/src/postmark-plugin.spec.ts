@@ -165,20 +165,27 @@ describe('PostmarkPlugin', () => {
 		 * backtracks quadratically over a run of `<` that never closes. The header is written by
 		 * whoever sent the mail and is read here BEFORE the webhook is authenticated (and
 		 * authentication is an operator opt-in for Postmark), so one POST could pin the event loop.
+		 *
+		 * Sized, not tightly timed: at 200 000 characters the regex needs ~40 s on a dev box and the
+		 * scan milliseconds, so a 2 s bound can be failed neither by a CPU-throttled CI runner nor
+		 * passed by the regex. Only `extractInboundRecipients` is timed — the webhook body is encoded
+		 * first. (A "< 200 ms" at 50 000 was one scheduler stall from red — develop CI, 2026-10-09.)
 		 */
 		const recipientsOf = (to: string) =>
 			plugin.extractInboundRecipients(Buffer.from(JSON.stringify({ To: to })), {});
 
 		it.each([
-			['a run of "<" that never closes', '<'.repeat(50_000)],
-			['"<" followed by a run of "<="', `<${'<='.repeat(25_000)}`]
+			['a run of "<" that never closes', '<'.repeat(200_000)],
+			['"<" followed by a run of "<="', `<${'<='.repeat(100_000)}`]
 		])('reads %s in linear time', (_label, hostile) => {
+			const body = Buffer.from(JSON.stringify({ To: hostile }));
+
 			const started = performance.now();
-			const recipients = recipientsOf(hostile);
+			const recipients = plugin.extractInboundRecipients(body, {});
 			const elapsedMs = performance.now() - started;
 
 			expect(recipients).toEqual([hostile]);
-			expect(elapsedMs).toBeLessThan(200);
+			expect(elapsedMs).toBeLessThan(2_000);
 		});
 
 		// The rewrite must name exactly the mailbox the regex named.

@@ -26,6 +26,7 @@ import {
     FLEET_JOB_QUEUE_EXPIRED_REASON,
     FLEET_JOB_STALE_LEASE_REASON,
     isFleetJobKind,
+    isFleetNodeVersionBelowFloor,
     nodeSatisfiesCapabilities,
 } from '@ever-works/contracts';
 import { config } from '../config';
@@ -70,6 +71,18 @@ export interface LeaseFleetJobsInput {
     kinds?: FleetJobKind[];
     /** Never claim these kinds on this poll (an attended node's work lane). Omitted = none excluded. */
     excludeKinds?: FleetJobKind[];
+    /**
+     * Node lifecycle (self-build slice AR) — told when THIS poll was refused
+     * because the node's daemon is below the platform's minimum version.
+     * The lease still resolves to `[]` (never null, never a throw: a refusal
+     * shaped like an auth failure would read as a revoked credential on the
+     * node); this is how the API edge learns WHY, so it can say so in the
+     * response. Optional, and a throwing listener can never fail the poll.
+     */
+    onUpgradeRequired?: (refusal: {
+        minNodeVersion: string;
+        reportedVersion: string | null;
+    }) => void;
 }
 
 /**
@@ -365,6 +378,32 @@ export class FleetJobService {
                 this.logger.log(`fleet lease refused for node ${node.id}: global stop flag is set`);
                 return [];
             }
+        }
+
+        // Node lifecycle (self-build slice AR) — the daemon version floor.
+        // After auth, for the same reason as the stop flag above: a
+        // credential that does not verify is a 401 whatever version it
+        // claims, and a node that IS authenticated is told "nothing for
+        // you" (`[]`), never "you are revoked". Judged on the version the
+        // node last REPORTED on its heartbeat (the row), through the one
+        // shared predicate the heartbeat response and the drawer use, which
+        // fails open on a version it cannot parse. Heartbeat and complete
+        // are deliberately not gated: a below-floor machine must still be
+        // able to settle the work it already holds.
+        const minNodeVersion = config.fleet.getMinNodeVersion();
+        if (isFleetNodeVersionBelowFloor(node.version, minNodeVersion)) {
+            this.logger.debug(
+                `fleet lease refused for node ${node.id}: daemon ${String(node.version)} is below the minimum ${minNodeVersion}`,
+            );
+            try {
+                input.onUpgradeRequired?.({
+                    minNodeVersion,
+                    reportedVersion: node.version ?? null,
+                });
+            } catch {
+                // The listener's failure is its own; the refusal stands.
+            }
+            return [];
         }
 
         // Inline reclaim before the scan: a job whose holder died is
@@ -1130,7 +1169,13 @@ export class FleetJobService {
         nodeId: unknown,
         secret: unknown,
         intent: 'lease' | 'report' = 'lease',
-    ): Promise<{ id: string; userId: string; capabilities: string[] } | null> {
+    ): Promise<{
+        id: string;
+        userId: string;
+        capabilities: string[];
+        /** The daemon version the node last reported (slice AR's floor reads it). */
+        version: string | null;
+    } | null> {
         const verified = verifyNodeSecret(nodeId, secret);
         if (!verified) return null;
 
@@ -1151,6 +1196,7 @@ export class FleetJobService {
             id: node.id,
             userId: node.userId,
             capabilities: node.capabilities ?? [],
+            version: node.version ?? null,
         };
     }
 }

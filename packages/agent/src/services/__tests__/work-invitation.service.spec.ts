@@ -105,11 +105,16 @@ describe('WorkInvitationService', () => {
             );
             const before = Date.now();
             await service.issue({ workId: 'w1', invitedById: 'u1', role: 'viewer' });
+            const after = Date.now();
             const arg = repo.create.mock.calls[0][0] as Partial<WorkInvitation>;
-            const elapsed = (arg.tokenExpiresAt as Date).getTime() - before;
+            const expiresAt = (arg.tokenExpiresAt as Date).getTime();
             const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-            expect(elapsed).toBeGreaterThanOrEqual(thirtyDays - 1000);
-            expect(elapsed).toBeLessThanOrEqual(thirtyDays + 1000);
+            // Bracketed by the clock on BOTH sides of the call, so the call's own
+            // duration is not part of the tolerance: measured from `before` alone,
+            // a CPU-throttled CI runner stalling over a second inside `issue` read as
+            // a 30-days-plus-a-second expiry.
+            expect(expiresAt).toBeGreaterThanOrEqual(before + thirtyDays - 1000);
+            expect(expiresAt).toBeLessThanOrEqual(after + thirtyDays + 1000);
         });
 
         it('rejects non-integer or non-positive expiry', async () => {

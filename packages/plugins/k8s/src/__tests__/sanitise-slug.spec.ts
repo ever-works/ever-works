@@ -12,16 +12,20 @@ describe('sanitiseSlug', () => {
 	 * `/^-+|-+$/g` BEFORE dash runs were collapsed, and `-+$` backtracks quadratically over a
 	 * long run of `-` that is not at the end: every `-` restarts a scan to the end of the run
 	 * (50 000 of them took ~2.4 s). Collapsing first leaves no run to rescan.
+	 *
+	 * Sized, not tightly timed: at 200 000 the old chain needs ~40 s on a dev box and today's
+	 * milliseconds, so a 2 s bound can be failed neither by a CPU-throttled CI runner nor passed by
+	 * the old chain. (A "< 200 ms" at 50 000 was one scheduler stall from red — develop CI, 2026-10-09.)
 	 */
 	it('sanitises a name with a long inner run of "-" in linear time', () => {
-		const hostile = `a${'-'.repeat(50_000)}a`;
+		const hostile = `a${'-'.repeat(200_000)}a`;
 
 		const started = performance.now();
 		const slug = sanitiseSlug(hostile);
 		const elapsedMs = performance.now() - started;
 
 		expect(slug).toBe('a-a');
-		expect(elapsedMs).toBeLessThan(200);
+		expect(elapsedMs).toBeLessThan(2_000);
 	});
 
 	// The reordered steps must answer exactly what the original chain answered.

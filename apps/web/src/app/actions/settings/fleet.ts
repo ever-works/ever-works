@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
+import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
 import {
     fleetAPI,
     type CancelFleetInFlightPayload,
@@ -101,6 +102,29 @@ export async function updateFleetNodeAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to update the node'),
+        };
+    }
+}
+
+/**
+ * Remote node limits (self-build slice AS) — set (or clear, with nulls) one
+ * node's platform-side limit ceiling. Owner-scoped by the API; audited
+ * there as `node.limits`.
+ */
+export async function setFleetNodeLimitCeilingAction(
+    nodeId: string,
+    ceiling: FleetNodeLimitCeiling,
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setNodeLimitCeiling(nodeId, ceiling);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to set the node limit ceiling'),
         };
     }
 }

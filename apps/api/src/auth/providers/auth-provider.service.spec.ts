@@ -1043,9 +1043,11 @@ describe('AuthProviderService', () => {
             installCounterFake(ctx, 4);
             ctx.auth.api.signInEmail.mockRejectedValue(new Error('Invalid credentials'));
 
+            const before = Date.now();
             await expect(ctx.service.signInEmail('a@b.co', 'wrong', new Headers())).rejects.toThrow(
                 /Invalid credentials/,
             );
+            const after = Date.now();
 
             // The counter side is now an atomic increment.
             expect(ctx.userRepository.increment).toHaveBeenCalledWith(
@@ -1062,9 +1064,17 @@ describe('AuthProviderService', () => {
             const [userId, partial] = lockCall!;
             expect(userId).toBe('u1');
             expect(partial.lockedUntil).toBeInstanceOf(Date);
-            // 15 min default, within 1s tolerance.
-            const expected = Date.now() + 15 * 60 * 1000;
-            expect(Math.abs(partial.lockedUntil.getTime() - expected)).toBeLessThan(1000);
+            // 15 min default, within 1s tolerance — bracketed by the clock on both
+            // sides of the call, so a CPU-throttled CI runner stalling inside it does
+            // not eat into the tolerance (a single `Date.now()` read after the call
+            // did).
+            const fifteenMinutes = 15 * 60 * 1000;
+            expect(partial.lockedUntil.getTime()).toBeGreaterThanOrEqual(
+                before + fifteenMinutes - 1000,
+            );
+            expect(partial.lockedUntil.getTime()).toBeLessThanOrEqual(
+                after + fifteenMinutes + 1000,
+            );
         });
 
         it('clears failedLoginAttempts and lockedUntil on a successful signInEmail', async () => {

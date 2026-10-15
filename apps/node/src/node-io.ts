@@ -181,6 +181,21 @@ export function isExecutableFile(filePath: string): boolean {
 	}
 }
 
+/**
+ * Node lifecycle (self-build slice AR) — the file stamp the model-CLI
+ * compatibility probe keys its cache on: modification time + size, so a CLI
+ * upgraded in place is re-probed on the very next ask. Null when the file
+ * cannot be stat'ed (the probe then falls back to a time-boxed cache).
+ */
+export async function statModelCliFile(filePath: string): Promise<{ mtimeMs: number; size: number } | null> {
+	try {
+		const stat = await fsp.stat(filePath);
+		return { mtimeMs: stat.mtimeMs, size: stat.size };
+	} catch {
+		return null;
+	}
+}
+
 /** Resolve a bare command name on `PATH`, or null. */
 export function lookupOnPath(command: string): string | null {
 	const hits = lookupAllOnPath(command);

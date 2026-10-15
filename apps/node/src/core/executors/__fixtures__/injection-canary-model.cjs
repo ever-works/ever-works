@@ -166,6 +166,15 @@ async function main() {
 	// injected by the node's loopback proxy on the way out.
 	evidence.mcp = { attempted: false };
 	const argv = process.argv.slice(2);
+	// Which MCP sources the node told the CLI to use (2026-10-09 isolation
+	// fix): a real `claude -p` merges the machine owner's own servers and
+	// the account's claude.ai connectors unless it gets `--strict-mcp-config`
+	// and `ENABLE_CLAUDEAI_MCP_SERVERS=false`.
+	evidence.mcpIsolation = {
+		strict: argv.includes('--strict-mcp-config'),
+		configFlags: argv.filter((arg) => arg === '--mcp-config').length,
+		claudeAiConnectors: env.ENABLE_CLAUDEAI_MCP_SERVERS === undefined ? null : env.ENABLE_CLAUDEAI_MCP_SERVERS
+	};
 	const configIndex = argv.indexOf('--mcp-config');
 	if (configIndex >= 0 && argv[configIndex + 1]) {
 		const config = tryRead(argv[configIndex + 1]);
@@ -174,6 +183,7 @@ async function main() {
 		if (config.ok) {
 			try {
 				const parsed = JSON.parse(config.value);
+				evidence.mcp.servers = Object.keys((parsed && parsed.mcpServers) || {});
 				const server = parsed && parsed.mcpServers && parsed.mcpServers['ever-works'];
 				const url = server && server.url;
 				evidence.mcp.url = url || null;

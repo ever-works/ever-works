@@ -32,16 +32,20 @@ describe('AnthropicManagedAgentsClient — base URL normalisation', () => {
 	 * CodeQL js/polynomial-redos. Trailing slashes used to be stripped with `/\/+$/`, which
 	 * backtracks quadratically over a run of `/` that is not at the end: every `/` restarts a
 	 * scan to the end of the run (50 000 of them took ~2.4 s). `baseUrl` is a plugin setting.
+	 *
+	 * Sized, not tightly timed: at 200 000 the regex needs ~40 s on a dev box and the linear trim
+	 * milliseconds, so a 2 s bound can be failed neither by a CPU-throttled CI runner nor passed by
+	 * the regex. (A "< 200 ms" at 50 000 was one scheduler stall from red — develop CI, 2026-10-09.)
 	 */
 	it('normalises a base URL with a long inner run of "/" in linear time', () => {
-		const hostile = `https://api.example.com${'/'.repeat(50_000)}x`;
+		const hostile = `https://api.example.com${'/'.repeat(200_000)}x`;
 
 		const started = performance.now();
 		const baseURL = baseUrlFor(hostile);
 		const elapsedMs = performance.now() - started;
 
 		expect(baseURL).toBe(hostile);
-		expect(elapsedMs).toBeLessThan(200);
+		expect(elapsedMs).toBeLessThan(2_000);
 	});
 
 	// The rewrite must answer exactly what the two regexes answered.

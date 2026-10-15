@@ -206,23 +206,31 @@ describe('SlackCommandsController (POST /api/ingest/slack/commands)', () => {
 
         it('does not wait on a slow chat leg (ack lands far ahead of the answer)', async () => {
             const { controller, bridge } = createController();
-            // Comfortably under Slack's 3s budget but far longer than any
-            // scheduling noise on a loaded CI box, so the assertion below
-            // can only pass if the ack really did not await the answer.
+            // Comfortably under Slack's 3s budget, and long enough that the
+            // ack cannot plausibly race it.
             const SLOW_MS = 1500;
             let timer: NodeJS.Timeout | undefined;
+            // Flips the moment the slow leg answers — the ORDERING asserted
+            // below. A wall-clock `Date.now() - startedAt < SLOW_MS` measured
+            // the runner as well as the code: on a CPU-throttled CI box the
+            // ack itself can be descheduled for that long. The leg's timer
+            // cannot fire before the ack unless the ack awaited it.
+            let answered = false;
             bridge.handleSlashCommand.mockImplementation(
                 () =>
                     new Promise((resolve) => {
-                        timer = setTimeout(() => resolve({ ingested: null }), SLOW_MS);
+                        timer = setTimeout(() => {
+                            answered = true;
+                            resolve({ ingested: null });
+                        }, SLOW_MS);
                     }),
             );
             const { req, timestamp, signature } = signedRequest();
 
-            const startedAt = Date.now();
             await controller.receiveCommand(req as any, signature, timestamp);
 
-            expect(Date.now() - startedAt).toBeLessThan(SLOW_MS);
+            expect(answered).toBe(false);
+            expect(bridge.handleSlashCommand).toHaveBeenCalledTimes(1);
             if (timer) clearTimeout(timer);
         });
 

@@ -508,6 +508,23 @@ describe.sequential('agent-task prompt-injection canary — real executor path',
 		expect(forwardedMcpHeaders?.['x-ever-works-jwt']).toBe(MCP_RUN_TOKEN);
 	});
 
+	it('the model CLI is held to the node’s MCP config — never the owner’s servers or claude.ai connectors', () => {
+		// Measured on a fleet PC (2026-10-09): without `--strict-mcp-config` a
+		// real `claude -p` merged in the owner's `~/.claude.json` servers and
+		// the account's claude.ai connectors. Through the REAL spawn and env
+		// scrub, the CLI gets exactly one config (the bridge's), the strict
+		// flag, and the connector switch off.
+		const isolation = evidence.mcpIsolation as {
+			strict: boolean;
+			configFlags: number;
+			claudeAiConnectors: string | null;
+		};
+		expect(isolation.strict).toBe(true);
+		expect(isolation.configFlags).toBe(1);
+		expect(isolation.claudeAiConnectors).toBe('false');
+		expect((evidence.mcp as { servers?: string[] }).servers).toEqual(['ever-works']);
+	});
+
 	// ── Gaps that do NOT hold today — honest-red, not skipped ────────────
 
 	it.fails(

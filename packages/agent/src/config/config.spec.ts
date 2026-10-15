@@ -261,6 +261,24 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getMinNodeVersion (node lifecycle, slice AR)', () => {
+        it('defaults to the first daemon ever published, so no machine is refused by default', () => {
+            expect(config.fleet.getMinNodeVersion()).toBe('0.1.0');
+        });
+
+        it('honours an operator floor, normalized', () => {
+            process.env.FLEET_MIN_NODE_VERSION = ' v0.3.0 ';
+            expect(config.fleet.getMinNodeVersion()).toBe('0.3.0');
+        });
+
+        it('falls back to the default on a value that is not a version — a typo must not idle the fleet', () => {
+            for (const value of ['latest', '', '1', 'x.y.z']) {
+                process.env.FLEET_MIN_NODE_VERSION = value;
+                expect(config.fleet.getMinNodeVersion()).toBe('0.1.0');
+            }
+        });
+    });
+
     describe('config.fleet (FLEET_* operator knobs)', () => {
         describe('getEnrollmentTokenTtlMs', () => {
             it('defaults to 15 minutes', () => {

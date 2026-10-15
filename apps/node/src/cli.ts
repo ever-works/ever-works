@@ -10,6 +10,7 @@ import {
 	currentEnvironment,
 	defaultConfigPath,
 	isExecutableFile,
+	statModelCliFile,
 	systemFetch
 } from './node-io';
 import { NODE_APP_VERSION } from './version';
@@ -34,7 +35,10 @@ function buildDeps(): CliDeps {
 			// Backs the free-disk figure in the Fleet runner indicator.
 			// Optional by contract — an unreadable volume reports nothing
 			// rather than failing the heartbeat that carries everything else.
-			diskProbe: createDiskProbe()
+			diskProbe: createDiskProbe(),
+			// Node lifecycle (slice AR): the cache key of the model-CLI
+			// compatibility probe, so an upgraded CLI is re-probed at once.
+			statFile: statModelCliFile
 		},
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),

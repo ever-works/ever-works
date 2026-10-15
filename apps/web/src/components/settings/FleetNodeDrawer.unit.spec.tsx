@@ -114,6 +114,11 @@ function renderDrawer(
         loading?: boolean;
         node?: FleetNodeView | null;
         onSaveCostCeiling?: (cents: number | null) => void;
+        onSaveLimitCeiling?: (ceiling: {
+            maxConcurrentJobs: number | null;
+            maxCpuPercent: number | null;
+            maxMemoryMb: number | null;
+        }) => void;
     } = {},
 ) {
     return render(
@@ -126,6 +131,7 @@ function renderDrawer(
             onClose={() => undefined}
             onSaveCapabilities={() => undefined}
             onSaveCostCeiling={over.onSaveCostCeiling ?? (() => undefined)}
+            onSaveLimitCeiling={over.onSaveLimitCeiling ?? (() => undefined)}
             onRotate={() => undefined}
             onDrain={() => undefined}
         />,
@@ -350,6 +356,7 @@ describe('FleetNodeDrawer — job filter', () => {
                 onClose={() => undefined}
                 onSaveCapabilities={() => undefined}
                 onSaveCostCeiling={() => undefined}
+                onSaveLimitCeiling={() => undefined}
                 onRotate={() => undefined}
                 onDrain={() => undefined}
             />,
@@ -648,5 +655,116 @@ describe('FleetNodeDrawer — reconciled job outcome', () => {
         );
         expect(screen.queryByTestId('fleet-node-job-outcome-text-job-quiet')).toBeNull();
         expect(screen.queryByTestId('fleet-node-job-summary-job-quiet')).toBeNull();
+    });
+});
+
+describe('FleetNodeDrawer — node lifecycle (self-build slice AR)', () => {
+    it('says UPGRADE REQUIRED with the exact command when the daemon is below the floor', () => {
+        const old = node({ version: '0.2.0', minNodeVersion: '0.3.0', upgradeRequired: true });
+        renderDrawer({ node: old, detail: detail({ node: old }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-upgrade-required')).toHaveTextContent(
+            'lifecycle.upgradeRequired',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-upgrade-hint')).toHaveTextContent(
+            'lifecycle.upgradeRequiredHint:0.2.0,0.3.0,npm install -g ever-works-node@latest',
+        );
+    });
+
+    it('shows the floor quietly when the daemon is above it', () => {
+        const current = node({ version: '0.2.0', minNodeVersion: '0.1.0', upgradeRequired: false });
+        renderDrawer({ node: current, detail: detail({ node: current }) });
+        expect(screen.queryByTestId('fleet-node-drawer-upgrade-required')).toBeNull();
+        expect(screen.getByTestId('fleet-node-drawer-version-floor')).toHaveTextContent(
+            'lifecycle.minimum:0.2.0,0.1.0',
+        );
+    });
+
+    it('lists the pinned CLI versions, and tells "none pinned" apart from "never reported"', () => {
+        const pinned = node({ cliVersions: ['claude-code 2.1.3', 'codex 0.48.0'] });
+        const { unmount } = renderDrawer({ node: pinned, detail: detail({ node: pinned }) });
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersions:claude-code 2.1.3, codex 0.48.0',
+        );
+        unmount();
+
+        const none = node({ cliVersions: [] });
+        const second = renderDrawer({ node: none, detail: detail({ node: none }) });
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersionsNone',
+        );
+        second.unmount();
+
+        renderDrawer();
+        expect(screen.getByTestId('fleet-node-drawer-cli-versions')).toHaveTextContent(
+            'lifecycle.cliVersionsNotReported',
+        );
+    });
+});
+
+describe('FleetNodeDrawer — remote node limits (self-build slice AS)', () => {
+    it('shows what the node enforces and the platform ceiling, and seeds the editor', () => {
+        const limited = node({
+            effectiveLimits: { maxConcurrentJobs: 2, maxCpuPercent: 70, maxMemoryMb: null },
+            limitCeiling: { maxConcurrentJobs: 2, maxCpuPercent: 80, maxMemoryMb: null },
+        });
+        renderDrawer({ node: limited, detail: detail({ node: limited }) });
+
+        expect(screen.getByTestId('fleet-node-limits-effective')).toHaveTextContent(
+            'limits.enforcing:2,70%,limits.noCeilingValue',
+        );
+        expect(screen.getByTestId('fleet-node-limits-ceiling')).toHaveTextContent(
+            'limits.ceilingSummary:2,80%,limits.noCeilingValue',
+        );
+        expect(screen.getByTestId('fleet-node-limit-input-maxConcurrentJobs')).toHaveValue('2');
+        expect(screen.getByTestId('fleet-node-limit-input-maxCpuPercent')).toHaveValue('80');
+        expect(screen.getByTestId('fleet-node-limit-input-maxMemoryMb')).toHaveValue('');
+        expect(screen.getByTestId('fleet-node-limits-clear')).toBeEnabled();
+    });
+
+    it('says when the node never reported limits, and that no ceiling is set', () => {
+        renderDrawer();
+        expect(screen.getByTestId('fleet-node-limits-effective')).toHaveTextContent(
+            'limits.notReported',
+        );
+        expect(screen.getByTestId('fleet-node-limits-ceiling')).toHaveTextContent(
+            'limits.noCeiling',
+        );
+        expect(screen.getByTestId('fleet-node-limits-clear')).toBeDisabled();
+    });
+
+    it('saves the whole ceiling, empty fields as null', async () => {
+        const onSaveLimitCeiling = vi.fn();
+        renderDrawer({ onSaveLimitCeiling });
+        await userEvent.type(screen.getByTestId('fleet-node-limit-input-maxConcurrentJobs'), '3');
+        await userEvent.type(screen.getByTestId('fleet-node-limit-input-maxMemoryMb'), '8192');
+        await userEvent.click(screen.getByTestId('fleet-node-limits-save'));
+        expect(onSaveLimitCeiling).toHaveBeenCalledWith({
+            maxConcurrentJobs: 3,
+            maxCpuPercent: null,
+            maxMemoryMb: 8192,
+        });
+    });
+
+    it('refuses an out-of-range value instead of sending it', async () => {
+        const onSaveLimitCeiling = vi.fn();
+        renderDrawer({ onSaveLimitCeiling });
+        await userEvent.type(screen.getByTestId('fleet-node-limit-input-maxConcurrentJobs'), '99');
+        await userEvent.click(screen.getByTestId('fleet-node-limits-save'));
+        expect(onSaveLimitCeiling).not.toHaveBeenCalled();
+    });
+
+    it('clears the ceiling with one click', async () => {
+        const onSaveLimitCeiling = vi.fn();
+        const limited = node({
+            limitCeiling: { maxConcurrentJobs: 1, maxCpuPercent: null, maxMemoryMb: null },
+        });
+        renderDrawer({ node: limited, detail: detail({ node: limited }), onSaveLimitCeiling });
+        await userEvent.click(screen.getByTestId('fleet-node-limits-clear'));
+        expect(onSaveLimitCeiling).toHaveBeenCalledWith({
+            maxConcurrentJobs: null,
+            maxCpuPercent: null,
+            maxMemoryMb: null,
+        });
     });
 });

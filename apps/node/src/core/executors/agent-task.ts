@@ -68,14 +68,20 @@ import {
 	type AgentTaskQuestionFs
 } from './agent-task-question';
 import {
+	assertMcpIsolationInCommand,
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
+	unsupportedOptionalModelCliFlags,
 	buildModelCliStep,
+	claudeManagedMcpConfigInEffect,
+	claudeManagedMcpConfigPath,
 	collectModelOutputProtectedValues,
 	ModelCliCommandError,
+	modelCliMcpIsolationEnv,
 	parseModelCliResult,
 	redactCommandResult,
 	type ModelCliPaths,
+	MODEL_CLI_EMPTY_MCP_CONFIG,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 import {
@@ -370,6 +376,21 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
 	/**
+	 * Node lifecycle (self-build slice AR) — what the PINNED binary for a
+	 * provider is and which flags it advertises, asked right before the
+	 * model step. An optional flag it does not advertise (`--effort`,
+	 * `--max-budget-usd`) is then left off the command and recorded on the
+	 * result as `droppedFlags`, instead of failing the run after the lease
+	 * and the worktree were already spent.
+	 *
+	 * Optional: absent (or answering null, or throwing) means "could not
+	 * tell", and the command is built exactly as it always was.
+	 */
+	modelCliCompat?: (
+		provider: FleetAgentModelExecution['provider'],
+		executable: string
+	) => Promise<{ version: string | null; supportedFlags: ReadonlySet<string> | null } | null>;
+	/**
 	 * Self-build slice Z (EW-796) — the node's redacting logger.
 	 *
 	 * Optional and additive: an absent logger simply means the bridge's
@@ -475,6 +496,16 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 * supplies its own so the check is deterministic.
 	 */
 	sessionConfigFs?: AgentTaskSessionConfigFs;
+	/**
+	 * Reads Claude Code's machine-wide `managed-mcp.json` (an enterprise
+	 * policy file) so a Claude Code run on a machine that deploys one is
+	 * refused with a reason BEFORE the spawn — the CLI itself exits at
+	 * startup on the `--mcp-config` / `--strict-mcp-config` every fleet run
+	 * carries. Reads only. Wired by the runtime to {@link defaultSessionConfigFs};
+	 * a hand-built `io` gets none and the check is skipped, which costs only
+	 * the message: the CLI still refuses the run on its own.
+	 */
+	managedMcpConfigFs?: AgentTaskSessionConfigFs;
 	/**
 	 * Self-build slice Q: reads / removes the owner-question file in the
 	 * worktree (and in writable mounts). Defaults to `node:fs`.
@@ -1294,7 +1325,42 @@ async function runModelStep(
 	// before anything is spawned, from the job's (validated) offer and this
 	// node's OWN enrollment id.
 	const resumeDecision = decideSessionResume(execution, io);
+	// What the model step's env must say on top of the containment overlay so
+	// the CLI never fetches the account's remote MCP connectors (Claude Code:
+	// `ENABLE_CLAUDEAI_MCP_SERVERS=false`). Merged LAST so it wins whether or
+	// not the run got an isolated home, and the ONE overlay the command runner
+	// applies after its scrub carries both.
+	const mcpIsolationEnv = modelCliMcpIsolationEnv(execution.provider);
+	const modelEnvOverlay: NodeCommandEnvOverlay | undefined = mcpIsolationEnv
+		? { ...(containment.envOverlay ?? {}), ...mcpIsolationEnv }
+		: containment.envOverlay;
 	try {
+		// ── MCP isolation when there is no bridge ───────────────────────
+		//
+		// A run the platform gave no tools must not inherit the machine
+		// owner's instead. With no live bridge, Claude Code is handed an EMPTY
+		// config at the bridge's own scratch path and `--strict-mcp-config`
+		// (see `MODEL_CLI_EMPTY_MCP_CONFIG`). Written inside the `try` so a
+		// failure still removes scratch; NOT degraded on failure — a run that
+		// cannot be isolated does not run, exactly as a run whose instructions
+		// file cannot be written does not run. A bridge that degraded leaves
+		// `bridge.cli` null, so its run is isolated the same way.
+		//
+		// Refused up front, never "fallen back" from, on a machine whose
+		// administrator deployed a managed MCP config: Claude Code exits at
+		// startup on the isolation flags there, so the run could not start
+		// isolated — and starting it WITHOUT them would hand the model a
+		// server set the platform never vetted.
+		await refuseUnderClaudeManagedMcpConfig(execution.provider, io);
+		let emptyMcpConfigPath: string | undefined;
+		if (!bridge.cli && execution.provider === 'claude-code') {
+			await scratchFs.writeFile(mcpConfigPath, MODEL_CLI_EMPTY_MCP_CONFIG);
+			emptyMcpConfigPath = mcpConfigPath;
+		}
+		// Node lifecycle (slice AR): ask the pinned binary what it supports
+		// BEFORE building its command line. A probe that cannot answer drops
+		// nothing — the command is then exactly what it always was.
+		const droppedFlags = await optionalFlagsToDrop(jobId, execution, executable, io);
 		// ONE model invocation: write the prompt, build and gate the command,
 		// spawn, parse. Run once for a fresh session — or, slice AU, once with
 		// `--resume` and, only when the CLI could not open that session at
@@ -1315,10 +1381,15 @@ async function runModelStep(
 					scratch,
 					...(mounts && mounts.length > 0 ? { mounts } : {}),
 					...(bridge.cli ? { mcp: bridge.cli } : {}),
+					...(emptyMcpConfigPath ? { emptyMcpConfigPath } : {}),
 					...(resumeSessionId ? { resumeSessionId } : {}),
 					...(io.platform ? { platform: io.platform } : {}),
-					...(streamClaude ? { stream: true } : {})
+					...(streamClaude ? { stream: true } : {}),
+					...(droppedFlags.length > 0 ? { omitFlags: droppedFlags } : {})
 				});
+				// Same gate, for MCP: a Claude Code command that would load the
+				// owner's own MCP servers is refused, not spawned.
+				assertMcpIsolationInCommand({ command, execution });
 				// Last gate before the spawn: the grant has to be in the string
 				// that is actually run, not merely computed. Nothing downstream
 				// can tell a discarded cross-repository edit from a model that
@@ -1351,7 +1422,7 @@ async function runModelStep(
 				scratchFs,
 				io,
 				signal,
-				envOverlay: containment.envOverlay,
+				envOverlay: modelEnvOverlay,
 				runSecretValues,
 				recordEvidence,
 				lineDelimitedOutput
@@ -1391,6 +1462,11 @@ async function runModelStep(
 					? { ...fresh, resume: { outcome: 'skipped', reason: resumeDecision.reason } }
 					: fresh;
 		}
+		// Node lifecycle (slice AR): recorded on the run, not only logged: a
+		// dropped `--max-budget-usd` means the CLI enforced no per-run budget,
+		// and whoever reads the run should not have to find that in a node's
+		// log file.
+		if (droppedFlags.length > 0) model = { ...model, droppedFlags };
 		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
@@ -1418,6 +1494,80 @@ async function runModelStep(
 			);
 		}
 	}
+}
+
+/**
+ * Refuse a Claude Code run on a machine whose administrator deployed a
+ * managed MCP config (`managed-mcp.json`), naming the file and the way out.
+ *
+ * Under that file Claude Code takes exclusive control of MCP and exits at
+ * startup when a session passes `--mcp-config` or `--strict-mcp-config`
+ * (code.claude.com/docs/en/managed-mcp). Every fleet Claude Code run carries
+ * both — the empty strict config, or the bridge's — so such a run cannot
+ * start isolated. The CLI would refuse it anyway; this turns its startup
+ * exit into a reason an operator can act on. It does NOT fall back to a
+ * run without the flags: that run would load the managed server set, which
+ * the platform never vetted.
+ *
+ * Mirrors what the CLI applies: an absent, unreadable or unparseable file
+ * is not in effect for the CLI either, so it does not refuse here.
+ */
+async function refuseUnderClaudeManagedMcpConfig(
+	provider: FleetAgentExecutionProvider,
+	io: AgentTaskIo
+): Promise<void> {
+	if (provider !== 'claude-code') return;
+	const read = io.managedMcpConfigFs?.readFile?.bind(io.managedMcpConfigFs);
+	if (!read) return;
+	const path = claudeManagedMcpConfigPath(io.platform ?? process.platform);
+	let raw: string | null;
+	try {
+		raw = await read(path);
+	} catch (error) {
+		io.logger?.warn(
+			`[fleet-node] could not read ${path} to check for a managed MCP config; continuing, since Claude ` +
+				`Code cannot apply a file it cannot read: ${describeContainmentError(error)}`
+		);
+		return;
+	}
+	if (!claudeManagedMcpConfigInEffect(raw)) return;
+	throw new AgentTaskPayloadError(
+		`This machine deploys a Claude Code managed MCP configuration (${path}), which gives its ` +
+			'administrator exclusive control of MCP servers: Claude Code refuses the per-run --mcp-config / ' +
+			'--strict-mcp-config every fleet run needs to be isolated from MCP servers the platform did not ' +
+			'vet, and would exit at startup. Remove that file from this machine, or do not run claude-code ' +
+			'fleet jobs on it.'
+	);
+}
+
+/**
+ * Node lifecycle (self-build slice AR) — the optional flags this run would
+ * pass that the pinned binary does not advertise. Never throws and never
+ * blocks the run: any failure to ask reads as "could not tell", which drops
+ * nothing.
+ */
+async function optionalFlagsToDrop(
+	jobId: string,
+	execution: FleetAgentModelExecution,
+	executable: string,
+	io: AgentTaskIo
+): Promise<string[]> {
+	if (!io.modelCliCompat) return [];
+	let compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null = null;
+	try {
+		compat = await io.modelCliCompat(execution.provider, executable);
+	} catch {
+		return [];
+	}
+	const dropped = unsupportedOptionalModelCliFlags(execution, compat?.supportedFlags ?? null);
+	if (dropped.length > 0) {
+		io.logger?.warn(
+			`[fleet-node] job ${jobId}: the pinned ${execution.provider} CLI (${compat?.version ?? 'version unknown'}) ` +
+				`does not advertise ${dropped.join(', ')} — running without ${dropped.length === 1 ? 'it' : 'them'}. ` +
+				'Upgrade the CLI on this machine to restore them (`ever-works-node doctor` lists what it supports).'
+		);
+	}
+	return dropped;
 }
 
 /**

@@ -62,14 +62,20 @@ describe('normalizeGeneratorError', () => {
     // scheme `[a-z][a-z0-9+.-]*` that was retried from every offset of a long
     // run of scheme characters — about 2.8 s for 50,000 `a`s on a dev box —
     // and the message is upstream text (git / provider errors).
-    it('redacts a long run of scheme characters in well under 200 ms', () => {
-        const error = new Error('a'.repeat(50_000));
+    // Sized, not tightly timed: at 200,000 characters the old pattern needs
+    // ~45 s on a dev box and the `://`-anchored pass milliseconds, so a 2 s
+    // bound can be failed neither by a CPU-throttled CI runner nor passed by
+    // the old pattern. (A "< 200 ms" at 50,000 was one scheduler stall from
+    // red — develop CI, 2026-10-09.)
+    it('redacts a long run of scheme characters in linear time', () => {
+        const error = new Error('a'.repeat(200_000));
+
         const started = performance.now();
-
         const result = normalizeGeneratorError(error);
+        const elapsedMs = performance.now() - started;
 
-        expect(performance.now() - started).toBeLessThan(200);
-        expect(result).toBe('a'.repeat(50_000));
+        expect(result).toBe('a'.repeat(200_000));
+        expect(elapsedMs).toBeLessThan(2_000);
     });
 
     // Recorded from the regex this replaced: the same URLs are redacted, the

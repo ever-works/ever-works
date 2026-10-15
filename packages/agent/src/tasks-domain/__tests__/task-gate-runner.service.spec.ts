@@ -78,12 +78,21 @@ describe('TaskGateRunnerService.runChecks', () => {
     });
 
     it('a hung check is killed at its timeoutSec → status timeout, null exit code, gate red', async () => {
+        // The command would sleep 20 s: far past its 1 s timeoutSec and past this
+        // test's own 15 s timeout. So a runner that did not kill it at timeoutSec
+        // times this test out instead of answering `timeout` with a null exit code;
+        // that answer is the proof it was killed early, and it holds on any runner.
+        // The old `Date.now() - startedAt < 4500` measured the runner as well
+        // (spawning `node` and every timer can run seconds late on a CPU-throttled
+        // CI box), and a 5 s sleep left a stalled runner room to let the command
+        // finish on its own before the 1 s kill timer ran.
+        const HANG_MS = 20_000;
         const startedAt = Date.now();
         const outcome = await runner.runChecks({
             checks: [
                 check({
                     id: 'hang',
-                    command: 'node -e "setTimeout(function () {}, 5000)"',
+                    command: `node -e "setTimeout(function () {}, ${HANG_MS})"`,
                     timeoutSec: 1,
                 }),
             ],
@@ -92,8 +101,9 @@ describe('TaskGateRunnerService.runChecks', () => {
         });
         expect(outcome.results[0]).toMatchObject({ id: 'hang', status: 'timeout', exitCode: null });
         expect(outcome.gateStatus).toBe('red');
-        // Killed at ~1s, not at the command's own 5s sleep.
-        expect(Date.now() - startedAt).toBeLessThan(4500);
+        // …and it was the 1 s timeoutSec that killed it, not an instant failure. A
+        // lower bound is safe on any runner: throttling only makes timers later.
+        expect(Date.now() - startedAt).toBeGreaterThanOrEqual(900);
     }, 15000);
 
     it('an unspawnable check (nonexistent cwd) → status error, distinguished from red', async () => {

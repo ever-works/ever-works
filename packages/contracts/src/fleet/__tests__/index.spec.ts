@@ -125,7 +125,27 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS',
 	// Node housekeeping visibility (EW-803): the cap on a reported
 	// workspace count. Covered in `fleet-node.spec.ts`.
-	'FLEET_MAX_WORKSPACE_COUNT'
+	'FLEET_MAX_WORKSPACE_COUNT',
+	// Node lifecycle (self-build slice AR): the daemon version floor, its
+	// comparator and normaliser, the upgrade command every surface prints,
+	// and the cap on per-provider CLI versions. Covered in `fleet-node.spec.ts`.
+	'FLEET_DEFAULT_MIN_NODE_VERSION',
+	'FLEET_NODE_UPGRADE_COMMAND',
+	'FLEET_MAX_CLI_VERSIONS',
+	'compareFleetNodeVersions',
+	'isFleetNodeVersionBelowFloor',
+	'normalizeFleetNodeVersionFloor',
+	// Remote node limits (self-build slice AS): the resource-limit bounds
+	// the node clamps to and the owner's ceiling is validated against, and
+	// the widest value a reported limit may carry. Covered in
+	// `fleet-node-lifecycle.spec.ts`.
+	'FLEET_NODE_MIN_CONCURRENT_JOBS',
+	'FLEET_NODE_MAX_CONCURRENT_JOBS',
+	'FLEET_NODE_MIN_CPU_PERCENT',
+	'FLEET_NODE_MAX_CPU_PERCENT',
+	'FLEET_NODE_MIN_MEMORY_MB',
+	'FLEET_NODE_MAX_MEMORY_MB',
+	'FLEET_MAX_REPORTED_LIMIT_VALUE'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -356,6 +376,9 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetAgentTaskContainment',
 	'normalizeFleetAgentTaskTimeline',
 	'normalizeFleetNodeWorkerState',
+	'compareFleetNodeVersions',
+	'isFleetNodeVersionBelowFloor',
+	'normalizeFleetNodeVersionFloor',
 	'isFleetRunTokenRouteAllowed',
 	'fleetRunTokenExpiryFromLease',
 	'describeFleetPushCredentialRefusal',
@@ -381,7 +404,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 199 runtime symbols', () => {
+	it('exposes exactly these 212 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -425,8 +448,14 @@ describe('fleet barrel', () => {
 		// id pattern and its guard, the resume-capable provider rule, the
 		// resume-block reader and the resume-outcome list. All in
 		// `fleet-jobs.types.ts`, an existing module — no new witness row.
+		// → 205 with the node lifecycle (self-build slice AR): the daemon
+		// version floor (default, comparator, below-floor predicate, env
+		// normaliser), the upgrade command and the `cliVersions` cap. All in
+		// `fleet-node.types.ts`, an existing module.
+		// → 212 with remote node limits (self-build slice AS): the six
+		// resource-limit bounds and the reported-limit cap, same module.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(199);
+		expect(Object.keys(fleet)).toHaveLength(212);
 	});
 
 	it.each([

@@ -466,16 +466,24 @@ describe('an unreachable cluster is a result, not a throw', () => {
 
 		const cluster = new FakeCluster();
 		cluster.versionHangs = true;
-		const startedAt = Date.now();
+		// The injected 5 ms budget — not the 10 s default — ended the wait: asserted as an ORDERING
+		// against a 5 s reference timer armed first, not as `Date.now() - startedAt < 5_000`. On a
+		// CPU-throttled CI runner every timer fires late, the budget's and the reference's alike, but
+		// never out of order.
+		let referenceFired = false;
+		const reference = setTimeout(() => {
+			referenceFired = true;
+		}, 5_000);
 		const result = await checker(cluster, { versionTimeoutMs: 5 }).checkAppCluster(KUBECONFIG, {
 			namespace: NAMESPACE,
 			needsCreateNamespace: false
 		});
+		clearTimeout(reference);
 
 		expect(result.ok).toBe(false);
 		expect(result.error?.code).toBe('cluster_unreachable');
 		expect(result.error?.message).toContain('/version');
-		expect(Date.now() - startedAt).toBeLessThan(5_000);
+		expect(referenceFired).toBe(false);
 		expect(cluster.questions).toEqual([]);
 	});
 });

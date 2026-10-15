@@ -18,6 +18,8 @@ import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
 import { config } from '../../config/constants';
 import {
+    classifyReviewAuthor,
+    classifyReviewBotComment,
     classifyReviewer,
     formatInlineFinding,
     isReviewBotNoise,
@@ -196,6 +198,8 @@ export interface GitHubWebhookBody {
         body?: string;
         html_url?: string;
         user?: { login?: string; type?: string };
+        /** Same as `review.author_association`, for a comment's author. */
+        author_association?: string;
         /**
          * Trusted review bots (R16) — `pull_request_review_comment` only.
          * The diff anchor of an inline finding: `line` on the current
@@ -228,6 +232,13 @@ export interface GitHubWebhookBody {
          */
         commit_id?: string;
         user?: { login?: string; type?: string };
+        /**
+         * The reviewer's relationship to the repository (`OWNER`,
+         * `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR`, `NONE`, …). A human's
+         * review counts only from the first three — see
+         * `classifyReviewAuthor`.
+         */
+        author_association?: string;
         submitted_at?: string;
     };
 }
@@ -679,9 +690,16 @@ export class GitHubPrReviewBridgeService {
         // here, BEFORE normalize(), for the same reason a review is: the
         // loop must never review its reviewers, so the comment cannot
         // become a `github.mention` no matter what it says.
+        //
+        // EVERY action is routed here, not only `created`: whether this
+        // delivery is a finding at all - a new comment, not an edit, and
+        // not one of the bot's own placeholders or summaries - is ONE
+        // decision, made by `classifyReviewBotComment` inside the
+        // recorder. An edit used to fall through to normalize(), which
+        // refused it for being an edit; it now stops here, which refuses
+        // it for the same reason with nothing else downstream to consult.
         if (
             (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') &&
-            body.action === 'created' &&
             classifyReviewer(body.comment?.user, this.reviewBotPolicy()) === 'trusted-bot'
         ) {
             await this.recordBotCommentFeedback(binding, eventName, body);
@@ -738,6 +756,12 @@ export class GitHubPrReviewBridgeService {
      * the bot's own severity marker carried along; its `COMMENTED`
      * summaries are not (their findings arrive as inline comments and are
      * recorded by {@link recordBotCommentFeedback}).
+     *
+     * A HUMAN rejection counts only from an OWNER, MEMBER or COLLABORATOR
+     * of the repository ({@link classifyReviewAuthor}). The repository may
+     * be public: any GitHub account can submit "Request changes", and
+     * this row is what the fix loop resumes the agent with — on the
+     * owner's PC, as instructions. An outsider's review records nothing.
      */
     private async recordReviewRejection(
         binding: GitHubEventsBinding,
@@ -745,7 +769,11 @@ export class GitHubPrReviewBridgeService {
     ): Promise<void> {
         const review = body.review;
         if (!review || review.state?.toLowerCase() !== 'changes_requested') return;
-        const who = classifyReviewer(review.user, this.reviewBotPolicy());
+        const who = classifyReviewAuthor(review, this.reviewBotPolicy());
+        if (who === 'outside-human') {
+            this.logOutsider('rejection', review, body);
+            return;
+        }
         if (who === 'self' || who === 'untrusted-bot') return;
         const raw = review.body ?? '';
         if (who === 'trusted-bot' && isReviewBotNoise(raw)) return;
@@ -797,6 +825,12 @@ export class GitHubPrReviewBridgeService {
      * approve for the Task's Organization approved it. The authorising
      * decision is the platform-side one in the Inbox.
      *
+     * And only from a person with a write relationship to the repository
+     * (OWNER, MEMBER, COLLABORATOR — {@link classifyReviewAuthor}): on a
+     * public repository anyone can click "Approve", and a stranger having
+     * read the diff is not what the merge Inbox means by "a person
+     * reviewed this".
+     *
      * Best-effort, exactly like its rejection twin.
      */
     private async recordReviewApproval(
@@ -805,7 +839,12 @@ export class GitHubPrReviewBridgeService {
     ): Promise<void> {
         const review = body.review;
         if (!review || review.state?.toLowerCase() !== 'approved') return;
-        if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
+        const who = classifyReviewAuthor(review, this.reviewBotPolicy());
+        if (who === 'outside-human') {
+            this.logOutsider('approval', review, body);
+            return;
+        }
+        if (who !== 'human') return;
 
         const fullName = body.repository?.full_name ?? '';
         const [owner, repo] = fullName.split('/');
@@ -870,6 +909,12 @@ export class GitHubPrReviewBridgeService {
         if (!review || (state !== 'dismissed' && state !== 'changes_requested')) return;
         // Bots never wrote one of these records, so they can never clear
         // one either — the same rule, from the other side.
+        //
+        // Deliberately NOT narrowed to collaborators (`classifyReviewAuthor`):
+        // clearing is scoped to the SAME login that approved, it only ever
+        // removes a "somebody read this" signal (the safe direction), and a
+        // reviewer whose collaborator access was revoked since must still be
+        // able to take their own approval back.
         if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
 
         const fullName = body.repository?.full_name ?? '';
@@ -899,14 +944,23 @@ export class GitHubPrReviewBridgeService {
      * (`pull_request_review_comment`) or summary comment (`issue_comment`)
      * from an allow-listed reviewer bot as rejection feedback for the
      * Task the PR belongs to. The caller has already classified the
-     * author as `trusted-bot` and checked `action === 'created'`.
+     * author as `trusted-bot`.
      *
-     * Status chatter (rate limits, "too many files", usage caps) is
-     * dropped: it carries nothing to fix. Presentation markup — HTML
-     * comments, collapsed static-analysis dumps, badges — is stripped
-     * BEFORE the text cap so the finding itself survives the budget, and
-     * an inline finding is prefixed with its `path:line` anchor. Same
-     * best-effort posture as {@link recordReviewRejection}.
+     * Only a comment that actually carries a finding is recorded —
+     * {@link classifyReviewBotComment} is the whole decision. An edit is
+     * never a new finding (CodeRabbit rewrites its summary comment on
+     * every push, and each recorded edit would be a duplicate row and a
+     * duplicate model run); CodeRabbit's "review in progress" placeholder,
+     * its walkthrough summary, its command acknowledgements, Greptile's
+     * finding-less summaries and every rate-limit / status notice carry
+     * nothing to fix. Production paid a full fleet model run for the
+     * placeholder on ever-works/ever-works#2575 (2026-10-09).
+     *
+     * Presentation markup — HTML comments, collapsed static-analysis
+     * dumps, badges — is stripped BEFORE the text cap so the finding
+     * itself survives the budget, and an inline finding is prefixed with
+     * its `path:line` anchor. Same best-effort posture as
+     * {@link recordReviewRejection}.
      */
     private async recordBotCommentFeedback(
         binding: GitHubEventsBinding,
@@ -916,7 +970,15 @@ export class GitHubPrReviewBridgeService {
         const comment = body.comment;
         if (!comment || typeof comment.id !== 'number') return;
         const raw = comment.body ?? '';
-        if (isReviewBotNoise(raw)) return;
+        const verdict = classifyReviewBotComment({ action: body.action, body: raw });
+        if (verdict.kind === 'ignore') {
+            this.logger.debug(
+                `Reviewer-bot ${eventName} ${comment.id} (${body.action ?? 'no action'}) by ${
+                    comment.user?.login ?? 'unknown'
+                } on ${body.repository?.full_name ?? 'unknown repo'} is not a finding: ${verdict.reason}`,
+            );
+            return;
+        }
         // issue_comment fires for plain issues too — only PR threads carry
         // review feedback.
         const prNumber =
@@ -965,6 +1027,26 @@ export class GitHubPrReviewBridgeService {
      * operator's env change (and a spec's) takes effect without a restart.
      * Both sets hold canonical (lower-case) logins.
      */
+    /**
+     * A review from somebody with no write relationship to the repository
+     * was dropped. Debug only — on a public repository this is ordinary
+     * traffic — and only what GitHub already shows publicly: the login,
+     * the association, the repository and the pull request.
+     */
+    private logOutsider(
+        what: 'rejection' | 'approval',
+        review: NonNullable<GitHubWebhookBody['review']>,
+        body: GitHubWebhookBody,
+    ): void {
+        this.logger.debug(
+            `Ignored a PR review ${what} from @${review.user?.login ?? 'unknown'} (author_association=${
+                review.author_association ?? 'missing'
+            }) on ${body.repository?.full_name ?? 'unknown repo'}#${
+                body.pull_request?.number ?? '?'
+            }: only an OWNER, MEMBER or COLLABORATOR steers a run.`,
+        );
+    }
+
     private reviewBotPolicy(): ReviewBotPolicy {
         return {
             trusted: new Set(config.githubReviewBots.trustedLogins()),

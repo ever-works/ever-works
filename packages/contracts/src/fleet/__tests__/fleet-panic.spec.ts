@@ -37,6 +37,7 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.rename',
 	'node.capabilities',
 	'node.cost-ceiling',
+	'node.limits',
 	'node.pause',
 	'node.disable',
 	'node.drain',

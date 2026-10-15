@@ -877,6 +877,28 @@ describe('SocialAuthService', () => {
             expect(error.message).not.toContain('github down');
         });
 
+        // The GitHub App onboarding path degrades a 403/404 from /user/emails to
+        // the unverified profile email (prod 2026-10-09). The OAuth-App sign-in
+        // path deliberately does NOT: it requests `user:email` and resolves the
+        // local user by email first, so a missing scope must keep failing here.
+        it.each([403, 404])(
+            '(f) GitHub /user/emails %i on OAuth-App sign-in still rejects -> 400, no unverified-email fallback',
+            async (status) => {
+                httpService.post.mockReturnValueOnce(of({ data: { access_token: 'gh' } }));
+                httpService.get
+                    .mockReturnValueOnce(
+                        of({ data: { id: 1, login: 'octo', email: 'octo@example.com' } }),
+                    )
+                    .mockReturnValueOnce(throwError(() => axiosHttpError(status, {})));
+
+                const error = await captureError(service.authenticate(AuthProvider.GITHUB, 'c'));
+
+                expect(error).toBeInstanceOf(BadRequestException);
+                expect(error.message).toContain('GitHub');
+                expect(authService.validateSocialUser).not.toHaveBeenCalled();
+            },
+        );
+
         it('keeps the 200-with-error-body behaviour (GitHub) -> "Missing access_token" BadRequestException', async () => {
             httpService.post.mockReturnValueOnce(
                 of({ data: { error: 'bad_verification_code', error_description: 'x' } }),

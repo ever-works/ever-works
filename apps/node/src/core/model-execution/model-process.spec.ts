@@ -49,6 +49,12 @@ const HUNG_CLOSE_DETECTION_MS = 8_000;
 /** Per-test budget for a hung-close race: the detector plus room for harness setup and teardown. */
 const HUNG_CLOSE_TEST_BUDGET_MS = HUNG_CLOSE_DETECTION_MS + 4_000;
 /**
+ * The upper edge of the termination settle window, as a reference timer armed in the
+ * same tick as the production settle timer (TERMINATION_SETTLE_MS, 2.5 s): that one
+ * must fire first. It was `settleWindowMs < 4_000` on the wall clock.
+ */
+const SETTLE_WINDOW_CEILING_MS = 4_000;
+/**
  * Wall-clock budget for a real two-subprocess success path (version probe +
  * model) on a saturated CI runner. Applied to the request deadline so a
  * starved runner reports the executor's own `timed-out` diagnosis, and the
@@ -2277,6 +2283,12 @@ describe('executeModelProcess — request refusal', () => {
 			let monotonicTime = 0;
 			let closeCalls = 0;
 			const closeTiming: { startedAt?: number } = {};
+			// The upper edge of the settle window as an ORDERING: a reference timer armed in
+			// the same tick as the settle timer, from inside `close`. Timers fire in due order
+			// however late a loaded runner fires them, so the settle timer (2.5 s) must beat
+			// this one (4 s) — where `settleWindowMs < 4_000` measured the runner as well.
+			let settleCeilingPassed = false;
+			let settleCeiling: NodeJS.Timeout | undefined;
 			let deferredRunRoot: string | undefined;
 			try {
 				const execution = executeModelProcess(
@@ -2304,6 +2316,9 @@ describe('executeModelProcess — request refusal', () => {
 								close: () => {
 									closeCalls += 1;
 									closeTiming.startedAt = performance.now();
+									settleCeiling = setTimeout(() => {
+										settleCeilingPassed = true;
+									}, SETTLE_WINDOW_CEILING_MS);
 									return new Promise(() => undefined);
 								}
 							};
@@ -2331,15 +2346,17 @@ describe('executeModelProcess — request refusal', () => {
 				// holds only the settle timer and microtasks - the workspace stat
 				// and the run-root removal are seamed out above - so it is the
 				// production bound itself: the lower edge tolerates Node firing a
-				// timer up to ~1 ms early, and the upper edge leaves 1.5 s for
-				// event-loop delay on a loaded runner (no I/O sits in the window).
+				// timer up to ~1 ms early, and the upper edge is the reference
+				// timer armed in `close` above — an ordering, so event-loop delay on
+				// a loaded runner cannot move it (no I/O sits in the window).
 				// An unclamped 60 s timer or a degenerate 1 ms timer both land far
 				// outside it.
 				const settleWindowMs = settledAt - (closeTiming.startedAt ?? settledAt);
 				expect(settleWindowMs).toBeGreaterThanOrEqual(TERMINATION_SETTLE_MS - 50);
-				expect(settleWindowMs).toBeLessThan(4_000);
+				expect(settleCeilingPassed).toBe(false);
 				expect(deferredRunRoot).toBeDefined();
 			} finally {
+				clearTimeout(settleCeiling);
 				if (deferredRunRoot) await rm(deferredRunRoot, { recursive: true, force: true });
 			}
 		},

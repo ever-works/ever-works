@@ -2,10 +2,16 @@ export interface SentryConfig {
     dsn?: string;
     environment?: string;
     tracesSampleRate?: number;
+    /** Sentry v11 profiling session sample rate (replaces `profilesSampleRate`). */
+    profileSessionSampleRate?: number;
+    /** @deprecated Removed in Sentry v11; mapped to `profileSessionSampleRate`. */
     profilesSampleRate?: number;
+    /** @deprecated Removed in Sentry v11 (logs are sent whenever `Sentry.logger` is used); ignored by the SDK. */
     enableLogs?: boolean;
     beforeSend?: (event: any) => any | null;
+    /** @deprecated No-op in Sentry v11 (span streaming); use `beforeSendSpan`. */
     beforeSendTransaction?: (event: any) => any | null;
+    beforeSendSpan?: (span: any) => any;
 }
 
 export interface PostHogConfig {

@@ -1050,13 +1050,25 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 new FakeStates(),
             );
 
-            const startedAt = Date.now();
+            // The 50 ms budget must end the wait well before a 1 s reference timer
+            // armed first — asserted as an ORDERING, not as `elapsed < 1_000`. On a
+            // CPU-throttled CI runner every timer fires late, the budget's and the
+            // reference's alike, but never out of order; a wall-clock bound measured
+            // the runner as well as the code. A request that ignored the overridden
+            // budget (or waited on the held dispatch) lets the reference fire first.
+            let referenceFired = false;
+            const reference = setTimeout(() => {
+                referenceFired = true;
+            }, 1_000);
+
             const result = await service.request(manual());
-            const elapsed = Date.now() - startedAt;
+            clearTimeout(reference);
 
             expect(result.status).toBe('accepted');
             expect(result.dispatched).toBe(false);
-            expect(elapsed).toBeLessThan(1_000);
+            expect(referenceFired).toBe(false);
+            // The dispatch WAS started — it is merely still pending, held.
+            expect(dispatcher.calls).toHaveLength(1);
 
             dispatcher.release();
         });
