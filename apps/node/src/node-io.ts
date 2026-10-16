@@ -37,7 +37,10 @@ export function createCommandRunner(): CommandRunner {
 						resolve({
 							code: typeof code === 'number' ? code : 1,
 							stdout: String(stdout),
-							stderr: String(stderr)
+							stderr: String(stderr),
+							// `execFile` sets `killed` when it terminated the child at
+							// `timeout`; what the child printed until then is partial.
+							timedOut: Boolean(error && (error as { killed?: boolean }).killed)
 						});
 					}
 				);

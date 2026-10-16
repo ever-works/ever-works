@@ -34,7 +34,20 @@ import {
 
 /** Minimal command abstraction, mirroring `apps/desktop`'s `CommandRunner`. */
 export interface CommandRunner {
-	run(command: string, args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }>;
+	run(
+		command: string,
+		args: string[]
+	): Promise<{
+		code: number | null;
+		stdout: string;
+		stderr: string;
+		/**
+		 * True when the runner killed the process at its own timeout, so
+		 * stdout/stderr may be cut short. Optional: a runner that cannot
+		 * tell leaves it unset.
+		 */
+		timedOut?: boolean;
+	}>;
 }
 
 /** Host facts the detector needs, snapshotted so tests can drive every branch. */

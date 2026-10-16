@@ -4,15 +4,15 @@
 	"compilerOptions": {
 		"baseUrl": ".",
 		"types": ["@docusaurus/module-type-aliases"],
-		// Force @types/react / @types/react-dom resolution to the 18.x copy pinned
-		// in this app's devDependencies. Several Docusaurus 3 packages (e.g.
-		// @docusaurus/module-type-aliases, @docusaurus/react-loadable,
-		// @docusaurus/theme-common) transitively pull @types/react@19, which leaks
-		// the React-19 ReactNode (includes `bigint`) into types for `Link` etc.
-		// At the JSX call site tsc resolves to the 18.x ReactNode, producing
-		// TS2786 "'Link' cannot be used as a JSX component" (Footer/FooterLinks,
-		// Navbar/DesktopMenu). Pinning paths keeps every consumer in this app on
-		// 18.x without affecting apps/web (React 19).
+		// Force @types/react / @types/react-dom resolution to the copy pinned in this
+		// app's devDependencies, so every consumer in this app sees one ReactNode.
+		// When the app ran React 18 with @types/react 18, several Docusaurus 3 packages
+		// (e.g. @docusaurus/module-type-aliases, @docusaurus/react-loadable,
+		// @docusaurus/theme-common) transitively pulled @types/react@19, which leaked
+		// the React-19 ReactNode (includes `bigint`) into types for `Link` etc. and
+		// produced TS2786 "'Link' cannot be used as a JSX component" (Footer/FooterLinks,
+		// Navbar/DesktopMenu). The app is on React 19 and @types/react 19 now; the pin
+		// still keeps a second @types/react copy from creeping in.
 		"paths": {
 			"@site/*": ["./*"],
 			"react": ["./node_modules/@types/react"],

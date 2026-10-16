@@ -282,7 +282,7 @@ Per-Mission overrides: a Mission can override these globally-defaulted switches 
     - Total Ideas stat on Dashboard (counts _all_ Ideas regardless of status — see §5.1).
     - Future "Re-build" / "Re-suggest" / "Similar Ideas" features.
     - Avoiding duplicate suggestions (see §3.3).
-- On the resulting Work card, surface a back-link "From Idea: _<title>_" (small affordance — out of scope to design here, but the data join is `Work.id → WorkProposal.acceptedWorkId`).
+- On the resulting Work card, surface a back-link "From Idea: `<title>`" (small affordance — out of scope to design here, but the data join is `Work.id → WorkProposal.acceptedWorkId`).
 
 ### 3.8a Failure handling, retry, and re-build (NEW in v6)
 

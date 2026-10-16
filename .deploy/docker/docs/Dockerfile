@@ -66,9 +66,15 @@ COPY docs/ ./docs/
 # memory" after ~33 min (develop bb2e9d9f, 0bbc5626, stage 764e7de3). 8 GB stays within the
 # x64-8 runner's requests (runner 8Gi + dind 4Gi; dind limit 76Gi).
 RUN NODE_OPTIONS="--max-old-space-size=8192" pnpm --filter ever-works-docs build
+# No U+0000 in any page. React 18's server renderer wrote one to three zero bytes before a multi-byte
+# character (emoji, U+FE0F, em dash, zero-width space) that straddled its 2048-byte SSR chunk, and
+# docs.ever.works served ~300 of them. React 19 fixed it; this gate keeps it fixed
+# (apps/docs/scripts/check-no-nul-bytes.mjs).
+RUN pnpm --filter ever-works-docs check:nul-bytes
 
 #-- Runtime: nginx serving the static build output
-FROM nginx:1.27-alpine
+# 1.31 is nginx's current mainline; the 1.27-alpine tag was last rebuilt in April 2025.
+FROM nginx:1.31-alpine
 
 # Copy nginx config tuned for an SPA with locale subpaths
 COPY .deploy/docker/docs/nginx.conf /etc/nginx/conf.d/default.conf

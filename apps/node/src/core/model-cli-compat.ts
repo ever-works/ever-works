@@ -55,25 +55,22 @@ const HELP_ARGS: Readonly<Record<ModelCliProvider, readonly string[]>> = {
  * next run would fail on the missing one.
  */
 export const MODEL_CLI_REQUIRED_FLAGS: Readonly<Record<ModelCliProvider, readonly string[]>> = {
-	'claude-code': ['-p', '--output-format', '--permission-mode'],
+	// `--mcp-config` + `--strict-mcp-config` ride EVERY fleet Claude Code run
+	// since the MCP isolation fix (#2584): the empty strict config, or the
+	// bridge's. A CLI without them cannot run fleet work at all, so `doctor`
+	// must say INCOMPATIBLE, not "runs that need them will fail".
+	'claude-code': ['-p', '--output-format', '--permission-mode', '--mcp-config', '--strict-mcp-config'],
 	codex: ['--json', '--sandbox', '-C']
 };
 
 /**
  * Flags passed only on SOME runs — a model override, a multi-repo grant,
- * the MCP bridge, the skip-permissions opt-in. Missing one does not affect
- * every run, so `doctor` reports it separately: "runs that need X will
- * fail here".
+ * an allowed-tools list, the skip-permissions opt-in. Missing one does not
+ * affect every run, so `doctor` reports it separately: "runs that need X
+ * will fail here".
  */
 export const MODEL_CLI_CONDITIONAL_FLAGS: Readonly<Record<ModelCliProvider, readonly string[]>> = {
-	'claude-code': [
-		'--model',
-		'--add-dir',
-		'--mcp-config',
-		'--strict-mcp-config',
-		'--allowedTools',
-		'--dangerously-skip-permissions'
-	],
+	'claude-code': ['--model', '--add-dir', '--allowedTools', '--dangerously-skip-permissions'],
 	codex: ['--add-dir', '-c', '-m', '--dangerously-bypass-approvals-and-sandbox']
 };
 
@@ -244,6 +241,11 @@ export class ModelCliCompatibilityProbe {
 	private async ask(command: string, args: string[]): Promise<string | null> {
 		try {
 			const result = await this.options.runner.run(command, args);
+			// A run the runner had to KILL (its timeout) may have printed a
+			// banner or half a help page first. That is an INCOMPLETE answer:
+			// judged as one, it would be cached for as long as the file does not
+			// change, and the one-minute incomplete retry would never apply.
+			if (result.timedOut) return null;
 			const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
 			// Help commands commonly exit non-zero on some CLIs; the TEXT is
 			// what is judged. A spawn failure with no output is "no answer".

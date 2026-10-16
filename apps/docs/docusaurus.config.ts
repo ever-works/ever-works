@@ -7,7 +7,9 @@ const ALGOLIA_APP_ID = process.env.ALGOLIA_APP_ID || null;
 const ALGOLIA_API_KEY = process.env.ALGOLIA_API_KEY || null;
 const ALGOLIA_INDEX_NAME = process.env.ALGOLIA_INDEX_NAME || null;
 const HAS_ALGOLIA_CREDENTIALS = ALGOLIA_APP_ID && ALGOLIA_API_KEY && ALGOLIA_INDEX_NAME;
-require('dotenv').config();
+// dotenv 17+ logs "injecting env (N) from .env" on every config() call unless told to be quiet;
+// keep the build log as it was with dotenv 16.
+require('dotenv').config({ quiet: true });
 
 // Locales to BUILD. Docusaurus builds a full copy of the site per locale, so building
 // the untranslated locales (only `fr` has any translations under apps/docs/i18n/) produced

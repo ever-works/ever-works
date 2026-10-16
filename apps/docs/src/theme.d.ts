@@ -18,7 +18,7 @@ declare module '@theme/Heading' {
 		readonly className?: string;
 		readonly id?: string;
 	}
-	export default function Heading(props: Props): JSX.Element;
+	export default function Heading(props: Props): import('react').JSX.Element;
 }
 
 declare module '@theme/Tabs' {
@@ -27,7 +27,7 @@ declare module '@theme/Tabs' {
 		readonly groupId?: string;
 		readonly className?: string;
 	}
-	export default function Tabs(props: Props): JSX.Element;
+	export default function Tabs(props: Props): import('react').JSX.Element;
 }
 
 declare module '@theme/TabItem' {
@@ -38,7 +38,7 @@ declare module '@theme/TabItem' {
 		readonly default?: boolean;
 		readonly className?: string;
 	}
-	export default function TabItem(props: Props): JSX.Element;
+	export default function TabItem(props: Props): import('react').JSX.Element;
 }
 
 declare module '@theme/CodeBlock' {
@@ -48,16 +48,16 @@ declare module '@theme/CodeBlock' {
 		readonly title?: string;
 		readonly className?: string;
 	}
-	export default function CodeBlock(props: Props): JSX.Element;
+	export default function CodeBlock(props: Props): import('react').JSX.Element;
 }
 
 declare module '@theme/Footer/Copyright' {
 	export interface Props {
 		readonly copyright?: string;
 	}
-	export default function FooterCopyright(props: Props): JSX.Element;
+	export default function FooterCopyright(props: Props): import('react').JSX.Element;
 }
 
 declare module '@theme/SearchBar' {
-	export default function SearchBar(): JSX.Element;
+	export default function SearchBar(): import('react').JSX.Element;
 }

@@ -455,7 +455,10 @@ export async function main(): Promise<number> {
 }
 
 /* istanbul ignore next — the CLI shim; `main` carries every branch a spec drives. */
-if (require.main === module) {
+// `typeof` first: the Trigger.dev deploy indexer loads this file as an ES module, where a bare
+// `module` reference throws "module is not defined in ES module scope" and fails every deploy.
+// Run as `node dist/.../app-runtime-local-worker.js` (CommonJS) it still starts the worker.
+if (typeof module !== 'undefined' && typeof require !== 'undefined' && require.main === module) {
     void main().then((code) => {
         process.exitCode = code;
         // Nothing else keeps the loop alive once a refusal returned, so exit explicitly.

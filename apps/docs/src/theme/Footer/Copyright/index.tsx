@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { JSX } from 'react';
 import { useThemeConfig } from '@docusaurus/theme-common';
 import type { Props } from '@theme/Footer/Copyright';
 
+/** The footer copyright line; `copyright` is HTML from the site config. */
 export default function FooterCopyright({ copyright }: Props): JSX.Element {
 	return (
 		<div

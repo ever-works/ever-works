@@ -16,9 +16,11 @@ interface RunExclusiveOptions {
  *
  * **The atomic primitive is `INSERT` on a PK-keyed row.** Two
  * acquirers race; the loser hits a unique-violation, catches it,
- * confirms a row exists, and returns `null` — the canonical
- * Postgres "INSERT-as-lock" pattern. Don't switch to UPDATE-based
- * locking without re-verifying the race semantics.
+ * and returns `null` — the canonical Postgres "INSERT-as-lock"
+ * pattern. The unique violation alone is the proof: the winner may
+ * already have released the row by the time the loser could look
+ * (so never require the row to still exist). Don't switch to
+ * UPDATE-based locking without re-verifying the race semantics.
  *
  * **Three TTLs you can tune (all bounded by each other):**
  *
@@ -156,6 +158,18 @@ export class DistributedTaskLockService {
             });
             return token;
         } catch (error) {
+            // A unique violation on this PK-keyed INSERT proves another acquirer
+            // held the lock at that instant, so we lost this tick. The winner can
+            // finish and release before we look (a one-minute cron sweep with
+            // nothing to do takes milliseconds), so the row may already be gone.
+            // Re-reading it here and rethrowing turned every such lost race into
+            // an ERROR log from the scheduler on multi-replica deployments.
+            if (DistributedTaskLockService.isUniqueViolation(error)) {
+                return null;
+            }
+
+            // Any other failure: still treat a live lock row as "held", otherwise
+            // surface the real DB error.
             const existingLock = await this.cacheEntryRepository.findOne({
                 where: { key: lockKey },
                 select: ['key'],
@@ -167,6 +181,40 @@ export class DistributedTaskLockService {
 
             throw error;
         }
+    }
+
+    /**
+     * Driver-agnostic unique-violation detection, deliberately narrow: only a
+     * DUPLICATE KEY proves contention. Postgres reports SQLSTATE `23505`;
+     * SQLite `SQLITE_CONSTRAINT_PRIMARYKEY` / `SQLITE_CONSTRAINT_UNIQUE` (or a
+     * bare `SQLITE_CONSTRAINT` whose message says "UNIQUE constraint failed");
+     * MySQL/MariaDB `ER_DUP_ENTRY` / "Duplicate entry". Other constraint
+     * failures (NOT NULL, FOREIGN KEY, CHECK) are real errors, never "locked".
+     */
+    private static isUniqueViolation(error: unknown): boolean {
+        const err = error as {
+            code?: unknown;
+            message?: unknown;
+            driverError?: { code?: unknown; message?: unknown };
+        };
+        const codes = [err?.code, err?.driverError?.code].map((code) => String(code ?? ''));
+        if (
+            codes.some(
+                (code) =>
+                    code === '23505' ||
+                    code === 'ER_DUP_ENTRY' ||
+                    code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
+                    code === 'SQLITE_CONSTRAINT_UNIQUE',
+            )
+        ) {
+            return true;
+        }
+        const message = `${String(err?.message ?? '')} ${String(err?.driverError?.message ?? '')}`;
+        return (
+            message.includes('UNIQUE constraint failed') ||
+            message.includes('duplicate key value violates unique constraint') ||
+            message.includes('Duplicate entry')
+        );
     }
 
     private async refresh(

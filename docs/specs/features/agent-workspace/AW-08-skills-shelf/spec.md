@@ -167,7 +167,7 @@ and, ten seconds after a run goes well:
 - **S7 — Ask an agent to repair it.**
   **Given** a Skill badged **Missing 2 requirements**,
   **when** the owner clicks **Ask an agent to fix this** and picks the agent Wren,
-  **then** a Task titled **"Fix requirements for Skill: <title>"** is created, assigned to
+  **then** a Task titled **"Fix requirements for Skill: `<title>`"** is created, assigned to
   Wren, its description enumerates the two missing items verbatim, a Run starts, the dialog
   closes onto a confirmation reading **"Wren is on it."** with a link to the Task, and the
   card switches to the **Repair in progress** state until the run ends.
