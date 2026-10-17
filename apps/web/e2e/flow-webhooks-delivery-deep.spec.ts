@@ -31,16 +31,15 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   POST /api/webhooks/deliveries/<absent-uuid>/redeliver → 404
  *        { message:'Webhook delivery not found' } (NOT 5xx; mirrors the
  *        subscription enumeration cover).
- *   PATCH /api/webhooks/:id { status:'active' } → 400
- *        'Resuming a paused subscription is not supported yet; recreate the
- *        subscription' (resume is intentionally a hard 400, not a no-op).
- *   PATCH /api/webhooks/:id {} (empty) → 400 'status must be one of: paused'.
+ *   PATCH /api/webhooks/:id { status:'active' } → 200 view status:'active'
+ *        (webhooks v2 #2623: resume is live and resets the failure streak).
+ *   PATCH /api/webhooks/:id {} (empty) → 400 'Nothing to update'.
  *   PATCH /api/webhooks/:id { status:'deleted' } → 400 DTO array message
  *        ['status must be one of the following values: paused, active'].
  *   PATCH /api/webhooks/:id { status:'paused' } → 200 view status:'paused';
- *        the paused row then DISAPPEARS from GET /api/webhooks (the list is
- *        active-only) yet rotate-secret (200) / test-fire (200) / delete (204)
- *        still resolve it — findOwn is NOT status-gated, only the LIST is.
+ *        GET /api/webhooks keeps listing it as 'paused' (the list returns
+ *        every status), and rotate-secret (200) / test-fire (200) / delete
+ *        (204) still resolve it — findOwn is NOT status-gated.
  *
  * NON-DUPLICATION — read FIRST, NOT re-pinned here:
  *   - sec-pin-webhook-ownership.spec.ts owns the WRITE-side ownership matrix
@@ -60,8 +59,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   - webhook-secret-rotation.spec.ts probes the github-app rotate path (a
  *     DIFFERENT surface) for hash-leak safety — unrelated to /api/webhooks.
  *   This file therefore owns: the delivery-VIEW record contract, the
- *   pause/resume PATCH branch matrix, the active-only-list vs verbs-still-
- *   resolve invariant, and the redeliver event-reuse + 404-message.
+ *   pause/resume PATCH branch matrix, the paused-row-stays-listed and
+ *   verbs-still-resolve invariant, and the redeliver event-reuse + 404-message.
  *
  * ISOLATION: every mutation test registers a FRESH user via
  * registerUserViaAPI; URLs carry a per-test unique suffix (test-title +
@@ -339,22 +338,29 @@ test.describe('Webhook deliveries — redeliver reuses the original event', () =
 });
 
 test.describe('Webhook subscription — pause / resume PATCH branch matrix', () => {
-    test('PATCH { status:active } is a hard 400 (resume intentionally unsupported)', async ({
+    test('PATCH { status:paused } pauses and { status:active } resumes (webhooks v2, #2623)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
         const sub = await createSubscription(request, u.access_token, 'patch-resume');
-        const res = await request.patch(`${WEBHOOKS}/${sub.id}`, {
-            headers: authedHeaders(u.access_token),
+        const headers = authedHeaders(u.access_token);
+        const paused = await request.patch(`${WEBHOOKS}/${sub.id}`, {
+            headers,
+            data: { status: 'paused' },
+        });
+        expect(paused.status()).toBe(200);
+        expect(((await paused.json()) as { status?: string }).status).toBe('paused');
+        // Resume used to be a hard 400; since v2 it re-activates the subscription
+        // (and resets its failure streak).
+        const resumed = await request.patch(`${WEBHOOKS}/${sub.id}`, {
+            headers,
             data: { status: 'active' },
         });
-        expect(res.status()).toBe(400);
-        expect(((await res.json()) as { message?: string }).message).toBe(
-            'Resuming a paused subscription is not supported yet; recreate the subscription',
-        );
+        expect(resumed.status()).toBe(200);
+        expect(((await resumed.json()) as { status?: string }).status).toBe('active');
     });
 
-    test('PATCH with an empty body → 400 "status must be one of: paused"', async ({ request }) => {
+    test('PATCH with an empty body → 400 "Nothing to update"', async ({ request }) => {
         const u = await registerUserViaAPI(request);
         const sub = await createSubscription(request, u.access_token, 'patch-empty');
         const res = await request.patch(`${WEBHOOKS}/${sub.id}`, {
@@ -362,9 +368,9 @@ test.describe('Webhook subscription — pause / resume PATCH branch matrix', () 
             data: {},
         });
         expect(res.status()).toBe(400);
-        expect(((await res.json()) as { message?: string }).message).toBe(
-            'status must be one of: paused',
-        );
+        // v2 PATCH changes status, url, events, organizationIds, excludeOriginTags
+        // or description; an empty body changes none of them.
+        expect(((await res.json()) as { message?: string }).message).toBe('Nothing to update');
     });
 
     test('PATCH with an unknown status enum → 400 at the DTO (array message)', async ({
@@ -387,7 +393,7 @@ test.describe('Webhook subscription — pause / resume PATCH branch matrix', () 
         );
     });
 
-    test('pause removes the row from the active list, but rotate / test-fire / delete still resolve it', async ({
+    test('pause keeps the row listed as paused, and rotate / test-fire / delete still resolve it', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -401,12 +407,14 @@ test.describe('Webhook subscription — pause / resume PATCH branch matrix', () 
         expect(paused.status()).toBe(200);
         expect(((await paused.json()) as { status: string }).status).toBe('paused');
 
-        // The list endpoint is ACTIVE-ONLY — the paused row disappears from it.
+        // The list returns every status (webhooks v2), so the paused row
+        // stays listed, now as 'paused', and can be resumed from it.
         const listRes = await request.get(WEBHOOKS, { headers: authedHeaders(u.access_token) });
         expect(listRes.status()).toBe(200);
-        const subs = ((await listRes.json()) as { subscriptions: Array<{ id: string }> })
-            .subscriptions;
-        expect(subs.map((s) => s.id)).not.toContain(sub.id);
+        const subs = (
+            (await listRes.json()) as { subscriptions: Array<{ id: string; status: string }> }
+        ).subscriptions;
+        expect(subs.find((s) => s.id === sub.id)?.status).toBe('paused');
 
         // findOwn is NOT status-gated — every per-subscription verb still
         // resolves the paused row by id.

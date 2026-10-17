@@ -446,6 +446,13 @@ describe('task recording points', () => {
 
     it('a runtime-only write records task.runtime_updated and bumps neither version nor updatedAt', async () => {
         const task = await newTask();
+        // Backdate the row: SQLite keeps whole seconds, so a bump to "now" was only
+        // visible when the write crossed a second boundary (flaky in CI). From a
+        // fixed past instant any bump shows, every run.
+        await dataSource.query(`UPDATE "tasks" SET "updatedAt" = ? WHERE "id" = ?`, [
+            '2026-01-01 00:00:00.000',
+            task.id,
+        ]);
         const before = await dataSource.getRepository(Task).findOneByOrFail({ id: task.id });
         await denorm.recordQueued(task.id, randomUUID());
         const runtime = (await events()).find((event) => event.type === 'task.runtime_updated');

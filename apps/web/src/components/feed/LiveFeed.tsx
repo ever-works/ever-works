@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { FEED_KINDS, type FeedActorSummaryDto, type FeedPageDto } from '@ever-works/contracts';
@@ -201,7 +209,10 @@ export function LiveFeed({
         pickerOpen,
         selectedIndex,
     });
-    useEffect(() => {
+    // A layout effect, so the keyboard handler reads this render's entries as
+    // soon as they are on screen: a passive effect can run after the list is
+    // visible, and a j pressed in that gap moved through the previous, empty list.
+    useLayoutEffect(() => {
         handlersRef.current = {
             moveSelection,
             filters,

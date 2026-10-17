@@ -57,7 +57,7 @@ pnpm format             # Prettier format all files
 # AUTHORING a new migration; nothing has to be run manually on deploy.
 #
 # RULE: every TypeORM entity / schema change MUST ship with a migration
-# in the SAME PR. See `docs/specs/architecture/database-migrations.md`.
+# in the SAME PR. See `docs/specs/architecture/database.md` §6 (Migrations).
 #
 # Generate a migration from current entity diff vs current DB schema:
 pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<NameOfMigration>

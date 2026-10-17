@@ -229,13 +229,16 @@ describe('LiveFeed', () => {
             data: page([entry('e1'), entry('e2', { target: null })]),
         });
         renderFeed();
-        await screen.findByTestId('feed-list');
+        // The entries (and the key handler that reads them) must be in place
+        // before the first key: pressing on the bare list was flaky in CI.
+        await screen.findAllByTestId('feed-entry');
 
         act(() => {
             fireEvent.keyDown(window, { key: 'j' });
         });
-        const rows = screen.getAllByTestId('feed-entry');
-        expect(rows[0]).toHaveAttribute('data-selected', 'true');
+        await waitFor(() =>
+            expect(screen.getAllByTestId('feed-entry')[0]).toHaveAttribute('data-selected', 'true'),
+        );
 
         act(() => {
             fireEvent.keyDown(document.body, { key: 'o' });
@@ -245,7 +248,9 @@ describe('LiveFeed', () => {
         act(() => {
             fireEvent.keyDown(window, { key: 'j' });
         });
-        expect(screen.getAllByTestId('feed-entry')[1]).toHaveAttribute('data-selected', 'true');
+        await waitFor(() =>
+            expect(screen.getAllByTestId('feed-entry')[1]).toHaveAttribute('data-selected', 'true'),
+        );
         act(() => {
             fireEvent.keyDown(document.body, { key: 'Enter' });
         });

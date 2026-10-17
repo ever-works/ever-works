@@ -638,19 +638,22 @@ export class TaskRepository {
      * run already installed. Queued creation passes no `expectRunId` — the
      * newest dispatch always wins the pointer.
      *
-     * Query-builder update on purpose: unlike `repository.update` it does
-     * NOT touch `updatedAt`, so silent telemetry denorms never reshuffle
-     * the updatedAt-ordered task lists.
+     * Silent telemetry: it must NOT touch `updatedAt`, so denorms never
+     * reshuffle the updatedAt-ordered task lists and `task.runtime_updated`
+     * bumps neither version nor updatedAt (domain events B2). TypeORM's
+     * UpdateQueryBuilder sets an `@UpdateDateColumn` to CURRENT_TIMESTAMP by
+     * itself unless the SET names it, so `updatedAt` is set to its own value.
      */
     async updateLatestRun(
         taskId: string,
         patch: { latestRunId: string; latestRunStatus: string },
         expectRunId?: string,
     ): Promise<boolean> {
+        const keepUpdatedAt = this.repository.manager.connection.driver.escape('updatedAt');
         const qb = this.repository
             .createQueryBuilder()
             .update(Task)
-            .set(patch)
+            .set({ ...patch, updatedAt: () => keepUpdatedAt })
             .where('id = :taskId', { taskId });
         if (expectRunId) {
             qb.andWhere('(latestRunId = :expectRunId OR latestRunId IS NULL)', { expectRunId });

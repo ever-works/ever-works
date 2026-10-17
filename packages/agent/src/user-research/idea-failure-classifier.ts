@@ -91,7 +91,7 @@ export function classifyIdeaFailure(input: unknown): IdeaFailureKind {
         /timeout/i.test(message) ||
         /aborted/i.test(message) ||
         /stream (closed|interrupted|incomplete)/i.test(message) ||
-        /langchain.*(retry|transient)/i.test(message) ||
+        langchainRetryOnOneLine(message) ||
         /provider (busy|overloaded)/i.test(message)
     ) {
         return IdeaFailureKind.TRANSIENT_PLUGIN;
@@ -180,4 +180,21 @@ function extractMessage(input: unknown): string {
         if (typeof m === 'string') return m;
     }
     return String(input ?? '');
+}
+
+/**
+ * `/langchain.*(retry|transient)/i` without the regex: CodeQL flags that
+ * pattern as polynomial on error text (js/polynomial-redos: many repeated
+ * `langchain`s). Same meaning, `.` included: it never crossed a JS line
+ * terminator (LF, CR, U+2028, U+2029), so on one line, `langchain` followed
+ * later by `retry` or `transient`. Linear.
+ */
+function langchainRetryOnOneLine(message: string): boolean {
+    return message.split(/[\n\r\u2028\u2029]/).some((line) => {
+        const lower = line.toLowerCase();
+        const at = lower.indexOf('langchain');
+        if (at < 0) return false;
+        const rest = lower.slice(at + 'langchain'.length);
+        return rest.includes('retry') || rest.includes('transient');
+    });
 }

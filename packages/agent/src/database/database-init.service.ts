@@ -16,8 +16,8 @@ import { InjectDataSource } from '@nestjs/typeorm';
  * issues raw `ALTER TABLE` / `DROP COLUMN` to bring the schema in line
  * with entity classes. If you point a CLI run at a production database
  * with `APP_TYPE=cli` set, any column that isn't in the current entity
- * tree will be silently dropped. Migrations (see NN #16 in CLAUDE.md
- * and `docs/specs/architecture/database-migrations.md`) are the only
+ * tree will be silently dropped. Migrations (see the migration RULE in
+ * CLAUDE.md and `docs/specs/architecture/database.md` §6) are the only
  * supported way to evolve prod schema; this hook MUST stay gated on
  * `APP_TYPE === 'cli'` and the operator MUST NOT set that env var on
  * any deployment that holds real data.
