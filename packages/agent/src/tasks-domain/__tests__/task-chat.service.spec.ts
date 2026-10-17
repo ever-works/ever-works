@@ -60,6 +60,35 @@ describe('TaskChatService', () => {
             }
         });
 
+        // EW-P1-2 — an integration key posting without acting as a user.
+        it('stores externalAuthor for an integration author only', async () => {
+            tasks.findByIdAndUser.mockResolvedValue({ id: 't1', userId: 'u1' });
+            messages.create.mockImplementation((d: any) => Promise.resolve({ id: 'm1', ...d }));
+            const externalAuthor = { name: 'Jane (Gauzy)', source: 'gauzy' };
+
+            await svc.post('u1', {
+                taskId: 't1',
+                authorType: 'integration',
+                authorId: 'key-1',
+                body: 'synced',
+                externalAuthor,
+            });
+            expect(messages.create.mock.calls[0][0]).toMatchObject({
+                authorType: 'integration',
+                authorId: 'key-1',
+                externalAuthor,
+            });
+
+            await svc.post('u1', {
+                taskId: 't1',
+                authorType: 'user',
+                authorId: 'u1',
+                body: 'mine',
+                externalAuthor,
+            });
+            expect(messages.create.mock.calls[1][0].externalAuthor).toBeNull();
+        });
+
         it('404s for a cross-user Task', async () => {
             tasks.findByIdAndUser.mockResolvedValueOnce(null);
             await expect(

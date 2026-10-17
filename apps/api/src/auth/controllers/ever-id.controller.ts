@@ -17,6 +17,7 @@ import {
     Res,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../integration/integration-forbidden.guard';
 import {
     ApiBearerAuth,
     ApiBody,
@@ -155,6 +156,8 @@ function bearerOf(req: { headers?: Record<string, unknown> }): string | null {
 @ApiTags('Auth — Ever ID')
 @Controller('api/auth/ever-id')
 @UseGuards(NoTokenInQueryGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class EverIdController {
     constructor(
         private readonly signIn: EverIdSignInService,

@@ -6,18 +6,25 @@ import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 // WebhooksService can authorize a supplied workId before binding a
 // subscription to that Work's event stream.
 import {
+    WEBHOOK_V2_ENQUEUER,
+    WebhookDomainEventFanoutService,
+} from '@ever-works/agent/webhooks-v2';
+import {
     WebhookDeliveryService,
+    WebhookOwnerAccessService,
     WebhookSubscriptionDeliveryService,
     WorkModule,
 } from '@ever-works/agent/services';
 import { InProcessSecretStoreResolver, SECRET_STORE_RESOLVER } from '@ever-works/agent/tasks';
 import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
+import { DomainEventsModule, DomainEventsRelayModule } from '@ever-works/agent/domain-events';
 import { AuthModule } from '../auth/auth.module';
 import { WebhooksController } from './webhooks.controller';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSecretService } from './webhook-secret.service';
 import { WebhookEventDispatcherService } from './webhook-event-dispatcher.service';
 import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
+import { IntegrationKeyRevokedWebhooksListener } from './integration-key-revoked.listener';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 import { TriggerWebhookController } from './trigger-webhook.controller';
 import { TriggerWebhookEventRouterService } from './trigger-webhook-event-router.service';
@@ -54,6 +61,10 @@ import { TriggerRunFailureSentryBreadcrumbSubscriber } from './subscribers/trigg
         // `credentials.webhookSecret`. `TenantJobRuntimeModule` does
         // not export the bare repository, so register it locally.
         TypeOrmModule.forFeature([TenantJobRuntimeConfig]),
+        // Webhooks v2 (EW-P1-5) — the change feed the fan-out reads and the relay
+        // it registers with (both single instances app-wide).
+        DomainEventsModule,
+        DomainEventsRelayModule,
     ],
     controllers: [WebhooksController, TriggerWebhookController],
     providers: [
@@ -63,6 +74,13 @@ import { TriggerRunFailureSentryBreadcrumbSubscriber } from './subscribers/trigg
         WebhookSubscriptionDeliveryService,
         WebhookEventDispatcherService,
         WebhooksDeliveriesService,
+        // EW-P1-5: revoking an integration key disables the webhooks it owns.
+        IntegrationKeyRevokedWebhooksListener,
+        // Webhooks v2 (EW-P1-5) — domain events → v2 subscriptions, enqueued on
+        // the same delivery pipeline as every other webhook.
+        WebhookDomainEventFanoutService,
+        WebhookOwnerAccessService,
+        { provide: WEBHOOK_V2_ENQUEUER, useExisting: WebhookEventDispatcherService },
         // EW-743 — SecretStoreResolver binding for the Trigger.dev
         // webhook receiver. `TenantJobRuntimeModule` also binds this
         // for its own use but does not export the token, so the same
@@ -88,6 +106,8 @@ import { TriggerRunFailureSentryBreadcrumbSubscriber } from './subscribers/trigg
     ],
     exports: [
         WebhooksService,
+        // `/api/integrations/v1/webhooks/:id/test` (EW-P1-5).
+        WebhooksDeliveriesService,
         WebhookSecretService,
         WebhookDeliveryService,
         WebhookSubscriptionDeliveryService,

@@ -255,4 +255,16 @@ export class Organization {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for optimistic concurrency and event ordering (EW-P1-1,
+     * `docs/specs/features/domain-events/spec.md` §4). Starts at 1 and is bumped by
+     * `bumpAggregateVersion` on every recorded change — roster (organization_members) changes too.
+     *
+     * A plain column on purpose, NOT `@VersionColumn`: TypeORM adds
+     * `version = version + 1` to every query-builder `.update()` of an entity
+     * with a version column, which would bump it on machine-only writes too.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

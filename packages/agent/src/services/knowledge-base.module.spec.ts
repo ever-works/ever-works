@@ -26,6 +26,9 @@ jest.mock('@nestjs/typeorm', () => ({
     InjectRepository: () => () => undefined,
     InjectDataSource: () => () => undefined,
 }));
+jest.mock('../domain-events/domain-events.module', () => ({
+    DomainEventsModule: class DomainEventsModule {},
+}));
 jest.mock('../database/database.module', () => ({
     DatabaseModule: class DatabaseModule {},
 }));
@@ -87,6 +90,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { MemoryHealthService } from './memory-health.service';
 import { MemoryConsolidationScheduleService } from './memory-consolidation-schedule.service';
 import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-log.repository';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 
 describe('KnowledgeBaseModule — static metadata', () => {
     const imports = Reflect.getMetadata('imports', KnowledgeBaseModule) as unknown[];
@@ -101,6 +105,9 @@ describe('KnowledgeBaseModule — static metadata', () => {
         expect(imports).toContain(DatabaseModule);
         expect(imports).toContain(FacadesModule);
         expect(imports).toContain(ActivityLogModule);
+        // EW-P3-2 — without it `@Optional() domainEvents` lands undefined and
+        // no `kb.document.*` event is ever recorded.
+        expect(imports).toContain(DomainEventsModule);
     });
 
     it('imports ActivityLogModule so KnowledgeBaseService.activityLog actually resolves at runtime', () => {

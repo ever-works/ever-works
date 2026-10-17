@@ -15,6 +15,8 @@ import { TimestampColumn } from './_types';
 @Index(['hashedKey'], { unique: true })
 @Index(['userId'])
 @Index(['boundJobId'])
+@Index('idx_api_keys_previous_hashed_key', ['previousHashedKey'])
+@Index('idx_api_keys_tenant_kind', ['tenantId', 'kind'])
 export class ApiKey {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -91,6 +93,49 @@ export class ApiKey {
 
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
+
+    // ── EW-P1-2 — integration keys (`kind = 'integration'`, `ew_int_…`) ──
+    //
+    // An integration key is the third kind of row in this table. It does not
+    // act as its creator on every route: it is pinned to Organizations of the
+    // creator's Tenant (`organizationIds`), it carries `scopes`, and the
+    // integration guards admit it only on routes that declare
+    // `@RequireScopes(...)`. Every column below is NULL on personal and
+    // fleet-run rows. Shipped by migration 1795060100000-AddIntegrationApiKeys.
+
+    /** Granted scopes (vocabulary v1, `INTEGRATION_SCOPES`). Integration keys only. */
+    @Column({ type: 'simple-json', nullable: true })
+    scopes?: string[] | null;
+
+    /** Organizations the key is pinned to (at least one). Integration keys only. */
+    @Column({ type: 'simple-json', nullable: true })
+    organizationIds?: string[] | null;
+
+    /** Who the key is for: `'ever-gauzy'` | `'generic'`. Integration keys only. */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    integrationKind?: string | null;
+
+    /** Free-text note shown in Settings > API keys. */
+    @Column({ type: 'varchar', length: 500, nullable: true })
+    description?: string | null;
+
+    /**
+     * Rotation with a grace period (`POST /api/auth/api-keys/:id/rotate`).
+     *
+     * Rotation is IN PLACE: the row keeps its id (webhook subscriptions,
+     * audit rows and the integration's stored key id stay valid), `hashedKey`
+     * becomes the new secret and the old digest moves here, accepted until
+     * `previousKeyGraceUntil`. A second rotation replaces it, so at most two
+     * secrets are ever live for one key.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    previousHashedKey?: string | null;
+
+    @TimestampColumn({ nullable: true })
+    previousKeyGraceUntil?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    rotatedAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

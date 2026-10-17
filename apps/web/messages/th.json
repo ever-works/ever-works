@@ -2655,6 +2655,7 @@
                 "appLauncher": "ตัวเรียกใช้แอป",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "เว็บฮุก",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8779,6 +8780,7 @@
             "app": "แอป",
             "company": "Company",
             "campaign": "แคมเปญ",
+            "project": "โปรเจกต์",
             "default": "Work"
         },
         "meetingsPage": {

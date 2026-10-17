@@ -1,7 +1,26 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+    Injectable,
+    BadRequestException,
+    ConflictException,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { randomBytes, createHash } from 'crypto';
-import { ApiKeyRepository } from '@ever-works/agent/database';
-import { PERSONAL_API_KEY_KIND } from '@ever-works/contracts';
+import {
+    ApiKeyRepository,
+    OrganizationMemberRepository,
+    TenantRepository,
+} from '@ever-works/agent/database';
+import type { ApiKey } from '@ever-works/agent/entities';
+import {
+    API_KEY_ROTATION_DEFAULT_GRACE_HOURS,
+    API_KEY_ROTATION_MAX_GRACE_HOURS,
+    INTEGRATION_API_KEY_KIND,
+    INTEGRATION_KEY_PREFIX,
+    PERSONAL_API_KEY_KIND,
+    type RotateApiKeyResponse,
+} from '@ever-works/contracts';
 
 const API_KEY_PREFIX = 'ew_live_';
 const MAX_KEYS_PER_USER = 10;
@@ -48,7 +67,16 @@ const MAX_KEYS_PER_USER = 10;
  */
 @Injectable()
 export class ApiKeyService {
-    constructor(private readonly apiKeyRepository: ApiKeyRepository) {}
+    private readonly logger = new Logger(ApiKeyService.name);
+
+    constructor(
+        private readonly apiKeyRepository: ApiKeyRepository,
+        // EW-P2-6 — an integration key created by an Organization admin may act only
+        // in the Organizations its creator still administers. Both @Optional(): a
+        // graph without them (unit tests) keeps the stored pins, as before.
+        @Optional() private readonly tenants?: TenantRepository,
+        @Optional() private readonly members?: OrganizationMemberRepository,
+    ) {}
 
     async createKey(userId: string, name: string, expiresAt?: string) {
         const count = await this.apiKeyRepository.countByUserId(userId);
@@ -94,8 +122,7 @@ export class ApiKeyService {
     }
 
     async validateKey(rawKey: string) {
-        const hashedKey = createHash('sha256').update(rawKey).digest('hex');
-        const apiKey = await this.apiKeyRepository.findByHashedKey(hashedKey);
+        const apiKey = await this.findLiveByRawKey(rawKey);
 
         if (!apiKey) {
             return null;
@@ -131,4 +158,155 @@ export class ApiKeyService {
 
         return apiKey;
     }
+
+    // ── EW-P1-2 — integration keys and in-place rotation ────────────────
+
+    /**
+     * Validate an `ew_int_…` integration key. Same digest lookup and the same
+     * rotation grace as {@link validateKey}, but the inverse kind gate: ONLY
+     * `kind = 'integration'` rows answer, so an integration secret can never
+     * be accepted as a personal key and vice versa. Pins and scopes are NOT
+     * checked here — `AuthSessionGuard` builds the principal from the row and
+     * `IntegrationPrincipalGuard` enforces them per request.
+     */
+    async validateIntegrationKey(rawKey: string): Promise<ApiKey | null> {
+        if (!rawKey.startsWith(INTEGRATION_KEY_PREFIX)) return null;
+        const apiKey = await this.findLiveByRawKey(rawKey);
+        if (!apiKey || apiKey.kind !== INTEGRATION_API_KEY_KIND) return null;
+        if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
+        if (!Array.isArray(apiKey.organizationIds) || apiKey.organizationIds.length === 0) {
+            // A key with no pin cannot act anywhere; refuse rather than guess.
+            return null;
+        }
+        this.apiKeyRepository.updateLastUsed(apiKey.id).catch(() => {});
+        // EW-P2-6 — the principal is built from these pins: narrow them to what the
+        // creator may use NOW (a copy when narrowed; the stored row is untouched).
+        const usable = await this.effectivePins(apiKey);
+        // A demoted (or removed) admin's key keeps no pin: like a key with no pin, it
+        // cannot act anywhere, so it does not authenticate at all.
+        if (usable.length === 0) return null;
+        if (usable.length === apiKey.organizationIds.length) return apiKey;
+        return { ...apiKey, organizationIds: usable } as ApiKey;
+    }
+
+    /**
+     * EW-P2-6 — the pins an integration key may use right now: all of them when its
+     * creator owns the Tenant; otherwise only the ones the creator still administers
+     * (roster role `admin`), so demoting or removing an admin takes their keys' pins
+     * away at once. Fails closed for a non-owner (a lookup error = no pins). Without
+     * the repositories (unit tests) the stored pins, as before.
+     */
+    async effectivePins(
+        key: Pick<ApiKey, 'userId' | 'tenantId' | 'organizationIds'>,
+    ): Promise<string[]> {
+        const pins = Array.isArray(key.organizationIds) ? [...key.organizationIds] : [];
+        if (!this.tenants) return pins;
+        if (!key.tenantId) return [];
+        try {
+            const tenant = await this.tenants.findById(key.tenantId);
+            if (tenant?.ownerUserId === key.userId) return pins;
+            if (!this.members) return [];
+            const administered = new Set(
+                await this.members.listAdministeredOrganizationIds(key.userId, key.tenantId),
+            );
+            return pins.filter((id) => administered.has(id));
+        } catch (error) {
+            this.logger.warn(
+                `Integration key ${String((key as { id?: string }).id ?? '')} pins: ${String(error)}`,
+            );
+            return [];
+        }
+    }
+
+    /**
+     * Rotate a key IN PLACE (`POST /api/auth/api-keys/:id/rotate`, session
+     * only): a fresh secret replaces `hashedKey`, and the previous digest is
+     * kept in `previousHashedKey`, accepted until `previousKeyGraceUntil`
+     * (default 24 h, `graceHours` 0..168). The row keeps its id, so whatever
+     * points at the key — webhook subscriptions, audit rows, an integration's
+     * stored key id — stays valid, and the integration swaps secrets with no
+     * downtime. A second rotation inside the grace window retires the oldest
+     * secret immediately: at most two secrets are live for one key.
+     *
+     * Personal (`ew_live_`) and integration (`ew_int_`) keys rotate; fleet-run
+     * tokens are re-minted by the fleet, never rotated by hand (404).
+     */
+    async rotateKey(
+        id: string,
+        userId: string,
+        graceHours: number = API_KEY_ROTATION_DEFAULT_GRACE_HOURS,
+    ): Promise<RotateApiKeyResponse & { kind: string }> {
+        if (
+            !Number.isFinite(graceHours) ||
+            graceHours < 0 ||
+            graceHours > API_KEY_ROTATION_MAX_GRACE_HOURS
+        ) {
+            throw new BadRequestException(
+                `graceHours must be between 0 and ${API_KEY_ROTATION_MAX_GRACE_HOURS}.`,
+            );
+        }
+        const apiKey = await this.apiKeyRepository.findByIdAndUserId(id, userId);
+        if (
+            !apiKey ||
+            !apiKey.isActive ||
+            (apiKey.kind !== PERSONAL_API_KEY_KIND && apiKey.kind !== INTEGRATION_API_KEY_KIND)
+        ) {
+            throw new NotFoundException('API key not found');
+        }
+        if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+            throw new BadRequestException(
+                'An expired API key cannot be rotated; create a new one.',
+            );
+        }
+
+        const prefix =
+            apiKey.kind === INTEGRATION_API_KEY_KIND ? INTEGRATION_KEY_PREFIX : API_KEY_PREFIX;
+        const rawKey = prefix + randomBytes(32).toString('hex');
+        const now = new Date();
+        const previousKeyGraceUntil = new Date(now.getTime() + graceHours * 3_600_000);
+        const applied = await this.apiKeyRepository.applyRotation(apiKey.id, apiKey.hashedKey, {
+            hashedKey: sha256(rawKey),
+            prefix: rawKey.substring(0, 12),
+            previousHashedKey: apiKey.hashedKey,
+            previousKeyGraceUntil,
+            rotatedAt: now,
+        });
+        if (!applied) {
+            // Another rotation (or a revoke) landed between our read and write.
+            // Never hand out a secret that is not the one stored.
+            throw new ConflictException('The API key was changed by another request; try again.');
+        }
+
+        return {
+            id: apiKey.id,
+            name: apiKey.name,
+            kind: apiKey.kind,
+            key: rawKey,
+            prefix: rawKey.substring(0, 12),
+            rotatedAt: now.toISOString(),
+            previousKeyGraceUntil: previousKeyGraceUntil.toISOString(),
+        };
+    }
+
+    /**
+     * The active row a raw secret belongs to: its current secret, or — within
+     * the rotation grace period — its previous one. Kind is NOT checked here.
+     */
+    private async findLiveByRawKey(rawKey: string): Promise<ApiKey | null> {
+        const hashedKey = sha256(rawKey);
+        const current = await this.apiKeyRepository.findByHashedKey(hashedKey);
+        if (current) return current;
+        const rotated = await this.apiKeyRepository.findByPreviousHashedKey(hashedKey);
+        if (
+            rotated?.previousKeyGraceUntil &&
+            new Date(rotated.previousKeyGraceUntil).getTime() > Date.now()
+        ) {
+            return rotated;
+        }
+        return null;
+    }
+}
+
+function sha256(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
 }

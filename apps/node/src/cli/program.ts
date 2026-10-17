@@ -4,6 +4,7 @@ import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
 import { FleetClientError } from '../core/fleet-client';
+import { untilHeartbeatAccepted } from '../core/heartbeat';
 import {
 	createNodeRuntime,
 	enrollNode,
@@ -541,10 +542,20 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
+	// One line per ACCEPTED beat. The loop patches its state more than once per
+	// beat (`connected`, then the next attempt's delay) and every patch
+	// notifies, so keying on the state alone logged each beat twice. Keyed on
+	// the beat itself: each accepted beat stores a freshly parsed `node` and
+	// its own timestamp, and a later patch of the same beat changes neither.
+	// Not on the transition into `connected`: a tick that starts connected
+	// never passes through `connecting`, so that would drop this per-beat
+	// liveness line.
+	let lastLoggedBeat: { node: unknown; at: number | null } | null = null;
 	loop.onChange((state) => {
-		if (state.state === 'connected') {
-			deps.io.logger.info(`Heartbeat accepted — node ${config.nodeId} is online`);
-		}
+		if (state.state !== 'connected') return;
+		if (lastLoggedBeat && lastLoggedBeat.node === state.node && lastLoggedBeat.at === state.lastHeartbeatAt) return;
+		lastLoggedBeat = { node: state.node, at: state.lastHeartbeatAt };
+		deps.io.logger.info(`Heartbeat accepted — node ${config.nodeId} is online`);
 	});
 
 	deps.out(`Starting node ${config.nodeId} → ${config.apiUrl} (every ${config.heartbeatIntervalMs / 1000}s)`);
@@ -566,16 +577,59 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 
 	await loop.start();
-	if (worker) {
-		await worker.start();
-	}
-	if (attendedWorker) {
-		await attendedWorker.start();
-		deps.out(
-			runtime.attended?.captureBackend
-				? 'Live view enabled — the owner can watch this machine from the dashboard (screen and terminal)'
-				: 'Live view enabled — terminal only: no browser was found here to show a screen'
-		);
+	// The lanes lease only after a heartbeat has been ACCEPTED (#2628): its
+	// answer carries the owner's limit ceiling and the version verdict, and
+	// the lease API uses this node's `max` as sent. `loop.start()` resolves
+	// after the first ATTEMPT, accepted or not. When the first beat was
+	// accepted (the usual case) this is exactly the old sequence. When it was
+	// not, the lanes start in the background on the first accepted beat, and
+	// a shutdown before that ends the wait without starting them.
+	let shuttingDown = false;
+	const startLanes = async (): Promise<void> => {
+		if (worker) {
+			await worker.start();
+		}
+		if (attendedWorker) {
+			await attendedWorker.start();
+			deps.out(
+				runtime.attended?.captureBackend
+					? 'Live view enabled — the owner can watch this machine from the dashboard (screen and terminal)'
+					: 'Live view enabled — terminal only: no browser was found here to show a screen'
+			);
+		}
+	};
+	let lanesStarted: Promise<void> = Promise.resolve();
+	let laneStartFailed = false;
+	let laneStartFailure: unknown = undefined;
+	if (worker || attendedWorker) {
+		if (loop.getState().state === 'connected') {
+			await startLanes();
+		} else {
+			deps.out(
+				'Waiting for the platform to accept a heartbeat before leasing work (its answer carries this node’s limits and version verdict)'
+			);
+			lanesStarted = startLanesAfterAcceptedHeartbeat(
+				loop,
+				async () => {
+					deps.io.logger.info('Heartbeat accepted — starting the worker lanes');
+					await startLanes();
+				},
+				() => !shuttingDown
+			).then((outcome) => {
+				if (!outcome.failed) return;
+				// A lane that cannot start leaves a node that beats but never
+				// works: fail closed, and exit NON-zero below so a supervisor
+				// with `Restart=on-failure` restarts it (review on #2637).
+				laneStartFailed = true;
+				laneStartFailure = outcome.error;
+				deps.io.logger.error(
+					`Worker lanes failed to start after the first accepted heartbeat: ${describeError(
+						outcome.error
+					)} — shutting down`
+				);
+				requestShutdown();
+			});
+		}
 	}
 	// The workspace reaper rides with the worker: it is the process that
 	// creates worktrees, so it is the one that reclaims them. A
@@ -629,8 +683,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	await (deps.waitForShutdown?.() ?? (deps.signals ? signalled : Promise.resolve()));
 
 	reaper?.stop();
+	shuttingDown = true;
 	loop.stop();
 	await loop.settled();
+	// A start that was waiting for an accepted beat ends here (the loop is
+	// stopped), and one already under way finishes before the drain below.
+	await lanesStarted;
 	if (attendedWorker) {
 		// A live view is open-ended, so draining would wait for ever: end each
 		// one now (the executor tells its viewers this machine went away), then
@@ -649,6 +707,38 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out(`Worker host stopped (completed ${state.completed}, failed ${state.failed}).`);
 	}
 	deps.out('Stopped.');
+	if (laneStartFailed) {
+		throw new CliError(
+			`Worker lanes failed to start after the first accepted heartbeat: ${describeError(laneStartFailure)}`,
+			EXIT_FAILURE
+		);
+	}
+}
+
+/**
+ * The CLI's deferred lane start (#2628): wait for an ACCEPTED heartbeat, then
+ * run `startLanes`, unless `shouldWait()` turned false (a shutdown) first.
+ * Never rejects: a failing start is reported as `failed`, so the caller can
+ * shut down AND exit non-zero instead of losing the error in a background
+ * promise. Exported for its own tests.
+ */
+export async function startLanesAfterAcceptedHeartbeat(
+	loop: Parameters<typeof untilHeartbeatAccepted>[0],
+	startLanes: () => Promise<void>,
+	shouldWait: () => boolean
+): Promise<{ started: boolean; failed: boolean; error?: unknown }> {
+	const accepted = await untilHeartbeatAccepted(loop, shouldWait);
+	if (!accepted || !shouldWait()) return { started: false, failed: false };
+	try {
+		await startLanes();
+		return { started: true, failed: false };
+	} catch (error) {
+		return { started: false, failed: true, error };
+	}
+}
+
+function describeError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 /** Parse `--concurrency`; anything unparseable falls back to the default. */

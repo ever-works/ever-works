@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { RecordViewTabs } from '@/components/record-visibility';
+import { parseRecordTab, withRecordTab } from '@/lib/record-visibility';
 import { getTranslations } from 'next-intl/server';
 import { missionsAPI, type Mission, type MissionStatus } from '@/lib/api/missions';
 import { MissionsList } from '@/components/missions';
@@ -18,6 +21,8 @@ const MISSION_STATUSES: MissionStatus[] = ['active', 'paused', 'completed', 'fai
 const PAGE_SIZE = 24;
 
 type MissionsSearchParams = Promise<{
+    /** Record visibility (EW-P1-3) list tab. */
+    tab?: string | string[];
     status?: string | string[];
     search?: string | string[];
     offset?: string | string[];
@@ -58,11 +63,13 @@ export default async function MissionsPage({
         : undefined;
     const search = firstParam(params.search)?.trim() || undefined;
     const offset = Math.max(0, parseInt(firstParam(params.offset) ?? '0', 10) || 0);
+    const tab = parseRecordTab(params.tab);
 
     let missions: Mission[] = [];
     let loadError: string | null = null;
     try {
         missions = await missionsAPI.list({
+            view: tab,
             status,
             search,
             offset,
@@ -79,6 +86,8 @@ export default async function MissionsPage({
 
     return (
         <MissionsList
+            key={tab}
+            tab={tab}
             missions={pageMissions}
             loadError={loadError}
             filters={{ status, search }}
@@ -86,9 +95,20 @@ export default async function MissionsPage({
                 offset,
                 hasPrevious: offset > 0,
                 hasNext,
-                previousHref: buildMissionsHref({ status, search, offset: prevOffset }),
-                nextHref: buildMissionsHref({ status, search, offset: nextOffset }),
+                previousHref: withRecordTab(
+                    buildMissionsHref({ status, search, offset: prevOffset }),
+                    tab,
+                ),
+                nextHref: withRecordTab(
+                    buildMissionsHref({ status, search, offset: nextOffset }),
+                    tab,
+                ),
             }}
+            tabs={
+                <Suspense fallback={null}>
+                    <RecordViewTabs />
+                </Suspense>
+            }
         />
     );
 }

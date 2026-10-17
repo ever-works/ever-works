@@ -1,3 +1,4 @@
+import { normalizeRecordListView } from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -98,6 +99,13 @@ export class GoalsController {
         required: false,
         description: "'true' | 'false' | 'all' (default: not archived)",
     })
+    @ApiQuery({
+        name: 'view',
+        required: false,
+        enum: ['mine', 'shared', 'organization'],
+        description:
+            "Record visibility tab (EW-P1-3): 'mine' (default) = own rows, unchanged; 'shared' = rows of others the caller takes part in or reaches through a Team / Work; 'organization' = every row of the active Organization the caller may read",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -105,10 +113,12 @@ export class GoalsController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
         @Query('archived') archived?: string,
+        @Query('view') view?: string,
     ): Promise<GoalDto[]> {
         return this.service.listForUser(
             auth.userId,
             {
+                view: normalizeRecordListView(view),
                 status: this.parseStatus(status),
                 limit: this.parseIntParam(limit, 'limit', 1, 101),
                 offset: this.parseIntParam(offset, 'offset', 0),
@@ -165,7 +175,9 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
-        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
+        // Record visibility (EW-P1-3): READ through the access policy; writes keep the
+        // owner-only gate (`requireScopedGoal`).
+        return this.service.getReadable(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/samples')

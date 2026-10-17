@@ -12,6 +12,7 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ModelAccountService } from '@ever-works/agent/model-routing';
 import { AuthSessionGuard, CurrentUser } from '../auth';
@@ -48,6 +49,8 @@ import { ModelWorkspaceAccessService } from './model-workspace-access.service';
 @Controller('api/model-accounts')
 @UseGuards(AuthSessionGuard)
 @ApiBearerAuth('JWT-auth')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class ModelAccountsController {
     constructor(
         private readonly accounts: ModelAccountService,

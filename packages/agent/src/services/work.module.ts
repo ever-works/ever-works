@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { DataGeneratorModule } from '../generators/data-generator/data-generator.module';
 import { ItemsGeneratorModule } from '../items-generator/items-generator.module';
 import { FacadesModule } from '../facades/facades.module';
@@ -66,6 +67,9 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
 @Module({
     imports: [
         DatabaseModule,
+        // Domain events (EW-P1-1 B2) — the publisher the work services record
+        // `work.*` through.
+        DomainEventsModule,
         // Schedules P2 — provides `ActivityLogService` so
         // `WorkScheduleDispatcherService` can emit `schedule_executed`
         // rows for cron-fired scheduled updates. `@Optional()`-injected,

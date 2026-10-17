@@ -1,4 +1,5 @@
 import 'server-only';
+import type { RecordListView } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 // Phase 1 PR A — three new statuses (`queued`/`building`/`failed`)
@@ -146,7 +147,14 @@ export const workProposalsAPI = {
 
     async list(
         statuses: WorkProposalStatus[] = ['pending'],
-        opts: { missionId?: string; search?: string; limit?: number; offset?: number } = {},
+        opts: {
+            missionId?: string;
+            search?: string;
+            limit?: number;
+            offset?: number;
+            /** Record visibility (EW-P1-3) list tab, sent as `view`. */
+            view?: RecordListView;
+        } = {},
     ): Promise<WorkProposal[]> {
         const params = statuses.map((s) => `statuses=${encodeURIComponent(s)}`);
         // Phase 6 PR R — server-side `missionId` filter is already
@@ -165,6 +173,9 @@ export const workProposalsAPI = {
         }
         if (opts.offset && opts.offset > 0) {
             params.push(`offset=${encodeURIComponent(String(opts.offset))}`);
+        }
+        if (opts.view && opts.view !== 'mine') {
+            params.push(`view=${encodeURIComponent(opts.view)}`);
         }
         return serverFetch<WorkProposal[]>(`/me/work-proposals?${params.join('&')}`, {
             method: 'GET',

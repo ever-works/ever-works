@@ -18,6 +18,11 @@
  *         Task + enqueues agent-task-execute), or
  *     4b. conversation mode → find/create email_conversations thread, link the
  *         message, touch lastMessageAt (the chat-reply path picks it up).
+ *
+ * RFC threading (EW-P4-3): a message whose `In-Reply-To` / `References` name
+ * an earlier message of the same owner and Agent joins that message's thread
+ * — its conversation, or (task-spawn) its Task through the spawner's optional
+ * `appendInboundEmailToTask` — before the subject fallback is tried.
  */
 
 /**
@@ -52,11 +57,61 @@ export interface AgentInboundEmailDispatchPayload {
     from: string;
     /** Every recipient the message names — recorded, never used for routing. */
     to: string[];
+    /** EW-P4-3 — `Cc` recipients; recorded, never used for routing. */
+    cc?: string[];
     subject: string;
     bodyText: string;
     bodyHtml?: string;
     receivedAt: Date;
+    /**
+     * EW-P4-3 — RFC threading ids from the message's headers, bare (see
+     * `normalizeMessageId` in `@ever-works/plugin`). Sender-written: they
+     * only ever select among the SAME owner's and Agent's own messages.
+     */
+    messageIdHeader?: string;
+    inReplyTo?: string;
+    references?: readonly string[];
+    /**
+     * EW-P4-3 — the plugin's attachments (base64 content). Stored through
+     * {@link INBOUND_EMAIL_ATTACHMENT_STORE} for the address owner and listed
+     * on the message row; never trusted for type (the store validates).
+     */
+    attachments?: readonly InboundEmailAttachment[];
+    /** EW-P4-3 — the plugin's provider metadata (spam score, headers, …), kept on the row. */
+    metadata?: Readonly<Record<string, unknown>>;
 }
+
+/** EW-P4-3 — an inbound attachment as the plugin decoded it. */
+export interface InboundEmailAttachment {
+    readonly filename: string;
+    readonly mimeType: string;
+    /** Base64-encoded content. */
+    readonly content: string;
+    readonly cid?: string;
+}
+
+/** EW-P4-3 — what the attachment store is asked to keep. */
+export interface InboundEmailAttachmentStoreInput {
+    /** The receiving address's owner — the upload is theirs. */
+    userId: string;
+    tenantId: string | null;
+    organizationId: string | null;
+    filename: string;
+    mimeType: string;
+    content: Buffer;
+}
+
+/**
+ * EW-P4-3 — optional adapter that stores an inbound attachment's bytes (the
+ * platform binds the upload pipeline, which validates type by magic bytes and
+ * size). Throws to refuse one; the dispatcher then lists it as not stored.
+ * When unbound, attachments are listed on the message but not stored.
+ */
+export interface InboundEmailAttachmentStore {
+    store(input: InboundEmailAttachmentStoreInput): Promise<{ uploadId: string; url?: string }>;
+}
+
+export const INBOUND_EMAIL_ATTACHMENT_STORE = 'INBOUND_EMAIL_ATTACHMENT_STORE' as const;
 
 export interface AgentInboundEmailDispatchResult {
     handled: boolean;
@@ -65,6 +120,11 @@ export interface AgentInboundEmailDispatchResult {
     emailMessageId?: string;
     conversationId?: string;
     taskId?: string;
+    /**
+     * EW-P4-3 — `true` when the message joined an existing thread (Task or
+     * conversation) through its `In-Reply-To` / `References` headers.
+     */
+    threaded?: boolean;
     reason?: string;
 }
 
@@ -98,11 +158,46 @@ export interface InboundEmailTaskSpawnerInput {
     subject: string;
     bodyText: string;
     from: string;
+    /**
+     * EW-P4-3 — the receiving address's tenant / organization: the Task is
+     * created in that scope (`null` = personal, as before).
+     */
+    tenantId?: string | null;
+    organizationId?: string | null;
+    /** EW-P4-3 — the message's attachments as recorded (names are sender-written). */
+    attachments?: readonly {
+        filename: string;
+        mimeType: string;
+        size: number;
+        stored: boolean;
+        uploadId?: string | null;
+    }[];
+}
+
+/**
+ * EW-P4-3 — a reply that threads (by `In-Reply-To` / `References`) onto an
+ * email already linked to a Task. Same untrusted-data rule as
+ * {@link InboundEmailTaskSpawnerInput}: `subject`, `bodyText` and `from` are
+ * attacker-controlled.
+ */
+export interface InboundEmailTaskAppendInput extends InboundEmailTaskSpawnerInput {
+    /** The Task the earlier message of the thread is linked to. */
+    taskId: string;
 }
 
 export interface InboundEmailTaskSpawner {
     spawnTaskForInboundEmail(
         input: InboundEmailTaskSpawnerInput,
+    ): Promise<{ taskId: string } | null>;
+    /**
+     * EW-P4-3 — optional: hand a threaded reply to the Task it belongs to
+     * instead of spawning a new one. Answers the Task id when the reply was
+     * delivered there; `null` (or a throw) makes the dispatcher fall back to
+     * {@link spawnTaskForInboundEmail}, so a reply is never lost. An adapter
+     * without it keeps the old behaviour: one new Task per message.
+     */
+    appendInboundEmailToTask?(
+        input: InboundEmailTaskAppendInput,
     ): Promise<{ taskId: string } | null>;
 }
 

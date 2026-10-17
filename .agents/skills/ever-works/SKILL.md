@@ -107,7 +107,7 @@ invent or run other deploy / `kubectl` commands from this repository.
 
 - **Web build uses Webpack, not Turbopack.** `apps/web` builds with `next build --webpack` (dev uses `--turbopack`). Keep the `--webpack` flag on the build script.
 - **Build shared packages before type-checking / testing.** `@ever-works/contracts` and `@ever-works/plugin` must be built (`pnpm build` / `pnpm build:plugins`) before `apps/web` type-check or agent tests can resolve them. The agent Jest config also maps those packages to source via `moduleNameMapper` — if test imports fail, build first.
-- **TypeORM migrations ship with entity changes.** Any entity/schema change needs a migration in the **same PR** (`apps/api/src/migrations/`). See `docs/specs/architecture/database-migrations.md`.
+- **TypeORM migrations ship with entity changes.** Any entity/schema change needs a migration in the **same PR** (`apps/api/src/migrations/`). See `docs/specs/architecture/database.md` §6 (Migrations).
 - **DTS build failure with conditional spreads.** `...cond && { key: value }` yields `string | false` and breaks declaration emit — use explicit `if` blocks to add properties conditionally.
 - **No stray docs in the repo root.** Working/plan/summary/tracker markdown goes under `docs/internal/` (or `docs/specs/<feature>/`), never the root — see `AGENTS.md` / `CLAUDE.md`.
 

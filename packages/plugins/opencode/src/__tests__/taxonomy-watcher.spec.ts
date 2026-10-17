@@ -117,6 +117,9 @@ describe('taxonomy-watcher', () => {
 				// Both waits expect a callback to FIRE, so poll for it rather than
 				// hoping a fixed sleep outlasts fs-watch latency.
 				await waitUntil(() => onNewItem.mock.calls.length >= 1);
+				// Fail HERE when the first event never came, rather than spending a second
+				// full wait and letting the suite timeout fire before the assertions below.
+				expect(onNewItem.mock.calls.length).toBeGreaterThanOrEqual(1);
 
 				await writeFile(
 					join(workspacePath, 'item-b.json'),
@@ -232,7 +235,10 @@ function sleep(ms: number): Promise<void> {
  * Returns rather than throws — the caller's own assertion should produce the
  * failure message, not this helper.
  */
-async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 6000): Promise<void> {
+// A HANG guard, not a timing assertion: it returns as soon as `check()` holds. Kept just
+// under the suite's 15 s `testTimeout`; 6 s failed healthy runs on CPU-throttled CI
+// runners (self-build handover item 14).
+async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 12_000): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		if (await check()) return;

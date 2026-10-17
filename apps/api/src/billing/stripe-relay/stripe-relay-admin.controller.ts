@@ -10,6 +10,7 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../../auth/integration/integration-forbidden.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { StripeRelayDeadLetterRepository } from '@ever-works/agent/database';
@@ -46,6 +47,8 @@ const MAX_PAGE = 100;
 @ApiTags('Admin')
 @Controller('api/admin/stripe-relay/dead-letters')
 @UseGuards(IsPlatformAdminGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class StripeRelayAdminController {
     constructor(
         private readonly relayService: StripeRelayService,

@@ -3,10 +3,17 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
+import type { VisibilityAggregate } from '@ever-works/contracts';
+import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
+import type { VisibilityPrincipal } from '../record-visibility/record-access.types';
+import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { type EntityManager, In, type ObjectLiteral, Repository } from 'typeorm';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { Agent } from '../entities/agent.entity';
+import { Goal } from '../entities/goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { Organization } from '../entities/organization.entity';
 import { Task } from '../entities/task.entity';
@@ -30,12 +37,21 @@ interface ScopedResourceRow {
     id: string;
     tenantId?: string | null;
     organizationId?: string | null;
+    /** Record visibility (EW-P1-3) — tasks, goals, missions, ideas, agents. */
+    visibility?: string | null;
 }
+
+/**
+ * Who reads a Team's resources (review 2026-10-17 F4): a person (the app's Team
+ * page) or an integration key (the integration API). Each sees only the records
+ * it may read; a `private` record never reaches an integration.
+ */
+export type TeamResourcesViewer = { kind: 'user'; userId: string } | { kind: 'integration' };
 
 /**
  * Teams & Prebuilt Companies — Team ↔ resource association service
  * (operator ask "some Works belong to some Teams", generalized to
- * Works / Tasks / Agents / Missions / Ideas).
+ * Works / Tasks / Agents / Missions / Ideas / Goals).
  *
  * Authorization happens BEFORE these methods run: every route is behind
  * `OrganizationOwnershipGuard` (fail-closed tenant-ownership, 404 posture).
@@ -64,7 +80,57 @@ export class TeamResourcesService {
         private readonly ideas: Repository<WorkProposal>,
         @InjectRepository(Task)
         private readonly tasks: Repository<Task>,
+        // Domain events (EW-P1-1 B2) — `team.resource.*`, plus `task.updated` /
+        // `work.updated` for an attached task or work (their `teamIds` change).
+        // Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // EW-P1-3: goals sit on Teams too (`team_resources` type `goal`). After the
+        // domain-event publisher so positional test fixtures keep their indices;
+        // @Optional() because a required parameter cannot follow an optional one.
+        @Optional()
+        @InjectRepository(Goal)
+        private readonly goals?: Repository<Goal>,
+        // Record visibility (EW-P1-3) — attaching a record's first Team narrows it to
+        // `team`, detaching its last widens it to `organization` (while not chosen
+        // by hand). @Optional(): absent means no automatic change.
+        @Optional() private readonly visibility?: RecordVisibilityService,
+        // Review 2026-10-17 F4 — the read policy the Team's resource list is filtered
+        // through. @Optional(): absent, a `private` record is still never listed.
+        @Optional() private readonly accessPolicy?: RecordAccessPolicy,
     ) {}
+
+    /** The resource-side event of a team resource change (its DTO's `teamIds` moved). */
+    private async recordResourceSide(
+        publisher: DomainEventPublisher,
+        manager: EntityManager,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        if (resourceType === 'task') {
+            await publisher.changed(manager, 'task', resourceId, 'task.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'work') {
+            await publisher.changed(manager, 'work', resourceId, 'work.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'idea') {
+            // EW-P2-1: an Idea's Teams are its `team_resources` rows.
+            await publisher.changed(manager, 'idea', resourceId, 'idea.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'goal') {
+            // EW-P2-2: a Goal's Teams are its `team_resources` rows (EW-P1-3 type `goal`).
+            await publisher.changed(manager, 'goal', resourceId, 'goal.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'mission') {
+            // EW-P2-5: a Mission's Teams are its `team_resources` rows (D11).
+            await publisher.changed(manager, 'mission', resourceId, 'mission.updated', {
+                changedFields: ['teamIds'],
+            });
+        }
+    }
 
     /**
      * Attach a resource to a Team. Validates the Team is in the org AND the
@@ -77,6 +143,7 @@ export class TeamResourcesService {
         orgId: string,
         teamId: string,
         input: AttachTeamResourceInput,
+        options: { viewer?: TeamResourcesViewer } = {},
     ): Promise<TeamResourceItem> {
         const resourceType = this.normalizeResourceType(input.resourceType);
         const team = await this.getTeamOrThrow(orgId, teamId);
@@ -86,6 +153,12 @@ export class TeamResourcesService {
         }
 
         const resource = await this.assertResourceInOrg(org, resourceType, input.resourceId);
+        const isPrivate = resource.visibility === 'private';
+        // Review 2026-10-17 F4: an integration never sees a private record, so it may
+        // not attach one either, and the 404 tells it nothing about whether it exists.
+        if (isPrivate && options.viewer?.kind === 'integration') {
+            throw new NotFoundException(`Resource ${input.resourceId} not found`);
+        }
 
         const row = this.resources.create({
             teamId: team.id,
@@ -100,7 +173,33 @@ export class TeamResourcesService {
         });
 
         try {
-            const saved = await this.resources.save(row);
+            const publisher = this.domainEvents;
+            const saved = publisher
+                ? await publisher.transaction(async (manager) => {
+                      const added = await manager.getRepository(TeamResource).save(row);
+                      await publisher.child(
+                          manager,
+                          'team',
+                          team.id,
+                          'team.resource.added',
+                          { teamId: team.id, resourceType, resourceId: input.resourceId },
+                          // A private record's link stays off the feed (F4).
+                          {
+                              changedFields: ['resources'],
+                              ...(isPrivate ? { visibility: 'private' } : {}),
+                          },
+                      );
+                      await this.recomputeVisibilityIn(manager, resourceType, input.resourceId);
+                      await this.recordResourceSide(
+                          publisher,
+                          manager,
+                          resourceType,
+                          input.resourceId,
+                      );
+                      return added;
+                  })
+                : await this.resources.save(row);
+            await this.recomputeVisibility(resourceType, input.resourceId);
             return this.toItem(saved, this.resolveRef(resourceType, resource));
         } catch (error) {
             if (this.isUniqueViolation(error)) {
@@ -119,19 +218,100 @@ export class TeamResourcesService {
     ): Promise<void> {
         const type = this.normalizeResourceType(resourceType);
         await this.getTeamOrThrow(orgId, teamId);
-        const result = await this.resources.delete({ teamId, resourceType: type, resourceId });
+        const publisher = this.domainEvents;
+        const isPrivate = publisher ? await this.isPrivateRecord(type, resourceId) : false;
+        const result = publisher
+            ? await publisher.transaction(async (manager) => {
+                  const deleted = await manager
+                      .getRepository(TeamResource)
+                      .delete({ teamId, resourceType: type, resourceId });
+                  if (deleted.affected) {
+                      await publisher.child(
+                          manager,
+                          'team',
+                          teamId,
+                          'team.resource.removed',
+                          { teamId, resourceType: type, resourceId, deleted: true },
+                          // A private record's link stays off the feed (F4).
+                          {
+                              changedFields: ['resources'],
+                              ...(isPrivate ? { visibility: 'private' } : {}),
+                          },
+                      );
+                      await this.recomputeVisibilityIn(manager, type, resourceId);
+                      await this.recordResourceSide(publisher, manager, type, resourceId);
+                  }
+                  return deleted;
+              })
+            : await this.resources.delete({ teamId, resourceType: type, resourceId });
         if (!result.affected) {
             throw new NotFoundException('Resource is not attached to this team');
         }
+        await this.recomputeVisibility(type, resourceId);
     }
 
-    /** List a Team's attached resources, resolved + grouped by type. */
-    async listForTeam(orgId: string, teamId: string): Promise<TeamResourcesGrouped> {
-        await this.getTeamOrThrow(orgId, teamId);
-        const rows = await this.resources.find({
+    /** Record visibility (EW-P1-3): re-apply D11 to a record whose Teams changed. */
+    private async recomputeVisibility(
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        const aggregate = this.visibilityAggregateOf(resourceType);
+        if (this.visibility && aggregate) {
+            await this.visibility.recomputeAutomatic(aggregate, resourceId);
+        }
+    }
+
+    /**
+     * The same, inside the team-event transaction and BEFORE `recordResourceSide`, so the
+     * task's `task.updated` snapshot already carries the new visibility (and no separate
+     * notice is needed for it). Ideas likewise: `recordResourceSide` records `idea.updated`
+     * for them (EW-P2-1), so a second event would bump the version twice for one change.
+     * Other aggregates get their own `visibility_changed`.
+     */
+    private async recomputeVisibilityIn(
+        manager: EntityManager,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        const aggregate = this.visibilityAggregateOf(resourceType);
+        if (!this.visibility || !aggregate) return;
+        await this.visibility.recomputeAutomaticIn(manager, aggregate, resourceId, {
+            recordEvent: aggregate !== 'task' && aggregate !== 'idea',
+        });
+    }
+
+    private visibilityAggregateOf(resourceType: TeamResourceType): VisibilityAggregate | null {
+        switch (resourceType) {
+            case 'task':
+            case 'goal':
+            case 'mission':
+            case 'idea':
+            case 'agent':
+                return resourceType;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * List a Team's attached resources, resolved + grouped by type: only those the
+     * viewer may read (review 2026-10-17 F4). A task, goal, mission, idea or agent
+     * goes through `visibleTo(viewer)`, so a record made private by hand (its
+     * `team_resources` row stays) or a Team-only record of a Team the viewer is not
+     * on is not listed. Without a viewer, a `private` record is never listed.
+     */
+    async listForTeam(
+        orgId: string,
+        teamId: string,
+        viewer?: TeamResourcesViewer,
+    ): Promise<TeamResourcesGrouped> {
+        const team = await this.getTeamOrThrow(orgId, teamId);
+        const all = await this.resources.find({
             where: { teamId },
             order: { createdAt: 'ASC' },
         });
+        const hidden = await this.unreadableResources(all, team, viewer);
+        const rows = all.filter((row) => !hidden.has(`${row.resourceType}:${row.resourceId}`));
 
         const grouped: TeamResourcesGrouped = {
             work: [],
@@ -139,6 +319,7 @@ export class TeamResourcesService {
             agent: [],
             mission: [],
             idea: [],
+            goal: [],
         };
         if (rows.length === 0) {
             return grouped;
@@ -179,6 +360,70 @@ export class TeamResourcesService {
             order: { name: 'ASC' },
         });
         return teamRows.map((t) => ({ teamId: t.id, name: t.name, slug: t.slug }));
+    }
+
+    // ── Read filtering (review 2026-10-17 F4) ──
+
+    /** `type:id` of the rows whose record the viewer may not read. */
+    private async unreadableResources(
+        rows: TeamResource[],
+        team: Team,
+        viewer: TeamResourcesViewer | undefined,
+    ): Promise<Set<string>> {
+        const hidden = new Set<string>();
+        const idsByType = new Map<VisibilityAggregate, string[]>();
+        for (const row of rows) {
+            const aggregate = this.isKnownType(row.resourceType)
+                ? this.visibilityAggregateOf(row.resourceType)
+                : null;
+            if (!aggregate) continue;
+            if (aggregate === 'goal' && !this.goals) continue;
+            idsByType.set(aggregate, [...(idsByType.get(aggregate) ?? []), row.resourceId]);
+        }
+        for (const [aggregate, ids] of idsByType) {
+            const visible = await this.readableIds(aggregate, ids, team, viewer);
+            for (const id of ids) if (!visible.has(id)) hidden.add(`${aggregate}:${id}`);
+        }
+        return hidden;
+    }
+
+    private async readableIds(
+        aggregate: VisibilityAggregate,
+        ids: string[],
+        team: Team,
+        viewer: TeamResourcesViewer | undefined,
+    ): Promise<Set<string>> {
+        const repo = this.repoFor(aggregate) as unknown as Repository<ObjectLiteral>;
+        const organizationId = team.organizationId ?? null;
+        if (viewer && this.accessPolicy && organizationId) {
+            const principal: VisibilityPrincipal =
+                viewer.kind === 'user'
+                    ? { kind: 'user', userId: viewer.userId }
+                    : { kind: 'integration', organizationIds: [organizationId] };
+            const context = await this.accessPolicy.contextFor(principal, {
+                tenantId: team.tenantId ?? null,
+                organizationId,
+            });
+            const qb = repo
+                .createQueryBuilder('rec')
+                .select('rec.id', 'id')
+                .where('rec.id IN (:...teamResourceIds)', { teamResourceIds: ids });
+            this.accessPolicy.applyVisibleTo(qb, 'rec', aggregate, context, 'organization', 'trv');
+            const found = await qb.getRawMany<{ id: string }>();
+            return new Set(found.map((row) => row.id));
+        }
+        const found = (await repo.find({ where: { id: In(ids) } })) as ScopedResourceRow[];
+        return new Set(found.filter((row) => row.visibility !== 'private').map((row) => row.id));
+    }
+
+    /** Whether the record behind a team resource is `private` (tasks, goals, missions, ideas, agents). */
+    private async isPrivateRecord(type: TeamResourceType, id: string): Promise<boolean> {
+        if (!this.visibilityAggregateOf(type)) return false;
+        if (type === 'goal' && !this.goals) return false;
+        const row = (await this.repoFor(type).findOne({
+            where: { id },
+        })) as ScopedResourceRow | null;
+        return row?.visibility === 'private';
     }
 
     // ── Validation helpers ──
@@ -249,6 +494,11 @@ export class TeamResourcesService {
                 return this.ideas as unknown as Repository<ScopedResourceRow>;
             case 'task':
                 return this.tasks as unknown as Repository<ScopedResourceRow>;
+            case 'goal':
+                if (!this.goals) {
+                    throw new NotFoundException('Goals cannot be attached in this context');
+                }
+                return this.goals as unknown as Repository<ScopedResourceRow>;
         }
     }
 
@@ -296,6 +546,7 @@ export class TeamResourcesService {
             case 'task':
                 return { name: str(e.title), slug: str(e.slug) };
             case 'mission':
+            case 'goal':
                 return { name: str(e.title), slug: null };
             case 'idea':
                 return { name: str(e.title), slug: str(e.slugSuggestion) };

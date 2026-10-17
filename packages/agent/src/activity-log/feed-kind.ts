@@ -141,6 +141,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.DELEGATED_ACCESS]: 'system',
     [ActivityActionType.IDENTITY_PROVIDER_CONFIG_CHANGED]: 'system',
 
+    // EW-P1-2 — an integration key writing (work, like an ingested external
+    // event) and the key's own lifecycle (workspace configuration).
+    [ActivityActionType.INTEGRATION_WRITE]: 'work',
+    [ActivityActionType.INTEGRATION_KEY_CREATED]: 'system',
+    [ActivityActionType.INTEGRATION_KEY_ROTATED]: 'system',
+    [ActivityActionType.INTEGRATION_KEY_REVOKED]: 'system',
+
     // Chat / community
     [ActivityActionType.CHAT_CONVERSATION]: 'work',
     [ActivityActionType.COMMUNITY_PR_MERGED]: 'delivery',

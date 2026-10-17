@@ -7,6 +7,7 @@ import {
     foldWorksByKind,
     knownWorkKindKeys,
     periodRange,
+    WORK_KINDS_WITHOUT_STATS_KEY,
     previousPeriodOf,
     utcDateOf,
     versionAndChannel,
@@ -140,8 +141,10 @@ describe('instance-stats mapping', () => {
     it('maps every Work kind the product knows onto a schema key that is not `other`', () => {
         // The guard for the next new kind: adding one to WORK_KINDS without a
         // schema key (and a contract release) fails here instead of silently
-        // counting it under `other`.
+        // counting it under `other` — unless it is listed, on purpose, in
+        // WORK_KINDS_WITHOUT_STATS_KEY (checked by the next test).
         for (const { kind, key } of knownWorkKindKeys()) {
+            if (WORK_KINDS_WITHOUT_STATS_KEY.includes(kind)) continue;
             expect({
                 kind,
                 key:
@@ -153,6 +156,16 @@ describe('instance-stats mapping', () => {
             });
         }
         expect(WORK_KINDS.length).toBeGreaterThan(0);
+    });
+
+    it('counts a kind the schema has no key for yet under `other`, and only while that is true', () => {
+        // Once a contract release adds the key, this fails: drop the kind
+        // from WORK_KINDS_WITHOUT_STATS_KEY so the guard above covers it.
+        for (const kind of WORK_KINDS_WITHOUT_STATS_KEY) {
+            expect((WORK_KINDS as readonly string[]).includes(kind)).toBe(true);
+            expect({ kind, key: workKindKey(kind) }).toEqual({ kind, key: 'other' });
+        }
+        expect(workKindKey('project')).toBe('other');
     });
 
     it('folds unknown kinds and providers under `other`, never as their own key', () => {

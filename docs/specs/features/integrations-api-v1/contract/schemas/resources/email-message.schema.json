@@ -1,0 +1,101 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/email-message.schema.json",
+	"title": "Agent email message DTO (P4, GET /email/messages, GET /email/messages/:id)",
+	"description": "One agent email: mail an Ever Works agent received (inbound) or sent / drafted (outbound). Also the data of email.message.* events. Recipient-scoped like the Inbox: the feed and webhooks v2 serve these events only to a key that also holds email:read, never to a user-owned subscription. Bcc, provider metadata, approval bookkeeping and failure reasons are never exposed. An event whose text + html exceed 262144 UTF-8 bytes carries text: null, html: null, bodyOmitted: true; GET always carries the bodies. The html is the raw message HTML: sanitize it before rendering (CR-11).",
+	"type": "object",
+	"required": [
+		"id",
+		"organizationId",
+		"version",
+		"createdAt",
+		"updatedAt",
+		"ownerUserId",
+		"agentId",
+		"taskId",
+		"conversationId",
+		"direction",
+		"status",
+		"deliveryStatus",
+		"from",
+		"to",
+		"cc",
+		"subject",
+		"text",
+		"html",
+		"messageId",
+		"inReplyTo",
+		"references",
+		"attachments",
+		"sentAt",
+		"receivedAt"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"organizationId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"version": { "$ref": "../common.schema.json#/$defs/Version" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"ownerUserId": {
+			"description": "The person the mailbox belongs to (the agent's owner).",
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		},
+		"agentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"taskId": {
+			"description": "The Task the message spawned or joined.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
+		"conversationId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"direction": { "type": "string", "enum": ["inbound", "outbound"] },
+		"status": {
+			"description": "Lifecycle. Open set; consumers must accept unknown values.",
+			"type": ["string", "null"],
+			"examples": ["received", "draft", "sending", "sent", "failed", "discarded"]
+		},
+		"deliveryStatus": {
+			"description": "Provider telemetry. Open set.",
+			"type": ["string", "null"],
+			"examples": ["delivered", "bounced", "opened", "clicked"]
+		},
+		"from": { "type": "string", "maxLength": 254 },
+		"to": { "type": "array", "items": { "type": "string" } },
+		"cc": { "type": "array", "items": { "type": "string" } },
+		"subject": { "type": "string", "maxLength": 998 },
+		"text": { "type": ["string", "null"] },
+		"html": { "type": ["string", "null"] },
+		"bodyOmitted": {
+			"description": "Only in an event over the event body limit: GET /email/messages/:id for the bodies.",
+			"const": true
+		},
+		"messageId": {
+			"description": "RFC 5322 Message-ID, bare (no angle brackets).",
+			"type": ["string", "null"],
+			"maxLength": 255
+		},
+		"inReplyTo": { "type": ["string", "null"], "maxLength": 255 },
+		"references": { "type": "array", "items": { "type": "string" } },
+		"attachments": {
+			"description": "Metadata only; the bytes stay in Ever Works.",
+			"type": "array",
+			"items": { "$ref": "#/$defs/Attachment" }
+		},
+		"sentAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"receivedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"Attachment": {
+			"type": "object",
+			"required": ["filename", "mimeType", "size", "stored"],
+			"properties": {
+				"filename": { "type": "string" },
+				"mimeType": { "type": "string" },
+				"size": { "type": "integer", "minimum": 0 },
+				"stored": { "type": "boolean" },
+				"reason": { "type": ["string", "null"] }
+			},
+			"additionalProperties": false
+		}
+	}
+}

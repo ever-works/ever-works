@@ -492,7 +492,7 @@ const canonicalTemporaryDirectory = realpathSync.native(testTemporaryDirectory);
 const temporaryRoot = (prefix: string): string =>
 	realpathSync.native(mkdtempSync(join(canonicalTemporaryDirectory, prefix)));
 
-describe.sequential('workspace reaper — real Git worktrees and a real remote', { timeout: 60_000 }, () => {
+describe('workspace reaper — real Git worktrees and a real remote', { timeout: 60_000, concurrent: false }, () => {
 	let ownedRoot: string;
 	let seedDir: string;
 	let originDir: string;

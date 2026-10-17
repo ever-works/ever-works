@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import type { RecordListView } from '@ever-works/contracts';
 import {
     clampTaskBoardColumnLimit,
     findTaskBoardColumn,
@@ -59,6 +60,8 @@ export interface TaskBoardInput {
     includeHidden?: boolean;
     /** Focus layout only — show the toggle-only Cancelled column. */
     includeCancelled?: boolean;
+    /** Record visibility (EW-P1-3) list tab. Default `mine` — today's board. */
+    view?: RecordListView;
     /** Clock override for tests; production reads the wall clock. */
     now?: Date;
 }
@@ -214,6 +217,7 @@ export class TaskBoardService {
             agentId: input.agentId,
             goalId: input.goalId,
             includeHidden: input.includeHidden === true,
+            view: input.view,
         };
         // All time = no recency predicate at all, so the count and the page
         // cover every completed Task. Paging per column keeps it cheap.

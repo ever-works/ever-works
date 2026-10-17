@@ -2,7 +2,7 @@
 
 **Feature ID**: `email-providers`
 **Jira Epic**: [EW-650](https://evertech.atlassian.net/browse/EW-650)
-**Last updated**: 2026-05-28
+**Last updated**: 2026-10-15
 
 Each task = one Jira child issue under EW-650. Approximate target: ~10 min of focused work per task (some larger items decomposed further).
 
@@ -73,6 +73,29 @@ Each task = one Jira child issue under EW-650. Approximate target: ~10 min of fo
 - [ ] **T39** Operator guide: "Connect an email provider".
 - [ ] **T40** Per-provider setup notes (webhook URLs, DNS records).
 - [ ] **T41** Update `docs/specs/architecture/database.md` with new tables.
+
+## Phase 10 — Email fixes for the Gauzy integration (EW-P4-3, spec §14)
+
+One small PR per item, security first.
+
+- [x] **T42** Refuse unsigned Postmark and Mailgun inbound (and delivery-event) webhooks when no secret is configured;
+      explicit opt-out `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (exact string), default secure. Unit tests per plugin plus
+      facade tests with the real plugins (§14.1).
+- [x] **T43** RFC threading: `messageIdHeader`, `inReplyTo`, `references` columns on `email_messages` (Postgres, MySQL,
+      better-sqlite3 migration); set on outbound through `EmailSendInput.headers`; parsed on inbound; the dispatcher
+      threads on them before falling back to the normalized subject; reply-in-thread (`inReplyToMessageId`); and the
+      `email_messages.taskId` back-link after task-spawn, which threading needs (§14.2).
+- [x] **T44** Inbound data: persist inbound attachments (upload pipeline, listed on `email_messages.attachments`); keep
+      `cc` and the plugin's `metadata` (bounded); stamp `tenantId` and `organizationId` on inbound rows, new
+      conversations and spawned Tasks from the receiving address (§14.3).
+- [x] **T45** Settings → Email addresses: replace the `alert()` placeholder with a real add-address wizard and row
+      actions; make verification real (confirmation mail through platform mail, click-to-confirm public page, enforce
+      `verified` for sending), grandfathering addresses already in use (§14.4).
+- [ ] **T46** (follow-up, review on #2612) Durable inbound ingestion: an idempotent admission record per inbound
+      message, written before attachments are stored, plus a reconciliation pass, so attachment bytes stored for a
+      message whose row (or upload ownership record) then failed to save are found and cleaned up — without deleting
+      content-hash uploads another message or upload still uses. Today such bytes stay in the receiving owner's own
+      upload namespace, like any interrupted upload.
 
 ## Status legend
 

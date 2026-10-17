@@ -1109,6 +1109,19 @@ export const config = {
          * Exactly `'true'` is on, defaulting to OFF, beside the other
          * `*_ENABLED` getters — the same posture as `config.appLauncher`.
          */
+        /**
+         * EW-P2-4 — the repo-less Project Work kind (`project`): plain project
+         * tracking and the Ever Works side of a Gauzy project. Exactly `'true'`
+         * is on, defaulting to OFF (an unset, empty or misspelled value keeps
+         * it off), beside the other `*_ENABLED` switches; the CI default-off
+         * check (`scripts/ci/check-default-off-switches.mjs`) keeps every
+         * deployed manifest at `false` until an environment opts in.
+         */
+        projectWorks: {
+            enabled() {
+                return process.env.EVER_WORKS_PROJECT_WORKS_ENABLED === 'true';
+            },
+        },
         apps: {
             worksEnabled() {
                 return process.env.EVER_WORKS_APP_WORKS_ENABLED === 'true';

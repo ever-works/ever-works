@@ -97,8 +97,23 @@ export class TitlerService {
         const collapsed = firstSentence.trim().replace(/\s+/g, ' ');
         // Strip trailing punctuation — sentence-end markers add no
         // signal in a title.
-        const stripped = collapsed.replace(/[!?,;:\-—]+$/, '').trim();
+        const stripped = stripTrailingPunctuation(collapsed).trim();
         const clipped = stripped.slice(0, maxChars).trim();
         return clipped.length > 0 ? clipped : FALLBACK_TITLES[kind];
     }
+}
+
+/** Sentence-end markers that add no signal at the end of a title. */
+const TRAILING_PUNCTUATION = new Set(['!', '?', ',', ';', ':', '-', '—']);
+
+/**
+ * `value` without its trailing run of {@link TRAILING_PUNCTUATION}. A loop, not
+ * the old character-class-plus-`$` regex: CodeQL flags that pattern as polynomial
+ * on prompt input (js/polynomial-redos). V8 happens to run it in linear time, but
+ * a loop is linear by construction on any engine.
+ */
+function stripTrailingPunctuation(value: string): string {
+    let end = value.length;
+    while (end > 0 && TRAILING_PUNCTUATION.has(value[end - 1])) end -= 1;
+    return value.slice(0, end);
 }

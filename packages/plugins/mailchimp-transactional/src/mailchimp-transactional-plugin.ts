@@ -91,7 +91,11 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 				subject: input.subject,
 				text: input.bodyText,
 				html: input.bodyHtml,
-				headers: input.replyTo ? { 'Reply-To': input.replyTo } : undefined,
+				// EW-P4-3 — RFC threading headers ride along with Reply-To.
+				headers:
+					input.replyTo || input.headers
+						? { ...(input.headers ?? {}), ...(input.replyTo ? { 'Reply-To': input.replyTo } : {}) }
+						: undefined,
 				metadata: input.metadata,
 				attachments: input.attachments?.map((a) => ({
 					type: a.mimeType,

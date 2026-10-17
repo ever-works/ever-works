@@ -1,0 +1,28 @@
+{
+	"id": "5b8f2a1c-3d4e-4f60-8a7b-9c0d1e2f3a4b",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 2,
+	"createdAt": "2026-10-16T09:00:00.000Z",
+	"updatedAt": "2026-10-16T09:05:00.000Z",
+	"recipientUserId": "2b6d4e8f-0a3c-4d5e-9f71-8b9c0d1e2f30",
+	"kind": "question",
+	"title": "Which pricing tier should the landing page lead with?",
+	"body": "Which pricing tier should the landing page lead with?\n\nThe brief lists three tiers but does not say which one to feature.",
+	"options": [
+		{ "id": "pro", "label": "Pro", "recommended": true },
+		{ "id": "team", "label": "Team" }
+	],
+	"sourceType": "agent-run",
+	"status": "answered",
+	"unread": false,
+	"answeredAt": "2026-10-16T09:05:00.000Z",
+	"answerText": "Lead with Pro, mention Team below.",
+	"answerOptionId": "pro",
+	"agentId": "3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41",
+	"agentRunId": "4d8f6a01-2c5e-4f70-9b93-0d1e2f3a4b52",
+	"taskId": "5e907b12-3d6f-4081-8ca4-1e2f3a4b5c63",
+	"workId": null,
+	"escalationId": null,
+	"proposalId": null,
+	"webUrl": "https://app.ever.works/inbox?id=5b8f2a1c-3d4e-4f60-8a7b-9c0d1e2f3a4b"
+}

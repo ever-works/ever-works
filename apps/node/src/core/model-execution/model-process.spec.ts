@@ -306,7 +306,11 @@ interface Harness {
 const roots: string[] = [];
 
 afterEach(async () => {
-	await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+	// A child the test just killed can still be writing into the root, so a single
+	// rmdir races it (ENOTEMPTY seen in CI); rm retries those codes itself.
+	await Promise.all(
+		roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }))
+	);
 });
 
 async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = process.env): Promise<Harness> {

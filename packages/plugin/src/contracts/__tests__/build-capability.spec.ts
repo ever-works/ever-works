@@ -162,7 +162,7 @@ const EXISTING_CATEGORIES = [
  * the assertions weaker, it makes them FAIL on a legitimate append — which is
  * exactly how the "last category is `build`" pin here was found.
  */
-const LATER_CAPABILITIES: readonly string[] = ['identity-provider', 'apps-tier'];
+const LATER_CAPABILITIES: readonly string[] = ['identity-provider', 'apps-tier', 'domain-event-subscriber'];
 const LATER_CATEGORIES: readonly PluginCategory[] = ['identity'];
 
 /** The four strategies of Resolution R-13, in the plan's order (plan §4.1:585–589). */

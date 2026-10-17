@@ -54,7 +54,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *   POST /api/webhooks/:id/rotate-secret → 200 { subscription:{ id, status },
  *        signingSecret:<NEW> } — same row, history preserved.
  *   PATCH /api/webhooks/:id { status:'paused' } → 200 view status:'paused'
- *        (row then drops from the active list; per-id verbs still resolve it).
+ *        (row stays listed as paused; per-id verbs still resolve it).
  *   DELETE /api/webhooks/:id → 204; repeat / cross-account / rotate-after-delete
  *        on the id → 404.
  *
@@ -241,14 +241,14 @@ test.describe('Webhooks subscriptions — end-to-end lifecycle (multi-step)', ()
         expect(rotBody.subscription.status).toBe('active');
         expect(rotBody.signingSecret).not.toBe(sub.signingSecret);
 
-        // 5) pause → drops from the active list.
+        // 5) pause → still listed (the list returns every status), as paused.
         const pause = await request.patch(`${WEBHOOKS}/${sub.id}`, {
             headers: authedHeaders(u.access_token),
             data: { status: 'paused' },
         });
         expect(pause.status()).toBe(200);
         subs = await listSubscriptions(request, u.access_token);
-        expect(subs.map((s) => s.id)).not.toContain(sub.id);
+        expect(subs.find((s) => s.id === sub.id)?.status).toBe('paused');
 
         // 6) delete → 204; the id then masks as 404 on every verb.
         const del = await request.delete(`${WEBHOOKS}/${sub.id}`, {
@@ -450,10 +450,10 @@ test.describe('Webhooks — redelivery survives the subscription lifecycle', () 
             data: { status: 'paused' },
         });
         expect(pause.status()).toBe(200);
-        // The active list no longer shows it...
-        expect((await listSubscriptions(request, u.access_token)).map((s) => s.id)).not.toContain(
-            sub.id,
-        );
+        // The list shows it as paused...
+        expect(
+            (await listSubscriptions(request, u.access_token)).find((s) => s.id === sub.id)?.status,
+        ).toBe('paused');
 
         // ...yet redeliver is NOT status-gated — the replay still enqueues.
         const rd = await redeliver(request, u.access_token, d1);
@@ -473,7 +473,7 @@ test.describe('Webhooks — redelivery survives the subscription lifecycle', () 
             headers: authedHeaders(u.access_token),
         });
         expect(del.status()).toBe(204);
-        // The subscription is gone from the active list.
+        // The subscription is gone from the list.
         expect((await listSubscriptions(request, u.access_token)).map((s) => s.id)).not.toContain(
             sub.id,
         );

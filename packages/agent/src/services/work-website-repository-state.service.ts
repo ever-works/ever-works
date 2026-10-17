@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Work } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import { GitFacadeService } from '@src/facades/git.facade';
+import { workKindHasRepository } from '@ever-works/contracts';
 
 @Injectable()
 export class WorkWebsiteRepositoryStateService {
@@ -34,6 +35,12 @@ export class WorkWebsiteRepositoryStateService {
      * — much worse — so we err toward "not initialised" on uncertainty.
      */
     async isInitialized(work: Work, user: User): Promise<boolean> {
+        // EW-P2-4: a Work with no repository (a Project Work) never has a
+        // website repository — and a probe of the derived `<slug>-website`
+        // name could find an unrelated one.
+        if (!workKindHasRepository(work.kind)) {
+            return false;
+        }
         if (
             work.website ||
             work.deployProjectId ||

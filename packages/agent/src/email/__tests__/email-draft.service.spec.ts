@@ -401,6 +401,64 @@ describe('EmailDraftService', () => {
         });
     });
 
+    // EW-P4-3 — a reply keeps its thread whether it is sent at once or held.
+    describe('RFC threading', () => {
+        const REPLY: SubmitAgentEmailInput = {
+            ...INPUT,
+            headers: {
+                'In-Reply-To': '<in-1@client.test>',
+                References: '<root@client.test> <in-1@client.test>',
+            },
+        };
+
+        it('passes the reply headers straight through when the inbox sends on its own', async () => {
+            const { service, facade } = makeHarness('auto-send');
+            await service.submit(REPLY);
+            expect(facade.send).toHaveBeenCalledWith(
+                expect.objectContaining({ headers: REPLY.headers }),
+                expect.anything(),
+            );
+        });
+
+        it('keeps the thread on a held draft and threads the release', async () => {
+            const { service, facade, rows } = makeHarness('draft-review');
+            const outcome = await service.submit(REPLY);
+            expect(outcome.held).toBe(true);
+            const draftId = (outcome as { messageId: string }).messageId;
+            expect(rows.get(draftId)).toMatchObject({
+                inReplyTo: 'in-1@client.test',
+                references: ['root@client.test', 'in-1@client.test'],
+            });
+
+            await service.approve('user-1', draftId);
+
+            expect(facade.send).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    headers: {
+                        'In-Reply-To': '<in-1@client.test>',
+                        References: '<root@client.test> <in-1@client.test>',
+                    },
+                }),
+                expect.objectContaining({ draftMessageId: draftId }),
+            );
+        });
+
+        it("keeps a held reply in its parent's conversation", async () => {
+            const { service, rows } = makeHarness('draft-review');
+            const outcome = await service.submit({ ...REPLY, conversationId: 'conv-3' });
+            expect(rows.get((outcome as { messageId: string }).messageId)).toMatchObject({
+                conversationId: 'conv-3',
+            });
+        });
+
+        it('releases a draft that replies to nothing without threading headers', async () => {
+            const { service, facade } = makeHarness('draft-review');
+            const outcome = await service.submit(INPUT);
+            await service.approve('user-1', (outcome as { messageId: string }).messageId);
+            expect(facade.send.mock.calls[0][0].headers).toBeUndefined();
+        });
+    });
+
     describe('discard', () => {
         it('discards a draft, mirrors the rejection, and cannot then be approved', async () => {
             const harness = makeHarness();

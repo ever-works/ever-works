@@ -26,7 +26,7 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  *     for that card's status, clicking one performs the transition
  *     (server action → POST /api/tasks/:id/transition), the API reflects it,
  *     and after a reload the card re-renders in its new column's move-state.
- *   - Cancelled cards expose NO move affordance (terminal state).
+ *   - Cancelled cards offer only the re-open targets, Backlog and To do (EW-P1-6).
  *   - New tasks created via the API appear on the board after reload.
  *
  * Board data contract (PROBED live, sqlite in-memory, all flags on):
@@ -45,7 +45,7 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  *       backlog → todo, cancelled
  *       todo    → in_progress, blocked, cancelled
  *       done / cancelled are terminal-ish (done → in_progress only;
- *       cancelled → []).
+ *       cancelled → backlog, todo — re-open, EW-P1-6).
  *
  * The UI tests run as the seeded user (default `chromium` project reuses the
  * stored storageState); the board only ever shows THAT user's tasks, so the
@@ -426,7 +426,7 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         }).toPass({ timeout: 30_000 });
     });
 
-    test('a cancelled card exposes no Move affordance (terminal state)', async ({
+    test('a cancelled card Move menu offers exactly the re-open targets (backlog, todo)', async ({
         page,
         request,
     }) => {
@@ -441,8 +441,21 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
-        // NEXT_STATUS.cancelled === [] → the "Move →" trigger is not rendered.
-        await expect(card.getByRole('button', { name: /move/i })).toHaveCount(0);
+
+        // EW-P1-6: NEXT_STATUS.cancelled === ['backlog', 'todo'].
+        await expect(async () => {
+            const todoItem = card.getByRole('button', { name: 'To do', exact: true });
+            if (!(await todoItem.isVisible().catch(() => false))) {
+                await card
+                    .getByRole('button', { name: /move/i })
+                    .click({ timeout: 3_000 })
+                    .catch(() => undefined);
+            }
+            await expect(todoItem).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
+        await expect(card.getByRole('button', { name: 'Backlog', exact: true })).toBeVisible();
+        await expect(card.getByRole('button', { name: 'In progress', exact: true })).toHaveCount(0);
+        await expect(card.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
     });
 });
 

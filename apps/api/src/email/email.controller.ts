@@ -102,8 +102,12 @@ export class EmailController {
     async listAddresses(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('direction') direction?: EmailAddressDirection,
+        // EW-P4-3 — `includeDisabled=true` (exact string): the settings page.
+        @Query('includeDisabled') includeDisabled?: string,
     ) {
-        const addresses = await this.emailService.listAddresses(auth.userId, direction);
+        const addresses = await this.emailService.listAddresses(auth.userId, direction, {
+            includeDisabled: includeDisabled === 'true',
+        });
         return { addresses: toPublicEmailAddresses(addresses) };
     }
 
@@ -145,7 +149,10 @@ export class EmailController {
     @UseGuards(AuthSessionGuard)
     @ApiBearerAuth('JWT-auth')
     @Post('addresses/:id/verify')
-    @ApiOperation({ summary: 'Trigger verification email for an address' })
+    // EW-P4-3 — this now really mails the address (which the caller typed):
+    // bound per caller as well as per address (the service's cooldown).
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    @ApiOperation({ summary: 'Send the confirmation email for an address' })
     async triggerVerification(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         return this.emailService.triggerVerification(auth.userId, id);
     }
@@ -358,10 +365,20 @@ export class EmailController {
                 providerMessageId: message.providerMessageId,
                 from: message.from,
                 to: [...message.to],
+                // EW-P4-3 — Cc, attachments and the provider metadata used to
+                // be dropped here; the dispatcher now keeps them.
+                cc: message.cc ? [...message.cc] : undefined,
+                attachments: message.attachments ? [...message.attachments] : undefined,
+                metadata: message.metadata,
                 subject: message.subject,
                 bodyText: message.bodyText,
                 bodyHtml: message.bodyHtml,
                 receivedAt: message.receivedAt,
+                // EW-P4-3 — RFC threading ids (bare), for the dispatcher to
+                // join the thread a reply belongs to.
+                messageIdHeader: message.messageIdHeader,
+                inReplyTo: message.inReplyTo,
+                references: message.references ? [...message.references] : undefined,
             });
         }
 

@@ -128,6 +128,14 @@ module.exports = {
         // Points at the agent package's existing stub rather than a second
         // copy: one behaviour, one file.
         '^p-map$': '<rootDir>/../../../packages/agent/test/jest-mocks/p-map.ts',
+        // `github-slugger` is ESM-only too, and reaches api specs the same way:
+        // `@src/services` -> work-lifecycle -> markdown generator -> readme-builder.
+        // Since #2638 the Integration API module graph (webhooks controller ->
+        // webhooks-deliveries -> `@src/services`) pulls it into five suites that
+        // then failed to RUN (integration-contract, kb / missions / works-write
+        // controllers, load-env). Same answer as `p-map`: one stub, mapped here.
+        // Specs that `jest.mock('github-slugger', …)` themselves still win.
+        '^github-slugger$': '<rootDir>/../test/jest-mocks/github-slugger.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

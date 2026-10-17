@@ -7,7 +7,9 @@ import {
     Query,
     Req,
     Res,
+    UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../integration/integration-forbidden.guard';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 
@@ -30,6 +32,8 @@ import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 
 @ApiTags('Auth')
 @Controller('api/oauth')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class OAuthController {
     constructor(
         private readonly socialAuthService: SocialAuthService,

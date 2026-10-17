@@ -210,10 +210,15 @@ export class TeamsController {
     })
     @ApiResponse({ status: 200, description: 'Team resources listed' })
     async listResources(
+        @CurrentUser() auth: AuthenticatedUser,
         @Param('orgId', ParseUUIDPipe) orgId: string,
         @Param('teamId', ParseUUIDPipe) teamId: string,
     ): Promise<TeamResourcesGrouped> {
-        return this.teamResources.listForTeam(orgId, teamId);
+        // Review 2026-10-17 F4: only the records this person may read.
+        return this.teamResources.listForTeam(orgId, teamId, {
+            kind: 'user',
+            userId: auth.userId,
+        });
     }
 
     @Post('teams/:teamId/resources')

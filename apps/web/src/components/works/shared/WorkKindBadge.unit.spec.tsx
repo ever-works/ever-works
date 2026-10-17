@@ -18,6 +18,8 @@ describe('WorkKindBadge', () => {
         ['awesome-repo', 'awesome-repo'],
         ['repo', 'repo'],
         ['company', 'company'],
+        // EW-P2-4 — the repo-less Project kind.
+        ['project', 'project'],
         ['default', 'default'],
     ])('renders the %s kind', (kind, expected) => {
         render(<WorkKindBadge kind={kind} />);

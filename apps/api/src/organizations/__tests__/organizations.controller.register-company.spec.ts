@@ -2,6 +2,14 @@ jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
 jest.mock('@ever-works/contracts/api', () => ({}));
+// Domain events (EW-P1-1 B2): the real barrel loads the entity graph, which
+// the empty entities mock above leaves half-initialized. The service only
+// needs the publisher type (absent here) and the best-effort helper.
+jest.mock('@ever-works/agent/domain-events', () => ({
+    DomainEventPublisher: class DomainEventPublisher {},
+    recordAfterWrite: jest.fn(),
+    buildMemberSnapshot: jest.fn(),
+}));
 
 import { OrganizationsController } from '../organizations.controller';
 

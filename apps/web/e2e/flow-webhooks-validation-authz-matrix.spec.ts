@@ -370,37 +370,48 @@ test.describe('Webhooks patch — status field validation grid', () => {
         }
     });
 
-    test('null status and an empty body yield the SINGLE-string controller message (400)', async ({
+    test('an empty body yields the SINGLE-string "Nothing to update" (400); a null status changes nothing', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
         const { view } = await createSub(request, u.access_token, 'patch-null');
-        // @IsOptional skips null → DTO passes → controller fall-through fires.
-        for (const data of [{ status: null }, {}]) {
-            const res = await request.patch(`${WEBHOOKS}/${view.id}`, {
-                headers: authedHeaders(u.access_token),
-                data,
-            });
-            expect(res.status(), JSON.stringify(data)).toBe(400);
-            const body = (await res.json()) as { message: string };
-            // Distinct from the present-but-invalid grid: a single string, not an array.
-            expect(typeof body.message).toBe('string');
-            expect(body.message).toBe('status must be one of: paused');
-        }
+        const headers = authedHeaders(u.access_token);
+        // Webhooks v2 (#2623): PATCH takes status / url / events / organizationIds /
+        // excludeOriginTags / description; with none of them the controller answers
+        // one string (distinct from the present-but-invalid grid's array).
+        const empty = await request.patch(`${WEBHOOKS}/${view.id}`, { headers, data: {} });
+        expect(empty.status()).toBe(400);
+        const body = (await empty.json()) as { message: string };
+        expect(typeof body.message).toBe('string');
+        expect(body.message).toBe('Nothing to update');
+        // @IsOptional lets a null status through and it names no change: a no-op,
+        // never a 5xx, and the subscription stays active.
+        const nullStatus = await request.patch(`${WEBHOOKS}/${view.id}`, {
+            headers,
+            data: { status: null },
+        });
+        expect(nullStatus.status()).toBe(200);
+        expect(((await nullStatus.json()) as { status?: string }).status).toBe('active');
     });
 
-    test('status:active is a hard 400 (resume is intentionally unsupported)', async ({
+    test('status:active resumes a paused subscription (webhooks v2, #2623)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
         const { view } = await createSub(request, u.access_token, 'patch-active');
+        const headers = authedHeaders(u.access_token);
+        const paused = await request.patch(`${WEBHOOKS}/${view.id}`, {
+            headers,
+            data: { status: 'paused' },
+        });
+        expect(paused.status()).toBe(200);
+        expect(((await paused.json()) as { status?: string }).status).toBe('paused');
         const res = await request.patch(`${WEBHOOKS}/${view.id}`, {
-            headers: authedHeaders(u.access_token),
+            headers,
             data: { status: 'active' },
         });
-        expect(res.status()).toBe(400);
-        const body = (await res.json()) as { message: string };
-        expect(body.message).toContain('Resuming a paused subscription is not supported');
+        expect(res.status()).toBe(200);
+        expect(((await res.json()) as { status?: string }).status).toBe('active');
     });
 
     test('an unknown extra field is rejected before the status branch (forbidNonWhitelisted)', async ({

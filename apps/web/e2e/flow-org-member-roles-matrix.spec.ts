@@ -305,7 +305,7 @@ test.describe('Org authorization boundary (owner vs non-member, multi-tenant)', 
         }
     });
 
-    test('org-members contract: /members is live and owner-scoped; add/role/DELETE-org stay 404', async ({
+    test('org-members contract: /members is live and owner-scoped; role PATCH is live (EW-P2-6); add/DELETE-org stay 404', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -359,13 +359,16 @@ test.describe('Org authorization boundary (owner vs non-member, multi-tenant)', 
         });
         expect(addMember.status()).toBe(404);
 
-        // Still NO role matrix — roles are owner/member by construction and
-        // are not assignable over HTTP.
+        // PATCH /members/:userId EXISTS since EW-P2-6 (#2655): the Tenant owner
+        // sets admin | member. Changing the role of somebody who never joined is
+        // a truthful 400 `not_a_member` from a LIVE route, asserted as 400 (not
+        // 404) for the same reason as DELETE below.
         const patchMemberRole = await request.patch(
             `${API_BASE}/api/organizations/${org.id}/members/${member.user.id}`,
             { headers, data: { role: 'member' } },
         );
-        expect(patchMemberRole.status()).toBe(404);
+        expect(patchMemberRole.status()).toBe(400);
+        expect(JSON.stringify(await patchMemberRole.json())).toContain('not_a_member');
 
         // DELETE /members/:userId now EXISTS, so this is no longer
         // route-not-found. Removing somebody who never joined is a truthful

@@ -13,6 +13,7 @@ import {
 	EXIT_OK,
 	parseIntervalSeconds,
 	runCli,
+	startLanesAfterAcceptedHeartbeat,
 	type CliDeps
 } from './program';
 
@@ -504,6 +505,78 @@ describe('ever-works-node pause / resume', () => {
 		expect(h.logged()).not.toContain(SECRET);
 	});
 
+	it('#2628: a FAILED first heartbeat starts no lane; the first ACCEPTED beat does', async () => {
+		let beats = 0;
+		let leaseCalls = 0;
+		const timers: Array<() => void> = [];
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async (url) => {
+				if (url.endsWith('/api/fleet/jobs/lease')) {
+					leaseCalls += 1;
+					return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+				}
+				if (url.endsWith('/api/fleet/heartbeat')) {
+					beats += 1;
+					if (beats === 1) return { ok: false, status: 503, text: async () => '{"message":"down"}' };
+				}
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+			}
+		});
+		h.deps.io.scheduler = {
+			setTimeout: (callback: () => void) => {
+				timers.push(callback);
+				return timers.length;
+			},
+			clearTimeout: () => undefined
+		};
+		let shutdown!: () => void;
+		h.deps.waitForShutdown = () =>
+			new Promise<void>((resolve) => {
+				shutdown = resolve;
+			});
+		const flush = async (): Promise<void> => {
+			for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve));
+		};
+
+		const run = runCli(['start', '--work'], h.deps);
+		await flush();
+		expect(beats).toBe(1);
+		expect(leaseCalls).toBe(0);
+		expect(h.output()).toContain('Waiting for the platform to accept a heartbeat before leasing work');
+
+		// The retried beat is accepted: only now may the worker lease.
+		for (const fire of timers.splice(0)) fire();
+		await flush();
+		expect(beats).toBe(2);
+		expect(leaseCalls).toBeGreaterThanOrEqual(1);
+
+		shutdown();
+		expect(await run).toBe(EXIT_OK);
+		expect(h.output()).toContain('Stopped.');
+	});
+
+	it('#2628: a shutdown while waiting out failed heartbeats exits cleanly and never leases', async () => {
+		let leaseCalls = 0;
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async (url) => {
+				if (url.endsWith('/api/fleet/jobs/lease')) {
+					leaseCalls += 1;
+					return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+				}
+				return { ok: false, status: 503, text: async () => '{"message":"down"}' };
+			}
+		});
+		h.deps.io.scheduler = { setTimeout: () => 1, clearTimeout: () => undefined };
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--work'], h.deps)).toBe(EXIT_OK);
+		expect(leaseCalls).toBe(0);
+		expect(h.output()).toContain('Waiting for the platform to accept a heartbeat before leasing work');
+		expect(h.output()).toContain('Stopped.');
+	});
+
 	it('start comes back paused when the config says so, and says so loudly', async () => {
 		const paused = JSON.stringify({ ...JSON.parse(storedConfig), paused: true });
 		const h = harness({
@@ -703,5 +776,76 @@ describe('program surface', () => {
 	it('fails on an unknown subcommand', async () => {
 		const h = harness();
 		expect(await runCli(['teleport'], h.deps)).toBe(EXIT_FAILURE);
+	});
+});
+
+describe('startLanesAfterAcceptedHeartbeat (#2628)', () => {
+	type State = 'connected' | 'retrying' | 'stopped';
+	function loopIn(initial: State) {
+		let state = initial;
+		const listeners = new Set<(s: { state: State }) => void>();
+		return {
+			loop: {
+				getState: () => ({ state }) as never,
+				onChange: (listener: (s: never) => void) => {
+					listeners.add(listener as never);
+					return () => listeners.delete(listener as never);
+				}
+			} as never,
+			emit(next: State) {
+				state = next;
+				for (const listener of [...listeners]) listener({ state });
+			}
+		};
+	}
+
+	it('starts the lanes once a beat is accepted', async () => {
+		const o = loopIn('retrying');
+		let started = 0;
+		const outcome = startLanesAfterAcceptedHeartbeat(
+			o.loop,
+			async () => void (started += 1),
+			() => true
+		);
+		o.emit('connected');
+		await expect(outcome).resolves.toEqual({ started: true, failed: false });
+		expect(started).toBe(1);
+	});
+
+	it('starts nothing when the caller stops waiting (a shutdown) before any accepted beat', async () => {
+		const o = loopIn('retrying');
+		let started = 0;
+		let wait = true;
+		const outcome = startLanesAfterAcceptedHeartbeat(
+			o.loop,
+			async () => void (started += 1),
+			() => wait
+		);
+		wait = false;
+		o.emit('stopped');
+		await expect(outcome).resolves.toEqual({ started: false, failed: false });
+		expect(started).toBe(0);
+	});
+
+	it('never rejects: a failing start is reported as failed, with its error (review: the CLI then exits non-zero)', async () => {
+		const boom = new Error('safety marker could not be written');
+		await expect(
+			startLanesAfterAcceptedHeartbeat(
+				loopIn('connected').loop,
+				async () => {
+					throw boom;
+				},
+				() => true
+			)
+		).resolves.toEqual({ started: false, failed: true, error: boom });
+		await expect(
+			startLanesAfterAcceptedHeartbeat(
+				loopIn('connected').loop,
+				async () => {
+					throw undefined;
+				},
+				() => true
+			)
+		).resolves.toMatchObject({ started: false, failed: true });
 	});
 });

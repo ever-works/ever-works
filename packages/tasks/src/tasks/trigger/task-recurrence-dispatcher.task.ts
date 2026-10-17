@@ -38,7 +38,9 @@ export const taskRecurrenceDispatcherTask = schedules.task({
             const recurrence = await dispatcher.dispatchDue();
             const scheduled = await dispatcher.dispatchDueScheduled();
             const fanout = await dispatcher.dispatchUnblockedTodo();
-            return { recurrence, scheduled, fanout };
+            // EW-P2-3 — `task_due_soon` notices (notifies only; never runs work).
+            const dueSoon = await dispatcher.notifyDueSoon();
+            return { recurrence, scheduled, fanout, dueSoon };
         } finally {
             await appContext.close();
         }

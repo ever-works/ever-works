@@ -69,8 +69,11 @@ export const FLEET_RUN_API_KEY_KIND = 'fleet-run';
 /** The `kind` every personal `ew_live_` key carries (and the column default). */
 export const PERSONAL_API_KEY_KIND = 'personal';
 
-/** `api_keys.kind` vocabulary. */
-export type ApiKeyKind = typeof PERSONAL_API_KEY_KIND | typeof FLEET_RUN_API_KEY_KIND;
+/**
+ * `api_keys.kind` vocabulary. `'integration'` (EW-P1-2) is the `ew_int_`
+ * integration key — see `integrations/integration-keys.types.ts`.
+ */
+export type ApiKeyKind = typeof PERSONAL_API_KEY_KIND | typeof FLEET_RUN_API_KEY_KIND | 'integration';
 
 /**
  * What the node gets back from `POST /api/fleet/jobs/:id/mcp-credential`.

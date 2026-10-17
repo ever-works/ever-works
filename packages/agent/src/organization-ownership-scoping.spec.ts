@@ -89,6 +89,11 @@ function mission(overrides: Partial<Mission>): Mission {
         sourceMissionId: null,
         tenantId: null,
         organizationId: null,
+        // Record visibility (EW-P1-3): the column defaults.
+        visibility: 'private',
+        visibilityExplicit: false,
+        // Aggregate version (EW-P2, migration 1795100000000): the column default.
+        version: 1,
         createdAt: new Date('2026-08-22T00:00:00.000Z'),
         updatedAt: new Date('2026-08-22T00:00:00.000Z'),
         ...overrides,

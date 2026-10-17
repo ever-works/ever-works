@@ -2655,6 +2655,7 @@
                 "appLauncher": "Запуск застосунків",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "Вебхуки",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8779,6 +8780,7 @@
             "app": "Застосунок",
             "company": "Company",
             "campaign": "Кампанія",
+            "project": "Проєкт",
             "default": "Work"
         },
         "meetingsPage": {

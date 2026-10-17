@@ -506,8 +506,15 @@ function uuid(index: number): string {
     return `${String(index).padStart(8, '0')}-0000-4000-8000-000000000000`;
 }
 
-/** Poll until `check()` is true, so an unawaited run can be observed. */
-async function waitFor(check: () => boolean, timeoutMs = 2_000): Promise<void> {
+/**
+ * Poll until `check()` is true, so an unawaited run can be observed.
+ *
+ * The ceiling is a HANG guard, not a timing assertion: the loop returns as soon as
+ * the condition holds. It sits just under this suite's 30 s `testTimeout` because a
+ * 2 s ceiling failed healthy runs on CPU-throttled CI runners (self-build handover
+ * item 14), where the same code simply needed longer to get scheduled.
+ */
+async function waitFor(check: () => boolean, timeoutMs = 20_000): Promise<void> {
     const started = Date.now();
     while (!check()) {
         if (Date.now() - started > timeoutMs) {

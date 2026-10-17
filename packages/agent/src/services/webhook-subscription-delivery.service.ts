@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { WebhookSubscriptionRepository, WebhookDeliveryRepository } from '../database';
+import type { WebhookSubscriptionStatus } from '../entities/webhook-subscription.entity';
 import { WebhookDeliveryService, type DeliveryResult } from './webhook-delivery.service';
+import { type WebhookEventRef, WebhookOwnerAccessService } from './webhook-owner-access.service';
 
 /**
  * Default dead-letter threshold (overridable via env). Picked to match the
@@ -23,7 +25,7 @@ export interface DispatchWebhookInput {
 
 export interface DispatchedWebhookResult {
     readonly result: DeliveryResult;
-    readonly subscription: { id: string; status: 'active' | 'paused' | 'failed' };
+    readonly subscription: { id: string; status: WebhookSubscriptionStatus };
     /**
      * `true` when the outcome is retryable AND we have NOT yet hit the
      * dead-letter threshold. Producers (Trigger.dev task) throw to trigger
@@ -63,6 +65,11 @@ export class WebhookSubscriptionDeliveryService {
         private readonly delivery: WebhookDeliveryService,
         private readonly subscriptions: WebhookSubscriptionRepository,
         private readonly deliveries: WebhookDeliveryRepository,
+        // Webhooks v2 (EW-P1-5): the owner's access is re-checked right before
+        // every v2 send (a queued or retried delivery must not reach a receiver
+        // whose owner lost access). Optional + last; when absent, v2 deliveries
+        // are refused rather than sent unchecked.
+        @Optional() private readonly ownerAccess?: WebhookOwnerAccessService,
     ) {}
 
     /**
@@ -212,19 +219,71 @@ export class WebhookSubscriptionDeliveryService {
             };
         }
 
+        // Webhooks v2 (EW-P1-5): v2 subscriptions sign `t=,v1=` and, inside a
+        // rotation's grace window, also with the previous secret.
+        const isV2 = Number(sub.version) === 2;
+        if (isV2) {
+            const organizationId = (input.payload as { organizationId?: unknown }).organizationId;
+            const access = this.ownerAccess
+                ? await this.ownerAccess.canReceive(
+                      sub,
+                      typeof organizationId === 'string' ? organizationId : null,
+                      // EW-P3-1 — a recipient-scoped event (inbox, email) also needs
+                      // the key's read scope at send time.
+                      input.event,
+                      // Review 2026-10-17 F2 — a user owner must still be able to read
+                      // the event's record (the payload is the domain-event envelope).
+                      input.payload as WebhookEventRef,
+                  )
+                : { allowed: false, disable: false };
+            if (!access.allowed) {
+                if (access.disable) {
+                    await this.subscriptions.markDisabled(sub.id).catch(() => undefined);
+                }
+                this.logger.warn(
+                    `webhook.owner_access_denied sub=${sub.id} event=${input.event} — not sending`,
+                );
+                await this.recordTerminalSkip(input, {
+                    outcome: 'owner_access_denied',
+                    error: this.ownerAccess ? 'owner_access_denied' : 'owner_access_unchecked',
+                });
+                return {
+                    result: {
+                        ok: false,
+                        outcome: 'client_error',
+                        error: 'owner_access_denied',
+                        deliveryId: input.deliveryId ?? sub.id,
+                    },
+                    subscription: { id: sub.id, status: access.disable ? 'disabled' : sub.status },
+                    shouldRetry: false,
+                    consecutiveFailures: sub.consecutiveFailures,
+                };
+            }
+        }
+        let previousSecret: string | null = null;
+        if (
+            isV2 &&
+            sub.previousSecretEncrypted &&
+            sub.previousSecretExpiresAt &&
+            sub.previousSecretExpiresAt.getTime() > Date.now()
+        ) {
+            previousSecret = this.decryptSecret(sub.previousSecretEncrypted) || null;
+        }
         const result = await this.delivery.deliver({
             url: sub.url,
             secret,
             event: input.event,
             payload: input.payload,
             deliveryId: input.deliveryId,
+            signatureVersion: isV2 ? 2 : 1,
+            previousSecret,
         });
 
         return this.applyResult(sub, result, input);
     }
 
     private async applyResult(
-        sub: { id: string; status: 'active' | 'paused' | 'failed'; consecutiveFailures: number },
+        sub: { id: string; status: WebhookSubscriptionStatus; consecutiveFailures: number },
         result: DeliveryResult,
         input: DispatchWebhookInput,
     ): Promise<DispatchedWebhookResult> {

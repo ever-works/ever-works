@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const sendEmailMock = vi.fn();
 
@@ -96,6 +96,157 @@ describe('PostmarkPlugin', () => {
 			await plugin.sendEmail(input, { userId: 'user-a' });
 			await plugin.sendEmail(input, { userId: 'user-b' });
 			expect(sendEmailMock).toHaveBeenCalledTimes(2);
+		});
+	});
+
+	// EW-P4-3 — RFC threading.
+	describe('RFC threading headers', () => {
+		it('forwards EmailSendInput.headers as Postmark Headers', async () => {
+			sendEmailMock.mockResolvedValueOnce({ MessageID: 'pm-1', ErrorCode: 0 });
+			await plugin.sendEmail(
+				{
+					from: 'a@example.com',
+					to: ['b@example.com'],
+					subject: 'Re: hi',
+					bodyText: 'hi',
+					messageRef: 'ref-thread',
+					headers: {
+						'Message-ID': '<out-1@acme.test>',
+						'In-Reply-To': '<in-1@client.test>',
+						References: '<root@client.test> <in-1@client.test>'
+					}
+				},
+				{ userId: 'user-1' }
+			);
+			expect(sendEmailMock.mock.calls[0][0].Headers).toEqual([
+				{ Name: 'Message-ID', Value: '<out-1@acme.test>' },
+				{ Name: 'In-Reply-To', Value: '<in-1@client.test>' },
+				{ Name: 'References', Value: '<root@client.test> <in-1@client.test>' }
+			]);
+		});
+
+		it('sends no Headers when none are given', async () => {
+			sendEmailMock.mockResolvedValueOnce({ MessageID: 'pm-2', ErrorCode: 0 });
+			await plugin.sendEmail(
+				{ from: 'a@example.com', to: ['b@example.com'], subject: 's', bodyText: 'b', messageRef: 'ref-none' },
+				{ userId: 'user-1' }
+			);
+			expect(sendEmailMock.mock.calls[0][0].Headers).toBeUndefined();
+		});
+
+		it('parses Message-ID / In-Reply-To / References from the inbound Headers (case-insensitive)', async () => {
+			const msg = await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'postmark-own-id',
+						From: 'x@y.test',
+						To: 'agent@acme.test',
+						Subject: 'Re: hi',
+						Date: '2026-10-15T10:00:00Z',
+						Headers: [
+							{ Name: 'message-id', Value: '<reply-2@client.test>' },
+							{ Name: 'In-Reply-To', Value: '<out-1@acme.test>' },
+							{ Name: 'References', Value: '<root@client.test>\r\n <out-1@acme.test>' }
+						]
+					})
+				),
+				{},
+				{}
+			);
+			expect(msg.providerMessageId).toBe('postmark-own-id');
+			expect(msg.messageIdHeader).toBe('reply-2@client.test');
+			expect(msg.inReplyTo).toBe('out-1@acme.test');
+			expect(msg.references).toEqual(['root@client.test', 'out-1@acme.test']);
+		});
+
+		it('parses Cc from CcFull, or from the raw Cc header (EW-P4-3)', async () => {
+			const full = await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'm1',
+						From: 'x@y.test',
+						To: 'a@b.test',
+						CcFull: [{ Email: 'c1@b.test', Name: 'C One' }, { Email: 'c2@b.test' }],
+						Subject: 's',
+						Date: '2026-10-15T10:00:00Z'
+					})
+				),
+				{},
+				{}
+			);
+			expect(full.cc).toEqual(['c1@b.test', 'c2@b.test']);
+			const raw = await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'm2',
+						From: 'x@y.test',
+						To: 'a@b.test',
+						Cc: '"C One" <c1@b.test>, c2@b.test',
+						Subject: 's',
+						Date: '2026-10-15T10:00:00Z'
+					})
+				),
+				{},
+				{}
+			);
+			expect(raw.cc).toEqual(['c1@b.test', 'c2@b.test']);
+		});
+
+		// Review (#2612): a quoted display name may contain a comma.
+		it('keeps a quoted display name with a comma in one Cc mailbox', async () => {
+			const msg = await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'm3',
+						From: 'x@y.test',
+						To: 'a@b.test',
+						Cc: '"Doe, John" <john@example.com>, jane@example.com, "a\\"b, c" <q@example.com>',
+						Subject: 's',
+						Date: '2026-10-15T10:00:00Z'
+					})
+				),
+				{},
+				{}
+			);
+			expect(msg.cc).toEqual(['john@example.com', 'jane@example.com', 'q@example.com']);
+		});
+
+		it('splits a hostile Cc header in linear time', async () => {
+			const started = Date.now();
+			await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'm4',
+						From: 'x@y.test',
+						To: 'a@b.test',
+						Cc: '"'.repeat(100_000) + '<'.repeat(100_000),
+						Subject: 's',
+						Date: '2026-10-15T10:00:00Z'
+					})
+				),
+				{},
+				{}
+			);
+			expect(Date.now() - started).toBeLessThan(2000);
+		});
+
+		it('leaves the threading fields out when the headers are absent', async () => {
+			const msg = await plugin.parseInboundWebhook(
+				Buffer.from(
+					JSON.stringify({
+						MessageID: 'm',
+						From: 'x@y.test',
+						To: 'a@b.test',
+						Subject: 's',
+						Date: '2026-10-15T10:00:00Z'
+					})
+				),
+				{},
+				{}
+			);
+			expect(msg.messageIdHeader).toBeUndefined();
+			expect(msg.inReplyTo).toBeUndefined();
+			expect(msg.references).toBeUndefined();
 		});
 	});
 
@@ -216,18 +367,100 @@ describe('PostmarkPlugin', () => {
 			).toThrow(/signature mismatch/);
 		});
 
-		it('accepts when no secret configured', () => {
-			expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
+		// EW-P4-3 — with no secret configured an inbound webhook is REFUSED
+		// (it used to be accepted with a warning: anyone who knew the public
+		// URL could inject mail). Only the explicit operator opt-out accepts it.
+		describe('with no secret configured', () => {
+			const savedSecret = process.env.POSTMARK_INBOUND_SECRET;
+			const savedOptOut = process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+
+			beforeEach(() => {
+				delete process.env.POSTMARK_INBOUND_SECRET;
+				delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+			});
+
+			afterEach(() => {
+				if (savedSecret === undefined) delete process.env.POSTMARK_INBOUND_SECRET;
+				else process.env.POSTMARK_INBOUND_SECRET = savedSecret;
+				if (savedOptOut === undefined) delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+				else process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = savedOptOut;
+			});
+
+			it('refuses an unsigned webhook', () => {
+				expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).toThrow(
+					/refusing an unsigned webhook/
+				);
+			});
+
+			it('refuses a webhook carrying an Authorization header it cannot check', () => {
+				expect(() =>
+					plugin.verifyWebhookSignature(
+						Buffer.from(''),
+						{ authorization: `Basic ${Buffer.from('postmark:guess').toString('base64')}` },
+						{ settings: {} }
+					)
+				).toThrow(/refusing an unsigned webhook/);
+			});
+
+			it.each(['TRUE', '1', 'yes', ' true', ''])(
+				'stays secure when EMAIL_INBOUND_ALLOW_UNSIGNED is %j (only the exact string "true" opts out)',
+				(value) => {
+					process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = value;
+					expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).toThrow(
+						/refusing an unsigned webhook/
+					);
+				}
+			);
+
+			it('accepts — and warns the operator — only with EMAIL_INBOUND_ALLOW_UNSIGNED=true', () => {
+				process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = 'true';
+				const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+				try {
+					expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
+					expect(warnSpy).toHaveBeenCalledTimes(1);
+					expect(warnSpy.mock.calls[0][0]).toMatch(/WITHOUT signature verification/);
+				} finally {
+					warnSpy.mockRestore();
+				}
+			});
+
+			it('verifies with the env secret when POSTMARK_INBOUND_SECRET is set', () => {
+				process.env.POSTMARK_INBOUND_SECRET = 'env-secret';
+				const good = `Basic ${Buffer.from('postmark:env-secret').toString('base64')}`;
+				expect(() =>
+					plugin.verifyWebhookSignature(Buffer.from(''), { authorization: good }, { settings: {} })
+				).not.toThrow();
+				expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).toThrow(
+					/missing or malformed Authorization header/
+				);
+			});
 		});
 
-		it('warns the operator when accepting an unsigned inbound webhook (no secret configured)', () => {
-			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		it('accepts a correctly signed webhook (Basic postmark:<secret>)', () => {
+			const good = `Basic ${Buffer.from('postmark:super-secret').toString('base64')}`;
+			expect(() =>
+				plugin.verifyWebhookSignature(
+					Buffer.from(''),
+					{ authorization: good },
+					{ settings: { inboundWebhookSecret: 'super-secret' } }
+				)
+			).not.toThrow();
+		});
+
+		it('the opt-out never weakens a configured secret: a missing signature still throws', () => {
+			const saved = process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+			process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = 'true';
 			try {
-				expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
-				expect(warnSpy).toHaveBeenCalledTimes(1);
-				expect(warnSpy.mock.calls[0][0]).toMatch(/WITHOUT signature verification/);
+				expect(() =>
+					plugin.verifyWebhookSignature(
+						Buffer.from(''),
+						{},
+						{ settings: { inboundWebhookSecret: 'super-secret' } }
+					)
+				).toThrow(/missing or malformed Authorization header/);
 			} finally {
-				warnSpy.mockRestore();
+				if (saved === undefined) delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+				else process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = saved;
 			}
 		});
 

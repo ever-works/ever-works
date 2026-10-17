@@ -1,4 +1,5 @@
 import 'server-only';
+import type { RecordListView } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -261,6 +262,11 @@ export interface UpdateGoalInput {
 }
 
 export interface ListGoalsInput {
+    /**
+     * Record visibility (EW-P1-3) list tab, sent as `view`: `mine` (default — omitted),
+     * `shared` or `organization`.
+     */
+    view?: RecordListView;
     status?: GoalStatus;
     limit?: number;
     offset?: number;
@@ -274,6 +280,7 @@ function buildListEndpoint(input?: ListGoalsInput): string {
     if (input?.limit) params.set('limit', String(input.limit));
     if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
     if (input?.archived !== undefined) params.set('archived', String(input.archived));
+    if (input?.view && input.view !== 'mine') params.set('view', input.view);
     const qs = params.toString();
     return qs ? `/me/goals?${qs}` : '/me/goals';
 }

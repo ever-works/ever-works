@@ -488,11 +488,16 @@ describe('TasksKanbanView', () => {
         expect(targets).toEqual(['To do', 'Cancelled']);
     });
 
-    it('offers no Move affordance on a cancelled card', () => {
+    // EW-P1-6 — a cancelled Task re-opens into the backlog or todo, nowhere else.
+    it('offers only the re-open moves on a cancelled card', () => {
         renderBoard({ tasks: [task({ status: 'cancelled' })] });
-        expect(
-            within(cardsIn('cancelled')[0]).queryByRole('button', { name: 'Move →' }),
-        ).toBeNull();
+        const card = cardsIn('cancelled')[0];
+        fireEvent.click(within(card).getByRole('button', { name: 'Move →' }));
+        const targets = within(card)
+            .getAllByRole('button')
+            .filter((button) => button.getAttribute('data-status'))
+            .map((button) => button.textContent);
+        expect(targets).toEqual(['Backlog', 'To do']);
     });
 
     it('shows the server’s reason when a move is refused, and a plain fallback when it gave none', async () => {
@@ -512,7 +517,7 @@ describe('TasksKanbanView', () => {
         );
     });
 
-    it('explains, once per drag, why a cancelled Task cannot be dropped anywhere', () => {
+    it('explains, once per drag, why a cancelled Task can only be dropped on Backlog or To do', () => {
         renderBoard({ tasks: [task({ status: 'cancelled' })] });
         const card = cardsIn('cancelled')[0];
         const dataTransfer = { setData: vi.fn(), getData: vi.fn(), effectAllowed: '' };
@@ -520,11 +525,18 @@ describe('TasksKanbanView', () => {
 
         const dropZone = (status: TaskStatus) =>
             column(status).querySelector('.overflow-y-auto') as HTMLElement;
+        // The re-open targets accept the card without a word (EW-P1-6)…
         fireEvent.dragOver(dropZone('todo'), { dataTransfer });
+        fireEvent.dragOver(dropZone('backlog'), { dataTransfer });
+        expect(toastError).not.toHaveBeenCalled();
+        // …anything else is refused, and said once per drag.
         fireEvent.dragOver(dropZone('in_progress'), { dataTransfer });
+        fireEvent.dragOver(dropZone('done'), { dataTransfer });
 
         expect(toastError).toHaveBeenCalledTimes(1);
-        expect(toastError).toHaveBeenCalledWith("A cancelled Task can't be reopened.");
+        expect(toastError).toHaveBeenCalledWith(
+            'A cancelled Task can only be reopened into Backlog or Todo.',
+        );
     });
 
     it('gives the priority chip its translated name as a tooltip', () => {

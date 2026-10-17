@@ -7,9 +7,11 @@ import {
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     UseGuards,
 } from '@nestjs/common';
+import { IsIn } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
@@ -17,6 +19,12 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
 import { CreateOrganizationInvitationDto } from './dto/create-organization-invitation.dto';
+
+/** EW-P2-6 — `PATCH /api/organizations/:orgId/members/:userId` body. */
+export class UpdateOrganizationMemberRoleDto {
+    @IsIn(['admin', 'member'])
+    role!: 'admin' | 'member';
+}
 
 /** Wire shape for a pending invitation. 🛑 Never carries the token. */
 export interface OrganizationInvitationResponse {
@@ -150,6 +158,27 @@ export class OrganizationInvitationsController {
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<void> {
         await this.flow.removeMember(orgId, targetUserId, user.userId);
+    }
+
+    @Patch('members/:userId')
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: "Change a member's role (admin | member)",
+        description:
+            'EW-P2-6. Only the Tenant owner changes roles; the owner role itself cannot be ' +
+            'granted or changed. An admin may create integration keys pinned to this ' +
+            'Organization; demoting them takes that away at once.',
+    })
+    @ApiResponse({ status: 200, description: 'The member, with the new role' })
+    @ApiResponse({ status: 400, description: 'Not a member, the owner, or an unknown role' })
+    @ApiResponse({ status: 403, description: 'The caller is not the Tenant owner' })
+    async updateMemberRole(
+        @Param('orgId', ParseUUIDPipe) orgId: string,
+        @Param('userId', ParseUUIDPipe) targetUserId: string,
+        @Body() dto: UpdateOrganizationMemberRoleDto,
+        @CurrentUser() user: AuthenticatedUser,
+    ): Promise<OrganizationMemberResponse> {
+        return this.flow.setMemberRole(orgId, targetUserId, dto.role, user.userId);
     }
 
     private toResponse(i: {

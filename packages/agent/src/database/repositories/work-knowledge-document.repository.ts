@@ -637,15 +637,24 @@ export class WorkKnowledgeDocumentRepository {
         return count > 0;
     }
 
-    async create(data: Partial<WorkKnowledgeDocument>): Promise<WorkKnowledgeDocument> {
-        const entity = this.repository.create(data);
+    async create(
+        data: Partial<WorkKnowledgeDocument>,
+        manager?: EntityManager,
+    ): Promise<WorkKnowledgeDocument> {
+        const repository = manager?.getRepository(WorkKnowledgeDocument) ?? this.repository;
+        const entity = repository.create(data);
         // Knowledge library — every document carries a revision timestamp
         // from birth, whichever service created it, so the "recently
         // changed" sort never has to reason about NULLs.
         if (!entity.revisionAt) {
             entity.revisionAt = new Date();
         }
-        return this.repository.save(entity);
+        return repository.save(entity);
+    }
+
+    /** Run `fn` in ONE transaction (EW-P3-2: a document and the link written with it). */
+    transaction<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(fn);
     }
 
     /**

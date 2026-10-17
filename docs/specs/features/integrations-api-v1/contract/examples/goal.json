@@ -1,0 +1,95 @@
+{
+	"id": "5d7f9b1c-3e5a-4c7b-9d1f-2a4c6e8f0b13",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 4,
+	"createdAt": "2026-10-16T09:00:00.000Z",
+	"updatedAt": "2026-10-16T11:20:00.000Z",
+	"visibility": "team",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "integration",
+		"id": "b4e6a8c0-2d3f-4a71-9b8c-1d2e3f4a5b67",
+		"label": "Ever Gauzy"
+	},
+	"externalLinks": [
+		{
+			"source": "gauzy",
+			"installationId": "8f2a4c6e-0b1d-4f3a-9c5e-7d9f1b3d5f70",
+			"externalId": "goal-41",
+			"externalUrl": "https://app.gauzy.co/#/pages/goals/goal-41"
+		}
+	],
+	"teamIds": ["c5f7b9d1-3e4a-4b82-8c9d-2e3f4a5b6c78"],
+	"title": "Grow paying customers",
+	"description": "Q4 objective, synced from Gauzy.",
+	"goalKind": "metric",
+	"status": "draft",
+	"outcome": null,
+	"metricSource": {
+		"pluginId": "external",
+		"metricId": "value"
+	},
+	"comparator": "gte",
+	"targetValue": 120,
+	"unit": "customers",
+	"window": "point",
+	"baselineValue": 80,
+	"currentValue": 96,
+	"currentValueAt": "2026-10-16T11:20:00.000Z",
+	"deadline": "2026-12-31T00:00:00.000Z",
+	"criteria": [
+		{
+			"id": "kr-signups",
+			"name": "New signups",
+			"weight": 2,
+			"target": 50,
+			"direction": "gte",
+			"unit": "signups"
+		},
+		{
+			"id": "kr-churn",
+			"name": "Monthly churn",
+			"weight": 1,
+			"target": 2,
+			"direction": "lte",
+			"unit": "%"
+		}
+	],
+	"resolvedScore": {
+		"score": 0.7,
+		"criteria": [
+			{ "id": "kr-signups", "value": 30, "target": 50, "weight": 2, "ratio": 0.6, "satisfied": false },
+			{ "id": "kr-churn", "value": 2.2, "target": 2, "weight": 1, "ratio": 0.9, "satisfied": false }
+		],
+		"violatedConstraintIds": [],
+		"violatedHardConstraintIds": [],
+		"at": "2026-10-16T11:20:00.000Z"
+	},
+	"dodCriteria": [
+		{
+			"id": "kr-launch",
+			"text": "Pricing page launched",
+			"status": "done",
+			"evidence": null,
+			"note": null,
+			"source": "operator",
+			"updatedAt": "2026-10-16T10:00:00.000Z"
+		}
+	],
+	"progress": 70,
+	"missionIds": ["d6a8c0e2-4f5b-4c93-9dae-3f4a5b6c7d89"],
+	"primaryMissionId": "d6a8c0e2-4f5b-4c93-9dae-3f4a5b6c7d89",
+	"assignedAgentId": null,
+	"activeAgentId": null,
+	"loop": {
+		"status": null,
+		"iteration": 0,
+		"spentCents": 0
+	},
+	"archivedAt": null,
+	"webUrl": "https://app.ever.works/goals/5d7f9b1c-3e5a-4c7b-9d1f-2a4c6e8f0b13"
+}

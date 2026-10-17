@@ -540,6 +540,16 @@ export class UpdateAgentGuardrailsDto {
 }
 
 export class ListAgentsQueryDto {
+    @ApiProperty({
+        required: false,
+        enum: ['mine', 'shared', 'organization'],
+        description:
+            "Record visibility tab (EW-P1-3): 'mine' (default) = own rows, unchanged; 'shared' = rows of others the caller takes part in or reaches through a Team / Work; 'organization' = every row of the active Organization the caller may read",
+    })
+    @IsOptional()
+    @IsString()
+    view?: string;
+
     @ApiProperty({ required: false, enum: AgentScope })
     @IsOptional()
     @IsEnum(AgentScope)

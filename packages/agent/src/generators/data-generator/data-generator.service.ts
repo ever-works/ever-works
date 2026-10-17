@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
@@ -6,6 +6,7 @@ import { DataRepository, RuntimeYamlCompatibilityError } from './data-repository
 import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
+import { workKindHasRepository } from '@ever-works/contracts';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -1295,6 +1296,15 @@ export class DataGeneratorService {
     }
 
     private async repositoryData(work: Work, user: User) {
+        // EW-P2-4 floor: a Work with no repository (a Project Work) must never
+        // clone the derived `<slug>-data` name — it does not exist, or is an
+        // unrelated repository. The read paths answer empty before getting
+        // here; anything else is refused.
+        if (!workKindHasRepository(work.kind)) {
+            throw new BadRequestException(
+                `Work "${work.slug}" has no repository (kind "${work.kind}") — there is no data repository to read or write.`,
+            );
+        }
         // Use work owner's credentials (they set up the repos)
         const workOwner = this.getWorkOwner(work);
         const committer = work.resolveCommitter(user);
@@ -1488,6 +1498,14 @@ export class DataGeneratorService {
         const repo = work.getDataRepo();
 
         try {
+            // EW-P2-4 floor: never clone the derived `<slug>-data` name of a
+            // Work with no repository (a Project Work). Thrown into the catch
+            // below, so a tolerant read answers empty and a strict one fails.
+            if (!workKindHasRepository(work.kind)) {
+                throw new BadRequestException(
+                    `Work "${work.slug}" has no repository (kind "${work.kind}") — there is no data repository to read.`,
+                );
+            }
             const dest = await this.gitFacade.cloneOrPull(
                 { owner: work.getRepoOwner(), repo, committer },
                 {

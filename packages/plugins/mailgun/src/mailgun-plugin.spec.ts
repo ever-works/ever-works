@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const createMock = vi.fn();
 const clientMock = vi.fn(() => ({ messages: { create: createMock } }));
@@ -93,9 +93,82 @@ describe('MailgunPlugin', () => {
 		).rejects.toThrow(/Mailgun send failed \(401\): Forbidden/);
 	});
 
-	it('verifyWebhookSignature is a no-op when no signing key is configured', () => {
-		const body = Buffer.from(JSON.stringify({ timestamp: '1', token: 't', signature: 'whatever' }));
-		expect(() => plugin.verifyWebhookSignature(body, {}, { userId: 'u' })).not.toThrow();
+	// EW-P4-3 — with no signing key configured an inbound webhook is REFUSED
+	// (it used to be accepted silently: anyone who knew the public URL could
+	// inject mail). Only the explicit operator opt-out accepts it.
+	describe('verifyWebhookSignature with no signing key configured', () => {
+		const savedOptOut = process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+		const savedSigningKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
+		const unsigned = Buffer.from(JSON.stringify({ timestamp: '1', token: 't', signature: 'whatever' }));
+
+		beforeEach(() => {
+			delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+			delete process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
+		});
+
+		afterEach(() => {
+			if (savedOptOut === undefined) delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+			else process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = savedOptOut;
+			if (savedSigningKey === undefined) delete process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
+			else process.env.MAILGUN_WEBHOOK_SIGNING_KEY = savedSigningKey;
+		});
+
+		it('refuses an unsigned (or unverifiable) webhook', () => {
+			expect(() => plugin.verifyWebhookSignature(unsigned, {}, { userId: 'u' })).toThrow(
+				/refusing an unsigned webhook/
+			);
+			expect(() => plugin.verifyWebhookSignature(Buffer.from('recipient=a%40b.test'), {}, {})).toThrow(
+				/refusing an unsigned webhook/
+			);
+		});
+
+		it.each(['TRUE', '1', 'yes', ' true', ''])(
+			'stays secure when EMAIL_INBOUND_ALLOW_UNSIGNED is %j (only the exact string "true" opts out)',
+			(value) => {
+				process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = value;
+				expect(() => plugin.verifyWebhookSignature(unsigned, {}, { userId: 'u' })).toThrow(
+					/refusing an unsigned webhook/
+				);
+			}
+		);
+
+		it('accepts — and warns the operator — only with EMAIL_INBOUND_ALLOW_UNSIGNED=true', () => {
+			process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = 'true';
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+			try {
+				expect(() => plugin.verifyWebhookSignature(unsigned, {}, { userId: 'u' })).not.toThrow();
+				expect(warnSpy).toHaveBeenCalledTimes(1);
+				expect(warnSpy.mock.calls[0][0]).toMatch(/WITHOUT signature verification/);
+			} finally {
+				warnSpy.mockRestore();
+			}
+		});
+
+		it('verifies with the env key when MAILGUN_WEBHOOK_SIGNING_KEY is set', () => {
+			process.env.MAILGUN_WEBHOOK_SIGNING_KEY = 'env-key';
+			const timestamp = '1700000000';
+			const token = 'tok';
+			const signature = createHmac('sha256', 'env-key').update(`${timestamp}${token}`).digest('hex');
+			const good = Buffer.from(JSON.stringify({ timestamp, token, signature }));
+			expect(() => plugin.verifyWebhookSignature(good, {}, {})).not.toThrow();
+			expect(() => plugin.verifyWebhookSignature(unsigned, {}, {})).toThrow(/signature mismatch/);
+		});
+	});
+
+	it('the opt-out never weakens a configured signing key: a forged signature still throws', () => {
+		const saved = process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+		process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = 'true';
+		try {
+			const opts = { userId: 'u', settings: { webhookSigningKey: 'sign-key' } };
+			const forged = Buffer.from(JSON.stringify({ timestamp: '1', token: 't', signature: 'deadbeef' }));
+			expect(() => plugin.verifyWebhookSignature(forged, {}, opts)).toThrow(/signature mismatch/);
+			expect(() => plugin.verifyWebhookSignature(Buffer.from('{}'), {}, opts)).toThrow(
+				/missing timestamp\/token\/signature/
+			);
+		} finally {
+			if (saved === undefined) delete process.env.EMAIL_INBOUND_ALLOW_UNSIGNED;
+			else process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = saved;
+		}
 	});
 
 	it('verifyWebhookSignature accepts a valid HMAC and rejects a forged one', () => {
@@ -110,6 +183,85 @@ describe('MailgunPlugin', () => {
 
 		const bad = Buffer.from(JSON.stringify({ signature: { timestamp, token, signature: 'deadbeef' } }));
 		expect(() => plugin.verifyWebhookSignature(bad, {}, opts)).toThrow(/signature mismatch/);
+	});
+
+	// EW-P4-3 — RFC threading.
+	it('forwards EmailSendInput.headers as h:<Name> parameters', async () => {
+		createMock.mockResolvedValueOnce({ id: '<x@mg>', message: 'Queued.' });
+		await plugin.sendEmail(
+			{
+				from: 'a@example.com',
+				to: ['b@example.com'],
+				subject: 'Re: hi',
+				bodyText: 'hi',
+				messageRef: 'ref-thread',
+				headers: {
+					'Message-ID': '<out-1@acme.test>',
+					'In-Reply-To': '<in-1@client.test>',
+					References: '<root@client.test> <in-1@client.test>'
+				}
+			},
+			{ userId: 'u' }
+		);
+		const [, data] = createMock.mock.calls[0];
+		expect(data['h:Message-ID']).toBe('<out-1@acme.test>');
+		expect(data['h:In-Reply-To']).toBe('<in-1@client.test>');
+		expect(data['h:References']).toBe('<root@client.test> <in-1@client.test>');
+	});
+
+	it('parses the threading headers from the forwarded fields', async () => {
+		const form = new URLSearchParams({
+			sender: 'x@y.test',
+			recipient: 'agent@mg.example.com',
+			subject: 'Re: hi',
+			'Message-Id': '<reply-2@client.test>',
+			'In-Reply-To': '<out-1@acme.test>',
+			References: '<root@client.test> <out-1@acme.test>',
+			timestamp: '1700000000'
+		});
+		const msg = await plugin.parseInboundWebhook(Buffer.from(form.toString()), {}, {});
+		expect(msg.messageIdHeader).toBe('reply-2@client.test');
+		expect(msg.inReplyTo).toBe('out-1@acme.test');
+		expect(msg.references).toEqual(['root@client.test', 'out-1@acme.test']);
+	});
+
+	it('parses Cc into bare mailboxes (EW-P4-3)', async () => {
+		const form = new URLSearchParams({
+			sender: 'x@y.test',
+			recipient: 'agent@mg.example.com',
+			subject: 's',
+			Cc: '"C One" <c1@b.test>, c2@b.test'
+		});
+		const msg = await plugin.parseInboundWebhook(Buffer.from(form.toString()), {}, {});
+		expect(msg.cc).toEqual(['c1@b.test', 'c2@b.test']);
+	});
+
+	it('keeps a quoted display name with a comma in one Cc mailbox', async () => {
+		const form = new URLSearchParams({
+			sender: 'x@y.test',
+			recipient: 'agent@mg.example.com',
+			subject: 's',
+			Cc: '"Doe, John" <john@example.com>, jane@example.com'
+		});
+		const msg = await plugin.parseInboundWebhook(Buffer.from(form.toString()), {}, {});
+		expect(msg.cc).toEqual(['john@example.com', 'jane@example.com']);
+	});
+
+	it('falls back to message-headers for the threading headers', async () => {
+		const form = new URLSearchParams({
+			sender: 'x@y.test',
+			recipient: 'agent@mg.example.com',
+			subject: 'Re: hi',
+			'message-headers': JSON.stringify([
+				['Message-Id', '<reply-3@client.test>'],
+				['In-Reply-To', '<out-1@acme.test>'],
+				['References', '<out-1@acme.test>']
+			])
+		});
+		const msg = await plugin.parseInboundWebhook(Buffer.from(form.toString()), {}, {});
+		expect(msg.messageIdHeader).toBe('reply-3@client.test');
+		expect(msg.inReplyTo).toBe('out-1@acme.test');
+		expect(msg.references).toEqual(['out-1@acme.test']);
 	});
 
 	it('parses a form-urlencoded inbound payload into the canonical shape', async () => {

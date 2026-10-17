@@ -427,6 +427,7 @@ export function TasksList({
                             sort={sort}
                             pageSize={boardResult.columnLimit}
                             loadColumn={loadBoardColumn}
+                            view={board.query.view}
                         />
                     </div>
                 ) : (

@@ -8,3 +8,5 @@ export * from './agent-inbox.service';
 export * from './email-draft.service';
 export * from './email-draft-approval.listener';
 export * from './email-drafts.module';
+// EW-P4-2 — `email.message.*` domain events.
+export * from './email-message-domain-events.bridge';

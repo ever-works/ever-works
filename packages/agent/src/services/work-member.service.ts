@@ -2,8 +2,14 @@ import {
     BadRequestException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 import { WorkMemberRepository } from '@src/database/repositories/work-member.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { WorkOwnershipService } from './work-ownership.service';
@@ -89,7 +95,30 @@ export class WorkMemberService {
         private readonly memberRepository: WorkMemberRepository,
         private readonly userRepository: UserRepository,
         private readonly ownershipService: WorkOwnershipService,
+        // Domain events (EW-P1-1 B2) — `work.member.*`, recorded right after
+        // the roster write. Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
+
+    private readonly eventsLogger = new Logger('WorkMemberService');
+
+    private async recordMemberEvent(
+        workId: string,
+        type: 'work.member.added' | 'work.member.updated' | 'work.member.removed',
+        data: { workId: string; userId: string; role: string; deleted?: true },
+        previous?: Record<string, unknown>,
+    ): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                publisher.child(manager, 'work', workId, type, data, {
+                    changedFields: ['members'],
+                    previous,
+                }),
+            (message) => this.eventsLogger.warn(message),
+            `${type} for work ${workId}`,
+        );
+    }
 
     async listMembers(workId: string, userId: string): Promise<WorkMemberDto[]> {
         await this.ownershipService.ensureCanView(workId, userId);
@@ -140,6 +169,11 @@ export class WorkMemberService {
         const inviter = await this.userRepository.findById(userId);
 
         const member = await this.memberRepository.addMember(workId, invitee.id, dto.role, userId);
+        await this.recordMemberEvent(workId, 'work.member.added', {
+            workId,
+            userId: invitee.id,
+            role: dto.role,
+        });
 
         const memberWithRelations = await this.memberRepository.findById(member.id);
         return {
@@ -176,6 +210,12 @@ export class WorkMemberService {
         }
 
         const updated = await this.memberRepository.updateRole(workId, member.userId, dto.role);
+        await this.recordMemberEvent(
+            workId,
+            'work.member.updated',
+            { workId, userId: member.userId, role: dto.role },
+            { role: member.role },
+        );
         return this.toDto(updated!);
     }
 
@@ -191,6 +231,12 @@ export class WorkMemberService {
         }
 
         await this.memberRepository.removeMember(workId, member.userId);
+        await this.recordMemberEvent(workId, 'work.member.removed', {
+            workId,
+            userId: member.userId,
+            role: member.role,
+            deleted: true,
+        });
     }
 
     async leaveWork(workId: string, userId: string): Promise<void> {
@@ -203,6 +249,9 @@ export class WorkMemberService {
             });
         }
 
+        const leaving = this.domainEvents
+            ? await this.memberRepository.findMember(workId, userId)
+            : null;
         const removed = await this.memberRepository.removeMember(workId, userId);
         if (!removed) {
             throw new NotFoundException({
@@ -210,6 +259,12 @@ export class WorkMemberService {
                 message: 'You are not a member of this work',
             });
         }
+        await this.recordMemberEvent(workId, 'work.member.removed', {
+            workId,
+            userId,
+            role: leaving?.role ?? 'viewer',
+            deleted: true,
+        });
     }
 
     async getMember(workId: string, userId: string, memberId: string): Promise<WorkMemberDto> {

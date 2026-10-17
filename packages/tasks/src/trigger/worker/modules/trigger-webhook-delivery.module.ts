@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import {
     WebhookDeliveryService,
+    WebhookOwnerAccessService,
     WebhookSubscriptionDeliveryService,
     WebhookSubscriptionSecretService,
 } from '@ever-works/agent/services';
@@ -33,6 +34,8 @@ import { TenantRuntimeBindingResolverService } from '../services/tenant-runtime-
     imports: [DatabaseModule],
     providers: [
         WebhookDeliveryService,
+        // Webhooks v2 (EW-P1-5) — owner access re-checked before every v2 send.
+        WebhookOwnerAccessService,
         WebhookSubscriptionDeliveryService,
         WebhookSubscriptionSecretService,
         // EW-742 P3.2 T22 — `(providerId, credentialVersion)` lookup +

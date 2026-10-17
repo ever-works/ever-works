@@ -1,5 +1,6 @@
 'use client';
 
+import { RecordVisibilityPanel } from '@/components/record-visibility';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
@@ -967,6 +968,10 @@ export function IdeaDetailClient({
 
                 {/* ── Context rail ─────────────────────────────────────── */}
                 <aside className="min-w-0 space-y-5 @5xl/main:col-span-4">
+                    {/* Record visibility (EW-P1-3): who else can see this Idea. */}
+                    <section className={sectionCard} data-testid="idea-visibility">
+                        <RecordVisibilityPanel aggregate="idea" id={idea.id} />
+                    </section>
                     {/* ── Build tracker ────────────────────────────────── */}
                     <section className={sectionCard} data-testid="idea-build-tracker">
                         <SectionHeader icon={Hammer} title={tDetail('sections.build')} />

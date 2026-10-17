@@ -2,6 +2,7 @@ import 'server-only';
 import type {
     DecisionConflictReportDto,
     GateStatus,
+    RecordListView,
     TaskAcceptanceCheck,
     TaskBoardSort,
     TaskBoardTerminalWindow,
@@ -20,6 +21,13 @@ export type TaskStatus =
 
 export type TaskPriority = 'p0' | 'p1' | 'p2' | 'p3' | 'p4';
 export type TaskActorType = 'user' | 'agent';
+
+/**
+ * EW-P1-2 — who created a Task or wrote a chat message. `'integration'` is an
+ * integration key (e.g. Ever Gauzy) writing without acting as a user; the
+ * actor id is then the key id.
+ */
+export type TaskAuthorType = TaskActorType | 'integration';
 
 /** Wave 2 M7 — per-Task isolation override ('on'/'off'; null = inherit
  *  the Work-level `taskIsolation` setting). */
@@ -201,7 +209,7 @@ export interface Task {
     teamId: string | null;
     goalId: string | null;
     parentTaskId: string | null;
-    createdByType: TaskActorType;
+    createdByType: TaskAuthorType;
     createdById: string;
     requireAllApprovers: boolean;
     startedAt: string | null;
@@ -218,6 +226,10 @@ export interface Task {
     parentRecurringTaskId: string | null;
     /** Schedule mode "Scheduled" — run once at this instant. */
     scheduledAt?: string | null;
+    /** EW-P2-3 — planning dates (ISO) + estimate in whole minutes. */
+    dueAt?: string | null;
+    startAt?: string | null;
+    estimateMinutes?: number | null;
     /** Set once the dispatcher claimed + fired the one-shot. */
     scheduleClaimedAt?: string | null;
     // Wave 2 M7 — worktree-per-Task isolation surface. All null when the
@@ -269,6 +281,11 @@ export interface Task {
 }
 
 export interface ListTasksQuery {
+    /**
+     * Record visibility (EW-P1-3) list tab, sent as `view`: `mine` (default — omitted),
+     * `shared` or `organization`.
+     */
+    view?: RecordListView;
     status?: TaskStatus | TaskStatus[];
     priority?: TaskPriority | TaskPriority[];
     missionId?: string;
@@ -297,6 +314,7 @@ function buildQuery(q: ListTasksQuery = {}): string {
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
     if (q.includeRun) params.set('includeRun', 'true');
+    if (q.view && q.view !== 'mine') params.set('view', q.view);
     const s = params.toString();
     return s ? `?${s}` : '';
 }
@@ -309,6 +327,11 @@ export type TaskBoardLayout = 'status' | 'focus';
  * optional; the API clamps the bounds and defaults the rest.
  */
 export interface TaskBoardQuery {
+    /**
+     * Record visibility (EW-P1-3) list tab, sent as `view`: `mine` (default — omitted),
+     * `shared` or `organization`.
+     */
+    view?: RecordListView;
     layout?: TaskBoardLayout;
     /** Cards per column (API default 50, clamped 1..100). */
     columnLimit?: number;
@@ -361,6 +384,7 @@ export interface TaskBoardResult {
 function buildBoardQuery(q: TaskBoardQuery = {}, extra: Record<string, string> = {}): string {
     const params = new URLSearchParams();
     if (q.layout) params.set('layout', q.layout);
+    if (q.view && q.view !== 'mine') params.set('view', q.view);
     if (q.columnLimit !== undefined) params.set('columnLimit', String(q.columnLimit));
     if (q.terminalWindowDays !== undefined)
         params.set('terminalWindowDays', String(q.terminalWindowDays));
@@ -449,6 +473,10 @@ export const tasksAPI = {
         parentTaskId?: string | null;
         requireAllApprovers?: boolean;
         isolationMode?: TaskIsolationMode | null;
+        /** EW-P2-3 — planning dates (ISO) + estimate in whole minutes. */
+        dueAt?: string | null;
+        startAt?: string | null;
+        estimateMinutes?: number | null;
         acceptanceChecks?: TaskAcceptanceCheck[] | null;
         maxGateAttempts?: number | null;
         /**
@@ -485,6 +513,9 @@ export const tasksAPI = {
                 | 'ideaId'
                 | 'agentId'
                 | 'extraRepos'
+                | 'dueAt'
+                | 'startAt'
+                | 'estimateMinutes'
             >
         >,
     ) {
@@ -823,8 +854,10 @@ export interface TaskChatMention {
 export interface TaskChatMessage {
     id: string;
     taskId: string;
-    authorType: TaskActorType;
+    authorType: TaskAuthorType;
     authorId: string;
+    /** EW-P1-2 — display attribution for an `'integration'` author. */
+    externalAuthor?: { name: string; avatarUrl?: string | null; source: string } | null;
     body: string;
     mentions: TaskChatMention[] | null;
     attachments: { uploadId: string }[] | null;

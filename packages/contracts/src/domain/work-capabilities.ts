@@ -249,8 +249,39 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		appEnvironment: true,
 		metrics: ['agents', 'open-tasks', 'deploy-status', 'days-active'],
 		repos: { data: false, work: false, website: true }
+	},
+
+	// A Project Work (EW-P2-4) is plain project tracking — and the Ever Works
+	// side of a Gauzy project — with NO repository at all: every `repos` role
+	// is off, so Tasks on it run without one (`resolveTaskRepository` answers
+	// none), nothing is generated, built or deployed, and nothing item-shaped
+	// applies. The knowledge base is off too for now: KB documents mirror to
+	// the Work's git repository, which a Project Work does not have.
+	project: {
+		items: { enabled: false, labelKey: 'items' },
+		taxonomy: false,
+		comparisons: false,
+		communityPr: false,
+		itemImportExport: false,
+		sourceValidation: false,
+		deploy: false,
+		kb: false,
+		builds: false,
+		appEnvironment: false,
+		metrics: ['agents', 'open-tasks', 'days-active'],
+		repos: { data: false, work: false, website: false }
 	}
 };
+
+/**
+ * True when a Work of this kind has at least one repository (EW-P2-4). Only
+ * `project` has none today. Accepts any kind string, like
+ * {@link getWorkCapabilities}.
+ */
+export function workKindHasRepository(kind?: string | null): boolean {
+	const { repos } = getWorkCapabilities(kind);
+	return repos.data || repos.work || repos.website;
+}
 
 /**
  * Capabilities for a possibly-unknown kind.

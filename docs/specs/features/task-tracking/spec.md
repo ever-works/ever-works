@@ -168,6 +168,27 @@ _Then_ it renders as a wikilink — same WikiLinkExtension reused from `KbEditor
 
 - **FR-7** Status enum: `backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled`.
 - **FR-8** Status transitions: `backlog → todo → in_progress → in_review → done`. `* → blocked` and `blocked → previous` allowed. `* → cancelled` allowed. `done → *` is rejected **except** `done → in_progress`, which is permitted as a soft re-open path for cases where a Task was closed by mistake or new information surfaced after completion. The soft re-open is the only post-`done` transition; everything else (`done → todo`, `done → in_review`, `done → blocked`, etc.) stays rejected. Users should prefer filing a new Task when the re-opened work is genuinely separate scope. (Carve-out resolved 2026-05-26 in [PR #1021](https://github.com/ever-works/ever-works/pull/1021) as FU-12 — implementation in `TaskTransitionService.ALLOWED[done] = ['in_progress']` matches this spec.)
+- **FR-8a** (EW-P1-6, Gauzy ↔ Ever Works integration, 2026-10-16) `cancelled → backlog` and `cancelled → todo` are
+  allowed for every caller (re-open). `cancelled` is no longer terminal; every other move out of it stays rejected. The
+  web board (`TASK_BOARD_TRANSITIONS`) and the Task detail page offer the two re-open targets.
+- **FR-8b** (EW-P1-6) `POST /api/tasks/:id/transition { to, mode: 'sync' }` walks the **shortest legal path** to `to`
+  (`TaskTransitionService.transitionSync`), one ordinary gated transition per hop, with one `task_transitioned` activity
+  row per hop. Before the first hop it checks the gates on the path (open blockers on `→ in_progress` / `→ done`, the
+  approver gate on `→ done`); a closed gate answers `409` in the integration envelope
+  `{ "error": { "code": "transition_blocked", "details": { from, to, blockers[], pendingApprovers[], path[] } } }` and
+  moves nothing. A sync walk never starts agent work (no `→ in_progress` agent fan-out, no `→ in_review` reviewer runs —
+  plan decision D9). Integration keys (`tasks:write`) may only use `mode: 'sync'` and never `force` (`422 domain_rule`);
+  sessions and personal keys may opt into it. If another writer moves the Task between two hops (the hop's
+  compare-and-set loses), the walk answers `409` with `code: "conflict"` and `details: { from, to, path[], currentStatus }`
+  — no gate refused, so the caller re-reads the Task and retries rather than treating it as `transition_blocked`.
+- **FR-8c** (EW-P2-3, 2026-10-16) Planning fields on every Task, all optional and nullable: `dueAt` (when it is due),
+  `startAt` (when work is planned to start; never after `dueAt`) and `estimateMinutes` (whole minutes, 0..525600). They are
+  planning only — nothing runs at these times (that is `scheduledAt`). Create and `PATCH` accept them (`null` clears), the
+  web task form and the Task detail page (Planning section) edit them, and board cards show the due date (red once past
+  while the Task is open). The per-minute dispatcher tick sends `task_due_soon` once per due date to the owner, the user
+  assignees and the watchers when `dueAt` is inside the next `TASK_DUE_SOON_WINDOW_HOURS` (default 24); moving `dueAt`
+  re-arms it (`dueSoonNotifiedAt`). Done, cancelled and recurring templates are never noticed. The integration task DTO and
+  `task.created` / `task.updated` events carry `dueAt`, `startAt` and `estimateMinutes` (contract v1 B.6, P2 fields).
 - **FR-9** When a Task with active blockers tries to move to `in_progress`, the system MUST reject the transition with `409 Conflict — has unresolved blockers`.
 - **FR-10** When all blockers for a `blocked` Task are `done`, the Task MUST auto-transition back to its prior status (stored in `previousStatus` column on the row).
 - **FR-11** On `done` transition: if any approvers are configured, the system MUST require all approvers' `approved=true` row before allowing `done`. Configurable per-task via `requireAllApprovers`.

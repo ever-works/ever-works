@@ -41,6 +41,8 @@ import { PortableDateColumn } from './_types';
 @Unique(['organizationId', 'userId'])
 @Index(['organizationId'])
 @Index(['userId'])
+// Integration API v1 keyset lists (migration 1795080300000).
+@Index('idx_org_members_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class OrganizationMember {
     @PrimaryGeneratedColumn('uuid')
     id: string;

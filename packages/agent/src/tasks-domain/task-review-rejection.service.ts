@@ -1,4 +1,11 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    ForbiddenException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 import { TaskReviewerRepository } from '../database/repositories/task-side.repositories';
@@ -51,6 +58,10 @@ export class TaskReviewRejectionService {
         private readonly rejections: TaskReviewRejectionRepository,
         private readonly reviewers: TaskReviewerRepository,
         private readonly works: WorkRepository,
+        // Domain events (EW-P1-1 B2) — a rejection moves the reviewer's
+        // `reviewState`, which the task DTO shows: `task.updated`. Appended
+        // LAST + @Optional (positional-spec arity rule).
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -94,6 +105,18 @@ export class TaskReviewRejectionService {
         // that matters, and a missing reviewer row is normal (anyone with
         // access can reject).
         await this.syncReviewerState(task.id, userId);
+        if (this.domainEvents) {
+            const publisher = this.domainEvents;
+            await publisher
+                .transaction((manager) =>
+                    publisher.changed(manager, 'task', task.id, 'task.updated', {
+                        changedFields: ['reviewers'],
+                    }),
+                )
+                .catch((err) =>
+                    this.logger.warn(`Could not record task.updated for ${task.id}: ${err}`),
+                );
+        }
 
         this.logger.log(`Task ${task.id}: rejection recorded by user ${userId}.`);
         return row;

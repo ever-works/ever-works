@@ -66,8 +66,43 @@ export interface AuthenticatedUser {
      * handlers marked `@DelegatedRead(scope)`. It never opens a session, and both
      * `HumanActorGuard` and `SessionOnlyGuard` refuse it (they admit only
      * `'session'`).
+     *
+     * EW-P1-2 appends `'integration'`: an integration key (`ew_int_…`). It is
+     * NOT a personal credential: the request carries {@link integration}, the
+     * integration guards admit it only on routes that declare
+     * `@RequireScopes(...)`, and `userId` is the user the request acts for —
+     * the validated `X-Act-As-User` on a write, otherwise the key's owner.
      */
-    authMethod?: 'session' | 'api-key' | 'ever-id-delegated';
+    authMethod?: 'session' | 'api-key' | 'ever-id-delegated' | 'integration';
+    /**
+     * EW-P1-2 — set only when `authMethod === 'integration'`. The key's own
+     * facts (scopes, pins, owner) and the act-as resolution of this request.
+     */
+    integration?: IntegrationPrincipal;
+}
+
+/**
+ * EW-P1-2 — the integration principal behind an `ew_int_…` key.
+ *
+ * Built by `AuthSessionGuard` from the key row; `actAsUserId` is filled by
+ * `IntegrationPrincipalGuard` once `X-Act-As-User` has been validated (writes
+ * only). Never derived from anything the caller controls except that header.
+ */
+export interface IntegrationPrincipal {
+    keyId: string;
+    keyName: string;
+    /** `'ever-gauzy'` | `'generic'`. */
+    integrationKind: string;
+    /** The Tenant the key was created in; every pin belongs to it. */
+    tenantId: string;
+    /** Organizations the key is pinned to. */
+    allowedOrganizationIds: string[];
+    /** Granted scopes (vocabulary v1). */
+    scopes: string[];
+    /** The user who created the key — the owner of writes made without act-as. */
+    ownerUserId: string;
+    /** The validated `X-Act-As-User` of this request, or `null`. */
+    actAsUserId: string | null;
 }
 
 export interface TokenResponse {

@@ -201,6 +201,22 @@
             "types": "./dist/teams/index.d.ts",
             "default": "./dist/teams/index.js"
         },
+        "./domain-events": {
+            "types": "./dist/domain-events/index.d.ts",
+            "default": "./dist/domain-events/index.js"
+        },
+        "./integrations-api": {
+            "types": "./dist/integrations-api/index.d.ts",
+            "default": "./dist/integrations-api/index.js"
+        },
+        "./webhooks-v2": {
+            "types": "./dist/webhooks-v2/index.d.ts",
+            "default": "./dist/webhooks-v2/index.js"
+        },
+        "./record-visibility": {
+            "types": "./dist/record-visibility/index.d.ts",
+            "default": "./dist/record-visibility/index.js"
+        },
         "./schedules": {
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"

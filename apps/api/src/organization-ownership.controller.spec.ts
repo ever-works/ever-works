@@ -143,6 +143,10 @@ describe('Organization ownership controller wiring', () => {
             getForUser: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
                 activeScope ? { id, ...scope } : null,
             ),
+            // Record visibility (EW-P1-3): GET /:id reads through getReadable.
+            getReadable: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
+                activeScope ? { id, ...scope } : null,
+            ),
         };
         const controller = new (MissionsController as any)(service, {}, {}, {}, scopeContext);
 
@@ -152,7 +156,7 @@ describe('Organization ownership controller wiring', () => {
             ...scope,
         });
         expect(service.listForUser).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
-        expect(service.getForUser).toHaveBeenCalledWith('user-1', 'mission-ever', scope);
+        expect(service.getReadable).toHaveBeenCalledWith('user-1', 'mission-ever', scope);
     });
 
     it('passes the active request scope to Goal list and get', async () => {
@@ -164,6 +168,10 @@ describe('Organization ownership controller wiring', () => {
             getForUser: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
                 activeScope ? { id, ...scope } : null,
             ),
+            // Record visibility (EW-P1-3): GET /:id reads through getReadable.
+            getReadable: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
+                activeScope ? { id, ...scope } : null,
+            ),
         };
         const controller = new (GoalsController as any)(service, {}, scopeContext);
 
@@ -173,7 +181,7 @@ describe('Organization ownership controller wiring', () => {
             ...scope,
         });
         expect(service.listForUser).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
-        expect(service.getForUser).toHaveBeenCalledWith('user-1', 'goal-ever', scope);
+        expect(service.getReadable).toHaveBeenCalledWith('user-1', 'goal-ever', scope);
     });
 
     it('passes the active request scope to Agent list and get', async () => {
@@ -183,6 +191,10 @@ describe('Organization ownership controller wiring', () => {
                 total: activeScope ? 1 : 0,
             })),
             getOne: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
+                activeScope ? { id, ...scope } : null,
+            ),
+            // Record visibility (EW-P1-3): GET /:id reads through getReadable.
+            getReadable: jest.fn(async (_userId: string, id: string, activeScope?: unknown) =>
                 activeScope ? { id, ...scope } : null,
             ),
         };
@@ -201,6 +213,6 @@ describe('Organization ownership controller wiring', () => {
             ...scope,
         });
         expect(service.list).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
-        expect(service.getOne).toHaveBeenCalledWith('user-1', 'agent-ever', scope);
+        expect(service.getReadable).toHaveBeenCalledWith('user-1', 'agent-ever', scope);
     });
 });

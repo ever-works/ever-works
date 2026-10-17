@@ -9,7 +9,8 @@ import {
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
 import { FleetRunCredentialService } from '@ever-works/agent/fleet';
-import { FLEET_RUN_TOKEN_PREFIX } from '@ever-works/contracts';
+import { FLEET_RUN_TOKEN_PREFIX, INTEGRATION_KEY_PREFIX } from '@ever-works/contracts';
+import { IntegrationHttpException } from '../integration/integration-http.exception';
 import type { AuthenticatedUser, FleetRunCredentialBinding } from '../types/auth.types';
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
@@ -42,6 +43,14 @@ const API_KEY_PREFIX = 'ew_live_';
  * a personal key is never checked against run bindings.
  */
 const FLEET_RUN_KEY_PREFIX: string = FLEET_RUN_TOKEN_PREFIX;
+
+/**
+ * EW-P1-2 — the integration key prefix. Same branch, same reason: a caller
+ * presenting `ew_int_…` asked for the machine path and gets a deterministic
+ * `401 invalid_key` in the integration error envelope, never a fall-through
+ * to cookies. Validated against integration rows only.
+ */
+const INTEGRATION_PREFIX: string = INTEGRATION_KEY_PREFIX;
 
 /**
  * Per-request auth guard for the API. Wires two independent credential
@@ -151,6 +160,11 @@ export class AuthSessionGuard {
             }
             if (!this.userRepository) {
                 this.userRepository = this.moduleRef.get(UserRepository, { strict: false });
+            }
+
+            if (apiKey.startsWith(INTEGRATION_PREFIX)) {
+                request.user = await this.authenticateIntegrationKey(apiKey, request.user);
+                return true;
             }
 
             const keyRecord = apiKey.startsWith(FLEET_RUN_KEY_PREFIX)
@@ -354,6 +368,73 @@ export class AuthSessionGuard {
         return { userId: binding.userId };
     }
 
+    /**
+     * EW-P1-2 — validate an `ew_int_…` integration key and build its principal.
+     *
+     * The key does NOT become its creator for every purpose: `request.user`
+     * carries `authMethod: 'integration'` and the `integration` block (scopes,
+     * pins, owner), and `IntegrationPrincipalGuard` then decides which routes,
+     * which Organization and which act-as user the request may use. `userId`
+     * starts as the key's owner — the owner of a write made without act-as.
+     *
+     * Every refusal is the same `401 invalid_key`: unknown, revoked, expired,
+     * past its rotation grace, an owner who is inactive or no longer in the
+     * key's Tenant. A caller holding a dead key learns nothing else.
+     */
+    private async authenticateIntegrationKey(
+        rawKey: string,
+        existing?: AuthenticatedUser,
+    ): Promise<AuthenticatedUser> {
+        const invalid = () =>
+            new IntegrationHttpException(
+                401,
+                'invalid_key',
+                'Invalid, expired or revoked integration key.',
+            );
+        const keyRecord = await this.apiKeyService.validateIntegrationKey(rawKey);
+        if (!keyRecord || !keyRecord.tenantId) throw invalid();
+
+        const owner = await this.userRepository.findById(keyRecord.userId);
+        if (!owner || !owner.isActive || owner.tenantId !== keyRecord.tenantId) throw invalid();
+
+        // A controller that re-applies this guard with `@UseGuards` runs it a
+        // second time on the same request. Keep the principal the first run
+        // built — and the act-as `IntegrationPrincipalGuard` resolved on it —
+        // instead of resetting the request to the key's owner.
+        if (
+            existing?.authMethod === 'integration' &&
+            existing.integration?.keyId === keyRecord.id
+        ) {
+            return existing;
+        }
+
+        return {
+            userId: owner.id,
+            email: owner.email,
+            username: owner.username,
+            provider: owner.registrationProvider,
+            emailVerified: owner.emailVerified,
+            isActive: owner.isActive,
+            avatar: owner.avatar || null,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'ever-works',
+            aud: 'ever-works',
+            authMethod: 'integration',
+            integration: {
+                keyId: keyRecord.id,
+                keyName: keyRecord.name,
+                integrationKind: keyRecord.integrationKind ?? 'generic',
+                tenantId: keyRecord.tenantId,
+                allowedOrganizationIds: Array.isArray(keyRecord.organizationIds)
+                    ? [...keyRecord.organizationIds]
+                    : [],
+                scopes: Array.isArray(keyRecord.scopes) ? [...keyRecord.scopes] : [],
+                ownerUserId: owner.id,
+                actAsUserId: null,
+            },
+        };
+    }
+
     private extractApiKey(request: any): string | null {
         const headerKey = request.headers?.['x-api-key'];
         if (headerKey && typeof headerKey === 'string' && isMachineCredential(headerKey)) {
@@ -373,10 +454,15 @@ export class AuthSessionGuard {
 }
 
 /**
- * The two machine-credential prefixes this guard owns. Anything else —
+ * The machine-credential prefixes this guard owns (`ew_live_`, `ew_run_`,
+ * and since EW-P1-2 `ew_int_`). Anything else —
  * including a random opaque bearer — still falls through to the auth
  * provider exactly as it always has.
  */
 function isMachineCredential(value: string): boolean {
-    return value.startsWith(API_KEY_PREFIX) || value.startsWith(FLEET_RUN_KEY_PREFIX);
+    return (
+        value.startsWith(API_KEY_PREFIX) ||
+        value.startsWith(FLEET_RUN_KEY_PREFIX) ||
+        value.startsWith(INTEGRATION_PREFIX)
+    );
 }

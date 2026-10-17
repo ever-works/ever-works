@@ -40,7 +40,7 @@ const linkDir = async (target: string, path: string): Promise<void> => {
 	await fs.symlink(target, path, process.platform === 'win32' ? 'junction' : 'dir');
 };
 
-describe.sequential('workspace reaper — evidence it could not see', { timeout: 90_000 }, () => {
+describe('workspace reaper — evidence it could not see', { timeout: 90_000, concurrent: false }, () => {
 	let ownedRoot: string;
 	let seedDir: string;
 	let originDir: string;

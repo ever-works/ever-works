@@ -1466,6 +1466,7 @@ export class AgentToolService {
             bodyHtml?: string;
             template?: { slug: string; props: Record<string, unknown> };
             fromAddressId?: string;
+            inReplyToMessageId?: string;
         },
         AgentSendEmailResult
     > {
@@ -1505,6 +1506,11 @@ export class AgentToolService {
                         description:
                             "Optional tenant_email_addresses id to send from. Defaults to the agent's primary (lowest-priority) outbound assignment.",
                     },
+                    inReplyToMessageId: {
+                        type: 'string',
+                        description:
+                            'Optional: the email message id this email replies to (for example the inbound email id named in an inbound-email Task). Threads the reply in the recipient\'s mail client (In-Reply-To / References). Keep the subject (a "Re: " prefix is fine).',
+                    },
                 },
                 required: ['to', 'subject'],
             },
@@ -1532,6 +1538,7 @@ export class AgentToolService {
                         bodyHtml: args.bodyHtml,
                         template: args.template,
                         fromAddressId: args.fromAddressId,
+                        inReplyToMessageId: args.inReplyToMessageId,
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

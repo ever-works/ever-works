@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import {
     TenantEmailAddress,
     EmailAddressDirection,
@@ -42,6 +42,22 @@ export class TenantEmailAddressRepository {
     }
 
     /** Active (non-disabled) addresses owned by this user. */
+    /**
+     * EW-P4-3 — every address of the user, disabled ones included (the
+     * settings page, where a disabled address can be enabled again). Sending
+     * and receiving keep using {@link findActiveByUser}.
+     */
+    async findAllByUser(
+        userId: string,
+        direction?: EmailAddressDirection,
+    ): Promise<TenantEmailAddress[]> {
+        const where: Record<string, unknown> = { userId };
+        if (direction) {
+            where.direction = direction;
+        }
+        return this.repository.find({ where, order: { createdAt: 'ASC' } });
+    }
+
     async findActiveByUser(
         userId: string,
         direction?: EmailAddressDirection,
@@ -84,6 +100,28 @@ export class TenantEmailAddressRepository {
      */
     async update(id: string, patch: Partial<TenantEmailAddress>): Promise<void> {
         await this.repository.update({ id }, patch);
+    }
+
+    /**
+     * EW-P4-3 — claim the right to send a confirmation email now: stamps
+     * `verificationSentAt = sentAt` only when no email was sent at or after
+     * `notBefore` (compare-and-set), so concurrent requests send one email.
+     * Answers whether this caller won. Trusted-internal, like {@link update}:
+     * the caller has already checked ownership.
+     */
+    async claimVerificationSend(id: string, notBefore: Date, sentAt: Date): Promise<boolean> {
+        // An explicit query builder with object conditions (TypeORM quotes the
+        // camelCase columns): `Repository.update` treats an ARRAY criteria as a
+        // list of primary keys in some TypeORM versions, which would drop the
+        // `verificationSentAt` condition and defeat the compare-and-set.
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(TenantEmailAddress)
+            .set({ verificationSentAt: sentAt })
+            .where({ id, verificationSentAt: IsNull() })
+            .orWhere({ id, verificationSentAt: LessThan(notBefore) })
+            .execute();
+        return (result.affected ?? 0) > 0;
     }
 
     async delete(id: string, userId: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { normalizeRecordListView } from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -13,7 +14,7 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     MissionCloneService,
@@ -89,6 +90,13 @@ export class MissionsController {
 
     @Get()
     @ApiOperation({ summary: 'List my missions' })
+    @ApiQuery({
+        name: 'view',
+        required: false,
+        enum: ['mine', 'shared', 'organization'],
+        description:
+            "Record visibility tab (EW-P1-3): 'mine' (default) = own rows, unchanged; 'shared' = rows of others the caller takes part in or reaches through a Team / Work; 'organization' = every row of the active Organization the caller may read",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -96,10 +104,12 @@ export class MissionsController {
         @Query('search') search?: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        @Query('view') view?: string,
     ): Promise<MissionDto[]> {
         return this.service.listForUser(
             auth.userId,
             {
+                view: normalizeRecordListView(view),
                 status: this.parseStatus(status),
                 search: this.parseSearch(search),
                 limit: this.parseLimit(limit),
@@ -142,7 +152,9 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
-        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
+        // Record visibility (EW-P1-3): READ through the access policy; every other
+        // route keeps the owner-only `getForUser` gate.
+        return this.service.getReadable(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/budget')

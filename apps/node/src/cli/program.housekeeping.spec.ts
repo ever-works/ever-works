@@ -636,3 +636,25 @@ describe('ever-works-node gc', () => {
 		expect(h.reap).not.toHaveBeenCalled();
 	});
 });
+
+describe('heartbeat log line', () => {
+	it('logs each ACCEPTED beat exactly once, although the loop patches its state twice per beat', async () => {
+		const scheduler = recordingScheduler();
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, scheduler });
+		const interval = DEFAULT_HEARTBEAT_INTERVAL_MS / 2;
+		let stop: () => void = () => undefined;
+		h.deps.waitForShutdown = () => new Promise<void>((resolve) => (stop = resolve));
+		const beats = () => (h.logged().match(/Heartbeat accepted — node /g) ?? []).length;
+
+		const run = runCli(['start'], h.deps);
+		await vi.waitFor(() => expect(beats()).toBe(1));
+		scheduler.fire(interval);
+		await vi.waitFor(() => expect(beats()).toBe(2));
+		scheduler.fire(interval);
+		await vi.waitFor(() => expect(beats()).toBe(3));
+
+		stop();
+		expect(await run).toBe(EXIT_OK);
+		expect(beats()).toBe(3);
+	});
+});

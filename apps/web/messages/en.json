@@ -2401,6 +2401,11 @@
                 "priority": "Priority",
                 "labels": "Labels",
                 "labelsPlaceholder": "comma-separated",
+                "dueDate": "Due date",
+                "startDate": "Start date",
+                "estimateMinutes": "Estimate (minutes)",
+                "errorStartAfterDue": "The start date must not be after the due date.",
+                "errorEstimate": "The estimate must be a whole number of minutes between 0 and 525600.",
                 "labelsHint": "Separate multiple labels with commas.",
                 "labelsAutoHint": "Derived from the title until you edit it. Separate multiple labels with commas.",
                 "organize": "Organize",
@@ -2652,7 +2657,7 @@
                 "errorOpenTable": "Open the Table view instead",
                 "columnErrorTitle": "Couldn't load this column.",
                 "transitionFailed": "Couldn't move this Task.",
-                "dropRefusedCancelled": "A cancelled Task can't be reopened."
+                "dropRefusedCancelled": "A cancelled Task can only be reopened into Backlog or Todo."
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -2710,6 +2715,20 @@
                     "typecheck": "Type check",
                     "custom": "Custom"
                 }
+            },
+            "planning": {
+                "section": "Planning",
+                "hint": "When the Task is due and how long it should take. Planning only: nothing runs at these times.",
+                "dueAt": "Due",
+                "startAt": "Start",
+                "estimateMinutes": "Estimate (minutes)",
+                "save": "Save",
+                "saved": "Planning saved",
+                "saveError": "Could not save the planning",
+                "errorStartAfterDue": "The start date must not be after the due date.",
+                "errorEstimate": "The estimate must be a whole number of minutes between 0 and 525600.",
+                "due": "Due {date}",
+                "overdue": "Overdue · {date}"
             },
             "schedule": {
                 "section": "Schedule",
@@ -4413,6 +4432,8 @@
                 "appLauncher": "App Launcher",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "Webhooks",
+                "everGauzy": "Ever Gauzy",
                 "connections": "Connections",
                 "repositories": "Repositories",
                 "agentPlugins": "Agent Plugins",
@@ -4855,6 +4876,123 @@
                     "revokeSuccess": "API key revoked successfully",
                     "revokeError": "Failed to revoke API key",
                     "copyError": "Failed to copy to clipboard"
+                },
+                "integration": {
+                    "title": "Integration keys",
+                    "subtitle": "Keys for other systems, such as Ever Gauzy. Each key is pinned to organizations, carries only the scopes you grant, and can never manage keys, your account or billing.",
+                    "create": "New integration key",
+                    "empty": "No integration keys yet.",
+                    "ownerOnly": "Only the workspace owner can create and manage integration keys.",
+                    "kinds": {
+                        "ever-gauzy": "Ever Gauzy",
+                        "generic": "Integration"
+                    },
+                    "columns": {
+                        "name": "Name",
+                        "key": "Key",
+                        "pins": "Organizations",
+                        "scopes": "Scopes",
+                        "lastUsed": "Last used",
+                        "actions": "Actions"
+                    },
+                    "scopeCount": "{count, plural, one {# scope} other {# scopes}}",
+                    "graceUntil": "Previous key works until {date}",
+                    "dialog": {
+                        "title": "New integration key",
+                        "nameLabel": "Name",
+                        "namePlaceholder": "e.g. Ever Gauzy — Acme",
+                        "descriptionLabel": "Description (optional)",
+                        "presetLabel": "Preset",
+                        "presets": {
+                            "ever-gauzy": "Ever Gauzy",
+                            "custom": "Custom"
+                        },
+                        "presetHint": "The Ever Gauzy preset grants every scope except creating organizations (org:write) and sending email (email:write). Tick those two only if you need them.",
+                        "organizationsLabel": "Organizations",
+                        "organizationsHint": "The key works only inside the organizations you pick.",
+                        "noOrganizations": "Create an organization first: integration keys are pinned to organizations.",
+                        "scopesLabel": "Scopes",
+                        "expirationLabel": "Expiration",
+                        "createButton": "Create key",
+                        "cancel": "Cancel",
+                        "keyCreated": "Integration key created",
+                        "keyWarning": "Copy this key now and paste it into the other system. You won't be able to see it again.",
+                        "copy": "Copy to clipboard",
+                        "copied": "Copied!",
+                        "done": "Done"
+                    },
+                    "rotate": {
+                        "action": "Rotate",
+                        "title": "Rotate integration key",
+                        "description": "A new secret replaces the current one for \"{name}\". The current secret keeps working for the grace period, so you can update the other system without downtime.",
+                        "graceLabel": "Grace period",
+                        "grace": {
+                            "0": "None (stop the old secret now)",
+                            "1": "1 hour",
+                            "24": "24 hours",
+                            "72": "3 days",
+                            "168": "7 days"
+                        },
+                        "confirm": "Rotate",
+                        "cancel": "Cancel",
+                        "rotated": "New secret created",
+                        "warning": "Copy the new secret now. You won't be able to see it again."
+                    },
+                    "revoke": {
+                        "title": "Revoke integration key",
+                        "description": "Revoke \"{name}\"? Every system using it is disconnected immediately. This cannot be undone.",
+                        "cancel": "Cancel",
+                        "confirm": "Revoke"
+                    },
+                    "messages": {
+                        "nameRequired": "Please enter a name for the key",
+                        "organizationsRequired": "Pick at least one organization",
+                        "scopesRequired": "Pick at least one scope",
+                        "createSuccess": "Integration key created",
+                        "createError": "Failed to create the integration key",
+                        "rotateSuccess": "Key rotated",
+                        "rotateError": "Failed to rotate the key",
+                        "revokeSuccess": "Integration key revoked",
+                        "revokeError": "Failed to revoke the integration key",
+                        "copyError": "Failed to copy to clipboard"
+                    }
+                }
+            },
+            "everGauzy": {
+                "title": "Ever Gauzy",
+                "subtitle": "Connect this workspace to Ever Gauzy so tasks, teams, goals and more stay in sync in both directions.",
+                "howTitle": "How to connect",
+                "steps": {
+                    "one": "Create an integration key with the Ever Gauzy preset and pin it to the organizations to sync.",
+                    "two": "Copy the key. It starts with ew_int_ and is shown once.",
+                    "three": "In Ever Gauzy, open Integrations → Ever Works → Connect and paste the key with this API URL."
+                },
+                "apiUrlLabel": "Ever Works API URL",
+                "apiUrlMissing": "not published by this install. Ask its operator to set NEXT_PUBLIC_API_URL to the API's public address.",
+                "createKey": "Create an Ever Gauzy key",
+                "keysTitle": "Active Ever Gauzy keys",
+                "noKeys": "No Ever Gauzy key yet. Ever Gauzy is not connected.",
+                "manageKeys": "Manage keys",
+                "revoke": "Revoke",
+                "revokeHint": "Revoking a key disconnects Ever Gauzy immediately.",
+                "lastUsed": "Last used {date}",
+                "neverUsed": "Never used",
+                "revokeSuccess": "Ever Gauzy key revoked",
+                "revokeError": "Failed to revoke the key",
+                "revokeHintWithWebhooks": "Revoking a key disconnects Ever Gauzy immediately and disables the {count, plural, one {webhook subscription} other {# webhook subscriptions}} it owns.",
+                "revokeSuccessWithWebhooks": "Ever Gauzy key revoked; {count, plural, one {its webhook subscription is} other {its # webhook subscriptions are}} disabled",
+                "webhooksTitle": "{count, plural, one {Webhook subscription} other {# webhook subscriptions}}",
+                "manageWebhooks": "Manage webhooks",
+                "noWebhooks": "No webhook subscription yet. Ever Gauzy creates its own once it is connected.",
+                "webhooksUnavailable": "Webhook subscriptions could not be loaded.",
+                "webhookEvents": "{count, plural, one {# event filter} other {# event filters}}",
+                "webhookLastDelivery": "last delivery {date}",
+                "webhookNoDelivery": "no delivery yet",
+                "webhookStatus": {
+                    "active": "Active",
+                    "paused": "Paused",
+                    "failed": "Failing",
+                    "disabled": "Disabled"
                 }
             },
             "fleet": {
@@ -6043,6 +6181,76 @@
                         "failed": "Something went wrong. Please try again."
                     }
                 }
+            },
+            "webhooksPage": {
+                "title": "Webhooks",
+                "intro": "Signed HTTPS callbacks. Domain-event webhooks (v2) carry the event envelope and are signed with the X-Ever-Works-Signature header (t=…,v1=…).",
+                "newWebhook": "New webhook",
+                "secretTitle": "Signing secret — shown once",
+                "secretHint": "Store it now; it cannot be read again. Rotate it to get a new one.",
+                "copy": "Copy",
+                "done": "Done",
+                "loadFailed": "Could not load your webhooks. Reload the page to try again.",
+                "empty": "No webhooks yet.",
+                "colEndpoint": "Endpoint",
+                "colEvents": "Events",
+                "colStatus": "Status",
+                "colActions": "Actions",
+                "legacyEvents": "Work & deployment (v1)",
+                "failedInARow": "{count} failed in a row",
+                "lastDelivery": "Last delivery: {when}",
+                "neverDelivered": "Never delivered",
+                "status": {
+                    "active": "active",
+                    "paused": "paused",
+                    "failed": "failed",
+                    "disabled": "disabled"
+                },
+                "pause": "Pause",
+                "resume": "Resume",
+                "test": "Test",
+                "rotate": "Rotate secret",
+                "deliveries": "Deliveries",
+                "hideDeliveries": "Hide deliveries",
+                "delete": "Delete",
+                "resumed": "Resumed",
+                "pausedNotice": "Paused",
+                "updateFailed": "Update failed",
+                "testDelivered": "Delivered: {outcome}",
+                "testFailedOutcome": "Failed: {outcome}",
+                "httpStatus": "(HTTP {status})",
+                "testFailed": "Test failed",
+                "rotatedV2": "Secret rotated; the previous one keeps signing during the rotation grace window",
+                "rotated": "Secret rotated",
+                "rotateFailed": "Rotation failed",
+                "deleteFailed": "Delete failed",
+                "deliveriesLoadFailed": "Failed to load deliveries",
+                "loading": "Loading…",
+                "noDeliveries": "No deliveries yet.",
+                "dEvent": "Event",
+                "dStatus": "Status",
+                "dAttempts": "Attempts",
+                "dResponse": "Response",
+                "dCreated": "Created",
+                "redeliver": "Redeliver",
+                "redelivering": "Sending…",
+                "resent": "Re-sent",
+                "redeliverFailed": "Redeliver failed: {error}",
+                "dialogTitle": "New webhook",
+                "endpointUrl": "Endpoint URL",
+                "description": "Description",
+                "organizations": "Organizations",
+                "noOrganizations": "You have no organizations yet.",
+                "events": "Events",
+                "runtimeHint": "(PR / CI / run state — chatty)",
+                "skipOrigins": "Skip events from these origins (comma-separated, optional)",
+                "errUrl": "Enter the https:// URL of your endpoint.",
+                "errOrg": "Pick at least one organization.",
+                "errEvents": "Pick at least one event group.",
+                "createFailed": "Failed to create the webhook",
+                "creating": "Creating…",
+                "create": "Create",
+                "cancel": "Cancel"
             }
         },
         "stats": {
@@ -10655,7 +10863,8 @@
                 "resourceGroupAgent": "Agents",
                 "resourceGroupMission": "Missions",
                 "resourceGroupIdea": "Ideas",
-                "resourceGroupTask": "Tasks"
+                "resourceGroupTask": "Tasks",
+                "resourceGroupGoal": "Goals"
             },
             "settings": {
                 "title": "Team Settings",
@@ -10716,6 +10925,7 @@
             "app": "App",
             "company": "Company",
             "campaign": "Campaign",
+            "project": "Project",
             "default": "Work"
         },
         "terminal": {
@@ -11754,6 +11964,38 @@
                 "bodyRequired": "Message body is required.",
                 "sendFailed": "Send failed."
             }
+        }
+    },
+    "recordVisibility": {
+        "tabs": {
+            "label": "Show",
+            "mine": "Mine",
+            "shared": "Shared with me",
+            "organization": "Organization"
+        },
+        "control": {
+            "label": "Visibility",
+            "automatic": "Automatic",
+            "automaticWith": "Automatic ({value})",
+            "private": "Private",
+            "team": "Team",
+            "organization": "Organization",
+            "automaticHint": "Team while it sits on a Team, otherwise the whole organization.",
+            "privateHint": "Only you and the people taking part.",
+            "teamHint": "Also the members of its Teams and its Work.",
+            "organizationHint": "Everyone in the organization.",
+            "saving": "Saving…",
+            "error": "Could not change the visibility.",
+            "loadError": "Could not load the visibility."
+        },
+        "teams": {
+            "label": "Teams",
+            "none": "This organization has no Teams yet.",
+            "noneSet": "Not on a Team.",
+            "count": "On {count, plural, one {# Team} other {# Teams}}.",
+            "save": "Save Teams",
+            "saved": "Teams saved.",
+            "error": "Could not save the Teams."
         }
     }
 }

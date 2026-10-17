@@ -64,7 +64,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  *   POST /api/tasks/:id/transition { to, force? }
  *      lattice: backlog→todo→in_progress→{in_review,done}; done→in_progress
- *      (re-open); *→cancelled (terminal). `→done` gates on open blockers
+ *      (re-open); *→cancelled; cancelled→backlog|todo (re-open, EW-P1-6). `→done` gates on open blockers
  *      (409, not bypassable by force) + the approver quorum (409 when
  *      requireAllApprovers && not all approved — force overrides THIS one).
  *      There is NO subtask-completion gate. allApproved() with zero approvers
@@ -507,9 +507,10 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
             'child still transitions freely after parent cancel',
         ).toBe('in_progress');
 
-        // --- Step 3: cancelled is terminal — the parent cannot leave it. ---
-        const reanimate = await transition(request, token, parent.id, 'todo');
-        expect(reanimate.status(), 'cancelled → todo is rejected (lattice 400)').toBe(400);
+        // --- Step 3: cancelled only re-opens into backlog/todo (EW-P1-6) — the
+        //     parent cannot jump straight back into work. ---
+        const reanimate = await transition(request, token, parent.id, 'in_progress');
+        expect(reanimate.status(), 'cancelled → in_progress is rejected (lattice 400)').toBe(400);
         expect(
             String((await reanimate.json()).message),
             'lattice error names the dead edge',

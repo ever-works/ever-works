@@ -90,7 +90,7 @@ Ever-Works-Job: ${TEST_JOB_ID}`
 	})
 });
 
-describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { timeout: 30_000 }, () => {
+describe('FleetTaskWorkspaceProvisioner — mounts (real Git)', { timeout: 30_000, concurrent: false }, () => {
 	let ownedRoot: string;
 	let workspaceRoot: string;
 	let primaryOrigin: string;

@@ -165,9 +165,22 @@ export function computeNextTemplateOccurrence(ctx: TemplateCadenceContext): Date
  * inert with nothing to run them. Assignee rows are copied by the
  * dispatcher (`TaskRecurrenceDispatcherService`) since they live in a
  * side table this pure function cannot reach.
+ *
+ * Record visibility (review 2026-10-17 F1): the instance carries the
+ * template's title and description, so it keeps the template's
+ * `visibility` + `visibilityExplicit`. Without them the insert-time
+ * default turned every instance of a private template into an
+ * `organization` row (and a Team template's into one too, when its Team
+ * came through `team_resources`, which the instance does not get).
  */
 export function cloneRecurringTaskAsInstance(template: Task): Partial<Task> {
+    const visibility: Partial<Task> = {};
+    if (template.visibility) {
+        visibility.visibility = template.visibility;
+        visibility.visibilityExplicit = template.visibilityExplicit ?? false;
+    }
     return {
+        ...visibility,
         userId: template.userId,
         tenantId: template.tenantId ?? null,
         organizationId: template.organizationId ?? null,

@@ -82,6 +82,13 @@ The settings UI (`/settings/integrations/emails`) and the per-Agent inbox surfac
 - **P10.2** Add per-provider setup notes (Postmark/Mailgun/Sendgrid/Resend webhook URLs operators must register).
 - **P10.3** Update `docs/specs/architecture/database.md` with the new tables.
 
+## Phase 11 — Email fixes for the Gauzy integration (EW-P4-3, spec §14)
+
+Additive, one small PR each, in this order (security first): (1) refuse unsigned inbound webhooks, (2) RFC threading
+columns and headers, (3) inbound data fixes (attachments, cc, metadata, tenant/org stamp, `taskId` back-link),
+(4) add-address wizard and real verification. Each PR ships its tests and, where the schema changes, its migration on
+Postgres, MySQL and better-sqlite3. Tasks T42–T45 in [tasks.md](./tasks.md).
+
 ## Dependencies & cross-spec coordination
 
 - **Independent of**: [`notification-channels`](../notification-channels/plan.md) — both share the plugin-capabilities foundation but ship on separate timelines.

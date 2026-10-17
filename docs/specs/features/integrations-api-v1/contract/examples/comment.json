@@ -1,0 +1,18 @@
+{
+	"id": "19d1f3b5-7c8e-4fc6-8af1-6c7d8e9fabbc",
+	"taskId": "e7b9d1f3-5a6c-4da4-8edf-4a5b6c7d8e9a",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"authorType": "agent",
+	"authorId": "c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78",
+	"body": "PR is up: https://github.com/acme/site/pull/12",
+	"mentions": [
+		{
+			"type": "user",
+			"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+		}
+	],
+	"editedAt": null,
+	"createdAt": "2026-10-15T18:02:00.000Z",
+	"updatedAt": "2026-10-15T18:02:00.000Z",
+	"externalLinks": []
+}

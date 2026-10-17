@@ -10,6 +10,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { RecordVisibility } from '@ever-works/contracts';
 import type { AgentHaltDetailDto, MergePolicyOverride } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
@@ -220,6 +221,7 @@ export enum AgentIdleBehavior {
  * avoid forward-import cycles; FK constraints are added by the migration.
  */
 @Entity({ name: 'agents' })
+@Index('idx_agents_org_visibility', ['organizationId', 'visibility'])
 // Durable per-scope slug uniqueness. The scope's target is normalized into the
 // NON-NULL `scopeTargetId` column (see below) so this index has no nullable
 // members — SQL treats NULLs as DISTINCT inside a unique index, so the previous
@@ -239,6 +241,8 @@ export enum AgentIdleBehavior {
 @Index('idx_agents_mission', ['missionId'])
 @Index('idx_agents_work', ['workId'])
 @Index('idx_agents_idea', ['ideaId'])
+// Integration API v1 keyset lists (migration 1795080300000).
+@Index('idx_agents_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class Agent {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -583,11 +587,40 @@ export class Agent {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
+    /**
+     * Record visibility (EW-P1-3, `docs/specs/features/record-visibility/spec.md`).
+     * Ownership (`userId`) is unchanged; this only ADDS readers of an org-scope row:
+     * `private` = the owner and the participants, `team` = also the members of the
+     * row's Teams and Work, `organization` = also every member of the Organization.
+     * Existing org rows were backfilled by migration 1795070000000 (owner decision D11).
+     */
+    @Column({ type: 'varchar', length: 16, default: 'private' })
+    visibility: RecordVisibility;
+
+    /**
+     * `true` once somebody chose `visibility` by hand: the automatic Team ↔
+     * Organization changes then stop. `private` is only ever set by hand.
+     */
+    @Column({ type: 'boolean', default: false })
+    visibilityExplicit: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for optimistic concurrency and event ordering (EW-P1-1,
+     * `docs/specs/features/domain-events/spec.md` §4). Starts at 1 and is bumped by
+     * `bumpAggregateVersion` on every recorded change — every user-meaningful change.
+     *
+     * A plain column on purpose, NOT `@VersionColumn`: TypeORM adds
+     * `version = version + 1` to every query-builder `.update()` of an entity
+     * with a version column, which would bump it on machine-only writes too.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 
     /**
      * Keep `scopeTargetId` in lock-step with the scope FKs on every persist so

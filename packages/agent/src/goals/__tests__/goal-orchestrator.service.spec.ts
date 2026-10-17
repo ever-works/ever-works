@@ -700,6 +700,42 @@ describe('GoalOrchestratorService — advance', () => {
         expect(goals._rows[0].activeAgentId).toBe('agent-7');
     });
 
+    // F1 (review 2026-10-17, P0): the iteration Task carries the Goal's title and
+    // brief, so a private Goal's iteration must not land as an `organization` Task.
+    it("files a private Goal's iteration Task as private", async () => {
+        const { service, tasksService } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                visibility: 'private',
+                visibilityExplicit: true,
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', derivedFromPrivate: true }),
+            expect.anything(),
+        );
+    });
+
+    it("leaves a shared Goal's iteration Task to the insert default", async () => {
+        const { service, tasksService } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                visibility: 'organization',
+                visibilityExplicit: false,
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        expect(tasksService.create.mock.calls[0][1].derivedFromPrivate).toBe(false);
+    });
+
     it('routes a pinned known Agent UUID only through the Goal persisted Ever scope', async () => {
         const assignedAgentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
         const { service, agents, tasksService, transitions } = build({

@@ -1,6 +1,7 @@
 import {
     Entity,
     Column,
+    Index,
     PrimaryGeneratedColumn,
     ManyToOne,
     OneToMany,
@@ -159,6 +160,8 @@ export function shouldGenerateProviderRepository(
 }
 
 @Entity({ name: 'works' })
+// Integration API v1 keyset lists (migration 1795080300000).
+@Index('idx_works_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class Work {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -842,6 +845,18 @@ export class Work {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for optimistic concurrency and event ordering (EW-P1-1,
+     * `docs/specs/features/domain-events/spec.md` §4). Starts at 1 and is bumped by
+     * `bumpAggregateVersion` on every recorded change — member changes too; never by generation/deploy runtime writes.
+     *
+     * A plain column on purpose, NOT `@VersionColumn`: TypeORM adds
+     * `version = version + 1` to every query-builder `.update()` of an entity
+     * with a version column, which would bump it on machine-only writes too.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 
     getDataRepo() {
         return this.getRelatedRepository('data').repo;

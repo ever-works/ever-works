@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { Task } from '@/lib/api/tasks';
+import type { RecordListView } from '@/lib/record-visibility';
 import { listTasksWithRunsAction } from '@/app/actions/tasks';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -19,7 +20,12 @@ const POLL_INTERVAL_MS = 10_000;
  * Same setInterval-in-effect shape as the existing pollers
  * (`NotificationDropdown`, `WorkActivity`).
  */
-export function useTaskRunPolling(tasks: Task[], onFreshRows: (rows: Task[]) => void): void {
+export function useTaskRunPolling(
+    tasks: Task[],
+    onFreshRows: (rows: Task[]) => void,
+    /** Record visibility (EW-P1-3): poll the same tab the board shows. */
+    view: RecordListView = 'mine',
+): void {
     // Keep the callback in a ref so a new inline function per render
     // doesn't tear the interval down and re-create it every 10s render.
     const onFreshRowsRef = useRef(onFreshRows);
@@ -40,7 +46,7 @@ export function useTaskRunPolling(tasks: Task[], onFreshRows: (rows: Task[]) => 
             if (inFlight) return; // never stack slow polls
             inFlight = true;
             try {
-                const rows = await listTasksWithRunsAction();
+                const rows = await listTasksWithRunsAction(view === 'mine' ? {} : { view });
                 if (!cancelled) onFreshRowsRef.current(rows);
             } catch {
                 // Poll is best-effort — keep last-known chips.
@@ -54,5 +60,5 @@ export function useTaskRunPolling(tasks: Task[], onFreshRows: (rows: Task[]) => 
             cancelled = true;
             clearInterval(interval);
         };
-    }, [hasActiveRun]);
+    }, [hasActiveRun, view]);
 }

@@ -104,8 +104,12 @@ describe('PaymentMethodController — route auth + owner/org scoping', () => {
         // The guard metadata is what makes these routes non-public; the
         // webhook is the only @Public route in this module.
         const guards = Reflect.getMetadata('__guards__', PaymentMethodController) ?? [];
-        expect(guards).toHaveLength(1);
-        expect(guards[0].name).toBe('AuthSessionGuard');
+        // EW-P1-2 adds IntegrationForbiddenGuard: integration keys (`ew_int_…`)
+        // can never reach billing, whatever scopes they hold.
+        expect(guards.map((guard: { name: string }) => guard.name).sort()).toEqual([
+            'AuthSessionGuard',
+            'IntegrationForbiddenGuard',
+        ]);
     });
 
     it('lists the AUTHENTICATED owner’s methods only', async () => {

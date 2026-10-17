@@ -199,8 +199,42 @@ export class AuthService {
 
     async validateSocialUser(socialUser: SocialAuthUser) {
         const isTrustedEmail = socialUser.emailVerified !== false;
-        let user = await this.userRepository.findByEmailForSocialAuth(socialUser.email);
         const displayName = socialUser.displayName || socialUser.email.split('@')[0];
+
+        // The provider IDENTITY decides first, the email second (self-build
+        // handover item 13). A user already linked to THIS provider account
+        // (provider + its immutable account id) is that user, whatever email
+        // the provider reports today. Matching by email first broke sign-in
+        // for anyone whose provider email changed: it created an orphan user,
+        // then failed on the link conflict, or it tried to log the identity
+        // into another user's account.
+        const providerAccountId =
+            socialUser.providerUserId === undefined || socialUser.providerUserId === null
+                ? ''
+                : String(socialUser.providerUserId).trim();
+        const linkedAccount = providerAccountId
+            ? await this.authAccountRepository.findProviderAccountByAccountId(
+                  socialUser.provider,
+                  providerAccountId,
+              )
+            : null;
+        let user = linkedAccount
+            ? await this.userRepository.findByIdForSocialAuth(linkedAccount.userId)
+            : null;
+        if (linkedAccount && !user) {
+            // This provider account is bound to a local user we cannot load
+            // (`account.userId` has no foreign key). Falling through to the
+            // email match would update another user's profile, or create a
+            // second user, and only then fail the link upsert on the
+            // (provider, account id) unique index. Refuse before writing,
+            // as GitHub App onboarding does.
+            throw new ConflictException(
+                'This social account is linked to a local account that could not be loaded',
+            );
+        }
+        if (!user) {
+            user = await this.userRepository.findByEmailForSocialAuth(socialUser.email);
+        }
 
         if (!user) {
             const hashedPassword = await this.randomHashedPassword();
@@ -225,21 +259,28 @@ export class AuthService {
         } else {
             this.ensureUserIsActive(user);
 
-            const existingProviderLink = await this.authAccountRepository.findProviderAccount(
-                user.id,
-                socialUser.provider,
-            );
-            if (!isTrustedEmail && !existingProviderLink) {
+            // An UNVERIFIED provider email may sign in only through a link to
+            // THIS provider account. The old check accepted ANY link of the same
+            // provider (`findProviderAccount(userId, provider)`), so a different
+            // account presenting the victim's email unverified passed it, and
+            // `upsertProviderAccount` then re-pointed the victim's existing link
+            // at the newcomer's account id and tokens: an account takeover.
+            const linkedToThisAccount = !!linkedAccount && linkedAccount.userId === user.id;
+            if (!isTrustedEmail && !linkedToThisAccount) {
                 throw new UnauthorizedException(
                     'Unable to link this social account because the provider email is not verified',
                 );
             }
 
+            // Only a verified address that IS the user's address can verify it.
+            // Reached through the link, the provider may now report another one.
+            const sameEmail =
+                (user.email ?? '').trim().toLowerCase() === socialUser.email.trim().toLowerCase();
             user = await this.userRepository.updateForSocialAuth(user.id, {
                 username: socialUser.username || user.username || displayName,
                 avatar: socialUser.avatar || user.avatar,
                 registrationProvider: socialUser.provider,
-                emailVerified: user.emailVerified || isTrustedEmail,
+                emailVerified: user.emailVerified || (isTrustedEmail && sameEmail),
                 lastLoginAt: new Date(),
             });
         }
@@ -247,7 +288,9 @@ export class AuthService {
         await this.authAccountRepository.upsertProviderAccount({
             userId: user.id,
             providerId: socialUser.provider,
-            accountId: socialUser.providerUserId,
+            // The SAME normalised id the link lookup above used, so the next
+            // sign-in finds this link (review on #2633).
+            accountId: providerAccountId || socialUser.providerUserId,
             username: socialUser.username || undefined,
             email: socialUser.email,
             accessToken: socialUser.accessToken,
@@ -683,6 +726,9 @@ export class AuthService {
         const updateFields: Record<string, any> = {};
         if (isNotNull(updateData.username)) updateFields.username = updateData.username;
         if (isNotNull(updateData.avatar)) updateFields.avatar = updateData.avatar;
+        // EW-P2-6 — `null` / empty clears the display name back to the username.
+        if (updateData.displayName !== undefined)
+            updateFields.displayName = updateData.displayName?.trim() || null;
         // Allow explicitly setting committer fields to null (to clear them)
         if (updateData.committerName !== undefined)
             updateFields.committerName = updateData.committerName || null;

@@ -28,6 +28,10 @@ export type WebhookDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'retryi
 @Index(['subscriptionId', 'createdAt'])
 @Index(['accountId', 'createdAt'])
 @Index(['status'])
+// Webhooks v2: one fan-out delivery per (subscription, domain event), so the
+// at-least-once fan-out can re-run a batch without double-sending. NULLs (v1,
+// test fires, redeliveries) never collide.
+@Index('uq_webhook_deliveries_subscription_event', ['subscriptionId', 'eventId'], { unique: true })
 export class WebhookDelivery {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -44,6 +48,14 @@ export class WebhookDelivery {
 
     @Column({ type: 'varchar', length: 128 })
     event: string;
+
+    /**
+     * Webhooks v2: the domain event (`evt_<ULID>`) this fan-out delivery
+     * carries. NULL on v1 deliveries, test fires and redeliveries (whose
+     * payload still carries the event `id`).
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    eventId?: string | null;
 
     /**
      * Raw JSON payload as it was signed. Re-enqueueing a delivery uses

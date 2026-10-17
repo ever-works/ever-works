@@ -1,0 +1,91 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/team.schema.json",
+	"title": "Team DTO (B.6, /teams)",
+	"description": "Teams are org-wide in Ever Works, so `visibility` is always `organization` and `visibilityExplicit` false. Members and resources are embedded as full sets (PUT /teams/:id/members and PUT /teams/:id/resources replace them). Also the `data` of team.created/updated/deleted.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": ["name", "slug", "members", "resources"],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": { "const": "organization" },
+		"visibilityExplicit": { "const": false },
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"name": { "type": "string", "minLength": 1, "maxLength": 200 },
+		"slug": { "type": "string", "maxLength": 100 },
+		"description": { "type": ["string", "null"] },
+		"parentTeamId": {
+			"description": "EW-only nesting; Gauzy teams are flat and keep it on the link (01 §5).",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
+		"managerAgentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"avatarIcon": { "type": ["string", "null"], "maxLength": 100 },
+		"members": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/TeamMemberRef" }
+		},
+		"resources": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/TeamResourceRef" }
+		},
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on team.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"TeamMemberRef": {
+			"type": "object",
+			"required": ["memberType", "memberId", "role"],
+			"properties": {
+				"memberType": { "type": "string", "enum": ["user", "agent"] },
+				"memberId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"role": { "type": "string", "enum": ["lead", "member"] }
+			},
+			"additionalProperties": false
+		},
+		"TeamResourceRef": {
+			"type": "object",
+			"required": ["resourceType", "resourceId"],
+			"properties": {
+				"resourceType": {
+					"description": "`goal` arrives with EW-P1-3. Consumers must ignore types they do not sync.",
+					"type": "string",
+					"examples": ["work", "task", "agent", "mission", "idea", "goal"]
+				},
+				"resourceId": { "$ref": "../common.schema.json#/$defs/Uuid" }
+			},
+			"additionalProperties": false
+		},
+		"TeamMemberEvent": {
+			"description": "`data` of team.member.added/updated/removed (aggregate = the team).",
+			"type": "object",
+			"required": ["teamId", "memberType", "memberId", "role"],
+			"properties": {
+				"teamId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"memberType": { "type": "string", "enum": ["user", "agent"] },
+				"memberId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"role": { "type": "string", "enum": ["lead", "member"] },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		},
+		"TeamResourceEvent": {
+			"description": "`data` of team.resource.added/removed (aggregate = the team).",
+			"type": "object",
+			"required": ["teamId", "resourceType", "resourceId"],
+			"properties": {
+				"teamId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"resourceType": { "type": "string" },
+				"resourceId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		}
+	}
+}

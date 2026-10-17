@@ -1,5 +1,6 @@
 'use client';
 
+import { RecordVisibilityPanel } from '@/components/record-visibility';
 import { useMemo, useState, useTransition } from 'react';
 import {
     Activity,
@@ -675,6 +676,10 @@ export function MissionDetailClient({
 
                 {/* ── Context rail ─────────────────────────────────────── */}
                 <aside className="min-w-0 space-y-5 @5xl/main:col-span-4">
+                    {/* Record visibility (EW-P1-3): who else can see this Mission. */}
+                    <section className={sectionCard} data-testid="mission-visibility">
+                        <RecordVisibilityPanel aggregate="mission" id={mission.id} />
+                    </section>
                     {/* ── Spend ────────────────────────────────────────── */}
                     <section className={sectionCard}>
                         <SectionHeader icon={BarChart3} title={t('sections.spend')} />

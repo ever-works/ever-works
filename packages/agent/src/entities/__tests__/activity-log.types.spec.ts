@@ -487,7 +487,10 @@ describe('activity-log.types', () => {
             //    identity_unlinked, user_logout, delegated_access and
             //    identity_provider_config_changed, each with its `feed-kind.ts`
             //    row in the same change -> 211. Nothing existing moves.
-            expect(literals).toHaveLength(211);
+            // +4 EW-P1-2 integration keys: integration_write,
+            //    integration_key_created / _rotated / _revoked, each with its
+            //    `feed-kind.ts` row in the same change -> 215.
+            expect(literals).toHaveLength(215);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

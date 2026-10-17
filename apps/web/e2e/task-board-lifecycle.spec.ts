@@ -13,7 +13,7 @@ import { createTaskViaAPI, transitionTaskViaAPI } from './helpers/agents-tasks';
  *   in_progress → in_review, blocked, done, cancelled
  *   in_review → in_progress, blocked, done, cancelled
  *   blocked → todo, in_progress, cancelled
- *   done → in_progress         cancelled → (terminal)
+ *   done → in_progress         cancelled → backlog, todo (re-open, EW-P1-6)
  *
  * What this spec proves end-to-end:
  *   1. A task is born in `backlog` (POST /api/tasks).

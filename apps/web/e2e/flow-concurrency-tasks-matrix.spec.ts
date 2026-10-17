@@ -233,7 +233,7 @@ test.describe('Tasks — identical-target transition bursts elect exactly one wi
         expect(await getStatus(request, u.access_token, task.id)).toBe('in_progress');
     });
 
-    test('N parallel todo→cancelled → exactly one 200 + the rest 400; cancelled is a terminal sink', async ({
+    test('N parallel todo→cancelled → exactly one 200 + the rest 400; cancelled only re-opens into backlog/todo', async ({
         request,
     }) => {
         test.setTimeout(90_000);
@@ -255,12 +255,19 @@ test.describe('Tasks — identical-target transition bursts elect exactly one wi
         expect(statuses.filter((s) => s === 200).length, 'exactly one cancel wins').toBe(1);
         expect(await getStatus(request, u.access_token, task.id)).toBe('cancelled');
 
-        // Terminal sink: a follow-up move off cancelled is refused (nothing resurrects it).
+        // EW-P1-6: cancelled is no longer a dead end, but it only re-opens into
+        // backlog or todo — any other move off it is still refused.
         const afterTerminal = await request.post(`${TASKS}/${task.id}/transition`, {
+            headers: H(u.access_token),
+            data: { to: 'in_progress' },
+        });
+        expect(afterTerminal.status(), 'cancelled → in_progress is not a legal move').toBe(400);
+        const reopened = await request.post(`${TASKS}/${task.id}/transition`, {
             headers: H(u.access_token),
             data: { to: 'todo' },
         });
-        expect(afterTerminal.status(), 'cancelled is terminal — no legal move out').toBe(400);
+        expect(reopened.status(), 'cancelled → todo re-opens').toBe(200);
+        expect(await getStatus(request, u.access_token, task.id)).toBe('todo');
     });
 });
 

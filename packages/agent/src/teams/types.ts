@@ -140,6 +140,8 @@ export interface TeamResourcesGrouped {
     agent: TeamResourceItem[];
     mission: TeamResourceItem[];
     idea: TeamResourceItem[];
+    /** EW-P1-3: Goals sit on Teams too (`team_resources` type `goal`). */
+    goal: TeamResourceItem[];
 }
 
 /** A Team that owns a given resource (`listTeamsForResource`). */

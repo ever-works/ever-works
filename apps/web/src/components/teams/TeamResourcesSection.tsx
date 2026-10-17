@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Bot, Briefcase, Lightbulb, ListChecks, Target, type LucideIcon } from 'lucide-react';
+import {
+    Bot,
+    Briefcase,
+    Gauge,
+    Lightbulb,
+    ListChecks,
+    Target,
+    type LucideIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -38,7 +46,7 @@ export interface TeamResourcesSectionProps {
     agents: ResourceOption[];
 }
 
-const GROUP_ORDER: TeamResourceType[] = ['work', 'agent', 'mission', 'idea', 'task'];
+const GROUP_ORDER: TeamResourceType[] = ['work', 'agent', 'mission', 'goal', 'idea', 'task'];
 
 const GROUP_ICON: Record<TeamResourceType, LucideIcon> = {
     work: Briefcase,
@@ -46,6 +54,7 @@ const GROUP_ICON: Record<TeamResourceType, LucideIcon> = {
     mission: Target,
     idea: Lightbulb,
     task: ListChecks,
+    goal: Gauge,
 };
 
 function resourceHref(type: TeamResourceType, id: string): string {
@@ -60,6 +69,8 @@ function resourceHref(type: TeamResourceType, id: string): string {
             return ROUTES.DASHBOARD_IDEA(id);
         case 'task':
             return ROUTES.DASHBOARD_TASK(id);
+        case 'goal':
+            return `${ROUTES.DASHBOARD_GOALS}/${id}`;
     }
 }
 
@@ -86,7 +97,10 @@ export function TeamResourcesSection({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [removingId, setRemovingId] = useState<string | null>(null);
 
-    const allItems = useMemo(() => GROUP_ORDER.flatMap((type) => resources[type]), [resources]);
+    const allItems = useMemo(
+        () => GROUP_ORDER.flatMap((type) => resources[type] ?? []),
+        [resources],
+    );
     const hasAny = allItems.length > 0;
 
     // Ids already attached (per type) — filtered out of the add options.
@@ -160,6 +174,8 @@ export function TeamResourcesSection({
                 return t('detail.resourceGroupIdea');
             case 'task':
                 return t('detail.resourceGroupTask');
+            case 'goal':
+                return t('detail.resourceGroupGoal');
         }
     };
 
@@ -183,55 +199,57 @@ export function TeamResourcesSection({
                 </p>
             ) : (
                 <div className="space-y-4">
-                    {GROUP_ORDER.filter((type) => resources[type].length > 0).map((type) => {
-                        const GroupIcon = GROUP_ICON[type];
-                        return (
-                            <div key={type}>
-                                <h3 className="text-xs font-medium uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark mb-2">
-                                    {groupLabel(type)}
-                                </h3>
-                                <ul className="divide-y divide-border/40 dark:divide-border-dark/40">
-                                    {resources[type].map((item) => (
-                                        <li
-                                            key={item.id}
-                                            data-testid={`team-resource-${item.resourceId}`}
-                                            className="flex items-center gap-3 py-2.5"
-                                        >
-                                            <div className="shrink-0 w-7 h-7 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark flex items-center justify-center">
-                                                <GroupIcon
-                                                    className="w-3.5 h-3.5 text-text-secondary dark:text-text-secondary-dark"
-                                                    strokeWidth={1.5}
-                                                    aria-hidden="true"
-                                                />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <Link
-                                                    href={resourceHref(
-                                                        item.resourceType,
-                                                        item.resourceId,
-                                                    )}
-                                                    className="text-sm text-text dark:text-text-dark truncate hover:text-primary transition-colors block"
-                                                >
-                                                    {item.name ?? item.resourceId}
-                                                </Link>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleRemove(item)}
-                                                loading={removingId === item.id}
-                                                disabled={removingId !== null}
-                                                className="text-xs text-danger hover:text-danger"
-                                                data-testid={`team-resource-remove-${item.resourceId}`}
+                    {GROUP_ORDER.filter((type) => (resources[type] ?? []).length > 0).map(
+                        (type) => {
+                            const GroupIcon = GROUP_ICON[type];
+                            return (
+                                <div key={type}>
+                                    <h3 className="text-xs font-medium uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark mb-2">
+                                        {groupLabel(type)}
+                                    </h3>
+                                    <ul className="divide-y divide-border/40 dark:divide-border-dark/40">
+                                        {(resources[type] ?? []).map((item) => (
+                                            <li
+                                                key={item.id}
+                                                data-testid={`team-resource-${item.resourceId}`}
+                                                className="flex items-center gap-3 py-2.5"
                                             >
-                                                {t('detail.removeResource')}
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        );
-                    })}
+                                                <div className="shrink-0 w-7 h-7 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark flex items-center justify-center">
+                                                    <GroupIcon
+                                                        className="w-3.5 h-3.5 text-text-secondary dark:text-text-secondary-dark"
+                                                        strokeWidth={1.5}
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <Link
+                                                        href={resourceHref(
+                                                            item.resourceType,
+                                                            item.resourceId,
+                                                        )}
+                                                        className="text-sm text-text dark:text-text-dark truncate hover:text-primary transition-colors block"
+                                                    >
+                                                        {item.name ?? item.resourceId}
+                                                    </Link>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemove(item)}
+                                                    loading={removingId === item.id}
+                                                    disabled={removingId !== null}
+                                                    className="text-xs text-danger hover:text-danger"
+                                                    data-testid={`team-resource-remove-${item.resourceId}`}
+                                                >
+                                                    {t('detail.removeResource')}
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        },
+                    )}
                 </div>
             )}
 

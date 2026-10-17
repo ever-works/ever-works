@@ -1,5 +1,9 @@
 import 'server-only';
-import type { AgentCapabilitiesPayload, MergePolicyOverride } from '@ever-works/contracts';
+import type {
+    AgentCapabilitiesPayload,
+    MergePolicyOverride,
+    RecordListView,
+} from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -150,6 +154,11 @@ export interface Agent {
 }
 
 export interface ListAgentsQuery {
+    /**
+     * Record visibility (EW-P1-3) list tab, sent as `view`: `mine` (default — omitted),
+     * `shared` or `organization`.
+     */
+    view?: RecordListView;
     scope?: AgentScope;
     status?: AgentStatus;
     missionId?: string;
@@ -337,6 +346,7 @@ function buildQuery(q: ListAgentsQuery = {}): string {
     if (q.search) params.set('search', q.search);
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
+    if (q.view && q.view !== 'mine') params.set('view', q.view);
     const s = params.toString();
     return s ? `?${s}` : '';
 }

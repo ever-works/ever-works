@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrganizationMember } from '../../entities/organization-member.entity';
+import type { OrganizationRosterRole } from '../../entities/types';
 
 /**
  * Data access for `OrganizationMember` — the Organization roster.
@@ -47,6 +48,29 @@ export class OrganizationMemberRepository {
      */
     async listForUserInTenant(userId: string, tenantId: string): Promise<OrganizationMember[]> {
         return this.repository.find({ where: { userId, tenantId } });
+    }
+
+    /** EW-P2-6 — set a roster row's role; `false` when there is no such row. */
+    async updateRole(
+        organizationId: string,
+        userId: string,
+        role: OrganizationRosterRole,
+    ): Promise<boolean> {
+        const result = await this.repository.update({ organizationId, userId }, { role });
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * EW-P2-6 — the Organizations of a Tenant this user administers through a roster
+     * row (`role = 'admin'`). The Tenant owner administers every Organization and has
+     * no rows; callers check ownership first.
+     */
+    async listAdministeredOrganizationIds(userId: string, tenantId: string): Promise<string[]> {
+        const rows = await this.repository.find({
+            where: { userId, tenantId, role: 'admin' },
+            select: { organizationId: true },
+        });
+        return rows.map((row) => row.organizationId);
     }
 
     async deleteByOrgAndUser(organizationId: string, userId: string): Promise<boolean> {

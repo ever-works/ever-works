@@ -10,6 +10,11 @@ import {
     ServiceUnavailableException,
     UnprocessableEntityException,
 } from '@nestjs/common';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
+import type { EntityManager } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import { WorkRepository } from '@src/database/repositories/work.repository';
@@ -224,6 +229,11 @@ export class WorkLifecycleService {
         // and the delete is unchanged. Only `kind: 'app'` ever reads it.
         @Optional()
         private readonly appWorksTelemetry?: AppWorksTelemetryService,
+        // Domain events (EW-P1-1 B2) — `work.updated` / `work.deleted`, recorded
+        // right after the write (`work.created` and status changes come from
+        // the existing `work.created` / `work.status.changed` events through
+        // `DomainEventWorkBridge`). Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -882,7 +892,17 @@ export class WorkLifecycleService {
         };
 
         try {
-            return await this.workRepository.create(workData, user);
+            const created = await this.workRepository.create(workData, user);
+            // This path emits no `work.created` app event, so the domain event is
+            // recorded here (the main create path is covered by DomainEventWorkBridge).
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.created(manager, 'work', created.id, 'work.created'),
+                (message) => this.logger.warn(message),
+                `work.created for ${created.id}`,
+            );
+            return created;
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating company work');
         }
@@ -924,9 +944,113 @@ export class WorkLifecycleService {
         };
 
         try {
-            return await this.workRepository.create(workData, user);
+            const created = await this.workRepository.create(workData, user);
+            // This path emits no `work.created` app event, so the domain event is
+            // recorded here (the main create path is covered by DomainEventWorkBridge).
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.created(manager, 'work', created.id, 'work.created'),
+                (message) => this.logger.warn(message),
+                `work.created for ${created.id}`,
+            );
+            return created;
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating campaign work');
+        }
+    }
+
+    /**
+     * EW-P2-4 — a repo-less Project Work (`kind: 'project'`): plain project
+     * tracking, and the Ever Works side of a Gauzy project. A bare row with
+     * ZERO repository / git / generation / deploy side-effects, exactly like
+     * `createCampaignWork` (`deployProvider: null`, so it does not count
+     * against the Deploy quota) — and nothing else ever provisions one: every
+     * repository role of the kind is off (`WORK_KIND_CAPABILITIES.project`).
+     *
+     * Behind `EVER_WORKS_PROJECT_WORKS_ENABLED` (exactly `'true'`, default
+     * OFF): refused with `400 project_works_disabled` otherwise.
+     *
+     * `withinCreate` (T17a pattern, integration `POST /works`): the row, its
+     * `work.created` event and whatever the hook writes (the `externalRef` link)
+     * commit in ONE transaction, and a throw rolls all of it back. Without the
+     * hook the event stays best-effort after the write, as before.
+     */
+    async createProjectWork(
+        user: User,
+        params: {
+            name: string;
+            slug: string;
+            description?: string;
+            /** Gauzy CR-6 — the project's website (`projectUrl`), optional. */
+            website?: string | null;
+        },
+        options: {
+            readonly withinCreate?: (work: Work, manager: EntityManager) => Promise<void>;
+        } = {},
+    ): Promise<Work> {
+        if (!config.everWorks.projectWorks.enabled()) {
+            throw new BadRequestException({
+                statusCode: 400,
+                code: 'project_works_disabled',
+                message:
+                    'Project Works are not enabled on this installation (EVER_WORKS_PROJECT_WORKS_ENABLED).',
+            });
+        }
+        const workData: Partial<Work> = {
+            slug: params.slug,
+            name: params.name,
+            description: params.description ?? params.name,
+            userId: user.id,
+            kind: 'project',
+            status: 'active',
+            deployProvider: null,
+        };
+        if (params.website) workData.website = params.website;
+
+        const withinCreate = options.withinCreate;
+        if (withinCreate) {
+            const publisher = this.domainEvents;
+            if (!publisher) {
+                throw new Error(
+                    'Project Work withinCreate needs DomainEventsModule (one transaction)',
+                );
+            }
+            // The hook's own error (e.g. the integration API's lost externalRef race)
+            // reaches the caller as thrown; only the create's errors are normalized.
+            let hookError: { readonly error: unknown } | null = null;
+            try {
+                return await publisher.transaction(async (manager) => {
+                    const row = await this.workRepository.create(workData, user, manager);
+                    await publisher.created(manager, 'work', row.id, 'work.created');
+                    try {
+                        await withinCreate(row, manager);
+                    } catch (error) {
+                        hookError = { error };
+                        throw error;
+                    }
+                    return row;
+                });
+            } catch (error) {
+                if (hookError) throw (hookError as { readonly error: unknown }).error;
+                rethrowAsNormalized(error, this.logger, 'creating project work');
+            }
+        }
+
+        try {
+            const created = await this.workRepository.create(workData, user);
+            // This path emits no `work.created` app event, so the domain event is
+            // recorded here (the main create path is covered by DomainEventWorkBridge).
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.created(manager, 'work', created.id, 'work.created'),
+                (message) => this.logger.warn(message),
+                `work.created for ${created.id}`,
+            );
+            return created;
+        } catch (error) {
+            rethrowAsNormalized(error, this.logger, 'creating project work');
         }
     }
 
@@ -965,7 +1089,17 @@ export class WorkLifecycleService {
         }
 
         try {
-            return await this.workRepository.create(workData, user);
+            const created = await this.workRepository.create(workData, user);
+            // This path emits no `work.created` app event, so the domain event is
+            // recorded here (the main create path is covered by DomainEventWorkBridge).
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.created(manager, 'work', created.id, 'work.created'),
+                (message) => this.logger.warn(message),
+                `work.created for ${created.id}`,
+            );
+            return created;
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating draft work');
         }
@@ -1311,6 +1445,15 @@ export class WorkLifecycleService {
             if (!updatedWork) {
                 throw new NotFoundException({ status: 'error', message: 'Work not found' });
             }
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.changed(manager, 'work', id, 'work.updated', {
+                        changedFields: workDtoFieldsOf(updateData),
+                    }),
+                (message) => this.logger.warn(message),
+                `work.updated for ${id}`,
+            );
 
             updatedWork.owner = updatedWork.getRepoOwner();
 
@@ -1641,11 +1784,6 @@ export class WorkLifecycleService {
     async syncFromDataRepository(workId: string, user: User) {
         // Require at least editor role to sync
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
-        // The snapshot clones the data repository looking for directory
-        // items and a README template. For a Repository Work that is a full
-        // clone of somebody's code repository into the shared checkout, for
-        // content that cannot be there.
-        assertNotRepositoryWork(work, 'syncing from the data repository');
         // A kind that provisions no data repository (`repos.data: false` in
         // the capability registry — today the App Work) has nothing to sync
         // FROM. Without this the snapshot below cloned the derived
@@ -1661,6 +1799,14 @@ export class WorkLifecycleService {
                 message: `Nothing to sync: a "${work.kind}" Work has no data repository.`,
             };
         }
+        // The snapshot clones the data repository looking for directory
+        // items and a README template. For a Repository Work that is a full
+        // clone of somebody's code repository into the shared checkout, for
+        // content that cannot be there. (After the no-op above, so a Project
+        // Work — no repository at all, page mounts call this — gets the
+        // no-op rather than a 400; a Repository Work has a data role, so it
+        // still reaches this refusal.)
+        assertNotRepositoryWork(work, 'syncing from the data repository');
         const updates: Record<string, any> = {};
 
         try {
@@ -1899,7 +2045,23 @@ export class WorkLifecycleService {
                 };
             }
 
+            const workTombstone = this.domainEvents
+                ? await this.domainEvents
+                      .transaction((manager) =>
+                          this.domainEvents!.beforeDelete(manager, 'work', work.id),
+                      )
+                      .catch(() => null)
+                : null;
             await this.workRepository.delete(work.id);
+            if (workTombstone) {
+                await recordAfterWrite(
+                    this.domainEvents,
+                    (publisher, manager) =>
+                        publisher.deleted(manager, workTombstone, 'work.deleted'),
+                    (message) => this.logger.warn(message),
+                    `work.deleted for ${work.id}`,
+                );
+            }
             this.trackAppWorkDeleted(work, workRepositoryDeleted, user);
 
             // Local checkouts are keyed by `owner/repo`, not by Work. Nothing
@@ -2245,4 +2407,28 @@ function describeFailureCode(error: unknown): string {
     }
     const name = (error as { name?: unknown } | null)?.name;
     return typeof name === 'string' && name.length > 0 && name !== 'Error' ? name : 'unknown';
+}
+
+/** Work entity column → integration DTO field (integration contract v1, B.6). */
+const WORK_COLUMN_TO_DTO_FIELD: Readonly<Record<string, string>> = {
+    name: 'name',
+    slug: 'slug',
+    description: 'description',
+    kind: 'kind',
+    status: 'status',
+    website: 'website',
+    owner: 'repoUrls',
+    gitProvider: 'repoUrls',
+    sourceRepository: 'repoUrls',
+};
+
+/** The integration DTO fields a work update touches (domain events, EW-P1-1). */
+function workDtoFieldsOf(patch: object): string[] {
+    return [
+        ...new Set(
+            Object.keys(patch)
+                .map((key) => WORK_COLUMN_TO_DTO_FIELD[key])
+                .filter((field): field is string => Boolean(field)),
+        ),
+    ];
 }

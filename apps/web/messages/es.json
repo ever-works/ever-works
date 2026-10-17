@@ -2723,6 +2723,7 @@
                 "appLauncher": "Lanzador de apps",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "Webhooks",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8809,6 +8810,7 @@
             "app": "App",
             "company": "Company",
             "campaign": "Campaña",
+            "project": "Proyecto",
             "default": "Work"
         },
         "meetingsPage": {

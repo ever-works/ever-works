@@ -1,0 +1,132 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/kb-document.schema.json",
+	"title": "Knowledge Base document DTO (P3, GET /kb/documents, GET /kb/documents/:id)",
+	"description": "One Knowledge Base document: Markdown with [[path]] wikilinks, owned by the organization library (scope organization) or by one Work of the organization (scope work), filed in a library folder or Unfiled. Also the data of kb.document.* events. Not a ResourceBase: it has no owner, visibility or teams of its own; it is readable by everyone who can read its organization or its Work. `revision` moves only on a real change to the title, description, tags, class or body and `normalizedContentHash` fingerprints the body; `version` moves on every recorded change and is the ETag. An event whose body is longer than 262144 UTF-8 bytes carries `body: null, bodyOmitted: true`; GET always carries the body (CR-7).",
+	"type": "object",
+	"required": [
+		"id",
+		"organizationId",
+		"version",
+		"createdAt",
+		"updatedAt",
+		"scope",
+		"workId",
+		"folderId",
+		"path",
+		"slug",
+		"title",
+		"description",
+		"class",
+		"tags",
+		"categories",
+		"status",
+		"reviewState",
+		"locked",
+		"lockMode",
+		"language",
+		"source",
+		"body",
+		"revision",
+		"revisionAt",
+		"normalizedContentHash",
+		"decision",
+		"createdById",
+		"updatedById",
+		"archivedAt",
+		"wordCount"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"organizationId": {
+			"description": "The organization the document belongs to (a Work document: its Work's organization).",
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		},
+		"version": { "$ref": "../common.schema.json#/$defs/Version" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"scope": { "$ref": "#/$defs/KbScope" },
+		"workId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"folderId": {
+			"description": "The organization library folder it is filed in; null = Unfiled.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
+		"path": {
+			"description": "Relative to the knowledge base root, e.g. brand/voice.md.",
+			"type": "string",
+			"maxLength": 512
+		},
+		"slug": { "type": "string", "maxLength": 255 },
+		"title": { "type": "string", "maxLength": 255 },
+		"description": { "type": ["string", "null"] },
+		"class": {
+			"description": "Document class. Every class may live at organization scope; only legal, style and seo are inherited into Works.",
+			"type": "string",
+			"enum": [
+				"brand",
+				"legal",
+				"seo",
+				"style",
+				"glossary",
+				"competitors",
+				"personas",
+				"research",
+				"output",
+				"freeform",
+				"decision"
+			]
+		},
+		"tags": { "type": "array", "items": { "type": "string" } },
+		"categories": { "type": "array", "items": { "type": "string" } },
+		"status": { "type": "string", "enum": ["draft", "active", "archived"] },
+		"reviewState": {
+			"description": "proposed = agent-written and waiting for a person (POST /kb/documents/:id/accept); null on rows that predate review.",
+			"type": ["string", "null"],
+			"enum": ["proposed", "accepted", null]
+		},
+		"locked": { "type": "boolean" },
+		"lockMode": { "type": ["string", "null"], "enum": ["full", "additions-only", null] },
+		"language": { "description": "BCP-47 tag.", "type": "string", "maxLength": 8 },
+		"source": {
+			"description": "Open set; consumers must accept unknown values.",
+			"type": "string",
+			"examples": ["user", "agent", "imported", "seeded"]
+		},
+		"body": {
+			"description": "The Markdown body; null only with bodyOmitted in an event.",
+			"type": ["string", "null"]
+		},
+		"bodyOmitted": {
+			"description": "Only in an event whose body exceeds the event body limit: GET /kb/documents/:id for the body.",
+			"const": true
+		},
+		"revision": { "type": "integer", "minimum": 1 },
+		"revisionAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"normalizedContentHash": { "type": ["string", "null"], "maxLength": 64 },
+		"decision": {
+			"description": "The decision lifecycle of a decision-class document (read-only), else null.",
+			"type": ["object", "null"]
+		},
+		"createdById": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"updatedById": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"archivedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"wordCount": { "type": ["integer", "null"], "minimum": 0 },
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on kb.document.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"KbScope": {
+			"type": "object",
+			"required": ["type", "id"],
+			"properties": {
+				"type": { "type": "string", "enum": ["organization", "work"] },
+				"id": {
+					"description": "The organization id, or the Work id.",
+					"$ref": "../common.schema.json#/$defs/Uuid"
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}

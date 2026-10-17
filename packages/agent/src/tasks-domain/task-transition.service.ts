@@ -8,6 +8,13 @@ import {
 } from '@nestjs/common';
 import { TaskStatus } from '../entities/task.entity';
 import type { Task, TaskActorType } from '../entities/task.entity';
+import {
+    shortestTransitionPath,
+    TaskTransitionBlockedException,
+    TaskTransitionConflictException,
+    type TransitionBlocker,
+    type TransitionPendingApprover,
+} from './task-transition-path';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { resolveChecksPolicy } from './task-gates';
@@ -27,6 +34,8 @@ import {
     type TerminalSessionStarter,
 } from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
+import { describeTaskPatch } from '../domain-events/domain-event-task-fields';
 import { TaskRunDenormService } from './task-run-denorm.service';
 // Value import (not `import type`): Nest resolves the @Optional() class
 // injection below via emitted design:paramtypes metadata, which needs the
@@ -82,7 +91,7 @@ type AgentReviewPlanLease =
  *   in_review → in_progress, blocked, done, cancelled
  *   blocked → todo, in_progress, cancelled  (unblock restores previousStatus)
  *   done → in_progress (re-open) — soft path
- *   cancelled → (terminal)
+ *   cancelled → backlog, todo  (re-open — EW-P1-6, every caller)
  *
  * Side-effect rules:
  *   - any → in_progress: set startedAt if null.
@@ -111,8 +120,18 @@ const ALLOWED: Record<TaskStatus, TaskStatus[]> = {
     ],
     [TaskStatus.BLOCKED]: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
     [TaskStatus.DONE]: [TaskStatus.IN_PROGRESS],
-    [TaskStatus.CANCELLED]: [],
+    // EW-P1-6 — a cancelled Task can be re-opened into the backlog or the
+    // todo list, by anyone who may transition it. Before, `cancelled` was
+    // terminal and a cancellation mirrored from another system (or made by
+    // mistake) could never be undone.
+    [TaskStatus.CANCELLED]: [TaskStatus.BACKLOG, TaskStatus.TODO],
 };
+
+/**
+ * The legal moves of the Task state machine (read-only). The web board's
+ * `TASK_BOARD_TRANSITIONS` mirror is pinned to this table by a spec.
+ */
+export const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, readonly TaskStatus[]>> = ALLOWED;
 
 export interface TransitionOptions {
     force?: boolean;
@@ -142,6 +161,25 @@ export interface TransitionOptions {
      * decision counts.
      */
     livePullRequestHeadSha?: string | null;
+    /**
+     * EW-P1-6 — mirror the status only: do NOT start agent work as a side
+     * effect of this move (no `→ in_progress` agent fan-out, no `→ in_review`
+     * reviewer runs). Set by {@link TaskTransitionService.transitionSync} on
+     * every hop of a sync walk: an integration reports a status another
+     * system already decided, and an integration write never starts Ever
+     * Works autonomous spend (plan decision D9). Gates, notifications and the
+     * auto-unblock of dependents still run.
+     */
+    suppressAgentDispatch?: boolean;
+}
+
+/** Result of a sync walk: the Task after the last hop and the hops taken. */
+export interface SyncTransitionResult {
+    task: Task;
+    /** The status the walk started from. */
+    from: TaskStatus;
+    /** Statuses moved through after `from`; `[]` when the Task was already there. */
+    path: TaskStatus[];
 }
 
 @Injectable()
@@ -200,6 +238,10 @@ export class TaskTransitionService {
         // meets the same admission gate, credits precheck and kill switch
         // as every other run and this slice adds no `createQueued` site.
         @Optional() private readonly agentReviews?: TaskAgentReviewService,
+        // Domain events (EW-P1-1 B2) — `task.transitioned`, recorded in the
+        // same transaction as the status compare-and-set. Appended LAST +
+        // @Optional (positional-spec arity rule); absent, nothing is recorded.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -307,6 +349,23 @@ export class TaskTransitionService {
         // token also makes any pre-entry attempt or snapshot stale.
         if (to === TaskStatus.IN_REVIEW) {
             Object.assign(patch, agentReviewPlanEntryReset(randomUUID()));
+            // EW-P1-6 / D9 — a SYNC entry starts no reviewer run, and must not
+            // leave one owed either: the PR-status reconcile plans any key the
+            // memory does not cover. Record the current key as deliberately not
+            // planned (`refused` / `sync-entry`), in this same compare-and-set,
+            // so the reconcile skips it. A new head or a changed approver set
+            // is a new key and plans as usual — that work is owed to the push,
+            // not to the integration.
+            if (opts.suppressAgentDispatch) {
+                const syncKey = await this.currentAgentReviewPlanKey(task);
+                if (syncKey) {
+                    Object.assign(patch, {
+                        agentReviewPlanKey: syncKey,
+                        agentReviewPlanState: 'refused',
+                        agentReviewPlanReason: 'sync-entry',
+                    });
+                }
+            }
         }
 
         // Atomic CAS on the source state: the UPDATE only lands while the row
@@ -315,7 +374,28 @@ export class TaskTransitionService {
         // the winner already advanced the status, so they get the same
         // read-time "Cannot transition" 400 a sequential stale caller would —
         // never a silent double-write or a 5xx.
-        const won = await this.tasks.casUpdateStatus(task.id, from, patch);
+        const publisher = this.domainEvents;
+        const won = publisher
+            ? await publisher.transaction(async (manager) => {
+                  const landed = await this.tasks.casUpdateStatus(task.id, from, patch, manager);
+                  if (landed) {
+                      // `status`, plus `startedAt` / `completedAt` when this entry sets them.
+                      const described = describeTaskPatch(patch, task);
+                      await publisher.changed(manager, 'task', task.id, 'task.transitioned', {
+                          changedFields: [
+                              'status',
+                              ...described.changedFields.filter((field) => field !== 'status'),
+                          ],
+                          previous: { ...described.previous, status: from },
+                          actor:
+                              opts.actorType === 'agent' && task.agentId
+                                  ? { type: 'agent', id: task.agentId, label: null }
+                                  : undefined,
+                      });
+                  }
+                  return landed;
+              })
+            : await this.tasks.casUpdateStatus(task.id, from, patch);
         if (!won) {
             throw new BadRequestException(`Cannot transition Task from ${from} to ${to}.`);
         }
@@ -330,7 +410,16 @@ export class TaskTransitionService {
         // the `recurrenceOccurredCount + 1` on the parent template (or
         // just `1` for non-recurring tasks) — keeps a rapid status
         // flip-flop from double-firing the same Agent.
-        if (to === TaskStatus.IN_PROGRESS && this.dispatcher && this.assignees) {
+        // EW-P1-6: `task.transitioned` is recorded above, in the same
+        // transaction as the compare-and-set, once per call — and a sync walk
+        // (`transitionSync`) calls this once per hop, so every hop records its
+        // own event with `previous.status` = that hop's source status.
+        if (
+            to === TaskStatus.IN_PROGRESS &&
+            this.dispatcher &&
+            this.assignees &&
+            !opts.suppressAgentDispatch
+        ) {
             void this.fanOutAgentExecutions(refreshed).catch((err) =>
                 this.logger.warn(`Agent fan-out failed for task ${refreshed.id}: ${err}`),
             );
@@ -353,7 +442,12 @@ export class TaskTransitionService {
         // reconcile (`reconcileAgentReviews`) is the recovery, and the plan
         // memory this writes is what tells that reconcile what already
         // happened.
-        if (to === TaskStatus.IN_REVIEW && this.agentReviews && this.dispatcher) {
+        if (
+            to === TaskStatus.IN_REVIEW &&
+            this.agentReviews &&
+            this.dispatcher &&
+            !opts.suppressAgentDispatch
+        ) {
             void this.planAgentReviewsDurably(refreshed, 'entry').catch((err) =>
                 this.logger.warn(`Agent review fan-out failed for task ${refreshed.id}: ${err}`),
             );
@@ -363,8 +457,14 @@ export class TaskTransitionService {
         // transitions to a "resolved" state. Done/cancelled both
         // count — a cancelled blocker no longer holds anything back.
         // Best-effort: failures log WARN but don't bubble.
+        // A sync move (`suppressAgentDispatch`) carries its no-dispatch choice
+        // down the cascade (review of EW-P1-6): a dependent restored to
+        // `in_progress` because a mirrored blocker resolved must not start a
+        // paid run either (D9). The status restore and notifications still run.
         if (to === TaskStatus.DONE || to === TaskStatus.CANCELLED) {
-            void this.autoUnblockResolvedTasks(refreshed.id).catch((err) =>
+            void this.autoUnblockResolvedTasks(refreshed.id, {
+                suppressAgentDispatch: opts.suppressAgentDispatch === true,
+            }).catch((err) =>
                 this.logger.warn(`autoUnblock cascade failed for task ${refreshed.id}: ${err}`),
             );
         }
@@ -413,6 +513,210 @@ export class TaskTransitionService {
         }
 
         return refreshed;
+    }
+
+    /**
+     * EW-P1-6 — sync transition (`POST /tasks/:id/transition {to, mode:'sync'}`).
+     *
+     * Walks the SHORTEST legal path from the Task's status to `to` through
+     * {@link TASK_STATUS_TRANSITIONS}, one {@link transition} per hop, so every
+     * hop meets exactly the gates (and fires exactly the side effects, minus
+     * agent dispatch) of an ordinary move:
+     *
+     * - **Gates first.** Before the first hop, the walk checks the gates its
+     *   path will meet — open blockers on `→ in_progress` / `→ done`, the
+     *   approver gate on `→ done` — and refuses with
+     *   {@link TaskTransitionBlockedException} (`409 transition_blocked`,
+     *   details: `blockers[]`, `pendingApprovers[]`, the `path` up to the
+     *   refused hop). A refusal therefore leaves the Task where it was. A gate
+     *   that closes mid-walk (a race) still refuses with the same 409; the
+     *   hops already taken stay taken, and `path` says how far it got.
+     * - **No agent work** (`suppressAgentDispatch`): a mirrored status never
+     *   starts a run (plan decision D9).
+     * - Already at `to` → a no-op with `path: []`.
+     * - `force` keeps its one meaning (approver-gate override); refusing it
+     *   for credentials that may not use it is the caller's job.
+     */
+    async transitionSync(
+        task: Task,
+        to: TaskStatus,
+        opts: TransitionOptions = {},
+        /** Called after EVERY hop that landed, before the next one is tried. */
+        onHop?: (hop: { from: TaskStatus; to: TaskStatus }) => Promise<void>,
+    ): Promise<SyncTransitionResult> {
+        const from = task.status;
+        const path = shortestTransitionPath(from, to, ALLOWED);
+        if (path === null) {
+            throw new BadRequestException(`No legal path moves a Task from ${from} to ${to}.`);
+        }
+        if (path.length === 0) return { task, from, path };
+
+        await this.assertSyncPathOpen(task, from, to, path, opts);
+
+        let current = task;
+        const walked: TaskStatus[] = [];
+        for (const hop of path) {
+            try {
+                current = await this.transition(current, hop, {
+                    ...opts,
+                    suppressAgentDispatch: true,
+                });
+            } catch (err) {
+                if (
+                    err instanceof ConflictException &&
+                    !(err instanceof TaskTransitionBlockedException)
+                ) {
+                    throw await this.transitionBlocked(
+                        current,
+                        from,
+                        to,
+                        [...walked, hop],
+                        err.message,
+                    );
+                }
+                // Review of EW-P1-6 (CodeRabbit): `transition()` answers a lost
+                // compare-and-set with the same 400 as an illegal move. Every hop
+                // of the walk is legal from the status it started at, so a 400
+                // whose Task now sits elsewhere means another writer moved it
+                // mid-walk: report the race (409 conflict) with how far the walk
+                // got, instead of an unexplained 400.
+                if (err instanceof BadRequestException) {
+                    const latest = await this.tasks.findById(current.id).catch(() => null);
+                    if (latest && latest.status !== current.status) {
+                        throw new TaskTransitionConflictException(
+                            `Task moved to ${latest.status} while the sync walk was at ${current.status}; re-read it and retry.`,
+                            {
+                                from,
+                                to,
+                                path: [...walked, hop],
+                                currentStatus: latest.status,
+                            },
+                        );
+                    }
+                }
+                throw err;
+            }
+            await onHop?.({ from: walked.length > 0 ? walked[walked.length - 1] : from, to: hop });
+            walked.push(hop);
+            // Review of EW-P1-6 (Greptile P1): `transition()` re-reads the row
+            // after its compare-and-set. If another writer moved the Task in
+            // between (todo → blocked), the next hop would start from THEIR
+            // status and quietly undo it. Stop instead: the hop we wrote
+            // landed, theirs came after, and the caller re-reads and decides.
+            // The final hop too (CodeRabbit): a walk never answers success with
+            // a Task that sits anywhere but `to`.
+            if (current.status !== hop) {
+                throw new TaskTransitionConflictException(
+                    `Task moved to ${current.status} while the sync walk was at ${hop}; re-read it and retry.`,
+                    { from, to, path: [...walked], currentStatus: current.status },
+                );
+            }
+        }
+        return { task: current, from, path: walked };
+    }
+
+    /**
+     * The review-plan key the reconcile would plan for right now (head +
+     * agent-approver set), or `null` when the stage is off, there is no head,
+     * or the probe is unavailable. Ledger reads only; never throws.
+     */
+    private async currentAgentReviewPlanKey(task: Task): Promise<string | null> {
+        const reviews = this.agentReviews;
+        if (!reviews || typeof reviews.probeAgentReviewPlan !== 'function') return null;
+        try {
+            const probe = await reviews.probeAgentReviewPlan(task);
+            return probe?.enabled && probe.planKey ? probe.planKey : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Pre-flight: refuse before any hop when a gate on the path is closed. */
+    private async assertSyncPathOpen(
+        task: Task,
+        from: TaskStatus,
+        to: TaskStatus,
+        path: TaskStatus[],
+        opts: TransitionOptions,
+    ): Promise<void> {
+        const blockerHop = path.findIndex(
+            (hop) => hop === TaskStatus.IN_PROGRESS || hop === TaskStatus.DONE,
+        );
+        if (blockerHop >= 0 && (await this.findOpenBlockers(task.id)).length > 0) {
+            throw await this.transitionBlocked(
+                task,
+                from,
+                to,
+                path.slice(0, blockerHop + 1),
+                `Task cannot move to ${path[blockerHop]}: it has open blockers.`,
+            );
+        }
+        const doneHop = path.indexOf(TaskStatus.DONE);
+        if (doneHop >= 0 && !opts.force && task.requireAllApprovers) {
+            const ok = await this.approvers.allApproved(task.id, () =>
+                this.resolveCompletionGateLiveHead(task, opts),
+            );
+            if (!ok) {
+                throw await this.transitionBlocked(
+                    task,
+                    from,
+                    to,
+                    path.slice(0, doneHop + 1),
+                    'Task cannot move to done: not all approvers have approved.',
+                );
+            }
+        }
+    }
+
+    /** Build the `409 transition_blocked` with the blockers and approvers that refuse it. */
+    private async transitionBlocked(
+        task: Task,
+        from: TaskStatus,
+        to: TaskStatus,
+        attemptedPath: TaskStatus[],
+        reason: string,
+    ): Promise<TaskTransitionBlockedException> {
+        const blockers: TransitionBlocker[] = [];
+        const openBlockerIds = await this.findOpenBlockers(task.id).catch(() => [] as string[]);
+        for (const id of openBlockerIds) {
+            const blocker = await this.tasks.findById(id).catch(() => null);
+            blockers.push({
+                taskId: id,
+                slug: blocker?.slug ?? null,
+                title: blocker?.title ?? null,
+                status: blocker?.status ?? null,
+            });
+        }
+        let pendingApprovers: TransitionPendingApprover[] = [];
+        if (attemptedPath.includes(TaskStatus.DONE)) {
+            const rows = await this.approvers.findByTaskId(task.id).catch(() => []);
+            const undecided = rows.filter((row) => row.approvalState !== 'approved');
+            // Every row approved and the gate still closed: the agent decisions
+            // are bound to a commit that is no longer the pull request's head,
+            // so those agents owe a fresh review.
+            const owing =
+                undecided.length > 0
+                    ? undecided
+                    : rows.filter((row) => row.approverType === 'agent');
+            pendingApprovers = owing.map((row) => ({
+                type: row.approverType,
+                id: row.approverId,
+                state: row.approvalState === 'rejected' ? 'rejected' : 'pending',
+            }));
+        }
+        const counts: string[] = [];
+        if (blockers.length > 0) counts.push(`${blockers.length} open blocker(s)`);
+        if (pendingApprovers.length > 0) {
+            counts.push(`${pendingApprovers.length} pending approver(s)`);
+        }
+        const message = counts.length > 0 ? `${reason} (${counts.join(', ')})` : reason;
+        return new TaskTransitionBlockedException(message, {
+            from,
+            to,
+            blockers,
+            pendingApprovers,
+            path: attemptedPath,
+        });
     }
 
     private async fanOutAgentExecutions(task: Task): Promise<void> {
@@ -1250,12 +1554,17 @@ export class TaskTransitionService {
      * but never bubbles, so resolving a blocker can't be rolled back
      * by a transient downstream failure.
      */
-    async autoUnblockResolvedTasks(blockerTaskId: string): Promise<{ unblocked: string[] }> {
+    async autoUnblockResolvedTasks(
+        blockerTaskId: string,
+        // EW-P1-6 — set when the resolving move was a sync (mirrored) one: the
+        // restores it causes then start no agent work either.
+        cascade: { suppressAgentDispatch?: boolean } = {},
+    ): Promise<{ unblocked: string[] }> {
         // Find every Task that was blocked BY this Task and is still in `blocked` status.
         const blockedTaskIds = await this.blocks.findTasksBlockedBy(blockerTaskId).catch(() => []);
         const unblocked: string[] = [];
         for (const blockedTaskId of blockedTaskIds) {
-            if (await this.tryUnblockSingleTask(blockedTaskId)) {
+            if (await this.tryUnblockSingleTask(blockedTaskId, cascade)) {
                 unblocked.push(blockedTaskId);
             }
         }
@@ -1288,7 +1597,10 @@ export class TaskTransitionService {
      * starts them through the ordinary gated dispatch path, bounded per
      * owner and off by default.
      */
-    private async tryUnblockSingleTask(taskId: string): Promise<boolean> {
+    private async tryUnblockSingleTask(
+        taskId: string,
+        cascade: { suppressAgentDispatch?: boolean } = {},
+    ): Promise<boolean> {
         const blocked = await this.tasks.findById(taskId).catch(() => null);
         if (!blocked || blocked.status !== TaskStatus.BLOCKED) return false;
         const openBlockers = await this.findOpenBlockers(taskId);
@@ -1298,7 +1610,10 @@ export class TaskTransitionService {
             // Re-enter transition() so blocker/approver gates + side
             // effects (previousStatus clear, startedAt set) all fire
             // consistently with a user-driven move.
-            await this.transition(blocked, restoreTo, { force: false });
+            await this.transition(blocked, restoreTo, {
+                force: false,
+                suppressAgentDispatch: cascade.suppressAgentDispatch === true,
+            });
             return true;
         } catch (err) {
             this.logger.warn(

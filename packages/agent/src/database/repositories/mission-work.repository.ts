@@ -45,13 +45,26 @@ export class MissionWorkRepository {
         private readonly repository: Repository<MissionWork>,
     ) {}
 
-    /** Idempotent attach — duplicate (mission, work, relation) is a no-op. */
+    /**
+     * Idempotent attach — duplicate (mission, work, relation) is a no-op. Returns
+     * true when the edge is new (EW-P2-5: only then is `mission.work.linked`
+     * recorded); two racing attaches may both answer true, and a link event is
+     * applied idempotently by its consumers.
+     */
     async attach(input: {
         missionId: string;
         workId: string;
         userId: string;
         relation: MissionWorkRelation;
-    }): Promise<void> {
+    }): Promise<boolean> {
+        const existed = await this.repository.exist({
+            where: {
+                missionId: input.missionId,
+                workId: input.workId,
+                relation: input.relation,
+            },
+        });
+        if (existed) return false;
         await this.repository
             .createQueryBuilder()
             .insert()
@@ -64,6 +77,7 @@ export class MissionWorkRepository {
             })
             .orIgnore()
             .execute();
+        return true;
     }
 
     /** Owner-scoped detach; returns true iff a row was removed. */

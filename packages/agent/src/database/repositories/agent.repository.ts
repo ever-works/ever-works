@@ -9,6 +9,7 @@ import {
     LessThanOrEqual,
     Not,
     Repository,
+    type SelectQueryBuilder,
 } from 'typeorm';
 import {
     Agent,
@@ -21,6 +22,9 @@ import {
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../ownership-scope';
+import type { RecordListView } from '@ever-works/contracts';
+import type { RecordAccessContext } from '../../record-visibility/record-access.types';
+import { visibleToPredicate } from '../../record-visibility/visible-to';
 
 /**
  * Filter shape for `findByUserIdScoped`. All fields optional — caller
@@ -28,6 +32,11 @@ import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../o
  * agents/plan.md §4 (scope filter + status filter + per-target filter).
  */
 export interface ListAgentsFilter {
+    /**
+     * Record visibility (EW-P1-3) list tab: `mine` (default), `shared`, `organization`.
+     * Read by `AgentsService.list`; the owner query ignores it.
+     */
+    view?: RecordListView;
     scope?: AgentScope;
     status?: AgentStatus | AgentStatus[];
     missionId?: string;
@@ -217,6 +226,74 @@ export class AgentRepository {
             qb.andWhere(ownership.clause, ownership.parameters);
         }
 
+        return this.readFilteredPage(qb, filter, wantsArchived);
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — the catalog through `visibleTo(principal)` instead
+     * of `userId = caller` (shared / organization tabs). Same filters, order and paging
+     * as {@link findByUserIdScoped}.
+     */
+    async findVisibleScoped(
+        context: RecordAccessContext,
+        view: RecordListView,
+        filter: ListAgentsFilter = {},
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ rows: Agent[]; total: number }> {
+        const wantsArchived = Array.isArray(filter.status)
+            ? filter.status.includes(AgentStatus.ARCHIVED)
+            : filter.status === AgentStatus.ARCHIVED;
+        const qb = this.repository.createQueryBuilder('agent');
+        const predicate = visibleToPredicate({
+            alias: 'agent',
+            aggregate: 'agent',
+            context,
+            view,
+            escape: (identifier) => qb.connection.driver.escape(identifier),
+        });
+        qb.where(predicate.clause, predicate.parameters);
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return this.readFilteredPage(qb, filter, wantsArchived);
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — one Agent the caller may read but does not own.
+     * `null` → 404, so existence never leaks.
+     */
+    async findVisibleNotOwned(
+        id: string,
+        userId: string,
+        context: RecordAccessContext,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent | null> {
+        const qb = this.repository
+            .createQueryBuilder('agent')
+            .where('agent.id = :agentId', { agentId: id })
+            .andWhere('agent.userId <> :notOwner', { notOwner: userId });
+        const predicate = visibleToPredicate({
+            alias: 'agent',
+            aggregate: 'agent',
+            context,
+            view: 'organization',
+            escape: (identifier) => qb.connection.driver.escape(identifier),
+        });
+        qb.andWhere(predicate.clause, predicate.parameters);
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return qb.getOne();
+    }
+
+    /** The shared filter / count / order / page tail of the two catalog reads. */
+    private async readFilteredPage(
+        qb: SelectQueryBuilder<Agent>,
+        filter: ListAgentsFilter,
+        wantsArchived: boolean,
+    ): Promise<{ rows: Agent[]; total: number }> {
         if (!wantsArchived) {
             qb.andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
         }

@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
     APP_WORK_TEMPLATE_REFUSAL,
+    PROJECT_WORK_REFUSAL,
     REPOSITORY_WORK_REFUSAL,
     assertNotAppWorkTemplateTarget,
     assertNotRepositoryWork,
@@ -154,5 +155,38 @@ describe('repository-work-guard', () => {
         it('lets a Work with no recorded kind through', () => {
             expect(() => assertNotAppWorkTemplateTarget({}, 'anything')).not.toThrow();
         });
+    });
+});
+
+/** EW-P2-4 — the repo-less Project Work is refused by the same guard. */
+describe('Project Works (EW-P2-4)', () => {
+    const project = { kind: 'project', name: 'Relaunch', slug: 'relaunch' };
+
+    it('refuses every content pipeline with its own reason', () => {
+        expect(() => assertNotRepositoryWork(project, 'item generation')).toThrow(
+            BadRequestException,
+        );
+        expect(() => assertNotRepositoryWork(project, 'item generation')).toThrow(
+            new RegExp(`${PROJECT_WORK_REFUSAL} — item generation is not available`),
+        );
+        expect(() => assertNotRepositoryWork({ ...project, kind: ' Project ' }, 'deploy')).toThrow(
+            PROJECT_WORK_REFUSAL,
+        );
+    });
+
+    it('is not a Repository Work, and provisions no repository role', () => {
+        expect(isRepositoryWork(project)).toBe(false);
+        for (const role of ['data', 'work', 'website'] as const) {
+            expect(hasRepositoryRole(project, role)).toBe(false);
+            expect(() => assertRepositoryRole(project, role)).toThrow(
+                /"project" Work and provisions no/,
+            );
+        }
+    });
+
+    it('leaves every other kind alone', () => {
+        for (const kind of ['default', 'directory', 'company', 'campaign', 'app']) {
+            expect(() => assertNotRepositoryWork({ kind }, 'generation')).not.toThrow();
+        }
     });
 });

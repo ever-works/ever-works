@@ -517,7 +517,8 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
             ...row,
             userId,
             direction: 'outbound',
-            conversationId: null,
+            // EW-P4-3 — a reply in a conversation stays in it.
+            conversationId: row.conversationId ?? null,
             providerMessageId: null,
             toAddresses: [...row.toAddresses],
             ccAddresses: row.ccAddresses ? [...row.ccAddresses] : null,

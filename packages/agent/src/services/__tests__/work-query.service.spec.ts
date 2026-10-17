@@ -83,6 +83,85 @@ describe('WorkQueryService', () => {
         expect(dataGenerator.getItems).not.toHaveBeenCalled();
     });
 
+    describe('a Work with no repository (EW-P2-4 Project Work) — repo-backed reads answer empty, never clone', () => {
+        const project = {
+            id: 'w-proj',
+            kind: 'project',
+            name: 'Relaunch',
+            slug: 'relaunch',
+            userId: user.id,
+        } as any;
+        const generatorCalls = () => [
+            dataGenerator.getItems,
+            dataGenerator.getConfig,
+            dataGenerator.count,
+            dataGenerator.getCategoriesTags,
+            dataGenerator.updateWebsiteSettings,
+        ];
+
+        beforeEach(() => {
+            ownershipService.ensureCanView = jest.fn().mockResolvedValue({ work: project });
+            ownershipService.ensureCanEdit = jest.fn().mockResolvedValue({ work: project });
+            dataGenerator.getItems = jest.fn();
+            dataGenerator.getConfig = jest.fn();
+            dataGenerator.count = jest.fn();
+            dataGenerator.getCategoriesTags = jest.fn();
+            dataGenerator.updateWebsiteSettings = jest.fn();
+        });
+
+        afterEach(() => {
+            for (const call of generatorCalls()) expect(call).not.toHaveBeenCalled();
+        });
+
+        it('workItems → []', async () => {
+            await expect(service.workItems('w-proj', user)).resolves.toEqual({
+                status: 'success',
+                items: [],
+            });
+        });
+
+        it('workConfig → null', async () => {
+            await expect(service.workConfig('w-proj', user)).resolves.toEqual({
+                status: 'success',
+                config: null,
+            });
+        });
+
+        it('workCount → zeros', async () => {
+            await expect(service.workCount('w-proj', user)).resolves.toEqual({
+                status: 'success',
+                items: 0,
+                categories: 0,
+                tags: 0,
+            });
+        });
+
+        it('workCategoriesTags → empty lists', async () => {
+            await expect(service.workCategoriesTags('w-proj', user)).resolves.toEqual({
+                status: 'success',
+                categories: [],
+                tags: [],
+                collections: [],
+            });
+        });
+
+        it('getWebsiteSettings → the defaults', async () => {
+            await expect(service.getWebsiteSettings('w-proj', user)).resolves.toEqual({
+                status: 'success',
+                company_name: 'Relaunch',
+                company_website: '',
+                settings: {},
+                custom_menu: { header: [], footer: [] },
+            });
+        });
+
+        it('updateWebsiteSettings is refused with the Project refusal (no data repository to write to)', async () => {
+            await expect(
+                service.updateWebsiteSettings('w-proj', user, { company_name: 'X' } as any),
+            ).rejects.toMatchObject({ status: 400 });
+        });
+    });
+
     it('recovers the last known positive items count for errored works', async () => {
         const work = {
             id: 'dir-1',

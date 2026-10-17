@@ -336,7 +336,7 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         expect(orgId).toMatch(UUID_RE);
     });
 
-    test('an org-level inheritable doc is DUAL-projected: Memory (workId null) + the Work inheritable resolution; a non-inheritable org class is rejected and never surfaces', async ({
+    test('an org-level inheritable doc is DUAL-projected: Memory (workId null) + the Work inheritable resolution; a non-inheritable org class lives at org scope but is never inherited; an unknown class is refused', async ({
         request,
     }) => {
         const { headers, orgId, workId } = await buildChain(request);
@@ -382,14 +382,33 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         );
         expect(foreign.status()).toBe(403);
 
-        // A non-inheritable org class is rejected outright and never surfaces.
+        // EW-P3-2: every known class may live at organization scope (an
+        // organization wiki); only KB_ORG_INHERITABLE_CLASSES are INHERITED into
+        // Works. A `research` org doc is accepted at organization scope (no Work),
+        // but never resolves as inheritable for the Work.
+        const researchDoc = await createOrgDoc(request, headers, orgId, {
+            path: 'research/x.md',
+            title: `Research ${stamp()}`,
+            class: 'research',
+            body: 'Organization-wide research notes.',
+        });
+        expect(researchDoc.workId).toBeNull();
+        expect(researchDoc.organizationId).toBe(orgId);
+        const inhAfter = await request.get(
+            `${API_BASE}/api/works/${workId}/kb/inheritable?orgId=${orgId}`,
+            { headers },
+        );
+        expect(inhAfter.status()).toBe(200);
+        const inheritedAfter = (await inhAfter.json()) as Array<{ id: string }>;
+        expect(inheritedAfter.some((d) => d.id === researchDoc.id)).toBe(false);
+        expect(inheritedAfter.some((d) => d.id === orgDoc.id)).toBe(true);
+
+        // An unknown class is still refused outright.
         const bad = await request.post(`${API_BASE}/api/organizations/${orgId}/kb/documents`, {
             headers,
-            data: { path: 'research/x.md', title: 'X', class: 'research', body: 'nope' },
+            data: { path: 'misc/x.md', title: 'X', class: 'not-a-class', body: 'nope' },
         });
         expect(bad.status()).toBe(400);
-        const memAfter = await getMemory(request, headers);
-        expect(memAfter.documents.every((d) => d.class !== 'research')).toBe(true);
     });
 
     test('the ?work filter isolates the Work rows and DROPS org-level rows, while the per-Work KB list shows only that Work — the chain projected two ways', async ({

@@ -1,5 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
-import { getWorkCapabilities, isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
+import {
+    getWorkCapabilities,
+    isAppWorkKind,
+    isProjectWorkKind,
+    isRepositoryWorkKind,
+} from '@ever-works/contracts';
 import type { RepositoryRole } from '@ever-works/contracts/api';
 
 /**
@@ -49,6 +54,9 @@ export interface WorkKindSubject {
 /** Stable prefix every refusal starts with, so callers and specs can match on it. */
 export const REPOSITORY_WORK_REFUSAL = 'is a Repository Work';
 
+/** EW-P2-4 — stable prefix of the refusal for a repo-less Project Work. */
+export const PROJECT_WORK_REFUSAL = 'is a Project Work';
+
 function describeWork(work: WorkKindSubject): string {
     const label = work.name || work.slug;
     return label ? `Work "${label}"` : 'This Work';
@@ -68,6 +76,15 @@ export function isRepositoryWork(work: WorkKindSubject): boolean {
  * and why, not just that something was.
  */
 export function assertNotRepositoryWork(work: WorkKindSubject, action: string): void {
+    // EW-P2-4 — a Project Work has no repository at all, so every pipeline
+    // that clones, generates into, builds or deploys one is refused for it
+    // at the same entry points, with its own reason.
+    if (isProjectWorkKind(work.kind)) {
+        throw new BadRequestException(
+            `${describeWork(work)} ${PROJECT_WORK_REFUSAL} — ${action} is not available for it: ` +
+                'a Project Work has no repository, and nothing is generated, built or deployed for it',
+        );
+    }
     if (!isRepositoryWork(work)) {
         return;
     }

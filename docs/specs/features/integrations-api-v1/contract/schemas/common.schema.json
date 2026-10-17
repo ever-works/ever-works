@@ -1,0 +1,228 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/common.schema.json",
+	"title": "Ever Works integration contract v1 — shared definitions",
+	"description": "Building blocks shared by every resource DTO, the event envelope and the error envelope. Source of truth: 03-events-sync-engine-and-contract.md Part B (homelab plan) as mirrored in ../../spec.md.",
+	"$defs": {
+		"Uuid": {
+			"type": "string",
+			"format": "uuid"
+		},
+		"NullableUuid": {
+			"type": ["string", "null"],
+			"format": "uuid"
+		},
+		"DateTime": {
+			"description": "ISO-8601 UTC timestamp with milliseconds, e.g. 2026-10-15T18:00:00.000Z.",
+			"type": "string",
+			"format": "date-time"
+		},
+		"NullableDateTime": {
+			"type": ["string", "null"],
+			"format": "date-time"
+		},
+		"Seq": {
+			"description": "Decimal string form of the global, monotonic domain_events.seq. Opaque to consumers except for ordering events of ONE aggregate: compare as big integers, never as strings.",
+			"type": "string",
+			"pattern": "^[0-9]{1,20}$"
+		},
+		"Cursor": {
+			"description": "Opaque pagination cursor. Pass it back unchanged.",
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 512
+		},
+		"Version": {
+			"description": "Aggregate version. Starts at 1 and is incremented on every change to the aggregate, including edge/child changes. Echoed as ETag: \"<version>\" and accepted as If-Match: \"<version>\".",
+			"type": "integer",
+			"minimum": 1
+		},
+		"Visibility": {
+			"description": "Scope of a record served to an integration (D11). `private` records are never served; see VisibilityChanged for the one place `private` appears.",
+			"type": "string",
+			"enum": ["team", "organization"]
+		},
+		"ActorType": {
+			"type": "string",
+			"enum": ["user", "agent", "integration", "system"]
+		},
+		"Actor": {
+			"description": "Who caused a change or created a record.",
+			"type": "object",
+			"required": ["type", "id"],
+			"properties": {
+				"type": {
+					"$ref": "#/$defs/ActorType"
+				},
+				"id": {
+					"description": "users.id, agents.id, api_keys.id (integration) or a stable system id (e.g. `pr-status-cron`, `system`). Always set.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 100
+				},
+				"label": {
+					"description": "Display label at the time of the change (username, agent name, key name).",
+					"type": ["string", "null"],
+					"maxLength": 200
+				}
+			},
+			"additionalProperties": false
+		},
+		"Owner": {
+			"description": "The owning principal of a record (today's per-user ownership is kept, D6).",
+			"type": "object",
+			"required": ["type", "id"],
+			"properties": {
+				"type": {
+					"type": "string",
+					"enum": ["user", "agent", "integration"]
+				},
+				"id": {
+					"$ref": "#/$defs/Uuid"
+				}
+			},
+			"additionalProperties": false
+		},
+		"ExternalLink": {
+			"description": "One external_record_links row, filtered to the caller's source.",
+			"type": "object",
+			"required": ["source", "externalId"],
+			"properties": {
+				"source": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 100,
+					"examples": ["gauzy"]
+				},
+				"installationId": {
+					"description": "The integration installation the link belongs to (for Gauzy: the Gauzy connection id).",
+					"type": ["string", "null"],
+					"maxLength": 200
+				},
+				"externalId": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"externalUrl": {
+					"type": ["string", "null"],
+					"format": "uri",
+					"maxLength": 2048
+				}
+			},
+			"additionalProperties": false
+		},
+		"ExternalRef": {
+			"description": "Sent on creates (B.6): the row and its external_record_links row are created atomically; a repeat with the same externalRef answers 200 with the existing entity.",
+			"type": "object",
+			"required": ["source", "externalId"],
+			"properties": {
+				"source": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 100
+				},
+				"installationId": {
+					"description": "The integration installation (for Gauzy: the connection id), as in external_record_links. Optional; when omitted it is taken from X-Sync-Origin (`gauzy:<connectionId>` → `<connectionId>`), else null.",
+					"type": ["string", "null"],
+					"maxLength": 200
+				},
+				"externalId": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"externalUrl": {
+					"type": ["string", "null"],
+					"format": "uri",
+					"maxLength": 2048
+				}
+			},
+			"additionalProperties": false
+		},
+		"TeamIds": {
+			"description": "teamId plus the team_resources rows, as one set. Writable on POST/PATCH; the first id is stored as teamId where the entity has that column. Non-empty means visibility `team` unless visibilityExplicit (D11).",
+			"type": "array",
+			"items": {
+				"$ref": "#/$defs/Uuid"
+			},
+			"uniqueItems": true
+		},
+		"ResourceBase": {
+			"description": "Fields every versioned integration DTO carries (B.6).",
+			"type": "object",
+			"required": [
+				"id",
+				"organizationId",
+				"version",
+				"createdAt",
+				"updatedAt",
+				"visibility",
+				"visibilityExplicit",
+				"owner",
+				"createdBy",
+				"externalLinks"
+			],
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/Uuid"
+				},
+				"organizationId": {
+					"$ref": "#/$defs/Uuid"
+				},
+				"version": {
+					"$ref": "#/$defs/Version"
+				},
+				"createdAt": {
+					"$ref": "#/$defs/DateTime"
+				},
+				"updatedAt": {
+					"$ref": "#/$defs/DateTime"
+				},
+				"visibility": {
+					"$ref": "#/$defs/Visibility"
+				},
+				"visibilityExplicit": {
+					"description": "true once a human picked the visibility by hand; automatic team<->organization changes stop (D11).",
+					"type": "boolean"
+				},
+				"owner": {
+					"$ref": "#/$defs/Owner"
+				},
+				"createdBy": {
+					"$ref": "#/$defs/Actor"
+				},
+				"externalLinks": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/ExternalLink"
+					}
+				}
+			}
+		},
+		"Page": {
+			"description": "List response shape (B.1). Lists are ordered by (updatedAt, id).",
+			"type": "object",
+			"required": ["data", "nextCursor", "hasMore"],
+			"properties": {
+				"data": {
+					"type": "array"
+				},
+				"nextCursor": {
+					"oneOf": [
+						{
+							"$ref": "#/$defs/Cursor"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"hasMore": {
+					"type": "boolean"
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}

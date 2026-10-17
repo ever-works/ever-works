@@ -13,6 +13,7 @@ import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
 import * as email from '../email/index.js';
+import * as events from '../events/index.js';
 import * as everPlatform from '../ever-platform/index.js';
 import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
@@ -22,6 +23,7 @@ import * as hitl from '../hitl/index.js';
 import * as home from '../home/index.js';
 import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
+import * as integrations from '../integrations/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
 import * as memory from '../memory/index.js';
@@ -67,6 +69,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['digest', digest],
 	['domain', domain],
 	['email', email],
+	['events', events],
 	['ever-platform', everPlatform],
 	['feed', feed],
 	['fleet', fleet],
@@ -76,6 +79,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['home', home],
 	['inbox', inbox],
 	['ingest', ingest],
+	['integrations', integrations],
 	['item', item],
 	['kb', kb],
 	['memory', memory],
@@ -146,7 +150,16 @@ describe('src/index.ts — the package root barrel', () => {
 		// added the `ever-platform` area: develop stood at 34 areas and this change
 		// adds exactly one (`ever-platform`, re-exported from
 		// `src/ever-platform/index.ts`); re-counting the array gives 35.
-		expect(exportLines).toBe(35);
+		// 36 is COUNTED the same way after the domain events module (EW-P1-1)
+		// added the `events` area: develop stood at 35 areas and this change adds
+		// exactly one (`events`, re-exported from `src/events/index.ts`);
+		// re-counting the array gives 36.
+		// 37 is COUNTED the same way after EW-P1-2 (integration keys) added the
+		// `integrations` area on top of that develop (36 areas, `events`
+		// included): exactly one more (`integrations`, re-exported from
+		// `src/integrations/index.ts`);
+		// re-counting the array gives 37.
+		expect(exportLines).toBe(37);
 	});
 
 	it('has no name exported by two different areas', () => {

@@ -40,6 +40,22 @@ export interface ScheduleDispatchEntry {
     message?: string;
 }
 
+/** EW-P2-3 — one tick of the due-soon scan. */
+export interface DueSoonSummary {
+    limit: number;
+    windowHours: number;
+    dueCount: number;
+    notified: number;
+    skipped: number;
+    failed: number;
+}
+
+/** Hours ahead of `dueAt` the `task_due_soon` notice goes out (TASK_DUE_SOON_WINDOW_HOURS, default 24). */
+export function taskDueSoonWindowHours(): number {
+    const raw = Number(process.env.TASK_DUE_SOON_WINDOW_HOURS);
+    return Number.isFinite(raw) && raw > 0 && raw <= 24 * 30 ? raw : 24;
+}
+
 export interface ScheduleDispatchSummary {
     limit: number;
     dueCount: number;
@@ -292,6 +308,80 @@ export class TaskRecurrenceDispatcherService {
             }
         }
 
+        return summary;
+    }
+
+    /**
+     * EW-P2-3 — the fourth scan of the tick: tell people a Task is due soon.
+     *
+     * Walks Tasks whose `dueAt` falls inside the next
+     * {@link taskDueSoonWindowHours} hours and that have not been noticed for
+     * that date, CAS-claims each (`dueSoonNotifiedAt`) and emits
+     * `task_due_soon` to the owner and the Task's user assignees (watchers are
+     * added by `TaskNotificationService`). Changing `dueAt` clears the claim,
+     * so a moved deadline is noticed again. Never dispatches any work.
+     *
+     * A notice that did not reach every recipient releases its claim, so the
+     * next tick tries again; notices are deduplicated per deadline, so a
+     * recipient who already has one is not notified twice. With no
+     * notification store bound the scan does not run at all (it would only
+     * claim and release the same rows every minute).
+     */
+    async notifyDueSoon(limit = 100, now: Date = new Date()): Promise<DueSoonSummary> {
+        const windowHours = taskDueSoonWindowHours();
+        if (!this.notifications?.canDeliver()) {
+            return { limit, windowHours, dueCount: 0, notified: 0, skipped: 0, failed: 0 };
+        }
+        const until = new Date(now.getTime() + windowHours * 3_600_000);
+        const due = await this.tasks.findDueSoonTasks(limit, now, until);
+        const summary: DueSoonSummary = {
+            limit,
+            windowHours,
+            dueCount: due.length,
+            notified: 0,
+            skipped: 0,
+            failed: 0,
+        };
+        for (const task of due) {
+            let claimed = false;
+            try {
+                claimed = await this.tasks.casClaimDueSoon(task.id, task.dueAt!, now);
+                if (!claimed) {
+                    summary.skipped += 1;
+                    continue;
+                }
+                const recipients = new Set<string>([task.userId]);
+                const assignees = await this.assignees?.findByTaskId(task.id).catch(() => []);
+                for (const assignee of assignees ?? []) {
+                    if (assignee.assigneeType === 'user') recipients.add(assignee.assigneeId);
+                }
+                const delivery = await this.notifications.emitCounted(
+                    'task_due_soon',
+                    {
+                        taskId: task.id,
+                        taskSlug: task.slug,
+                        taskTitle: task.title,
+                        extra: { dueAt: task.dueAt!.toISOString() },
+                    },
+                    [...recipients],
+                );
+                if (delivery.sent < delivery.recipients) {
+                    throw new Error(
+                        `delivered ${delivery.sent} of ${delivery.recipients} due-soon notices`,
+                    );
+                }
+                summary.notified += 1;
+            } catch (err) {
+                summary.failed += 1;
+                if (claimed) {
+                    // Give the notice back so the next tick retries it.
+                    await this.tasks.releaseDueSoonClaim(task.id, now).catch(() => false);
+                }
+                this.logger.warn(
+                    `Due-soon notice failed for task ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
+        }
         return summary;
     }
 

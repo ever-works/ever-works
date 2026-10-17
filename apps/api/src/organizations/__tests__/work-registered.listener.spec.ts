@@ -1,7 +1,13 @@
 // Mock the agent barrels so importing the listener doesn't drag in the
 // full TypeORM DataSource graph. We only need `WorkStatusChangedEvent`
 // to construct test payloads. Same pattern as organization.service.spec.ts.
-jest.mock('@ever-works/agent/database', () => ({}));
+// The real write queue (self-contained, no imports): OrganizationService queues its
+// transactions with it on single-connection drivers; the rest of the module stays empty.
+jest.mock('@ever-works/agent/database', () => ({
+    serializeOnSingleConnection: jest.requireActual(
+        '../../../../../packages/agent/src/database/repositories/single-connection-write-queue',
+    ).serializeOnSingleConnection,
+}));
 jest.mock('@ever-works/agent/events', () => ({
     WorkStatusChangedEvent: class WorkStatusChangedEvent {
         static EVENT_NAME = 'work.status.changed';

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DomainEventsModule } from '@ever-works/agent/domain-events';
 import {
     DatabaseModule,
     OrganizationRepository,
@@ -60,6 +61,8 @@ import { ActiveScopeService } from '../users/services/active-scope.service';
     // facade (catalog reads from the private ever-works/orgs repo).
     imports: [
         DatabaseModule,
+        // Domain events (EW-P1-1 B2) — roster and organization recording points.
+        DomainEventsModule,
         UsersModule,
         WorkModule,
         AgentAgentsModule,

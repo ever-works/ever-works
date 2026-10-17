@@ -4,6 +4,10 @@ export * from './database.module';
 export * from './ownership-scope';
 // Pricing Wave 9 M2 — run-cost settlement seam (token + contract).
 export * from './run-cost-settler';
+// The per-DataSource write queue for single-connection drivers (better-sqlite3:
+// local/self-hosted installs, CI and e2e). Queue a whole transaction with it when
+// it can overlap the domain-event publisher's (queued) transactions.
+export { serializeOnSingleConnection } from './repositories/single-connection-write-queue';
 export * from './repositories/api-key.repository';
 export * from './repositories/work.repository';
 export * from './repositories/work-deployment.repository';

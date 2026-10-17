@@ -8,7 +8,9 @@ import {
     HttpStatus,
     Post,
     Put,
+    UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../../auth/integration/integration-forbidden.guard';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
@@ -62,6 +64,8 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 @ApiTags('Account · Tenant Job Runtime')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/account/job-runtime')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class TenantJobRuntimeController {
     constructor(private readonly service: TenantJobRuntimeService) {}
 

@@ -1,0 +1,75 @@
+{
+	"id": "evt_01JABZ3Q8E0F2G4H6J8K0M2N4P",
+	"seq": "102950",
+	"type": "task.deleted",
+	"version": 1,
+	"occurredAt": "2026-10-15T18:00:00.000Z",
+	"tenantId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"aggregate": {
+		"type": "task",
+		"id": "f8c0e2a4-6b7d-4eb5-9fe0-5b6c7d8e9fab",
+		"version": 4
+	},
+	"actor": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"origin": {
+		"tag": null,
+		"integrationKeyId": null
+	},
+	"changedFields": [],
+	"data": {
+		"id": "f8c0e2a4-6b7d-4eb5-9fe0-5b6c7d8e9fab",
+		"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+		"version": 3,
+		"createdAt": "2026-10-14T09:12:03.000Z",
+		"updatedAt": "2026-10-15T18:00:00.000Z",
+		"visibility": "team",
+		"visibilityExplicit": false,
+		"owner": {
+			"type": "user",
+			"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+		},
+		"createdBy": {
+			"type": "user",
+			"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+			"label": "ruslan"
+		},
+		"externalLinks": [],
+		"teamIds": ["d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89"],
+		"slug": "T-43",
+		"title": "Old spike",
+		"description": "Serve `GET /events` with keyset paging.",
+		"status": "cancelled",
+		"priority": "p1",
+		"labels": ["integration", "gauzy"],
+		"workId": "2ae2a4c6-8d9f-4ad7-9b02-7d8e9fabbccd",
+		"missionId": null,
+		"ideaId": null,
+		"goalId": null,
+		"agentId": null,
+		"parentTaskId": null,
+		"assignees": [],
+		"watchers": [],
+		"approvers": [],
+		"reviewers": [],
+		"blockedBy": [],
+		"relations": [],
+		"startedAt": "2026-10-15T08:00:00.000Z",
+		"completedAt": null,
+		"isRecurringTemplate": false,
+		"hiddenFromBoard": false,
+		"runtime": {
+			"prUrl": null,
+			"prState": null,
+			"ciState": null,
+			"latestRunStatus": null
+		},
+		"webUrl": null,
+		"deleted": true
+	},
+	"previous": {}
+}

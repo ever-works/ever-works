@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThan, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
+import { In, IsNull, MoreThan, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
 import type { EmailMessageStatus } from '@ever-works/contracts';
 import { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 import { EmailMessage, EmailMessageDirection } from '../../entities/email-message.entity';
@@ -88,6 +88,40 @@ export class EmailMessageRepository {
      * legitimate mail. A failure INSIDE `fn` (or its commit) is re-raised and
      * `fn` is never re-run, since it may already have reserved capacity.
      */
+    // ── EW-P4-2 — change notifications (domain events) ─────────────────
+
+    /**
+     * Set once at bootstrap by `EmailMessageDomainEventsBridge` (the one
+     * component that records `email.message.*`): this repository is the single
+     * writer of `email_messages`, so every row it creates or moves is reported
+     * here, after the write. Unset (unit tests, the worker) = nothing reported.
+     */
+    setChangeListener(listener: EmailMessageChangeListener | undefined): void {
+        this.changeListener = listener;
+    }
+
+    private changeListener?: EmailMessageChangeListener;
+
+    /** Set on the transaction-scoped twin {@link withSendAdmissionLock} hands out: changes wait for the commit. */
+    private deferredChanges?: EmailMessageChange[];
+
+    private async notify(change: EmailMessageChange): Promise<void> {
+        if (this.deferredChanges) {
+            this.deferredChanges.push(change);
+            return;
+        }
+        if (!this.changeListener) return;
+        try {
+            await this.changeListener(change);
+        } catch (error) {
+            this.logger.warn(
+                `email_messages change listener failed for ${change.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
     async withSendAdmissionLock<T>(
         keys: EmailSendAdmissionLockKeys,
         fn: (messages: EmailMessageRepository) => Promise<T>,
@@ -113,8 +147,11 @@ export class EmailMessageRepository {
             return fn(this);
         }
         let entered = false;
+        // EW-P4-2 — what the locked unit of work writes is reported once it has
+        // committed (a rolled-back reservation reports nothing).
+        const deferred: EmailMessageChange[] = [];
         try {
-            return await connection.transaction(async (manager) => {
+            const result = await connection.transaction(async (manager) => {
                 for (const [classId, objectId] of locks) {
                     await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
                         classId,
@@ -122,8 +159,12 @@ export class EmailMessageRepository {
                     ]);
                 }
                 entered = true;
-                return fn(new EmailMessageRepository(manager.getRepository(EmailMessage)));
+                const scoped = new EmailMessageRepository(manager.getRepository(EmailMessage));
+                scoped.deferredChanges = deferred;
+                return fn(scoped);
             });
+            for (const change of deferred) await this.notify(change);
+            return result;
         } catch (error) {
             if (entered) throw error;
             this.logger.warn(
@@ -140,7 +181,29 @@ export class EmailMessageRepository {
     }
 
     async save(entry: EmailMessage): Promise<EmailMessage> {
-        return this.repository.save(entry);
+        // EW-P4-2 — a re-save of an existing row reports what it really
+        // changed (read before the write, only while someone listens).
+        const tracking = !!this.changeListener || !!this.deferredChanges;
+        const before =
+            tracking && entry.id
+                ? await this.repository.findOne({ where: { id: entry.id } })
+                : null;
+        // `version` and `updatedAt` belong to the domain-event recorder (and
+        // TypeORM): a caller re-saving a copy read before an event must never
+        // roll them back, or the integration's `updatedSince` sync would miss
+        // the change.
+        const saved = await this.repository.save(entry.id ? withoutRecorderColumns(entry) : entry);
+        if (!saved?.id || !tracking) return saved;
+        if (!before) {
+            await this.notify({ kind: 'created', id: saved.id });
+            return saved;
+        }
+        const change = describeEmailMessageChange(before, saved);
+        // Nothing the integration DTO shows moved: no event, no version bump.
+        if (change.changedFields.length > 0) {
+            await this.notify({ kind: 'status', id: saved.id, ...change });
+        }
+        return saved;
     }
 
     async findById(id: string): Promise<EmailMessage | null> {
@@ -163,6 +226,39 @@ export class EmailMessageRepository {
         return this.repository.findOne({
             where: { pluginId, providerMessageId },
         });
+    }
+
+    /**
+     * EW-P4-3 — RFC threading: this owner's messages whose `Message-ID` is one
+     * of `ids` (bare ids, see `normalizeMessageId`). Owner-scoped: a header is
+     * sender-written, so a reply can never thread into another owner's mail.
+     * Newest first; callers rank by the order of `ids` themselves.
+     */
+    async findByMessageIdHeaders(userId: string, ids: readonly string[]): Promise<EmailMessage[]> {
+        if (ids.length === 0) return [];
+        return this.repository.find({
+            where: { userId, messageIdHeader: In([...ids]) },
+            order: { createdAt: 'DESC' },
+            take: 100,
+        });
+    }
+
+    /**
+     * EW-P4-3 — link a message to the Task it spawned or joined. Only fills an
+     * EMPTY link: a message already bound to a Task keeps it.
+     */
+    async linkTask(id: string, taskId: string): Promise<boolean> {
+        const result = await this.repository.update({ id, taskId: IsNull() }, { taskId });
+        const linked = (result.affected ?? 0) > 0;
+        if (linked) {
+            await this.notify({
+                kind: 'status',
+                id,
+                changedFields: ['taskId'],
+                previous: { taskId: null },
+            });
+        }
+        return linked;
     }
 
     async findByUser(
@@ -189,7 +285,15 @@ export class EmailMessageRepository {
     }
 
     async updateDeliveryStatus(id: string, deliveryStatus: string): Promise<void> {
-        await this.repository.update({ id }, { deliveryStatus });
+        const result = await this.repository.update({ id }, { deliveryStatus });
+        if ((result.affected ?? 0) > 0) {
+            await this.notify({
+                kind: 'status',
+                id,
+                changedFields: ['deliveryStatus'],
+                previous: {},
+            });
+        }
     }
 
     // ── AW-05 — send ceilings + draft lifecycle ─────────────────────
@@ -318,6 +422,9 @@ export class EmailMessageRepository {
                 | 'sentAt'
                 | 'deliveryStatus'
                 | 'pluginId'
+                | 'messageIdHeader'
+                | 'inReplyTo'
+                | 'references'
             >
         > = {},
     ): Promise<number> {
@@ -325,7 +432,17 @@ export class EmailMessageRepository {
             { id, status: In([...from]) },
             { ...patch, status: to },
         );
-        return result.affected ?? 0;
+        const moved = result.affected ?? 0;
+        if (moved > 0) {
+            await this.notify({
+                kind: 'status',
+                id,
+                to,
+                changedFields: ['status', ...emailMessageDtoFields(Object.keys(patch))],
+                previous: from.length === 1 ? { status: from[0] } : {},
+            });
+        }
+        return moved;
     }
 
     private sentWindowWhere(
@@ -345,3 +462,113 @@ export class EmailMessageRepository {
         return where;
     }
 }
+
+/**
+ * EW-P4-2 — the integration DTO field (`IntegrationEmailMessageDto`) each
+ * `email_messages` column shows as. A column the DTO does not show (bcc, the
+ * provider ids, approval bookkeeping, metadata …) changes no event.
+ */
+const EMAIL_MESSAGE_DTO_FIELDS: Readonly<Record<string, string>> = {
+    userId: 'ownerUserId',
+    agentId: 'agentId',
+    taskId: 'taskId',
+    conversationId: 'conversationId',
+    direction: 'direction',
+    status: 'status',
+    deliveryStatus: 'deliveryStatus',
+    from: 'from',
+    toAddresses: 'to',
+    ccAddresses: 'cc',
+    subject: 'subject',
+    bodyText: 'text',
+    bodyHtml: 'html',
+    messageIdHeader: 'messageId',
+    inReplyTo: 'inReplyTo',
+    references: 'references',
+    attachments: 'attachments',
+    sentAt: 'sentAt',
+    receivedAt: 'receivedAt',
+};
+
+/** Small values an event carries in `previous` (never a body or an address list). */
+const EMAIL_MESSAGE_PREVIOUS_FIELDS = new Set([
+    'status',
+    'deliveryStatus',
+    'taskId',
+    'conversationId',
+]);
+
+/** The DTO names of `columns`, de-duplicated, dropping columns the DTO does not show. */
+export function emailMessageDtoFields(columns: readonly string[]): string[] {
+    const fields = columns
+        .map((column) => EMAIL_MESSAGE_DTO_FIELDS[column])
+        .filter((field): field is string => !!field);
+    return [...new Set(fields)];
+}
+
+function withoutRecorderColumns(entry: EmailMessage): EmailMessage {
+    const {
+        version: _version,
+        updatedAt: _updatedAt,
+        ...writable
+    } = entry as EmailMessage & { version?: number; updatedAt?: Date };
+    return writable as EmailMessage;
+}
+
+function comparable(value: unknown): unknown {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'object') return JSON.stringify(value);
+    return value;
+}
+
+/**
+ * EW-P4-2 — what a `save` of an existing row changed, as DTO fields: only the
+ * columns the write carried and whose value differs from the row before it.
+ */
+export function describeEmailMessageChange(
+    before: EmailMessage,
+    after: Partial<EmailMessage>,
+): {
+    to?: EmailMessageStatus;
+    changedFields: string[];
+    previous: Record<string, unknown>;
+} {
+    const columns = Object.keys(EMAIL_MESSAGE_DTO_FIELDS).filter(
+        (column) =>
+            Object.prototype.hasOwnProperty.call(after, column) &&
+            comparable((after as Record<string, unknown>)[column]) !==
+                comparable((before as unknown as Record<string, unknown>)[column]),
+    );
+    const previous: Record<string, unknown> = {};
+    for (const column of columns) {
+        if (EMAIL_MESSAGE_PREVIOUS_FIELDS.has(column)) {
+            previous[EMAIL_MESSAGE_DTO_FIELDS[column]] =
+                (before as unknown as Record<string, unknown>)[column] ?? null;
+        }
+    }
+    const statusMoved = columns.includes('status') && !!after.status;
+    return {
+        ...(statusMoved ? { to: after.status as EmailMessageStatus } : {}),
+        changedFields: emailMessageDtoFields(columns),
+        previous,
+    };
+}
+
+/**
+ * EW-P4-2 — one write {@link EmailMessageRepository} made to `email_messages`:
+ * a new row (`created`), or a change to an existing one (`status`: its status,
+ * delivery status or Task link; `to` set when the lifecycle status moved).
+ */
+export type EmailMessageChange =
+    | { readonly kind: 'created'; readonly id: string }
+    | {
+          readonly kind: 'status';
+          readonly id: string;
+          readonly to?: EmailMessageStatus;
+          readonly changedFields: readonly string[];
+          readonly previous: Readonly<Record<string, unknown>>;
+      };
+
+/** Receives every {@link EmailMessageChange}, after the write. Must not throw into the write. */
+export type EmailMessageChangeListener = (change: EmailMessageChange) => Promise<void>;

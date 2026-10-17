@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { getWorkCapabilities, WORK_KIND_CAPABILITIES, workKindHasItems } from '../work-capabilities.js';
+import {
+	getWorkCapabilities,
+	WORK_KIND_CAPABILITIES,
+	workKindHasItems,
+	workKindHasRepository
+} from '../work-capabilities.js';
 import {
 	isAppWorkKind,
+	isProjectWorkKind,
 	isRepositoryWorkKind,
 	isUserSelectableWorkKind,
 	normalizeWorkKind,
@@ -103,16 +109,38 @@ describe('WORK_KIND_CAPABILITIES', () => {
 		}
 	});
 
-	it('always provisions a data repository — it is the source of truth (every kind except "app")', () => {
+	it('always provisions a data repository — it is the source of truth (every kind except "app" and "project")', () => {
 		for (const kind of WORK_KINDS) {
 			// `app` is the deliberate exception (FR-2): its Work Repository is
 			// the app code itself, and it never provisions the `data` role.
-			// Asserted positively in its own test below.
-			if (kind === 'app') {
+			// `project` (EW-P2-4) is the repo-less kind: it has no repository
+			// of any role. Both asserted positively in their own tests below.
+			if (kind === 'app' || kind === 'project') {
 				continue;
 			}
 			expect(WORK_KIND_CAPABILITIES[kind].repos.data).toBe(true);
 		}
+	});
+
+	// EW-P2-4 — the repo-less Project kind.
+	it('"project" has no repository, no deploy, no build, no knowledge base and nothing item-shaped', () => {
+		const caps = WORK_KIND_CAPABILITIES.project;
+		expect(caps.repos).toEqual({ data: false, work: false, website: false });
+		expect(caps.deploy).toBe(false);
+		expect(caps.builds).toBe(false);
+		expect(caps.appEnvironment).toBe(false);
+		expect(caps.kb).toBe(false);
+		expect(caps.items.enabled).toBe(false);
+		expect(caps.taxonomy || caps.comparisons || caps.communityPr).toBe(false);
+	});
+
+	it('"project" is the only kind without any repository', () => {
+		expect(WORK_KINDS.filter((kind) => !workKindHasRepository(kind))).toEqual(['project']);
+		expect(workKindHasRepository('PROJECT')).toBe(false);
+		// Unknown kinds behave like `default`, which has repositories.
+		expect(workKindHasRepository('no-such-kind')).toBe(true);
+		expect(isProjectWorkKind(' Project ')).toBe(true);
+		expect(isProjectWorkKind('repo')).toBe(false);
 	});
 
 	it('does not offer taxonomy-dependent features without taxonomy', () => {

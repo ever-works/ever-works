@@ -1,0 +1,110 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/mission.schema.json",
+	"title": "Mission DTO (B.6, GET /missions, GET /missions/:id)",
+	"description": "An Ever Works Mission (EW-P2-5, plan D3b): a Gauzy Strategic Initiative — Goals 1:N (one primary), Works M:N (typed). Integration creates are always status='paused' with no schedule and no auto-build; an integration never sets a Mission active (spend safety D9): only a person resumes it in Ever Works, which starts its ticks. Team scope = the Mission's team_resources links (teamIds, D11). Also the `data` of mission.created / updated / status_changed / deleted.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": [
+		"teamIds",
+		"title",
+		"description",
+		"type",
+		"status",
+		"outcome",
+		"completedAt",
+		"schedule",
+		"autoBuildWorks",
+		"goals",
+		"works",
+		"sourceMissionId"
+	],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": true,
+		"visibilityExplicit": true,
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+		"description": { "type": "string" },
+		"type": { "type": "string", "enum": ["one-shot", "scheduled"] },
+		"status": {
+			"description": "active (ticks run) | paused | completed (a person's verdict, with outcome) | failed (a fatal tick; revivable by a person).",
+			"type": "string",
+			"enum": ["active", "paused", "completed", "failed"]
+		},
+		"outcome": {
+			"type": ["string", "null"],
+			"enum": ["succeeded", "partially_succeeded", "failed", "cancelled", "superseded", null]
+		},
+		"completedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"schedule": { "description": "EW-only cron of a scheduled Mission (read-only).", "type": ["string", "null"] },
+		"autoBuildWorks": { "description": "EW-only (read-only).", "type": "boolean" },
+		"goals": {
+			"description": "Linked Goals, the primary first (mission_goals).",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["goalId", "isPrimary"],
+				"properties": {
+					"goalId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+					"isPrimary": { "type": "boolean" }
+				},
+				"additionalProperties": false
+			}
+		},
+		"works": {
+			"description": "Typed Work links (mission_works).",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["workId", "relation"],
+				"properties": {
+					"workId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+					"relation": { "$ref": "#/$defs/WorkRelation" }
+				},
+				"additionalProperties": false
+			}
+		},
+		"sourceMissionId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on mission.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"WorkRelation": {
+			"type": "string",
+			"enum": ["created", "improves", "operates", "markets", "researches", "retires"]
+		},
+		"MissionGoalLinkEvent": {
+			"description": "`data` of mission.goal.linked / mission.goal.unlinked (child: the link; the envelope's aggregate is the Mission with its new version).",
+			"type": "object",
+			"required": ["missionId", "goalId", "isPrimary"],
+			"properties": {
+				"missionId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"goalId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"isPrimary": { "type": "boolean" },
+				"deleted": { "description": "Only on mission.goal.unlinked.", "const": true }
+			},
+			"additionalProperties": false
+		},
+		"MissionWorkLinkEvent": {
+			"description": "`data` of mission.work.linked / mission.work.unlinked (child: the link; the envelope's aggregate is the Mission with its new version).",
+			"type": "object",
+			"required": ["missionId", "workId", "relation"],
+			"properties": {
+				"missionId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"workId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"relation": { "$ref": "#/$defs/WorkRelation" },
+				"deleted": { "description": "Only on mission.work.unlinked.", "const": true }
+			},
+			"additionalProperties": false
+		}
+	}
+}

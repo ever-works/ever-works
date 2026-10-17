@@ -1,0 +1,56 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/member.schema.json",
+	"title": "Organization member DTO (B.6, GET /members)",
+	"description": "One organization_members roster row joined with its user. A roster row has no version of its own (it is a child of the organization aggregate); lists use updatedSince on the roster row's updatedAt. Also the `data` of organization.member.* events (removed: last snapshot + deleted:true).",
+	"type": "object",
+	"required": [
+		"organizationId",
+		"userId",
+		"username",
+		"email",
+		"emailVerified",
+		"avatarUrl",
+		"role",
+		"joinedAt",
+		"everIdSubjects",
+		"updatedAt"
+	],
+	"properties": {
+		"organizationId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"userId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"username": { "type": "string", "maxLength": 255 },
+		"displayName": {
+			"description": "The optional `users.displayName` (EW-P2-6); null when the person set none. Consumers fall back to username.",
+			"type": ["string", "null"],
+			"maxLength": 200
+		},
+		"email": { "type": ["string", "null"], "maxLength": 320 },
+		"emailVerified": { "type": "boolean" },
+		"avatarUrl": { "type": ["string", "null"], "maxLength": 2048 },
+		"role": {
+			"description": "`owner` (the Tenant owner), `admin` (may create integration keys pinned to this organization, EW-P2-6) or `member`. Consumers must accept unknown values.",
+			"type": "string",
+			"maxLength": 32,
+			"examples": ["member", "admin", "owner"]
+		},
+		"isActive": { "description": "users.isActive.", "type": "boolean" },
+		"joinedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"everIdSubjects": {
+			"description": "external_identities rows (Ever ID): the automatic people-matching key (01 §3). Never matched by email.",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["issuer", "subject"],
+				"properties": {
+					"issuer": { "type": "string", "maxLength": 512 },
+					"subject": { "type": "string", "maxLength": 255 }
+				},
+				"additionalProperties": false
+			}
+		},
+		"deleted": { "description": "Only on organization.member.removed.", "const": true }
+	},
+	"additionalProperties": false
+}

@@ -96,7 +96,17 @@ describe('TasksController — Task board routes', () => {
                 includeTemplates: false,
                 includeHidden: false,
                 includeCancelled: false,
+                // Record visibility (EW-P1-3): the board defaults to the Mine tab.
+                view: 'mine',
             });
+        });
+
+        it('passes the record visibility tab through, unknown values read as mine (EW-P1-3)', async () => {
+            const { controller, service } = make();
+            await controller.board(auth, { view: 'organization' });
+            await controller.board(auth, { view: 'everything' });
+            expect(service.getBoard.mock.calls[0][1].view).toBe('organization');
+            expect(service.getBoard.mock.calls[1][1].view).toBe('mine');
         });
 
         it('passes layout=focus through and falls back to status for anything else', async () => {

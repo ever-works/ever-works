@@ -10,11 +10,22 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsIn, IsOptional, IsString, IsUUID, IsUrl } from 'class-validator';
+import {
+    ArrayMaxSize,
+    ArrayMinSize,
+    IsArray,
+    IsIn,
+    IsOptional,
+    IsString,
+    IsUUID,
+    IsUrl,
+    MaxLength,
+} from 'class-validator';
 import { AuthSessionGuard } from '../auth/guards/auth-session.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -42,12 +53,77 @@ class CreateWebhookSubscriptionDto {
     @IsOptional()
     @IsUUID()
     workId?: string;
+
+    // ── Webhooks v2 (EW-P1-5): `events` + `organizationIds` make a v2 subscription ──
+
+    /** Catalog types, `<prefix>.*` or `*` (task.runtime_updated only by exact name). */
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    @MaxLength(64, { each: true })
+    events?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(50)
+    @IsUUID('all', { each: true })
+    organizationIds?: string[];
+
+    /** Events whose `origin.tag` is listed are not delivered (loop guard). */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @MaxLength(100, { each: true })
+    excludeOriginTags?: string[];
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    description?: string | null;
 }
 
 class UpdateWebhookSubscriptionDto {
+    /** `paused` pauses, `active` resumes (and resets the failure streak). */
     @IsOptional()
     @IsIn(['paused', 'active'])
     status?: 'paused' | 'active';
+
+    // v2 subscriptions only:
+
+    @IsOptional()
+    @IsUrl({ require_protocol: true, protocols: WEBHOOK_URL_PROTOCOLS })
+    url?: string;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    @MaxLength(64, { each: true })
+    events?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(50)
+    @IsUUID('all', { each: true })
+    organizationIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @MaxLength(100, { each: true })
+    excludeOriginTags?: string[];
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    description?: string | null;
 }
 
 /**
@@ -92,8 +168,15 @@ export class WebhooksController {
     @ApiResponse({ status: 200, description: 'Array of delivery views (most-recent first)' })
     async listDeliveries(
         @CurrentUser() auth: AuthenticatedUser,
+        @Query('subscriptionId', new ParseUUIDPipe({ optional: true })) subscriptionId?: string,
+        @Query('limit') limit?: string,
     ): Promise<{ deliveries: WebhookDeliveryView[] }> {
-        const deliveries = await this.deliveries.list(auth.userId);
+        // Optional filters (Settings > Webhooks shows one subscription's deliveries).
+        const parsed = limit === undefined ? undefined : Number.parseInt(limit, 10);
+        const deliveries = await this.deliveries.list(auth.userId, {
+            subscriptionId,
+            limit: Number.isFinite(parsed) ? parsed : undefined,
+        });
         return { deliveries };
     }
 
@@ -116,7 +199,9 @@ export class WebhooksController {
     }
 
     @Get()
-    @ApiOperation({ summary: "List my account's active webhook subscriptions" })
+    @ApiOperation({
+        summary: "List my account's webhook subscriptions (active, paused, failed or disabled)",
+    })
     @ApiResponse({ status: 200, description: 'Array of subscription views (no secret material)' })
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -139,12 +224,37 @@ export class WebhooksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() dto: CreateWebhookSubscriptionDto,
     ) {
+        // Webhooks v2 (EW-P1-5): `events` + `organizationIds` subscribe to domain
+        // events of those organizations; without them this is a v1 subscription.
+        if (dto.events !== undefined || dto.organizationIds !== undefined) {
+            if (!dto.events?.length || !dto.organizationIds?.length) {
+                throw new BadRequestException(
+                    'A v2 subscription needs both events and organizationIds',
+                );
+            }
+            if (dto.workId) {
+                throw new BadRequestException(
+                    'workId applies to v1 subscriptions only; v2 subscriptions scope by organizationIds',
+                );
+            }
+            return this.webhooks.createV2(auth.userId, {
+                url: dto.url,
+                events: dto.events,
+                organizationIds: dto.organizationIds,
+                excludeOriginTags: dto.excludeOriginTags,
+                description: dto.description ?? null,
+            });
+        }
         return this.webhooks.create(auth.userId, { url: dto.url, workId: dto.workId });
     }
 
     @Patch(':id')
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
-    @ApiOperation({ summary: 'Pause / resume a subscription' })
+    @ApiOperation({
+        summary: 'Pause / resume a subscription; change a v2 subscription',
+        description:
+            '`status: paused` pauses and `status: active` resumes (resetting the failure streak). `url`, `events`, `organizationIds`, `excludeOriginTags` and `description` change a v2 subscription only.',
+    })
     @ApiParam({ name: 'id', description: 'Subscription ID' })
     @ApiResponse({ status: 200, description: 'Updated subscription view' })
     @ApiResponse({ status: 404, description: 'Not found (or not yours)' })
@@ -153,23 +263,18 @@ export class WebhooksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: UpdateWebhookSubscriptionDto,
     ): Promise<WebhookSubscriptionView> {
-        // Only `status` transitions are supported through this endpoint.
-        // URL / workId changes require a fresh subscription so the
-        // owner of the old endpoint receives a clear signal (delivery
-        // stops) instead of a silent redirect.
-        if (dto.status === 'paused') {
-            return this.webhooks.pause(auth.userId, id);
+        // A v1 subscription changes only its status: URL / workId changes need a
+        // fresh subscription, so the owner of the old endpoint gets a clear
+        // signal (delivery stops) instead of a silent redirect. A v2 subscription
+        // also takes url / events / organizationIds / excludeOriginTags /
+        // description (integration contract v1 B.5, UpdateWebhook).
+        const keys = Object.keys(dto).filter(
+            (key) => (dto as Record<string, unknown>)[key] !== undefined,
+        );
+        if (keys.length === 0) {
+            throw new BadRequestException('Nothing to update');
         }
-        if (dto.status === 'active') {
-            // Resuming is a no-op for now since list-active only
-            // returns 'active' rows; status transitions other than
-            // pause require a follow-up endpoint. Surface as 400 to
-            // avoid the silent no-op smell.
-            throw new BadRequestException(
-                'Resuming a paused subscription is not supported yet; recreate the subscription',
-            );
-        }
-        throw new BadRequestException('status must be one of: paused');
+        return this.webhooks.update(auth.userId, id, dto);
     }
 
     @Post(':id/test')
@@ -193,7 +298,7 @@ export class WebhooksController {
     @ApiOperation({
         summary: 'Rotate the signing secret',
         description:
-            'Generates a new HMAC signing secret. The previous secret is irretrievable after this call. Returns the new RAW secret ONCE.',
+            'Generates a new HMAC signing secret and returns the RAW secret ONCE. v1: the previous secret stops at once. v2: the previous secret keeps signing as a second `v1=` in `X-Ever-Works-Signature` for the grace window (WEBHOOK_SECRET_ROTATION_GRACE_HOURS, default 24 h).',
     })
     @ApiParam({ name: 'id', description: 'Subscription ID' })
     @ApiResponse({ status: 200, description: 'New signingSecret returned once' })

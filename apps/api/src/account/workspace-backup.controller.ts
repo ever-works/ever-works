@@ -15,7 +15,9 @@ import {
     Res,
     ServiceUnavailableException,
     Body,
+    UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
     BACKUP_DOMAINS,
@@ -61,6 +63,8 @@ type ArchiveResponse = {
  */
 @ApiTags('Workspace backup')
 @Controller('api/account/backups')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class WorkspaceBackupController {
     constructor(
         private readonly backups: WorkspaceBackupService,

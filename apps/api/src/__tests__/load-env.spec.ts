@@ -73,6 +73,14 @@ function bootMain(dotenv: string | null, env: Record<string, string> = {}): Boot
                 Module({ imports: [...stats.instanceStatsModuleImports()] })(ApiModule);
                 return { ApiModule };
             });
+            // `main.ts` serves the integration OpenAPI document only after boot (never
+            // reached here: `create` never resolves). Its static import pulls in the whole
+            // Integration API module graph, down to ESM-only node_modules (`github-slugger`
+            // via the webhooks controller -> agent services) that Jest cannot parse, and this
+            // boot-order check needs none of it.
+            jest.doMock('../integrations-api/v1/integration-openapi', () => ({
+                serveIntegrationOpenApi: () => undefined,
+            }));
             jest.doMock('@scalar/nestjs-api-reference', () => ({
                 apiReference: () => () => undefined,
             }));

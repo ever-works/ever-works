@@ -1,4 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, AuthSessionGuard } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
@@ -8,6 +9,8 @@ import { DeviceAuthService } from './device-auth.service';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/device-auth')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class DeviceAuthController {
     constructor(private readonly deviceAuthService: DeviceAuthService) {}
 

@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { In } from 'typeorm';
 import { BudgetService } from '@ever-works/agent/budgets';
@@ -50,6 +51,8 @@ interface AdminUsageResponse {
 // `terms/terms.controller.spec.ts`.
 @Controller('api/admin/usage')
 @UseGuards(IsPlatformAdminGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class AdminUsageController {
     constructor(
         private readonly budgetService: BudgetService,

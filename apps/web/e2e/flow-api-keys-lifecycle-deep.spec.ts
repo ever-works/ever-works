@@ -8,7 +8,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  * specs leave uncovered — the per-user QUOTA, name-validation boundaries, the
  * not-yet-used masked-list shape, anonymous lockout of the management endpoints,
  * 404-not-500 hardening of revoke, and the (load-bearing, easy-to-miss) fact that
- * an API key carries FULL owner rights — including minting MORE keys.
+ * an API key carries owner rights — but, since EW-P1-2 (integration keys), it can
+ * NO LONGER mint more keys: creating and rotating keys is session-only.
  *
  * NON-DUPLICATION — already pinned by siblings, intentionally NOT repeated here:
  *   flow-api-keys-lifecycle.spec.ts
@@ -56,8 +57,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     • well-formed but nonexistent UUID         → 404 same body.
  *   FULL-OWNER-RIGHTS of a key (extractApiKey maps the key to its OWNER's user):
  *     • GET /api/auth/api-keys with x-api-key    → 200 (a key can READ its owner's key list)
- *     • POST /api/auth/api-keys with x-api-key   → 201 (a key can MINT another key for its owner);
- *       the new key authenticates independently, and BOTH count toward the owner's quota.
+ *     • POST /api/auth/api-keys with x-api-key   → 403 since EW-P1-2: minting a key is
+ *       session-only (`@SessionCredentialOnly()`), which closes the hole where a leaked key could
+ *       mint ten more. Before EW-P1-2 this answered 201.
  *
  * Isolation: every test registers a FRESH registerUserViaAPI() user (never the shared seeded user);
  * unique suffixes come from a per-test counter, never a module-scope clock. Defensive throughout:
@@ -362,7 +364,7 @@ test.describe('API keys — deep quota, validation, anon lockout, and full-owner
         expect(ghost.status()).not.toBe(500);
     });
 
-    test('a key carries FULL owner rights: it can READ its owner key list AND MINT another key, and both keys count toward the same quota', async ({
+    test('a key can READ its owner key list but can NOT mint another key (session-only since EW-P1-2)', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -392,36 +394,30 @@ test.describe('API keys — deep quota, validation, anon lockout, and full-owner
             'the key sees itself in the owner-scoped list',
         ).toBe(true);
 
-        // 2. That key can MINT another key (no privilege boundary between "session" and "key" for the
-        //    owner) — the new secret authenticates independently and resolves to the SAME owner.
+        // 2. That key can NOT mint another key (EW-P1-2): creating a key is session-only, so a
+        //    leaked key can no longer multiply itself. The parent key keeps working.
         const minted = await createKeyWith(request, { 'x-api-key': parentSecret }, uniq('minted'));
-        expect(minted.status, `key minted another key; got ${minted.status}`).toBe(201);
-        expect(minted.key, 'minted key returns its own fresh secret').toBeTruthy();
-        expect(minted.key!.key).not.toBe(parentSecret);
+        expect(minted.status, `a key must not mint another key; got ${minted.status}`).toBe(403);
+        expect(minted.key, 'no secret is returned').toBeFalsy();
 
-        const mintedWho = await request.get(PROFILE_FRESH, {
-            headers: { 'x-api-key': minted.key!.key },
+        const parentWho = await request.get(PROFILE_FRESH, {
+            headers: { 'x-api-key': parentSecret },
             failOnStatusCode: false,
         });
-        expect(mintedWho.status(), 'key-minted key authenticates').toBe(200);
-        expect((await mintedWho.json()).email, 'minted key resolves to the same owner').toBe(
+        expect(parentWho.status(), 'the parent key still authenticates').toBe(200);
+        expect((await parentWho.json()).email, 'the parent key resolves to its owner').toBe(
             owner.user.email,
         );
 
-        // 3. Both keys count toward the owner's quota: the owner-scoped list now contains BOTH ids,
-        //    confirming the minted key was attributed to the owner (not orphaned).
+        // 3. The owner-scoped list holds exactly the one key the session created.
         const finalList = await request.get(KEYS, {
             headers: authedHeaders(owner.access_token),
             failOnStatusCode: false,
         });
         const finalRows: any[] = await finalList.json();
         expect(
-            finalRows.some((r) => r.id === first.key!.id),
-            'parent key present',
-        ).toBe(true);
-        expect(
-            finalRows.some((r) => r.id === minted.key!.id),
-            'key-minted key attributed to the same owner',
-        ).toBe(true);
+            finalRows.map((r) => r.id),
+            'only the session-created key exists',
+        ).toEqual([first.key!.id]);
     });
 });

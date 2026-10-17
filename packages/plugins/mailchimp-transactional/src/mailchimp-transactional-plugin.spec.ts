@@ -53,6 +53,34 @@ describe('MailchimpTransactionalPlugin', () => {
 		]);
 	});
 
+	it('forwards EmailSendInput.headers beside Reply-To (EW-P4-3 RFC threading)', async () => {
+		sendMock.mockResolvedValueOnce([{ _id: 'md-h', email: 'b@example.com', status: 'sent' }]);
+		await plugin.sendEmail(
+			{
+				from: 'a@example.com',
+				to: ['b@example.com'],
+				subject: 'Re: hi',
+				bodyText: 'hi',
+				replyTo: 'reply@acme.test',
+				messageRef: 'ref-thread',
+				headers: {
+					'Message-ID': '<out-1@acme.test>',
+					'In-Reply-To': '<in-1@client.test>',
+					References: '<root@client.test> <in-1@client.test>'
+				}
+			},
+			{ userId: 'u' }
+		);
+		expect(sendMock.mock.calls[0][0].message.headers).toEqual({
+			...{
+				'Message-ID': '<out-1@acme.test>',
+				'In-Reply-To': '<in-1@client.test>',
+				References: '<root@client.test> <in-1@client.test>'
+			},
+			'Reply-To': 'reply@acme.test'
+		});
+	});
+
 	it('surfaces per-recipient rejections in the result', async () => {
 		sendMock.mockResolvedValueOnce([
 			{ email: 'ok@example.com', status: 'queued', _id: 'mand-2' },

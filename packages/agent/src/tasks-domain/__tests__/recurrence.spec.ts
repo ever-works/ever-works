@@ -225,4 +225,34 @@ describe('recurrence.cloneRecurringTaskAsInstance', () => {
         const clone = cloneRecurringTaskAsInstance(template);
         expect(clone.parentTaskId).toBeNull();
     });
+
+    // F1 (review 2026-10-17, P0): without these two columns the insert-time default
+    // turned a private template's every instance into an `organization` row.
+    it("keeps a private template's visibility on the instance", () => {
+        const clone = cloneRecurringTaskAsInstance({
+            ...template,
+            organizationId: 'org-1',
+            visibility: 'private',
+            visibilityExplicit: true,
+        } as Task);
+        expect(clone.visibility).toBe('private');
+        expect(clone.visibilityExplicit).toBe(true);
+    });
+
+    it("keeps a team template's automatic visibility on the instance", () => {
+        const clone = cloneRecurringTaskAsInstance({
+            ...template,
+            organizationId: 'org-1',
+            visibility: 'team',
+            visibilityExplicit: false,
+        } as Task);
+        expect(clone.visibility).toBe('team');
+        expect(clone.visibilityExplicit).toBe(false);
+    });
+
+    it('leaves the visibility to the insert default when the template carries none', () => {
+        const clone = cloneRecurringTaskAsInstance(template);
+        expect(clone).not.toHaveProperty('visibility');
+        expect(clone).not.toHaveProperty('visibilityExplicit');
+    });
 });

@@ -12,7 +12,7 @@ import type {
 	PluginCategory,
 	JsonSchema
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, normalizeMessageId, parseMessageIdList } from '@ever-works/plugin';
 
 function resolveApiKey(options: EmailOptions): string {
 	const fromSettings = options.settings?.apiKey;
@@ -41,6 +41,19 @@ function resolveSigningKey(options: EmailOptions): string | undefined {
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
 	const fromEnv = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
 	return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
+}
+
+/**
+ * Operator opt-out (EW-P4-3): accept inbound webhooks that carry no
+ * signature when no signing key is configured. Off unless the env var is the
+ * exact string `'true'`, so a typo or an empty value stays secure. Meant for
+ * a local/dev stack with no public webhook URL — never for an environment
+ * a provider can reach.
+ */
+const EMAIL_INBOUND_ALLOW_UNSIGNED_ENV = 'EMAIL_INBOUND_ALLOW_UNSIGNED';
+
+function unsignedInboundAllowed(): boolean {
+	return process.env[EMAIL_INBOUND_ALLOW_UNSIGNED_ENV] === 'true';
 }
 
 /** Mailgun delivers webhooks as JSON OR form-urlencoded; decode both. */
@@ -89,6 +102,38 @@ function angleAddress(value: string): string | null {
 		open = value.indexOf('<', close + 1);
 	}
 	return null;
+}
+
+/**
+ * EW-P4-3 — split a raw address-list header (`To` / `Cc`) on the commas that
+ * SEPARATE mailboxes, not the ones inside a quoted display name or an angle
+ * address: `"Doe, John" <john@x>, jane@x` is two mailboxes. Linear time (the
+ * header is sender-written and read before verification).
+ */
+function splitAddressList(raw: string): string[] {
+	const parts: string[] = [];
+	let current = '';
+	let inQuote = false;
+	let inAngle = false;
+	for (let i = 0; i < raw.length; i += 1) {
+		const ch = raw[i];
+		if (ch === '\\' && inQuote && i + 1 < raw.length) {
+			current += ch + raw[i + 1];
+			i += 1;
+			continue;
+		}
+		if (ch === '"' && !inAngle) inQuote = !inQuote;
+		else if (ch === '<' && !inQuote) inAngle = true;
+		else if (ch === '>' && !inQuote) inAngle = false;
+		if (ch === ',' && !inQuote && !inAngle) {
+			parts.push(current);
+			current = '';
+			continue;
+		}
+		current += ch;
+	}
+	parts.push(current);
+	return parts;
 }
 
 interface MailgunSignature {
@@ -170,6 +215,8 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 		// Mailgun custom variables (`v:<name>`) carry our attribution metadata.
 		const customVars: Record<string, string> = {};
 		for (const [k, v] of Object.entries(input.metadata ?? {})) customVars[`v:${k}`] = v;
+		// EW-P4-3 — RFC threading headers travel as `h:<Name>` parameters.
+		for (const [k, v] of Object.entries(input.headers ?? {})) customVars[`h:${k}`] = v;
 
 		let id: string;
 		try {
@@ -224,7 +271,23 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 
 	verifyWebhookSignature(rawBody: Buffer, _headers: Readonly<Record<string, string>>, options: EmailOptions): void {
 		const signingKey = resolveSigningKey(options);
-		if (!signingKey) return; // No key configured — operator opt-in to signature checking.
+		if (!signingKey) {
+			// Security (EW-P4-3): FAIL CLOSED. With no key there is nothing to
+			// authenticate the caller against, and the route is public: accepting
+			// the webhook would let ANY caller who knows the URL inject mail into a
+			// tenant's scope (it used to be accepted silently). The facade answers
+			// this throw with a 401, as for a mismatch.
+			if (!unsignedInboundAllowed()) {
+				throw new Error(
+					`Mailgun inbound: no \`webhookSigningKey\`/MAILGUN_WEBHOOK_SIGNING_KEY configured; refusing an unsigned webhook (${EMAIL_INBOUND_ALLOW_UNSIGNED_ENV}=true accepts it on a local stack only).`
+				);
+			}
+			// The operator opted out explicitly: accept, loudly.
+			console.warn(
+				`[mailgun] inbound webhook accepted WITHOUT signature verification: no \`webhookSigningKey\`/MAILGUN_WEBHOOK_SIGNING_KEY configured and ${EMAIL_INBOUND_ALLOW_UNSIGNED_ENV}=true. Configure a signing key to authenticate inbound mail.`
+			);
+			return;
+		}
 		const sig = extractSignature(decodeBody(rawBody));
 		if (!sig) {
 			throw new Error('Mailgun inbound: missing timestamp/token/signature.');
@@ -263,11 +326,50 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 		const recipient = str('recipient') ?? str('To') ?? '';
 		const messageId = (str('Message-Id') ?? str('message-id') ?? `mailgun-${Date.now()}`).replace(/^<|>$/g, '');
 		const tsSeconds = Number(str('timestamp'));
+		// EW-P4-3 — RFC threading headers. A Mailgun route forwards each
+		// header as a field of its own name, and all of them in
+		// `message-headers` (a JSON list of [name, value] pairs).
+		const header = (name: string): string | undefined => {
+			for (const [key, value] of Object.entries(body)) {
+				if (key.toLowerCase() === name && typeof value === 'string') return value;
+			}
+			const raw = body['message-headers'];
+			let pairs: unknown = raw;
+			if (typeof raw === 'string') {
+				try {
+					pairs = JSON.parse(raw);
+				} catch {
+					pairs = null;
+				}
+			}
+			if (Array.isArray(pairs)) {
+				for (const pair of pairs) {
+					if (
+						Array.isArray(pair) &&
+						typeof pair[0] === 'string' &&
+						typeof pair[1] === 'string' &&
+						pair[0].toLowerCase() === name
+					) {
+						return pair[1];
+					}
+				}
+			}
+			return undefined;
+		};
+		const messageIdHeader = normalizeMessageId(header('message-id'));
+		// Quote-aware: a display name may itself contain a comma.
+		const cc = splitAddressList(header('cc') ?? '')
+			.map((part) => (angleAddress(part.trim()) ?? part).trim())
+			.filter((address) => address.length > 0 && address.includes('@'));
+		const inReplyTo = parseMessageIdList(header('in-reply-to'))[0];
+		const references = parseMessageIdList(header('references'));
 		return {
 			provider: this.id,
 			providerMessageId: messageId,
 			from: str('sender') ?? str('from') ?? '',
 			to: parseAddressList(recipient),
+			// EW-P4-3 — Cc is recorded (never routed on).
+			...(cc.length > 0 ? { cc } : {}),
 			subject: str('subject') ?? '',
 			bodyText: str('body-plain') ?? str('stripped-text') ?? '',
 			bodyHtml: str('body-html') ?? str('stripped-html'),
@@ -276,7 +378,10 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 			metadata: {
 				recipient,
 				signatureVerified: Boolean(resolveSigningKey(_options))
-			}
+			},
+			...(messageIdHeader ? { messageIdHeader } : {}),
+			...(inReplyTo ? { inReplyTo } : {}),
+			...(references.length > 0 ? { references } : {})
 		};
 	}
 }

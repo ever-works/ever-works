@@ -135,6 +135,15 @@ const EXISTING_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
 	['IDENTITY_PROVIDER', 'identity-provider']
 ];
 
+/**
+ * Capabilities later epics appended behind `apps-tier`, in table order, so the
+ * position checks above stay exact totals instead of drifting.
+ */
+const LATER_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
+	// Domain events (EW-P1-1).
+	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber']
+];
+
 /** Every category that existed before T2, in the tuple's own order. T2 appends none. */
 const PRE_APPS_TIER_CATEGORIES: readonly string[] = [
 	'git-provider',
@@ -481,20 +490,26 @@ describe('the apps-tier capability (APW-10 T2)', () => {
 		// constant can be broken without a compile error.
 		expect(Object.entries(PLUGIN_CAPABILITIES)).toEqual([
 			...EXISTING_CAPABILITY_ENTRIES,
-			['APPS_TIER', 'apps-tier']
+			['APPS_TIER', 'apps-tier'],
+			...LATER_CAPABILITY_ENTRIES
 		]);
 
-		// Exactly one member was added, and it is last: the plan appends
-		// `apps-tier` after `build` and APW-12's `identity-provider` (plan §5.1:595).
+		// Exactly one member was added by T2, right after the pre-T2 snapshot: the
+		// plan appends `apps-tier` after `build` and APW-12's `identity-provider`
+		// (plan §5.1:595). Later epics append behind it (LATER_CAPABILITY_ENTRIES).
 		const keys = Object.keys(PLUGIN_CAPABILITIES);
-		expect(keys).toHaveLength(EXISTING_CAPABILITY_ENTRIES.length + 1);
-		expect(keys[keys.length - 1]).toBe('APPS_TIER');
+		expect(keys).toHaveLength(EXISTING_CAPABILITY_ENTRIES.length + 1 + LATER_CAPABILITY_ENTRIES.length);
+		expect(keys[EXISTING_CAPABILITY_ENTRIES.length]).toBe('APPS_TIER');
 		expect(keys.filter((key) => key === 'APPS_TIER')).toHaveLength(1);
 
 		// The derived lookup array follows the table, so `ALL_PLUGIN_CAPABILITIES`
 		// and the guard cannot disagree with it.
 		const values = Object.values(PLUGIN_CAPABILITIES) as readonly string[];
-		expect(values).toEqual([...EXISTING_CAPABILITY_ENTRIES.map(([, value]) => value), 'apps-tier']);
+		expect(values).toEqual([
+			...EXISTING_CAPABILITY_ENTRIES.map(([, value]) => value),
+			'apps-tier',
+			...LATER_CAPABILITY_ENTRIES.map(([, value]) => value)
+		]);
 		expect(values.filter((entry) => entry === 'apps-tier')).toHaveLength(1);
 	});
 

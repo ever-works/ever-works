@@ -1,10 +1,24 @@
 // Mock the agent database barrel to avoid pulling in the full TypeORM
 // DataSource graph (which transitively imports `@src/config`). Same
 // pattern as the existing `auth.service.spec.ts` tests.
-jest.mock('@ever-works/agent/database', () => ({}));
+// The real write queue (self-contained, no imports): OrganizationService queues its
+// transactions with it on single-connection drivers; the rest of the module stays empty.
+jest.mock('@ever-works/agent/database', () => ({
+    serializeOnSingleConnection: jest.requireActual(
+        '../../../../../packages/agent/src/database/repositories/single-connection-write-queue',
+    ).serializeOnSingleConnection,
+}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/contracts/api', () => ({
     UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS: 'UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS',
+}));
+// Domain events (EW-P1-1 B2): the real barrel loads the entity graph, which
+// the empty entities mock above leaves half-initialized. The service only
+// needs the publisher type (absent here) and the best-effort helper.
+jest.mock('@ever-works/agent/domain-events', () => ({
+    DomainEventPublisher: class DomainEventPublisher {},
+    recordAfterWrite: jest.fn(),
+    buildMemberSnapshot: jest.fn(),
 }));
 
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -259,6 +273,50 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(updateQueries.find((q) => q.sql.includes('"templates"'))?.sql).toContain(
                 '"ownerUserId"',
             );
+        });
+
+        // Cascade-3 stage E2E: on better-sqlite3 every caller shares ONE query runner, so
+        // an unqueued create transaction overlapping a queued one nested as its savepoint
+        // and failed on commit ("no such savepoint"). It is now queued there; Postgres is
+        // unchanged (each transaction has its own pooled connection).
+        async function concurrentCreates(driver: 'better-sqlite3' | 'postgres'): Promise<number> {
+            const { service, manager } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+            const ds = (
+                service as unknown as {
+                    dataSource: { manager?: unknown; transaction: jest.Mock };
+                }
+            ).dataSource;
+            ds.manager = { connection: { options: { type: driver } } };
+            let active = 0;
+            let maxActive = 0;
+            ds.transaction.mockImplementation(
+                async (cb: (m: typeof manager) => Promise<unknown>) => {
+                    active += 1;
+                    maxActive = Math.max(maxActive, active);
+                    try {
+                        await new Promise((resolve) => setTimeout(resolve, 5));
+                        return await cb(manager);
+                    } finally {
+                        active -= 1;
+                    }
+                },
+            );
+            await Promise.all([
+                service.createOrganization('u-1', 'Acme A'),
+                service.createOrganization('u-1', 'Acme B'),
+            ]);
+            expect(ds.transaction).toHaveBeenCalledTimes(2);
+            return maxActive;
+        }
+
+        it('queues its transaction on a single-connection driver: two concurrent creates never overlap (SQLite)', async () => {
+            expect(await concurrentCreates('better-sqlite3')).toBe(1);
+        });
+
+        it('leaves Postgres unchanged: concurrent creates still run side by side', async () => {
+            expect(await concurrentCreates('postgres')).toBe(2);
         });
 
         it('prefers explicit slug over name-derived', async () => {

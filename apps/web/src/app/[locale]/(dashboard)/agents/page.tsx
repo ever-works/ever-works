@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { RecordViewTabs } from '@/components/record-visibility';
+import { parseRecordTab } from '@/lib/record-visibility';
 import { getTranslations } from 'next-intl/server';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import type { AstTemplateEntry } from '@/lib/api/agent-templates';
@@ -32,9 +35,15 @@ export async function generateMetadata(): Promise<Metadata> {
  * round of fetches — and `AgentsHashRedirect` still catches the old
  * `/agents#skills` links.
  */
-export default async function AgentsPage() {
+export default async function AgentsPage({
+    searchParams,
+}: {
+    /** Record visibility (EW-P1-3) list tab: `?tab=mine|shared|organization`. */
+    searchParams: Promise<{ tab?: string | string[] }>;
+}) {
+    const tab = parseRecordTab((await searchParams).tab);
     const [result, templates] = await Promise.all([
-        agentsAPI.list({ limit: 50 }).catch(() => ({
+        agentsAPI.list({ limit: 50, view: tab }).catch(() => ({
             data: [] as Agent[],
             meta: { total: 0, limit: 50, offset: 0 },
         })),
@@ -58,7 +67,15 @@ export default async function AgentsPage() {
             <AgentsPageTabs active="agents" />
             <AgentsHubTabs active="agents" />
             <AgentsHashRedirect />
-            <AgentsList agents={result.data} templates={templates} userTemplates={userTemplates} />
+            <Suspense fallback={null}>
+                <RecordViewTabs />
+            </Suspense>
+            <AgentsList
+                key={tab}
+                agents={result.data}
+                templates={templates}
+                userTemplates={userTemplates}
+            />
         </div>
     );
 }

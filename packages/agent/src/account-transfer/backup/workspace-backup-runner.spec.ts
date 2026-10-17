@@ -797,10 +797,12 @@ describe('WorkspaceBackupRunner', () => {
                         await new Promise((resolve) => setImmediate(resolve));
                     }
                 };
-                for (
-                    let i = 0;
-                    i < 2_000 && !(h.storage.readObject as jest.Mock).mock.calls.length;
-                    i += 1
+                // Bounded by wall time (Date is real here), not by a turn count: the
+                // walk does real I/O, and 2 000 turns ran out on a loaded CI runner.
+                const reachedBy = Date.now() + 20_000;
+                while (
+                    !(h.storage.readObject as jest.Mock).mock.calls.length &&
+                    Date.now() < reachedBy
                 ) {
                     await turns(1);
                 }

@@ -1,0 +1,68 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/work.schema.json",
+	"title": "Work DTO (B.6, GET /works, GET /works/:id)",
+	"description": "Works = Gauzy Projects (D3), link only in P1. `visibility` is derived and read-only: `team` when the work sits on a team (team_resources type work), else `organization`. Also the `data` of work.* events.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": ["name", "slug", "kind", "status", "teamIds", "members", "repoUrls"],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": true,
+		"visibilityExplicit": { "const": false },
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"name": { "type": "string", "maxLength": 255 },
+		"slug": { "type": "string", "maxLength": 255 },
+		"description": { "type": ["string", "null"] },
+		"kind": {
+			"description": "Open set: website, landing-page, blog, directory, awesome-repo, repo, app, company, campaign, default; P2 adds `project` (repo-less). Consumers must accept unknown values.",
+			"type": "string",
+			"maxLength": 32
+		},
+		"status": { "type": "string", "enum": ["draft", "active", "registered", "archived"] },
+		"website": { "type": ["string", "null"], "maxLength": 2048 },
+		"repoUrls": {
+			"description": "The work's repositories, primary first.",
+			"type": "array",
+			"items": { "type": "string", "maxLength": 2048 }
+		},
+		"members": {
+			"description": "work_members rows plus the implicit owner (role owner = works.userId, never stored).",
+			"type": "array",
+			"items": { "$ref": "#/$defs/WorkMemberRef" }
+		},
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on work.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"WorkMemberRef": {
+			"type": "object",
+			"required": ["userId", "role"],
+			"properties": {
+				"userId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"role": { "type": "string", "enum": ["owner", "manager", "editor", "viewer"] }
+			},
+			"additionalProperties": false
+		},
+		"WorkMemberEvent": {
+			"description": "`data` of work.member.added/updated/removed (aggregate = the work).",
+			"type": "object",
+			"required": ["workId", "userId", "role"],
+			"properties": {
+				"workId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"userId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"role": { "type": "string", "enum": ["owner", "manager", "editor", "viewer"] },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		}
+	}
+}

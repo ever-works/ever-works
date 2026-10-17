@@ -7,6 +7,7 @@ import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { BudgetsModule } from '@ever-works/agent/budgets';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { User, WorkAgentPreference } from '@ever-works/agent/entities';
+import { RecordVisibilityModule } from '@ever-works/agent/record-visibility';
 import { AuthModule } from '../auth/auth.module';
 import { WorkProposalsController } from './work-proposals.controller';
 import { WorkProposalsApiService } from './work-proposals.service';
@@ -21,6 +22,8 @@ import { ScheduledReRunService } from './scheduled-rerun.service';
         AuthModule,
         ConfigModule,
         TypeOrmModule.forFeature([User, WorkAgentPreference]),
+        // Record visibility (EW-P1-3) — RecordAccessPolicy for the shared reads.
+        RecordVisibilityModule,
         // Phase 1 PR B — POST /me/work-proposals/:id/build calls
         // WorkAgentService.createBuildRequest() to spin up the build pipeline.
         WorkAgentModule,

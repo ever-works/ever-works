@@ -26,6 +26,7 @@ import { Work } from '@ever-works/agent/entities';
 // production. The delivery layer (WebhookDeliveryService.deliver) performs the
 // same check again as defence-in-depth.
 import { isSafeWebhookUrl } from '@ever-works/agent/utils';
+import { newDomainEventId } from '@ever-works/agent/domain-events';
 
 /**
  * Producer-side fanout for outbound webhook subscriptions.
@@ -147,11 +148,17 @@ export class WebhookEventDispatcherService {
         readonly accountId: string;
     }): Promise<{ deliveryId: string; outcome: string; status: number | null; ok: boolean }> {
         const event = 'webhook.test';
-        const payload = {
+        const sub = await this.subscriptions.findById(input.subscriptionId);
+        const payload: Record<string, unknown> = {
             event,
             sentAt: new Date().toISOString(),
             note: 'This is a test delivery. Receivers should respond 2xx to confirm the URL is reachable.',
         };
+        if (Number(sub?.version ?? 1) === 2) {
+            // v2 receivers key on the event id (`X-Ever-Works-Event-Id`, envelope `id`).
+            payload.id = newDomainEventId();
+            payload.type = event;
+        }
 
         const delivery = await this.deliveries.createPending({
             subscriptionId: input.subscriptionId,
@@ -233,7 +240,11 @@ export class WebhookEventDispatcherService {
             // scope is "your subscriptions for any of your works". Filter
             // here so a Work shared across accounts doesn't accidentally
             // ping a different account's account-scoped subscription.
-            const ownerSubs = subs.filter((s) => s.accountId === work.userId);
+            // Webhooks v2 subscriptions (version 2) receive domain events through
+            // WebhookDomainEventFanoutService, never these legacy work events.
+            const ownerSubs = subs.filter(
+                (s) => s.accountId === work.userId && Number(s.version ?? 1) !== 2,
+            );
             if (ownerSubs.length === 0) {
                 return;
             }
@@ -254,6 +265,20 @@ export class WebhookEventDispatcherService {
                 err as Error,
             );
         }
+    }
+
+    /**
+     * Webhooks v2: enqueue a delivery row the domain-event fan-out already
+     * created (`WebhookDomainEventFanoutService`), through the same Trigger.dev /
+     * in-process path as every other delivery.
+     */
+    async enqueueDelivery(payload: {
+        readonly deliveryId: string;
+        readonly subscriptionId: string;
+        readonly eventName: string;
+        readonly payload: Record<string, unknown>;
+    }): Promise<string | null> {
+        return this.enqueue(payload);
     }
 
     private async enqueueOne(

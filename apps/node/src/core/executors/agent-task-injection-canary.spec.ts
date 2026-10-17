@@ -152,7 +152,7 @@ const pushSession = () => ({
 	})
 });
 
-describe.sequential('agent-task prompt-injection canary — real executor path', { timeout: 120_000 }, () => {
+describe('agent-task prompt-injection canary — real executor path', { timeout: 120_000, concurrent: false }, () => {
 	let ownedRoot: string;
 	let originDir: string;
 	let pretendHome: string;

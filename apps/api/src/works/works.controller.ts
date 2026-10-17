@@ -116,6 +116,8 @@ import { AuthService, CurrentUser, AuthSessionGuard } from '../auth';
 import { CaptchaVerifierService } from '../auth/services/captcha-verifier.service';
 import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
+// EW-P2-4 — validates the works-list `kind` filter.
+import { WORK_KINDS } from '@ever-works/contracts';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { GenerateWorkDetailDto } from './dto/generate-detail.dto';
 import { GenerateManualComparisonDto } from './dto/generate-manual-comparison.dto';
@@ -243,13 +245,27 @@ export class WorksController {
     @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
     @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
     @ApiQuery({ name: 'search', required: false, description: 'Search term to filter works' })
+    @ApiQuery({
+        name: 'kind',
+        required: false,
+        description:
+            'Only Works of this kind (exact persisted kind, e.g. `project`). An unknown kind answers 400.',
+    })
     @ApiResponse({ status: 200, description: 'List of works' })
     async getWorks(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
         @Query('search') search?: string,
+        // EW-P2-4 — the works-list kind filter (additive; absent = every kind).
+        @Query('kind') kind?: string,
     ) {
+        const kindFilter = kind?.trim().toLowerCase() || undefined;
+        if (kindFilter && !(WORK_KINDS as readonly string[]).includes(kindFilter)) {
+            throw new BadRequestException(
+                `Unknown work kind "${kindFilter}". Known kinds: ${WORK_KINDS.join(', ')}.`,
+            );
+        }
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
@@ -260,6 +276,7 @@ export class WorksController {
                 limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
                 offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
                 search: search || undefined,
+                kind: kindFilter,
             },
             user,
         );

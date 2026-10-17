@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository, type FindOptionsWhere } from 'typeorm';
 import { Mission, MissionGuardrailsOverride, MissionStatus } from '../entities/mission.entity';
@@ -8,6 +14,7 @@ import {
     WorkProposalStatus,
 } from '../entities/work-proposal.entity';
 import { parseCron } from './cron-matcher';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { toMissionDto, type MissionDto } from './types';
 import {
     ownershipStamp,
@@ -87,6 +94,9 @@ export class MissionCloneService {
         private readonly missions: Repository<Mission>,
         @InjectRepository(WorkProposal)
         private readonly proposals: Repository<WorkProposal>,
+        // EW-P2-5 — the clone's `mission.created` and its copied Ideas' `idea.created`,
+        // in the clone's own transaction. TRAILING + @Optional(): absent records nothing.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -258,8 +268,13 @@ export class MissionCloneService {
                         generationRunId: undefined,
                     }),
                 );
-                await tx.save(WorkProposal, newIdeaRows);
+                const savedIdeas = await tx.save(WorkProposal, newIdeaRows);
+                for (const idea of this.domainEvents ? savedIdeas : []) {
+                    await this.domainEvents!.created(tx, 'idea', idea.id, 'idea.created');
+                }
             }
+            // EW-P2-5 — after the Ideas, so the Mission's snapshot is complete.
+            await this.domainEvents?.created(tx, 'mission', newMission.id, 'mission.created');
 
             this.logger.log(
                 `Cloned Mission ${source.id} → ${newMission.id} for user ${userId}: ` +

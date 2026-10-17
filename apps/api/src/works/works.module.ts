@@ -59,6 +59,8 @@ import { OrgKbController } from './org-kb.controller';
 import { OrgMemoryController } from './org-memory.controller';
 import { WorkTemplatesController } from './work-templates.controller';
 import { WorkCampaignsController } from './work-campaigns.controller';
+// EW-P2-4 — the repo-less Project Work kind's create route.
+import { WorkProjectsController } from './work-projects.controller';
 import { ExistingWebsiteLinkController } from './existing-website-link.controller';
 
 // Services
@@ -206,6 +208,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkTemplatesController,
         // Roadmap 14.1 — the only path that mints a `campaign` Work.
         WorkCampaignsController,
+        WorkProjectsController,
         ExistingWebsiteLinkController,
     ],
 })

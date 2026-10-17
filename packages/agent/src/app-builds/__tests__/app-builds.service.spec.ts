@@ -661,8 +661,15 @@ function makeHarness(options: HarnessOptions = {}): Harness {
     };
 }
 
-/** Poll until `check()` is true, so the unawaited fallback can be observed. */
-async function waitFor(check: () => boolean, timeoutMs = 2_000): Promise<void> {
+/**
+ * Poll until `check()` is true, so the unawaited fallback can be observed.
+ *
+ * The ceiling is a HANG guard, not a timing assertion: the loop returns as soon as
+ * the condition holds. It sits just under this suite's 30 s `testTimeout` because a
+ * 2 s ceiling failed healthy runs on CPU-throttled CI runners (self-build handover
+ * item 14), where the same code simply needed longer to get scheduled.
+ */
+async function waitFor(check: () => boolean, timeoutMs = 20_000): Promise<void> {
     const started = Date.now();
     while (!check()) {
         if (Date.now() - started > timeoutMs) {
@@ -670,6 +677,27 @@ async function waitFor(check: () => boolean, timeoutMs = 2_000): Promise<void> {
         }
         await new Promise((resolve) => setTimeout(resolve, 5));
     }
+}
+
+/**
+ * A timer armed before the call under test, used as an ORDERING reference instead
+ * of a wall-clock bound (the #2590 pattern, see plugin-execution-router.service.spec.ts):
+ * `stop()` clears it and reports whether it had already fired. On a CPU-throttled CI
+ * runner every timer fires late, the code's own and this reference alike, but never
+ * out of order, so "the request answered before the 2 s reference fired" holds on any
+ * runner, where `Date.now() - started < 2_000` measured the runner as well as the code.
+ */
+function referenceTimer(ms: number): { stop(): boolean } {
+    let fired = false;
+    const timer = setTimeout(() => {
+        fired = true;
+    }, ms);
+    return {
+        stop() {
+            clearTimeout(timer);
+            return fired;
+        },
+    };
 }
 
 function snapshot(overrides: Partial<BuildSnapshot> = {}): BuildSnapshot {
@@ -727,10 +755,10 @@ describe('AppBuildsService (APW-05 T17)', () => {
             // this case started is still running when it ends.
             //
             // The 8-second fallback is deliberate: an `await
-            // this.dispatchPrepare(...)` mutant then reddens with
-            // `expect(elapsed).toBeLessThan(2_000)` receiving ~8 000, which names
-            // the regression, instead of deadlocking into a bare 30-second jest
-            // timeout that names nothing.
+            // this.dispatchPrepare(...)` mutant then waits on it, so the 2 s
+            // reference timer armed before the call fires first and the
+            // ordering check below names the regression, instead of the test
+            // deadlocking into a bare 30-second jest timeout that names nothing.
             let releaseDispatcher!: () => void;
             const dispatcherGate = new Promise<void>((resolve) => {
                 releaseDispatcher = resolve;
@@ -746,14 +774,15 @@ describe('AppBuildsService (APW-05 T17)', () => {
                 },
             });
 
-            const started = Date.now();
+            const budget = referenceTimer(2_000);
             const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
-            const elapsed = Date.now() - started;
+            const budgetFired = budget.stop();
 
             expect(result.ok).toBe(true);
             // FR-41: the request must answer inside its 2-second budget even
-            // though the dispatch behind it is still pending.
-            expect(elapsed).toBeLessThan(2_000);
+            // though the dispatch behind it is still pending. Asserted as an
+            // ORDERING against a 2 s timer armed first, not as wall-clock time.
+            expect(budgetFired).toBe(false);
             // The dispatch DID happen — it is merely not awaited past the insert.
             // It is requested through `requestPrepare` (APW-05 wave 2), whose
             // `prepareSeq` bump comes first (§7.2), so it reaches the dispatcher a
@@ -775,7 +804,7 @@ describe('AppBuildsService (APW-05 T17)', () => {
             // not become the very leak this change removes.
             releaseDispatcher();
             clearTimeout(gateFallback);
-            await waitFor(() => dispatcherSettled, 5_000);
+            await waitFor(() => dispatcherSettled);
         });
 
         it('falls back in process exactly once when the prepare dispatcher returns null (APW05-G20)', async () => {
@@ -797,12 +826,14 @@ describe('AppBuildsService (APW-05 T17)', () => {
                 },
             });
 
-            const started = Date.now();
+            const budget = referenceTimer(2_000);
             const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
+            const budgetFired = budget.stop();
             expect(result.ok).toBe(true);
             // FR-41: the request must answer inside its 2-second budget even
-            // while the in-process fallback it kicked off is still running.
-            expect(Date.now() - started).toBeLessThan(2_000);
+            // while the in-process fallback it kicked off is still running
+            // (an ordering against a 2 s timer armed first, see referenceTimer).
+            expect(budgetFired).toBe(false);
 
             // A second request while the first in-process run is still in flight is
             // not run CONCURRENTLY — §7.1's "an in-process run and a dispatched one
@@ -811,7 +842,7 @@ describe('AppBuildsService (APW-05 T17)', () => {
             // dispatch loses nothing").
             await harness.service.requestPrepare(WORK_ID, 'envChanged');
 
-            await waitFor(() => runs >= 2, 2_000);
+            await waitFor(() => runs >= 2);
             await new Promise((resolve) => setTimeout(resolve, 300));
             // Corrected from 1 (APW-05 wave 2): the old value pinned the LOST
             // request. The second request was dropped while the first run was in

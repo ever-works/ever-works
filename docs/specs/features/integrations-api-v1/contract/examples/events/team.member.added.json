@@ -1,0 +1,31 @@
+{
+	"id": "evt_01JABZ3P6D9E1F3G5H7J9K1M3N",
+	"seq": "102942",
+	"type": "team.member.added",
+	"version": 1,
+	"occurredAt": "2026-10-15T18:00:00.000Z",
+	"tenantId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"aggregate": {
+		"type": "team",
+		"id": "d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89",
+		"version": 4
+	},
+	"actor": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"origin": {
+		"tag": null,
+		"integrationKeyId": null
+	},
+	"changedFields": ["members"],
+	"data": {
+		"teamId": "d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89",
+		"memberType": "agent",
+		"memberId": "c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78",
+		"role": "member"
+	},
+	"previous": {}
+}

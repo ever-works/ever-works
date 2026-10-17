@@ -615,8 +615,15 @@ export class InboxItemRepository {
     async setArchived(id: string, userId: string, archived: boolean): Promise<InboxItem | null> {
         const row = await this.findOwned(id, userId);
         if (!row) return null;
-        row.status = archived ? 'archived' : row.answeredAt ? 'answered' : 'open';
-        return this.repository.save(row);
+        const status: InboxItemStatus = archived
+            ? 'archived'
+            : row.answeredAt
+              ? 'answered'
+              : 'open';
+        // A column update, not `save(row)`: saving the entity read above would
+        // write its (possibly stale) `version` back over a concurrent bump.
+        await this.repository.update({ id, userId }, { status });
+        return this.findOwned(id, userId);
     }
 
     /**

@@ -559,6 +559,72 @@ describe('TasksService authorization guardrails', () => {
         expect(repos.tasks.create).not.toHaveBeenCalled();
     });
 
+    // F1 (review 2026-10-17, P0): a sub-task of a private Task (an agent breaking it
+    // down, a delegation) was created `organization` by the insert default.
+    it('creates a child of a private parent as private (explicit)', async () => {
+        const parent = makeTask({
+            id: 'parent-1',
+            visibility: 'private',
+            visibilityExplicit: true,
+        } as Partial<Task>);
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(parent);
+        repos.tasks.create.mockResolvedValueOnce(makeTask({ id: 'child-1' }));
+
+        await service.create('user-1', {
+            title: 'Child task',
+            parentTaskId: parent.id,
+            createdByType: 'agent',
+            createdById: 'agent-1',
+        });
+
+        expect(repos.tasks.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                parentTaskId: parent.id,
+                visibility: 'private',
+                visibilityExplicit: true,
+            }),
+        );
+    });
+
+    it('leaves a child of a shared parent to the insert default', async () => {
+        const parent = makeTask({
+            id: 'parent-1',
+            visibility: 'organization',
+            visibilityExplicit: false,
+        } as Partial<Task>);
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(parent);
+        repos.tasks.create.mockResolvedValueOnce(makeTask({ id: 'child-1' }));
+
+        await service.create('user-1', {
+            title: 'Child task',
+            parentTaskId: parent.id,
+            createdByType: 'user',
+            createdById: 'user-1',
+        });
+
+        const row = repos.tasks.create.mock.calls[0][0];
+        expect(row).not.toHaveProperty('visibility');
+        expect(row).not.toHaveProperty('visibilityExplicit');
+    });
+
+    it('creates a Task derived from a private record as private (explicit)', async () => {
+        const { service, repos } = makeService();
+        repos.tasks.create.mockResolvedValueOnce(makeTask({ id: 'derived-1' }));
+
+        await service.create('user-1', {
+            title: '[Goal] Private goal — iteration 1',
+            createdByType: 'user',
+            createdById: 'user-1',
+            derivedFromPrivate: true,
+        });
+
+        expect(repos.tasks.create).toHaveBeenCalledWith(
+            expect.objectContaining({ visibility: 'private', visibilityExplicit: true }),
+        );
+    });
+
     it('rejects parentTaskId updates when the parent scope differs from the task scope', async () => {
         const task = makeTask({ workId: 'work-1' });
         const parent = makeTask({ id: 'parent-1', workId: 'work-2' });

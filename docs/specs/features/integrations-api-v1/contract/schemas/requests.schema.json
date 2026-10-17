@@ -1,0 +1,898 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/requests.schema.json",
+	"title": "Request bodies (contract v1, B.5/B.6: P1, then P2 as served)",
+	"description": "Bodies of the P1 write routes. Unknown properties answer 400 validation_failed. PUT set routes replace the whole set and answer the parent DTO. Every POST that creates something needs an Idempotency-Key header; every write should send X-Sync-Origin.",
+	"$defs": {
+		"WritableVisibility": {
+			"description": "Integrations may set team or organization only; `private` answers 422 domain_rule. Setting it marks visibilityExplicit=true.",
+			"type": "string",
+			"enum": ["team", "organization"]
+		},
+		"CreateTeam": {
+			"description": "POST /teams",
+			"type": "object",
+			"required": ["name"],
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"slug": {
+					"type": "string",
+					"pattern": "^[a-z0-9][a-z0-9-]{0,99}$"
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 5000
+				},
+				"parentTeamId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"avatarIcon": {
+					"type": ["string", "null"],
+					"maxLength": 100
+				},
+				"externalRef": {
+					"$ref": "common.schema.json#/$defs/ExternalRef"
+				}
+			},
+			"additionalProperties": false
+		},
+		"UpdateTeam": {
+			"description": "PATCH /teams/:id (If-Match optional)",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 5000
+				},
+				"parentTeamId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"avatarIcon": {
+					"type": ["string", "null"],
+					"maxLength": 100
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTeamMembers": {
+			"description": "PUT /teams/:id/members — the full member set.",
+			"type": "object",
+			"required": ["members"],
+			"properties": {
+				"members": {
+					"type": "array",
+					"maxItems": 500,
+					"items": {
+						"$ref": "resources/team.schema.json#/$defs/TeamMemberRef"
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTeamResources": {
+			"description": "PUT /teams/:id/resources — the full resource set.",
+			"type": "object",
+			"required": ["resources"],
+			"properties": {
+				"resources": {
+					"type": "array",
+					"maxItems": 5000,
+					"items": {
+						"$ref": "resources/team.schema.json#/$defs/TeamResourceRef"
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"CreateTask": {
+			"description": "POST /tasks. Status on create may only be backlog (default) or todo; later moves go through /transition.",
+			"type": "object",
+			"required": ["title"],
+			"properties": {
+				"title": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 100000
+				},
+				"status": {
+					"type": "string",
+					"enum": ["backlog", "todo"]
+				},
+				"priority": {
+					"type": "string",
+					"enum": ["p0", "p1", "p2", "p3", "p4"]
+				},
+				"labels": {
+					"type": "array",
+					"maxItems": 50,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					}
+				},
+				"teamIds": {
+					"$ref": "common.schema.json#/$defs/TeamIds"
+				},
+				"visibility": {
+					"$ref": "#/$defs/WritableVisibility"
+				},
+				"workId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"missionId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"ideaId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"parentTaskId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"assignees": {
+					"type": "array",
+					"maxItems": 50,
+					"items": {
+						"$ref": "resources/task.schema.json#/$defs/PrincipalRef"
+					}
+				},
+				"externalRef": {
+					"$ref": "common.schema.json#/$defs/ExternalRef"
+				},
+				"dueAt": {
+					"description": "EW-P2-3 — when the Task is due (planning only).",
+					"$ref": "common.schema.json#/$defs/NullableDateTime"
+				},
+				"startAt": {
+					"description": "EW-P2-3 — planned start; never after dueAt.",
+					"$ref": "common.schema.json#/$defs/NullableDateTime"
+				},
+				"estimateMinutes": {
+					"description": "EW-P2-3 — estimated effort in whole minutes.",
+					"type": ["integer", "null"],
+					"minimum": 0,
+					"maximum": 525600
+				}
+			},
+			"additionalProperties": false
+		},
+		"UpdateTask": {
+			"description": "PATCH /tasks/:id (If-Match optional). No `status` here: use /transition.",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"title": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 100000
+				},
+				"priority": {
+					"type": "string",
+					"enum": ["p0", "p1", "p2", "p3", "p4"]
+				},
+				"labels": {
+					"type": "array",
+					"maxItems": 50,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 80
+					}
+				},
+				"teamIds": {
+					"$ref": "common.schema.json#/$defs/TeamIds"
+				},
+				"visibility": {
+					"$ref": "#/$defs/WritableVisibility"
+				},
+				"workId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"parentTaskId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				},
+				"dueAt": {
+					"description": "EW-P2-3 — when the Task is due (planning only).",
+					"$ref": "common.schema.json#/$defs/NullableDateTime"
+				},
+				"startAt": {
+					"description": "EW-P2-3 — planned start; never after dueAt.",
+					"$ref": "common.schema.json#/$defs/NullableDateTime"
+				},
+				"estimateMinutes": {
+					"description": "EW-P2-3 — estimated effort in whole minutes.",
+					"type": ["integer", "null"],
+					"minimum": 0,
+					"maximum": 525600
+				}
+			},
+			"additionalProperties": false
+		},
+		"TransitionTask": {
+			"description": "POST /tasks/:id/transition. mode 'sync' walks the shortest legal path through ALLOWED_TRANSITIONS; each hop records task.transitioned; gates fail with 409 transition_blocked.",
+			"type": "object",
+			"required": ["to", "mode"],
+			"properties": {
+				"to": {
+					"$ref": "resources/task.schema.json#/$defs/TaskStatus"
+				},
+				"mode": {
+					"const": "sync"
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTaskAssignees": {
+			"description": "PUT /tasks/:id/assignees — the full set.",
+			"type": "object",
+			"required": ["assignees"],
+			"properties": {
+				"assignees": {
+					"type": "array",
+					"maxItems": 50,
+					"items": {
+						"$ref": "resources/task.schema.json#/$defs/PrincipalRef"
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTaskWatchers": {
+			"description": "PUT /tasks/:id/watchers — the full set of watcher user ids.",
+			"type": "object",
+			"required": ["userIds"],
+			"properties": {
+				"userIds": {
+					"type": "array",
+					"maxItems": 200,
+					"items": {
+						"$ref": "common.schema.json#/$defs/Uuid"
+					},
+					"uniqueItems": true
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTaskBlocks": {
+			"description": "PUT /tasks/:id/blocks — the full set of blocking task ids. A cycle answers 422 domain_rule.",
+			"type": "object",
+			"required": ["blockedBy"],
+			"properties": {
+				"blockedBy": {
+					"type": "array",
+					"maxItems": 200,
+					"items": {
+						"$ref": "common.schema.json#/$defs/Uuid"
+					},
+					"uniqueItems": true
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutTaskRelations": {
+			"description": "PUT /tasks/:id/relations — the full set.",
+			"type": "object",
+			"required": ["relations"],
+			"properties": {
+				"relations": {
+					"type": "array",
+					"maxItems": 200,
+					"items": {
+						"type": "object",
+						"required": ["taskId", "kind"],
+						"properties": {
+							"taskId": {
+								"$ref": "common.schema.json#/$defs/Uuid"
+							},
+							"kind": {
+								"type": "string",
+								"enum": ["related", "duplicates", "follow-up"]
+							}
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"CreateComment": {
+			"description": "POST /tasks/:id/comments. With X-Act-As-User the author is that user; without it authorType=integration and externalAuthor is shown. body: at most 16384 characters (CR-2: Ever Works' task chat limit); a body that looks like it carries a credential is refused with 400 validation_failed.",
+			"type": "object",
+			"required": ["body"],
+			"properties": {
+				"body": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				},
+				"externalAuthor": {
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 200
+						},
+						"avatarUrl": {
+							"type": ["string", "null"],
+							"maxLength": 2048
+						},
+						"source": {
+							"type": "string",
+							"maxLength": 100
+						}
+					},
+					"additionalProperties": false
+				},
+				"externalRef": {
+					"$ref": "common.schema.json#/$defs/ExternalRef"
+				}
+			},
+			"additionalProperties": false
+		},
+		"UpdateComment": {
+			"description": "PATCH /tasks/:id/comments/:cid. Integration-authored comments have no edit window; act-as user comments follow the 5-minute window. Only the author may edit (or DELETE): the integration key that wrote it, or the act-as user who wrote it; otherwise, or past the window, 422 domain_rule (CR-2).",
+			"type": "object",
+			"required": ["body"],
+			"properties": {
+				"body": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384
+				}
+			},
+			"additionalProperties": false
+		},
+		"InboxReply": {
+			"description": "POST /inbox/items/:id/reply (P3, EW-P3-1). Requires X-Act-As-User = the item's recipientUserId (else 403 act_as_forbidden). Text, an option, or both; optionId must be one of the item's options[].id; an approval needs approve or reject (400 validation_failed otherwise). Answered or archived items answer 409 conflict. Idempotency-Key is optional (a reply creates nothing) and, when sent, replays the first answer. Routed through the app's own Inbox reply: a question steers or resumes the run, an approval decides the proposal, an escalation resolves (CR-4).",
+			"type": "object",
+			"properties": {
+				"text": { "type": ["string", "null"], "maxLength": 8000 },
+				"optionId": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 }
+			},
+			"additionalProperties": false
+		},
+		"InboxStateChange": {
+			"description": "PATCH /inbox/items/:id/state (P3, EW-P3-1). Requires X-Act-As-User = the item's recipientUserId. At least one field. archived: false restores an answered item as answered, else open. Archiving an OPEN fleet question releases the run parked on it, as in the app. If-Match optional (412 version_mismatch). Answers the inbox item DTO with its ETag (CR-4).",
+			"type": "object",
+			"properties": {
+				"unread": { "type": "boolean" },
+				"archived": { "type": "boolean" }
+			},
+			"minProperties": 1,
+			"additionalProperties": false
+		},
+		"CreateKbDocument": {
+			"description": "POST /kb/documents (P3, EW-P3-2). Idempotency-Key required; externalRef de-duplicates (200 with the existing document). scope.type organization: scope.id must be the pinned organization and the writer an organization admin; scope.type work: a Work of the pinned organization the writer may edit. Every class is allowed at organization scope (only legal, style and seo are inherited into Works). folderId is checked before the write (404 for a folder outside the organization's library, nothing created); an organization document's path must be relative without '..' (400). A refusal by the app's rules answers 422 domain_rule (CR-7).",
+			"type": "object",
+			"required": ["scope", "path", "title", "class", "body"],
+			"properties": {
+				"scope": { "$ref": "resources/kb-document.schema.json#/$defs/KbScope" },
+				"folderId": { "$ref": "common.schema.json#/$defs/NullableUuid" },
+				"path": { "type": "string", "minLength": 1, "maxLength": 512 },
+				"title": { "type": "string", "minLength": 1, "maxLength": 255 },
+				"class": { "$ref": "resources/kb-document.schema.json#/properties/class" },
+				"body": { "type": "string", "maxLength": 1000000 },
+				"description": { "type": ["string", "null"], "maxLength": 4000 },
+				"tags": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 100 } },
+				"categories": {
+					"type": "array",
+					"maxItems": 50,
+					"items": { "type": "string", "maxLength": 100 }
+				},
+				"language": { "type": "string", "minLength": 2, "maxLength": 8 },
+				"status": { "type": "string", "enum": ["draft", "active"] },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateKbDocument": {
+			"description": "PATCH /kb/documents/:id (P3). At least one field; If-Match optional (412 version_mismatch). A fully locked document answers 422 domain_rule, and so does a status on an archived document (restore it with /unarchive). Archive, restore, review and filing have their own routes.",
+			"type": "object",
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 255 },
+				"body": { "type": "string", "maxLength": 1000000 },
+				"description": { "type": ["string", "null"], "maxLength": 4000 },
+				"class": { "$ref": "resources/kb-document.schema.json#/properties/class" },
+				"tags": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 100 } },
+				"categories": {
+					"type": "array",
+					"maxItems": 50,
+					"items": { "type": "string", "maxLength": 100 }
+				},
+				"language": { "type": "string", "minLength": 2, "maxLength": 8 },
+				"status": { "type": "string", "enum": ["draft", "active"] }
+			},
+			"minProperties": 1,
+			"additionalProperties": false
+		},
+		"MoveKbDocument": {
+			"description": "POST /kb/documents/:id/move (P3): file into an organization library folder, or folderId null = Unfiled. Never changes the revision.",
+			"type": "object",
+			"required": ["folderId"],
+			"properties": { "folderId": { "$ref": "common.schema.json#/$defs/NullableUuid" } },
+			"additionalProperties": false
+		},
+		"CreateKbFolder": {
+			"description": "POST /kb/folders (P3). Idempotency-Key required; externalRef de-duplicates. Organization admin only (422 domain_rule otherwise); sibling names are unique case-insensitively (409 conflict); depth and per-organization limits answer 422 domain_rule.",
+			"type": "object",
+			"required": ["name"],
+			"properties": {
+				"name": { "type": "string", "minLength": 1, "maxLength": 120 },
+				"parentId": { "$ref": "common.schema.json#/$defs/NullableUuid" },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateKbFolder": {
+			"description": "PATCH /kb/folders/:id (P3): rename and / or move (parentId null = top level). If-Match optional.",
+			"type": "object",
+			"properties": {
+				"name": { "type": "string", "minLength": 1, "maxLength": 120 },
+				"parentId": { "$ref": "common.schema.json#/$defs/NullableUuid" }
+			},
+			"minProperties": 1,
+			"additionalProperties": false
+		},
+		"InboundEmail": {
+			"description": "POST /email/inbound (P4, EW-P4-1; email:write, opt-in). Pushes an email a Gauzy mailbox received to an Ever Works agent of the pinned organization: stored as an inbound email_messages row on the agent's own inbound address and dispatched through the agent's inbound assignment exactly like provider mail (task-spawn or conversation; RFC threading joins an existing thread). Idempotency-Key required; a repeated Message-ID (same key and organization) answers 200 with the message already delivered. An agent without an active inbound assignment, or whose inbound address is not an address of the pinned organization, answers 422 domain_rule. Attachments are recorded with their url and never fetched (CR-11).",
+			"type": "object",
+			"required": ["agentId", "message"],
+			"properties": {
+				"agentId": { "$ref": "common.schema.json#/$defs/Uuid" },
+				"message": {
+					"type": "object",
+					"required": ["from", "to", "subject"],
+					"properties": {
+						"from": { "type": "string", "minLength": 3, "maxLength": 254 },
+						"to": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 254 } },
+						"cc": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 254 } },
+						"subject": { "type": "string", "maxLength": 998 },
+						"text": { "type": ["string", "null"], "maxLength": 2000000 },
+						"html": { "type": ["string", "null"], "maxLength": 2000000 },
+						"messageId": { "type": ["string", "null"], "maxLength": 255 },
+						"inReplyTo": { "type": ["string", "null"], "maxLength": 255 },
+						"references": {
+							"type": "array",
+							"maxItems": 100,
+							"items": { "type": "string", "maxLength": 255 }
+						},
+						"attachments": {
+							"type": "array",
+							"maxItems": 20,
+							"items": {
+								"type": "object",
+								"required": ["filename", "contentType"],
+								"properties": {
+									"filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+									"contentType": { "type": "string", "minLength": 1, "maxLength": 255 },
+									"url": { "type": ["string", "null"], "maxLength": 2048 }
+								},
+								"additionalProperties": false
+							}
+						}
+					},
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": false
+		},
+		"CreateIdea": {
+			"description": "POST /ideas (EW-P2-1). An integration-created Idea is always source='external' and status='pending' (a `source` or `status` in the body answers 400). It is never queued or built: building stays a user action in Ever Works (spend safety D9). `missionId` must name a Mission of the pinned organization the key sees (404 otherwise). `teamIds` decide the scope (D11) unless `visibility` is set by hand.",
+			"type": "object",
+			"required": ["title", "description"],
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 120 },
+				"description": { "type": "string", "minLength": 1, "maxLength": 100000 },
+				"missionId": { "$ref": "common.schema.json#/$defs/NullableUuid" },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateIdea": {
+			"description": "PATCH /ideas/:id (EW-P2-1, If-Match optional). No `status`: POST /ideas/:id/dismiss (pending -> dismissed) and /restore (dismissed -> pending) move it; accept and build stay Ever Works actions (D9).",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 120 },
+				"description": { "type": "string", "minLength": 1, "maxLength": 100000 },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" }
+			},
+			"additionalProperties": false
+		},
+		"CreateGoal": {
+			"description": "POST /goals (EW-P2-2). Always created status='draft': an integration never activates a Goal (spend safety D9). A metric Goal (the default kind) reads the external source: `metricSource` may be omitted (= {pluginId:'external', metricId:'value'}); any other pluginId, on the Goal or a criterion, answers 422 domain_rule. A metric Goal needs comparator, targetValue and unit (window defaults to 'point'); a delivery Goal needs at least one Definition-of-Done item and carries no metric fields. `teamIds` decide the scope (D11) unless `visibility` is set by hand.",
+			"type": "object",
+			"required": ["title"],
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"description": { "type": ["string", "null"], "maxLength": 100000 },
+				"goalKind": { "type": "string", "enum": ["metric", "delivery"] },
+				"metricSource": { "$ref": "resources/goal.schema.json#/$defs/MetricSource" },
+				"comparator": { "type": "string", "enum": ["gte", "lte"] },
+				"targetValue": { "type": "number" },
+				"unit": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"window": { "$ref": "resources/goal.schema.json#/$defs/Window" },
+				"baselineValue": { "type": ["number", "null"] },
+				"deadline": { "$ref": "common.schema.json#/$defs/NullableDateTime" },
+				"criteria": {
+					"type": "array",
+					"maxItems": 20,
+					"items": { "$ref": "resources/goal.schema.json#/$defs/Criterion" }
+				},
+				"dodCriteria": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/GoalDoDItem" } },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateGoal": {
+			"description": "PATCH /goals/:id (EW-P2-2, If-Match optional). No status, outcome, metricSource or goalKind: an integration never activates, resumes or completes a Goal (D9), the source stays external and the kind is immutable. Metric fields on a delivery Goal answer 400.",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"description": { "type": ["string", "null"], "maxLength": 100000 },
+				"comparator": { "type": "string", "enum": ["gte", "lte"] },
+				"targetValue": { "type": "number" },
+				"unit": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"window": { "$ref": "resources/goal.schema.json#/$defs/Window" },
+				"baselineValue": { "type": ["number", "null"] },
+				"deadline": { "$ref": "common.schema.json#/$defs/NullableDateTime" },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" }
+			},
+			"additionalProperties": false
+		},
+		"PutGoalCriteria": {
+			"description": "PUT /goals/:id/criteria (If-Match optional): the full set of weighted criteria of a metric Goal (`[]` clears the weighted path). Criteria read the external source (their own metricSource, or the Goal's). Answers the Goal DTO.",
+			"type": "object",
+			"required": ["criteria"],
+			"properties": {
+				"criteria": {
+					"type": "array",
+					"maxItems": 20,
+					"items": { "$ref": "resources/goal.schema.json#/$defs/Criterion" }
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutGoalDod": {
+			"description": "PUT /goals/:id/dod (If-Match optional): the full Definition of Done (`[]` clears it on a metric Goal; a delivery Goal must keep one item). Items are written as approved operator items; a planner proposal (`proposed: true`) the body does not name is kept (Gauzy CR-12). Answers the Goal DTO.",
+			"type": "object",
+			"required": ["dodCriteria"],
+			"properties": {
+				"dodCriteria": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/GoalDoDItem" } }
+			},
+			"additionalProperties": false
+		},
+		"GoalDoDItem": {
+			"type": "object",
+			"required": ["id", "text", "status"],
+			"properties": {
+				"id": { "type": "string", "minLength": 1, "maxLength": 64 },
+				"text": { "type": "string", "minLength": 1, "maxLength": 500 },
+				"status": { "type": "string", "enum": ["open", "done", "waived"] },
+				"evidence": { "type": ["string", "null"], "maxLength": 1000 },
+				"note": { "type": ["string", "null"], "maxLength": 500 }
+			},
+			"additionalProperties": false
+		},
+		"GoalSample": {
+			"description": "POST /goals/:id/samples (EW-P2-2, Idempotency-Key required): one externally measured value. Without criterionId it is the Goal's own metric (it becomes currentValue when it is the newest, and the baseline when there is none); with criterionId it measures that criterion. The Goal (or the criterion) must read the external source, else 422 domain_rule; a delivery Goal takes no samples (422). Re-scores a Goal with criteria; never activates, completes or schedules it. Records goal.progress_changed (at most one per Goal per 5 minutes; the version still moves). Answers 200 with the Goal DTO.",
+			"type": "object",
+			"required": ["value", "sampledAt"],
+			"properties": {
+				"criterionId": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+				"value": { "type": "number" },
+				"sampledAt": { "$ref": "common.schema.json#/$defs/DateTime" }
+			},
+			"additionalProperties": false
+		},
+		"CreateMission": {
+			"description": "POST /missions (EW-P2-5, plan D3b: a Gauzy Strategic Initiative). Always created status='paused' with no auto-build (type defaults to 'one-shot'): an integration never starts a Mission's ticks (spend safety D9). A title is required (no generated title). `teamIds` decide the scope (D11) unless `visibility` is set by hand. Goals and Works are linked with PUT /missions/:id/goals and /works.",
+			"type": "object",
+			"required": ["title", "description"],
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"description": { "type": "string", "minLength": 1, "maxLength": 100000 },
+				"type": {
+					"description": "Default one-shot. A scheduled Mission needs `schedule` and ticks only once a person resumes it.",
+					"type": "string",
+					"enum": ["one-shot", "scheduled"]
+				},
+				"schedule": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"UpdateMission": {
+			"description": "PATCH /missions/:id (EW-P2-5, If-Match optional). `status` may pause an active Mission, complete an active / paused one (with `outcome`) or fail it (stops its ticks; a person can resume it); `active` answers 422 domain_rule (D9: only a person resumes a Mission); the target status already reached is a no-op; any other move is 422.",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"description": { "type": "string", "minLength": 1, "maxLength": 100000 },
+				"status": { "type": "string", "enum": ["paused", "completed", "failed"] },
+				"outcome": {
+					"description": "Only with status 'completed'.",
+					"type": ["string", "null"],
+					"enum": ["succeeded", "partially_succeeded", "failed", "cancelled", "superseded", null]
+				},
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" }
+			},
+			"additionalProperties": false
+		},
+		"PutMissionGoals": {
+			"description": "PUT /missions/:id/goals (If-Match pre-checked): the full set of Goal links, at most one primary (else 422 domain_rule), no repeated goalId (400). Each link change records mission.goal.linked / unlinked and the Goal's goal.updated. The Goals must be the caller's (404). Answers the Mission DTO.",
+			"type": "object",
+			"required": ["goals"],
+			"properties": {
+				"goals": {
+					"type": "array",
+					"maxItems": 100,
+					"items": {
+						"type": "object",
+						"required": ["goalId"],
+						"properties": {
+							"goalId": { "$ref": "common.schema.json#/$defs/Uuid" },
+							"isPrimary": { "type": "boolean" }
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"PutMissionWorks": {
+			"description": "PUT /missions/:id/works (If-Match pre-checked): the full set of typed Work links. Each change records mission.work.linked / unlinked. The Works must be the caller's (404). Answers the Mission DTO.",
+			"type": "object",
+			"required": ["works"],
+			"properties": {
+				"works": {
+					"type": "array",
+					"maxItems": 100,
+					"items": {
+						"type": "object",
+						"required": ["workId", "relation"],
+						"properties": {
+							"workId": { "$ref": "common.schema.json#/$defs/Uuid" },
+							"relation": { "$ref": "resources/mission.schema.json#/$defs/WorkRelation" }
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"CreateOrganization": {
+			"description": "POST /organizations (EW-P2-6, scope org:write — opt-in, not in the Ever Gauzy preset; Idempotency-Key required; no X-Scope-Slug needed). Creates an organization in the key's tenant, owned by the tenant owner, and pins it to the calling key (at most 50 pins, else 400). A key created by an organization admin makes that admin an `admin` of the new organization. Answers 201 with the organization DTO. Records organization.created.",
+			"type": "object",
+			"required": ["displayName"],
+			"properties": {
+				"displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"slug": {
+					"description": "Optional; allocated from displayName when omitted (a taken slug gets a suffix).",
+					"type": "string",
+					"pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+				},
+				"legalName": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"countryCode": { "type": "string", "pattern": "^[A-Za-z]{2}$" }
+			},
+			"additionalProperties": false
+		},
+		"CreateWork": {
+			"description": "POST /works (Gauzy CR-6, EW-P2-4; scope works:write; Idempotency-Key required; a repeated externalRef answers 200 with the existing work). Only kind 'project': a repo-less Project Work with no repositories, deploy or generator (nothing is provisioned, D9). Owner = the act-as user, else the key's owner; the slug is derived from name (`<slug>-N` when taken). teamIds become team_resources rows (type work); a work's visibility is derived from them (CR-1), so `visibility` is only validated (private -> 422 domain_rule). While EVER_WORKS_PROJECT_WORKS_ENABLED is off: 422 domain_rule with details.reason 'project_works_disabled'. Answers 201 with the work DTO and records work.created.",
+			"type": "object",
+			"required": ["kind", "name"],
+			"properties": {
+				"kind": { "const": "project" },
+				"name": { "type": "string", "minLength": 1, "maxLength": 255 },
+				"description": { "type": ["string", "null"], "maxLength": 2000 },
+				"website": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+				"teamIds": { "$ref": "common.schema.json#/$defs/TeamIds" },
+				"visibility": { "$ref": "#/$defs/WritableVisibility" },
+				"externalRef": { "$ref": "common.schema.json#/$defs/ExternalRef" }
+			},
+			"additionalProperties": false
+		},
+		"PutLink": {
+			"description": "PUT /links/:entityType/:entityId. `source` comes from the key's integrationKind (ever-gauzy → gauzy).",
+			"type": "object",
+			"required": ["externalId"],
+			"properties": {
+				"externalId": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 200
+				},
+				"externalUrl": {
+					"type": ["string", "null"],
+					"format": "uri",
+					"maxLength": 2048
+				},
+				"installationId": {
+					"type": ["string", "null"],
+					"maxLength": 200
+				}
+			},
+			"additionalProperties": false
+		},
+		"CreateWebhook": {
+			"description": "POST /webhooks → webhook-subscription DTO with `secret` (returned once).",
+			"type": "object",
+			"required": ["url", "events", "organizationIds"],
+			"properties": {
+				"url": {
+					"type": "string",
+					"format": "uri",
+					"maxLength": 2048
+				},
+				"events": {
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 200,
+					"items": {
+						"type": "string",
+						"maxLength": 64
+					},
+					"uniqueItems": true
+				},
+				"organizationIds": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"$ref": "common.schema.json#/$defs/Uuid"
+					},
+					"uniqueItems": true
+				},
+				"excludeOriginTags": {
+					"type": "array",
+					"maxItems": 20,
+					"items": {
+						"type": "string",
+						"maxLength": 100
+					}
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 500
+				}
+			},
+			"additionalProperties": false
+		},
+		"UpdateWebhook": {
+			"description": "PATCH /webhooks/:id. status active resumes (v2), paused pauses.",
+			"type": "object",
+			"minProperties": 1,
+			"properties": {
+				"url": {
+					"type": "string",
+					"format": "uri",
+					"maxLength": 2048
+				},
+				"events": {
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 200,
+					"items": {
+						"type": "string",
+						"maxLength": 64
+					},
+					"uniqueItems": true
+				},
+				"organizationIds": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"$ref": "common.schema.json#/$defs/Uuid"
+					},
+					"uniqueItems": true
+				},
+				"excludeOriginTags": {
+					"type": "array",
+					"maxItems": 20,
+					"items": {
+						"type": "string",
+						"maxLength": 100
+					}
+				},
+				"description": {
+					"type": ["string", "null"],
+					"maxLength": 500
+				},
+				"status": {
+					"type": "string",
+					"enum": ["active", "paused"]
+				}
+			},
+			"additionalProperties": false
+		},
+		"Batch": {
+			"description": "POST /batch: at most 100 operations, executed in order, not atomic. Each operation counts against limits. Response: BatchResult.",
+			"type": "object",
+			"required": ["operations"],
+			"properties": {
+				"operations": {
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 100,
+					"items": {
+						"type": "object",
+						"required": ["method", "path"],
+						"properties": {
+							"method": {
+								"type": "string",
+								"enum": ["GET", "POST", "PATCH", "PUT", "DELETE"]
+							},
+							"path": {
+								"description": "Relative to /api/integrations/v1, e.g. /tasks/<id>.",
+								"type": "string",
+								"pattern": "^/(?!batch)"
+							},
+							"headers": {
+								"description": "Per-operation Idempotency-Key, If-Match, X-Act-As-User. Auth and X-Scope-Slug come from the outer request.",
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								}
+							},
+							"body": {}
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"BatchResult": {
+			"type": "object",
+			"required": ["results"],
+			"properties": {
+				"results": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["status", "body"],
+						"properties": {
+							"status": {
+								"type": "integer",
+								"minimum": 100,
+								"maximum": 599
+							},
+							"body": {}
+						},
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		}
+	}
+}

@@ -78,6 +78,8 @@ export class SendGridPlugin implements IEmailOutboundPlugin {
 			text: input.bodyText,
 			html: input.bodyHtml,
 			customArgs: input.metadata ? { ...input.metadata } : undefined,
+			// EW-P4-3 — RFC threading (Message-ID / In-Reply-To / References).
+			headers: input.headers ? { ...input.headers } : undefined,
 			attachments: input.attachments?.map((a) => ({
 				content: a.content,
 				filename: a.filename,

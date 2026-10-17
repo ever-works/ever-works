@@ -146,8 +146,10 @@ describe('resolveTaskBoardDrop — the full status × focus-column matrix', () =
 			done: refuse,
 			cancelled: refuse
 		},
+		// EW-P1-6 — re-open: the Backlog focus column holds both backlog and
+		// todo, so the board asks which one.
 		cancelled: {
-			backlog: refuse,
+			backlog: { kind: 'ask', options: ['backlog', 'todo'] },
 			in_flight: refuse,
 			needs_you: refuse,
 			done: refuse,
@@ -167,14 +169,18 @@ describe('resolveTaskBoardDrop — the full status × focus-column matrix', () =
 		expect(resolveTaskBoardDrop(from, column)).toEqual(EXPECTED[from][key]);
 	});
 
-	it('asks in exactly one place: in_progress onto Needs you', () => {
+	it('asks in exactly two places: in_progress onto Needs you, and a cancelled card onto Backlog', () => {
 		const asks = pairs.filter(([from, , column]) => resolveTaskBoardDrop(from, column).kind === 'ask');
-		expect(asks.map(([from, key]) => `${from}->${key}`)).toEqual(['in_progress->needs_you']);
+		expect(asks.map(([from, key]) => `${from}->${key}`)).toEqual(['in_progress->needs_you', 'cancelled->backlog']);
 	});
 
-	it('refuses every drop out of cancelled, in every layout', () => {
+	it('re-opens a cancelled card only into backlog or todo, in every layout (EW-P1-6)', () => {
 		for (const column of [...TASK_BOARD_FOCUS_COLUMNS, ...TASK_BOARD_STATUS_COLUMNS]) {
-			expect(resolveTaskBoardDrop('cancelled', column)).toEqual(refuse);
+			const resolution = resolveTaskBoardDrop('cancelled', column);
+			const reopen = column.statuses.filter((status) => status === 'backlog' || status === 'todo');
+			if (reopen.length === 0) expect(resolution).toEqual(refuse);
+			else if (reopen.length === 1) expect(resolution).toEqual(apply(reopen[0]));
+			else expect(resolution).toEqual({ kind: 'ask', options: reopen });
 		}
 	});
 

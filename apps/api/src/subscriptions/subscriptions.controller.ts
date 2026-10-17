@@ -8,6 +8,7 @@ import {
     Post,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthSessionGuard, AuthService, CurrentUser } from '@src/auth';
 import {
@@ -29,6 +30,8 @@ class UpdateSubscriptionPlanDto {
 @ApiBearerAuth('JWT-auth')
 @Controller('api/subscriptions')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class SubscriptionsController {
     constructor(
         private readonly subscriptionService: SubscriptionService,

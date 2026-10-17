@@ -2723,6 +2723,7 @@
                 "appLauncher": "مشغّل التطبيقات",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "خطافات الويب",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8809,6 +8810,7 @@
             "app": "تطبيق",
             "company": "Company",
             "campaign": "حملة",
+            "project": "مشروع",
             "default": "Work"
         },
         "meetingsPage": {

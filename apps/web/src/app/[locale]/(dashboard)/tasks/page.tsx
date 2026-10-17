@@ -1,4 +1,12 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { RecordViewTabs } from '@/components/record-visibility';
+import {
+    RECORD_TAB_PARAM,
+    parseRecordTab,
+    withRecordTab,
+    type RecordListView,
+} from '@/lib/record-visibility';
 import { cookies } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { ListChecks, Plus, Search } from 'lucide-react';
@@ -72,6 +80,8 @@ type TasksSearchParams = Promise<{
     label?: string;
     offset?: string;
     view?: string;
+    /** Record visibility (EW-P1-3) list tab — `?view=` is the board / list layout. */
+    tab?: string;
     sort?: string;
     done?: string;
 }>;
@@ -89,6 +99,7 @@ function buildTasksHref(input: {
     view?: TasksView;
     sort?: TaskBoardSort;
     done?: TasksBoardDoneWindow;
+    tab?: RecordListView;
 }): string {
     const params = new URLSearchParams();
     if (input.status) params.set('status', input.status);
@@ -99,6 +110,7 @@ function buildTasksHref(input: {
     if (input.view) params.set('view', input.view);
     if (input.sort) params.set('sort', input.sort);
     if (input.done !== undefined) params.set('done', String(input.done));
+    if (input.tab && input.tab !== 'mine') params.set(RECORD_TAB_PARAM, input.tab);
     const qs = params.toString();
     return qs ? `${ROUTES.DASHBOARD_TASKS}?${qs}` : ROUTES.DASHBOARD_TASKS;
 }
@@ -116,6 +128,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
     const search = firstParam(params.search)?.trim();
     const label = firstParam(params.label)?.trim();
     const offset = Math.max(0, parseInt(firstParam(params.offset) ?? '0', 10) || 0);
+    const tab = parseRecordTab(firstParam(params.tab));
     // Board options. The explicit URL values ride along on links and the
     // filter form; the resolved values (with defaults) drive the board read.
     const sortParam = parseTasksBoardSort(firstParam(params.sort)) ?? undefined;
@@ -132,11 +145,13 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
         label: label || undefined,
         limit,
         offset,
+        view: tab,
         // Kanban run cockpit (Wave 2) — embed each row's latest AgentRun so
         // the board chips render on first paint (polling takes over after).
         includeRun: true,
     };
     const baseHrefInput = {
+        tab,
         status: query.status,
         priority: query.priority,
         search: query.search,
@@ -150,6 +165,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
     // toggles that let a user put them back.
     let boardResult: TaskBoardResult | null = null;
     const boardQuery: TaskBoardQuery = {
+        view: tab,
         status: query.status ? [query.status] : undefined,
         priority: query.priority,
         search: query.search,
@@ -211,9 +227,13 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                 }
             />
             <TasksTabsNav active="tasks" />
+            <Suspense fallback={null}>
+                <RecordViewTabs />
+            </Suspense>
             <form className="mb-4 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
                 {/* Applying a filter keeps the view the user is looking at. */}
                 <input type="hidden" name="view" value={view} />
+                {tab !== 'mine' && <input type="hidden" name={RECORD_TAB_PARAM} value={tab} />}
                 {sortParam && <input type="hidden" name="sort" value={sortParam} />}
                 {doneParam !== undefined && (
                     <input type="hidden" name="done" value={String(doneParam)} />
@@ -252,7 +272,11 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                     <Button type="submit" size="sm">
                         {t('list.filter.apply')}
                     </Button>
-                    <Button href={ROUTES.DASHBOARD_TASKS} size="sm" variant="ghost">
+                    <Button
+                        href={withRecordTab(ROUTES.DASHBOARD_TASKS, tab)}
+                        size="sm"
+                        variant="ghost"
+                    >
                         {t('list.filter.reset')}
                     </Button>
                 </div>

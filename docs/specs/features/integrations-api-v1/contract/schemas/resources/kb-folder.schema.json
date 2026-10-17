@@ -1,0 +1,38 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/kb-folder.schema.json",
+	"title": "Organization library folder DTO (P3, GET /kb/folders, GET /kb/folders/:id)",
+	"description": "One folder of the organization's Knowledge library (a person's own Memory folders are never served). Also the data of kb.folder.* events. A rename or a move rewrites the path of the whole subtree: every folder in it records kb.folder.updated. Deleting a folder deletes its subfolders (kb.folder.deleted each) and moves their documents to Unfiled (kb.document.moved each); no document is deleted (CR-7).",
+	"type": "object",
+	"required": [
+		"id",
+		"organizationId",
+		"version",
+		"createdAt",
+		"updatedAt",
+		"name",
+		"parentId",
+		"path",
+		"createdById"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"organizationId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"version": { "$ref": "../common.schema.json#/$defs/Version" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"name": { "type": "string", "maxLength": 120 },
+		"parentId": {
+			"description": "null = a top-level folder.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
+		"path": { "description": "The folder chain, e.g. /Playbooks/Support.", "type": "string", "maxLength": 512 },
+		"createdById": {
+			"description": "The person who created it.",
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		},
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on kb.folder.deleted.", "const": true }
+	},
+	"additionalProperties": false
+}

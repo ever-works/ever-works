@@ -1,0 +1,41 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/webhook-signature-vectors.schema.json",
+	"title": "Shape of webhook-signature-vectors.json",
+	"type": "object",
+	"required": ["contract", "contractVersion", "header", "toleranceSeconds", "vectors"],
+	"properties": {
+		"$schema": { "type": "string" },
+		"contract": { "const": "ever-works-integrations" },
+		"contractVersion": { "type": "string" },
+		"description": { "type": "string" },
+		"header": { "const": "X-Ever-Works-Signature" },
+		"format": { "type": "string" },
+		"signedPayload": { "type": "string" },
+		"hmacKey": { "type": "string" },
+		"toleranceSeconds": { "type": "integer", "minimum": 1 },
+		"verification": { "type": "array", "items": { "type": "string" } },
+		"vectors": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["name", "description", "secret", "body", "header", "now", "toleranceSeconds", "expected"],
+				"properties": {
+					"name": { "type": "string", "pattern": "^(valid|invalid)-[a-z0-9-]+$" },
+					"description": { "type": "string" },
+					"secret": { "description": "The secret the RECEIVER holds.", "type": "string" },
+					"body": { "description": "The raw body bytes as received (UTF-8).", "type": "string" },
+					"header": { "description": "The X-Ever-Works-Signature value as received.", "type": "string" },
+					"now": { "description": "The receiver's clock, unix seconds.", "type": "integer" },
+					"toleranceSeconds": { "type": "integer" },
+					"expected": { "description": "true = the receiver must accept.", "type": "boolean" },
+					"signedPayload": { "type": "string" },
+					"expectedV1": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+				},
+				"additionalProperties": false
+			}
+		}
+	},
+	"additionalProperties": false
+}

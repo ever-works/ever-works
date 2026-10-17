@@ -6,6 +6,10 @@ import {
     Logger,
     Optional,
 } from '@nestjs/common';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
@@ -116,7 +120,20 @@ export class WorkImportService {
         // two above. Without it an import stores no template, as before.
         @Optional()
         private readonly templateCatalogService?: TemplateCatalogService,
+        // Domain events (EW-P1-1 B2) — an imported Work records `work.created`
+        // (this path does not emit the `work.created` app event). Appended
+        // LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
+
+    private async recordWorkCreated(workId: string): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) => publisher.created(manager, 'work', workId, 'work.created'),
+            (message) => this.logger.warn(message),
+            `work.created for ${workId}`,
+        );
+    }
 
     /**
      * The website template a Work this service creates must be pinned to, or
@@ -391,6 +408,7 @@ export class WorkImportService {
                 workData.websiteTemplateId = pinnedWebsiteTemplateId;
             }
             const work = await this.workRepository.create(workData, user);
+            await this.recordWorkCreated(work.id);
 
             if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 return this.handleLinkExisting(work, dto, parsed, user);
@@ -563,6 +581,7 @@ export class WorkImportService {
             workData.websiteTemplateId = pinnedWebsiteTemplateId;
         }
         const work = await this.workRepository.create(workData, user);
+        await this.recordWorkCreated(work.id);
 
         return this.handleLinkExisting(
             work,

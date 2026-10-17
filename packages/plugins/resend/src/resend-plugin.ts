@@ -74,6 +74,8 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 				text: input.bodyText,
 				html: input.bodyHtml,
 				replyTo: input.replyTo,
+				// EW-P4-3 — RFC threading (Message-ID / In-Reply-To / References).
+				headers: input.headers ? { ...input.headers } : undefined,
 				tags: input.metadata
 					? Object.entries(input.metadata).map(([name, value]) => ({ name, value }))
 					: undefined,

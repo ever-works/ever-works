@@ -1,0 +1,53 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/idea.schema.json",
+	"title": "Idea DTO (B.6, GET /ideas, GET /ideas/:id)",
+	"description": "An Ever Works Idea (work_proposals). Integration creates are always source='external' and status='pending', and an integration never builds an Idea (spend safety D9): building stays a user action. Team scope = the Idea's team_resources links (teamIds, D11). Also the `data` of idea.* events.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": [
+		"teamIds",
+		"title",
+		"description",
+		"status",
+		"source",
+		"missionId",
+		"targetWorkId",
+		"acceptedWorkId",
+		"failureMessage"
+	],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": true,
+		"visibilityExplicit": true,
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"title": { "type": "string", "minLength": 1, "maxLength": 120 },
+		"description": { "type": "string" },
+		"status": {
+			"type": "string",
+			"enum": ["pending", "dismissed", "accepted", "queued", "building", "failed"]
+		},
+		"source": {
+			"type": "string",
+			"enum": ["auto-signup", "user-refresh", "discover", "scheduled", "user-manual", "mission", "external"]
+		},
+		"missionId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"targetWorkId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"acceptedWorkId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"failureMessage": {
+			"description": "Set when status = failed.",
+			"type": ["string", "null"],
+			"maxLength": 5000
+		},
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on idea.deleted.", "const": true }
+	},
+	"additionalProperties": false
+}

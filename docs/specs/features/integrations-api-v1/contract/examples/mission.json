@@ -1,0 +1,42 @@
+{
+	"id": "d6a8c0e2-4f5b-4c93-9dae-3f4a5b6c7d89",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 3,
+	"createdAt": "2026-10-16T09:00:00.000Z",
+	"updatedAt": "2026-10-16T12:00:00.000Z",
+	"visibility": "organization",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "integration",
+		"id": "b4e6a8c0-2d3f-4a71-9b8c-1d2e3f4a5b67",
+		"label": "Ever Gauzy"
+	},
+	"externalLinks": [],
+	"teamIds": [],
+	"title": "Win the SMB market",
+	"description": "Strategic initiative synced from Gauzy.",
+	"type": "one-shot",
+	"status": "paused",
+	"outcome": null,
+	"completedAt": null,
+	"schedule": null,
+	"autoBuildWorks": false,
+	"goals": [
+		{
+			"goalId": "5d7f9b1c-3e5a-4c7b-9d1f-2a4c6e8f0b13",
+			"isPrimary": true
+		}
+	],
+	"works": [
+		{
+			"workId": "e7b9d1f3-5a6c-4da4-8ebf-4a5b6c7d8e90",
+			"relation": "improves"
+		}
+	],
+	"sourceMissionId": null,
+	"webUrl": "https://app.ever.works/missions/d6a8c0e2-4f5b-4c93-9dae-3f4a5b6c7d89"
+}

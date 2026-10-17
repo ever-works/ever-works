@@ -100,6 +100,145 @@ export interface ModelCliMcpBridge {
 export const MODEL_CLI_EMPTY_MCP_CONFIG = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`;
 
 /**
+ * The machine owner's Codex settings a fleet run KEEPS once
+ * `--ignore-user-config` drops the rest of `$CODEX_HOME/config.toml`
+ * (fleet session trust model, control 16).
+ *
+ * Every fleet Codex run is started with `--ignore-user-config`: that is the
+ * one switch that keeps the owner's `[mcp_servers.*]`, every enabled
+ * plugin's servers (computer-use and browser among them on a desktop with
+ * the Codex app), the `notify` command and the rest of the owner's config
+ * away from an untrusted prompt. Measured on codex-cli 0.130.0
+ * (2026-10-16): with the owner's config the run starts its MCP workers;
+ * with `--ignore-user-config` it starts none, and auth still comes from
+ * `CODEX_HOME`.
+ *
+ * The flag would also drop two things the run should keep, so they are
+ * forwarded explicitly, and nothing else is. `[windows] sandbox` is the
+ * owner's sandbox mode for model-run shell commands (`"elevated"` on
+ * EVERDESK2), which isolation must not weaken. `model` and
+ * `model_reasoning_effort` are the owner's model defaults (a job's own
+ * `model` still wins).
+ */
+export interface CodexUserSettings {
+	model?: string;
+	reasoningEffort?: string;
+	windowsSandbox?: string;
+}
+
+/**
+ * A forwarded value: a bare identifier only. It is placed on a SHELL command
+ * line, so anything else (quotes, spaces, `$`, `&`, `|`, `%`, `^`) is refused
+ * rather than escaped.
+ */
+const CODEX_SETTING_VALUE = /^[A-Za-z0-9._-]{1,64}$/;
+
+/**
+ * `key = "value"` / `key = 'value'`, optionally followed by a comment,
+ * matched against a TRIMMED line. No leading/trailing whitespace runs and no
+ * nested quantifiers, so it stays linear on any input (CodeQL review on
+ * #2635 flagged the previous header pattern as polynomial).
+ */
+const TOML_STRING_ASSIGNMENT = /^([A-Za-z0-9_-]+)[ \t]*=[ \t]*(?:"([^"\\]*)"|'([^']*)')(?:[ \t]+#.*|#.*)?$/;
+
+/** TOML multiline string delimiters (basic and literal). */
+const TOML_MULTILINE_DELIMITERS = ['"""', "'''"] as const;
+
+/**
+ * An assignment whose VALUE starts with a multiline delimiter. The key is
+ * everything before the first `=` with no `#` in it, so quoted keys with
+ * spaces count and a comment never does. Linear: the class excludes `=`.
+ */
+const TOML_MULTILINE_VALUE_START = /^[^=#]*=[ \t]*("""|''')/;
+
+/**
+ * The {@link CodexUserSettings} in a Codex `config.toml`, read with a
+ * deliberately tiny scanner: only plain string assignments to the three keys,
+ * in the top-level table (`model`, `model_reasoning_effort`) or in `[windows]`
+ * (`sandbox`). Anything it does not recognise, or a value outside
+ * {@link CODEX_SETTING_VALUE}, is simply not forwarded. A config it cannot
+ * read therefore yields `{}`, which is the run an owner with no config gets.
+ *
+ * The CONTENT of a multiline string (`"""` or `'''`, e.g. an instructions
+ * field holding an example `model = "…"` or `[windows]` line) is skipped:
+ * it is text, not config (review on #2635). Table headers are parsed by
+ * position, not by a regular expression.
+ */
+export function readCodexUserSettings(configToml: string | null | undefined): CodexUserSettings {
+	const settings: CodexUserSettings = {};
+	if (typeof configToml !== 'string' || configToml.length === 0) return settings;
+	let table = '';
+	let openMultiline: (typeof TOML_MULTILINE_DELIMITERS)[number] | null = null;
+	for (const raw of configToml.split(/\r?\n/)) {
+		if (openMultiline !== null) {
+			if (indexOfTomlClosingDelimiter(raw, openMultiline) !== -1) openMultiline = null;
+			continue;
+		}
+		const line = raw.trim();
+		// A multiline string opens only where a VALUE starts with its delimiter
+		// (`key = """…`) and does not close on the same line: everything up to
+		// its closing delimiter is then string content. A delimiter anywhere
+		// else (a comment, mid-value) opens nothing (review on #2635).
+		const opening = TOML_MULTILINE_VALUE_START.exec(line);
+		if (opening) {
+			const delimiter = opening[1] as (typeof TOML_MULTILINE_DELIMITERS)[number];
+			if (indexOfTomlClosingDelimiter(line.slice(opening[0].length), delimiter) === -1) {
+				openMultiline = delimiter;
+				continue;
+			}
+		}
+		if (line.startsWith('[')) {
+			if (line.startsWith('[[')) {
+				table = '\u0000array';
+			} else {
+				const close = line.indexOf(']');
+				table = close > 1 ? line.slice(1, close).trim() : '\u0000unknown';
+			}
+			continue;
+		}
+		const assignment = TOML_STRING_ASSIGNMENT.exec(line);
+		if (!assignment) continue;
+		const key = assignment[1];
+		const value = assignment[2] ?? assignment[3] ?? '';
+		if (!CODEX_SETTING_VALUE.test(value)) continue;
+		if (table === '' && key === 'model' && settings.model === undefined) settings.model = value;
+		else if (table === '' && key === 'model_reasoning_effort' && settings.reasoningEffort === undefined) {
+			settings.reasoningEffort = value;
+		} else if (table === 'windows' && key === 'sandbox' && settings.windowsSandbox === undefined) {
+			settings.windowsSandbox = value;
+		}
+	}
+	return settings;
+}
+
+/**
+ * Index of the first CLOSING `delimiter` in `text`, or -1. In a basic
+ * multiline string (`"""`) a quote preceded by an ODD run of backslashes
+ * is escaped content: `\"""` does not close it, `\\"""` does (review on
+ * #2635). A literal one (`'''`) has no escapes. Linear: a candidate is only
+ * ever preceded by a backslash run once, so each run is scanned once.
+ */
+function indexOfTomlClosingDelimiter(text: string, delimiter: (typeof TOML_MULTILINE_DELIMITERS)[number]): number {
+	let from = 0;
+	for (;;) {
+		const at = text.indexOf(delimiter, from);
+		if (at === -1 || delimiter === "'''") return at;
+		let backslashes = 0;
+		for (let i = at - 1; i >= 0 && text[i] === '\\'; i -= 1) backslashes += 1;
+		if (backslashes % 2 === 0) return at;
+		from = at + 1;
+	}
+}
+
+function assertCodexSetting(name: string, value: string | undefined): string | undefined {
+	if (value === undefined) return undefined;
+	if (!CODEX_SETTING_VALUE.test(value)) {
+		throw new ModelCliCommandError(`Refusing to forward the Codex setting '${name}': not a bare identifier`);
+	}
+	return value;
+}
+
+/**
  * Environment a fleet model step is FORCED to see so the CLI never fetches
  * the account's own remote MCP connectors, or null when the provider has
  * no such switch.
@@ -371,6 +510,13 @@ export function buildModelCliCommand(input: {
 	 */
 	emptyMcpConfigPath?: string;
 	/**
+	 * Codex only: the owner settings kept under `--ignore-user-config` (see
+	 * {@link CodexUserSettings}), as read by {@link readCodexUserSettings}.
+	 * Absent: none are forwarded. The isolation flag itself is ALWAYS emitted
+	 * for Codex, whatever this says.
+	 */
+	codexUserSettings?: CodexUserSettings;
+	/**
 	 * Self-build slice AU — continue this CLI session instead of starting
 	 * one. Absent (the default) produces byte-for-byte the command this step
 	 * has always built. Validated against the contracts' session-id shape
@@ -563,7 +709,26 @@ export function buildModelCliCommand(input: {
 		if (roots.length > 0) args.push('--add-dir', ...roots);
 	} else if (execution.provider === 'codex') {
 		const sandbox = permissionMode === 'plan' ? 'read-only' : 'workspace-write';
-		args.push('exec', '--json', '--sandbox', sandbox, '-C', quoteShellPath(input.workspacePath, platform));
+		// `--ignore-user-config` on EVERY fleet Codex run (control 16): the
+		// owner's `$CODEX_HOME/config.toml` (its MCP servers, plugins, notify
+		// hook and the rest) is not loaded, so an untrusted prompt never
+		// reaches the owner's tools. Only the settings in CodexUserSettings
+		// are put back below. Auth still comes from CODEX_HOME.
+		args.push(
+			'exec',
+			'--ignore-user-config',
+			'--json',
+			'--sandbox',
+			sandbox,
+			'-C',
+			quoteShellPath(input.workspacePath, platform)
+		);
+		const kept = input.codexUserSettings ?? {};
+		const windowsSandbox = assertCodexSetting('windows.sandbox', kept.windowsSandbox);
+		const reasoningEffort = assertCodexSetting('model_reasoning_effort', kept.reasoningEffort);
+		const ownerModel = assertCodexSetting('model', kept.model);
+		if (windowsSandbox) args.push('-c', `windows.sandbox=${windowsSandbox}`);
+		if (reasoningEffort) args.push('-c', `model_reasoning_effort=${reasoningEffort}`);
 		// `--add-dir <DIR>` takes ONE directory and accumulates across
 		// occurrences. Only alongside `workspace-write`: in `read-only` the
 		// run writes nowhere at all, the primary included, so an extra
@@ -580,26 +745,23 @@ export function buildModelCliCommand(input: {
 		// given, and keeps both providers on one code path), but for codex
 		// the override on argv is what actually takes effect.
 		//
-		// NOT isolated from the owner's own MCP servers, and stated rather
-		// than papered over. Codex loads every `[mcp_servers.*]` table in
-		// `~/.codex/config.toml` plus every enabled plugin's servers, and
-		// it has no `--strict-mcp-config`. Measured on codex-cli 0.130.0
-		// (2026-10-09): `-c mcp_servers={}` is a no-op — overrides are
-		// DEEP-MERGED into the user layer, so an empty table leaves every
-		// server in place; `-c mcp_servers.<name>.enabled=false` works for
-		// a config-file server but needs its name and refuses to start
-		// ("invalid transport") for a plugin-provided one; and
-		// `--ignore-user-config`, the one switch that drops them all, also
-		// drops the owner's `[windows] sandbox` mode and model default —
-		// a sandbox change this fix must not make. Tracked as a follow-up
-		// in the fleet session trust model (control 16).
+		// Isolated from the owner's own MCP servers by `--ignore-user-config`
+		// above (2026-10-16). The alternatives measured on codex-cli 0.130.0
+		// (2026-10-09) do not work: `-c mcp_servers={}` is a no-op (overrides
+		// are DEEP-MERGED into the user layer), and
+		// `-c mcp_servers.<name>.enabled=false` needs each name and refuses a
+		// plugin-provided server. The bridge's own server is added here on
+		// top of that empty user layer.
 		if (mcp) {
 			args.push(
 				'-c',
 				`mcp_servers.${assertMcpServerName(mcp.serverName)}.url=${assertLoopbackUrl(mcp.serverUrl)}`
 			);
 		}
-		if (model) args.push('-m', model);
+		// The job's model wins; otherwise the owner's default model, which
+		// `--ignore-user-config` would otherwise drop.
+		const codexModel = model ?? ownerModel;
+		if (codexModel) args.push('-m', codexModel);
 		if (execution.skipPermissions === true) args.push('--dangerously-bypass-approvals-and-sandbox');
 		args.push('-');
 	} else {
@@ -663,6 +825,9 @@ export function assertMountGrantsInCommand(input: {
  */
 const STRICT_MCP_CONFIG_IN_COMMAND = / --mcp-config "[^"]+" --strict-mcp-config /;
 
+/** `exec --ignore-user-config`, adjacent: the flag the codex branch emits right after the subcommand. */
+const CODEX_IGNORE_USER_CONFIG_IN_COMMAND = / exec --ignore-user-config /;
+
 /**
  * Refuse to spawn a Claude Code run that is not isolated from the machine
  * owner's own MCP servers.
@@ -676,10 +841,20 @@ const STRICT_MCP_CONFIG_IN_COMMAND = / --mcp-config "[^"]+" --strict-mcp-config 
  * owner's Atlassian, Sentry or claude.ai tools in reach of an untrusted
  * prompt.
  *
- * Codex is exempt because it has no switch to check for, not because it is
- * isolated — see the codex branch of {@link buildModelCliCommand}.
+ * Codex (control 16, 2026-10-16): the command must carry
+ * `exec --ignore-user-config`, the switch that keeps the owner's
+ * `config.toml` (MCP servers, plugins, notify) out of the run.
  */
 export function assertMcpIsolationInCommand(input: { command: string; execution: FleetAgentModelExecution }): void {
+	if (input.execution.provider === 'codex') {
+		if (!CODEX_IGNORE_USER_CONFIG_IN_COMMAND.test(input.command)) {
+			throw new ModelCliCommandError(
+				'The codex command line does not carry exec --ignore-user-config, so the run would load the machine ' +
+					"owner's own config.toml: its MCP servers, plugins and notify hook"
+			);
+		}
+		return;
+	}
 	if (input.execution.provider !== 'claude-code') return;
 	if (!STRICT_MCP_CONFIG_IN_COMMAND.test(input.command)) {
 		throw new ModelCliCommandError(

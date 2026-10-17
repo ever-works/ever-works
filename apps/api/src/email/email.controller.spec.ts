@@ -95,7 +95,23 @@ describe('EmailController', () => {
     it('listAddresses delegates to the service', async () => {
         const auth = { userId: 'user-1' } as any;
         await controller.listAddresses(auth);
-        expect(service.listAddresses).toHaveBeenCalledWith('user-1', undefined);
+        expect(service.listAddresses).toHaveBeenCalledWith('user-1', undefined, {
+            includeDisabled: false,
+        });
+    });
+
+    // EW-P4-3 — the settings page also lists disabled addresses; only the
+    // exact string `true` asks for them.
+    it('listAddresses passes includeDisabled=true through, and nothing else', async () => {
+        const auth = { userId: 'user-1' } as any;
+        await controller.listAddresses(auth, 'outbound', 'true');
+        expect(service.listAddresses).toHaveBeenLastCalledWith('user-1', 'outbound', {
+            includeDisabled: true,
+        });
+        await controller.listAddresses(auth, undefined, '1');
+        expect(service.listAddresses).toHaveBeenLastCalledWith('user-1', undefined, {
+            includeDisabled: false,
+        });
     });
 
     it('createAddress delegates to the service', async () => {

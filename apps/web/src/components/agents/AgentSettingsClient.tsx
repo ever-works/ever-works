@@ -1,5 +1,6 @@
 'use client';
 
+import { RecordVisibilityPanel } from '@/components/record-visibility';
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -304,6 +305,13 @@ export function AgentSettingsClient({
 
     return (
         <div className="p-6 max-w-screen-2xl mx-auto space-y-4">
+            {/* Record visibility (EW-P1-3): who else can see this Agent. */}
+            <section
+                className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5"
+                data-testid="agent-visibility"
+            >
+                <RecordVisibilityPanel aggregate="agent" id={agent.id} />
+            </section>
             {/* Identity */}
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

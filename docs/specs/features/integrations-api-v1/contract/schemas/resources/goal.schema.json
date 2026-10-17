@@ -1,0 +1,184 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/goal.schema.json",
+	"title": "Goal DTO (B.6, GET /goals, GET /goals/:id)",
+	"description": "An Ever Works Goal (EW-P2-2): a Gauzy Goal plus key results — criteria are numeric key results, the Definition of Done True/False ones. Integration creates are always status='draft' and a metric Goal reads the EXTERNAL source (metricSource.pluginId='external'), whose values arrive through POST /goals/:id/samples; an integration never activates, resumes or completes a Goal (spend safety D9). Team scope = the Goal's team_resources links (teamIds, D11). `loop` is the EW-only execution loop: read-only and runtime (it never bumps the version). Also the `data` of goal.* events.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": [
+		"teamIds",
+		"title",
+		"description",
+		"goalKind",
+		"status",
+		"outcome",
+		"metricSource",
+		"comparator",
+		"targetValue",
+		"unit",
+		"window",
+		"baselineValue",
+		"currentValue",
+		"currentValueAt",
+		"deadline",
+		"criteria",
+		"resolvedScore",
+		"dodCriteria",
+		"progress",
+		"missionIds",
+		"primaryMissionId",
+		"assignedAgentId",
+		"activeAgentId",
+		"loop",
+		"archivedAt"
+	],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": true,
+		"visibilityExplicit": true,
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+		"description": { "type": ["string", "null"] },
+		"goalKind": { "type": "string", "enum": ["metric", "delivery"] },
+		"status": {
+			"description": "draft (created, never evaluated) | active (evaluated on schedule) | paused | completed (carries an outcome).",
+			"type": "string",
+			"enum": ["draft", "active", "paused", "completed"]
+		},
+		"outcome": { "type": ["string", "null"], "enum": ["achieved", "missed", "abandoned", null] },
+		"metricSource": { "oneOf": [{ "$ref": "#/$defs/MetricSource" }, { "type": "null" }] },
+		"comparator": { "type": ["string", "null"], "enum": ["gte", "lte", null] },
+		"targetValue": { "type": ["number", "null"] },
+		"unit": { "type": ["string", "null"], "maxLength": 32 },
+		"window": { "$ref": "#/$defs/Window" },
+		"baselineValue": { "type": ["number", "null"] },
+		"currentValue": { "type": ["number", "null"] },
+		"currentValueAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"deadline": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"criteria": {
+			"oneOf": [{ "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/Criterion" } }, { "type": "null" }]
+		},
+		"resolvedScore": { "oneOf": [{ "$ref": "#/$defs/ResolvedScore" }, { "type": "null" }] },
+		"dodCriteria": {
+			"oneOf": [
+				{ "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/DoDCriterion" } },
+				{ "type": "null" }
+			]
+		},
+		"progress": {
+			"description": "EW's 0..100 view: the weighted score, else baseline -> current -> target, else (delivery) the closed share of the approved Definition of Done. Maps the Gauzy Goal's progress (EW -> G only).",
+			"type": ["integer", "null"],
+			"minimum": 0,
+			"maximum": 100
+		},
+		"missionIds": {
+			"description": "Missions the Goal is linked to (mission_goals).",
+			"type": "array",
+			"items": { "$ref": "../common.schema.json#/$defs/Uuid" },
+			"uniqueItems": true
+		},
+		"primaryMissionId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"assignedAgentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"activeAgentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"loop": {
+			"description": "EW-only execution loop (read-only, runtime: loop changes never bump the version).",
+			"type": "object",
+			"required": ["status", "iteration", "spentCents"],
+			"properties": {
+				"status": {
+					"type": ["string", "null"],
+					"enum": ["running", "paused", "done", "cancelled", "stuck", null]
+				},
+				"iteration": { "type": "integer", "minimum": 0 },
+				"spentCents": { "type": "integer", "minimum": 0 }
+			},
+			"additionalProperties": false
+		},
+		"archivedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on goal.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"Window": { "type": "string", "enum": ["day", "week", "month", "total", "point"] },
+		"MetricSource": {
+			"description": "Where a metric is read. `pluginId: 'external'` = no provider: values are pushed through POST /goals/:id/samples. Integrations may only write the external source.",
+			"type": "object",
+			"required": ["pluginId", "metricId"],
+			"properties": {
+				"pluginId": { "type": "string", "minLength": 1, "maxLength": 100 },
+				"metricId": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"params": { "type": "object" }
+			},
+			"additionalProperties": false
+		},
+		"Criterion": {
+			"description": "One weighted success criterion (a numeric key result). A criterion without metricSource reads the Goal's.",
+			"type": "object",
+			"required": ["id", "name", "weight", "target", "direction"],
+			"properties": {
+				"id": { "type": "string", "minLength": 1, "maxLength": 64 },
+				"name": { "type": "string", "minLength": 1, "maxLength": 200 },
+				"weight": { "type": "number", "exclusiveMinimum": 0 },
+				"target": { "type": "number" },
+				"direction": { "type": "string", "enum": ["gte", "lte"] },
+				"unit": { "type": "string", "maxLength": 32 },
+				"metricSource": { "$ref": "#/$defs/MetricSource" },
+				"window": { "$ref": "#/$defs/Window" }
+			},
+			"additionalProperties": false
+		},
+		"ResolvedScore": {
+			"description": "The weighted score of the last evaluation or external sample.",
+			"type": "object",
+			"required": ["score", "criteria", "violatedConstraintIds", "violatedHardConstraintIds", "at"],
+			"properties": {
+				"score": { "type": "number", "minimum": 0, "maximum": 1 },
+				"criteria": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["id", "value", "target", "weight", "ratio", "satisfied"],
+						"properties": {
+							"id": { "type": "string" },
+							"value": { "type": ["number", "null"] },
+							"target": { "type": "number" },
+							"weight": { "type": "number" },
+							"ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+							"satisfied": { "type": "boolean" },
+							"error": { "type": "string" }
+						},
+						"additionalProperties": false
+					}
+				},
+				"violatedConstraintIds": { "type": "array", "items": { "type": "string" } },
+				"violatedHardConstraintIds": { "type": "array", "items": { "type": "string" } },
+				"at": { "$ref": "../common.schema.json#/$defs/DateTime" }
+			},
+			"additionalProperties": false
+		},
+		"DoDCriterion": {
+			"description": "One Definition-of-Done item (a True/False key result). `proposed: true` = a planner's suggestion awaiting approval (not part of the finish line).",
+			"type": "object",
+			"required": ["id", "text", "status"],
+			"properties": {
+				"id": { "type": "string", "minLength": 1, "maxLength": 64 },
+				"text": { "type": "string", "minLength": 1, "maxLength": 500 },
+				"status": { "type": "string", "enum": ["open", "done", "waived"] },
+				"evidence": { "type": ["string", "null"], "maxLength": 1000 },
+				"note": { "type": ["string", "null"], "maxLength": 500 },
+				"source": { "type": "string", "enum": ["operator", "planner"] },
+				"proposed": { "type": "boolean" },
+				"updatedAt": { "type": "string" }
+			},
+			"additionalProperties": false
+		}
+	}
+}

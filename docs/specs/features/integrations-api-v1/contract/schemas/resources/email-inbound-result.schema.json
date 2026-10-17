@@ -1,0 +1,29 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/email-inbound-result.schema.json",
+	"title": "Inbound email result (P4, POST /email/inbound)",
+	"description": "What pushing an email to an agent did (CR-11): the stored message (direction inbound, on the agent's own inbound address) and how the agent's inbound assignment dispatched it. 201 for a new message, 200 (dispatch.mode null) for a push already delivered (same Message-ID or Idempotency-Key).",
+	"type": "object",
+	"required": ["message", "dispatch"],
+	"properties": {
+		"message": { "$ref": "email-message.schema.json" },
+		"dispatch": {
+			"type": "object",
+			"required": ["mode", "taskId", "conversationId", "threaded"],
+			"properties": {
+				"mode": { "type": ["string", "null"], "enum": ["task-spawn", "conversation", null] },
+				"taskId": {
+					"description": "The Task the mail spawned or joined (task-spawn).",
+					"$ref": "../common.schema.json#/$defs/NullableUuid"
+				},
+				"conversationId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+				"threaded": {
+					"description": "The mail joined an existing thread through In-Reply-To / References.",
+					"type": "boolean"
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false
+}

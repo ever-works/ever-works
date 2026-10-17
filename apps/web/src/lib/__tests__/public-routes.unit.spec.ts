@@ -74,4 +74,13 @@ describe('PUBLIC_ROUTES', () => {
         expect(href).toBe('/org-invite/tok-123');
         expect(isPublic(href)).toBe(true);
     });
+
+    // EW-P4-3 — the confirmation link mailed to a tenant email address.
+    it('serves the email-address confirmation page to signed-out visitors, one segment only', () => {
+        expect(ROUTES.EMAIL_ADDRESS_VERIFY).toBe('/email-address/verify/:token');
+        expect(isPublic('/email-address/verify/AbC_-123')).toBe(true);
+        expect(isPublic('/email-address/verify')).toBe(false);
+        expect(isPublic('/email-address/verify/a/b')).toBe(false);
+        expect(isPublic('/email-address')).toBe(false);
+    });
 });
