@@ -1,4 +1,5 @@
 import { setAuthCookies } from '@/lib/auth';
+import { GITHUB_APP_SETUP_COOKIE_NAME, githubAppSetupCookieOptions } from '@/lib/auth/cookies';
 import { API_URL, ROUTES } from '@/lib/constants';
 import { publicOriginFor } from '@/lib/public-origin';
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,13 +22,28 @@ export async function GET(request: NextRequest) {
     // browser landed on `https://<pod-name>:3000/auth/error`), see
     // `lib/public-origin.ts`.
     const publicOrigin = publicOriginFor(request);
+    // Item 13: the binding cookie is single-use — cleared on every outcome.
+    const clearBinding = (res: NextResponse): NextResponse => {
+        res.cookies.set(GITHUB_APP_SETUP_COOKIE_NAME, '', {
+            ...githubAppSetupCookieOptions(60),
+            maxAge: 0,
+        });
+        return res;
+    };
     const errorRedirect = () =>
-        NextResponse.redirect(new URL(`${ROUTES.AUTH_ERROR}?error=oauth_callback`, publicOrigin));
+        clearBinding(
+            NextResponse.redirect(
+                new URL(`${ROUTES.AUTH_ERROR}?error=oauth_callback`, publicOrigin),
+            ),
+        );
 
+    const binding = request.cookies.get(GITHUB_APP_SETUP_COOKIE_NAME)?.value;
     const response = await fetch(callbackUrl.toString(), {
         method: 'GET',
         headers: {
             Accept: 'application/json',
+            // Server-to-server only; the API compares it with the state's hash.
+            ...(binding ? { 'X-Ever-Works-Setup-Binding': binding } : {}),
         },
         cache: 'no-store',
     });
@@ -73,5 +89,5 @@ export async function GET(request: NextRequest) {
         redirectUrl.searchParams.set('installation_id', data.installationId);
     }
 
-    return NextResponse.redirect(redirectUrl);
+    return clearBinding(NextResponse.redirect(redirectUrl));
 }

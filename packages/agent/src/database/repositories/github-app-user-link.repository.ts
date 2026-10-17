@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { GitHubAppUserLink } from '../../entities/github-app-user-link.entity';
 export type UpsertGitHubAppUserLinkData = {
     userId: string;
@@ -20,6 +20,16 @@ export class GitHubAppUserLinkRepository {
         @InjectRepository(GitHubAppUserLink)
         private readonly repository: Repository<GitHubAppUserLink>,
     ) {}
+
+    /**
+     * A copy of this repository bound to `manager`, so every method runs
+     * inside the caller's transaction (GitHub App onboarding writes the user,
+     * its provider account, the App user link and the installation claim as
+     * one unit — 10-09 handover item 13).
+     */
+    withManager(manager: EntityManager): GitHubAppUserLinkRepository {
+        return new GitHubAppUserLinkRepository(manager.getRepository(GitHubAppUserLink));
+    }
 
     async findByUserId(userId: string): Promise<GitHubAppUserLink | null> {
         return this.repository.findOne({ where: { userId } });

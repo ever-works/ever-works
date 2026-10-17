@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import * as bcrypt from 'bcrypt';
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { GitHubAppService, type GitHubInstallationResponse } from './github-app.service';
 import { UsernameAllocatorService } from '@src/users/services/username-allocator.service';
 
@@ -24,6 +24,31 @@ type SetupStatePayload = {
     redirectTo?: string;
     setupAction?: string;
     issuedAt: number;
+    /**
+     * 10-09 handover item 13 — sha256 (base64url) of the browser-binding
+     * nonce handed to the web tier at setup, which keeps the nonce in an
+     * HttpOnly cookie on the INITIATING browser. The callback must present
+     * the same nonce, so a callback URL replayed from another browser (or a
+     * state lifted from a log) cannot complete the claim.
+     */
+    binding: string;
+};
+
+/** Lifetime of a setup state (and of the browser-binding cookie that pairs with it). */
+export const GITHUB_APP_SETUP_STATE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Domain separation for the state HMAC: the raw auth secret also signs
+ * sessions, so a state is signed with a key derived for THIS purpose only.
+ */
+const SETUP_STATE_KEY_LABEL = 'ever-works:github-app-setup-state:v2';
+
+/** The repositories one onboarding claim writes through, bound to one transaction. */
+type OnboardingRepos = {
+    users: UserRepository;
+    authAccounts: AuthAccountRepository;
+    links: GitHubAppUserLinkRepository;
+    installations: GitHubAppInstallationRepository;
 };
 
 @Injectable()
@@ -52,24 +77,35 @@ export class GitHubAppOnboardingService {
             rawPayload: installation as unknown as Record<string, unknown>,
         });
 
+        // Item 13: bind the state to THIS browser. The nonce leaves the API
+        // only towards the web tier, which keeps it in an HttpOnly cookie
+        // scoped to the GitHub App routes; the state carries just its hash.
+        const binding = randomBytes(32).toString('base64url');
         const state = this.signState({
             installationId: String(installation.id),
             redirectTo: this.normalizeRedirectTo(input.redirectTo),
             setupAction: input.setupAction,
             issuedAt: Date.now(),
+            binding: hashBinding(binding),
         });
 
         return {
             url: this.gitHubAppService.getUserAuthorizationUrl(state),
+            binding,
+            bindingTtlSeconds: Math.floor(GITHUB_APP_SETUP_STATE_TTL_MS / 1000),
         };
     }
 
-    async completeUserAuth(input: { code: string; state: string }): Promise<{
+    async completeUserAuth(input: {
+        code: string;
+        state: string;
+        binding?: string | null;
+    }): Promise<{
         user: User;
         installation: GitHubAppInstallation;
         redirectTo?: string;
     }> {
-        const state = this.verifyState(input.state);
+        const state = this.verifyState(input.state, input.binding ?? null);
         const tokenResult = await this.gitHubAppService.exchangeUserCode(input.code);
         const githubUser = await this.gitHubAppService.getAuthenticatedGithubUser(
             tokenResult.access_token,
@@ -90,51 +126,75 @@ export class GitHubAppOnboardingService {
             accessToken: tokenResult.access_token,
         });
 
-        const user = await this.findOrCreateLocalUser({
-            githubUserId: githubUser.githubUserId,
-            login: githubUser.login,
-            email: githubUser.email,
-            emailVerified: githubUser.emailVerified,
-            avatarUrl: githubUser.avatarUrl,
-            accessToken: tokenResult.access_token,
-            refreshToken: tokenResult.refresh_token || null,
-            accessTokenExpiresAt: tokenResult.expires_in
-                ? new Date(Date.now() + tokenResult.expires_in * 1000)
-                : null,
-            refreshTokenExpiresAt: tokenResult.refresh_token_expires_in
-                ? new Date(Date.now() + tokenResult.refresh_token_expires_in * 1000)
-                : null,
-            scope: tokenResult.scope || null,
-            nodeId: githubUser.nodeId,
-        });
+        // Item 13: every write below — the local user, its `github` provider
+        // account, the App user link, the installation row and its claim —
+        // commits or rolls back TOGETHER. Before, a conflict on the link (or a
+        // failed claim) left a freshly created user and provider account
+        // behind. All reads and GitHub calls happened above, outside it.
+        return this.inTransaction(async (repos) => {
+            const user = await this.findOrCreateLocalUser(repos, {
+                githubUserId: githubUser.githubUserId,
+                login: githubUser.login,
+                email: githubUser.email,
+                emailVerified: githubUser.emailVerified,
+                avatarUrl: githubUser.avatarUrl,
+                accessToken: tokenResult.access_token,
+                refreshToken: tokenResult.refresh_token || null,
+                accessTokenExpiresAt: tokenResult.expires_in
+                    ? new Date(Date.now() + tokenResult.expires_in * 1000)
+                    : null,
+                refreshTokenExpiresAt: tokenResult.refresh_token_expires_in
+                    ? new Date(Date.now() + tokenResult.refresh_token_expires_in * 1000)
+                    : null,
+                scope: tokenResult.scope || null,
+                nodeId: githubUser.nodeId,
+            });
 
-        await this.gitHubAppInstallationRepository.upsertFromGithub({
-            installationId: String(installationDetails.id),
-            appSlug: installationDetails.app_slug || config.githubApp.slug(),
-            accountLogin: installationDetails.account?.login || '',
-            accountType: installationDetails.account?.type || 'User',
-            targetType: installationDetails.target_type || 'User',
-            deletedAt: null,
-            suspendedAt: installationDetails.suspended_at
-                ? new Date(installationDetails.suspended_at)
-                : null,
-            rawPayload: installationDetails as unknown as Record<string, unknown>,
+            await repos.installations.upsertFromGithub({
+                installationId: String(installationDetails.id),
+                appSlug: installationDetails.app_slug || config.githubApp.slug(),
+                accountLogin: installationDetails.account?.login || '',
+                accountType: installationDetails.account?.type || 'User',
+                targetType: installationDetails.target_type || 'User',
+                deletedAt: null,
+                suspendedAt: installationDetails.suspended_at
+                    ? new Date(installationDetails.suspended_at)
+                    : null,
+                rawPayload: installationDetails as unknown as Record<string, unknown>,
+            });
+            const installation = await repos.installations.claimOwnershipIfUnassigned(
+                String(installationDetails.id),
+                user.id,
+                githubUser.githubUserId,
+            );
+
+            if (!installation) {
+                throw new BadRequestException('GitHub App installation could not be persisted');
+            }
+
+            return {
+                user,
+                installation,
+                redirectTo: state.redirectTo,
+            };
         });
-        const installation = await this.gitHubAppInstallationRepository.claimOwnershipIfUnassigned(
-            String(installationDetails.id),
-            user.id,
-            githubUser.githubUserId,
+    }
+
+    /**
+     * Run `work` with every onboarding repository bound to ONE transaction.
+     * A unique-constraint race inside it (two browsers claiming the same
+     * installation at the same instant) aborts the whole claim instead of
+     * half-applying it; the user simply retries.
+     */
+    private async inTransaction<T>(work: (repos: OnboardingRepos) => Promise<T>): Promise<T> {
+        return this.gitHubAppInstallationRepository.transaction((manager) =>
+            work({
+                users: this.userRepository.withManager(manager),
+                authAccounts: this.authAccountRepository.withManager(manager),
+                links: this.gitHubAppUserLinkRepository.withManager(manager),
+                installations: this.gitHubAppInstallationRepository.withManager(manager),
+            }),
         );
-
-        if (!installation) {
-            throw new BadRequestException('GitHub App installation could not be persisted');
-        }
-
-        return {
-            user,
-            installation,
-            redirectTo: state.redirectTo,
-        };
     }
 
     /**
@@ -202,38 +262,38 @@ export class GitHubAppOnboardingService {
         return refuse('unsupported-target-type');
     }
 
-    private async findOrCreateLocalUser(input: {
-        githubUserId: string;
-        login: string;
-        email: string | null;
-        emailVerified: boolean;
-        avatarUrl: string | null;
-        accessToken: string;
-        refreshToken: string | null;
-        accessTokenExpiresAt: Date | null;
-        refreshTokenExpiresAt: Date | null;
-        scope: string | null;
-        nodeId: string | null;
-    }) {
+    private async findOrCreateLocalUser(
+        repos: OnboardingRepos,
+        input: {
+            githubUserId: string;
+            login: string;
+            email: string | null;
+            emailVerified: boolean;
+            avatarUrl: string | null;
+            accessToken: string;
+            refreshToken: string | null;
+            accessTokenExpiresAt: Date | null;
+            refreshTokenExpiresAt: Date | null;
+            scope: string | null;
+            nodeId: string | null;
+        },
+    ) {
         // Identity resolution order matters: the GitHub user id is the only
         // identifier GitHub guarantees, so the App user link and the `github`
         // auth account (accountId = GitHub user id, written by both this flow
         // and the OAuth sign-in) are consulted BEFORE any email. The email path
         // below is reached only for a GitHub id we have never seen, and it can
         // never link an unverified email to an existing user.
-        const existingLink = await this.gitHubAppUserLinkRepository.findByGithubUserId(
-            input.githubUserId,
-        );
-        let user = existingLink ? await this.userRepository.findById(existingLink.userId) : null;
+        const existingLink = await repos.links.findByGithubUserId(input.githubUserId);
+        let user = existingLink ? await repos.users.findById(existingLink.userId) : null;
 
         if (!user) {
-            const existingAuthAccount =
-                await this.authAccountRepository.findProviderAccountByAccountId(
-                    'github',
-                    input.githubUserId,
-                );
+            const existingAuthAccount = await repos.authAccounts.findProviderAccountByAccountId(
+                'github',
+                input.githubUserId,
+            );
             if (existingAuthAccount) {
-                user = await this.userRepository.findById(existingAuthAccount.userId);
+                user = await repos.users.findById(existingAuthAccount.userId);
                 if (!user) {
                     // This GitHub id is already bound to a local account we cannot
                     // load. Falling through would create a second user for the
@@ -248,7 +308,7 @@ export class GitHubAppOnboardingService {
         }
 
         if (!user && input.email) {
-            user = await this.userRepository.findByEmail(input.email);
+            user = await repos.users.findByEmail(input.email);
             if (user && !input.emailVerified) {
                 throw new UnauthorizedException(
                     'Unable to link this GitHub App user because the provider email is not verified',
@@ -261,7 +321,7 @@ export class GitHubAppOnboardingService {
             const email =
                 input.email || `github-app-${input.githubUserId}@users.noreply.ever.works`;
 
-            user = await this.userRepository.create({
+            user = await repos.users.create({
                 username,
                 email,
                 password: await bcrypt.hash(randomUUID(), 10),
@@ -278,7 +338,7 @@ export class GitHubAppOnboardingService {
             const isPlaceholderEmail =
                 !user.email || user.email.endsWith('@users.noreply.ever.works');
             const nextEmail = input.email && isPlaceholderEmail ? input.email : user.email;
-            user = await this.userRepository.update(user.id, {
+            user = await repos.users.update(user.id, {
                 username: user.username || input.login,
                 avatar: input.avatarUrl || user.avatar,
                 email: nextEmail,
@@ -288,7 +348,7 @@ export class GitHubAppOnboardingService {
             });
         }
 
-        await this.authAccountRepository.upsertProviderAccount({
+        await repos.authAccounts.upsertProviderAccount({
             userId: user.id,
             providerId: 'github',
             accountId: input.githubUserId,
@@ -307,7 +367,7 @@ export class GitHubAppOnboardingService {
             },
         });
 
-        await this.gitHubAppUserLinkRepository.upsertLink({
+        await repos.links.upsertLink({
             userId: user.id,
             githubUserId: input.githubUserId,
             githubLogin: input.login,
@@ -336,20 +396,20 @@ export class GitHubAppOnboardingService {
 
     private signState(payload: SetupStatePayload): string {
         const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-        const signature = createHmac('sha256', config.auth.secret())
+        const signature = createHmac('sha256', setupStateKey())
             .update(encodedPayload)
             .digest('base64url');
 
         return `${encodedPayload}.${signature}`;
     }
 
-    private verifyState(state: string): SetupStatePayload {
-        const [encodedPayload, signature] = state.split('.');
+    private verifyState(state: string, binding: string | null): SetupStatePayload {
+        const [encodedPayload, signature] = (typeof state === 'string' ? state : '').split('.');
         if (!encodedPayload || !signature) {
             throw new BadRequestException('Invalid GitHub App state');
         }
 
-        const expectedSignature = createHmac('sha256', config.auth.secret())
+        const expectedSignature = createHmac('sha256', setupStateKey())
             .update(encodedPayload)
             .digest('base64url');
 
@@ -378,8 +438,25 @@ export class GitHubAppOnboardingService {
             throw new BadRequestException('Invalid GitHub App state payload');
         }
 
-        if (Date.now() - payload.issuedAt > 10 * 60 * 1000) {
+        if (Date.now() - payload.issuedAt > GITHUB_APP_SETUP_STATE_TTL_MS) {
             throw new BadRequestException('GitHub App setup state expired');
+        }
+
+        // Item 13: the callback must come from the browser that started the
+        // setup. No cookie, or another browser's, is refused before any code
+        // is exchanged or anything is written.
+        if (
+            typeof payload.binding !== 'string' ||
+            typeof binding !== 'string' ||
+            !binding ||
+            !constantTimeEqual(hashBinding(binding), payload.binding)
+        ) {
+            this.logger.warn(
+                `Refused GitHub App setup callback for installation ${payload.installationId}: not the browser that started it`,
+            );
+            throw new BadRequestException(
+                'Finish the GitHub App setup in the browser where you started it',
+            );
         }
 
         return payload;
@@ -392,4 +469,18 @@ export class GitHubAppOnboardingService {
 
         return redirectTo.startsWith('/') ? redirectTo : undefined;
     }
+}
+
+function setupStateKey(): Buffer {
+    return createHmac('sha256', config.auth.secret()).update(SETUP_STATE_KEY_LABEL).digest();
+}
+
+function hashBinding(binding: string): string {
+    return createHash('sha256').update(binding, 'utf8').digest('base64url');
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+    const a = Buffer.from(left, 'utf8');
+    const b = Buffer.from(right, 'utf8');
+    return a.length === b.length && timingSafeEqual(a, b);
 }

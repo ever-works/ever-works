@@ -167,4 +167,41 @@ describe('GET /api/github-app/callback', () => {
             expect(url.searchParams.get('installation_id')).toBe('1');
         });
     });
+
+    // 10-09 handover item 13 — the setup's browser-binding cookie goes to the
+    // API as a server-to-server header, and is single-use.
+    describe('browser binding (item 13)', () => {
+        it('forwards the binding cookie as a header and clears it', async () => {
+            const fetchMock = apiAnswers({ access_token: 'tok', installationId: '169597044' });
+            const request = new NextRequest(
+                `${INTERNAL_ORIGIN}/api/github-app/callback?code=c&state=s`,
+                {
+                    headers: { cookie: 'ew_github_app_setup=nonce-1' },
+                },
+            );
+
+            const response = await GET(request);
+
+            const init = fetchMock.mock.calls[0][1] as RequestInit;
+            expect((init.headers as Record<string, string>)['X-Ever-Works-Setup-Binding']).toBe(
+                'nonce-1',
+            );
+            const cleared = response.headers.get('set-cookie') ?? '';
+            expect(cleared).toContain('ew_github_app_setup=');
+            expect(cleared).toMatch(/Max-Age=0/i);
+        });
+
+        it('sends no binding header when the browser has no cookie (the API then refuses)', async () => {
+            const fetchMock = apiAnswers(
+                { message: 'Finish the GitHub App setup in the browser where you started it' },
+                400,
+            );
+            const url = locationOf(await GET(callbackRequest()));
+            const init = fetchMock.mock.calls[0][1] as RequestInit;
+            expect(init.headers as Record<string, string>).not.toHaveProperty(
+                'X-Ever-Works-Setup-Binding',
+            );
+            expect(url.pathname).toBe('/auth/error');
+        });
+    });
 });

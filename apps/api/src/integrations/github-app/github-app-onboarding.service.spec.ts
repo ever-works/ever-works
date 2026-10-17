@@ -5,12 +5,25 @@ import {
     UnauthorizedException,
 } from '@nestjs/common';
 import { AxiosError } from 'axios';
+import { createHash } from 'node:crypto';
 import { of, throwError } from 'rxjs';
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
 import { GitHubAppService } from './github-app.service';
 
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
+
+/** Item 13 — the browser-binding nonce the initiating browser's cookie holds. */
+const BINDING = 'browser-binding-nonce';
+const TX_MANAGER = { tx: true };
+
+/** A state signed the way `beginSetup` signs it: bound to {@link BINDING}. */
+function signBound(service: unknown, payload: Record<string, unknown>): string {
+    return (service as { signState(p: Record<string, unknown>): string }).signState({
+        binding: createHash('sha256').update(BINDING, 'utf8').digest('base64url'),
+        ...payload,
+    });
+}
 
 describe('GitHubAppOnboardingService', () => {
     beforeAll(() => {
@@ -37,6 +50,12 @@ describe('GitHubAppOnboardingService', () => {
             findByInstallationId: jest.fn(),
             claimOwnershipIfUnassigned: jest.fn(),
             upsertFromGithub: jest.fn(),
+            // Item 13: the claim runs in one transaction; the doubles hand
+            // themselves back as the transaction-bound copies.
+            transaction: jest.fn(async (work: (manager: unknown) => Promise<unknown>) =>
+                work(TX_MANAGER),
+            ),
+            withManager: jest.fn(),
         };
         const userLinkRepository = {
             findByGithubUserId: jest.fn(),
@@ -64,6 +83,15 @@ describe('GitHubAppOnboardingService', () => {
             normalize: jest.fn().mockImplementation((s: string) => s),
             suggest: jest.fn(),
         };
+
+        for (const repo of [
+            installationRepository,
+            userLinkRepository,
+            authAccountRepository,
+            userRepository,
+        ] as Array<{ withManager?: jest.Mock }>) {
+            repo.withManager = jest.fn(() => repo);
+        }
 
         const service = new GitHubAppOnboardingService(
             gitHubAppService as any,
@@ -94,7 +122,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
             });
@@ -119,10 +147,7 @@ describe('GitHubAppOnboardingService', () => {
             });
 
             await expect(
-                service.completeUserAuth({
-                    code: 'code',
-                    state,
-                }),
+                service.completeUserAuth({ binding: BINDING, code: 'code', state }),
             ).rejects.toBeInstanceOf(UnauthorizedException);
 
             expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
@@ -138,7 +163,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
                 redirectTo: '/settings/github-app',
@@ -193,6 +218,7 @@ describe('GitHubAppOnboardingService', () => {
             installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(installation);
 
             const result = await service.completeUserAuth({
+                binding: BINDING,
                 code: 'code',
                 state,
             });
@@ -229,7 +255,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
             });
@@ -279,10 +305,7 @@ describe('GitHubAppOnboardingService', () => {
                 createdByGithubUserId: 'gh-user-1',
             });
 
-            await service.completeUserAuth({
-                code: 'code',
-                state,
-            });
+            await service.completeUserAuth({ binding: BINDING, code: 'code', state });
 
             expect(installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
                 '12345',
@@ -302,7 +325,7 @@ describe('GitHubAppOnboardingService', () => {
                 options: { recordedInstaller?: string | null; githubUserId?: string } = {},
             ) => {
                 const ctx = createService();
-                const state = (ctx.service as any).signState({
+                const state = signBound(ctx.service, {
                     installationId: '12345',
                     issuedAt: Date.now(),
                 });
@@ -340,7 +363,8 @@ describe('GitHubAppOnboardingService', () => {
                 const row = { id: 'row-1', installationId: '12345' };
                 ctx.installationRepository.upsertFromGithub.mockResolvedValue(row);
                 ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(row);
-                const run = () => ctx.service.completeUserAuth({ code: 'code', state });
+                const run = () =>
+                    ctx.service.completeUserAuth({ binding: BINDING, code: 'code', state });
                 return { ...ctx, state, run };
             };
             const orgInstallation = {
@@ -479,7 +503,7 @@ describe('GitHubAppOnboardingService', () => {
 
             const arrange = (overrides: { githubUserId?: string } = {}) => {
                 const ctx = createService();
-                const state = (ctx.service as any).signState({
+                const state = signBound(ctx.service, {
                     installationId: '12345',
                     issuedAt: Date.now(),
                 });
@@ -524,6 +548,7 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findById.mockResolvedValue(existingUser);
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -555,6 +580,7 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findById.mockResolvedValue(existingUser);
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -579,7 +605,11 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findByEmail.mockResolvedValue(null);
 
                 await expect(
-                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                    ctx.service.completeUserAuth({
+                        binding: BINDING,
+                        code: 'code',
+                        state: ctx.state,
+                    }),
                 ).rejects.toBeInstanceOf(ConflictException);
 
                 expect(ctx.userRepository.create).not.toHaveBeenCalled();
@@ -600,7 +630,11 @@ describe('GitHubAppOnboardingService', () => {
                 });
 
                 await expect(
-                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                    ctx.service.completeUserAuth({
+                        binding: BINDING,
+                        code: 'code',
+                        state: ctx.state,
+                    }),
                 ).rejects.toBeInstanceOf(UnauthorizedException);
 
                 expect(ctx.userRepository.create).not.toHaveBeenCalled();
@@ -618,6 +652,7 @@ describe('GitHubAppOnboardingService', () => {
                 }));
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -694,8 +729,9 @@ describe('GitHubAppOnboardingService', () => {
 
             try {
                 const result = await service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
-                    state: (service as any).signState({
+                    state: signBound(service, {
                         installationId: '169597044',
                         issuedAt: Date.now(),
                     }),
@@ -719,6 +755,95 @@ describe('GitHubAppOnboardingService', () => {
                 );
             } finally {
                 warnSpy.mockRestore();
+            }
+        });
+    });
+
+    // 10-09 handover item 13 — the setup state is bound to the browser that
+    // started it, and the claim's writes are one transaction.
+    describe('browser binding and one transaction (item 13)', () => {
+        it('beginSetup hands the web tier a binding nonce and signs only its hash', async () => {
+            const { service, gitHubAppService, installationRepository } = createService();
+            installationRepository.upsertFromGithub.mockResolvedValue({});
+            gitHubAppService.getUserAuthorizationUrl.mockImplementation(
+                (state: string) => `https://github.com/login/oauth/authorize?state=${state}`,
+            );
+            const result = await service.beginSetup({ installationId: '12345' });
+            expect(typeof result.binding).toBe('string');
+            expect(result.binding.length).toBeGreaterThanOrEqual(40);
+            expect(result.bindingTtlSeconds).toBe(600);
+            const state = decodeURIComponent(result.url.split('state=')[1]);
+            const payload = JSON.parse(
+                Buffer.from(state.split('.')[0], 'base64url').toString('utf8'),
+            );
+            expect(payload.binding).toBe(
+                createHash('sha256').update(result.binding, 'utf8').digest('base64url'),
+            );
+            expect(JSON.stringify(payload)).not.toContain(result.binding);
+        });
+
+        it.each([
+            ['no binding cookie', undefined],
+            ["another browser's binding", 'someone-elses-nonce'],
+        ])('refuses a callback with %s before exchanging the code', async (_label, binding) => {
+            const { service, gitHubAppService, userRepository } = createService();
+            const state = signBound(service, { installationId: '12345', issuedAt: Date.now() });
+            await expect(
+                service.completeUserAuth({ code: 'code', state, binding: binding ?? null }),
+            ).rejects.toThrow('Finish the GitHub App setup in the browser where you started it');
+            expect(gitHubAppService.exchangeUserCode).not.toHaveBeenCalled();
+            expect(userRepository.create).not.toHaveBeenCalled();
+        });
+
+        it('refuses a state signed with the raw secret (no domain separation) or without a binding', async () => {
+            const { service } = createService();
+            const unbound = (service as any).signState({
+                installationId: '12345',
+                issuedAt: Date.now(),
+            });
+            await expect(
+                service.completeUserAuth({ code: 'code', state: unbound, binding: BINDING }),
+            ).rejects.toThrow('Finish the GitHub App setup in the browser where you started it');
+        });
+
+        it('writes the claim through transaction-bound repositories', async () => {
+            const {
+                service,
+                gitHubAppService,
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            } = createService();
+            gitHubAppService.exchangeUserCode.mockResolvedValue({ access_token: 'token' });
+            gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                githubUserId: 'gh-1',
+                login: 'octo',
+                email: null,
+                emailVerified: false,
+                avatarUrl: null,
+                nodeId: null,
+            });
+            userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+            authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+            userRepository.create.mockResolvedValue({ id: 'user-1' });
+            installationRepository.claimOwnershipIfUnassigned.mockResolvedValue({
+                installationId: '12345',
+            });
+            const state = signBound(service, { installationId: '12345', issuedAt: Date.now() });
+
+            await service.completeUserAuth({ code: 'code', state, binding: BINDING });
+
+            expect(installationRepository.transaction).toHaveBeenCalledTimes(1);
+            for (const repo of [
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            ]) {
+                expect((repo as { withManager?: jest.Mock }).withManager).toHaveBeenCalledWith(
+                    TX_MANAGER,
+                );
             }
         });
     });

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import { isUniqueConstraintError } from '../../utils/db-error.utils';
 import {
     TASK_REVIEW_REJECTION_MAX_FEEDBACK_CHARS,
     TaskReviewRejection,
@@ -24,6 +25,12 @@ export interface RecordTaskReviewRejectionInput {
     severity?: TaskReviewRejectionSeverity | null;
     /** R16 — `human` | `bot`; absent = not stated (legacy / gate). */
     reviewerKind?: TaskReviewRejectionReviewerKind | null;
+    /**
+     * Item 11 — the provider object this row comes from (`review:<id>`,
+     * `<comment event>:<id>`). A second record with the same key for the
+     * same Task is a redelivery and records nothing (`null`).
+     */
+    sourceKey?: string | null;
 }
 
 /**
@@ -55,6 +62,19 @@ export class TaskReviewRejectionRepository {
     async record(input: RecordTaskReviewRejectionInput): Promise<TaskReviewRejection | null> {
         const feedback = (input.feedback ?? '').trim();
         if (feedback.length === 0) return null;
+        const sourceKey =
+            typeof input.sourceKey === 'string' && input.sourceKey.trim()
+                ? input.sourceKey.trim().slice(0, 120)
+                : null;
+        // A redelivered webhook: the same source already produced a row for
+        // this Task. The unique index below is the guarantee; this read only
+        // spares the common case an INSERT that is known to fail.
+        if (sourceKey) {
+            const existing = await this.repository.findOne({
+                where: { taskId: input.taskId, sourceKey },
+            });
+            if (existing) return null;
+        }
         const row = this.repository.create({
             taskId: input.taskId,
             source: input.source,
@@ -67,9 +87,17 @@ export class TaskReviewRejectionRepository {
             prUrl: input.prUrl ?? null,
             severity: input.severity ?? null,
             reviewerKind: input.reviewerKind ?? null,
+            sourceKey,
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
         });
-        return this.repository.save(row);
+        try {
+            return await this.repository.save(row);
+        } catch (error) {
+            // Two deliveries of the same comment raced past the read above:
+            // the index let exactly one land, and this one is the duplicate.
+            if (sourceKey && isUniqueConstraintError(error)) return null;
+            throw error;
+        }
     }
 
     /**

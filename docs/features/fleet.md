@@ -152,7 +152,7 @@ A model CLI on a node can run out of quota: Claude Code's weekly or 5-hour limit
 - The AgentRun goes back to `queued` with the same reason (exempt from the stuck-run and queued-too-long sweeps, not counted as in-flight by the dispatch gate) and its activity line reads `Waiting for everdesk4: Claude Code weekly limit until 2026-10-19 01:01 UTC`. The next lease flips it to `running` and clears the reason.
 - The Fleet node list shows a `Claude Code: weekly limit until …` badge under the status; the drawer lists every CLI out of quota with its reset.
 
-To resume sooner, sign that CLI on that machine in to a seat with quota left, then restart the node service (the node-side throttle is in memory) — the platform-side throttle still holds until the stated reset.
+To resume sooner, sign that CLI on that machine in to a seat with quota left, then press **Clear limit now** next to the limit in the node drawer (`POST /api/fleet/nodes/:id/clear-model-throttle` with an optional `{ "provider": "claude-code" }`; owner-scoped, audited as `node.model-throttle-clear`). The lease offers that CLI's work to the node again on its next poll, and the node lifts its own copy from its next heartbeat — every heartbeat response carries `node.modelThrottles`, which the node reconciles with (adopting the platform's after a restart; dropping one the owner cleared once it is older than two minutes, so a beat answered just before the platform recorded a fresh limit cannot undo it). If the seat is in fact still out, the next run simply parks again.
 
 ### Inbox notices
 
@@ -997,6 +997,33 @@ A fleet job carries the whole assembled prompt (`payload`, up to 256 KB) and the
 | `FLEET_JOB_PURGE_ENABLED`  | `true`  | `false` switches the purge off entirely (an audit hold)                                         |
 
 The pass works in batches of 200 and stops after 50 batches, leaving any remainder to the next night. Purged rows carry `bodiesPurgedAt`, so no row is purged twice.
+
+### How long agent runs keep their timeline (slice AT)
+
+Every run's step timeline — the fleet step records above, the cloud tool loop, chat turns — lives in `agent_run_logs`, and nothing used to purge it. A second nightly pass (03:45 UTC, same lock, same batching) **deletes the timeline of terminal runs that finished more than `AGENT_RUN_LOG_RETENTION_DAYS` ago** and stamps the run `logsPurgedAt`. The run row — status, summary, cost, timings, check results — is kept. Deleting run ROWS is opt-in: the cost dashboards, the Task history and the audit tables (Inbox items, escalations, usage events) name runs by id, so an operator who wants rows gone sets `AGENT_RUN_RETENTION_DAYS`; a row is only deleted after its timeline was purged, and its transcript chunks cascade with it.
+
+A run waiting on a human (`awaitingInput`) or parked for a resume (`terminalEndedReason = 'parked'`) is never touched, whatever its age — its history is what the resume continues from.
+
+| Env                            | Default  | Meaning                                                                                                   |
+| ------------------------------ | -------- | --------------------------------------------------------------------------------------------------------- |
+| `AGENT_RUN_LOG_RETENTION_DAYS` | `90`     | days a terminal run keeps its `agent_run_logs` timeline; clamped to 7–3650 (the export already trims run logs to 90 days) |
+| `AGENT_RUN_RETENTION_DAYS`     | _(off)_  | days a terminal run ROW is kept; unset or `0` keeps rows forever; when set, clamped to 30–3650            |
+| `AGENT_RUN_RETENTION_ENABLED`  | `true`   | `false` switches the whole pass off (an audit hold)                                                       |
+
+### Backups and restore (slice AT)
+
+Retention is the half of data durability the application owns; the other half — that a purge, a bad migration or a lost volume can be undone — is the database's. The rules this repository assumes of a production deployment:
+
+- **Postgres runs under CloudNativePG** with a **nightly base backup** (`ScheduledBackup`) and **continuous WAL archiving** to object storage, so the `ever_works` database can be restored to any point in time inside the retention window (PITR), not only to last night. The Helm/GitOps values that declare the `Cluster` and the `ScheduledBackup` are the source of truth; change them there, never by hand-editing the live spec.
+- **"Configured" is not "working."** Before ANY change to the database, its engine, its storage or a node hosting it — a CNPG switchover or upgrade, a production migration, a resize, draining the node — prove a recent restorable backup exists:
+  1. the `ScheduledBackup` is not suspended and its `lastScheduleTime` is recent;
+  2. the newest `Backup` objects are `phase: completed`, with no `.status.error` and a real `backupId`;
+  3. on the primary, `SELECT last_archived_time, last_failed_time FROM pg_stat_archiver;` shows `last_archived_time` newer than `last_failed_time` (WAL is flowing);
+  4. the base backup and recent WAL are actually present at the destination bucket.
+  With the barman-cloud **plugin**, `Cluster.status.lastSuccessfulBackup` / `firstRecoverabilityPoint` can read stale while nightlies are fine — never judge backup health from them. Record the restore point you rely on in the change log; if you cannot prove one, take an on-demand `Backup` first.
+- **Restore = a NEW cluster**, never an in-place overwrite: create a CNPG `Cluster` that bootstraps with `recovery` from the backup object store (with `recoveryTarget.targetTime` for PITR), let it replay WAL to the target, verify it (row counts on `agent_runs`, `tasks`, `fleet_jobs`; the newest `createdAt`), then point the API at it (or promote it) and keep the old cluster until the new one is proven. Migrations are forward-only with per-step guards, so a restored database at an older schema converges on the next boot.
+- **What a restore does NOT bring back:** files outside Postgres (object-storage uploads have their own versioning), anything a retention pass purged before the restore point, and in-flight fleet work — leased jobs on a restored database lapse and are re-offered by the reclaim sweep; nodes keep their credentials (the hashes are in the restored rows).
+- **Self-hosting without CNPG:** a scheduled `pg_dump` is the minimum (see `docs/guides/self-host-docker-kubernetes.md` → Backups); test the restore, not just the dump. Disaster-recovery procedures for the managed-cloud deployment are in `docs/devops/disaster-recovery.md`.
 
 ### Fleet run telemetry
 

@@ -112,6 +112,7 @@ describe('GitHubAppController', () => {
             expect(onboardingService.completeUserAuth).toHaveBeenCalledWith({
                 code: 'c',
                 state: 's',
+                binding: null,
             });
             expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
                 ipAddress: '203.0.113.4',

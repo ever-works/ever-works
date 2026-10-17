@@ -100,6 +100,12 @@ import type { WorkerSafetyGate } from './worker-safety-store';
 /** Gap between polls when the fleet has nothing queued for this node. */
 export const DEFAULT_IDLE_POLL_MS = 5_000;
 
+/**
+ * Fleet usage limits — how old a node-recorded throttle must be before a
+ * heartbeat that does not list it may lift it (see `syncModelThrottles`).
+ */
+export const MODEL_THROTTLE_SYNC_GRACE_MS = 120_000;
+
 /** First retry delay after a failed poll. */
 export const WORKER_BACKOFF_BASE_MS = 1_000;
 
@@ -614,7 +620,7 @@ export class WorkerLoop {
 	/** Fleet usage limits: provider → the throttle in force (expiry checked on read). */
 	private readonly modelThrottles = new Map<
 		string,
-		{ until: number; window: FleetModelUsageLimitWindow; reason: string }
+		{ until: number; window: FleetModelUsageLimitWindow; reason: string; setAt: number }
 	>();
 
 	private running = false;
@@ -751,7 +757,7 @@ export class WorkerLoop {
 		if (!provider || !Number.isFinite(until) || until <= this.now()) return;
 		const previous = this.modelThrottles.get(provider);
 		if (previous && previous.until >= until) return;
-		this.modelThrottles.set(provider, { until, window: limit.window, reason: limit.message });
+		this.modelThrottles.set(provider, { until, window: limit.window, reason: limit.message, setAt: this.now() });
 		if (!previous || previous.until <= this.now()) {
 			this.options.logger?.warn(
 				`${describeFleetModelProvider(provider)} hit its ${describeFleetModelUsageLimitWindow(limit.window)} on this node — ` +
@@ -759,6 +765,59 @@ export class WorkerLoop {
 			);
 		}
 		this.patch({});
+	}
+
+	/**
+	 * Fleet usage limits — reconcile with the platform's view of this node's
+	 * throttles, as carried on every heartbeat response (`node.modelThrottles`).
+	 *
+	 * The platform is authoritative both ways:
+	 *  - a throttle it holds that this loop does not (a restarted daemon, a
+	 *    limit another path recorded) is ADOPTED, so the node stops offering
+	 *    itself for that CLI and says so on its next beat;
+	 *  - a throttle this loop holds that the platform no longer does — the
+	 *    owner pressed "clear limit now" — is LIFTED, but only once it is older
+	 *    than `graceMs`: a heartbeat answered just before the platform recorded
+	 *    the limit this node just reported must not undo it.
+	 * `null` / absent (an API older than the field) changes nothing.
+	 */
+	syncModelThrottles(
+		server: ReadonlyArray<{ provider?: unknown; window?: unknown; until?: unknown; reason?: unknown }> | null | undefined,
+		graceMs = MODEL_THROTTLE_SYNC_GRACE_MS
+	): void {
+		if (!Array.isArray(server)) return;
+		const now = this.now();
+		const held = new Set<string>();
+		let changed = false;
+		for (const entry of server) {
+			const provider = typeof entry?.provider === 'string' ? entry.provider.trim() : '';
+			const until = typeof entry?.until === 'string' ? Date.parse(entry.until) : Number.NaN;
+			if (!provider || !Number.isFinite(until) || until <= now) continue;
+			held.add(provider);
+			const local = this.modelThrottles.get(provider);
+			if (local && local.until >= until) continue;
+			const window = (typeof entry.window === 'string' ? entry.window : 'usage') as FleetModelUsageLimitWindow;
+			const reason = typeof entry.reason === 'string' ? entry.reason : `${provider} usage limit reached`;
+			this.modelThrottles.set(provider, { until, window, reason, setAt: local?.setAt ?? now });
+			changed = true;
+			if (!local) {
+				this.options.logger?.info(
+					`${describeFleetModelProvider(provider)} is out of quota on this node per the platform — not leasing ${provider} agent-task jobs until ${new Date(until).toISOString()}`
+				);
+			}
+		}
+		for (const [provider, local] of this.modelThrottles) {
+			if (held.has(provider) || now - local.setAt < graceMs) continue;
+			this.modelThrottles.delete(provider);
+			changed = true;
+			this.options.logger?.info(
+				`${describeFleetModelProvider(provider)} usage limit was cleared on the platform — leasing ${provider} agent-task jobs again`
+			);
+		}
+		if (changed) {
+			this.patch({});
+			this.pollSoon();
+		}
 	}
 
 	/** The usage-limit throttles still in force; expired ones are dropped (and logged) here. */

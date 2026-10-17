@@ -18,6 +18,9 @@ import { GitHubAppCallbackQueryDto, GitHubAppSetupQueryDto } from './dto/github-
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
 import { GitHubAppSyncService } from './github-app-sync.service';
 
+/** Header the web tier forwards the setup's browser-binding cookie in (lower-case, as Node exposes it). */
+export const GITHUB_APP_SETUP_BINDING_HEADER = 'x-ever-works-setup-binding';
+
 @Controller('api/github-app')
 export class GitHubAppController {
     constructor(
@@ -41,9 +44,13 @@ export class GitHubAppController {
     @Public()
     @Get('callback')
     async callback(@Query() query: GitHubAppCallbackQueryDto, @Request() req) {
+        // Item 13: the web tier forwards the browser-binding cookie it set at
+        // setup as this header (server-to-server; the browser never sees it).
+        const bindingHeader = req?.headers?.[GITHUB_APP_SETUP_BINDING_HEADER];
         const result = await this.gitHubAppOnboardingService.completeUserAuth({
             code: query.code,
             state: query.state,
+            binding: typeof bindingHeader === 'string' ? bindingHeader : null,
         });
         // H-04: bind the GitHub-App-issued session to the requesting client.
         const ipAddress =

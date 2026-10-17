@@ -5297,6 +5297,8 @@
                     "title": "Model usage limits",
                     "entry": "{cli}: {window} until {until}",
                     "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll",
                     "windows": {
                         "weekly": "weekly limit",
                         "session": "5-hour limit",

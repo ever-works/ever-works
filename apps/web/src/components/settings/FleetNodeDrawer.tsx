@@ -63,6 +63,12 @@ interface FleetNodeDrawerProps {
      * ceiling on this node's resource limits; all-null clears it.
      */
     onSaveLimitCeiling: (ceiling: FleetNodeLimitCeiling) => void;
+    /**
+     * Fleet usage limits — "clear limit now" for one CLI (`provider`) before
+     * its reset. Optional: absent, the drawer shows the limits without the
+     * control.
+     */
+    onClearModelThrottle?: (provider: string | null) => void;
     onRotate: () => void;
     onDrain: (drain: boolean) => void;
 }
@@ -124,6 +130,7 @@ export function FleetNodeDrawer({
     onSaveCapabilities,
     onSaveCostCeiling,
     onSaveLimitCeiling,
+    onClearModelThrottle,
     onRotate,
     onDrain,
 }: FleetNodeDrawerProps) {
@@ -360,6 +367,19 @@ export function FleetNodeDrawer({
                                                     until: formatMoment(throttle.until),
                                                 })}
                                             </span>
+                                            {onClearModelThrottle ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="ml-2"
+                                                    disabled={isPending}
+                                                    onClick={() => onClearModelThrottle(throttle.provider)}
+                                                    data-testid={`fleet-node-drawer-clear-throttle-${throttle.provider}`}
+                                                >
+                                                    {t('modelThrottles.clear')}
+                                                </Button>
+                                            ) : null}
                                         </span>
                                     ))}
                                     <span className="block text-xs text-text-muted dark:text-text-muted-dark">

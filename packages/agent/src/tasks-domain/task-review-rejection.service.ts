@@ -146,6 +146,8 @@ export class TaskReviewRejectionService {
         prUrl?: string | null;
         reviewerKind?: TaskReviewRejectionReviewerKind | null;
         severity?: TaskReviewRejectionSeverity | null;
+        /** Item 11 — `review:<id>` / `<comment event>:<id>`; a redelivery records nothing. */
+        sourceKey?: string | null;
     }): Promise<TaskReviewRejection | null> {
         const trimmed = (input.feedback ?? '').trim();
         if (trimmed.length === 0) return null;
@@ -170,6 +172,7 @@ export class TaskReviewRejectionService {
                 prUrl: input.prUrl ?? null,
                 reviewerKind: input.reviewerKind ?? null,
                 severity: input.severity ?? null,
+                sourceKey: input.sourceKey ?? null,
                 organizationId: task.organizationId ?? null,
             });
             if (row) {

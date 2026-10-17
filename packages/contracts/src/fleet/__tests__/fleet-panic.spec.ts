@@ -38,6 +38,7 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.capabilities',
 	'node.cost-ceiling',
 	'node.limits',
+	'node.model-throttle-clear',
 	'node.pause',
 	'node.disable',
 	'node.drain',

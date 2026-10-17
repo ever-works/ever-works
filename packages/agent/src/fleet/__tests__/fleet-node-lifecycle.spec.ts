@@ -412,3 +412,52 @@ describe('FleetService — remote node limits (slice AS)', () => {
         expect(repository.update).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Fleet usage limits — the owner's "clear limit now": owner-scoped, per CLI or
+ * all, audited, and the view stops listing the throttle at once.
+ */
+describe('FleetService — clear model usage-limit throttles', () => {
+    let repository: { findById: jest.Mock; update: jest.Mock };
+    let audit: { recordNodeAction: jest.Mock };
+    const future = new Date(Date.now() + 3_600_000).toISOString();
+    const throttles = [
+        { provider: 'claude-code', window: 'weekly', until: future, reason: 'weekly', since: future },
+        { provider: 'codex', window: 'usage', until: future, reason: 'usage', since: future },
+    ];
+
+    beforeEach(() => {
+        repository = {
+            findById: jest.fn(async () => node({ modelThrottles: throttles } as Partial<FleetNode>)),
+            update: jest.fn(async () => undefined),
+        };
+        audit = { recordNodeAction: jest.fn(async () => true) };
+    });
+
+    const build = () =>
+        new FleetService(repository as never, undefined, undefined, undefined, audit as never);
+
+    it('clears one CLI and keeps the other, audited as node.model-throttle-clear', async () => {
+        const view = await build().clearModelThrottlesForUser(USER, NODE, 'claude-code');
+        expect(repository.update).toHaveBeenCalledWith(NODE, {
+            modelThrottles: [expect.objectContaining({ provider: 'codex' })],
+        });
+        expect(view.modelThrottles?.map((entry) => entry.provider)).toEqual(['codex']);
+        expect(audit.recordNodeAction).toHaveBeenCalledWith(
+            expect.objectContaining({ action: 'node.model-throttle-clear' }),
+        );
+    });
+
+    it('clears every CLI when none is named', async () => {
+        const view = await build().clearModelThrottlesForUser(USER, NODE, null);
+        expect(repository.update).toHaveBeenCalledWith(NODE, { modelThrottles: null });
+        expect(view.modelThrottles).toEqual([]);
+    });
+
+    it("answers 404 for another account's node and writes nothing", async () => {
+        await expect(build().clearModelThrottlesForUser('someone-else', NODE, null)).rejects.toThrow(
+            /not found/,
+        );
+        expect(repository.update).not.toHaveBeenCalled();
+    });
+});

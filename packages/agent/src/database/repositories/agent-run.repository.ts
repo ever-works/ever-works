@@ -29,6 +29,8 @@ import { isAgentReviewRunScope } from '../../tasks-domain/task-agent-review';
  * alone — see {@link AgentRunRepository.casTerminal}.
  */
 const NON_TERMINAL: AgentRunStatus[] = ['queued', 'running'];
+/** Self-build slice AT — the statuses the retention pass may touch. */
+const RETENTION_TERMINAL: AgentRunStatus[] = ['completed', 'failed', 'cancelled'];
 
 /**
  * Dispatch rollback may only touch a run that has NOT been picked up yet.
@@ -1604,6 +1606,77 @@ export class AgentRunRepository {
             .andWhere('queuedReason = :from', { from })
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Self-build slice AT — up to `limit` TERMINAL runs that finished before
+     * `cutoff` and whose timeline has not been purged yet, oldest first.
+     *
+     * Never a run that is waiting on a human (`awaitingInput`) or parked for a
+     * resume (`terminalEndedReason = 'parked'`): their history is what the
+     * resume continues from, however old.
+     */
+    async findLogRetentionCandidates(cutoff: Date, limit: number): Promise<string[]> {
+        const rows = await this.retentionQuery(cutoff)
+            .andWhere('run.logsPurgedAt IS NULL')
+            .orderBy('run.finishedAt', 'ASC')
+            .limit(Math.max(1, Math.trunc(limit)))
+            .getMany();
+        return rows.map((row) => row.id);
+    }
+
+    /** Stamp `logsPurgedAt` on runs whose timeline the retention pass just deleted. */
+    async markLogsPurged(runIds: string[], at: Date): Promise<number> {
+        if (runIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ logsPurgedAt: at })
+            .where('id IN (:...runIds)', { runIds })
+            .andWhere('logsPurgedAt IS NULL')
+            .execute();
+        return result.affected ?? 0;
+    }
+
+    /**
+     * Self-build slice AT (OPT-IN, `AGENT_RUN_RETENTION_DAYS`) — delete up to
+     * `limit` TERMINAL run rows that finished before `cutoff` AND whose logs
+     * were already purged. Same exclusions as
+     * {@link findLogRetentionCandidates}; the DELETE re-checks the terminal
+     * status so a row revived between the read and the write survives.
+     * `agent_run_logs` / `terminal_transcript_chunks` cascade; the audit
+     * tables that name runs (inbox, escalations, usage events) are kept.
+     */
+    async deleteRetainedRuns(cutoff: Date, limit: number): Promise<number> {
+        const rows = await this.retentionQuery(cutoff)
+            .andWhere('run.logsPurgedAt IS NOT NULL')
+            .orderBy('run.finishedAt', 'ASC')
+            .limit(Math.max(1, Math.trunc(limit)))
+            .getMany();
+        if (rows.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .delete()
+            .from(AgentRun)
+            .where('id IN (:...ids)', { ids: rows.map((row) => row.id) })
+            .andWhere('status IN (:...terminal)', { terminal: RETENTION_TERMINAL })
+            .execute();
+        return result.affected ?? 0;
+    }
+
+    private retentionQuery(cutoff: Date) {
+        return this.repository
+            .createQueryBuilder('run')
+            .select(['run.id'])
+            .where('run.status IN (:...terminal)', { terminal: RETENTION_TERMINAL })
+            .andWhere('run.finishedAt IS NOT NULL')
+            .andWhere('run.finishedAt < :cutoff', { cutoff })
+            .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
+                notAwaiting: false,
+            })
+            .andWhere('(run.terminalEndedReason IS NULL OR run.terminalEndedReason <> :parked)', {
+                parked: 'parked',
+            });
     }
 
     /**

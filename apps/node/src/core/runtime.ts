@@ -572,6 +572,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Remote node limits (slice AS): where an owner's ceiling lands — the
 	// work lane, once it exists below. Unset on a visibility-only node.
 	let limitTarget: ((ceiling: NodeLimitCeiling) => void) | null = null;
+	// Fleet usage limits: where the platform's view of this node's model
+	// throttles lands (the work lane, once it exists below).
+	let throttleTarget: ((throttles: unknown) => void) | null = null;
 	const lifecycle = new NodeLifecycleTracker({
 		daemonVersion: io.version,
 		logger: io.logger,
@@ -597,9 +600,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			minNodeVersion?: string;
 			upgradeRequired?: boolean;
 			limitCeiling?: NodeLimitCeiling;
+			node?: { modelThrottles?: unknown };
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
+			throttleTarget?.(response.node?.modelThrottles);
 		}
 	};
 
@@ -680,6 +685,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			}
 		};
 		telemetry.limits = () => worker.resourceLimits;
+		// Fleet usage limits: the platform's throttles for this node, from every
+		// accepted beat — adopted after a restart, lifted after "clear limit now".
+		throttleTarget = (throttles) => {
+			if (Array.isArray(throttles)) worker.syncModelThrottles(throttles);
+		};
 		// Fleet health signals (EW-776). Wired onto the SAME telemetry
 		// object `describe` already closed over above, so the heartbeat
 		// starts reporting worker state without the loop having to be

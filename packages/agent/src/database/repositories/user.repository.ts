@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOneOptions, LessThan, Repository } from 'typeorm';
+import { FindOneOptions, LessThan, Repository, EntityManager } from 'typeorm';
 import { User } from '../../entities/user.entity';
 import { config } from '../../config';
 import { randomUUID } from 'node:crypto';
@@ -29,6 +29,16 @@ export class UserRepository {
         @InjectRepository(User)
         private readonly repository: Repository<User>,
     ) {}
+
+    /**
+     * A copy of this repository bound to `manager`, so every method runs
+     * inside the caller's transaction (GitHub App onboarding writes the user,
+     * its provider account, the App user link and the installation claim as
+     * one unit — 10-09 handover item 13).
+     */
+    withManager(manager: EntityManager): UserRepository {
+        return new UserRepository(manager.getRepository(User));
+    }
 
     async create(userData: Partial<User>): Promise<User> {
         const user = this.repository.create(userData);

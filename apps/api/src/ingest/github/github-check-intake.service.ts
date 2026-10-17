@@ -409,9 +409,17 @@ export function isReviewFeedbackDelivery(
 function isDoorbellComment(body: GitHubWebhookBody, policy: ReviewBotPolicy): boolean {
     if (!isDoorbellAuthor(body.comment, policy)) return false;
     if (classifyReviewer(body.comment?.user, policy) !== 'trusted-bot') return true;
+    // `inReplyTo` too, exactly as the bridge passes it (#2632): a bot's
+    // in-thread reply ("Thanks for the fix…") with no severity marker of its
+    // own is not a finding, so it must not ring the doorbell either.
+    const inReplyTo = (body.comment as { in_reply_to_id?: number | null } | undefined)
+        ?.in_reply_to_id;
     return (
-        classifyReviewBotComment({ action: body.action, body: body.comment?.body }).kind ===
-        'findings'
+        classifyReviewBotComment({
+            action: body.action,
+            body: body.comment?.body,
+            inReplyTo: typeof inReplyTo === 'number' ? inReplyTo : null,
+        }).kind === 'findings'
     );
 }
 
