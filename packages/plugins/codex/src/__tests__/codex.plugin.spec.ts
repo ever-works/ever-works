@@ -198,6 +198,17 @@ describe('CodexPlugin', () => {
 		expect(plugin.getStepDefinitions()[0]?.id).toBe('setup-codex');
 	});
 
+	it('offers current Codex models with a listed default', async () => {
+		const models = await plugin.listModels();
+		expect(models.map((model) => model.id)).toEqual([
+			'gpt-6-astra',
+			'gpt-5.6-sol',
+			'gpt-5.6-terra',
+			'gpt-5.6-luna'
+		]);
+		expect(models.map((model) => model.id)).toContain(plugin.settingsSchema.properties?.model?.default);
+	});
+
 	it('does not rely on legacy completion fields in the manifest', () => {
 		expect(plugin.getManifest().uiHints?.completionFields).toBeUndefined();
 	});

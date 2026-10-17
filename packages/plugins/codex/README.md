@@ -57,14 +57,12 @@ The onboarding UI provides a 3-step flow: choose auth mode, configure credential
 | --------------------- | ------- | ------ | ---------------------------------------------------------- |
 | `authMode`            | string  | user   | `api-key` or `local` (hidden, set by onboarding wizard)    |
 | `apiKey`              | string  | user   | OpenAI API key (secret, supports env var `OPENAI_API_KEY`) |
-| `model`               | string  | global | Model for generation (default: `gpt-5.4`)                  |
+| `model`               | string  | global | Model for generation (default: `gpt-5.6-terra`)            |
 | `unsafeBypassSandbox` | boolean | hidden | Bypass Codex sandboxing on incompatible hosts              |
 
-### Supported Models
+### Model picker
 
-- **GPT-5.4** (default) - 400k context
-- **Codex Mini Latest** - 200k context
-- **GPT-5.2 Codex** - 400k context
+The picker suggests **GPT-6 Astra**, **GPT-5.6 Sol**, **GPT-5.6 Terra** (default), and **GPT-5.6 Luna**, based on the [Codex model guide](https://learn.chatgpt.com/docs/models). Each has a 1.05M-token context window. Model availability depends on the account, sign-in method, and rollout. The picker also accepts a custom model ID for an API-specific or future model; existing saved selections remain intact.
 
 ## Form Schema
 
