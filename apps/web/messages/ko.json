@@ -287,6 +287,8 @@
             "signIn": "Ever ID로 로그인",
             "signUp": "Ever ID로 가입",
             "redirecting": "Ever ID를 여는 중…",
+            "signInWith": "<wordmark>Ever ID</wordmark>로 로그인",
+            "signUpWith": "<wordmark>Ever ID</wordmark>로 가입",
             "consentRequired": "계속하려면 위의 약관에 동의하세요.",
             "createAccount": {
                 "title": "Ever Works 계정 만들기",

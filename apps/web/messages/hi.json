@@ -287,6 +287,8 @@
             "signIn": "Ever ID से साइन इन करें",
             "signUp": "Ever ID से साइन अप करें",
             "redirecting": "Ever ID खोला जा रहा है…",
+            "signInWith": "<wordmark>Ever ID</wordmark> से साइन इन करें",
+            "signUpWith": "<wordmark>Ever ID</wordmark> से साइन अप करें",
             "consentRequired": "जारी रखने के लिए ऊपर दी गई शर्तें स्वीकार करें।",
             "createAccount": {
                 "title": "अपना Ever Works खाता बनाएं",

@@ -287,6 +287,8 @@
             "signIn": "使用 Ever ID 登录",
             "signUp": "使用 Ever ID 注册",
             "redirecting": "正在打开 Ever ID…",
+            "signInWith": "使用 <wordmark>Ever ID</wordmark> 登录",
+            "signUpWith": "使用 <wordmark>Ever ID</wordmark> 注册",
             "consentRequired": "请接受上方的条款以继续。",
             "createAccount": {
                 "title": "创建您的 Ever Works 帐户",

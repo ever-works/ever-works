@@ -287,6 +287,8 @@
             "signIn": "התחברות עם Ever ID",
             "signUp": "הרשמה עם Ever ID",
             "redirecting": "פותח את Ever ID…",
+            "signInWith": "התחברות עם <wordmark>Ever ID</wordmark>",
+            "signUpWith": "הרשמה עם <wordmark>Ever ID</wordmark>",
             "consentRequired": "אשר את התנאים שלמעלה כדי להמשיך.",
             "createAccount": {
                 "title": "צור את חשבון ה-Ever Works שלך",

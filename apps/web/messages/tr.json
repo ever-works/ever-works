@@ -287,6 +287,8 @@
             "signIn": "Ever ID ile oturum aç",
             "signUp": "Ever ID ile kaydol",
             "redirecting": "Ever ID açılıyor…",
+            "signInWith": "<wordmark>Ever ID</wordmark> ile oturum aç",
+            "signUpWith": "<wordmark>Ever ID</wordmark> ile kaydol",
             "consentRequired": "Devam etmek için yukarıdaki şartları kabul edin.",
             "createAccount": {
                 "title": "Ever Works hesabınızı oluşturun",

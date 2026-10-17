@@ -287,6 +287,8 @@
             "signIn": "Ever ID でサインイン",
             "signUp": "Ever ID で登録",
             "redirecting": "Ever ID を開いています…",
+            "signInWith": "<wordmark>Ever ID</wordmark> でサインイン",
+            "signUpWith": "<wordmark>Ever ID</wordmark> で登録",
             "consentRequired": "続行するには、上の規約に同意してください。",
             "createAccount": {
                 "title": "Ever Works アカウントを作成",

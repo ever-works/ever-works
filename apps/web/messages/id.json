@@ -287,6 +287,8 @@
             "signIn": "Masuk dengan Ever ID",
             "signUp": "Daftar dengan Ever ID",
             "redirecting": "Membuka Ever ID…",
+            "signInWith": "Masuk dengan <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Daftar dengan <wordmark>Ever ID</wordmark>",
             "consentRequired": "Setujui ketentuan di atas untuk melanjutkan.",
             "createAccount": {
                 "title": "Buat akun Ever Works Anda",

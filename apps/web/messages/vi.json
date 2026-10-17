@@ -287,6 +287,8 @@
             "signIn": "Đăng nhập bằng Ever ID",
             "signUp": "Đăng ký bằng Ever ID",
             "redirecting": "Đang mở Ever ID…",
+            "signInWith": "Đăng nhập bằng <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Đăng ký bằng <wordmark>Ever ID</wordmark>",
             "consentRequired": "Hãy chấp nhận các điều khoản ở trên để tiếp tục.",
             "createAccount": {
                 "title": "Tạo tài khoản Ever Works của bạn",

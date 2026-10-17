@@ -287,6 +287,8 @@
             "signIn": "เข้าสู่ระบบด้วย Ever ID",
             "signUp": "สมัครสมาชิกด้วย Ever ID",
             "redirecting": "กำลังเปิด Ever ID…",
+            "signInWith": "เข้าสู่ระบบด้วย <wordmark>Ever ID</wordmark>",
+            "signUpWith": "สมัครสมาชิกด้วย <wordmark>Ever ID</wordmark>",
             "consentRequired": "โปรดยอมรับข้อกำหนดด้านบนเพื่อดำเนินการต่อ",
             "createAccount": {
                 "title": "สร้างบัญชี Ever Works ของคุณ",

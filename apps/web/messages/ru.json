@@ -287,6 +287,8 @@
             "signIn": "Войти через Ever ID",
             "signUp": "Зарегистрироваться через Ever ID",
             "redirecting": "Открываем Ever ID…",
+            "signInWith": "Войти через <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Зарегистрироваться через <wordmark>Ever ID</wordmark>",
             "consentRequired": "Примите условия выше, чтобы продолжить.",
             "createAccount": {
                 "title": "Создайте аккаунт Ever Works",
