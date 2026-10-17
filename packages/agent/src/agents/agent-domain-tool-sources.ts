@@ -19,6 +19,8 @@ import type { ToolGrantEnforcer, ToolGrantResolveInput } from '../policy/tool-gr
 import type { ResolveToolGrantsArgs } from '../policy/agent-tool-grant-tools';
 import type { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
 import type { InboxToolService } from '../inbox/agent-inbox-tools';
+import type { AppChangeToolService } from '../app-works/agent-app-change-tools';
+import type { Work } from '../entities/work.entity';
 
 /**
  * Domain chat-tool sources — the ONE injection seam that lets
@@ -167,6 +169,16 @@ export interface AgentInboxToolSource {
 }
 
 /**
+ * APW-08 T26 — the App change chat tools. `authorize` is the owner check the model-supplied
+ * Work id goes through on every call: the Work when the Agent's owner has `level` access to
+ * it AND it is an App Work, `null` otherwise (no existence leak).
+ */
+export interface AgentAppChangeToolSource {
+    service: AppChangeToolService;
+    authorize(userId: string, workId: string, level: 'edit' | 'view'): Promise<Work | null>;
+}
+
+/**
  * The bundle itself. Every member optional: a runtime binds what it can
  * reach, and `resolveAllowedTools` registers exactly the corresponding
  * tools.
@@ -184,4 +196,5 @@ export interface AgentDomainToolSources {
     toolGrants?: AgentToolGrantToolSource;
     workflow?: AgentWorkflowToolSource;
     inbox?: AgentInboxToolSource;
+    appChanges?: AgentAppChangeToolSource;
 }

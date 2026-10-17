@@ -484,6 +484,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		);
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
+			const commitMessage = rewriteCommitMessage(opts, status.stdout);
 			// Committer identity stays in `-c` flags — transient, never
 			// written to the shared pool config a linked worktree's
 			// `--local` would land in. The literals are the FALLBACK now
@@ -508,7 +509,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 					...(opts.hardenRepoHooks ? ['--no-verify'] : []),
 					...(identity ? [`--author=${identity.authorName} <${identity.authorEmail}>`] : []),
 					'-m',
-					opts.commitMessage
+					commitMessage
 				],
 				dir,
 				opts.auth,
@@ -2171,4 +2172,34 @@ function isSafeCloneArgument(url: string): boolean {
 	}
 	// The same option-in-the-host-position problem, reached through a real URL.
 	return !parsed.hostname.startsWith('-');
+}
+
+/**
+ * Repository-relative paths named by `git status --porcelain` (v1): `XY path`,
+ * or `XY orig -> path` for a rename, with C-style quoting for unusual names.
+ */
+export function parsePorcelainPaths(stdout: string): string[] {
+	const paths: string[] = [];
+	for (const line of stdout.split(/\r?\n/)) {
+		if (line.length < 4) continue;
+		let path = line.slice(3);
+		const arrow = path.lastIndexOf(' -> ');
+		if (arrow !== -1) path = path.slice(arrow + 4);
+		if (path.startsWith('"') && path.endsWith('"') && path.length >= 2) {
+			path = path.slice(1, -1).replace(/\\(.)/g, '$1');
+		}
+		if (path) paths.push(path);
+	}
+	return paths;
+}
+
+/** `opts.commitMessageFor`'s answer when it gives a usable one, else `opts.commitMessage`. */
+function rewriteCommitMessage(opts: WorkspaceFinalizeOptions, porcelain: string): string {
+	if (typeof opts.commitMessageFor !== 'function') return opts.commitMessage;
+	try {
+		const next = opts.commitMessageFor(parsePorcelainPaths(porcelain), opts.commitMessage);
+		return typeof next === 'string' && next.trim() && !/[\0\r]/.test(next) ? next : opts.commitMessage;
+	} catch {
+		return opts.commitMessage;
+	}
 }

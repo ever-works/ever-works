@@ -163,6 +163,12 @@ describe('activity-log.types', () => {
             // `app.build.cancelled`) are stored in `action`; `blocked` is a
             // stored status and publishes nothing (plan.md:1560).
             ['APP_BUILD', 'app_build'],
+            // APW-06 T28 (#2688) — the runtime families: one row per relayed
+            // §9.4 event, the dotted name (`app.deploy.started`,
+            // `app.job.failed`, `app.smoke.passed`, …) stored in `action`.
+            ['APP_DEPLOY', 'app_deploy'],
+            ['APP_JOB', 'app_job'],
+            ['APP_SMOKE', 'app_smoke'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -490,7 +496,11 @@ describe('activity-log.types', () => {
             // +4 EW-P1-2 integration keys: integration_write,
             //    integration_key_created / _rotated / _revoked, each with its
             //    `feed-kind.ts` row in the same change -> 215.
-            expect(literals).toHaveLength(215);
+            // +3 APW-06 T28 (#2688) runtime families: app_deploy, app_job and
+            //    app_smoke (one row per relayed §9.4 runtime event, written by
+            //    `AppRuntimeActivityListener`), each with its `feed-kind.ts` row
+            //    in the same change -> 218. Nothing existing moves.
+            expect(literals).toHaveLength(218);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

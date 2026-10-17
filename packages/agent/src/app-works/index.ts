@@ -138,3 +138,27 @@ export {
 
 // APW-08 T17 — the change gate `TasksDomainModule` binds to `APP_WORK_CHANGE_GATE`.
 export { AppWorkChangeGateService } from './app-work-change-gate.service';
+
+// APW-08 T25 — the agent-resolution rule. The token and port are ALSO re-exported by
+// `app-upstream-state.service` (where they used to be declared), so only the class and
+// the helpers are named here — a second `export *` of the same names would be ambiguous.
+export {
+    AppWorkAgentResolverService,
+    isCommittingAgent,
+    type AppWorkAgentResolution,
+    type AppWorkAgentSource,
+} from './app-work-agent-resolver';
+
+// APW-08 T25 — `POST /api/works/:id/evolve`: the chat-to-modify loop over the Task machinery.
+export * from './app-change-request.service';
+
+// APW-04 — the provisioner (declarative check + AI path) and its events port.
+export * from './app-repository-detector';
+export * from './app-provisioning.service';
+
+// APW-08 GAP-14 / T26 — the `evolve-app` Agent template and the App change chat tools.
+export * from './evolve-app-agent-template';
+export * from './agent-app-change-tools';
+
+// APW-04 — the provisioning feedback loop (build / deploy / smoke → the provisioning Task).
+export * from './app-provisioning-feedback.service';

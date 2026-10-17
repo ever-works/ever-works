@@ -26,6 +26,7 @@ jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {
 jest.mock('@ever-works/agent/agents', () => ({ AgentEscalationService: class {} }));
 
 import 'reflect-metadata';
+import { NotFoundException } from '@nestjs/common';
 import { TasksController } from './tasks.controller';
 import { REQUIRE_SCOPES_KEY } from '../auth/integration/integration.decorators';
 import { IntegrationHttpException } from '../auth/integration/integration-http.exception';
@@ -75,6 +76,7 @@ describe('TasksController — integration principal (EW-P1-2)', () => {
                 from: 'backlog',
                 path: ['todo', 'in_progress', 'done'],
             }),
+            getReadable: jest.fn().mockResolvedValue({ id: TASK, visibility: 'organization' }),
         };
         const chat = { post: jest.fn().mockResolvedValue({ id: 'm-1' }) };
         const agents = {
@@ -215,6 +217,35 @@ describe('TasksController — integration principal (EW-P1-2)', () => {
         }
         expect(service.transition).not.toHaveBeenCalled();
         expect(service.syncTransition).not.toHaveBeenCalled();
+    });
+
+    // ── Review 2026-10-17 F6 — never a private Task through the core routes ──
+
+    it('answers 404 to an integration for a private Task (transition, chat, create parent)', async () => {
+        const { controller, service, chat } = build();
+        service.getReadable.mockResolvedValue({ id: TASK, visibility: 'private' });
+        await expect(
+            controller.transition(integration(null), TASK, { to: 'todo', mode: 'sync' } as never),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            controller.postChat(integration(MEMBER), TASK, { body: 'hi' } as never),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            controller.create(integration(null), { title: 'Child', parentTaskId: TASK } as never),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(service.getReadable).toHaveBeenCalledWith(MEMBER, TASK, scope);
+        expect(service.syncTransition).not.toHaveBeenCalled();
+        expect(chat.post).not.toHaveBeenCalled();
+        expect(service.create).not.toHaveBeenCalled();
+    });
+
+    it('a session never pays the extra read (its own private Tasks are its own)', async () => {
+        const { controller, service } = build();
+        service.getReadable.mockResolvedValue({ id: TASK, visibility: 'private' });
+        await controller.transition(session, TASK, { to: 'todo' } as never);
+        await controller.postChat(session, TASK, { body: 'hi' } as never);
+        await controller.create(session, { title: 'Child', parentTaskId: TASK } as never);
+        expect(service.getReadable).not.toHaveBeenCalled();
     });
 
     it('a session keeps the single-edge move, and may opt into sync mode', async () => {

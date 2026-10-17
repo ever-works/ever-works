@@ -45,6 +45,13 @@ export {
 } from './app-dependencies.service';
 
 export { AppDependenciesModule } from './app-dependencies.module';
+// A0.10 (lane aw-deploy-2) — the spec source and the worker relays.
+export { AppDependencySpecSourceAdapter } from './app-dependency-spec.source';
+export {
+    AppDependencyConfigCipherRelay,
+    AppDependencyProvisionDispatchRelay,
+    AppDependencyRowsRelay,
+} from './app-dependency-worker.relays';
 
 // APW-07 T17 — the `app-dependency-provision` runner. Exported from this barrel
 // (rather than reached by path) because `packages/tasks`'s task on APW-06's

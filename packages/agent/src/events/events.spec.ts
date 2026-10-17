@@ -351,6 +351,10 @@ describe('agent/events submodule', () => {
                     'AppBuildStartedEvent',
                     'AppBuildSucceededEvent',
                     'APP_BUILD_EVENT_CLASSES',
+                    // APW-07 — the env change and rotation events, names only and
+                    // split by phase (2026-10-17).
+                    'AppEnvChangedEvent',
+                    'AppEnvRotatedEvent',
                     'BaseEvent',
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',
@@ -368,6 +372,9 @@ describe('agent/events submodule', () => {
                     // reaching into the other's module.
                     'FleetJobMcpCredentialMintedEvent',
                     'FleetJobMcpCredentialRevokedEvent',
+                    // The fleet job parking event — exported by `fleet-job.events.ts`
+                    // without this pin being updated (found red on develop, 2026-10-17).
+                    'FleetJobParkedEvent',
                     'WorkCreatedEvent',
                     'WorkStatusChangedEvent',
                     'WorkGenerationCompletedEvent',

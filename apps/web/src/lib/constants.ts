@@ -166,6 +166,9 @@ export const ROUTES = {
     // divergence, sync and inherited workflows, with the slot APW-09 mounts its
     // "Upstream pull requests" section into. Never a second tab or route.
     DASHBOARD_WORK_UPSTREAM: (id: string) => `/works/${id}/upstream`,
+    // APW-05 T25–T28 — an App Work's Builds tab: the list, the drawer and the
+    // Start build button. Offered for kind `app` only.
+    DASHBOARD_WORK_BUILDS: (id: string) => `/works/${id}/builds`,
     // Wave 7 feature h — the in-platform PR review surface.
     DASHBOARD_WORK_PULL_REQUESTS: (id: string) => `/works/${id}/pull-requests`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,

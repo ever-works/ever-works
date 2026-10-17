@@ -101,11 +101,15 @@ import {
 } from '@ever-works/agent/subscriptions';
 import {
     AppForkReadinessRunner,
+    AppProvisionEventsService,
     AppSourceInitializerService,
     AppUpstreamStateService,
     AppUpstreamSyncDispatcherService,
 } from '@ever-works/agent/app-works';
 import { AppSpecService } from '@ever-works/agent/app-spec';
+// APW-03 T42 — the licence service the `app-upstream-sync` worker proxies for FR-37's
+// `previewUpstream` and FR-40's `request` (`APP_UPSTREAM_LICENSE_SERVICE`).
+import { AppLicenseService } from '@ever-works/agent/app-license';
 // APW-05 T19 + C7 — the `app-build-prepare` runner the worker proxies. The class,
 // not the port of the same name on `./app-builds.service`: the port is T17's
 // provisional seam (`run(payload)`) and is deliberately NOT what the RPC channel
@@ -120,7 +124,29 @@ import {
 // APW-06 §5.1 — the Build source the isolated App runtime worker's
 // `APP_DEPLOY_BUILD_SOURCE` proxies (it owns no DataSource). The adapter CLASS, as
 // `AppDeployRequestModule` exports it, so the allow-list is its two reads.
-import { AppDeployBuildSourceAdapter } from '@ever-works/agent/app-runtime';
+import {
+    AppClusterOpDispatchRelay,
+    AppDeployBuildSourceAdapter,
+    AppDeployDispatchRelay,
+    AppDeployRequestService,
+    AppRuntimeEventRelayService,
+} from '@ever-works/agent/app-runtime';
+// APW-06 T71 (A0.7) — the runtime-state row and the env source the isolated App runtime worker
+// proxies by name (plan §6.4). Both read or write rows, so neither can be local in the worker.
+import {
+    WorkAppDependencyRepository,
+    WorkAppRuntimeStateRepository,
+} from '@ever-works/agent/database';
+import { AppEnvRuntimeSource } from '@ever-works/agent/app-env';
+import { AppsDomainDnsServiceImpl } from '@ever-works/agent/ever-works-providers';
+import { AppBuildPullTokenReader } from '@ever-works/agent/app-builds';
+// A0.10 (lane aw-deploy-2) — the dependency worker's rows, cipher, spec and re-dispatch.
+import {
+    AppDependencyConfigCipherRelay,
+    AppDependencyProvisionDispatchRelay,
+    AppDependencyRowsRelay,
+    AppDependencySpecSourceAdapter,
+} from '@ever-works/agent/app-dependencies';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -630,6 +656,65 @@ export class TriggerInternalController implements OnModuleInit {
         // `PluginAllowlistReader`. Appended LAST + `@Optional()` per the arity rule above.
         @Optional()
         private readonly gitHubAppInstallationRepository?: GitHubAppInstallationRepository,
+        // APW-06 T71 / T28 / T31 / T73 (A0.7, 2026-10-17) — the five names the isolated App runtime
+        // worker (`trigger-app-runtime.module.ts`) still needed to run a Deployment end to end.
+        // Appended LAST + `@Optional()` per the arity rule above:
+        //   - `WorkAppRuntimeStateRepository` — `WORK_APP_RUNTIME_STATES` (T71 status item (b)):
+        //     the deploy lock, the target, the snapshot; health, ops, smoke and deletion read it;
+        //   - `AppEnvRuntimeSource` — `APP_RUNTIME_ENV_SOURCE` (§6.4 "proxied by name", T73);
+        //   - `AppRuntimeEventRelayService` — `APP_RUNTIME_EVENT_SINK` (T28's relay);
+        //   - `AppDeployDispatchRelay` — the worker's `APP_DEPLOY_DISPATCHER` (§5.6 step 7's dequeue);
+        //   - `AppDeployRequestService` — `APP_HOSTS_DEPLOY_REQUESTER` (a primary-domain change
+        //     asks for a Deployment; the request re-runs every §5.1 precondition HERE).
+        @Optional()
+        private readonly workAppRuntimeStateRepository?: WorkAppRuntimeStateRepository,
+        @Optional()
+        private readonly appEnvRuntimeSource?: AppEnvRuntimeSource,
+        @Optional()
+        private readonly appRuntimeEventRelayService?: AppRuntimeEventRelayService,
+        @Optional()
+        private readonly appDeployDispatchRelay?: AppDeployDispatchRelay,
+        @Optional()
+        private readonly appDeployRequestService?: AppDeployRequestService,
+        // APW-04 (lane aw-ai) — the provisioner's events port, behind the isolated App
+        // runtime worker's `APP_PROVISION_EVENTS_PORT` and `APP_TARGET_UPDATED_PORT` proxies
+        // (`trigger-app-runtime.module.ts`). Appended LAST + `@Optional()` per the arity rule
+        // above: with the name absent the worker's proxy answers the loud `Unknown remote
+        // target: AppProvisionEventsService` rather than pretending it was told.
+        @Optional()
+        private readonly appProvisionEventsService?: AppProvisionEventsService,
+        // APW-03 T42 / APW-02 T33 — `AppLicenseService`, which the `app-upstream-sync`
+        // worker binds to `APP_UPSTREAM_LICENSE_SERVICE` by this name: FR-37's
+        // `previewUpstream` (is upstream's head licence worse?) and FR-40's `request`
+        // land here, where the spec state row and the licence registry are. Appended
+        // LAST + `@Optional()` per the arity rule above: with it absent the proxy answers
+        // the loud `Unknown remote target: AppLicenseService`, which the sync reads as
+        // "unknown" and takes the pull-request path (never an unasked fast-forward).
+        @Optional()
+        private readonly appLicenseService?: AppLicenseService,
+        // APW-06 T31 (lane aw-deploy-2) — the worker's `APP_CLUSTER_OP_DISPATCHER` re-dispatches
+        // through the API's gate. Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly appClusterOpDispatchRelay?: AppClusterOpDispatchRelay,
+        // A0.10 (lane aw-deploy-2) — `app-dependency-provision` runs `AppDependenciesService` in the
+        // isolated worker, which owns no DataSource and no key: its row store, its raw row writes,
+        // its cipher, its spec source and its re-dispatch land here. Appended LAST + `@Optional()`.
+        @Optional()
+        private readonly workAppDependencyRepository?: WorkAppDependencyRepository,
+        @Optional()
+        private readonly appDependencyRowsRelay?: AppDependencyRowsRelay,
+        @Optional()
+        private readonly appDependencyConfigCipherRelay?: AppDependencyConfigCipherRelay,
+        @Optional()
+        private readonly appDependencySpecSourceAdapter?: AppDependencySpecSourceAdapter,
+        @Optional()
+        private readonly appDependencyProvisionDispatchRelay?: AppDependencyProvisionDispatchRelay,
+        // T47/T48 (lane aw-deploy-2) — the worker's `APPS_DOMAIN_DNS_SERVICE` (managed record removal).
+        @Optional()
+        private readonly appsDomainDnsService?: AppsDomainDnsServiceImpl,
+        // Lane aw-deploy-3 — the worker's pull credential reads the stored registry pull token.
+        @Optional()
+        private readonly appBuildPullTokenReader?: AppBuildPullTokenReader,
     ) {}
 
     onModuleInit() {
@@ -845,11 +930,29 @@ export class TriggerInternalController implements OnModuleInit {
             // row (FR-17…FR-24a) — the service's own `deps.sleep` cannot cross this hop,
             // which is what `AppForkReadinessRunner` exists to bridge.
             AppForkReadinessRunner: this.appForkReadinessRunner,
+            AppProvisionEventsService: this.appProvisionEventsService,
             // APW-01 T15 — the worker half of the ready hand-off. Registered
             // unconditionally for the same reason every App entry above is: a name that
             // maps to `undefined` answers a loud "Unknown remote target" instead of
             // pretending the source was recorded in the member's repository.
             AppSourceInitializerService: this.appSourceInitializerService,
+            // APW-03 T42 / APW-02 T33 — the licence reads a worker may make, and ONLY
+            // those: a three-member facade (the `PluginAllowlistReader` precedent), so
+            // the derived allow-list never includes the owner-only `attest` or the
+            // evaluation writes. `previewUpstream` + `request` are the sync's
+            // `APP_UPSTREAM_LICENSE_SERVICE`; `getHostingEligibility` is the App runtime
+            // worker's `APP_LICENSE_SERVICE` read. Maps to `undefined` (a loud "Unknown
+            // remote target") when the service is not bound.
+            AppLicenseService: this.appLicenseService
+                ? {
+                      previewUpstream: (workId: string, owner: string, repo: string, sha: string) =>
+                          this.appLicenseService!.previewUpstream(workId, owner, repo, sha),
+                      request: (workId: string, reason?: string) =>
+                          this.appLicenseService!.request(workId, reason),
+                      getHostingEligibility: (workId: string, opts?: { commitSha?: string }) =>
+                          this.appLicenseService!.getHostingEligibility(workId, opts),
+                  }
+                : undefined,
             // AW-22 — `workspace-backup` calls `startFromPayload()` on the
             // runner, then `observeRun()` and `notifyFinished()` on the
             // service; the
@@ -858,6 +961,33 @@ export class TriggerInternalController implements OnModuleInit {
             WorkspaceBackupRunner: this.workspaceBackupRunner,
             WorkspaceBackupService: this.workspaceBackupService,
             WorkspaceBackupRepository: this.workspaceBackupRepository,
+            // APW-06 T71 (A0.7) — the isolated App runtime worker's five remaining names, same rule
+            // as every App entry above: a name that maps to `undefined` answers a loud
+            // "Unknown remote target" instead of pretending.
+            WorkAppRuntimeStateRepository: this.workAppRuntimeStateRepository,
+            AppEnvRuntimeSource: this.appEnvRuntimeSource,
+            AppRuntimeEventRelayService: this.appRuntimeEventRelayService,
+            AppDeployDispatchRelay: this.appDeployDispatchRelay,
+            AppClusterOpDispatchRelay: this.appClusterOpDispatchRelay,
+            WorkAppDependencyRepository: this.workAppDependencyRepository,
+            AppDependencyRowsRelay: this.appDependencyRowsRelay,
+            AppDependencyConfigCipherRelay: this.appDependencyConfigCipherRelay,
+            AppDependencySpecSourceAdapter: this.appDependencySpecSourceAdapter,
+            AppDependencyProvisionDispatchRelay: this.appDependencyProvisionDispatchRelay,
+            // A one-member facade (the `PluginAllowlistReader` precedent): the worker removes a
+            // managed record by Work id and nothing else — the service's `provider()` holds the
+            // apps-DNS token and must never be reachable over this hop.
+            AppsDomainDnsServiceImpl: this.appsDomainDnsService
+                ? {
+                      removeRecord: (workId: string) =>
+                          this.appsDomainDnsService!.removeRecord(String(workId)),
+                  }
+                : undefined,
+            // Lane aw-deploy-3 — one read (`read(workId)`), the `PluginAllowlistReader` shape.
+            AppBuildPullTokenReader: this.appBuildPullTokenReader
+                ? { read: (workId: string) => this.appBuildPullTokenReader!.read(String(workId)) }
+                : undefined,
+            AppDeployRequestService: this.appDeployRequestService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

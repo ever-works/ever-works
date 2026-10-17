@@ -1902,6 +1902,22 @@ describe('GitHubPrReviewBridgeService', () => {
                 expect(rejections.recordPullRequestRejection).toHaveBeenCalledTimes(1);
             });
 
+            // Item 11: the row is keyed on its SOURCE, so a redelivered
+            // `created` webhook is recognised as the same finding.
+            it('keys a bot finding on its comment, so a redelivery is the same row', async () => {
+                const { service, rejections } = createService();
+                const body = botReviewComment('coderabbitai[bot]', CODERABBIT_MAJOR_FINDING);
+                await service.handleEvent(BINDING, 'pull_request_review_comment', body);
+                await service.handleEvent(BINDING, 'pull_request_review_comment', body);
+                const keys = rejections.recordPullRequestRejection.mock.calls.map(
+                    ([input]: [{ sourceKey?: string }]) => input.sourceKey,
+                );
+                expect(keys).toEqual([
+                    `pull_request_review_comment:${(body.comment as { id: number }).id}`,
+                    `pull_request_review_comment:${(body.comment as { id: number }).id}`,
+                ]);
+            });
+
             it('drops an edited bot comment — only `created` carries a new finding', async () => {
                 const { service, rejections, eventIngestService } = createService();
                 await service.handleEvent(

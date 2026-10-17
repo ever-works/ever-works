@@ -14,6 +14,8 @@ import {
 } from '@ever-works/agent/app-works';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
+import { AppLicenseRegistryCronService } from '../app-license/app-license-registry-cron.service';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 
 /**
  * APW-02 T27 — the API-side App Works module: the three upstream routes of plan §4.1
@@ -168,6 +170,13 @@ import { AppUpstreamController } from './app-upstream.controller';
         // `useClass`: the bound handler must be the SAME instance the RPC channel
         // publishes, so a worker call and an in-process run cannot diverge.
         { provide: APP_FORK_READY_HANDLER, useExisting: AppSourceInitializerService },
+        // APW-03 T43 — the licence registry-change fan-out (≤ 500 per tick). Its one
+        // collaborator, `AppLicenseService`, arrives through `AgentAppWorksModule`'s
+        // re-export of `AppLicenseModule`.
+        AppLicenseRegistryCronService,
+        // Its per-tick lease (the cache module is not global; provided locally, as the agent
+        // `AppWorksModule` and `AppSpecModule` do).
+        DistributedTaskLockService,
     ],
     exports: [
         AgentAppWorksModule,

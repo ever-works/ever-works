@@ -301,6 +301,10 @@
             "types": "./dist/app-spec/index.d.ts",
             "default": "./dist/app-spec/index.js"
         },
+        "./app-license": {
+            "types": "./dist/app-license/index.d.ts",
+            "default": "./dist/app-license/index.js"
+        },
         "./app-builds": {
             "types": "./dist/app-builds/index.d.ts",
             "default": "./dist/app-builds/index.js"

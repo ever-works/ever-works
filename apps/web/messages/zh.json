@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "生成 Work，一次性或按计划",
                     "deploy": "部署 Work",
                     "tasks": "此 Work 的任务",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "从您的仓库构建的容器镜像"
                 },
                 "tasks": "任务",
                 "posts": "文章",
                 "pages": "页面",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "构建"
             },
             "members": {
                 "title": "团队成员",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "上游仓库：{fullName}",
+                    "fork": "复刻：{fullName}",
+                    "private-copy": "私有副本：{fullName}",
+                    "link": "已关联：{fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "正在准备您的复刻",
+                    "forkBody": "GitHub 正在创建 {fullName}。通常不到一分钟即可完成；大型仓库可能需要更长时间。",
+                    "copyTitle": "正在准备您的私有副本",
+                    "copyBody": "正在将 {upstream} 复制到 {fullName}。仓库越大，耗时越长。",
+                    "linkTitle": "正在完成设置",
+                    "linkBody": "正在发起一个向 {fullName} 添加 .works/works.yml 的拉取请求。",
+                    "blueprintTitle": "正在应用 {name} Blueprint",
+                    "blueprintBody": "Ever Works 正在准备您的 App Work，并将写入 .works/works.yml 以及该 Blueprint 的文件。"
+                },
+                "setupPrClosed": "设置拉取请求未经合并即被关闭。",
+                "timedOut": "您的复刻已耗时超过 15 分钟。",
+                "failedAccess": "Ever Works 在准备此 App Work 时失去了 GitHub 访问权限。",
+                "failedOther": "准备此 App Work 失败：{reason}",
+                "waitingForSetupPr": "合并设置拉取请求即可完成。",
+                "tryAgain": "重试",
+                "openOnGitHub": "在 GitHub 上打开",
+                "reconnectGitHub": "重新连接 GitHub",
+                "openPullRequest": "打开拉取请求",
+                "retryLimit": "您已用完本小时的 3 次重试机会。请稍后再试。",
+                "retryFailed": "无法开始新的尝试。请重试。",
+                "failedReasons": {
+                    "works_yml_unparseable": "默认分支上的 .works/works.yml 不是有效的 YAML。请修复或删除该文件，然后重试。",
+                    "works_yml_other_kind": ".works/works.yml 已声明了其他类型的 Work。请设置 kind: app 或删除该文件，然后重试。",
+                    "push_rejected": "GitHub 一直拒绝添加 .works/works.yml 的提交。",
+                    "provider_unsupported": "此仓库的 Git 提供方无法自动设置。",
+                    "too_large_for_private_copy": "该仓库过大，无法创建私有副本。请改为创建复刻。",
+                    "uses_lfs": "该仓库使用了 Git LFS，私有副本无法携带。请改为创建复刻。",
+                    "other": "设置仓库时出现问题。"
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Work 仓库",
+                    "upstream": "上游仓库",
+                    "relationLabel": "关系",
+                    "readinessLabel": "就绪状态",
+                    "readiness": {
+                        "preparing": "准备中",
+                        "ready": "就绪",
+                        "timed_out": "已超时",
+                        "failed": "失败",
+                        "waiting_for_setup_pr": "正在等待设置拉取请求"
+                    },
+                    "relations": {
+                        "link": "已关联",
+                        "fork": "复刻",
+                        "private-copy": "私有副本"
+                    },
+                    "appSpecLabel": "应用规范",
+                    "appSpecStatus": {
+                        "valid": "有效",
+                        "valid_with_warnings": "有效，但有警告",
+                        "invalid": "存在错误",
+                        "missing": "尚未编写",
+                        "unreadable": "无法读取",
+                        "pending": "正在检查",
+                        "unknown": "尚未检查"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {无错误} =1 {1 个错误} other {# 个错误}} · {warnings, plural, =0 {无警告} =1 {1 个警告} other {# 个警告}}",
+                    "openAppSpec": "打开应用规范",
+                    "blueprint": "Blueprint：{id}",
+                    "unavailable": "目前无法加载 App 详情。",
+                    "builds": "构建",
+                    "deploy": "部署",
+                    "upstreamTab": "上游仓库",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "借助其智能体持续改进",
+                    "body": "让该 Work 的智能体修改应用——添加功能、修复缺陷、升级依赖。它会在 Work 仓库中工作并发起拉取请求。",
+                    "button": "就此 App 进行对话"
+                }
+            },
+            "builds": {
+                "title": "构建",
+                "subtitle": "在 {repository} 中由 GitHub 托管的运行器构建 · 镜像 {imageRepository}",
+                "subtitleNoImage": "在 {repository} 中由 GitHub 托管的运行器构建",
+                "subtitleGeneric": "从此 App Work 的仓库构建的容器镜像。",
+                "startBuild": "开始构建",
+                "starting": "正在启动…",
+                "refresh": "刷新",
+                "cancel": "取消",
+                "cancelling": "正在取消…",
+                "viewerDisabled": "您需要编辑权限才能执行此操作。",
+                "deployable": "可部署",
+                "notDeployableLine": "不可部署——{reason}",
+                "pagination": "显示第 {start}–{end} 条，共 {total} 条",
+                "listLabel": "此 App Work 的构建",
+                "openDetails": "打开构建 #{number}",
+                "status": {
+                    "queued": "排队中",
+                    "running": "运行中",
+                    "succeeded": "成功",
+                    "failed": "失败",
+                    "cancelled": "已取消",
+                    "blocked": "已阻止"
+                },
+                "trigger": {
+                    "push": "推送",
+                    "pullRequest": "PR #{number}",
+                    "manual": "手动",
+                    "verification": "验证"
+                },
+                "notDeployable": {
+                    "notSucceeded": "构建未成功",
+                    "pullRequest": "从拉取请求构建",
+                    "verification": "为验证而构建",
+                    "specInvalid": "此提交的应用规范存在错误",
+                    "staleInputs": "使用了较旧的构建值",
+                    "secretCheckFailed": "机密检查未通过",
+                    "digestUnconfirmed": "无法确认已推送的镜像",
+                    "criticalVulnerability": "存在已有修复方案的严重漏洞",
+                    "unsigned": "镜像未签名"
+                },
+                "blocked": {
+                    "workflowPending": "正在等待构建工作流被合并。",
+                    "workflowEditedByHand": "构建工作流已被手动编辑。",
+                    "workflowWriteFailed": "Ever Works 无法将构建工作流写入仓库。此仓库上的某条规则拒绝了该更改。",
+                    "actionsDisabled": "此仓库已关闭 GitHub Actions。",
+                    "missingBuildValues": "正在等待 {count, plural, =1 {1 个构建值} other {# 个构建值}}：{names}",
+                    "runnerTooSmall": "此构建需要 {needed}，但 {visibility} 仓库的运行器最多允许 {max}。",
+                    "tooManyBuildValues": "此构建使用了 {count} 个构建值；最多允许 50 个。",
+                    "buildValueTooLarge": "{name} 过大，无法传递给构建（最大 48 KB）。",
+                    "secretLimitReached": "该仓库已无空间存放更多机密。",
+                    "strategyNotSupported": "GitHub 托管的运行器无法使用“{strategy}”策略构建。请添加 Dockerfile，并将 build.strategy 设置为 dockerfile。",
+                    "specInvalid": "此提交的应用规范存在错误。",
+                    "gitConnectionMissing": "Ever Works 无法通过您的 GitHub 连接访问此仓库。",
+                    "repositoryUnavailable": "{repository} 已归档、已删除，或您的 GitHub 连接已无法访问。",
+                    "managedConcurrencyLimit": "正在等待其他构建：每个应用最多同时运行 {perWork} 个，每个账户最多 {perAccount} 个。",
+                    "buildValueNameReserved": "{name} 是 Ever Works 的保留名称，无法传递给构建。请重命名该环境条目。",
+                    "buildServicePortRequired": "构建服务 {service} 需要一个端口：Ever Works 不知道“{image}”监听哪个端口。",
+                    "verificationDependencyUnsupported": "验证暂时无法启动 {kind}。此检查将改为在集群上运行。",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "审查拉取请求",
+                    "turnOnActions": "开启",
+                    "setValue": "设置",
+                    "useLargerRunner": "使用更大的运行器",
+                    "openRepositorySettings": "打开仓库设置",
+                    "reconnectGithub": "重新连接 GitHub",
+                    "rebuild": "重新构建",
+                    "openEnvironment": "打开环境"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "内存不足",
+                        "suggestion": "请提高 build.resources.memory（当前为 {memory}）或减小构建的堆大小。在此运行器上，构建最多可使用 {max}。"
+                    },
+                    "diskFull": {
+                        "title": "磁盘空间不足",
+                        "suggestion": "在构建设置中开启“回收运行器磁盘”，或使用 .dockerignore 文件缩小构建上下文。"
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile 在第 {step} 步（共 {total} 步）失败",
+                        "suggestion": "失败的步骤是：{command}。请在 {dockerfile} 中修复并推送，或让智能体来修复。"
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "无法下载依赖",
+                        "suggestion": "某个软件包或基础镜像仓库未响应。请几分钟后重新构建；如果仍然失败，请固定您所依赖的版本。"
+                    },
+                    "registryPushDenied": {
+                        "title": "无法推送镜像",
+                        "suggestion": "允许此仓库中的工作流写入软件包（Settings ▸ Actions ▸ General ▸ Workflow permissions），然后重新构建。"
+                    },
+                    "missingBuildValue": {
+                        "title": "缺少构建值：{names}",
+                        "suggestion": "请在“设置 ▸ 环境”中设置，然后重新构建。"
+                    },
+                    "secretInImage": {
+                        "title": "有一项机密本会被发布到镜像中：{name}",
+                        "suggestion": "请仅在较早的构建阶段使用此值，或将其作为构建机密挂载传入。未推送任何内容。"
+                    },
+                    "timeout": {
+                        "title": "耗时超过 {minutes} 分钟",
+                        "suggestion": "请提高 build.resources.timeoutMinutes（最大 180），或通过缓存加快构建速度。"
+                    },
+                    "workflowInvalid": {
+                        "title": "工作流文件无效",
+                        "suggestion": "GitHub 无法运行构建工作流。请审查 Ever Works 发起的拉取请求以恢复它。"
+                    },
+                    "digestMismatch": {
+                        "title": "无法确认已推送的镜像",
+                        "suggestion": "镜像仓库报告的镜像与构建报告的不同。请重新构建；任何未经确认的内容都不会被部署。"
+                    },
+                    "verificationFailed": {
+                        "title": "应用未通过冒烟测试",
+                        "suggestion": "{total} 项冒烟测试中有 {failed} 项失败。请查看下方结果。"
+                    },
+                    "egressBlocked": {
+                        "title": "网络访问被阻止",
+                        "suggestion": "构建尝试访问 {hosts}，但它们不在构建器的允许列表中。请从您的源仓库或允许的镜像仓库获取所需内容，然后重新构建。"
+                    },
+                    "lost": {
+                        "title": "已失去对此构建的跟踪",
+                        "suggestion": "GitHub 已不再响应此构建的状态。请在 GitHub 上查看。"
+                    },
+                    "unknown": {
+                        "title": "出现了其他问题",
+                        "suggestion": "在 GitHub 上打开日志，或让智能体查看。"
+                    },
+                    "askAgent": "让智能体修复此问题",
+                    "excerptLabel": "日志最后几行"
+                },
+                "cancelReason": {
+                    "user": "已由成员取消",
+                    "superseded": "已被更新的构建取代"
+                },
+                "detail": {
+                    "title": "构建 #{number} · {sha} · {status}",
+                    "loading": "正在加载构建详情…",
+                    "close": "关闭",
+                    "trigger": "触发方式",
+                    "triggeredBy": "{trigger}——由 {name} 触发",
+                    "commit": "提交",
+                    "commitValue": "{sha}（{branch}）",
+                    "runner": "运行器",
+                    "duration": "时长",
+                    "durationValue": "{duration}（排队 {queued}）",
+                    "image": "镜像",
+                    "tags": "标签",
+                    "deployable": "可部署",
+                    "yes": "是",
+                    "buildValues": "构建值",
+                    "buildValuesValue": "{count, plural, =1 {已同步 1 个} other {已同步 # 个}}：{names}",
+                    "noBuildValues": "无",
+                    "receipt": "费用明细",
+                    "verification": "验证",
+                    "copy": "复制",
+                    "copied": "已复制镜像引用。",
+                    "copyFailed": "无法复制镜像引用。",
+                    "viewLogs": "在 GitHub 上查看日志",
+                    "rebuildThisCommit": "重新构建此提交",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} 运行器分钟 · 由您的 GitHub 账户支付",
+                    "minutesPlatform": "{minutes} 运行器分钟 · 由 Ever Works 支付",
+                    "checksMinutes": "其中 {checksMinutes} 分钟用于运行 App 检查",
+                    "costUnknown": "运行器分钟数尚未上报"
+                },
+                "verification": {
+                    "componentsReady": "组件已启动",
+                    "componentsNotReady": "组件未启动",
+                    "job": "作业 {name} 以 {exitCode} 退出",
+                    "jobNoExit": "作业 {name} 未完成",
+                    "smokePassed": "通过：{name}",
+                    "smokeFailed": "失败：{name}——预期 {expected}，实际 {observed}"
+                },
+                "empty": {
+                    "noBuilds": "暂无构建。构建工作流进入仓库后，将开始第一次构建。",
+                    "unavailable": "此实例暂不支持构建。"
+                },
+                "errors": {
+                    "loadFailed": "无法加载构建。请尝试刷新页面。",
+                    "rebuildRateLimited": "您本小时启动的构建过多。请在 {minutes, plural, =1 {1 分钟} other {# 分钟}}后重试。",
+                    "commitNotReachable": "该提交不在被跟踪的分支上。",
+                    "nothingToBuild": "此 App Work 运行的是已发布的镜像，因此无需构建。",
+                    "notCancellable": "此构建已完成，因此无法取消。",
+                    "providerUnavailable": "目前没有可用的构建提供方。请稍后再试。",
+                    "startFailed": "无法启动构建。请重试。",
+                    "cancelFailed": "无法取消此构建。请重试。",
+                    "detailFailed": "无法加载此构建。请重试。"
+                },
+                "toasts": {
+                    "started": "构建已加入队列。",
+                    "deduped": "此提交的构建已在队列中。",
+                    "cancelled": "构建已取消。"
+                },
+                "pullToken": {
+                    "title": "添加拉取令牌",
+                    "body": "此镜像为私有。您的集群需要一个只能读取软件包的令牌才能下载它。",
+                    "stepCreate": "1. 创建一个仅勾选“read:packages”的经典令牌。",
+                    "stepPaste": "2. 将其粘贴到此处。",
+                    "label": "令牌",
+                    "submit": "检查并保存",
+                    "saving": "正在检查…",
+                    "tooBroad": "此令牌的权限超出读取软件包的范围。请创建一个仅具有 read:packages 的令牌。",
+                    "fineGrained": "这是细粒度令牌。请创建一个仅勾选 read:packages 的经典令牌。",
+                    "cannotRead": "此令牌无法读取 {imageRepository}。",
+                    "publicImage": "此镜像已公开——无需令牌。",
+                    "noImageYet": "尚无已完成的构建。请在首次成功构建后添加拉取令牌。",
+                    "savedExpires": "拉取令牌已保存。它将于 {date} 过期。",
+                    "savedNoExpiry": "拉取令牌已保存。它不会过期。",
+                    "tokenSet": "已保存拉取令牌。粘贴新令牌即可替换。",
+                    "expiringSoon": "拉取令牌将于 {date} 过期。请在此之前添加新令牌。",
+                    "viewerDisabled": "您需要编辑权限才能执行此操作。",
+                    "failed": "无法保存拉取令牌。请重试。"
+                },
+                "overview": {
+                    "title": "最新构建",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "可部署构建：此提交",
+                    "deployableOther": "可部署构建：{sha}",
+                    "noDeployable": "暂无可部署构建",
+                    "open": "打开构建"
+                }
+            },
+            "appDeploy": {
+                "title": "部署",
+                "notRunning": "此应用尚未在任何地方运行。",
+                "runningOn": "{state} · {target}",
+                "openApp": "打开应用",
+                "source": "来源",
+                "buildsLink": "查看构建",
+                "buildsHint": "无论目标是什么，构建都会照常运行。",
+                "stale": "上次检查于 {minutes, plural, =1 {1 分钟} other {# 分钟}}前",
+                "status": {
+                    "notDeployed": "未部署",
+                    "live": "运行中",
+                    "degraded": "性能下降",
+                    "down": "已宕机",
+                    "unreachable": "无法访问您的集群",
+                    "paused": "已暂停",
+                    "deleting": "正在删除…"
+                },
+                "target": {
+                    "heading": "应在哪里运行？",
+                    "current": "（当前）",
+                    "none": {
+                        "label": "无——暂不部署",
+                        "description": "构建仍会运行。"
+                    },
+                    "yourCluster": {
+                        "label": "您的集群",
+                        "description": "在您掌控的 Kubernetes 集群上运行。"
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "由我们为您运行。",
+                        "unavailable": "即将推出——应用托管服务尚未开放。",
+                        "ineligible": "此应用暂不可用。"
+                    },
+                    "connect": "连接您的集群",
+                    "reconnect": "更改集群连接",
+                    "connected": "已连接 · {version}",
+                    "connectedNoVersion": "已连接",
+                    "checkFailed": "上次集群检查失败。",
+                    "notChecked": "尚未连接集群。",
+                    "save": "使用此目标",
+                    "saving": "正在保存…",
+                    "saved": "目标已保存。",
+                    "saveFailed": "无法保存目标：{reason}",
+                    "changeNote": "更改目标不会移除任何已在运行的内容。",
+                    "routeUnavailable": "此实例暂不支持更改目标。"
+                },
+                "connect": {
+                    "title": "连接您的集群",
+                    "description": "粘贴此应用将要运行的集群中某个服务账户的 kubeconfig。",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "粘贴您的 kubeconfig…",
+                    "kubeconfigHelp": "请使用服务账户令牌。不支持命令、本地文件和代理。",
+                    "kubeconfigStored": "您的 kubeconfig 已发送过一次，并以加密方式存储。粘贴新的即可替换，或重新检查已存储的配置。",
+                    "contextLabel": "上下文（可选）",
+                    "contextHelp": "留空则使用 kubeconfig 的当前上下文。",
+                    "check": "检查连接",
+                    "checking": "正在检查…",
+                    "checkAgain": "重新检查",
+                    "checkTimedOut": "检查未在 30 秒内完成。请重试。",
+                    "checkFailed": "无法检查连接：{reason}",
+                    "unavailable": "此实例暂不支持连接集群。",
+                    "kubeconfigTooLarge": "此 kubeconfig 超过 64 KiB。",
+                    "kubeconfigRequired": "请先粘贴 kubeconfig。",
+                    "ingressClass": "Ingress 类",
+                    "ingressDefault": "{name}（默认）",
+                    "ingressNone": "未找到 Ingress 类",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "由签发者提供证书",
+                        "external": "在集群外部处理",
+                        "edge": "在边缘终止",
+                        "none": "无 TLS（仅 http）"
+                    },
+                    "issuer": "签发者",
+                    "namespace": "命名空间",
+                    "namespaceAuto": "在应用首次部署时选定",
+                    "isolation": "网络隔离",
+                    "isolationOn": "开启（推荐）",
+                    "isolationOff": "关闭",
+                    "isolationOffWarning": "如果没有网络隔离，集群上的其他工作负载可以访问此应用及其数据库。",
+                    "cancel": "取消",
+                    "save": "保存",
+                    "saving": "正在保存…",
+                    "saveBlocked": "检查通过且具备所有必需权限后即可保存。",
+                    "saved": "集群已连接。",
+                    "saveFailed": "无法保存集群连接：{reason}"
+                },
+                "check": {
+                    "ok": "已连接",
+                    "version": "Kubernetes {version}",
+                    "failed": "集群检查失败。",
+                    "kubeconfigRefused": "此 kubeconfig {reason}。请改用服务账户令牌。",
+                    "notPublic": "Ever Works 只能访问具有公网地址的集群。",
+                    "permissions": "权限",
+                    "allPermissions": "所有必需权限均已具备。",
+                    "missing": "缺少：{verb} {resource}",
+                    "optionalMissing": "可选，缺少：{verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "立即部署",
+                    "deploying": "正在请求…",
+                    "started": "部署已开始。",
+                    "queued": "已排队——将在当前运行的部署完成后开始。",
+                    "deduplicated": "该部署已被请求过。",
+                    "inProgress": "另一个部署正在运行（{id}）。请等待其完成后再部署。",
+                    "preconditionsHeader": "部署前请先解决以下问题：",
+                    "workerNotIsolated": "暂时无法开始部署：此实例没有隔离的 App 集群 worker。",
+                    "notAppWork": "此 Work 不是 App Work，因此无法以这种方式部署。",
+                    "failed": "无法请求部署：{reason}",
+                    "targetNone": "请先选择应用的运行位置——选择“无”不会部署任何内容。",
+                    "deploymentId": "部署 {id}",
+                    "warningsHeader": "警告"
+                },
+                "preconditions": {
+                    "specInvalid": "应用规范（.works/works.yml）存在错误。请在应用规范页面中修复。",
+                    "licenseBlocksTarget": "该应用的许可证不允许在此目标上托管。",
+                    "licenseAttestationMissing": "部署前请先声明该应用的许可证。",
+                    "envRequiredUnset": "部分必需的 env 值尚未设置。",
+                    "dependencyNotReady": "应用所需的某个依赖尚未就绪。",
+                    "noGreenBuild": "尚无可部署的成功构建。请先启动构建。",
+                    "noGreenBuildForHead": "部署分支上的最新提交尚未成功构建。",
+                    "buildImageMissing": "该构建没有可部署的镜像。",
+                    "nothingToDeploy": "暂无可部署的内容：没有构建，也没有已发布的镜像。",
+                    "imageNotPinned": "此镜像通过标签引用。请按摘要（digest）固定它，以便每次部署都运行相同的镜像。",
+                    "imageNotFound": "在其镜像仓库中找不到该镜像。",
+                    "imagePrivateUnsupported": "没有凭据无法下载此镜像。Ever Works 仅在已发布镜像公开时才会部署它们。",
+                    "imageUnresolvable": "无法解析镜像引用。",
+                    "primaryDomainMissing": "主域名尚未设置。",
+                    "targetNone": "请先选择应用的运行位置。",
+                    "targetNotChecked": "请先检查集群连接。",
+                    "clusterChangedUnconfirmed": "自上次部署以来集群已发生变化。请确认此变化后再部署。",
+                    "managedDisabled": "即将推出——应用托管服务尚未开放。",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps 仅运行来自已验证 Blueprint 的应用。",
+                    "quotaExceeded": "您在 Ever Works Apps 上可运行的应用数量已达上限。",
+                    "managedIneligible": "此应用无法在 Ever Works Apps 上运行。",
+                    "managedSandboxUnavailable": "Ever Works Apps 目前无法接收新应用。",
+                    "appWorkDeleting": "此 App Work 正在被删除。",
+                    "paused": "应用已暂停。请恢复后再部署。",
+                    "deployInProgress": "另一个部署正在运行。",
+                    "cronAuthEnvUnset": "某个计划调用需要一个尚未设置的认证值。",
+                    "jobAuthEnvUnset": "某个作业需要一个尚未设置的认证值。",
+                    "volumeReplicas": "带有卷的组件只能运行一个副本。",
+                    "volumeShrink": "卷无法缩小。",
+                    "privilegedPort": "某个组件监听的端口低于 1024。",
+                    "cronTooFrequent": "某个计划调用的运行频率超出允许范围。",
+                    "managedRootForbidden": "此镜像以 root 身份运行。",
+                    "imageUserUnverifiable": "Ever Works 无法检查该镜像以哪个用户身份运行。",
+                    "workerNotIsolated": "暂时无法开始部署：此实例没有隔离的 App 集群 worker。",
+                    "envSourceUnavailable": "目前无法读取该应用的 env 值。",
+                    "pullCredentialUnavailable": "用于拉取镜像的凭据不可用。",
+                    "namespaceForeign": "该命名空间已属于集群上的其他资源。",
+                    "verificationNamespaceForbidden": "该命名空间保留用于验证运行。"
+                },
+                "license": {
+                    "loading": "正在读取许可证…",
+                    "unavailable": "此实例暂不提供许可证详情。",
+                    "error": "无法读取许可证。请重新加载页面后重试。",
+                    "headline": "{spdx}——{classLabel}",
+                    "headlineUnknown": "未找到我们能识别的许可证。",
+                    "classes": {
+                        "green": "允许托管",
+                        "amber": "在您确认许可证条款后，可部署到您的集群",
+                        "red": "在您确认许可证条款后，仅可部署到您的集群",
+                        "unknown": "许可证未知——部署前请确认条款",
+                        "unclassified": "尚未分类"
+                    },
+                    "mixed": "此仓库的部分内容使用了不同的许可证。",
+                    "incomplete": "此仓库过大，无法完整扫描。",
+                    "yourClusterAllowed": "您的集群：允许",
+                    "yourClusterAfterConfirm": "您的集群：确认许可证条款后允许",
+                    "review": "查看并确认",
+                    "confirmed": "已于 {date} 确认。",
+                    "disclaimer": "这是对仓库许可证文件的自动解读，不构成法律建议。",
+                    "unknownSpdx": "此软件的许可证",
+                    "dialogTitle": "确认许可证条款",
+                    "dialogBody": "{spdx} 限制了此软件的托管方式。Ever Works Apps 不适用于此软件。若要在您自己的集群上运行，请确认：",
+                    "noText": "许可证登记库中没有此许可证的声明。",
+                    "checkbox": "我确认上述声明。",
+                    "footer": "我们会记录确认人、确认时间，以及对应的许可证和提交。",
+                    "cancel": "取消",
+                    "confirm": "确认",
+                    "refusals": {
+                        "ownerOnly": "只有 App Work 的所有者可以声明。",
+                        "licenseChanged": "在您查看期间许可证已更改。请查看新条款并重新确认。",
+                        "attestationNotRequired": "此许可证已无需确认。",
+                        "licenseUnavailable": "此实例暂不支持许可证确认。",
+                        "route_unavailable": "此实例暂不支持许可证确认。",
+                        "failed": "无法记录确认。请重试。"
+                    }
+                },
+                "rollback": {
+                    "button": "回滚",
+                    "title": "回滚到较早的部署",
+                    "description": "选择一个曾经上线的部署。它的镜像和应用规范将再次运行，不会重新构建任何内容。",
+                    "pickLabel": "要回滚到的部署",
+                    "liveAt": "自 {when, date, medium} {when, time, short} 起上线",
+                    "liveAtUnknown": "之前曾上线",
+                    "none": "没有可回滚到的较早上线部署。",
+                    "runJobs": "重新运行部署前任务",
+                    "confirm": "回滚",
+                    "cancel": "取消",
+                    "started": "回滚已开始。",
+                    "failed": "无法开始回滚：{reason}"
+                },
+                "lifecycle": {
+                    "pause": "暂停",
+                    "resume": "恢复",
+                    "remove": "从集群中移除",
+                    "removeTitle": "从集群中移除此应用",
+                    "removeDescription": "正在运行的应用将停止，其 Kubernetes 对象将被删除。App Work 及其构建会保留。",
+                    "deleteData": "同时删除已存储的数据（卷和依赖数据库）",
+                    "deleteDataWarning": "此操作无法撤销。",
+                    "confirmSlugLabel": "输入 {slug} 以确认",
+                    "confirmRemove": "移除",
+                    "cancel": "取消",
+                    "failed": "无法完成此操作：{reason}",
+                    "slugMismatch": "你输入的标识与此 App Work 不匹配。",
+                    "accepted": {
+                        "pause": "已请求暂停。",
+                        "resume": "已请求恢复。",
+                        "remove": "已请求移除。",
+                        "cancelDeploy": "已请求取消。"
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "名称须以字母或下划线开头，且只能使用 A–Z、0–9 和 _。",
+                    "reservedName": "以 EVER_WORKS_ 开头的名称为平台保留。",
+                    "valueTooLarge": "单个值最多 65,536 字节。",
+                    "controlCharacter": "值不能包含 NUL 字符。",
+                    "lengthMismatch": "长度必须正好为 {expected} 个字符——当前为 {actual} 个。",
+                    "tooShort": "至少需要 {min} 个字符。",
+                    "tooLong": "最多 {max} 个字符。",
+                    "patternMismatch": "不符合此应用要求的格式。",
+                    "generatedValueUseRotate": "此值为自动生成。请通过轮换来替换它。",
+                    "neverRotateNotAcknowledged": "此应用声明此值绝不能更改。轮换前请确认您已了解这一点。",
+                    "rotateConfirmationMismatch": "您输入的名称与此值的名称不匹配。",
+                    "secureStorageUnavailable": "此安装未配置安全存储，因此无法存储值。",
+                    "tooManyValues": "一个应用最多可保存 300 个值。",
+                    "valuesTooLarge": "一个应用的所有值总计最多 1 MiB。",
+                    "malformedLine": "不是有效的 NAME=value 行。",
+                    "rotateRateLimited": "轮换次数过多。请稍后再试。"
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "待处理",
+                    "awaitingConfig": "需要您的设置",
+                    "provisioning": "正在预配",
+                    "ready": "就绪",
+                    "degraded": "性能下降",
+                    "failed": "失败",
+                    "kept": "已保留——不再受管理",
+                    "deleting": "正在删除",
+                    "deleted": "已删除",
+                    "notInSpec": "应用规范已不再使用——数据已保留"
+                },
+                "backup": {
+                    "none": "没有自动备份。如果此卷丢失，数据也将随之丢失。",
+                    "notConfigured": "备份：未配置",
+                    "healthy": "备份：上次完成于 {time}",
+                    "overdue": "备份：已逾期——上次完成于 {time}",
+                    "failing": "备份：上次尝试失败",
+                    "external": "备份：由您的 {kind} 提供方管理",
+                    "unknown": "备份：无法检查"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "您的集群没有默认存储类。请在依赖设置中选择一个。",
+                    "clusterUnreachable": "无法访问您的集群。",
+                    "smtpConnectFailed": "无法连接到邮件服务器。",
+                    "smtpTlsFailed": "与邮件服务器的 TLS 握手失败。",
+                    "smtpAuthRefused": "服务器拒绝了登录。",
+                    "bucketUnreadable": "存储桶 {bucket} 不存在或无法读取。",
+                    "volumeNotReady": "卷未在 {minutes} 分钟内就绪。",
+                    "extensionUnavailable": "扩展不可用：{names}。",
+                    "platformServerRefused": "该服务器存有 Ever Works 平台数据。请选择其他服务器。",
+                    "deadlineExceeded": "预配未能及时完成。",
+                    "namespaceNotOwned": "该命名空间属于另一个应用。请选择其他命名空间。",
+                    "namespaceBaselineMissing": "该命名空间缺少基线限制和策略。",
+                    "clusterPermissionMissing": "Ever Works 没有在您的集群中创建此依赖的权限。",
+                    "operatorNamespaceUnknown": "依赖设置中未设置 operator 的命名空间。",
+                    "volumeExpansionUnsupported": "存储类 {storageClass} 无法扩容此卷。",
+                    "sizeShrinkRefused": "依赖的存储无法缩小。如需更小的存储，请先删除其数据。",
+                    "relayIneligible": "此应用无法使用 Ever Works 邮件中继。",
+                    "relaySuspended": "Ever Works 邮件中继已暂停。",
+                    "providerNotSupported": "该提供方无法提供此依赖。",
+                    "dependencyNotDeclared": "应用规范未声明此依赖。",
+                    "confirmationMismatch": "您输入的名称不匹配。",
+                    "deleteInProgress": "此依赖的数据已在删除中。",
+                    "notGenerated": "该值并非自动生成，因此无需轮换。",
+                    "notAppWork": "此 Work 不是应用。",
+                    "targetNone": "此应用尚未设置部署位置。请选择一个部署目标以预配其依赖。",
+                    "targetNotChecked": "您的集群尚未通过检查。请检查连接，然后重试。"
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "代码仓库",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "将现有代码仓库注册为 Work — 任务、目标和车队运行都关联到它。不生成也不部署任何内容。",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "运行并持续改进任意 GitHub 仓库——关联或复刻它，然后选择它的运行位置。"
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "代码仓库"
+                "repo": "代码仓库",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "将现有代码仓库注册为 Work — 任务、目标和车队运行都关联到它。不生成也不部署任何内容。"
+                "repo": "将现有代码仓库注册为 Work — 任务、目标和车队运行都关联到它。不生成也不部署任何内容。",
+                "app": "运行并持续改进任意 GitHub 仓库——关联或复刻它，然后选择它的运行位置。"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "例如“https://github.com/owner/repo — 一个您想拥有自己副本的开源应用”",
+                "formTitle": "新建 App Work",
+                "formSubtitle": "从任意 GitHub 仓库开始。Ever Works 会关联它或为您创建副本，然后帮助您运行它并持续修改。",
+                "urlLabel": "仓库 URL",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "您已连接的账户可以读取的任意 GitHub 仓库。",
+                "checkButton": "检查仓库",
+                "checking": "正在检查…",
+                "tabPaste": "粘贴 URL",
+                "tabCatalog": "浏览 App 目录",
+                "catalogComingSoon": "App 目录即将在此开放。目前请粘贴仓库 URL。",
+                "stars": "{count, plural, =1 {1 颗星} other {# 颗星}}",
+                "defaultBranch": "默认分支：{branch}",
+                "largeRepository": "大型仓库（{size}）",
+                "moved": "已移至 {fullName}",
+                "isFork": "此仓库是 {parent} 的复刻。",
+                "ownFork": "这是您对 {parent} 的复刻。Ever Works 将把 {parent} 作为上游仓库进行跟踪。",
+                "publicForkNote": "公共仓库的复刻是公开的。",
+                "archivedNote": "此仓库已归档。上游同步保持关闭。",
+                "licenseChip": "许可证：{spdx}",
+                "licenseNotDetected": "许可证：未检测到",
+                "licenseClass": {
+                    "green": "允许托管",
+                    "amber": "在您声明许可证后，可部署到您的集群",
+                    "red": "在您声明许可证后，可部署到您的集群",
+                    "unknown": "许可证未知——您需要在部署前声明"
+                },
+                "blueprintBadge": {
+                    "verified": "已验证的 Blueprint",
+                    "available": "有可用的 Blueprint",
+                    "none": "无 Blueprint——将由智能体摸索如何运行它",
+                    "unavailable": "Blueprint 检查不可用"
+                },
+                "existingAppWork": "您已为此仓库创建了 App Work：{name}。",
+                "openExistingAppWork": "打开",
+                "scanIncomplete": "并非所有账户都已检查是否存在复刻。",
+                "modesTitle": "Ever Works 应如何使用此仓库？",
+                "modes": {
+                    "link": {
+                        "title": "关联",
+                        "titleOwnFork": "关联——不跟踪上游",
+                        "description": "按原样使用此仓库。您可以向其推送，因此更改会直接落到这里。"
+                    },
+                    "fork": {
+                        "title": "复刻",
+                        "description": "创建您自己的复刻。您可以将其与上游同步，并向上游提议更改。"
+                    },
+                    "private-copy": {
+                        "title": "私有副本",
+                        "description": "创建一个包含相同代码的私有仓库。"
+                    }
+                },
+                "unavailable": "不可用：{reason}",
+                "forkInto": "复刻到",
+                "copyInto": "复制到",
+                "ownerFilter": "搜索账户",
+                "ownerOrganization": "组织",
+                "ownerNotChecked": "未检查是否存在复刻",
+                "existingFork": "您已有一个复刻：{fullName}。Ever Works 将使用它。",
+                "privateCopyTradeOff": "私有副本在 GitHub 上与原仓库没有关联，因此无法向原项目发起拉取请求。上游的更改会以拉取请求的形式进入您的副本。",
+                "linkSetupNote": "Ever Works 会发起一个拉取请求，添加一个文件 .works/works.yml。合并它即可完成。",
+                "existingForkSetupNote": "此复刻并非由 Ever Works 创建，因此它会发起一个添加 .works/works.yml 的拉取请求。",
+                "linkSetupNoteBlueprint": "Ever Works 会发起一个拉取请求，添加 .works/works.yml 和该 Blueprint 的文件。合并它即可完成。",
+                "existingForkSetupNoteBlueprint": "此复刻并非由 Ever Works 创建，因此它会发起一个添加 .works/works.yml 和该 Blueprint 文件的拉取请求。",
+                "promptsTitle": "此应用需要的值",
+                "promptHint": "{name} Blueprint 需要这些值。您可以稍后在“设置”中更改。",
+                "promptRequired": "必填",
+                "promptsIncomplete": "请先填写应用需要的值。",
+                "autoProvision": "让智能体摸索如何运行它",
+                "autoProvisionHelp": "仓库就绪后开始。它会在预配上限内消耗 AI 令牌和构建运行器分钟数。您可以取消，或取消勾选此项，稍后在“概览”中通过“预配”启动。",
+                "deployTargetTitle": "应在哪里运行？",
+                "deployTargets": {
+                    "none": {
+                        "title": "无——暂不部署",
+                        "description": "您可以稍后选择目标。"
+                    },
+                    "your-cluster": {
+                        "title": "您的集群",
+                        "description": "在您自己的 Kubernetes 集群上运行。您将在“部署”标签页中添加连接。"
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "即将推出——应用托管服务尚未开放。"
+                    }
+                },
+                "submit": {
+                    "link": "关联并创建 App Work",
+                    "fork": "复刻并创建 App Work",
+                    "private-copy": "复制并创建 App Work"
+                },
+                "submitPending": "正在创建…",
+                "nameLabel": "名称",
+                "slugLabel": "Slug",
+                "descriptionLabel": "描述",
+                "slugHelp": "URL 友好的标识符。由仓库名称生成——可编辑以覆盖。",
+                "invalidSlug": "只能使用小写字母、数字和连字符，例如 tasks-app",
+                "cancel": "取消",
+                "createFailed": "无法创建 App Work。请重试。",
+                "success": {
+                    "link": "已创建 App Work。",
+                    "fork": "已请求复刻——就绪后我们会通知您。",
+                    "private-copy": "已开始复制——就绪后我们会通知您。"
+                },
+                "reasons": {
+                    "invalid_url": "请输入 GitHub 仓库 URL，例如 https://github.com/owner/repo",
+                    "provider_not_connected": "连接 GitHub 以创建 App Work。",
+                    "insufficient_scope": "重新连接 GitHub 以授予仓库访问权限。",
+                    "not_found": "我们找不到此仓库，或者您的 GitHub 账户无法读取它。",
+                    "sso_authorization_required": "{owner} 要求您在 GitHub 上为其组织授权 Ever Works。",
+                    "oauth_app_restricted": "{owner} 限制了第三方访问。请让 {owner} 的所有者批准 Ever Works，或选择其他账户。",
+                    "empty_repository": "此仓库还没有任何提交。",
+                    "no_push_access": "您无法向此仓库推送。",
+                    "archived": "已归档的仓库为只读。",
+                    "forking_disabled": "此仓库的所有者不允许复刻或复制。",
+                    "own_repository": "此仓库归您所有——请改为关联它。",
+                    "target_owner_unavailable": "此账户在您的 GitHub 连接中不可用。",
+                    "target_owner_forbidden": "您无法在 {owner} 中创建仓库。",
+                    "too_large_for_private_copy": "对于私有副本来说过大（{size}）。请改为复刻。",
+                    "uses_lfs": "使用了 Git LFS，私有副本无法携带。请改为复刻。",
+                    "copy_name_unavailable": "{owner} 已有名为 {name} 至 {name}-copy-5 的仓库。",
+                    "in_use_by_another_account": "另一个账户已在 Ever Works 中使用此仓库。请让其所有者将您添加为成员。",
+                    "app_work_exists": "您已为 {fullName} 创建了 App Work：{workName}。",
+                    "create_in_progress": "此 App Work 正在创建中。",
+                    "rate_limited": "GitHub 正在对您的账户限速。请在 {time} 重试。",
+                    "managed_hosting_unavailable": "即将推出——应用托管服务尚未开放。",
+                    "cluster_target_unavailable": "未安装可运行应用的部署选项。",
+                    "app_works_disabled": "此实例不支持 App Work。",
+                    "blueprint_mismatch": "此仓库的 Blueprint 已更改。请重新检查仓库。"
+                },
+                "catalog": {
+                    "searchLabel": "搜索 App 目录",
+                    "searchPlaceholder": "搜索应用——例如 umami 或 calendar",
+                    "listLabel": "App Blueprint",
+                    "loading": "正在加载 App 目录…",
+                    "unavailable": "App 目录当前不可用。请改为粘贴仓库 URL。",
+                    "disabled": "此实例不支持 App Work。",
+                    "error": "无法加载 App 目录。请重试，或粘贴仓库 URL。",
+                    "empty": "尚未发布任何 App Blueprint。请改为粘贴仓库 URL。",
+                    "noMatches": "没有与您的搜索匹配的应用。",
+                    "pick": "从 {name} 开始",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "即将推出",
+                    "verified": "已验证",
+                    "upstreamLine": "来自 {repo}",
+                    "runsOn": "运行于：{targets}",
+                    "targetYourCluster": "您的集群",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "暂不可用",
+                    "fallbackNote": "正在显示在 GitHub 上找到的 App Blueprint——精选目录当前不可用。"
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "导入已成功启动",
                 "failed": "导入作品失败",
                 "fetchReposFailed": "获取仓库失败"
+            },
+            "app": {
+                "repositoryUrlRequired": "请输入 GitHub 仓库 URL，例如 https://github.com/owner/repo",
+                "repositoryModeRequired": "请选择如何使用此仓库：关联、复刻或私有副本。",
+                "targetOwnerRequired": "请选择要在其中创建仓库的账户。",
+                "invalidUrl": "请输入 GitHub 仓库 URL，例如 https://github.com/owner/repo",
+                "inspectFailed": "无法检查此仓库。请重试。"
             }
         },
         "generator": {

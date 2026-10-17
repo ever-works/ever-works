@@ -46,6 +46,7 @@ import { TaskChatService } from '../tasks-domain/task-chat.service';
 import { TasksService } from '../tasks-domain/tasks.service';
 import type { AppForkReadyOutcome } from './app-fork-ready-handler.port';
 import { computeNextUpstreamSync } from './upstream-schedule';
+import { APP_WORK_AGENT_RESOLVER, type AppWorkAgentResolver } from './app-work-agent-resolver';
 
 /**
  * APW-02 (Fork lifecycle) — the Upstream state service: the one writer of
@@ -369,29 +370,12 @@ export interface AppConflictResult {
 // to its fail-closed default and the feature would fail silently rather than loudly.
 
 /**
- * _Provisional — APW-08 T25_ (`packages/agent/src/app-works/app-work-agent-resolver.ts`,
- * CONTRACTS.md:351, Resolution R-21).
- *
- * APW-08's change-Agent rule: the most recent Task's Agent, else the only Work-scoped
- * Agent, else the only assigned Agent, skipping archived and non-committing ones. APW-08
- * T25 states that the token is bound in `packages/agent/src/app-works/app-works.module.ts`
- * (APW-08 plan §2.8, `APW-08-evolve-loop/plan.md:523-533`), together with a
- * module-compilation spec asserting the injected token is **defined** — which is exactly
- * the check that will catch a forgotten swap.
- *
- * When T25 lands: delete this block, import `AppWorkAgentResolver` and
- * `APP_WORK_AGENT_RESOLVER` from `./app-work-agent-resolver`, and let that module bind
- * it. The port below is the consumer half of the CONTRACTS §2 row and nothing more.
+ * APW-08 T25 has landed (2026-10-17, lane aw-ai): the swap this block asked for is done.
+ * The port and its ONE Symbol now live in `./app-work-agent-resolver` and are re-exported
+ * here, so every import of them from this file keeps resolving to the same token, and
+ * `AppWorksModule` binds `AppWorkAgentResolverService` to it.
  */
-export interface AppWorkAgentResolver {
-    resolve(input: {
-        userId: string;
-        workId: string;
-    }): Promise<{ agentId: string; source: 'recent-task' | 'pinned' | 'assigned' } | null>;
-}
-
-/** DI token for {@link AppWorkAgentResolver} — owned by APW-08 T25. */
-export const APP_WORK_AGENT_RESOLVER = Symbol('APP_WORK_AGENT_RESOLVER');
+export { APP_WORK_AGENT_RESOLVER, type AppWorkAgentResolver };
 
 /**
  * _Provisional — APW-02 T31_ (`packages/agent/src/tasks/app-fork-readiness.types.ts`,

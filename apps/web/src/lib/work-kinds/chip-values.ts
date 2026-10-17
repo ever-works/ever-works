@@ -51,6 +51,7 @@ export type ChipType =
     | 'directory'
     | 'awesome-repo'
     | 'repo'
+    | 'app'
     | 'company';
 
 /**
@@ -77,6 +78,11 @@ export const CHIP_ORDER: ChipType[] = [
     'awesome-repo',
     // Self-build slice D (EW-766) — an existing code repository as a Work.
     'repo',
+    // APW-01 T23 — any GitHub repository, linked or forked, then built,
+    // deployed and evolved. FAIL-CLOSED: while `works-app` /
+    // `EVER_WORKS_APP_WORKS_ENABLED` is off the chip is ABSENT, not "Soon"
+    // (`isHiddenWhenDisabled`, FR-47).
+    'app',
     'company',
 ];
 
@@ -101,7 +107,8 @@ export type InitialWorkKind =
     | 'blog'
     | 'directory'
     | 'awesome-repo'
-    | 'repo';
+    | 'repo'
+    | 'app';
 
 /** The `/works/new` work kinds, in render order. */
 export const WORK_KIND_ORDER: InitialWorkKind[] = [
@@ -112,6 +119,8 @@ export const WORK_KIND_ORDER: InitialWorkKind[] = [
     'awesome-repo',
     // Self-build slice D (EW-766) — an existing code repository as a Work.
     'repo',
+    // APW-01 T23 — the App Work (fail-closed, see `CHIP_ORDER`).
+    'app',
 ];
 
 /**

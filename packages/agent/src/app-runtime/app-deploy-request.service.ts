@@ -168,9 +168,15 @@ export type AppDeployTrigger =
     | 'domain-change'
     | 'rollback'
     | 'target-saved'
-    | 'spec-applied';
+    | 'spec-applied'
+    // 2026-10-17 (lane aw-env-redeploy) — a runtime-phase App env change redeploys
+    // the live Deployment (`AppEnvRedeployListener`). Appended, like `spec-applied`.
+    | 'env-changed';
 
-/** Every trigger: plan §7.1:1036's five in its own order, then the sixth it omits (see above). */
+/**
+ * Every trigger: plan §7.1:1036's five in its own order, then the sixth it omits
+ * (see above), then `env-changed` (2026-10-17).
+ */
 export const APP_DEPLOY_TRIGGERS: readonly AppDeployTrigger[] = [
     'manual',
     'build',
@@ -178,6 +184,7 @@ export const APP_DEPLOY_TRIGGERS: readonly AppDeployTrigger[] = [
     'rollback',
     'target-saved',
     'spec-applied',
+    'env-changed',
 ];
 
 /**
@@ -194,6 +201,9 @@ export const APP_DEPLOY_QUEUEABLE_TRIGGERS: readonly AppDeployTrigger[] = [
     'build',
     'domain-change',
     'spec-applied',
+    // Event-driven like `spec-applied`: an env save during a running Deployment
+    // queues behind it (latest wins) instead of being refused 409.
+    'env-changed',
 ];
 
 /** T17's stale-lock window: the Deployment's 7 200 s maximum plus 60 (plan §7.2:1054). */

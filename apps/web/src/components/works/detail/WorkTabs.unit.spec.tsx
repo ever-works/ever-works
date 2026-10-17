@@ -97,3 +97,26 @@ describe('WorkTabs — the Upstream tab', () => {
         },
     );
 });
+
+/**
+ * APW-01 T24 / APW-05 T25 / APW-06 T37 — an App Work's tab strip: no Generator
+ * (spec S10), a Builds tab (the `builds` capability), and the Deploy tab even
+ * though an App Work has no generated config.
+ */
+describe('WorkTabs — App Work', () => {
+    it('withholds the Generator tab and offers Builds and Deploy', () => {
+        render(<WorkTabs work={makeWork('app')} appRelation="fork" />);
+
+        expect(screen.queryByText(`${T}.generator`)).not.toBeInTheDocument();
+        expect(screen.getByText(`${T}.builds`)).toBeInTheDocument();
+        expect(screen.getByText(`${T}.deploy`)).toBeInTheDocument();
+    });
+
+    it('never offers Builds to another kind, and leaves their Deploy rule untouched', () => {
+        render(<WorkTabs work={makeWork('default')} />);
+
+        expect(screen.queryByText(`${T}.builds`)).not.toBeInTheDocument();
+        // `config` is null in this harness, so a generated Work still has no Deploy tab.
+        expect(screen.queryByText(`${T}.deploy`)).not.toBeInTheDocument();
+    });
+});

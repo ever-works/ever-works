@@ -253,6 +253,20 @@ export class SetFleetNodeLimitCeilingDto {
  * one idempotent control, and an operator retrying a drain must not
  * accidentally toggle a node back into service.
  */
+/** Body of `POST /api/fleet/nodes/:id/clear-model-throttle`. */
+export class ClearFleetNodeModelThrottleDto {
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description:
+            'The model CLI whose usage-limit throttle to clear (`claude-code`, `codex`). Omitted or null clears every CLI on the node.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    provider?: string | null;
+}
+
 export class DrainFleetNodeDto {
     @ApiProperty({
         description:

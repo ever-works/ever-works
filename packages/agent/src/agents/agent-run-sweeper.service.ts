@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON } from '@ever-works/contracts';
 import { config } from '../config';
 import {
     ATTENTION_REASON_QUEUED_TOO_LONG,
@@ -149,9 +150,12 @@ export class AgentRunSweeperService {
         // held work would turn that promise into a lie. Both halves are
         // required: the SQL predicate below AND the service-layer filter
         // further down.
+        // Fleet usage limits — a fleet run parked until its node's model CLI
+        // resets (possibly days: a weekly limit) is waiting, not stuck.
         const scanned = await this.runs.findStuckNonTerminal(cutoff, limit, [
             QUEUED_REASON_KILL_SWITCH,
             QUEUED_REASON_AGENT_PAUSED,
+            FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
         ]);
         // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
         // on a human question must NEVER be reaped by a TTL sweep. It is not
@@ -173,7 +177,8 @@ export class AgentRunSweeperService {
                 !(
                     row.status === 'queued' &&
                     (row.queuedReason === QUEUED_REASON_KILL_SWITCH ||
-                        row.queuedReason === QUEUED_REASON_AGENT_PAUSED)
+                        row.queuedReason === QUEUED_REASON_AGENT_PAUSED ||
+                        row.queuedReason === FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON)
                 ),
         );
         const skippedHeld = notAwaiting.length - stuck.length;
@@ -312,7 +317,11 @@ export class AgentRunSweeperService {
 
         const limit = config.agents.getRunQueuedAttentionBatch();
         const cutoff = new Date(Date.now() - thresholdMinutes * 60_000);
-        const candidates = await this.runs.findQueuedTooLong(cutoff, limit);
+        // A run parked behind a model usage limit already filed its own,
+        // more precise, notice (one per node per window): not "queued too long".
+        const candidates = await this.runs.findQueuedTooLong(cutoff, limit, [
+            FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+        ]);
         if (candidates.length === 0) {
             return base;
         }

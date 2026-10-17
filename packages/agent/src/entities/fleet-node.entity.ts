@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 import type {
     ComputerControlPolicy,
     FleetNodeKind,
+    FleetNodeModelThrottleView,
     FleetNodeStatus,
     FleetNodeWorkerState,
 } from '@ever-works/contracts';
@@ -377,6 +378,24 @@ export class FleetNode {
      */
     @PortableDateColumn({ nullable: true })
     quarantineNoticedAt?: Date | null;
+
+    /**
+     * Fleet usage limits — the model CLIs this node's seat is OUT OF QUOTA
+     * on, one entry per CLI with the instant it may take that CLI's work
+     * again (`until`). Written by `FleetJobService` when a job result
+     * reports `failureKind: 'model_usage_limit'` (or an older node's result
+     * carries the CLI's limit sentence) and read by the LEASE, which drops
+     * the throttled CLI's capability tag for this node until then — so a
+     * pinned job waits for its node and an unpinned one runs elsewhere.
+     *
+     * Expired entries are inert (every reader filters on `until`) and are
+     * pruned on the next write. A JSON column, not one per CLI, so a new
+     * CLI is a code change only. NULL = never throttled.
+     *
+     * Migration: `1795161700000-AddFleetModelUsageLimits`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    modelThrottles?: FleetNodeModelThrottleView[] | null;
 
     /**
      * Node housekeeping (EW-803) — the free-space FLOOR the node enforces

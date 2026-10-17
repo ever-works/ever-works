@@ -53,6 +53,16 @@ export interface AgentInboundEmailDispatchPayload {
      * victim's where routing looks.
      */
     recipient: AgentInboundEmailRecipient | null;
+    /**
+     * The one agent the caller already authorized for this message (the
+     * integration API's `POST /email/inbound {agentId}`). Set, the dispatcher
+     * routes to THAT agent's inbound assignment on the address and refuses when
+     * it has none. An address may serve several agents (another organization's,
+     * a personal one), and the first assignment is not necessarily the one the
+     * caller may reach (review 2026-10-17 F15). Unset (the provider webhooks):
+     * the address's first inbound assignment, as before.
+     */
+    agentId?: string;
     providerMessageId: string;
     from: string;
     /** Every recipient the message names — recorded, never used for routing. */

@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Work genereren — eenmalig of volgens planning",
                     "deploy": "Work uitrollen",
                     "tasks": "Taken voor deze Work",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Container-images gebouwd vanuit je repository"
                 },
                 "tasks": "Taken",
                 "posts": "Berichten",
                 "pages": "Pagina's",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Builds"
             },
             "members": {
                 "title": "Teamleden",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Fork: {fullName}",
+                    "private-copy": "Privékopie: {fullName}",
+                    "link": "Gekoppeld: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Je fork wordt voorbereid",
+                    "forkBody": "GitHub maakt {fullName} aan. Dit duurt meestal minder dan een minuut; grote repository's kunnen langer duren.",
+                    "copyTitle": "Je privékopie wordt voorbereid",
+                    "copyBody": "{upstream} wordt gekopieerd naar {fullName}. Grotere repository's duren langer.",
+                    "linkTitle": "Installatie afronden",
+                    "linkBody": "Er wordt een pull request geopend die .works/works.yml toevoegt aan {fullName}.",
+                    "blueprintTitle": "De Blueprint {name} toepassen",
+                    "blueprintBody": "Ever Works bereidt je App Work voor en schrijft .works/works.yml met de bestanden van de Blueprint."
+                },
+                "setupPrClosed": "De installatie-pull request is gesloten zonder te mergen.",
+                "timedOut": "Je fork duurt langer dan 15 minuten.",
+                "failedAccess": "Ever Works heeft de toegang tot GitHub verloren tijdens het voorbereiden van deze App Work.",
+                "failedOther": "Voorbereiden van deze App Work mislukt: {reason}",
+                "waitingForSetupPr": "Merge de installatie-pull request om af te ronden.",
+                "tryAgain": "Opnieuw proberen",
+                "openOnGitHub": "Openen op GitHub",
+                "reconnectGitHub": "GitHub opnieuw koppelen",
+                "openPullRequest": "Pull request openen",
+                "retryLimit": "Je hebt alle 3 pogingen voor dit uur gebruikt. Probeer het later opnieuw.",
+                "retryFailed": "Kon geen nieuwe poging starten. Probeer het opnieuw.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml op de standaardbranch is geen geldige YAML. Corrigeer of verwijder het bestand en probeer het opnieuw.",
+                    "works_yml_other_kind": ".works/works.yml declareert al een ander soort Work. Stel kind: app in of verwijder het bestand en probeer het opnieuw.",
+                    "push_rejected": "GitHub bleef de commit weigeren die .works/works.yml toevoegt.",
+                    "provider_unsupported": "De Git-provider van deze repository kan niet automatisch worden ingesteld.",
+                    "too_large_for_private_copy": "De repository is te groot voor een privékopie. Maak in plaats daarvan een fork.",
+                    "uses_lfs": "De repository gebruikt Git LFS, dat een privékopie niet kan overnemen. Maak in plaats daarvan een fork.",
+                    "other": "Er ging iets mis bij het instellen van de repository."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Work-repository",
+                    "upstream": "Upstream",
+                    "relationLabel": "Relatie",
+                    "readinessLabel": "Gereedheid",
+                    "readiness": {
+                        "preparing": "Wordt voorbereid",
+                        "ready": "Klaar",
+                        "timed_out": "Time-out",
+                        "failed": "Mislukt",
+                        "waiting_for_setup_pr": "Wacht op de installatie-pull request"
+                    },
+                    "relations": {
+                        "link": "Gekoppeld",
+                        "fork": "Fork",
+                        "private-copy": "Privékopie"
+                    },
+                    "appSpecLabel": "App-spec",
+                    "appSpecStatus": {
+                        "valid": "Geldig",
+                        "valid_with_warnings": "Geldig, met waarschuwingen",
+                        "invalid": "Bevat fouten",
+                        "missing": "Nog niet geschreven",
+                        "unreadable": "Kon niet worden gelezen",
+                        "pending": "Wordt gecontroleerd",
+                        "unknown": "Nog niet gecontroleerd"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Geen fouten} =1 {1 fout} other {# fouten}} · {warnings, plural, =0 {geen waarschuwingen} =1 {1 waarschuwing} other {# waarschuwingen}}",
+                    "openAppSpec": "App-spec openen",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "De App-details konden nu niet worden geladen.",
+                    "builds": "Builds",
+                    "deploy": "Deployen",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Ontwikkel hem verder met zijn agent",
+                    "body": "Vraag de agent van de Work om de app te wijzigen — een functie toevoegen, een bug oplossen, een dependency upgraden. Hij werkt in de Work-repository en opent pull requests.",
+                    "button": "Chatten over deze App"
+                }
+            },
+            "builds": {
+                "title": "Builds",
+                "subtitle": "Gebouwd op door GitHub gehoste runners in {repository} · image {imageRepository}",
+                "subtitleNoImage": "Gebouwd op door GitHub gehoste runners in {repository}",
+                "subtitleGeneric": "Container-images gebouwd vanuit de repository van deze App Work.",
+                "startBuild": "Build starten",
+                "starting": "Starten…",
+                "refresh": "Vernieuwen",
+                "cancel": "Annuleren",
+                "cancelling": "Annuleren…",
+                "viewerDisabled": "Je hebt bewerkingsrechten nodig om dit te doen.",
+                "deployable": "Deploybaar",
+                "notDeployableLine": "Niet deploybaar — {reason}",
+                "pagination": "{start}–{end} van {total}",
+                "listLabel": "Builds van deze App Work",
+                "openDetails": "Build #{number} openen",
+                "status": {
+                    "queued": "In wachtrij",
+                    "running": "Bezig",
+                    "succeeded": "Geslaagd",
+                    "failed": "Mislukt",
+                    "cancelled": "Geannuleerd",
+                    "blocked": "Geblokkeerd"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Handmatig",
+                    "verification": "Verificatie"
+                },
+                "notDeployable": {
+                    "notSucceeded": "De build is niet geslaagd",
+                    "pullRequest": "Gebouwd vanuit een pull request",
+                    "verification": "Gebouwd voor verificatie",
+                    "specInvalid": "De App-spec bij deze commit bevat fouten",
+                    "staleInputs": "Gebouwd met oudere buildwaarden",
+                    "secretCheckFailed": "De secretcontrole is niet geslaagd",
+                    "digestUnconfirmed": "De gepushte image kon niet worden bevestigd",
+                    "criticalVulnerability": "Er is een fix beschikbaar voor een kritieke kwetsbaarheid",
+                    "unsigned": "De image is niet ondertekend"
+                },
+                "blocked": {
+                    "workflowPending": "Wacht tot de buildworkflow is gemerged.",
+                    "workflowEditedByHand": "De buildworkflow is handmatig bewerkt.",
+                    "workflowWriteFailed": "Ever Works kon de buildworkflow niet naar de repository schrijven. Een regel op deze repository weigert de wijziging.",
+                    "actionsDisabled": "GitHub Actions staat uit voor deze repository.",
+                    "missingBuildValues": "Wacht op {count, plural, =1 {1 buildwaarde} other {# buildwaarden}}: {names}",
+                    "runnerTooSmall": "Deze build heeft {needed} nodig, maar de runner voor {visibility} repository's staat {max} toe.",
+                    "tooManyBuildValues": "Deze build gebruikt {count} buildwaarden; er zijn er maximaal 50 toegestaan.",
+                    "buildValueTooLarge": "{name} is te groot om aan een build door te geven (maximaal 48 KB).",
+                    "secretLimitReached": "De repository heeft geen ruimte meer voor extra secrets.",
+                    "strategyNotSupported": "Door GitHub gehoste runners kunnen niet bouwen met de strategie \"{strategy}\". Voeg een Dockerfile toe en stel build.strategy in op dockerfile.",
+                    "specInvalid": "De App-spec bij deze commit bevat fouten.",
+                    "gitConnectionMissing": "Ever Works kan deze repository niet bereiken met je GitHub-verbinding.",
+                    "repositoryUnavailable": "{repository} is gearchiveerd, verwijderd of niet meer beschikbaar voor je GitHub-verbinding.",
+                    "managedConcurrencyLimit": "Wacht op andere builds: er draaien maximaal {perWork} per app en {perAccount} per account tegelijk.",
+                    "buildValueNameReserved": "{name} is gereserveerd door Ever Works en kan niet aan een build worden doorgegeven. Wijzig de naam van de omgevingsvariabele.",
+                    "buildServicePortRequired": "De buildservice {service} heeft een poort nodig: Ever Works weet niet op welke poort \"{image}\" luistert.",
+                    "verificationDependencyUnsupported": "Een verificatie kan {kind} nog niet starten. De controle draait in plaats daarvan op het cluster.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Pull request beoordelen",
+                    "turnOnActions": "Inschakelen",
+                    "setValue": "Instellen",
+                    "useLargerRunner": "Een grotere runner gebruiken",
+                    "openRepositorySettings": "Repository-instellingen openen",
+                    "reconnectGithub": "GitHub opnieuw koppelen",
+                    "rebuild": "Opnieuw bouwen",
+                    "openEnvironment": "Omgeving openen"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Geheugen vol",
+                        "suggestion": "Verhoog build.resources.memory (nu {memory}) of verklein de heapgrootte van de build. Op deze runner kan een build maximaal {max} gebruiken."
+                    },
+                    "diskFull": {
+                        "title": "Schijfruimte vol",
+                        "suggestion": "Schakel \"Runnerschijf vrijmaken\" in bij de buildinstellingen, of verklein de buildcontext met een .dockerignore-bestand."
+                    },
+                    "dockerfileError": {
+                        "title": "De Dockerfile is mislukt bij stap {step} van {total}",
+                        "suggestion": "De mislukte stap was: {command}. Corrigeer dit in {dockerfile} en push, of vraag een agent om het te corrigeren."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Kon dependencies niet downloaden",
+                        "suggestion": "Een pakket- of base-image-registry reageerde niet. Bouw over een paar minuten opnieuw; als het blijft mislukken, pin dan de versies waarvan je afhankelijk bent."
+                    },
+                    "registryPushDenied": {
+                        "title": "Kon de image niet pushen",
+                        "suggestion": "Sta workflows in deze repository toe om packages te schrijven (Settings ▸ Actions ▸ General ▸ Workflow permissions) en bouw daarna opnieuw."
+                    },
+                    "missingBuildValue": {
+                        "title": "Er ontbreekt een buildwaarde: {names}",
+                        "suggestion": "Stel deze in via Instellingen ▸ Omgeving en bouw daarna opnieuw."
+                    },
+                    "secretInImage": {
+                        "title": "Een secret zou in de image zijn gepubliceerd: {name}",
+                        "suggestion": "Gebruik deze waarde alleen in een eerdere buildfase, of geef hem door als build secret mount. Er is niets gepusht."
+                    },
+                    "timeout": {
+                        "title": "Duurde langer dan {minutes} minuten",
+                        "suggestion": "Verhoog build.resources.timeoutMinutes (maximaal 180) of versnel de build met caching."
+                    },
+                    "workflowInvalid": {
+                        "title": "Het workflowbestand is ongeldig",
+                        "suggestion": "GitHub kan de buildworkflow niet uitvoeren. Beoordeel de openstaande pull request van Ever Works om hem te herstellen."
+                    },
+                    "digestMismatch": {
+                        "title": "De gepushte image kon niet worden bevestigd",
+                        "suggestion": "De registry meldde een andere image dan de build. Bouw opnieuw; niets wat niet is bevestigd wordt gedeployed."
+                    },
+                    "verificationFailed": {
+                        "title": "De app heeft de smoketests niet doorstaan",
+                        "suggestion": "{failed} van de {total} smoketests zijn mislukt. Bekijk de resultaten hieronder."
+                    },
+                    "egressBlocked": {
+                        "title": "Netwerktoegang is geblokkeerd",
+                        "suggestion": "De build probeerde {hosts} te bereiken, die niet op de toegestane lijst van de builder staan. Haal wat je nodig hebt uit je bronrepository of een toegestane registry en bouw daarna opnieuw."
+                    },
+                    "lost": {
+                        "title": "Deze build is uit het oog verloren",
+                        "suggestion": "GitHub geeft geen antwoord meer over deze build. Controleer hem op GitHub."
+                    },
+                    "unknown": {
+                        "title": "Er ging iets anders mis",
+                        "suggestion": "Open de logs op GitHub, of vraag een agent om te kijken."
+                    },
+                    "askAgent": "Vraag een agent om dit op te lossen",
+                    "excerptLabel": "Laatste regels van de log"
+                },
+                "cancelReason": {
+                    "user": "Geannuleerd door een lid",
+                    "superseded": "Vervangen door een nieuwere build"
+                },
+                "detail": {
+                    "title": "Build #{number} · {sha} · {status}",
+                    "loading": "Builddetails laden…",
+                    "close": "Sluiten",
+                    "trigger": "Trigger",
+                    "triggeredBy": "{trigger} — door {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Duur",
+                    "durationValue": "{duration} (in wachtrij {queued})",
+                    "image": "Image",
+                    "tags": "Tags",
+                    "deployable": "Deploybaar",
+                    "yes": "Ja",
+                    "buildValues": "Buildwaarden",
+                    "buildValuesValue": "{count, plural, =1 {1 gesynchroniseerd} other {# gesynchroniseerd}}: {names}",
+                    "noBuildValues": "Geen",
+                    "receipt": "Bon",
+                    "verification": "Verificatie",
+                    "copy": "Kopiëren",
+                    "copied": "Image-referentie gekopieerd.",
+                    "copyFailed": "Kon de image-referentie niet kopiëren.",
+                    "viewLogs": "Logs bekijken op GitHub",
+                    "rebuildThisCommit": "Deze commit opnieuw bouwen",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} runnerminuten · betaald door je GitHub-account",
+                    "minutesPlatform": "{minutes} runnerminuten · betaald door Ever Works",
+                    "checksMinutes": "Waarvan {checksMinutes} voor App-controles",
+                    "costUnknown": "Runnerminuten nog niet gerapporteerd"
+                },
+                "verification": {
+                    "componentsReady": "Componenten gestart",
+                    "componentsNotReady": "Componenten zijn niet gestart",
+                    "job": "Job {name} is beëindigd met {exitCode}",
+                    "jobNoExit": "Job {name} is niet voltooid",
+                    "smokePassed": "Geslaagd: {name}",
+                    "smokeFailed": "Mislukt: {name} — verwacht {expected}, gekregen {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Nog geen builds. De eerste build start zodra de buildworkflow in de repository staat.",
+                    "unavailable": "Builds zijn nog niet beschikbaar op deze instantie."
+                },
+                "errors": {
+                    "loadFailed": "Builds konden niet worden geladen. Probeer de pagina te vernieuwen.",
+                    "rebuildRateLimited": "Je hebt dit uur te veel builds gestart. Probeer het over {minutes, plural, =1 {1 minuut} other {# minuten}} opnieuw.",
+                    "commitNotReachable": "Die commit staat niet op de gevolgde branch.",
+                    "nothingToBuild": "Deze App Work draait een gepubliceerde image, dus er valt niets te bouwen.",
+                    "notCancellable": "Deze build is al voltooid en kan dus niet worden geannuleerd.",
+                    "providerUnavailable": "Er is momenteel geen buildprovider beschikbaar. Probeer het later opnieuw.",
+                    "startFailed": "Kon geen build starten. Probeer het opnieuw.",
+                    "cancelFailed": "Kon deze build niet annuleren. Probeer het opnieuw.",
+                    "detailFailed": "Kon deze build niet laden. Probeer het opnieuw."
+                },
+                "toasts": {
+                    "started": "Build in wachtrij gezet.",
+                    "deduped": "Er staat al een build voor deze commit in de wachtrij.",
+                    "cancelled": "Build geannuleerd."
+                },
+                "pullToken": {
+                    "title": "Een pulltoken toevoegen",
+                    "body": "Deze image is privé. Je cluster heeft een token nodig dat alleen packages kan lezen om hem te downloaden.",
+                    "stepCreate": "1. Maak een klassiek token aan met alleen \"read:packages\" aangevinkt.",
+                    "stepPaste": "2. Plak het hier.",
+                    "label": "Token",
+                    "submit": "Controleren en opslaan",
+                    "saving": "Controleren…",
+                    "tooBroad": "Dit token kan meer dan alleen packages lezen. Maak er een aan met alleen read:packages.",
+                    "fineGrained": "Dit is een fine-grained token. Maak een klassiek token aan met alleen read:packages aangevinkt.",
+                    "cannotRead": "Dit token kan {imageRepository} niet lezen.",
+                    "publicImage": "Deze image is al openbaar — er is geen token nodig.",
+                    "noImageYet": "Er is nog geen voltooide build. Voeg een pulltoken toe na de eerste geslaagde build.",
+                    "savedExpires": "Pulltoken opgeslagen. Het verloopt op {date}.",
+                    "savedNoExpiry": "Pulltoken opgeslagen. Het verloopt niet.",
+                    "tokenSet": "Er is een pulltoken opgeslagen. Plak een nieuw token om het te vervangen.",
+                    "expiringSoon": "Het pulltoken verloopt op {date}. Voeg daarvoor een nieuw token toe.",
+                    "viewerDisabled": "Je hebt bewerkingsrechten nodig om dit te doen.",
+                    "failed": "Kon het pulltoken niet opslaan. Probeer het opnieuw."
+                },
+                "overview": {
+                    "title": "Laatste build",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Deploybare build: deze commit",
+                    "deployableOther": "Deploybare build: {sha}",
+                    "noDeployable": "Nog geen deploybare build",
+                    "open": "Builds openen"
+                }
+            },
+            "appDeploy": {
+                "title": "Deployen",
+                "notRunning": "Deze app draait nog nergens.",
+                "runningOn": "{state} · {target}",
+                "openApp": "App openen",
+                "source": "Bron",
+                "buildsLink": "Builds bekijken",
+                "buildsHint": "Builds draaien hoe dan ook, ongeacht het doel.",
+                "stale": "{minutes, plural, =1 {1 minuut} other {# minuten}} geleden voor het laatst gecontroleerd",
+                "status": {
+                    "notDeployed": "Niet gedeployed",
+                    "live": "Live",
+                    "degraded": "Verminderd",
+                    "down": "Offline",
+                    "unreachable": "Kan je cluster niet bereiken",
+                    "paused": "Gepauzeerd",
+                    "deleting": "Verwijderen…"
+                },
+                "target": {
+                    "heading": "Waar moet hij draaien?",
+                    "current": "(huidig)",
+                    "none": {
+                        "label": "Geen — nog niet deployen",
+                        "description": "Builds draaien nog steeds."
+                    },
+                    "yourCluster": {
+                        "label": "Je eigen cluster",
+                        "description": "Draait op een Kubernetes-cluster dat jij beheert."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Wij draaien hem voor je.",
+                        "unavailable": "Binnenkort beschikbaar — beheerde hosting voor apps is nog niet open.",
+                        "ineligible": "Nog niet beschikbaar voor deze app."
+                    },
+                    "connect": "Je cluster koppelen",
+                    "reconnect": "Clusterverbinding wijzigen",
+                    "connected": "Verbonden · {version}",
+                    "connectedNoVersion": "Verbonden",
+                    "checkFailed": "De laatste clustercontrole is mislukt.",
+                    "notChecked": "Nog geen cluster gekoppeld.",
+                    "save": "Dit doel gebruiken",
+                    "saving": "Opslaan…",
+                    "saved": "Doel opgeslagen.",
+                    "saveFailed": "Kon het doel niet opslaan: {reason}",
+                    "changeNote": "Het doel wijzigen verwijdert niets wat al draait.",
+                    "routeUnavailable": "Het doel wijzigen is nog niet beschikbaar op deze instantie."
+                },
+                "connect": {
+                    "title": "Je cluster koppelen",
+                    "description": "Plak een kubeconfig voor een serviceaccount in het cluster waarop deze app moet draaien.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Plak je kubeconfig…",
+                    "kubeconfigHelp": "Gebruik een serviceaccounttoken. Commando's, lokale bestanden en proxy's worden niet ondersteund.",
+                    "kubeconfigStored": "Je kubeconfig is één keer verzonden en wordt versleuteld opgeslagen. Plak een nieuwe om hem te vervangen, of controleer de opgeslagen kubeconfig opnieuw.",
+                    "contextLabel": "Context (optioneel)",
+                    "contextHelp": "Laat leeg om de huidige context van de kubeconfig te gebruiken.",
+                    "check": "Verbinding controleren",
+                    "checking": "Controleren…",
+                    "checkAgain": "Opnieuw controleren",
+                    "checkTimedOut": "De controle was niet binnen 30 seconden klaar. Probeer het opnieuw.",
+                    "checkFailed": "Kon de verbinding niet controleren: {reason}",
+                    "unavailable": "Een cluster koppelen is nog niet beschikbaar op deze instantie.",
+                    "kubeconfigTooLarge": "Deze kubeconfig is groter dan 64 KiB.",
+                    "kubeconfigRequired": "Plak eerst een kubeconfig.",
+                    "ingressClass": "Ingress-klasse",
+                    "ingressDefault": "{name} (standaard)",
+                    "ingressNone": "Geen ingress-klasse gevonden",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Certificaten van issuer",
+                        "external": "Afgehandeld buiten het cluster",
+                        "edge": "Beëindigd aan de edge",
+                        "none": "Geen TLS (alleen http)"
+                    },
+                    "issuer": "Issuer",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Wordt gekozen bij de eerste deployment van de app",
+                    "isolation": "Netwerkisolatie",
+                    "isolationOn": "Aan (aanbevolen)",
+                    "isolationOff": "Uit",
+                    "isolationOffWarning": "Zonder netwerkisolatie kunnen andere workloads op het cluster deze app en zijn databases bereiken.",
+                    "cancel": "Annuleren",
+                    "save": "Opslaan",
+                    "saving": "Opslaan…",
+                    "saveBlocked": "Opslaan is mogelijk zodra de controle slaagt met alle vereiste rechten.",
+                    "saved": "Cluster gekoppeld.",
+                    "saveFailed": "Kon de clusterverbinding niet opslaan: {reason}"
+                },
+                "check": {
+                    "ok": "Verbonden",
+                    "version": "Kubernetes {version}",
+                    "failed": "De clustercontrole is mislukt.",
+                    "kubeconfigRefused": "Deze kubeconfig {reason}. Gebruik in plaats daarvan een serviceaccounttoken.",
+                    "notPublic": "Ever Works kan alleen clusters op een openbaar adres bereiken.",
+                    "permissions": "Rechten",
+                    "allPermissions": "Alle vereiste rechten zijn aanwezig.",
+                    "missing": "Ontbreekt: {verb} {resource}",
+                    "optionalMissing": "Optioneel, ontbreekt: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Nu deployen",
+                    "deploying": "Aanvragen…",
+                    "started": "Deployment gestart.",
+                    "queued": "In wachtrij — start zodra de lopende deployment klaar is.",
+                    "deduplicated": "Die deployment was al aangevraagd.",
+                    "inProgress": "Er loopt al een andere deployment ({id}). Wacht tot die klaar is en deploy dan opnieuw.",
+                    "preconditionsHeader": "Los dit op voordat je deployt:",
+                    "workerNotIsolated": "Deployments kunnen nog niet starten: deze instantie heeft geen geïsoleerde App-clusterworker.",
+                    "notAppWork": "Deze Work is geen App Work en kan dus niet op deze manier worden gedeployed.",
+                    "failed": "Kon de deployment niet aanvragen: {reason}",
+                    "targetNone": "Kies eerst waar de app moet draaien — met Geen wordt niets gedeployed.",
+                    "deploymentId": "Deployment {id}",
+                    "warningsHeader": "Waarschuwingen"
+                },
+                "preconditions": {
+                    "specInvalid": "De App-spec (.works/works.yml) bevat fouten. Corrigeer ze op de pagina App-spec.",
+                    "licenseBlocksTarget": "De licentie van de app staat hosting op dit doel niet toe.",
+                    "licenseAttestationMissing": "Bevestig de licentie van de app voordat je hem deployt.",
+                    "envRequiredUnset": "Sommige vereiste omgevingswaarden zijn nog niet ingesteld.",
+                    "dependencyNotReady": "Een dependency die de app nodig heeft, is nog niet klaar.",
+                    "noGreenBuild": "Er is nog geen geslaagde build om te deployen. Start eerst een build.",
+                    "noGreenBuildForHead": "De laatste commit op de deploybranch is nog niet succesvol gebouwd.",
+                    "buildImageMissing": "De build heeft geen image om te deployen.",
+                    "nothingToDeploy": "Er is nog niets om te deployen: geen build en geen gepubliceerde image.",
+                    "imageNotPinned": "Naar deze image wordt verwezen via een tag. Pin hem op digest zodat elke deployment dezelfde image draait.",
+                    "imageNotFound": "De image is niet te vinden in zijn registry.",
+                    "imagePrivateUnsupported": "Deze image kan niet worden gedownload zonder inloggegevens. Ever Works deployt gepubliceerde images alleen als ze openbaar zijn.",
+                    "imageUnresolvable": "De image-referentie kon niet worden opgelost.",
+                    "primaryDomainMissing": "Het primaire domein is nog niet ingesteld.",
+                    "targetNone": "Kies eerst waar de app moet draaien.",
+                    "targetNotChecked": "Controleer eerst de clusterverbinding.",
+                    "clusterChangedUnconfirmed": "Het cluster is gewijzigd sinds de laatste deployment. Bevestig de wijziging om te deployen.",
+                    "managedDisabled": "Binnenkort beschikbaar — beheerde hosting voor apps is nog niet open.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps draait alleen apps van een geverifieerde Blueprint.",
+                    "quotaExceeded": "Je hebt het maximale aantal apps bereikt dat je op Ever Works Apps kunt draaien.",
+                    "managedIneligible": "Deze app kan niet op Ever Works Apps draaien.",
+                    "managedSandboxUnavailable": "Ever Works Apps kan momenteel geen nieuwe apps aannemen.",
+                    "appWorkDeleting": "Deze App Work wordt verwijderd.",
+                    "paused": "De app is gepauzeerd. Hervat hem om te deployen.",
+                    "deployInProgress": "Er loopt al een andere deployment.",
+                    "cronAuthEnvUnset": "Een geplande aanroep heeft een authenticatiewaarde nodig die niet is ingesteld.",
+                    "jobAuthEnvUnset": "Een job heeft een authenticatiewaarde nodig die niet is ingesteld.",
+                    "volumeReplicas": "Een component met een volume kan maar één replica draaien.",
+                    "volumeShrink": "Een volume kan niet kleiner worden gemaakt.",
+                    "privilegedPort": "Een component luistert op een poort onder 1024.",
+                    "cronTooFrequent": "Een geplande aanroep draait vaker dan toegestaan.",
+                    "managedRootForbidden": "Deze image draait als root.",
+                    "imageUserUnverifiable": "Ever Works kon niet controleren als welke gebruiker de image draait.",
+                    "workerNotIsolated": "Deployments kunnen nog niet starten: deze instantie heeft geen geïsoleerde App-clusterworker.",
+                    "envSourceUnavailable": "De omgevingswaarden van de app kunnen momenteel niet worden gelezen.",
+                    "pullCredentialUnavailable": "De inloggegevens om de image op te halen zijn niet beschikbaar.",
+                    "namespaceForeign": "Die namespace hoort al bij iets anders op het cluster.",
+                    "verificationNamespaceForbidden": "Die namespace is gereserveerd voor verificatieruns."
+                },
+                "license": {
+                    "loading": "Licentie lezen…",
+                    "unavailable": "Licentiedetails zijn nog niet beschikbaar op deze instantie.",
+                    "error": "Kon de licentie niet lezen. Laad de pagina opnieuw om het nog eens te proberen.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Er is geen licentie gevonden die we herkennen.",
+                    "classes": {
+                        "green": "Hosting toegestaan",
+                        "amber": "Je eigen cluster, nadat je de licentievoorwaarden hebt bevestigd",
+                        "red": "Alleen je eigen cluster, nadat je de licentievoorwaarden hebt bevestigd",
+                        "unknown": "Licentie onbekend — bevestig de voorwaarden vóór het deployen",
+                        "unclassified": "Nog niet geclassificeerd"
+                    },
+                    "mixed": "Delen van deze repository gebruiken een andere licentie.",
+                    "incomplete": "Deze repository is te groot om volledig te scannen.",
+                    "yourClusterAllowed": "Je eigen cluster: toegestaan",
+                    "yourClusterAfterConfirm": "Je eigen cluster: toegestaan nadat je de licentievoorwaarden hebt bevestigd",
+                    "review": "Bekijken en bevestigen",
+                    "confirmed": "Bevestigd op {date}.",
+                    "disclaimer": "Dit is een automatische interpretatie van de licentiebestanden van de repository, geen juridisch advies.",
+                    "unknownSpdx": "De licentie van deze software",
+                    "dialogTitle": "De licentievoorwaarden bevestigen",
+                    "dialogBody": "{spdx} beperkt hoe deze software mag worden gehost. Ever Works Apps is er niet voor beschikbaar. Bevestig het volgende om hem op je eigen cluster te draaien:",
+                    "noText": "Het licentieregister bevat geen verklaring voor deze licentie.",
+                    "checkbox": "Ik bevestig de bovenstaande verklaring.",
+                    "footer": "We registreren wie heeft bevestigd, wanneer, en voor welke licentie en commit.",
+                    "cancel": "Annuleren",
+                    "confirm": "Bevestigen",
+                    "refusals": {
+                        "ownerOnly": "Alleen de eigenaar van de App Work kan dit bevestigen.",
+                        "licenseChanged": "De licentie is gewijzigd terwijl je hem aan het bekijken was. Bekijk de nieuwe voorwaarden en bevestig opnieuw.",
+                        "attestationNotRequired": "Deze licentie hoeft niet meer te worden bevestigd.",
+                        "licenseUnavailable": "Licentiebevestiging is nog niet beschikbaar op deze instantie.",
+                        "route_unavailable": "Licentiebevestiging is nog niet beschikbaar op deze instantie.",
+                        "failed": "Kon de bevestiging niet registreren. Probeer het opnieuw."
+                    }
+                },
+                "rollback": {
+                    "button": "Terugdraaien",
+                    "title": "Terugdraaien naar een eerdere deployment",
+                    "description": "Kies een deployment die al eerder live was. Het image en de app-specificatie ervan draaien opnieuw; er wordt niets opnieuw gebouwd.",
+                    "pickLabel": "Deployment om naar terug te gaan",
+                    "liveAt": "Live sinds {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Was eerder live",
+                    "none": "Er is geen eerdere live deployment om naar terug te draaien.",
+                    "runJobs": "De pre-deploy-jobs opnieuw uitvoeren",
+                    "confirm": "Terugdraaien",
+                    "cancel": "Annuleren",
+                    "started": "Terugdraaien gestart.",
+                    "failed": "Kon het terugdraaien niet starten: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Pauzeren",
+                    "resume": "Hervatten",
+                    "remove": "Uit cluster verwijderen",
+                    "removeTitle": "Deze app uit zijn cluster verwijderen",
+                    "removeDescription": "De draaiende app stopt en de Kubernetes-objecten worden verwijderd. Het App Work en de builds blijven bestaan.",
+                    "deleteData": "Ook opgeslagen gegevens verwijderen (volumes en databases van afhankelijkheden)",
+                    "deleteDataWarning": "Dit kan niet ongedaan worden gemaakt.",
+                    "confirmSlugLabel": "Typ {slug} om te bevestigen",
+                    "confirmRemove": "Verwijderen",
+                    "cancel": "Annuleren",
+                    "failed": "Dat is niet gelukt: {reason}",
+                    "slugMismatch": "De ingevoerde slug komt niet overeen met dit App Work.",
+                    "accepted": {
+                        "pause": "Pauzeren aangevraagd.",
+                        "resume": "Hervatten aangevraagd.",
+                        "remove": "Verwijderen aangevraagd.",
+                        "cancelDeploy": "Annuleren aangevraagd."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Namen beginnen met een letter of een underscore en gebruiken alleen A–Z, 0–9 en _.",
+                    "reservedName": "Namen die beginnen met EVER_WORKS_ zijn gereserveerd voor het platform.",
+                    "valueTooLarge": "Een waarde mag maximaal 65.536 bytes zijn.",
+                    "controlCharacter": "Waarden mogen geen NUL-teken bevatten.",
+                    "lengthMismatch": "Moet precies {expected} tekens lang zijn — deze is {actual}.",
+                    "tooShort": "Moet minstens {min} tekens lang zijn.",
+                    "tooLong": "Mag maximaal {max} tekens lang zijn.",
+                    "patternMismatch": "Dat komt niet overeen met het patroon dat deze app vraagt.",
+                    "generatedValueUseRotate": "Deze waarde wordt gegenereerd. Roteer hem om hem te vervangen.",
+                    "neverRotateNotAcknowledged": "Volgens deze app mag deze waarde nooit veranderen. Bevestig dat je dit begrijpt voordat je roteert.",
+                    "rotateConfirmationMismatch": "De naam die je hebt getypt komt niet overeen met de naam van deze waarde.",
+                    "secureStorageUnavailable": "Beveiligde opslag is niet geconfigureerd op deze installatie, dus waarden kunnen niet worden opgeslagen.",
+                    "tooManyValues": "Een app kan maximaal 300 waarden bevatten.",
+                    "valuesTooLarge": "De waarden van een app mogen samen maximaal 1 MiB zijn.",
+                    "malformedLine": "Geen geldige NAME=value-regel.",
+                    "rotateRateLimited": "Te veel rotaties. Probeer het later opnieuw."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "In afwachting",
+                    "awaitingConfig": "Heeft je instellingen nodig",
+                    "provisioning": "Wordt geprovisioned",
+                    "ready": "Klaar",
+                    "degraded": "Verminderd",
+                    "failed": "Mislukt",
+                    "kept": "Behouden — niet meer beheerd",
+                    "deleting": "Verwijderen",
+                    "deleted": "Verwijderd",
+                    "notInSpec": "Niet meer gebruikt door de App-spec — gegevens behouden"
+                },
+                "backup": {
+                    "none": "Geen automatische back-ups. Als dit volume verloren gaat, zijn de gegevens weg.",
+                    "notConfigured": "Back-ups: niet geconfigureerd",
+                    "healthy": "Back-ups: laatst voltooid {time}",
+                    "overdue": "Back-ups: achterstallig — laatst voltooid {time}",
+                    "failing": "Back-ups: laatste poging mislukt",
+                    "external": "Back-ups: beheerd door je {kind}-provider",
+                    "unknown": "Back-ups: kon niet worden gecontroleerd"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Je cluster heeft geen standaard-storageclass. Kies er een in de dependency-instellingen.",
+                    "clusterUnreachable": "Kon je cluster niet bereiken.",
+                    "smtpConnectFailed": "Kon geen verbinding maken met de mailserver.",
+                    "smtpTlsFailed": "De TLS-handshake van de mailserver is mislukt.",
+                    "smtpAuthRefused": "Inloggen is geweigerd door de server.",
+                    "bucketUnreadable": "Bucket {bucket} bestaat niet of kan niet worden gelezen.",
+                    "volumeNotReady": "Het volume was niet binnen {minutes} minuten klaar.",
+                    "extensionUnavailable": "Extensies niet beschikbaar: {names}.",
+                    "platformServerRefused": "Die server bevat platformgegevens van Ever Works. Kies een andere.",
+                    "deadlineExceeded": "Provisioning is niet op tijd voltooid.",
+                    "namespaceNotOwned": "Die namespace hoort bij een andere app. Kies een andere.",
+                    "namespaceBaselineMissing": "De namespace mist zijn basislimieten en -policy's.",
+                    "clusterPermissionMissing": "Ever Works heeft geen toestemming om deze dependency in je cluster aan te maken.",
+                    "operatorNamespaceUnknown": "De namespace van de operator is niet ingesteld in de dependency-instellingen.",
+                    "volumeExpansionUnsupported": "De storageclass {storageClass} kan dit volume niet vergroten.",
+                    "sizeShrinkRefused": "De opslag van een dependency kan niet worden verkleind. Verwijder eerst de gegevens als je een kleinere nodig hebt.",
+                    "relayIneligible": "Deze app kan de mailrelay van Ever Works niet gebruiken.",
+                    "relaySuspended": "De mailrelay van Ever Works is opgeschort.",
+                    "providerNotSupported": "Die provider kan deze dependency niet leveren.",
+                    "dependencyNotDeclared": "De App-spec declareert deze dependency niet.",
+                    "confirmationMismatch": "De naam die je hebt getypt komt niet overeen.",
+                    "deleteInProgress": "De gegevens van deze dependency worden al verwijderd.",
+                    "notGenerated": "Die waarde wordt niet gegenereerd, dus er valt niets te roteren.",
+                    "notAppWork": "Deze Work is geen app.",
+                    "targetNone": "Deze app is nog nergens ingesteld om te deployen. Kies een deploydoel om zijn dependencies te provisionen.",
+                    "targetNotChecked": "Je cluster heeft zijn controle nog niet doorstaan. Controleer de verbinding en probeer het daarna opnieuw."
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "Repository",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Een bestaande code-repository als Work — taken, doelen en fleet-runs koppelen eraan. Er wordt niets gegenereerd of gedeployed.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Draai en ontwikkel elke GitHub-repository verder: koppel of fork hem en kies daarna waar hij draait."
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Repository"
+                "repo": "Repository",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "Een bestaande code-repository als Work — taken, doelen en fleet-runs koppelen eraan. Er wordt niets gegenereerd of gedeployed."
+                "repo": "Een bestaande code-repository als Work — taken, doelen en fleet-runs koppelen eraan. Er wordt niets gegenereerd of gedeployed.",
+                "app": "Draai en ontwikkel elke GitHub-repository verder: koppel of fork hem en kies daarna waar hij draait."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "bijv. \"https://github.com/owner/repo — een open-source-app waarvan je een eigen kopie wilt\"",
+                "formTitle": "Nieuwe App Work",
+                "formSubtitle": "Begin met een willekeurige GitHub-repository. Ever Works koppelt hem of maakt een eigen kopie voor je, en helpt je daarna om hem te draaien en verder aan te passen.",
+                "urlLabel": "Repository-URL",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Elke GitHub-repository die je gekoppelde account kan lezen.",
+                "checkButton": "Repository controleren",
+                "checking": "Controleren…",
+                "tabPaste": "Een URL plakken",
+                "tabCatalog": "Door de Apps-catalogus bladeren",
+                "catalogComingSoon": "De Apps-catalogus is hier binnenkort beschikbaar. Plak voorlopig een repository-URL.",
+                "stars": "{count, plural, =1 {1 ster} other {# sterren}}",
+                "defaultBranch": "Standaardbranch: {branch}",
+                "largeRepository": "Grote repository ({size})",
+                "moved": "Verplaatst naar {fullName}",
+                "isFork": "Deze repository is een fork van {parent}.",
+                "ownFork": "Dit is jouw fork van {parent}. Ever Works volgt {parent} als upstream.",
+                "publicForkNote": "Forks van openbare repository's zijn openbaar.",
+                "archivedNote": "Deze repository is gearchiveerd. Synchronisatie met de upstream blijft uit.",
+                "licenseChip": "Licentie: {spdx}",
+                "licenseNotDetected": "Licentie: niet gedetecteerd",
+                "licenseClass": {
+                    "green": "Hosting toegestaan",
+                    "amber": "Je eigen cluster, nadat je de licentie hebt bevestigd",
+                    "red": "Je eigen cluster, nadat je de licentie hebt bevestigd",
+                    "unknown": "Licentie onbekend — je bevestigt deze vóór het deployen"
+                },
+                "blueprintBadge": {
+                    "verified": "Geverifieerde Blueprint",
+                    "available": "Blueprint beschikbaar",
+                    "none": "Geen Blueprint — een agent zoekt uit hoe hij moet draaien",
+                    "unavailable": "Blueprint-controle niet beschikbaar"
+                },
+                "existingAppWork": "Je hebt al een App Work voor deze repository: {name}.",
+                "openExistingAppWork": "Openen",
+                "scanIncomplete": "Niet elk account is gecontroleerd op een bestaande fork.",
+                "modesTitle": "Hoe moet Ever Works deze repository gebruiken?",
+                "modes": {
+                    "link": {
+                        "title": "Koppelen",
+                        "titleOwnFork": "Koppelen — upstream niet volgen",
+                        "description": "Gebruik deze repository zoals hij is. Je kunt ernaar pushen, dus wijzigingen komen hier direct terecht."
+                    },
+                    "fork": {
+                        "title": "Forken",
+                        "description": "Maak je eigen fork. Je kunt hem synchroniseren met de upstream en wijzigingen terug voorstellen."
+                    },
+                    "private-copy": {
+                        "title": "Privékopie",
+                        "description": "Maak een privérepository met dezelfde code."
+                    }
+                },
+                "unavailable": "Niet beschikbaar: {reason}",
+                "forkInto": "Forken naar",
+                "copyInto": "Kopiëren naar",
+                "ownerFilter": "Accounts zoeken",
+                "ownerOrganization": "organisatie",
+                "ownerNotChecked": "niet gecontroleerd op een bestaande fork",
+                "existingFork": "Je hebt al een fork: {fullName}. Ever Works gebruikt die.",
+                "privateCopyTradeOff": "Een privékopie is op GitHub niet gekoppeld aan het origineel, dus kan er geen pull requests naar het oorspronkelijke project mee worden geopend. Upstream-wijzigingen komen binnen als pull requests in je kopie.",
+                "linkSetupNote": "Ever Works opent een pull request die één bestand toevoegt: .works/works.yml. Merge hem om af te ronden.",
+                "existingForkSetupNote": "Ever Works heeft deze fork niet aangemaakt, dus wordt er een pull request geopend die .works/works.yml toevoegt.",
+                "linkSetupNoteBlueprint": "Ever Works opent een pull request die .works/works.yml en de bestanden van de Blueprint toevoegt. Merge hem om af te ronden.",
+                "existingForkSetupNoteBlueprint": "Ever Works heeft deze fork niet aangemaakt, dus wordt er een pull request geopend die .works/works.yml en de bestanden van de Blueprint toevoegt.",
+                "promptsTitle": "Waarden die deze app nodig heeft",
+                "promptHint": "De Blueprint {name} vraagt om deze waarden. Je kunt ze later wijzigen in Instellingen.",
+                "promptRequired": "Verplicht",
+                "promptsIncomplete": "Vul eerst de waarden in die de app nodig heeft.",
+                "autoProvision": "Laat een agent uitzoeken hoe hij moet draaien",
+                "autoProvisionHelp": "Start zodra de repository klaar is. Dit verbruikt AI-tokens en buildrunner-minuten, binnen de provisioninglimieten. Je kunt het annuleren, of dit uitvinken en het later starten vanuit het Overzicht met Provision.",
+                "deployTargetTitle": "Waar moet hij draaien?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Geen — nog niet deployen",
+                        "description": "Je kunt later een doel kiezen."
+                    },
+                    "your-cluster": {
+                        "title": "Je eigen cluster",
+                        "description": "Draai hem op je eigen Kubernetes-cluster. Je voegt de verbinding toe op het tabblad Deployen."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Binnenkort beschikbaar — beheerde hosting voor apps is nog niet open."
+                    }
+                },
+                "submit": {
+                    "link": "Koppelen en App Work maken",
+                    "fork": "Forken en App Work maken",
+                    "private-copy": "Kopiëren en App Work maken"
+                },
+                "submitPending": "Bezig met maken…",
+                "nameLabel": "Naam",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Beschrijving",
+                "slugHelp": "URL-vriendelijke identificatie. Afgeleid van de repositorynaam — bewerk om te overschrijven.",
+                "invalidSlug": "Gebruik alleen kleine letters, cijfers en koppeltekens, bijvoorbeeld tasks-app",
+                "cancel": "Annuleren",
+                "createFailed": "Kon de App Work niet maken. Probeer het opnieuw.",
+                "success": {
+                    "link": "App Work gemaakt.",
+                    "fork": "Fork aangevraagd — we laten het je weten zodra hij klaar is.",
+                    "private-copy": "Kopiëren gestart — we laten het je weten zodra het klaar is."
+                },
+                "reasons": {
+                    "invalid_url": "Voer een GitHub-repository-URL in, zoals https://github.com/owner/repo",
+                    "provider_not_connected": "Koppel GitHub om een App Work te maken.",
+                    "insufficient_scope": "Koppel GitHub opnieuw om toegang tot repository's te verlenen.",
+                    "not_found": "We konden deze repository niet vinden, of je GitHub-account kan hem niet lezen.",
+                    "sso_authorization_required": "{owner} vereist dat je Ever Works voor de organisatie autoriseert op GitHub.",
+                    "oauth_app_restricted": "{owner} beperkt toegang door derden. Vraag een eigenaar van {owner} om Ever Works goed te keuren, of kies een ander account.",
+                    "empty_repository": "Deze repository heeft nog geen commits.",
+                    "no_push_access": "Je kunt niet naar deze repository pushen.",
+                    "archived": "Gearchiveerde repository's zijn alleen-lezen.",
+                    "forking_disabled": "De eigenaar van deze repository staat geen forks of kopieën toe.",
+                    "own_repository": "Deze repository is van jou — koppel hem in plaats daarvan.",
+                    "target_owner_unavailable": "Dit account is niet beschikbaar via je GitHub-verbinding.",
+                    "target_owner_forbidden": "Je kunt geen repository's aanmaken in {owner}.",
+                    "too_large_for_private_copy": "Te groot voor een privékopie ({size}). Fork hem in plaats daarvan.",
+                    "uses_lfs": "Gebruikt Git LFS, dat een privékopie niet kan overnemen. Fork hem in plaats daarvan.",
+                    "copy_name_unavailable": "{owner} heeft al repository's met de namen {name} tot en met {name}-copy-5.",
+                    "in_use_by_another_account": "Een ander account gebruikt deze repository al in Ever Works. Vraag de eigenaar om je als lid toe te voegen.",
+                    "app_work_exists": "Je hebt al een App Work voor {fullName}: {workName}.",
+                    "create_in_progress": "Deze App Work wordt al gemaakt.",
+                    "rate_limited": "GitHub beperkt het aantal verzoeken van je account. Probeer het opnieuw om {time}.",
+                    "managed_hosting_unavailable": "Binnenkort beschikbaar — beheerde hosting voor apps is nog niet open.",
+                    "cluster_target_unavailable": "Er is geen deploymentoptie geïnstalleerd die apps kan draaien.",
+                    "app_works_disabled": "App Works zijn niet beschikbaar op deze instantie.",
+                    "blueprint_mismatch": "De Blueprint voor deze repository is gewijzigd. Controleer de repository opnieuw."
+                },
+                "catalog": {
+                    "searchLabel": "Zoeken in de Apps-catalogus",
+                    "searchPlaceholder": "Apps zoeken — bijvoorbeeld umami of calendar",
+                    "listLabel": "App-Blueprints",
+                    "loading": "Apps-catalogus laden…",
+                    "unavailable": "De Apps-catalogus is momenteel niet beschikbaar. Plak in plaats daarvan een repository-URL.",
+                    "disabled": "App Works zijn niet beschikbaar op deze instantie.",
+                    "error": "Kon de Apps-catalogus niet laden. Probeer het opnieuw of plak een repository-URL.",
+                    "empty": "Er zijn nog geen App-Blueprints gepubliceerd. Plak in plaats daarvan een repository-URL.",
+                    "noMatches": "Geen apps gevonden voor je zoekopdracht.",
+                    "pick": "Beginnen met {name}",
+                    "statusBeta": "Bèta",
+                    "statusPlaceholder": "Binnenkort beschikbaar",
+                    "verified": "Geverifieerd",
+                    "upstreamLine": "Van {repo}",
+                    "runsOn": "Draait op: {targets}",
+                    "targetYourCluster": "Je eigen cluster",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Nog niet beschikbaar",
+                    "fallbackNote": "De App-Blueprints die op GitHub zijn gevonden worden getoond — de samengestelde catalogus is momenteel niet beschikbaar."
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "Importeren succesvol gestart",
                 "failed": "Werk importeren mislukt",
                 "fetchReposFailed": "Repositories ophalen mislukt"
+            },
+            "app": {
+                "repositoryUrlRequired": "Voer een GitHub-repository-URL in, zoals https://github.com/owner/repo",
+                "repositoryModeRequired": "Kies hoe je deze repository wilt gebruiken: Koppelen, Forken of Privékopie.",
+                "targetOwnerRequired": "Kies het account waarin de repository moet worden aangemaakt.",
+                "invalidUrl": "Voer een GitHub-repository-URL in, zoals https://github.com/owner/repo",
+                "inspectFailed": "Kon deze repository niet controleren. Probeer het opnieuw."
             }
         },
         "generator": {

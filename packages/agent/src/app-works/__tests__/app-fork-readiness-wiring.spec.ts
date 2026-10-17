@@ -41,12 +41,19 @@ import {
 import { AppActionsHygieneService } from '../app-actions-hygiene.service';
 import {
     APP_FORK_READINESS_DISPATCHER,
+    APP_UPSTREAM_SYNC_DISPATCHER,
     AppUpstreamStateService,
     type AppForkReadinessJobPayload,
+    type AppUpstreamSyncJobPayload,
 } from '../app-upstream-state.service';
+import { AppUpstreamSyncDispatcherService } from '../app-upstream-sync-dispatcher.service';
 import { AppWorkCreateService } from '../app-work-create.service';
 import { APP_FORK_READINESS_JOB_ID } from '../app-fork-readiness.runner';
-import { AppWorksModule, buildAppForkReadinessDispatcherProvider } from '../app-works.module';
+import {
+    AppWorksModule,
+    buildAppForkReadinessDispatcherProvider,
+    buildAppUpstreamSyncDispatcherProvider,
+} from '../app-works.module';
 
 /**
  * C10 — `APP_FORK_READINESS_DISPATCHER` is bound, in a real container, and the two
@@ -338,5 +345,65 @@ describe('C10 — the App Works module binds APP_FORK_READINESS_DISPATCHER', () 
             // rename on either side would otherwise only fail on the run that needed it.
             expect(denseSource).toContain("createRemoteProxy(apiClient,'AppForkReadinessRunner')");
         });
+    });
+});
+
+describe('APW-02 T31 — the App Works module binds APP_UPSTREAM_SYNC_DISPATCHER', () => {
+    const SYNC_PAYLOAD: AppUpstreamSyncJobPayload = { workId: WORK_ID, trigger: 'manual' };
+
+    const syncDispatcherOf = (registry: JobRuntimeProviderRegistry | undefined) => {
+        const factory = buildAppUpstreamSyncDispatcherProvider().useFactory as (
+            registry?: JobRuntimeProviderRegistry | null,
+        ) => { dispatch(payload: AppUpstreamSyncJobPayload): Promise<string | null> };
+        return factory(registry);
+    };
+
+    it('provides the token through an optional-registry factory, and exports it', () => {
+        const providers = (Reflect.getMetadata('providers', AppWorksModule) as unknown[]) ?? [];
+        const binding = providers.find(
+            (provider) =>
+                typeof provider === 'object' &&
+                provider !== null &&
+                (provider as { provide?: unknown }).provide === APP_UPSTREAM_SYNC_DISPATCHER,
+        ) as { useFactory?: unknown; useExisting?: unknown; inject?: unknown[] } | undefined;
+
+        expect(typeof binding?.useFactory).toBe('function');
+        expect(binding?.useExisting).toBeUndefined();
+        expect(binding?.inject).toEqual([{ token: JOB_RUNTIME_PROVIDER_REGISTRY, optional: true }]);
+        expect((Reflect.getMetadata('exports', AppWorksModule) as unknown[]) ?? []).toContain(
+            APP_UPSTREAM_SYNC_DISPATCHER,
+        );
+    });
+
+    it('answers null with no runtime, and dispatches through dispatchAppUpstreamSync otherwise', async () => {
+        await expect(syncDispatcherOf(undefined).dispatch(SYNC_PAYLOAD)).resolves.toBeNull();
+        await expect(syncDispatcherOf(emptyRegistry()).dispatch(SYNC_PAYLOAD)).resolves.toBeNull();
+        await expect(
+            syncDispatcherOf(registryWith({ dispatchAppForkReadiness: jest.fn() })).dispatch(
+                SYNC_PAYLOAD,
+            ),
+        ).resolves.toBeNull();
+
+        const dispatchAppUpstreamSync = jest.fn(async () => 'run_sync_1');
+        await expect(
+            syncDispatcherOf(registryWith({ dispatchAppUpstreamSync })).dispatch(SYNC_PAYLOAD),
+        ).resolves.toBe('run_sync_1');
+        expect(dispatchAppUpstreamSync).toHaveBeenCalledWith(SYNC_PAYLOAD);
+    });
+
+    it('hands the binding to both declared call sites in a real container', async () => {
+        const moduleRef = await Test.createTestingModule({ imports: [AppWorksModule] })
+            .overrideProvider(getRepositoryToken(WorkUpstreamState))
+            .useValue({ findOne: jest.fn().mockResolvedValue(null) })
+            .overrideProvider(DistributedTaskLockService)
+            .useValue({ runExclusive: jest.fn(), isLocked: jest.fn() })
+            .compile();
+
+        const bound = moduleRef.get(APP_UPSTREAM_SYNC_DISPATCHER);
+        expect(bound).toBeDefined();
+        expect((moduleRef.get(AppUpstreamStateService) as any).syncDispatcher).toBe(bound);
+        expect((moduleRef.get(AppUpstreamSyncDispatcherService) as any).syncDispatcher).toBe(bound);
+
+        await moduleRef.close();
     });
 });

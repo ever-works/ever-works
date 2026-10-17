@@ -1,4 +1,8 @@
 import type { Metadata } from 'next';
+import {
+    summarizeAppSourceRelation,
+    type AppSourceRelationSummary,
+} from '@/lib/works/app-source-relation';
 import { Work, workAPI, gitProvidersAPI, GitProviderConnectionInfo } from '@/lib/api';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { notFound } from 'next/navigation';
@@ -42,6 +46,8 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let agentsTotal = 0;
     let assignedAgentIds: string[] = [];
     let appRelation: AppRepositoryMode | null = null;
+    // APW-01 T24 — the header's relation line (spec §6.4), from the same read.
+    let appSource: AppSourceRelationSummary | null = null;
 
     try {
         const res = await workAPI.get(id);
@@ -100,10 +106,9 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             // `appRelation` is `link` for a linked App Work, which is exactly
             // what keeps the tab off that Work (FR-44, FR-59).
             if (work.kind === 'app') {
-                appRelation = await workAPI
-                    .getUpstream(id)
-                    .then((state) => state.relation)
-                    .catch(() => null);
+                const upstreamState = await workAPI.getUpstream(id).catch(() => null);
+                appRelation = upstreamState?.relation ?? null;
+                appSource = upstreamState ? summarizeAppSourceRelation(upstreamState) : null;
             }
         }
     } catch (error) {
@@ -120,6 +125,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             agentsTotal={agentsTotal}
             assignedAgentIds={assignedAgentIds}
             appRelation={appRelation}
+            appSource={appSource}
         >
             {children}
         </WorkLayoutClient>

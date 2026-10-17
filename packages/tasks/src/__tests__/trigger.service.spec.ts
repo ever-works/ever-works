@@ -102,8 +102,13 @@ vi.mock('../tasks/trigger/app-fork-readiness.task', () => ({
     APP_FORK_READINESS_TASK_ID: 'app-fork-readiness',
     appForkReadinessTask: { id: 'app-fork-readiness' },
 }));
+// APW-02 T31 — the `app-upstream-sync` job, reached by id, mocked for the same reason.
+vi.mock('../tasks/trigger/app-upstream-sync.task', () => ({
+    APP_UPSTREAM_SYNC_TASK_ID: 'app-upstream-sync',
+    appUpstreamSyncTask: { id: 'app-upstream-sync' },
+}));
 
-import { TriggerService } from '../trigger/trigger.service';
+import { TriggerService, appUpstreamSyncIdempotencyKey } from '../trigger/trigger.service';
 
 describe('TriggerService', () => {
     let service: TriggerService;
@@ -557,6 +562,55 @@ describe('TriggerService', () => {
 
             tasksTriggerMock.mockRejectedValue(new Error('fetch failed'));
             await expect(service.dispatchAppForkReadiness(payload)).resolves.toBeNull();
+        });
+    });
+
+    describe('dispatchAppUpstreamSync', () => {
+        // APW-02 T31 — `APP_UPSTREAM_SYNC_DISPATCHER`'s enqueue half; `null` is the
+        // callers' documented "not queued" answer, never a throw.
+        const payload = { workId: 'w1', trigger: 'manual' as const, providerId: 'github' };
+
+        it('returns null when trigger is disabled', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            await expect(service.dispatchAppUpstreamSync(payload)).resolves.toBeNull();
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('enqueues app-upstream-sync with the plan §6.1 idempotency key and the per-Work key', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_sync_1' });
+
+            await expect(service.dispatchAppUpstreamSync(payload)).resolves.toBe('run_sync_1');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'app-upstream-sync',
+                payload,
+                expect.objectContaining({
+                    tags: ['app-upstream-sync', 'work:w1', 'trigger:manual'],
+                    concurrencyKey: 'app-upstream-sync:w1',
+                    idempotencyKey: expect.stringMatching(/^app-upstream-sync:w1:manual:\d{12}$/),
+                }),
+            );
+        });
+
+        it('buckets the idempotency key by UTC minute', () => {
+            expect(
+                appUpstreamSyncIdempotencyKey(
+                    'w1',
+                    'schedule',
+                    new Date('2026-10-17T09:41:59.999Z'),
+                ),
+            ).toBe('app-upstream-sync:w1:schedule:202610170941');
+            expect(
+                appUpstreamSyncIdempotencyKey(
+                    'w1',
+                    'schedule',
+                    new Date('2026-10-17T09:42:00.000Z'),
+                ),
+            ).toBe('app-upstream-sync:w1:schedule:202610170942');
+        });
+
+        it('returns null when the SDK throws', async () => {
+            tasksTriggerMock.mockRejectedValue(new Error('fetch failed'));
+            await expect(service.dispatchAppUpstreamSync(payload)).resolves.toBeNull();
         });
     });
 

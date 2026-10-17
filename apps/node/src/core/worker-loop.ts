@@ -3,11 +3,16 @@ import type {
 	FleetJobKind,
 	FleetJobPushCredentialResponse,
 	FleetJobView,
+	FleetModelUsageLimit,
+	FleetModelUsageLimitWindow,
 	FleetRunEnvFileContent,
 	FleetRunEnvFileRequestRef
 } from '@ever-works/contracts';
 import {
 	clampLeaseTtlSec,
+	describeFleetModelProvider,
+	describeFleetModelUsageLimitWindow,
+	FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT,
 	FLEET_NODE_UPGRADE_COMMAND,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
 	FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON,
@@ -94,6 +99,12 @@ import type { WorkerSafetyGate } from './worker-safety-store';
 
 /** Gap between polls when the fleet has nothing queued for this node. */
 export const DEFAULT_IDLE_POLL_MS = 5_000;
+
+/**
+ * Fleet usage limits — how old a node-recorded throttle must be before a
+ * heartbeat that does not list it may lift it (see `syncModelThrottles`).
+ */
+export const MODEL_THROTTLE_SYNC_GRACE_MS = 120_000;
 
 /** First retry delay after a failed poll. */
 export const WORKER_BACKOFF_BASE_MS = 1_000;
@@ -428,7 +439,27 @@ export type WorkerState =
 	| 'unsafe'
 	| 'stopped';
 
+/**
+ * Fleet usage limits — one model CLI this node is out of quota on. While it is
+ * in force the loop leases no `agent-task` job for that CLI (see
+ * {@link WorkerLoop.noteModelUsageLimit}); other kinds, and other CLIs' work,
+ * still lease.
+ */
+export interface WorkerModelThrottle {
+	provider: string;
+	window: FleetModelUsageLimitWindow;
+	/** ISO instant the throttle lifts. */
+	until: string;
+	/** The CLI's own sentence. */
+	reason: string;
+}
+
 export interface WorkerLoopState {
+	/**
+	 * Fleet usage limits — the model CLIs this node is out of quota on right
+	 * now (expired entries are never reported). Empty / absent = none.
+	 */
+	modelThrottles?: WorkerModelThrottle[];
 	/**
 	 * Why leasing is currently withheld by a resource ceiling, or null.
 	 * Surfaced so an idle-looking node can explain itself instead of
@@ -540,6 +571,15 @@ export interface WorkerLoopOptions {
 	excludeKinds?: FleetJobKind[];
 	/** Per-poll idle cadence; absent keeps the fixed `idlePollMs`. */
 	pollCadence?: WorkerPollCadence;
+	/**
+	 * Fleet usage limits — the model CLIs this node can run an `agent-task`
+	 * with (`claude-code`, `codex`). When EVERY one of them is out of quota
+	 * the lease excludes `agent-task` outright; while only some are, the
+	 * platform's own per-node throttle keeps those CLIs' jobs away and the
+	 * loop refuses any that still arrive without starting them. Absent =
+	 * unknown, read as "any throttle covers all of them".
+	 */
+	modelProviders?: () => readonly string[];
 }
 
 export class WorkerLoop {
@@ -577,6 +617,11 @@ export class WorkerLoop {
 	private readonly monotonicNow: () => number;
 	private readonly leasePollDrainTimeoutMs: number;
 	private readonly publishFenceMarginMs: number;
+	/** Fleet usage limits: provider → the throttle in force (expiry checked on read). */
+	private readonly modelThrottles = new Map<
+		string,
+		{ until: number; window: FleetModelUsageLimitWindow; reason: string; setAt: number }
+	>();
 
 	private running = false;
 	private stopping = false;
@@ -690,7 +735,129 @@ export class WorkerLoop {
 	}
 
 	getState(): WorkerLoopState {
-		return { ...this.state, activeJobIds: [...this.state.activeJobIds] };
+		const modelThrottles = this.activeModelThrottles();
+		return {
+			...this.state,
+			activeJobIds: [...this.state.activeJobIds],
+			...(modelThrottles.length > 0 ? { modelThrottles } : {})
+		};
+	}
+
+	/**
+	 * Fleet usage limits — record that `limit.provider` is out of quota on this
+	 * machine until `limit.retryAfter`. From the next poll the loop leases no
+	 * `agent-task` for that CLI (all of `agent-task` when every CLI this node
+	 * has is out), and refuses — without starting it — any such job the
+	 * platform still hands it. Other job kinds keep leasing. A later reset
+	 * replaces an earlier one; an earlier one never shortens a later one.
+	 */
+	noteModelUsageLimit(limit: Pick<FleetModelUsageLimit, 'provider' | 'window' | 'retryAfter' | 'message'>): void {
+		const provider = typeof limit.provider === 'string' ? limit.provider.trim() : '';
+		const until = Date.parse(limit.retryAfter);
+		if (!provider || !Number.isFinite(until) || until <= this.now()) return;
+		const previous = this.modelThrottles.get(provider);
+		if (previous && previous.until >= until) return;
+		this.modelThrottles.set(provider, { until, window: limit.window, reason: limit.message, setAt: this.now() });
+		if (!previous || previous.until <= this.now()) {
+			this.options.logger?.warn(
+				`${describeFleetModelProvider(provider)} hit its ${describeFleetModelUsageLimitWindow(limit.window)} on this node — ` +
+					`not leasing ${provider} agent-task jobs until ${new Date(until).toISOString()} (other work still runs)`
+			);
+		}
+		this.patch({});
+	}
+
+	/**
+	 * Fleet usage limits — reconcile with the platform's view of this node's
+	 * throttles, as carried on every heartbeat response (`node.modelThrottles`).
+	 *
+	 * The platform is authoritative both ways:
+	 *  - a throttle it holds that this loop does not (a restarted daemon, a
+	 *    limit another path recorded) is ADOPTED, so the node stops offering
+	 *    itself for that CLI and says so on its next beat;
+	 *  - a throttle this loop holds that the platform no longer does — the
+	 *    owner pressed "clear limit now" — is LIFTED, but only once it is older
+	 *    than `graceMs`: a heartbeat answered just before the platform recorded
+	 *    the limit this node just reported must not undo it.
+	 * `null` / absent (an API older than the field) changes nothing.
+	 */
+	syncModelThrottles(
+		server:
+			| ReadonlyArray<{ provider?: unknown; window?: unknown; until?: unknown; reason?: unknown }>
+			| null
+			| undefined,
+		graceMs = MODEL_THROTTLE_SYNC_GRACE_MS
+	): void {
+		if (!Array.isArray(server)) return;
+		const now = this.now();
+		const held = new Set<string>();
+		let changed = false;
+		for (const entry of server) {
+			const provider = typeof entry?.provider === 'string' ? entry.provider.trim() : '';
+			const until = typeof entry?.until === 'string' ? Date.parse(entry.until) : Number.NaN;
+			if (!provider || !Number.isFinite(until) || until <= now) continue;
+			held.add(provider);
+			const local = this.modelThrottles.get(provider);
+			if (local && local.until >= until) continue;
+			const window = (typeof entry.window === 'string' ? entry.window : 'usage') as FleetModelUsageLimitWindow;
+			const reason = typeof entry.reason === 'string' ? entry.reason : `${provider} usage limit reached`;
+			this.modelThrottles.set(provider, { until, window, reason, setAt: local?.setAt ?? now });
+			changed = true;
+			if (!local) {
+				this.options.logger?.info(
+					`${describeFleetModelProvider(provider)} is out of quota on this node per the platform — not leasing ${provider} agent-task jobs until ${new Date(until).toISOString()}`
+				);
+			}
+		}
+		for (const [provider, local] of this.modelThrottles) {
+			if (held.has(provider) || now - local.setAt < graceMs) continue;
+			this.modelThrottles.delete(provider);
+			changed = true;
+			this.options.logger?.info(
+				`${describeFleetModelProvider(provider)} usage limit was cleared on the platform — leasing ${provider} agent-task jobs again`
+			);
+		}
+		if (changed) {
+			this.patch({});
+			this.pollSoon();
+		}
+	}
+
+	/** The usage-limit throttles still in force; expired ones are dropped (and logged) here. */
+	activeModelThrottles(): WorkerModelThrottle[] {
+		const now = this.now();
+		const active: WorkerModelThrottle[] = [];
+		for (const [provider, throttle] of this.modelThrottles) {
+			if (throttle.until <= now) {
+				this.modelThrottles.delete(provider);
+				this.options.logger?.info(
+					`${describeFleetModelProvider(provider)} usage limit has reset — leasing ${provider} agent-task jobs again`
+				);
+				continue;
+			}
+			active.push({
+				provider,
+				window: throttle.window,
+				until: new Date(throttle.until).toISOString(),
+				reason: throttle.reason
+			});
+		}
+		return active.sort((a, b) => a.provider.localeCompare(b.provider));
+	}
+
+	/** True when every model CLI this node can run an agent-task with is out of quota. */
+	private allAgentCliThrottled(): boolean {
+		const active = this.activeModelThrottles();
+		if (active.length === 0) return false;
+		let providers: readonly string[] = [];
+		try {
+			providers = this.options.modelProviders?.() ?? [];
+		} catch {
+			providers = [];
+		}
+		if (providers.length === 0) return true;
+		const out = new Set(active.map((throttle) => throttle.provider));
+		return providers.every((provider) => out.has(provider));
 	}
 
 	onChange(listener: (state: WorkerLoopState) => void): () => void {
@@ -1028,8 +1195,13 @@ export class WorkerLoop {
 			};
 			if (this.options.capabilities) request.capabilities = this.options.capabilities;
 			if (this.options.kinds && this.options.kinds.length > 0) request.kinds = [...this.options.kinds];
-			if (this.options.excludeKinds && this.options.excludeKinds.length > 0) {
-				request.excludeKinds = [...this.options.excludeKinds];
+			const excludeKinds = new Set<FleetJobKind>(this.options.excludeKinds ?? []);
+			// Fleet usage limits: every CLI this node could run an agent-task
+			// with is out of quota, so none would start. Leave them for a node
+			// that can (or for this one after the reset) — other kinds still lease.
+			if (this.allAgentCliThrottled()) excludeKinds.add('agent-task');
+			if (excludeKinds.size > 0) {
+				request.excludeKinds = [...excludeKinds];
 			}
 			if (this.options.client.leaseOutcome) {
 				const outcome = await this.options.client.leaseOutcome(request, pollController.signal);
@@ -1314,6 +1486,19 @@ export class WorkerLoop {
 			return;
 		}
 
+		// Fleet usage limits: this job's CLI is out of quota here. Refuse it
+		// WITHOUT starting anything — the same machine-readable outcome a run
+		// that hit the limit reports, so the platform parks it for the reset
+		// (or for another node) instead of failing it.
+		const throttled = this.throttledResultFor(job);
+		if (throttled) {
+			this.options.logger?.info(
+				`Fleet job ${job.id} not started: ${String(throttled.failureReason)} — handed back for the platform to park`
+			);
+			await this.report(job.id, { success: true, result: throttled }, generation, run);
+			return;
+		}
+
 		const keepAlive = this.startKeepAlive(run);
 		let successAccepted = false;
 		try {
@@ -1322,6 +1507,7 @@ export class WorkerLoop {
 			);
 			const result = await executor(job, signal, keepAlive.handle);
 			throwIfJobAborted(signal);
+			this.noteUsageLimitResult(result);
 			if (this.settleDeferred(job.id, keepAlive.deferral())) return;
 			const accepted = await this.report(
 				job.id,
@@ -1363,6 +1549,59 @@ export class WorkerLoop {
 		} finally {
 			keepAlive.stop();
 		}
+	}
+
+	/** A result that says its CLI hit a usage limit throttles that CLI here. */
+	private noteUsageLimitResult(result: Record<string, unknown> | void): void {
+		if (!result || result.failureKind !== FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT) return;
+		const limit = result.modelUsageLimit as Partial<FleetModelUsageLimit> | null | undefined;
+		if (!limit || typeof limit.provider !== 'string' || typeof limit.retryAfter !== 'string') return;
+		this.noteModelUsageLimit({
+			provider: limit.provider,
+			window: limit.window ?? 'usage',
+			retryAfter: limit.retryAfter,
+			message: typeof limit.message === 'string' ? limit.message : `${limit.provider} usage limit reached`
+		});
+	}
+
+	/**
+	 * The usage-limit outcome for an `agent-task` whose CLI is out of quota on
+	 * this node, or null. Shaped like a real run's result (model block
+	 * included) so the platform — current or older — reads it the same way.
+	 */
+	private throttledResultFor(job: FleetJobView): Record<string, unknown> | null {
+		if (job.kind !== 'agent-task') return null;
+		const payload = (job.payload ?? {}) as Record<string, unknown>;
+		const execution = payload.execution as { provider?: unknown } | null | undefined;
+		const provider = typeof execution?.provider === 'string' ? execution.provider : null;
+		if (!provider) return null;
+		const throttle = this.activeModelThrottles().find((entry) => entry.provider === provider);
+		if (!throttle) return null;
+		const failureReason = `${provider} is out of quota on this node until ${throttle.until} (${describeFleetModelUsageLimitWindow(throttle.window)}) — not started`;
+		return {
+			status: 'failed',
+			taskId: typeof payload.taskId === 'string' ? payload.taskId : '',
+			runId: typeof payload.runId === 'string' ? payload.runId : null,
+			workspace: null,
+			steps: [],
+			model: {
+				provider,
+				status: 'failed',
+				exitCode: null,
+				durationMs: 0,
+				summary: throttle.reason
+			},
+			gateStatus: 'none',
+			failureReason,
+			failureKind: FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT,
+			modelUsageLimit: {
+				provider,
+				window: throttle.window,
+				resetsAt: null,
+				retryAfter: throttle.until,
+				message: throttle.reason
+			}
+		};
 	}
 
 	/**

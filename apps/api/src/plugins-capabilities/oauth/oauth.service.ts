@@ -7,6 +7,7 @@ import {
     buildPluginProviderId,
 } from '@ever-works/agent/database';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
+import { config as agentConfig } from '@ever-works/agent/config';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
 export interface OAuthConnectionInfo extends OAuthProviderInfo {
@@ -111,6 +112,7 @@ export class OAuthService {
         const config = await this.getOAuthConfig(providerId, redirectUri);
         const url = await this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
             ...config,
+            scopes: withAppWorksScopes(providerId, config.scopes),
             forceConsent,
         });
 
@@ -285,4 +287,33 @@ export class OAuthService {
             scopes: settings?.scopes as readonly string[] | undefined,
         };
     }
+}
+
+/**
+ * The GitHub scopes App Works cannot build without (2026-10-17, lane aw-builds-2).
+ *
+ * An App Work's Build commits `.github/workflows/ever-works-build.yml` into the
+ * member's repository, and GitHub only lets an OAuth token write that directory
+ * with the `workflow` scope (APW-02 plan §4's permission matrix). The GitHub
+ * plugin's default scope list already carries it (`GITHUB_FULL_SCOPES`); this
+ * covers an operator-configured `scopes` setting that does not, while App Works
+ * is switched on. Additive only: a configured scope is never removed, and with no
+ * configured list the plugin's own default applies unchanged.
+ */
+export const APP_WORKS_REQUIRED_GITHUB_SCOPES = ['repo', 'workflow'] as const;
+
+export function withAppWorksScopes(
+    providerId: string,
+    scopes: readonly string[] | undefined,
+): readonly string[] | undefined {
+    if (providerId !== 'github' || !scopes || scopes.length === 0) return scopes;
+    let enabled = false;
+    try {
+        enabled = agentConfig.everWorks.apps.worksEnabled();
+    } catch {
+        enabled = false;
+    }
+    if (!enabled) return scopes;
+    const missing = APP_WORKS_REQUIRED_GITHUB_SCOPES.filter((scope) => !scopes.includes(scope));
+    return missing.length === 0 ? scopes : [...scopes, ...missing];
 }

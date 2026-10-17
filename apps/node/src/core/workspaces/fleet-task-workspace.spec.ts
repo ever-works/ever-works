@@ -761,8 +761,13 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 			// asks the provider to neutralise repo hooks / fsmonitor on the
 			// node's own commit, lease or no lease, because the checkout is
 			// attacker-authored on every run.
+			//
+			// `commitMessageFor` joined in #2682: every fleet finalize hands the
+			// provider the staged-paths re-typer (docs-only → `docs`, tests-only
+			// → `test`), lease or no lease.
 			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual([
 				'commitMessage',
+				'commitMessageFor',
 				'hardenRepoHooks',
 				'identity',
 				'push',

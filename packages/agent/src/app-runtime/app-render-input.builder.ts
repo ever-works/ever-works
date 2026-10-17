@@ -155,6 +155,9 @@ import type {
  * -------------------------------------------------------------------------- */
 
 /** No host source is bound at all, so nothing is published — a warning, never a refusal (§5.1:686's advisory row). */
+/** Lane aw-deploy-3 — the image was pulled with the owner's GitHub token (no pull token stored). */
+export const APP_RENDER_WARNING_PULL_OWNER_TOKEN = 'pull_credential_owner_token';
+
 export const APP_RENDER_WARNING_HOST_SOURCE_UNAVAILABLE = 'host_source_unavailable';
 
 /**
@@ -627,6 +630,20 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
                     'the App image pull credential could not be resolved',
                     specBody,
                 );
+            }
+
+            // Lane aw-deploy-3 — record WHICH credential pulled the image when it was the
+            // fallback (the owner's whole-account GitHub token), so the Deployment says so. The
+            // pull block itself stays the port's answer verbatim (ACC-06-16).
+            const source = (
+                this.pullCredentials as { lastSource?: Map<string, string> } | undefined
+            )?.lastSource?.get(workId);
+            if (pullCredential && source === 'owner-token') {
+                warnings.push({
+                    code: APP_RENDER_WARNING_PULL_OWNER_TOKEN,
+                    message:
+                        "No registry pull token is stored for this App, so the image was pulled with the owner's GitHub token. Save a read-only pull token on the Builds tab.",
+                });
             }
         }
 

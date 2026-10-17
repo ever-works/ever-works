@@ -66,6 +66,27 @@ export class AppBuildPreparationRepository {
     }
 
     /**
+     * APW-05 T21a — run discovery's scope (plan §7.4a): up to `limit` App Works
+     * whose workflow has been written (`workflowSha256` set), stalest
+     * `runsCheckedAt` first, never-checked first of all.
+     *
+     * The `CASE` is the same cross-driver NULL ordering `findSilentNonTerminal`
+     * uses: PostgreSQL sorts NULLs last ascending, SQLite first.
+     */
+    async findDiscoveryCandidates(limit: number): Promise<WorkBuildPreparation[]> {
+        const take = Math.max(0, Math.min(1000, Math.floor(limit) || 0));
+        if (take === 0) return [];
+        return this.repository
+            .createQueryBuilder('prep')
+            .where('prep.workflowSha256 IS NOT NULL')
+            .orderBy('CASE WHEN prep.runsCheckedAt IS NULL THEN 0 ELSE 1 END', 'ASC')
+            .addOrderBy('prep.runsCheckedAt', 'ASC')
+            .addOrderBy('prep.workId', 'ASC')
+            .take(take)
+            .getMany();
+    }
+
+    /**
      * Merge one prepare's result into the App Work's row, creating it on the
      * first call.
      *

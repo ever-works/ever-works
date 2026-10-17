@@ -282,6 +282,134 @@ describe('Work creation honours the managed Ever Works Git storage choice', () =
                 gitProvider: 'github',
             });
         });
+        // APW-01 T21 — an App Work reads, forks or links the member's
+        // repositories with THEIR OWN connection, so managed storage is no
+        // shortcut for it either (same rule as `repo`).
+        it('createWork with kind=app still requires a connected personal provider under managed storage', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({ success: true, connected: false });
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'tasks-app',
+                name: 'Tasks App',
+                description: 'acme/tasks-app',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'app',
+                repositoryUrl: 'https://github.com/acme/tasks-app',
+                repositoryMode: 'fork',
+                targetOwner: 'me',
+            });
+
+            expect(result.success).toBe(false);
+            expect(result.requiresGitProvider).toBe(true);
+            expect(workAPICreateMock).not.toHaveBeenCalled();
+        });
+
+        it('createWork with kind=app requires the mode, and the owner for a fork', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({
+                success: true,
+                connected: true,
+                username: 'me',
+                organizations: [],
+            });
+            const { createWork } = await import('./works');
+            const base = {
+                slug: 'tasks-app',
+                name: 'Tasks App',
+                description: 'acme/tasks-app',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'app',
+                repositoryUrl: 'https://github.com/acme/tasks-app',
+            };
+
+            const noMode = await createWork(base);
+            expect(noMode.success).toBe(false);
+            expect(noMode.error).toBe('app.repositoryModeRequired');
+
+            const noOwner = await createWork({ ...base, repositoryMode: 'fork' });
+            expect(noOwner.success).toBe(false);
+            expect(noOwner.error).toBe('app.targetOwnerRequired');
+
+            expect(workAPICreateMock).not.toHaveBeenCalled();
+        });
+
+        it('createWork with kind=app sends mode, owner, Blueprint and the decline of auto-provisioning', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({
+                success: true,
+                connected: true,
+                username: 'me',
+                organizations: [],
+            });
+            workAPICreateMock.mockResolvedValueOnce({
+                work: { id: 'w-app' },
+                appSource: { relation: 'fork', readiness: 'preparing' },
+            });
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'tasks-app',
+                name: 'Tasks App',
+                description: 'acme/tasks-app',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'app',
+                repositoryUrl: 'https://github.com/acme/tasks-app',
+                repositoryMode: 'fork',
+                targetOwner: 'my-org',
+                blueprintId: 'umami',
+                autoProvision: false,
+                appEnv: { APP_SECRET: 'x' },
+            });
+
+            expect(result.success).toBe(true);
+            expect(result.appSource).toMatchObject({ relation: 'fork' });
+            const sent = workAPICreateMock.mock.calls.at(-1)![0];
+            expect(sent).toMatchObject({
+                kind: 'app',
+                repositoryMode: 'fork',
+                targetOwner: 'my-org',
+                blueprintId: 'umami',
+                autoProvision: false,
+                appEnv: { APP_SECRET: 'x' },
+            });
+        });
+
+        it('createWork strips autoProvision: true so an absent property keeps meaning "on"', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({
+                success: true,
+                connected: true,
+                username: 'me',
+                organizations: [],
+            });
+            const { createWork } = await import('./works');
+
+            await createWork({
+                slug: 'tasks-app',
+                name: 'Tasks App',
+                description: 'acme/tasks-app',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'app',
+                repositoryUrl: 'https://github.com/acme/tasks-app',
+                repositoryMode: 'link',
+                autoProvision: true,
+            });
+
+            const sent = workAPICreateMock.mock.calls.at(-1)![0];
+            expect(sent.autoProvision).toBeUndefined();
+        });
+
+        it('createWorkWithAI refuses kind=app (ACC-01-14)', async () => {
+            const { createWorkWithAI } = await import('./works');
+            const before = workAPICreateMock.mock.calls.length;
+
+            const result = await createWorkWithAI({ ...AI_REQUEST, workKind: 'app' } as never);
+
+            expect(result.success).toBe(false);
+            expect(workAPICreateMock.mock.calls.length).toBe(before);
+        });
     });
 
     describe('personal storage still requires a connected provider', () => {

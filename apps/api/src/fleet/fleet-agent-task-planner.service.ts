@@ -22,6 +22,7 @@ import {
     type AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
 import {
+    composeFleetTaskCommitMessage,
     FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
     FLEET_RUN_MCP_SERVER_NAME,
     FLEET_RUN_MCP_TOOL_FAMILIES,
@@ -690,7 +691,13 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             git: {
                 commit: canCommit,
                 push: canCommit,
-                commitMessage: `feat(task): ${task.slug ?? task.id} agent run output`,
+                // A conventional commit from the Task title, the slug in the
+                // body; the node re-types it from what was actually staged
+                // (docs-only -> docs, tests-only -> test).
+                commitMessage: composeFleetTaskCommitMessage({
+                    title: task.title,
+                    slug: task.slug ?? task.id,
+                }),
             },
             // Conditional key: a run without the bridge produces the exact
             // payload it always produced, so nothing about a normal fleet

@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "สร้าง Work ครั้งเดียวหรือตามตารางเวลา",
                     "deploy": "ปรับใช้ Work",
                     "tasks": "งานสำหรับ Work นี้",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "อิมเมจคอนเทนเนอร์ที่บิลด์จากรีโพสิทอรีของคุณ"
                 },
                 "tasks": "งาน",
                 "posts": "โพสต์",
                 "pages": "หน้า",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "บิลด์"
             },
             "members": {
                 "title": "สมาชิกทีม",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "อัปสตรีม: {fullName}",
+                    "fork": "ฟอร์ก: {fullName}",
+                    "private-copy": "สำเนาส่วนตัว: {fullName}",
+                    "link": "ลิงก์แล้ว: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "กำลังเตรียมฟอร์กของคุณ",
+                    "forkBody": "GitHub กำลังสร้าง {fullName} โดยปกติใช้เวลาไม่ถึงหนึ่งนาที รีโพสิทอรีขนาดใหญ่อาจใช้เวลานานกว่านั้น",
+                    "copyTitle": "กำลังเตรียมสำเนาส่วนตัวของคุณ",
+                    "copyBody": "กำลังคัดลอก {upstream} ไปยัง {fullName} รีโพสิทอรีที่ใหญ่กว่าจะใช้เวลานานกว่า",
+                    "linkTitle": "กำลังตั้งค่าให้เสร็จ",
+                    "linkBody": "กำลังเปิดพูลรีเควสต์ที่เพิ่ม .works/works.yml ไปยัง {fullName}",
+                    "blueprintTitle": "กำลังใช้ Blueprint {name}",
+                    "blueprintBody": "Ever Works กำลังเตรียม App Work ของคุณ และจะเขียน .works/works.yml พร้อมไฟล์ของ Blueprint"
+                },
+                "setupPrClosed": "พูลรีเควสต์สำหรับตั้งค่าถูกปิดโดยไม่ได้ผสาน",
+                "timedOut": "ฟอร์กของคุณใช้เวลานานกว่า 15 นาที",
+                "failedAccess": "Ever Works สูญเสียการเข้าถึง GitHub ระหว่างเตรียม App Work นี้",
+                "failedOther": "เตรียม App Work นี้ไม่สำเร็จ: {reason}",
+                "waitingForSetupPr": "ผสานพูลรีเควสต์สำหรับตั้งค่าเพื่อเสร็จสิ้น",
+                "tryAgain": "ลองอีกครั้ง",
+                "openOnGitHub": "เปิดบน GitHub",
+                "reconnectGitHub": "เชื่อมต่อ GitHub อีกครั้ง",
+                "openPullRequest": "เปิดพูลรีเควสต์",
+                "retryLimit": "คุณใช้การลองใหม่ครบทั้ง 3 ครั้งในชั่วโมงนี้แล้ว ลองอีกครั้งภายหลัง",
+                "retryFailed": "เริ่มความพยายามครั้งใหม่ไม่สำเร็จ ลองอีกครั้ง",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml ในแบรนช์เริ่มต้นไม่ใช่ YAML ที่ถูกต้อง แก้ไขหรือลบไฟล์ แล้วลองอีกครั้ง",
+                    "works_yml_other_kind": ".works/works.yml ระบุ Work ชนิดอื่นไว้แล้ว ตั้งค่า kind: app หรือลบไฟล์ แล้วลองอีกครั้ง",
+                    "push_rejected": "GitHub ปฏิเสธคอมมิตที่เพิ่ม .works/works.yml ซ้ำ ๆ",
+                    "provider_unsupported": "ไม่สามารถตั้งค่าผู้ให้บริการ Git ของรีโพสิทอรีนี้โดยอัตโนมัติ",
+                    "too_large_for_private_copy": "รีโพสิทอรีใหญ่เกินไปสำหรับสำเนาส่วนตัว ให้สร้างฟอร์กแทน",
+                    "uses_lfs": "รีโพสิทอรีใช้ Git LFS ซึ่งสำเนาส่วนตัวนำไปด้วยไม่ได้ ให้สร้างฟอร์กแทน",
+                    "other": "เกิดข้อผิดพลาดระหว่างตั้งค่ารีโพสิทอรี"
+                },
+                "overview": {
+                    "title": "แอป",
+                    "repository": "รีโพสิทอรีของ Work",
+                    "upstream": "อัปสตรีม",
+                    "relationLabel": "ความสัมพันธ์",
+                    "readinessLabel": "ความพร้อม",
+                    "readiness": {
+                        "preparing": "กำลังเตรียม",
+                        "ready": "พร้อม",
+                        "timed_out": "หมดเวลา",
+                        "failed": "ล้มเหลว",
+                        "waiting_for_setup_pr": "กำลังรอพูลรีเควสต์สำหรับตั้งค่า"
+                    },
+                    "relations": {
+                        "link": "ลิงก์แล้ว",
+                        "fork": "ฟอร์ก",
+                        "private-copy": "สำเนาส่วนตัว"
+                    },
+                    "appSpecLabel": "สเปก App",
+                    "appSpecStatus": {
+                        "valid": "ถูกต้อง",
+                        "valid_with_warnings": "ถูกต้อง แต่มีคำเตือน",
+                        "invalid": "มีข้อผิดพลาด",
+                        "missing": "ยังไม่ได้เขียน",
+                        "unreadable": "อ่านไม่ได้",
+                        "pending": "กำลังตรวจสอบ",
+                        "unknown": "ยังไม่ได้ตรวจสอบ"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {ไม่มีข้อผิดพลาด} =1 {ข้อผิดพลาด 1 รายการ} other {ข้อผิดพลาด # รายการ}} · {warnings, plural, =0 {ไม่มีคำเตือน} =1 {คำเตือน 1 รายการ} other {คำเตือน # รายการ}}",
+                    "openAppSpec": "เปิดสเปก App",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "โหลดรายละเอียดแอปไม่ได้ในขณะนี้",
+                    "builds": "บิลด์",
+                    "deploy": "การปรับใช้",
+                    "upstreamTab": "อัปสตรีม",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "พัฒนาต่อด้วยเอเจนต์ของแอป",
+                    "body": "ขอให้เอเจนต์ของ Work เปลี่ยนแปลงแอป — เพิ่มฟีเจอร์ แก้บั๊ก อัปเกรดดีเพนเดนซี เอเจนต์ทำงานในรีโพสิทอรีของ Work และเปิดพูลรีเควสต์",
+                    "button": "แชตเกี่ยวกับแอปนี้"
+                }
+            },
+            "builds": {
+                "title": "บิลด์",
+                "subtitle": "บิลด์บนรันเนอร์ที่ GitHub โฮสต์ใน {repository} · อิมเมจ {imageRepository}",
+                "subtitleNoImage": "บิลด์บนรันเนอร์ที่ GitHub โฮสต์ใน {repository}",
+                "subtitleGeneric": "อิมเมจคอนเทนเนอร์ที่บิลด์จากรีโพสิทอรีของ App Work นี้",
+                "startBuild": "เริ่มบิลด์",
+                "starting": "กำลังเริ่ม…",
+                "refresh": "รีเฟรช",
+                "cancel": "ยกเลิก",
+                "cancelling": "กำลังยกเลิก…",
+                "viewerDisabled": "คุณต้องมีสิทธิ์แก้ไขจึงจะทำสิ่งนี้ได้",
+                "deployable": "ปรับใช้ได้",
+                "notDeployableLine": "ปรับใช้ไม่ได้ — {reason}",
+                "pagination": "แสดง {start}–{end} จาก {total}",
+                "listLabel": "บิลด์ของ App Work นี้",
+                "openDetails": "เปิดบิลด์ #{number}",
+                "status": {
+                    "queued": "อยู่ในคิว",
+                    "running": "กำลังทำงาน",
+                    "succeeded": "สำเร็จ",
+                    "failed": "ล้มเหลว",
+                    "cancelled": "ยกเลิกแล้ว",
+                    "blocked": "ถูกบล็อก"
+                },
+                "trigger": {
+                    "push": "พุช",
+                    "pullRequest": "PR #{number}",
+                    "manual": "ด้วยตนเอง",
+                    "verification": "การตรวจสอบ"
+                },
+                "notDeployable": {
+                    "notSucceeded": "บิลด์ไม่สำเร็จ",
+                    "pullRequest": "บิลด์จากพูลรีเควสต์",
+                    "verification": "บิลด์เพื่อการตรวจสอบ",
+                    "specInvalid": "สเปก App ในคอมมิตนี้มีข้อผิดพลาด",
+                    "staleInputs": "บิลด์ด้วยค่าบิลด์ที่เก่ากว่า",
+                    "secretCheckFailed": "การตรวจสอบซีเคร็ตไม่ผ่าน",
+                    "digestUnconfirmed": "ยืนยันอิมเมจที่พุชไม่ได้",
+                    "criticalVulnerability": "ช่องโหว่ระดับวิกฤตมีการแก้ไขให้ใช้แล้ว",
+                    "unsigned": "อิมเมจไม่ได้ลงนาม"
+                },
+                "blocked": {
+                    "workflowPending": "กำลังรอการผสานเวิร์กโฟลว์บิลด์",
+                    "workflowEditedByHand": "เวิร์กโฟลว์บิลด์ถูกแก้ไขด้วยมือ",
+                    "workflowWriteFailed": "Ever Works เขียนเวิร์กโฟลว์บิลด์ลงในรีโพสิทอรีไม่ได้ กฎในรีโพสิทอรีนี้ปฏิเสธการเปลี่ยนแปลง",
+                    "actionsDisabled": "GitHub Actions ถูกปิดสำหรับรีโพสิทอรีนี้",
+                    "missingBuildValues": "กำลังรอ{count, plural, =1 {ค่าบิลด์ 1 ค่า} other {ค่าบิลด์ # ค่า}}: {names}",
+                    "runnerTooSmall": "บิลด์นี้ต้องการ {needed} แต่รันเนอร์สำหรับรีโพสิทอรี{visibility}อนุญาตได้ {max}",
+                    "tooManyBuildValues": "บิลด์นี้ใช้ค่าบิลด์ {count} ค่า อนุญาตได้สูงสุด 50 ค่า",
+                    "buildValueTooLarge": "{name} ใหญ่เกินกว่าจะส่งให้บิลด์ได้ (สูงสุด 48 KB)",
+                    "secretLimitReached": "รีโพสิทอรีไม่มีที่ว่างสำหรับซีเคร็ตเพิ่มอีก",
+                    "strategyNotSupported": "รันเนอร์ที่ GitHub โฮสต์บิลด์ด้วยกลยุทธ์ “{strategy}” ไม่ได้ เพิ่ม Dockerfile แล้วตั้งค่า build.strategy เป็น dockerfile",
+                    "specInvalid": "สเปก App ในคอมมิตนี้มีข้อผิดพลาด",
+                    "gitConnectionMissing": "Ever Works เข้าถึงรีโพสิทอรีนี้ด้วยการเชื่อมต่อ GitHub ของคุณไม่ได้",
+                    "repositoryUnavailable": "{repository} ถูกเก็บถาวร ถูกลบ หรือไม่สามารถเข้าถึงได้ด้วยการเชื่อมต่อ GitHub ของคุณอีกต่อไป",
+                    "managedConcurrencyLimit": "กำลังรอบิลด์อื่น: รันพร้อมกันได้สูงสุด {perWork} ต่อแอป และ {perAccount} ต่อบัญชี",
+                    "buildValueNameReserved": "{name} ถูกสงวนไว้โดย Ever Works และส่งให้บิลด์ไม่ได้ เปลี่ยนชื่อรายการสภาพแวดล้อม",
+                    "buildServicePortRequired": "บริการบิลด์ {service} ต้องมีพอร์ต: Ever Works ไม่ทราบว่า “{image}” รอรับที่พอร์ตใด",
+                    "verificationDependencyUnsupported": "การตรวจสอบยังเริ่ม {kind} ไม่ได้ การตรวจสอบจึงรันบนคลัสเตอร์แทน",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "ตรวจทานพูลรีเควสต์",
+                    "turnOnActions": "เปิดใช้งาน",
+                    "setValue": "ตั้งค่า",
+                    "useLargerRunner": "ใช้รันเนอร์ที่ใหญ่ขึ้น",
+                    "openRepositorySettings": "เปิดการตั้งค่ารีโพสิทอรี",
+                    "reconnectGithub": "เชื่อมต่อ GitHub อีกครั้ง",
+                    "rebuild": "บิลด์ใหม่",
+                    "openEnvironment": "เปิดสภาพแวดล้อม"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "หน่วยความจำไม่พอ",
+                        "suggestion": "เพิ่ม build.resources.memory (ตอนนี้ {memory}) หรือลดขนาด heap ของบิลด์ บนรันเนอร์นี้บิลด์ใช้ได้สูงสุด {max}"
+                    },
+                    "diskFull": {
+                        "title": "พื้นที่ดิสก์ไม่พอ",
+                        "suggestion": "เปิด “Reclaim runner disk” ในการตั้งค่าบิลด์ หรือลดขนาด build context ด้วยไฟล์ .dockerignore"
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile ล้มเหลวที่ขั้นตอน {step} จาก {total}",
+                        "suggestion": "ขั้นตอนที่ล้มเหลวคือ: {command} แก้ไขใน {dockerfile} แล้วพุช หรือขอให้เอเจนต์แก้ไข"
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "ดาวน์โหลดดีเพนเดนซีไม่สำเร็จ",
+                        "suggestion": "รีจิสทรีของแพ็กเกจหรืออิมเมจฐานไม่ตอบสนอง บิลด์ใหม่ในอีกไม่กี่นาที หากยังล้มเหลว ให้ปักหมุดเวอร์ชันที่คุณพึ่งพา"
+                    },
+                    "registryPushDenied": {
+                        "title": "พุชอิมเมจไม่สำเร็จ",
+                        "suggestion": "อนุญาตให้เวิร์กโฟลว์ในรีโพสิทอรีนี้เขียนแพ็กเกจได้ (Settings ▸ Actions ▸ General ▸ Workflow permissions) แล้วบิลด์ใหม่"
+                    },
+                    "missingBuildValue": {
+                        "title": "ไม่มีค่าบิลด์: {names}",
+                        "suggestion": "ตั้งค่าใน การตั้งค่า ▸ สภาพแวดล้อม แล้วบิลด์ใหม่"
+                    },
+                    "secretInImage": {
+                        "title": "ซีเคร็ตจะถูกเผยแพร่อยู่ภายในอิมเมจ: {name}",
+                        "suggestion": "ใช้ค่านี้เฉพาะในขั้นบิลด์ก่อนหน้า หรือส่งเป็น build secret mount ไม่มีสิ่งใดถูกพุช"
+                    },
+                    "timeout": {
+                        "title": "ใช้เวลานานกว่า {minutes} นาที",
+                        "suggestion": "เพิ่ม build.resources.timeoutMinutes (สูงสุด 180) หรือเร่งบิลด์ด้วยการแคช"
+                    },
+                    "workflowInvalid": {
+                        "title": "ไฟล์เวิร์กโฟลว์ไม่ถูกต้อง",
+                        "suggestion": "GitHub รันเวิร์กโฟลว์บิลด์ไม่ได้ ตรวจทานพูลรีเควสต์ที่เปิดอยู่จาก Ever Works เพื่อกู้คืน"
+                    },
+                    "digestMismatch": {
+                        "title": "ยืนยันอิมเมจที่พุชไม่ได้",
+                        "suggestion": "รีจิสทรีรายงานอิมเมจที่ต่างจากที่บิลด์รายงาน บิลด์ใหม่ สิ่งที่ยังไม่ได้รับการยืนยันจะไม่ถูกปรับใช้"
+                    },
+                    "verificationFailed": {
+                        "title": "แอปไม่ผ่าน smoke test",
+                        "suggestion": "smoke test ล้มเหลว {failed} จาก {total} รายการ ดูผลลัพธ์ด้านล่าง"
+                    },
+                    "egressBlocked": {
+                        "title": "การเข้าถึงเครือข่ายถูกบล็อก",
+                        "suggestion": "บิลด์พยายามเข้าถึง {hosts} ซึ่งไม่อยู่ในรายการที่อนุญาตของ builder ดึงสิ่งที่ต้องการจากรีโพสิทอรีต้นทางหรือรีจิสทรีที่อนุญาต แล้วบิลด์ใหม่"
+                    },
+                    "lost": {
+                        "title": "ติดตามบิลด์นี้ไม่ได้แล้ว",
+                        "suggestion": "GitHub หยุดตอบกลับเกี่ยวกับบิลด์นี้ ตรวจสอบบน GitHub"
+                    },
+                    "unknown": {
+                        "title": "เกิดข้อผิดพลาดอื่น",
+                        "suggestion": "เปิดล็อกบน GitHub หรือขอให้เอเจนต์ตรวจดู"
+                    },
+                    "askAgent": "ขอให้เอเจนต์แก้ไข",
+                    "excerptLabel": "บรรทัดสุดท้ายของล็อก"
+                },
+                "cancelReason": {
+                    "user": "ยกเลิกโดยสมาชิก",
+                    "superseded": "ถูกแทนที่ด้วยบิลด์ที่ใหม่กว่า"
+                },
+                "detail": {
+                    "title": "บิลด์ #{number} · {sha} · {status}",
+                    "loading": "กำลังโหลดรายละเอียดบิลด์…",
+                    "close": "ปิด",
+                    "trigger": "ทริกเกอร์",
+                    "triggeredBy": "{trigger} — โดย {name}",
+                    "commit": "คอมมิต",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "รันเนอร์",
+                    "duration": "ระยะเวลา",
+                    "durationValue": "{duration} (อยู่ในคิว {queued})",
+                    "image": "อิมเมจ",
+                    "tags": "แท็ก",
+                    "deployable": "ปรับใช้ได้",
+                    "yes": "ใช่",
+                    "buildValues": "ค่าบิลด์",
+                    "buildValuesValue": "{count, plural, =1 {ซิงค์แล้ว 1 ค่า} other {ซิงค์แล้ว # ค่า}}: {names}",
+                    "noBuildValues": "ไม่มี",
+                    "receipt": "ใบสรุป",
+                    "verification": "การตรวจสอบ",
+                    "copy": "คัดลอก",
+                    "copied": "คัดลอกการอ้างอิงอิมเมจแล้ว",
+                    "copyFailed": "คัดลอกการอ้างอิงอิมเมจไม่สำเร็จ",
+                    "viewLogs": "ดูล็อกบน GitHub",
+                    "rebuildThisCommit": "บิลด์คอมมิตนี้ใหม่",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} นาทีของรันเนอร์ · ชำระโดยบัญชี GitHub ของคุณ",
+                    "minutesPlatform": "{minutes} นาทีของรันเนอร์ · ชำระโดย Ever Works",
+                    "checksMinutes": "ในจำนวนนี้ {checksMinutes} นาทีใช้รันการตรวจสอบ App",
+                    "costUnknown": "ยังไม่มีการรายงานนาทีของรันเนอร์"
+                },
+                "verification": {
+                    "componentsReady": "คอมโพเนนต์เริ่มทำงานแล้ว",
+                    "componentsNotReady": "คอมโพเนนต์ไม่เริ่มทำงาน",
+                    "job": "งาน {name} จบด้วยรหัส {exitCode}",
+                    "jobNoExit": "งาน {name} ทำงานไม่เสร็จ",
+                    "smokePassed": "ผ่าน: {name}",
+                    "smokeFailed": "ไม่ผ่าน: {name} — คาดหวัง {expected} แต่ได้ {observed}"
+                },
+                "empty": {
+                    "noBuilds": "ยังไม่มีบิลด์ บิลด์แรกจะเริ่มเมื่อเวิร์กโฟลว์บิลด์อยู่ในรีโพสิทอรี",
+                    "unavailable": "บิลด์ยังไม่พร้อมใช้งานในอินสแตนซ์นี้"
+                },
+                "errors": {
+                    "loadFailed": "โหลดบิลด์ไม่สำเร็จ ลองรีเฟรชหน้า",
+                    "rebuildRateLimited": "คุณเริ่มบิลด์มากเกินไปในชั่วโมงนี้ ลองอีกครั้งใน {minutes, plural, =1 {1 นาที} other {# นาที}}",
+                    "commitNotReachable": "คอมมิตนั้นไม่อยู่ในแบรนช์ที่ติดตาม",
+                    "nothingToBuild": "App Work นี้รันอิมเมจที่เผยแพร่แล้ว จึงไม่มีอะไรต้องบิลด์",
+                    "notCancellable": "บิลด์นี้เสร็จไปแล้ว จึงยกเลิกไม่ได้",
+                    "providerUnavailable": "ไม่มีผู้ให้บริการบิลด์ที่พร้อมใช้งานในขณะนี้ ลองอีกครั้งภายหลัง",
+                    "startFailed": "เริ่มบิลด์ไม่สำเร็จ ลองอีกครั้ง",
+                    "cancelFailed": "ยกเลิกบิลด์นี้ไม่สำเร็จ ลองอีกครั้ง",
+                    "detailFailed": "โหลดบิลด์นี้ไม่สำเร็จ ลองอีกครั้ง"
+                },
+                "toasts": {
+                    "started": "เพิ่มบิลด์เข้าคิวแล้ว",
+                    "deduped": "มีบิลด์สำหรับคอมมิตนี้อยู่ในคิวแล้ว",
+                    "cancelled": "ยกเลิกบิลด์แล้ว"
+                },
+                "pullToken": {
+                    "title": "เพิ่มโทเค็นสำหรับพูล",
+                    "body": "อิมเมจนี้เป็นแบบส่วนตัว คลัสเตอร์ของคุณต้องมีโทเค็นที่อ่านแพ็กเกจได้เท่านั้นเพื่อดาวน์โหลด",
+                    "stepCreate": "1. สร้างโทเค็นแบบคลาสสิกโดยเลือกเฉพาะ “read:packages”",
+                    "stepPaste": "2. วางโทเค็นที่นี่",
+                    "label": "โทเค็น",
+                    "submit": "ตรวจสอบและบันทึก",
+                    "saving": "กำลังตรวจสอบ…",
+                    "tooBroad": "โทเค็นนี้ทำได้มากกว่าการอ่านแพ็กเกจ สร้างโทเค็นที่มีเฉพาะ read:packages",
+                    "fineGrained": "นี่คือโทเค็นแบบ fine-grained สร้างโทเค็นแบบคลาสสิกโดยเลือกเฉพาะ read:packages",
+                    "cannotRead": "โทเค็นนี้อ่าน {imageRepository} ไม่ได้",
+                    "publicImage": "อิมเมจนี้เป็นสาธารณะอยู่แล้ว — ไม่ต้องใช้โทเค็น",
+                    "noImageYet": "ยังไม่มีบิลด์ที่เสร็จสมบูรณ์ เพิ่มโทเค็นสำหรับพูลหลังจากบิลด์แรกสำเร็จ",
+                    "savedExpires": "บันทึกโทเค็นสำหรับพูลแล้ว จะหมดอายุวันที่ {date}",
+                    "savedNoExpiry": "บันทึกโทเค็นสำหรับพูลแล้ว ไม่มีวันหมดอายุ",
+                    "tokenSet": "บันทึกโทเค็นสำหรับพูลไว้แล้ว วางโทเค็นใหม่เพื่อแทนที่",
+                    "expiringSoon": "โทเค็นสำหรับพูลจะหมดอายุวันที่ {date} เพิ่มโทเค็นใหม่ก่อนถึงวันนั้น",
+                    "viewerDisabled": "คุณต้องมีสิทธิ์แก้ไขจึงจะทำสิ่งนี้ได้",
+                    "failed": "บันทึกโทเค็นสำหรับพูลไม่สำเร็จ ลองอีกครั้ง"
+                },
+                "overview": {
+                    "title": "บิลด์ล่าสุด",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "บิลด์ที่ปรับใช้ได้: คอมมิตนี้",
+                    "deployableOther": "บิลด์ที่ปรับใช้ได้: {sha}",
+                    "noDeployable": "ยังไม่มีบิลด์ที่ปรับใช้ได้",
+                    "open": "เปิดบิลด์"
+                }
+            },
+            "appDeploy": {
+                "title": "การปรับใช้",
+                "notRunning": "แอปนี้ยังไม่ได้รันที่ใดเลย",
+                "runningOn": "{state} · {target}",
+                "openApp": "เปิดแอป",
+                "source": "แหล่งที่มา",
+                "buildsLink": "ดูบิลด์",
+                "buildsHint": "บิลด์ยังคงรันไม่ว่าเป้าหมายจะเป็นอะไร",
+                "stale": "ตรวจสอบล่าสุดเมื่อ {minutes, plural, =1 {1 นาที} other {# นาที}}ที่แล้ว",
+                "status": {
+                    "notDeployed": "ยังไม่ได้ปรับใช้",
+                    "live": "ออนไลน์",
+                    "degraded": "ทำงานบกพร่อง",
+                    "down": "ล่ม",
+                    "unreachable": "เข้าถึงคลัสเตอร์ของคุณไม่ได้",
+                    "paused": "หยุดชั่วคราว",
+                    "deleting": "กำลังลบ…"
+                },
+                "target": {
+                    "heading": "ควรให้รันที่ไหน",
+                    "current": "(ปัจจุบัน)",
+                    "none": {
+                        "label": "ไม่มี — ยังไม่ปรับใช้",
+                        "description": "บิลด์ยังคงรันอยู่"
+                    },
+                    "yourCluster": {
+                        "label": "คลัสเตอร์ของคุณ",
+                        "description": "รันบนคลัสเตอร์ Kubernetes ที่คุณควบคุม"
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "เรารันให้คุณ",
+                        "unavailable": "เร็ว ๆ นี้ — โฮสติ้งแบบจัดการสำหรับแอปยังไม่เปิดให้บริการ",
+                        "ineligible": "ยังไม่พร้อมใช้งานสำหรับแอปนี้"
+                    },
+                    "connect": "เชื่อมต่อคลัสเตอร์ของคุณ",
+                    "reconnect": "เปลี่ยนการเชื่อมต่อคลัสเตอร์",
+                    "connected": "เชื่อมต่อแล้ว · {version}",
+                    "connectedNoVersion": "เชื่อมต่อแล้ว",
+                    "checkFailed": "การตรวจสอบคลัสเตอร์ครั้งล่าสุดล้มเหลว",
+                    "notChecked": "ยังไม่ได้เชื่อมต่อคลัสเตอร์",
+                    "save": "ใช้เป้าหมายนี้",
+                    "saving": "กำลังบันทึก…",
+                    "saved": "บันทึกเป้าหมายแล้ว",
+                    "saveFailed": "บันทึกเป้าหมายไม่สำเร็จ: {reason}",
+                    "changeNote": "การเปลี่ยนเป้าหมายจะไม่ลบสิ่งที่รันอยู่แล้ว",
+                    "routeUnavailable": "การเปลี่ยนเป้าหมายยังไม่พร้อมใช้งานในอินสแตนซ์นี้"
+                },
+                "connect": {
+                    "title": "เชื่อมต่อคลัสเตอร์ของคุณ",
+                    "description": "วาง kubeconfig ของ service account ในคลัสเตอร์ที่แอปนี้ควรรัน",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "วาง kubeconfig ของคุณ…",
+                    "kubeconfigHelp": "ใช้โทเค็นของ service account ไม่รองรับคำสั่ง ไฟล์ในเครื่อง และพร็อกซี",
+                    "kubeconfigStored": "kubeconfig ของคุณถูกส่งมาครั้งเดียวและจัดเก็บแบบเข้ารหัส วางไฟล์ใหม่เพื่อแทนที่ หรือตรวจสอบไฟล์ที่จัดเก็บไว้อีกครั้ง",
+                    "contextLabel": "Context (ไม่บังคับ)",
+                    "contextHelp": "เว้นว่างไว้เพื่อใช้ context ปัจจุบันของ kubeconfig",
+                    "check": "ตรวจสอบการเชื่อมต่อ",
+                    "checking": "กำลังตรวจสอบ…",
+                    "checkAgain": "ตรวจสอบอีกครั้ง",
+                    "checkTimedOut": "การตรวจสอบไม่เสร็จภายใน 30 วินาที ลองอีกครั้ง",
+                    "checkFailed": "ตรวจสอบการเชื่อมต่อไม่สำเร็จ: {reason}",
+                    "unavailable": "การเชื่อมต่อคลัสเตอร์ยังไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                    "kubeconfigTooLarge": "kubeconfig นี้ใหญ่กว่า 64 KiB",
+                    "kubeconfigRequired": "วาง kubeconfig ก่อน",
+                    "ingressClass": "คลาส Ingress",
+                    "ingressDefault": "{name} (ค่าเริ่มต้น)",
+                    "ingressNone": "ไม่พบคลาส Ingress",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "ใบรับรองจากผู้ออก",
+                        "external": "จัดการภายนอกคลัสเตอร์",
+                        "edge": "สิ้นสุดที่ขอบเครือข่าย",
+                        "none": "ไม่มี TLS (http เท่านั้น)"
+                    },
+                    "issuer": "ผู้ออกใบรับรอง",
+                    "namespace": "เนมสเปซ",
+                    "namespaceAuto": "เลือกเมื่อปรับใช้แอปครั้งแรก",
+                    "isolation": "การแยกเครือข่าย",
+                    "isolationOn": "เปิด (แนะนำ)",
+                    "isolationOff": "ปิด",
+                    "isolationOffWarning": "หากไม่มีการแยกเครือข่าย เวิร์กโหลดอื่นในคลัสเตอร์จะเข้าถึงแอปนี้และฐานข้อมูลของแอปได้",
+                    "cancel": "ยกเลิก",
+                    "save": "บันทึก",
+                    "saving": "กำลังบันทึก…",
+                    "saveBlocked": "บันทึกได้เมื่อการตรวจสอบผ่านพร้อมสิทธิ์ที่จำเป็นครบทุกรายการ",
+                    "saved": "เชื่อมต่อคลัสเตอร์แล้ว",
+                    "saveFailed": "บันทึกการเชื่อมต่อคลัสเตอร์ไม่สำเร็จ: {reason}"
+                },
+                "check": {
+                    "ok": "เชื่อมต่อแล้ว",
+                    "version": "Kubernetes {version}",
+                    "failed": "การตรวจสอบคลัสเตอร์ล้มเหลว",
+                    "kubeconfigRefused": "kubeconfig นี้{reason} ให้ใช้โทเค็นของ service account แทน",
+                    "notPublic": "Ever Works เข้าถึงได้เฉพาะคลัสเตอร์ที่มีที่อยู่สาธารณะ",
+                    "permissions": "สิทธิ์",
+                    "allPermissions": "มีสิทธิ์ที่จำเป็นครบทุกรายการ",
+                    "missing": "ขาด: {verb} {resource}",
+                    "optionalMissing": "ไม่บังคับ ขาด: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "ปรับใช้ตอนนี้",
+                    "deploying": "กำลังส่งคำขอ…",
+                    "started": "เริ่มการปรับใช้แล้ว",
+                    "queued": "อยู่ในคิว — จะเริ่มเมื่อการปรับใช้ที่กำลังทำงานเสร็จสิ้น",
+                    "deduplicated": "มีการขอการปรับใช้นี้ไปแล้ว",
+                    "inProgress": "มีการปรับใช้อื่นกำลังทำงานอยู่ ({id}) รอให้เสร็จก่อน แล้วปรับใช้อีกครั้ง",
+                    "preconditionsHeader": "แก้ไขสิ่งเหล่านี้ก่อนปรับใช้:",
+                    "workerNotIsolated": "ยังเริ่มการปรับใช้ไม่ได้: อินสแตนซ์นี้ไม่มี worker ของคลัสเตอร์ App ที่แยกไว้",
+                    "notAppWork": "Work นี้ไม่ใช่ App Work จึงปรับใช้ด้วยวิธีนี้ไม่ได้",
+                    "failed": "ส่งคำขอการปรับใช้ไม่สำเร็จ: {reason}",
+                    "targetNone": "เลือกก่อนว่าจะให้แอปรันที่ไหน — ตัวเลือกไม่มีจะไม่ปรับใช้สิ่งใด",
+                    "deploymentId": "การปรับใช้ {id}",
+                    "warningsHeader": "คำเตือน"
+                },
+                "preconditions": {
+                    "specInvalid": "สเปก App (.works/works.yml) มีข้อผิดพลาด แก้ไขในหน้าสเปก App",
+                    "licenseBlocksTarget": "สัญญาอนุญาตของแอปไม่อนุญาตให้โฮสต์บนเป้าหมายนี้",
+                    "licenseAttestationMissing": "รับรองสัญญาอนุญาตของแอปก่อนปรับใช้",
+                    "envRequiredUnset": "ยังไม่ได้ตั้งค่า env ที่จำเป็นบางรายการ",
+                    "dependencyNotReady": "ดีเพนเดนซีที่แอปต้องการยังไม่พร้อม",
+                    "noGreenBuild": "ยังไม่มีบิลด์ที่สำเร็จให้ปรับใช้ เริ่มบิลด์ก่อน",
+                    "noGreenBuildForHead": "คอมมิตล่าสุดในแบรนช์สำหรับปรับใช้ยังบิลด์ไม่สำเร็จ",
+                    "buildImageMissing": "บิลด์ไม่มีอิมเมจให้ปรับใช้",
+                    "nothingToDeploy": "ยังไม่มีอะไรให้ปรับใช้: ไม่มีบิลด์และไม่มีอิมเมจที่เผยแพร่",
+                    "imageNotPinned": "อิมเมจนี้อ้างอิงด้วยแท็ก ปักหมุดด้วย digest เพื่อให้ทุกการปรับใช้รันอิมเมจเดียวกัน",
+                    "imageNotFound": "ไม่พบอิมเมจในรีจิสทรีของอิมเมจนั้น",
+                    "imagePrivateUnsupported": "อิมเมจนี้ดาวน์โหลดไม่ได้หากไม่มีข้อมูลรับรอง Ever Works ปรับใช้อิมเมจที่เผยแพร่เฉพาะเมื่อเป็นสาธารณะเท่านั้น",
+                    "imageUnresolvable": "แก้ไขการอ้างอิงอิมเมจไม่ได้",
+                    "primaryDomainMissing": "ยังไม่ได้ตั้งค่าโดเมนหลัก",
+                    "targetNone": "เลือกก่อนว่าจะให้แอปรันที่ไหน",
+                    "targetNotChecked": "ตรวจสอบการเชื่อมต่อคลัสเตอร์ก่อน",
+                    "clusterChangedUnconfirmed": "คลัสเตอร์เปลี่ยนไปตั้งแต่การปรับใช้ครั้งล่าสุด ยืนยันการเปลี่ยนแปลงเพื่อปรับใช้",
+                    "managedDisabled": "เร็ว ๆ นี้ — โฮสติ้งแบบจัดการสำหรับแอปยังไม่เปิดให้บริการ",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps รันเฉพาะแอปจาก Blueprint ที่ยืนยันแล้วเท่านั้น",
+                    "quotaExceeded": "คุณรันแอปบน Ever Works Apps ครบจำนวนที่กำหนดแล้ว",
+                    "managedIneligible": "แอปนี้รันบน Ever Works Apps ไม่ได้",
+                    "managedSandboxUnavailable": "Ever Works Apps รับแอปใหม่ไม่ได้ในขณะนี้",
+                    "appWorkDeleting": "App Work นี้กำลังถูกลบ",
+                    "paused": "แอปหยุดชั่วคราวอยู่ ให้ทำงานต่อเพื่อปรับใช้",
+                    "deployInProgress": "มีการปรับใช้อื่นกำลังทำงานอยู่",
+                    "cronAuthEnvUnset": "การเรียกตามกำหนดเวลาต้องใช้ค่าการยืนยันตัวตนที่ยังไม่ได้ตั้งค่า",
+                    "jobAuthEnvUnset": "job ต้องใช้ค่าการยืนยันตัวตนที่ยังไม่ได้ตั้งค่า",
+                    "volumeReplicas": "คอมโพเนนต์ที่มีวอลุ่มรันได้เพียงเรพลิกาเดียว",
+                    "volumeShrink": "ลดขนาดวอลุ่มไม่ได้",
+                    "privilegedPort": "คอมโพเนนต์รอรับที่พอร์ตต่ำกว่า 1024",
+                    "cronTooFrequent": "การเรียกตามกำหนดเวลารันบ่อยกว่าที่อนุญาต",
+                    "managedRootForbidden": "อิมเมจนี้รันในฐานะ root",
+                    "imageUserUnverifiable": "Ever Works ตรวจสอบไม่ได้ว่าอิมเมจรันในฐานะผู้ใช้ใด",
+                    "workerNotIsolated": "ยังเริ่มการปรับใช้ไม่ได้: อินสแตนซ์นี้ไม่มี worker ของคลัสเตอร์ App ที่แยกไว้",
+                    "envSourceUnavailable": "อ่านค่า env ของแอปไม่ได้ในขณะนี้",
+                    "pullCredentialUnavailable": "ข้อมูลรับรองสำหรับพูลอิมเมจไม่พร้อมใช้งาน",
+                    "namespaceForeign": "เนมสเปซนั้นเป็นของสิ่งอื่นในคลัสเตอร์อยู่แล้ว",
+                    "verificationNamespaceForbidden": "เนมสเปซนั้นสงวนไว้สำหรับการรันการตรวจสอบ"
+                },
+                "license": {
+                    "loading": "กำลังอ่านสัญญาอนุญาต…",
+                    "unavailable": "รายละเอียดสัญญาอนุญาตยังไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                    "error": "อ่านสัญญาอนุญาตไม่สำเร็จ โหลดหน้าใหม่เพื่อลองอีกครั้ง",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "ไม่พบสัญญาอนุญาตที่เรารู้จัก",
+                    "classes": {
+                        "green": "อนุญาตให้โฮสต์",
+                        "amber": "คลัสเตอร์ของคุณ หลังจากคุณยืนยันเงื่อนไขสัญญาอนุญาต",
+                        "red": "เฉพาะคลัสเตอร์ของคุณ หลังจากคุณยืนยันเงื่อนไขสัญญาอนุญาต",
+                        "unknown": "ไม่ทราบสัญญาอนุญาต — ยืนยันเงื่อนไขก่อนปรับใช้",
+                        "unclassified": "ยังไม่ได้จัดประเภท"
+                    },
+                    "mixed": "บางส่วนของรีโพสิทอรีนี้ใช้สัญญาอนุญาตอื่น",
+                    "incomplete": "รีโพสิทอรีนี้ใหญ่เกินกว่าจะสแกนได้ครบถ้วน",
+                    "yourClusterAllowed": "คลัสเตอร์ของคุณ: อนุญาต",
+                    "yourClusterAfterConfirm": "คลัสเตอร์ของคุณ: อนุญาตหลังจากคุณยืนยันเงื่อนไขสัญญาอนุญาต",
+                    "review": "ตรวจทานและยืนยัน",
+                    "confirmed": "ยืนยันเมื่อ {date}",
+                    "disclaimer": "นี่คือการอ่านไฟล์สัญญาอนุญาตของรีโพสิทอรีแบบอัตโนมัติ ไม่ใช่คำแนะนำทางกฎหมาย",
+                    "unknownSpdx": "สัญญาอนุญาตของซอฟต์แวร์นี้",
+                    "dialogTitle": "ยืนยันเงื่อนไขสัญญาอนุญาต",
+                    "dialogBody": "{spdx} จำกัดวิธีโฮสต์ซอฟต์แวร์นี้ Ever Works Apps ใช้กับซอฟต์แวร์นี้ไม่ได้ หากต้องการรันบนคลัสเตอร์ของคุณเอง ให้ยืนยันว่า:",
+                    "noText": "รีจิสทรีสัญญาอนุญาตไม่มีข้อความสำหรับสัญญาอนุญาตนี้",
+                    "checkbox": "ฉันยืนยันข้อความข้างต้น",
+                    "footer": "เราบันทึกว่าใครยืนยัน เมื่อใด และสำหรับสัญญาอนุญาตและคอมมิตใด",
+                    "cancel": "ยกเลิก",
+                    "confirm": "ยืนยัน",
+                    "refusals": {
+                        "ownerOnly": "เฉพาะเจ้าของ App Work เท่านั้นที่รับรองได้",
+                        "licenseChanged": "สัญญาอนุญาตเปลี่ยนไประหว่างที่คุณตรวจทาน ตรวจทานเงื่อนไขใหม่แล้วยืนยันอีกครั้ง",
+                        "attestationNotRequired": "สัญญาอนุญาตนี้ไม่ต้องยืนยันอีกต่อไป",
+                        "licenseUnavailable": "การยืนยันสัญญาอนุญาตยังไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                        "route_unavailable": "การยืนยันสัญญาอนุญาตยังไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                        "failed": "บันทึกการยืนยันไม่สำเร็จ ลองอีกครั้ง"
+                    }
+                },
+                "rollback": {
+                    "button": "ย้อนกลับ",
+                    "title": "ย้อนกลับไปยังการปรับใช้ก่อนหน้า",
+                    "description": "เลือกการปรับใช้ที่เคยใช้งานจริงมาก่อน อิมเมจและข้อกำหนดแอปของการปรับใช้นั้นจะทำงานอีกครั้ง โดยไม่มีการบิลด์ใหม่",
+                    "pickLabel": "การปรับใช้ที่จะย้อนกลับไป",
+                    "liveAt": "ใช้งานจริงตั้งแต่ {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "เคยใช้งานจริงก่อนหน้านี้",
+                    "none": "ไม่มีการปรับใช้ที่ใช้งานจริงก่อนหน้านี้ให้ย้อนกลับไป",
+                    "runJobs": "เรียกใช้งานก่อนการปรับใช้อีกครั้ง",
+                    "confirm": "ย้อนกลับ",
+                    "cancel": "ยกเลิก",
+                    "started": "เริ่มการย้อนกลับแล้ว",
+                    "failed": "ไม่สามารถเริ่มการย้อนกลับได้: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "หยุดชั่วคราว",
+                    "resume": "ทำงานต่อ",
+                    "remove": "นำออกจากคลัสเตอร์",
+                    "removeTitle": "นำแอปนี้ออกจากคลัสเตอร์",
+                    "removeDescription": "แอปที่กำลังทำงานจะหยุด และออบเจ็กต์ Kubernetes ของแอปจะถูกลบ App Work และบิลด์ของแอปยังคงอยู่",
+                    "deleteData": "ลบข้อมูลที่จัดเก็บไว้ด้วย (วอลุ่มและฐานข้อมูลของการพึ่งพา)",
+                    "deleteDataWarning": "การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                    "confirmSlugLabel": "พิมพ์ {slug} เพื่อยืนยัน",
+                    "confirmRemove": "นำออก",
+                    "cancel": "ยกเลิก",
+                    "failed": "ไม่สามารถดำเนินการได้: {reason}",
+                    "slugMismatch": "สลักที่คุณพิมพ์ไม่ตรงกับ App Work นี้",
+                    "accepted": {
+                        "pause": "ส่งคำขอหยุดชั่วคราวแล้ว",
+                        "resume": "ส่งคำขอทำงานต่อแล้ว",
+                        "remove": "ส่งคำขอนำออกแล้ว",
+                        "cancelDeploy": "ส่งคำขอยกเลิกแล้ว"
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "ชื่อต้องขึ้นต้นด้วยตัวอักษรหรือขีดล่าง และใช้ได้เฉพาะ A–Z, 0–9 และ _",
+                    "reservedName": "ชื่อที่ขึ้นต้นด้วย EVER_WORKS_ สงวนไว้สำหรับแพลตฟอร์ม",
+                    "valueTooLarge": "ค่าหนึ่งค่ามีขนาดได้สูงสุด 65,536 ไบต์",
+                    "controlCharacter": "ค่าต้องไม่มีอักขระ NUL",
+                    "lengthMismatch": "ต้องมีความยาว {expected} อักขระพอดี — ค่านี้มี {actual}",
+                    "tooShort": "ต้องมีอย่างน้อย {min} อักขระ",
+                    "tooLong": "ต้องมีไม่เกิน {max} อักขระ",
+                    "patternMismatch": "ไม่ตรงกับรูปแบบที่แอปนี้กำหนด",
+                    "generatedValueUseRotate": "ค่านี้ถูกสร้างขึ้นโดยอัตโนมัติ หมุนเวียนค่าเพื่อแทนที่",
+                    "neverRotateNotAcknowledged": "แอปนี้ระบุว่าค่านี้ต้องไม่เปลี่ยนแปลงเลย ยืนยันว่าคุณเข้าใจก่อนหมุนเวียนค่า",
+                    "rotateConfirmationMismatch": "ชื่อที่คุณพิมพ์ไม่ตรงกับชื่อของค่านี้",
+                    "secureStorageUnavailable": "ยังไม่ได้กำหนดค่าที่เก็บข้อมูลที่ปลอดภัยในการติดตั้งนี้ จึงจัดเก็บค่าไม่ได้",
+                    "tooManyValues": "แอปหนึ่งเก็บค่าได้สูงสุด 300 ค่า",
+                    "valuesTooLarge": "ค่าทั้งหมดของแอปรวมกันได้สูงสุด 1 MiB",
+                    "malformedLine": "ไม่ใช่บรรทัด NAME=value ที่ถูกต้อง",
+                    "rotateRateLimited": "หมุนเวียนค่าบ่อยเกินไป ลองอีกครั้งภายหลัง"
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "รอดำเนินการ",
+                    "awaitingConfig": "ต้องการการตั้งค่าจากคุณ",
+                    "provisioning": "กำลังจัดเตรียม",
+                    "ready": "พร้อม",
+                    "degraded": "ทำงานบกพร่อง",
+                    "failed": "ล้มเหลว",
+                    "kept": "เก็บไว้ — ไม่ได้จัดการแล้ว",
+                    "deleting": "กำลังลบ",
+                    "deleted": "ลบแล้ว",
+                    "notInSpec": "สเปก App ไม่ได้ใช้แล้ว — เก็บข้อมูลไว้"
+                },
+                "backup": {
+                    "none": "ไม่มีการสำรองข้อมูลอัตโนมัติ หากวอลุ่มนี้สูญหาย ข้อมูลจะหายไป",
+                    "notConfigured": "การสำรองข้อมูล: ยังไม่ได้กำหนดค่า",
+                    "healthy": "การสำรองข้อมูล: เสร็จล่าสุดเมื่อ {time}",
+                    "overdue": "การสำรองข้อมูล: เกินกำหนด — เสร็จล่าสุดเมื่อ {time}",
+                    "failing": "การสำรองข้อมูล: ความพยายามครั้งล่าสุดล้มเหลว",
+                    "external": "การสำรองข้อมูล: จัดการโดยผู้ให้บริการ {kind} ของคุณ",
+                    "unknown": "การสำรองข้อมูล: ตรวจสอบไม่ได้"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "คลัสเตอร์ของคุณไม่มี storage class เริ่มต้น เลือกได้ในการตั้งค่าดีเพนเดนซี",
+                    "clusterUnreachable": "เข้าถึงคลัสเตอร์ของคุณไม่ได้",
+                    "smtpConnectFailed": "เชื่อมต่อเมลเซิร์ฟเวอร์ไม่ได้",
+                    "smtpTlsFailed": "TLS handshake กับเมลเซิร์ฟเวอร์ล้มเหลว",
+                    "smtpAuthRefused": "เซิร์ฟเวอร์ปฏิเสธการลงชื่อเข้าใช้",
+                    "bucketUnreadable": "บักเก็ต {bucket} ไม่มีอยู่หรืออ่านไม่ได้",
+                    "volumeNotReady": "วอลุ่มไม่พร้อมภายใน {minutes} นาที",
+                    "extensionUnavailable": "ส่วนขยายที่ไม่พร้อมใช้งาน: {names}",
+                    "platformServerRefused": "เซิร์ฟเวอร์นั้นเก็บข้อมูลแพลตฟอร์ม Ever Works เลือกเซิร์ฟเวอร์อื่น",
+                    "deadlineExceeded": "การจัดเตรียมไม่เสร็จทันเวลา",
+                    "namespaceNotOwned": "เนมสเปซนั้นเป็นของแอปอื่น เลือกเนมสเปซอื่น",
+                    "namespaceBaselineMissing": "เนมสเปซไม่มีขีดจำกัดและนโยบายพื้นฐาน",
+                    "clusterPermissionMissing": "Ever Works ไม่มีสิทธิ์สร้างดีเพนเดนซีนี้ในคลัสเตอร์ของคุณ",
+                    "operatorNamespaceUnknown": "ยังไม่ได้ตั้งค่าเนมสเปซของ operator ในการตั้งค่าดีเพนเดนซี",
+                    "volumeExpansionUnsupported": "storage class {storageClass} ขยายวอลุ่มนี้ไม่ได้",
+                    "sizeShrinkRefused": "ลดขนาดพื้นที่จัดเก็บของดีเพนเดนซีไม่ได้ หากต้องการขนาดเล็กลง ให้ลบข้อมูลของดีเพนเดนซีก่อน",
+                    "relayIneligible": "แอปนี้ใช้รีเลย์อีเมลของ Ever Works ไม่ได้",
+                    "relaySuspended": "รีเลย์อีเมลของ Ever Works ถูกระงับ",
+                    "providerNotSupported": "ผู้ให้บริการนั้นให้บริการดีเพนเดนซีนี้ไม่ได้",
+                    "dependencyNotDeclared": "สเปก App ไม่ได้ประกาศดีเพนเดนซีนี้",
+                    "confirmationMismatch": "ชื่อที่คุณพิมพ์ไม่ตรงกัน",
+                    "deleteInProgress": "ข้อมูลของดีเพนเดนซีนี้กำลังถูกลบอยู่แล้ว",
+                    "notGenerated": "ค่านั้นไม่ได้ถูกสร้างขึ้นโดยอัตโนมัติ จึงไม่มีอะไรให้หมุนเวียน",
+                    "notAppWork": "Work นี้ไม่ใช่แอป",
+                    "targetNone": "แอปนี้ยังไม่ได้ตั้งค่าให้ปรับใช้ที่ใด เลือกเป้าหมายการปรับใช้เพื่อจัดเตรียมดีเพนเดนซีของแอป",
+                    "targetNotChecked": "คลัสเตอร์ของคุณยังไม่ผ่านการตรวจสอบ ตรวจสอบการเชื่อมต่อ แล้วลองอีกครั้ง"
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "รีโพซิทอรี",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "แอป"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "รันและพัฒนารีโพสิทอรี GitHub ใดก็ได้ — ลิงก์หรือฟอร์กมา แล้วเลือกว่าจะให้รันที่ไหน"
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "รีโพซิทอรี"
+                "repo": "รีโพซิทอรี",
+                "app": "แอป"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ"
+                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ",
+                "app": "รันและพัฒนารีโพสิทอรี GitHub ใดก็ได้ — ลิงก์หรือฟอร์กมา แล้วเลือกว่าจะให้รันที่ไหน"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "เช่น “https://github.com/owner/repo — แอปโอเพนซอร์สที่คุณต้องการมีสำเนาของตัวเอง”",
+                "formTitle": "App Work ใหม่",
+                "formSubtitle": "เริ่มจากรีโพสิทอรี GitHub ใดก็ได้ Ever Works จะลิงก์หรือสร้างสำเนาของคุณเอง แล้วช่วยให้คุณรันและพัฒนาต่อได้เรื่อย ๆ",
+                "urlLabel": "URL ของรีโพสิทอรี",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "รีโพสิทอรี GitHub ใดก็ได้ที่บัญชีที่เชื่อมต่อของคุณอ่านได้",
+                "checkButton": "ตรวจสอบรีโพสิทอรี",
+                "checking": "กำลังตรวจสอบ…",
+                "tabPaste": "วาง URL",
+                "tabCatalog": "เรียกดูแคตตาล็อกแอป",
+                "catalogComingSoon": "แคตตาล็อกแอปจะเปิดที่นี่เร็ว ๆ นี้ ระหว่างนี้ให้วาง URL ของรีโพสิทอรี",
+                "stars": "{count, plural, =1 {1 ดาว} other {# ดาว}}",
+                "defaultBranch": "แบรนช์เริ่มต้น: {branch}",
+                "largeRepository": "รีโพสิทอรีขนาดใหญ่ ({size})",
+                "moved": "ย้ายไปที่ {fullName} แล้ว",
+                "isFork": "รีโพสิทอรีนี้เป็นฟอร์กของ {parent}",
+                "ownFork": "นี่คือฟอร์กของคุณจาก {parent} Ever Works จะติดตาม {parent} เป็นอัปสตรีม",
+                "publicForkNote": "ฟอร์กของรีโพสิทอรีสาธารณะจะเป็นสาธารณะ",
+                "archivedNote": "รีโพสิทอรีนี้ถูกเก็บถาวรแล้ว การซิงค์กับอัปสตรีมจะปิดอยู่",
+                "licenseChip": "สัญญาอนุญาต: {spdx}",
+                "licenseNotDetected": "สัญญาอนุญาต: ตรวจไม่พบ",
+                "licenseClass": {
+                    "green": "อนุญาตให้โฮสต์",
+                    "amber": "คลัสเตอร์ของคุณ หลังจากคุณรับรองสัญญาอนุญาต",
+                    "red": "คลัสเตอร์ของคุณ หลังจากคุณรับรองสัญญาอนุญาต",
+                    "unknown": "ไม่ทราบสัญญาอนุญาต — คุณจะต้องรับรองก่อนปรับใช้"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint ที่ยืนยันแล้ว",
+                    "available": "มี Blueprint",
+                    "none": "ไม่มี Blueprint — เอเจนต์จะหาวิธีรันให้เอง",
+                    "unavailable": "ตรวจสอบ Blueprint ไม่ได้"
+                },
+                "existingAppWork": "คุณมี App Work สำหรับรีโพสิทอรีนี้อยู่แล้ว: {name}",
+                "openExistingAppWork": "เปิด",
+                "scanIncomplete": "ยังไม่ได้ตรวจทุกบัญชีว่ามีฟอร์กอยู่แล้วหรือไม่",
+                "modesTitle": "Ever Works ควรใช้รีโพสิทอรีนี้อย่างไร",
+                "modes": {
+                    "link": {
+                        "title": "ลิงก์",
+                        "titleOwnFork": "ลิงก์ — ไม่ติดตามอัปสตรีม",
+                        "description": "ใช้รีโพสิทอรีนี้ตามที่เป็นอยู่ คุณพุชไปยังรีโพสิทอรีนี้ได้ การเปลี่ยนแปลงจึงเข้ามาที่นี่โดยตรง"
+                    },
+                    "fork": {
+                        "title": "ฟอร์ก",
+                        "description": "สร้างฟอร์กของคุณเอง คุณซิงค์กับอัปสตรีมและเสนอการเปลี่ยนแปลงกลับไปได้"
+                    },
+                    "private-copy": {
+                        "title": "สำเนาส่วนตัว",
+                        "description": "สร้างรีโพสิทอรีส่วนตัวที่มีโค้ดเดียวกัน"
+                    }
+                },
+                "unavailable": "ใช้ไม่ได้: {reason}",
+                "forkInto": "ฟอร์กไปยัง",
+                "copyInto": "คัดลอกไปยัง",
+                "ownerFilter": "ค้นหาบัญชี",
+                "ownerOrganization": "องค์กร",
+                "ownerNotChecked": "ยังไม่ได้ตรวจหาฟอร์กที่มีอยู่",
+                "existingFork": "คุณมีฟอร์กอยู่แล้ว: {fullName} Ever Works จะใช้ฟอร์กนี้",
+                "privateCopyTradeOff": "สำเนาส่วนตัวไม่ได้เชื่อมโยงกับต้นฉบับบน GitHub จึงเปิดพูลรีเควสต์ไปยังโปรเจกต์ต้นฉบับไม่ได้ การเปลี่ยนแปลงจากอัปสตรีมจะเข้ามาเป็นพูลรีเควสต์ในสำเนาของคุณ",
+                "linkSetupNote": "Ever Works จะเปิดพูลรีเควสต์ที่เพิ่มไฟล์เดียวคือ .works/works.yml ผสานพูลรีเควสต์นั้นเพื่อเสร็จสิ้น",
+                "existingForkSetupNote": "Ever Works ไม่ได้สร้างฟอร์กนี้ จึงจะเปิดพูลรีเควสต์ที่เพิ่ม .works/works.yml",
+                "linkSetupNoteBlueprint": "Ever Works จะเปิดพูลรีเควสต์ที่เพิ่ม .works/works.yml และไฟล์ของ Blueprint ผสานพูลรีเควสต์นั้นเพื่อเสร็จสิ้น",
+                "existingForkSetupNoteBlueprint": "Ever Works ไม่ได้สร้างฟอร์กนี้ จึงจะเปิดพูลรีเควสต์ที่เพิ่ม .works/works.yml และไฟล์ของ Blueprint",
+                "promptsTitle": "ค่าที่แอปนี้ต้องการ",
+                "promptHint": "Blueprint {name} ขอค่าเหล่านี้ คุณเปลี่ยนได้ภายหลังในการตั้งค่า",
+                "promptRequired": "จำเป็น",
+                "promptsIncomplete": "กรอกค่าที่แอปต้องการก่อน",
+                "autoProvision": "ให้เอเจนต์หาวิธีรันให้",
+                "autoProvisionHelp": "เริ่มเมื่อรีโพสิทอรีพร้อม ใช้โทเค็น AI และนาทีของรันเนอร์บิลด์ภายในขีดจำกัดการจัดเตรียม คุณยกเลิกได้ หรือยกเลิกการเลือกตัวเลือกนี้แล้วเริ่มภายหลังจากภาพรวมด้วย Provision",
+                "deployTargetTitle": "ควรให้รันที่ไหน",
+                "deployTargets": {
+                    "none": {
+                        "title": "ไม่มี — ยังไม่ปรับใช้",
+                        "description": "คุณเลือกเป้าหมายได้ภายหลัง"
+                    },
+                    "your-cluster": {
+                        "title": "คลัสเตอร์ของคุณ",
+                        "description": "รันบนคลัสเตอร์ Kubernetes ของคุณเอง คุณจะเพิ่มการเชื่อมต่อได้ในแท็บการปรับใช้"
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "เร็ว ๆ นี้ — โฮสติ้งแบบจัดการสำหรับแอปยังไม่เปิดให้บริการ"
+                    }
+                },
+                "submit": {
+                    "link": "ลิงก์และสร้าง App Work",
+                    "fork": "ฟอร์กและสร้าง App Work",
+                    "private-copy": "คัดลอกและสร้าง App Work"
+                },
+                "submitPending": "กำลังสร้าง…",
+                "nameLabel": "ชื่อ",
+                "slugLabel": "Slug",
+                "descriptionLabel": "คำอธิบาย",
+                "slugHelp": "ตัวระบุที่ใช้ใน URL ได้ สร้างจากชื่อรีโพสิทอรี — แก้ไขเพื่อเปลี่ยน",
+                "invalidSlug": "ใช้เฉพาะตัวพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น เช่น tasks-app",
+                "cancel": "ยกเลิก",
+                "createFailed": "สร้าง App Work ไม่สำเร็จ ลองอีกครั้ง",
+                "success": {
+                    "link": "สร้าง App Work แล้ว",
+                    "fork": "ส่งคำขอฟอร์กแล้ว — เราจะแจ้งให้ทราบเมื่อพร้อม",
+                    "private-copy": "เริ่มคัดลอกแล้ว — เราจะแจ้งให้ทราบเมื่อพร้อม"
+                },
+                "reasons": {
+                    "invalid_url": "ใส่ URL ของรีโพสิทอรี GitHub เช่น https://github.com/owner/repo",
+                    "provider_not_connected": "เชื่อมต่อ GitHub เพื่อสร้าง App Work",
+                    "insufficient_scope": "เชื่อมต่อ GitHub อีกครั้งเพื่ออนุญาตการเข้าถึงรีโพสิทอรี",
+                    "not_found": "เราไม่พบรีโพสิทอรีนี้ หรือบัญชี GitHub ของคุณอ่านรีโพสิทอรีนี้ไม่ได้",
+                    "sso_authorization_required": "{owner} กำหนดให้คุณอนุญาต Ever Works สำหรับองค์กรนี้บน GitHub",
+                    "oauth_app_restricted": "{owner} จำกัดการเข้าถึงจากบุคคลที่สาม ขอให้เจ้าของ {owner} อนุมัติ Ever Works หรือเลือกบัญชีอื่น",
+                    "empty_repository": "รีโพสิทอรีนี้ยังไม่มีคอมมิต",
+                    "no_push_access": "คุณพุชไปยังรีโพสิทอรีนี้ไม่ได้",
+                    "archived": "รีโพสิทอรีที่เก็บถาวรแล้วเป็นแบบอ่านอย่างเดียว",
+                    "forking_disabled": "เจ้าของรีโพสิทอรีนี้ไม่อนุญาตให้ฟอร์กหรือคัดลอก",
+                    "own_repository": "คุณเป็นเจ้าของรีโพสิทอรีนี้ — ให้ลิงก์แทน",
+                    "target_owner_unavailable": "บัญชีนี้ไม่มีอยู่ในการเชื่อมต่อ GitHub ของคุณ",
+                    "target_owner_forbidden": "คุณสร้างรีโพสิทอรีใน {owner} ไม่ได้",
+                    "too_large_for_private_copy": "ใหญ่เกินไปสำหรับสำเนาส่วนตัว ({size}) ให้ฟอร์กแทน",
+                    "uses_lfs": "ใช้ Git LFS ซึ่งสำเนาส่วนตัวนำไปด้วยไม่ได้ ให้ฟอร์กแทน",
+                    "copy_name_unavailable": "{owner} มีรีโพสิทอรีชื่อ {name} ถึง {name}-copy-5 อยู่แล้ว",
+                    "in_use_by_another_account": "มีบัญชีอื่นใช้รีโพสิทอรีนี้ใน Ever Works อยู่แล้ว ขอให้เจ้าของบัญชีนั้นเพิ่มคุณเป็นสมาชิก",
+                    "app_work_exists": "คุณมี App Work สำหรับ {fullName} อยู่แล้ว: {workName}",
+                    "create_in_progress": "App Work นี้กำลังถูกสร้างอยู่แล้ว",
+                    "rate_limited": "GitHub กำลังจำกัดอัตราคำขอของบัญชีคุณ ลองอีกครั้งเวลา {time}",
+                    "managed_hosting_unavailable": "เร็ว ๆ นี้ — โฮสติ้งแบบจัดการสำหรับแอปยังไม่เปิดให้บริการ",
+                    "cluster_target_unavailable": "ยังไม่ได้ติดตั้งตัวเลือกการปรับใช้ที่รันแอปได้",
+                    "app_works_disabled": "App Works ไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                    "blueprint_mismatch": "Blueprint ของรีโพสิทอรีนี้เปลี่ยนไป ตรวจสอบรีโพสิทอรีอีกครั้ง"
+                },
+                "catalog": {
+                    "searchLabel": "ค้นหาในแคตตาล็อกแอป",
+                    "searchPlaceholder": "ค้นหาแอป — เช่น umami หรือ calendar",
+                    "listLabel": "Blueprint ของแอป",
+                    "loading": "กำลังโหลดแคตตาล็อกแอป…",
+                    "unavailable": "แคตตาล็อกแอปไม่พร้อมใช้งานในขณะนี้ ให้วาง URL ของรีโพสิทอรีแทน",
+                    "disabled": "App Works ไม่พร้อมใช้งานในอินสแตนซ์นี้",
+                    "error": "โหลดแคตตาล็อกแอปไม่สำเร็จ ลองอีกครั้ง หรือวาง URL ของรีโพสิทอรี",
+                    "empty": "ยังไม่มีการเผยแพร่ Blueprint ของแอป ให้วาง URL ของรีโพสิทอรีแทน",
+                    "noMatches": "ไม่มีแอปที่ตรงกับการค้นหาของคุณ",
+                    "pick": "เริ่มจาก {name}",
+                    "statusBeta": "เบต้า",
+                    "statusPlaceholder": "เร็ว ๆ นี้",
+                    "verified": "ยืนยันแล้ว",
+                    "upstreamLine": "จาก {repo}",
+                    "runsOn": "รันบน: {targets}",
+                    "targetYourCluster": "คลัสเตอร์ของคุณ",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "ยังไม่พร้อมใช้งาน",
+                    "fallbackNote": "กำลังแสดง Blueprint ของแอปที่พบบน GitHub — แคตตาล็อกที่คัดสรรไว้ไม่พร้อมใช้งานในขณะนี้"
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "เริ่มนำเข้าสำเร็จ",
                 "failed": "นำเข้างานล้มเหลว",
                 "fetchReposFailed": "ดึงคลังล้มเหลว"
+            },
+            "app": {
+                "repositoryUrlRequired": "ใส่ URL ของรีโพสิทอรี GitHub เช่น https://github.com/owner/repo",
+                "repositoryModeRequired": "เลือกวิธีใช้รีโพสิทอรีนี้: ลิงก์ ฟอร์ก หรือสำเนาส่วนตัว",
+                "targetOwnerRequired": "เลือกบัญชีที่จะสร้างรีโพสิทอรี",
+                "invalidUrl": "ใส่ URL ของรีโพสิทอรี GitHub เช่น https://github.com/owner/repo",
+                "inspectFailed": "ตรวจสอบรีโพสิทอรีนี้ไม่สำเร็จ ลองอีกครั้ง"
             }
         },
         "generator": {

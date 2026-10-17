@@ -12,6 +12,10 @@ import { RuntimeEnvManagement } from '@/components/works/detail/deploy/RuntimeEn
 import { SubdomainManagement } from '@/components/works/detail/deploy/SubdomainManagement';
 import { DeployProgressPanel } from '@/components/works/detail/deploy/DeployProgressPanel';
 import { canDeploy } from '@/lib/permissions';
+import { isAppWorkKind } from '@ever-works/contracts';
+import { appRuntimeAPI } from '@/lib/api/app-runtime';
+import { deriveAppTargetFromProvider, type AppTargetView } from '@/lib/api/app-runtime.types';
+import { AppDeployPage } from '@/components/works/detail/deploy/app/AppDeployPage';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -30,12 +34,23 @@ export default async function DeployPage({ params }: DeployPageParams) {
     let websiteTemplates: WebsiteTemplateOption[] = [];
 
     try {
-        const [res, capabilityRes] = await Promise.all([
+        // The website capability check means nothing for an App Work (it has
+        // no website deploy provider or token), so its failure must not 404
+        // the App branch. For every other kind it still fails the page exactly
+        // as before: the settled error is rethrown into this same catch.
+        const [res, capabilitySettled] = await Promise.all([
             workAPI.get(id),
-            deployAPI.checkDeploymentCapability(id),
+            deployAPI.checkDeploymentCapability(id).then(
+                (value) => ({ ok: true as const, value }),
+                (error: unknown) => ({ ok: false as const, error }),
+            ),
         ]);
         work = res.work;
-        deploymentCapability = capabilityRes;
+        if (capabilitySettled.ok) {
+            deploymentCapability = capabilitySettled.value;
+        } else if (!isAppWorkKind(work.kind)) {
+            throw capabilitySettled.error;
+        }
     } catch (error) {
         console.error('Failed to fetch Work or deployment capability:', error);
         notFound();
@@ -44,6 +59,44 @@ export default async function DeployPage({ params }: DeployPageParams) {
     // Permission & status checks OUTSIDE try-catch so Next.js
     // redirect/notFound errors propagate correctly
     if (!canDeploy(work.userRole)) {
+        notFound();
+    }
+
+    // APW-06 T37 — an App Work deploys its built image to a cluster, not a
+    // generated website: it has no website repository to wait for, no website
+    // deploy provider and no provider token. Its own branch renders here,
+    // before the website-repository redirect, and every other kind continues
+    // below exactly as before.
+    if (isAppWorkKind(work.kind)) {
+        // A failed read never 404s the tab: the target falls back to the one
+        // derived from `deployProvider`, and the status to "not running".
+        const [appTarget, appStatus] = await Promise.all([
+            appRuntimeAPI.getAppTarget(id, work.deployProvider).catch(
+                (): AppTargetView => ({
+                    target: deriveAppTargetFromProvider(work.deployProvider),
+                    settings: null,
+                    namespace: null,
+                    clusterCheck: null,
+                    clusterCheckedAt: null,
+                    eligibility: null,
+                    routeAvailable: false,
+                }),
+            ),
+            appRuntimeAPI.getAppStatus(id).catch(() => null),
+        ]);
+        return (
+            <AppDeployPage
+                work={{ id: work.id, slug: work.slug, name: work.name }}
+                initialTarget={appTarget}
+                status={appStatus}
+                canEdit={canDeploy(work.userRole)}
+            />
+        );
+    }
+
+    // Only an App Work may arrive here without a capability answer, and it
+    // returned above; this keeps the website path's invariant explicit.
+    if (!deploymentCapability) {
         notFound();
     }
 

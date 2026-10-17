@@ -3613,7 +3613,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3700,6 +3701,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4525,12 +4540,14 @@
                     "generator": "Generar Work, una vez o según programación",
                     "deploy": "Desplegar Work",
                     "tasks": "Tareas de este Work",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Imágenes de contenedor compiladas desde tu repositorio"
                 },
                 "tasks": "Tareas",
                 "posts": "Publicaciones",
                 "pages": "Páginas",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Compilaciones"
             },
             "members": {
                 "title": "Miembros del equipo",
@@ -6875,6 +6892,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Fork: {fullName}",
+                    "private-copy": "Copia privada: {fullName}",
+                    "link": "Vinculado: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Preparando tu fork",
+                    "forkBody": "GitHub está creando {fullName}. Suele tardar menos de un minuto; los repositorios grandes pueden tardar más.",
+                    "copyTitle": "Preparando tu copia privada",
+                    "copyBody": "Copiando {upstream} en {fullName}. Los repositorios más grandes tardan más.",
+                    "linkTitle": "Terminando la configuración",
+                    "linkBody": "Abriendo un pull request que añade .works/works.yml a {fullName}.",
+                    "blueprintTitle": "Aplicando el Blueprint {name}",
+                    "blueprintBody": "Ever Works está preparando tu Trabajo de App y escribirá .works/works.yml con los archivos del Blueprint."
+                },
+                "setupPrClosed": "El pull request de configuración se cerró sin fusionarse.",
+                "timedOut": "Tu fork está tardando más de 15 minutos.",
+                "failedAccess": "Ever Works perdió el acceso a GitHub mientras preparaba este Trabajo de App.",
+                "failedOther": "Falló la preparación de este Trabajo de App: {reason}",
+                "waitingForSetupPr": "Fusiona el pull request de configuración para terminar.",
+                "tryAgain": "Intentar de nuevo",
+                "openOnGitHub": "Abrir en GitHub",
+                "reconnectGitHub": "Volver a conectar GitHub",
+                "openPullRequest": "Abrir pull request",
+                "retryLimit": "Has usado los 3 reintentos de esta hora. Inténtalo de nuevo más tarde.",
+                "retryFailed": "No se pudo iniciar otro intento. Inténtalo de nuevo.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml en la rama predeterminada no es YAML válido. Corrige o elimina el archivo y vuelve a intentarlo.",
+                    "works_yml_other_kind": ".works/works.yml ya declara otro tipo de Trabajo. Establece kind: app o elimina el archivo y vuelve a intentarlo.",
+                    "push_rejected": "GitHub siguió rechazando el commit que añade .works/works.yml.",
+                    "provider_unsupported": "El proveedor Git de este repositorio no se puede configurar automáticamente.",
+                    "too_large_for_private_copy": "El repositorio es demasiado grande para una copia privada. Crea un fork en su lugar.",
+                    "uses_lfs": "El repositorio usa Git LFS, que una copia privada no puede trasladar. Crea un fork en su lugar.",
+                    "other": "Algo salió mal al configurar el repositorio."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Repositorio del Trabajo",
+                    "upstream": "Upstream",
+                    "relationLabel": "Relación",
+                    "readinessLabel": "Preparación",
+                    "readiness": {
+                        "preparing": "Preparando",
+                        "ready": "Listo",
+                        "timed_out": "Tiempo agotado",
+                        "failed": "Fallido",
+                        "waiting_for_setup_pr": "Esperando el pull request de configuración"
+                    },
+                    "relations": {
+                        "link": "Vinculado",
+                        "fork": "Fork",
+                        "private-copy": "Copia privada"
+                    },
+                    "appSpecLabel": "Especificación de la app",
+                    "appSpecStatus": {
+                        "valid": "Válida",
+                        "valid_with_warnings": "Válida, con advertencias",
+                        "invalid": "Tiene errores",
+                        "missing": "Aún no escrita",
+                        "unreadable": "No se pudo leer",
+                        "pending": "En comprobación",
+                        "unknown": "Aún no comprobada"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Sin errores} =1 {1 error} other {# errores}} · {warnings, plural, =0 {sin advertencias} =1 {1 advertencia} other {# advertencias}}",
+                    "openAppSpec": "Abrir la especificación de la app",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "No se pudieron cargar los detalles de la App en este momento.",
+                    "builds": "Compilaciones",
+                    "deploy": "Implementar",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Evoluciónala con su agente",
+                    "body": "Pide al agente del Trabajo que cambie la app: añadir una función, corregir un error, actualizar una dependencia. Trabaja en el Repositorio del Trabajo y abre pull requests.",
+                    "button": "Chatear sobre esta App"
+                }
+            },
+            "builds": {
+                "title": "Compilaciones",
+                "subtitle": "Compilado en runners alojados en GitHub en {repository} · imagen {imageRepository}",
+                "subtitleNoImage": "Compilado en runners alojados en GitHub en {repository}",
+                "subtitleGeneric": "Imágenes de contenedor compiladas desde el repositorio de este Trabajo de App.",
+                "startBuild": "Iniciar compilación",
+                "starting": "Iniciando…",
+                "refresh": "Actualizar",
+                "cancel": "Cancelar",
+                "cancelling": "Cancelando…",
+                "viewerDisabled": "Necesitas acceso de edición para hacer esto.",
+                "deployable": "Desplegable",
+                "notDeployableLine": "No desplegable: {reason}",
+                "pagination": "Mostrando {start}–{end} de {total}",
+                "listLabel": "Compilaciones de este Trabajo de App",
+                "openDetails": "Abrir la compilación #{number}",
+                "status": {
+                    "queued": "En cola",
+                    "running": "En ejecución",
+                    "succeeded": "Correcta",
+                    "failed": "Fallida",
+                    "cancelled": "Cancelada",
+                    "blocked": "Bloqueada"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Manual",
+                    "verification": "Verificación"
+                },
+                "notDeployable": {
+                    "notSucceeded": "La compilación no se completó correctamente",
+                    "pullRequest": "Compilada desde un pull request",
+                    "verification": "Compilada para verificación",
+                    "specInvalid": "La especificación de la app en este commit tiene errores",
+                    "staleInputs": "Compilada con valores de compilación anteriores",
+                    "secretCheckFailed": "La comprobación de secretos no se superó",
+                    "digestUnconfirmed": "No se pudo confirmar la imagen enviada",
+                    "criticalVulnerability": "Hay una vulnerabilidad crítica con una corrección disponible",
+                    "unsigned": "La imagen no está firmada"
+                },
+                "blocked": {
+                    "workflowPending": "Esperando a que se fusione el workflow de compilación.",
+                    "workflowEditedByHand": "El workflow de compilación se editó a mano.",
+                    "workflowWriteFailed": "Ever Works no pudo escribir el workflow de compilación en el repositorio. Una regla de este repositorio rechaza el cambio.",
+                    "actionsDisabled": "GitHub Actions está desactivado para este repositorio.",
+                    "missingBuildValues": "Esperando {count, plural, =1 {1 valor de compilación} other {# valores de compilación}}: {names}",
+                    "runnerTooSmall": "Esta compilación necesita {needed}, pero el runner para repositorios {visibility} permite {max}.",
+                    "tooManyBuildValues": "Esta compilación usa {count} valores de compilación; se permiten como máximo 50.",
+                    "buildValueTooLarge": "{name} es demasiado grande para pasarlo a una compilación (máximo 48 KB).",
+                    "secretLimitReached": "El repositorio no tiene espacio para más secretos.",
+                    "strategyNotSupported": "Los runners alojados en GitHub no pueden compilar con la estrategia «{strategy}». Añade un Dockerfile y establece build.strategy en dockerfile.",
+                    "specInvalid": "La especificación de la app en este commit tiene errores.",
+                    "gitConnectionMissing": "Ever Works no puede acceder a este repositorio con tu conexión de GitHub.",
+                    "repositoryUnavailable": "{repository} está archivado, eliminado o ya no está disponible para tu conexión de GitHub.",
+                    "managedConcurrencyLimit": "Esperando a otras compilaciones: se ejecutan a la vez como máximo {perWork} por app y {perAccount} por cuenta.",
+                    "buildValueNameReserved": "{name} está reservado por Ever Works y no se puede pasar a una compilación. Cambia el nombre de la entrada del entorno.",
+                    "buildServicePortRequired": "El servicio de compilación {service} necesita un puerto: Ever Works no sabe en qué puerto escucha «{image}».",
+                    "verificationDependencyUnsupported": "Una verificación todavía no puede iniciar {kind}. La comprobación se ejecuta en el clúster en su lugar.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Revisar pull request",
+                    "turnOnActions": "Activarlo",
+                    "setValue": "Establecerlo",
+                    "useLargerRunner": "Usar un runner más grande",
+                    "openRepositorySettings": "Abrir la configuración del repositorio",
+                    "reconnectGithub": "Volver a conectar GitHub",
+                    "rebuild": "Recompilar",
+                    "openEnvironment": "Abrir Entorno"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Se quedó sin memoria",
+                        "suggestion": "Aumenta build.resources.memory (ahora {memory}) o reduce el tamaño del heap de la compilación. En este runner, una compilación puede usar como máximo {max}."
+                    },
+                    "diskFull": {
+                        "title": "Se quedó sin espacio en disco",
+                        "suggestion": "Activa «Recuperar disco del runner» en la configuración de compilación, o reduce el contexto de compilación con un archivo .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "El Dockerfile falló en el paso {step} de {total}",
+                        "suggestion": "El paso que falló fue: {command}. Corrígelo en {dockerfile} y haz push, o pide a un agente que lo corrija."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "No se pudieron descargar las dependencias",
+                        "suggestion": "Un registro de paquetes o de imágenes base no respondió. Recompila en unos minutos; si sigue fallando, fija las versiones de las que dependes."
+                    },
+                    "registryPushDenied": {
+                        "title": "No se pudo enviar la imagen",
+                        "suggestion": "Permite que los workflows de este repositorio escriban paquetes (Settings ▸ Actions ▸ General ▸ Workflow permissions) y luego recompila."
+                    },
+                    "missingBuildValue": {
+                        "title": "Falta un valor de compilación: {names}",
+                        "suggestion": "Establécelo en Configuración ▸ Entorno y luego recompila."
+                    },
+                    "secretInImage": {
+                        "title": "Se habría publicado un secreto dentro de la imagen: {name}",
+                        "suggestion": "Usa este valor solo en una etapa de compilación anterior, o pásalo como montaje de secreto de compilación. No se envió nada."
+                    },
+                    "timeout": {
+                        "title": "Tardó más de {minutes} minutos",
+                        "suggestion": "Aumenta build.resources.timeoutMinutes (máximo 180) o acelera la compilación con caché."
+                    },
+                    "workflowInvalid": {
+                        "title": "El archivo de workflow no es válido",
+                        "suggestion": "GitHub no puede ejecutar el workflow de compilación. Revisa el pull request abierto por Ever Works para restaurarlo."
+                    },
+                    "digestMismatch": {
+                        "title": "No se pudo confirmar la imagen enviada",
+                        "suggestion": "El registro informó de una imagen distinta a la de la compilación. Recompila; no se desplegará nada sin confirmar."
+                    },
+                    "verificationFailed": {
+                        "title": "La app no superó sus pruebas de humo",
+                        "suggestion": "Fallaron {failed} de {total} pruebas de humo. Consulta los resultados a continuación."
+                    },
+                    "egressBlocked": {
+                        "title": "Se bloqueó el acceso a la red",
+                        "suggestion": "La compilación intentó acceder a {hosts}, que no están en la lista de permitidos del compilador. Obtén lo que necesitas de tu repositorio de origen o de un registro permitido y luego recompila."
+                    },
+                    "lost": {
+                        "title": "Se perdió el rastro de esta compilación",
+                        "suggestion": "GitHub dejó de responder sobre esta compilación. Compruébala en GitHub."
+                    },
+                    "unknown": {
+                        "title": "Algo más salió mal",
+                        "suggestion": "Abre los registros en GitHub o pide a un agente que lo revise."
+                    },
+                    "askAgent": "Pedir a un agente que lo corrija",
+                    "excerptLabel": "Últimas líneas del registro"
+                },
+                "cancelReason": {
+                    "user": "Cancelada por un miembro",
+                    "superseded": "Sustituida por una compilación más reciente"
+                },
+                "detail": {
+                    "title": "Compilación #{number} · {sha} · {status}",
+                    "loading": "Cargando los detalles de la compilación…",
+                    "close": "Cerrar",
+                    "trigger": "Disparador",
+                    "triggeredBy": "{trigger}: por {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Duración",
+                    "durationValue": "{duration} (en cola {queued})",
+                    "image": "Imagen",
+                    "tags": "Etiquetas",
+                    "deployable": "Desplegable",
+                    "yes": "Sí",
+                    "buildValues": "Valores de compilación",
+                    "buildValuesValue": "{count, plural, =1 {1 sincronizado} other {# sincronizados}}: {names}",
+                    "noBuildValues": "Ninguno",
+                    "receipt": "Recibo",
+                    "verification": "Verificación",
+                    "copy": "Copiar",
+                    "copied": "Referencia de imagen copiada.",
+                    "copyFailed": "No se pudo copiar la referencia de imagen.",
+                    "viewLogs": "Ver registros en GitHub",
+                    "rebuildThisCommit": "Recompilar este commit",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} minutos de runner · pagados por tu cuenta de GitHub",
+                    "minutesPlatform": "{minutes} minutos de runner · pagados por Ever Works",
+                    "checksMinutes": "{checksMinutes} de ellos ejecutaron comprobaciones de la App",
+                    "costUnknown": "Aún no se han informado los minutos de runner"
+                },
+                "verification": {
+                    "componentsReady": "Componentes iniciados",
+                    "componentsNotReady": "Los componentes no se iniciaron",
+                    "job": "El job {name} terminó con {exitCode}",
+                    "jobNoExit": "El job {name} no terminó",
+                    "smokePassed": "Superada: {name}",
+                    "smokeFailed": "Fallida: {name}: se esperaba {expected}, se obtuvo {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Aún no hay compilaciones. La primera compilación empieza cuando el workflow de compilación está en el repositorio.",
+                    "unavailable": "Las compilaciones aún no están disponibles en esta instancia."
+                },
+                "errors": {
+                    "loadFailed": "No se pudieron cargar las compilaciones. Prueba a actualizar la página.",
+                    "rebuildRateLimited": "Has iniciado demasiadas compilaciones esta hora. Inténtalo de nuevo en {minutes, plural, =1 {1 minuto} other {# minutos}}.",
+                    "commitNotReachable": "Ese commit no está en la rama seguida.",
+                    "nothingToBuild": "Este Trabajo de App ejecuta una imagen publicada, así que no hay nada que compilar.",
+                    "notCancellable": "Esta compilación ya ha terminado, así que no se puede cancelar.",
+                    "providerUnavailable": "No hay ningún proveedor de compilación disponible ahora mismo. Inténtalo de nuevo más tarde.",
+                    "startFailed": "No se pudo iniciar una compilación. Inténtalo de nuevo.",
+                    "cancelFailed": "No se pudo cancelar esta compilación. Inténtalo de nuevo.",
+                    "detailFailed": "No se pudo cargar esta compilación. Inténtalo de nuevo."
+                },
+                "toasts": {
+                    "started": "Compilación en cola.",
+                    "deduped": "Ya hay una compilación en cola para este commit.",
+                    "cancelled": "Compilación cancelada."
+                },
+                "pullToken": {
+                    "title": "Añadir un token de descarga",
+                    "body": "Esta imagen es privada. Tu clúster necesita un token que solo pueda leer paquetes para descargarla.",
+                    "stepCreate": "1. Crea un token clásico marcando solo «read:packages».",
+                    "stepPaste": "2. Pégalo aquí.",
+                    "label": "Token",
+                    "submit": "Comprobar y guardar",
+                    "saving": "Comprobando…",
+                    "tooBroad": "Este token puede hacer más que leer paquetes. Crea uno solo con read:packages.",
+                    "fineGrained": "Este es un token de grano fino. Crea un token clásico marcando solo read:packages.",
+                    "cannotRead": "Este token no puede leer {imageRepository}.",
+                    "publicImage": "Esta imagen ya es pública: no se necesita ningún token.",
+                    "noImageYet": "Aún no hay ninguna compilación terminada. Añade un token de descarga después de la primera compilación correcta.",
+                    "savedExpires": "Token de descarga guardado. Caduca el {date}.",
+                    "savedNoExpiry": "Token de descarga guardado. No caduca.",
+                    "tokenSet": "Hay un token de descarga guardado. Pega uno nuevo para sustituirlo.",
+                    "expiringSoon": "El token de descarga caduca el {date}. Añade uno nuevo antes de esa fecha.",
+                    "viewerDisabled": "Necesitas acceso de edición para hacer esto.",
+                    "failed": "No se pudo guardar el token de descarga. Inténtalo de nuevo."
+                },
+                "overview": {
+                    "title": "Última compilación",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Compilación desplegable: este commit",
+                    "deployableOther": "Compilación desplegable: {sha}",
+                    "noDeployable": "Aún no hay ninguna compilación desplegable",
+                    "open": "Abrir Compilaciones"
+                }
+            },
+            "appDeploy": {
+                "title": "Implementar",
+                "notRunning": "Esta app todavía no se está ejecutando en ningún sitio.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Abrir app",
+                "source": "Origen",
+                "buildsLink": "Ver Compilaciones",
+                "buildsHint": "Las compilaciones se siguen ejecutando sea cual sea el destino.",
+                "stale": "Última comprobación hace {minutes, plural, =1 {1 minuto} other {# minutos}}",
+                "status": {
+                    "notDeployed": "No desplegada",
+                    "live": "En línea",
+                    "degraded": "Degradada",
+                    "down": "Caída",
+                    "unreachable": "No se puede acceder a tu clúster",
+                    "paused": "En pausa",
+                    "deleting": "Eliminando…"
+                },
+                "target": {
+                    "heading": "¿Dónde debe ejecutarse?",
+                    "current": "(actual)",
+                    "none": {
+                        "label": "Ninguno: no desplegar todavía",
+                        "description": "Las compilaciones se siguen ejecutando."
+                    },
+                    "yourCluster": {
+                        "label": "Tu clúster",
+                        "description": "Se ejecuta en un clúster de Kubernetes que tú controlas."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "La ejecutamos por ti.",
+                        "unavailable": "Próximamente: el alojamiento gestionado para apps aún no está abierto.",
+                        "ineligible": "Aún no disponible para esta app."
+                    },
+                    "connect": "Conectar tu clúster",
+                    "reconnect": "Cambiar la conexión del clúster",
+                    "connected": "Conectado · {version}",
+                    "connectedNoVersion": "Conectado",
+                    "checkFailed": "La última comprobación del clúster falló.",
+                    "notChecked": "Aún no hay ningún clúster conectado.",
+                    "save": "Usar este destino",
+                    "saving": "Guardando…",
+                    "saved": "Destino guardado.",
+                    "saveFailed": "No se pudo guardar el destino: {reason}",
+                    "changeNote": "Cambiar el destino no elimina nada de lo que ya se está ejecutando.",
+                    "routeUnavailable": "Cambiar el destino aún no está disponible en esta instancia."
+                },
+                "connect": {
+                    "title": "Conectar tu clúster",
+                    "description": "Pega un kubeconfig de una cuenta de servicio del clúster en el que debe ejecutarse esta app.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Pega tu kubeconfig…",
+                    "kubeconfigHelp": "Usa un token de cuenta de servicio. No se admiten comandos, archivos locales ni proxies.",
+                    "kubeconfigStored": "Tu kubeconfig se envió una vez y se guarda cifrado. Pega uno nuevo para sustituirlo, o vuelve a comprobar el guardado.",
+                    "contextLabel": "Contexto (opcional)",
+                    "contextHelp": "Déjalo vacío para usar el contexto actual del kubeconfig.",
+                    "check": "Comprobar conexión",
+                    "checking": "Comprobando…",
+                    "checkAgain": "Comprobar de nuevo",
+                    "checkTimedOut": "La comprobación no terminó en 30 segundos. Inténtalo de nuevo.",
+                    "checkFailed": "No se pudo comprobar la conexión: {reason}",
+                    "unavailable": "Conectar un clúster aún no está disponible en esta instancia.",
+                    "kubeconfigTooLarge": "Este kubeconfig supera los 64 KiB.",
+                    "kubeconfigRequired": "Primero pega un kubeconfig.",
+                    "ingressClass": "Clase de ingress",
+                    "ingressDefault": "{name} (predeterminada)",
+                    "ingressNone": "No se encontró ninguna clase de ingress",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Certificados del emisor",
+                        "external": "Gestionado fuera del clúster",
+                        "edge": "Terminado en el edge",
+                        "none": "Sin TLS (solo http)"
+                    },
+                    "issuer": "Emisor",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Se elige cuando la app se despliega por primera vez",
+                    "isolation": "Aislamiento de red",
+                    "isolationOn": "Activado (recomendado)",
+                    "isolationOff": "Desactivado",
+                    "isolationOffWarning": "Sin aislamiento de red, otras cargas de trabajo del clúster pueden acceder a esta app y a sus bases de datos.",
+                    "cancel": "Cancelar",
+                    "save": "Guardar",
+                    "saving": "Guardando…",
+                    "saveBlocked": "Podrás guardar cuando la comprobación se supere con todos los permisos necesarios.",
+                    "saved": "Clúster conectado.",
+                    "saveFailed": "No se pudo guardar la conexión del clúster: {reason}"
+                },
+                "check": {
+                    "ok": "Conectado",
+                    "version": "Kubernetes {version}",
+                    "failed": "La comprobación del clúster falló.",
+                    "kubeconfigRefused": "Este kubeconfig {reason}. Usa un token de cuenta de servicio en su lugar.",
+                    "notPublic": "Ever Works solo puede acceder a clústeres con una dirección pública.",
+                    "permissions": "Permisos",
+                    "allPermissions": "Están todos los permisos necesarios.",
+                    "missing": "Falta: {verb} {resource}",
+                    "optionalMissing": "Opcional, falta: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Desplegar ahora",
+                    "deploying": "Solicitando…",
+                    "started": "Despliegue iniciado.",
+                    "queued": "En cola: empieza cuando termine el despliegue en curso.",
+                    "deduplicated": "Ese despliegue ya se había solicitado.",
+                    "inProgress": "Hay otro despliegue en curso ({id}). Espera a que termine y vuelve a desplegar.",
+                    "preconditionsHeader": "Corrige esto antes de desplegar:",
+                    "workerNotIsolated": "Los despliegues aún no pueden empezar: esta instancia no tiene un worker aislado de clúster de App.",
+                    "notAppWork": "Este Trabajo no es un Trabajo de App, así que no se puede desplegar de esta forma.",
+                    "failed": "No se pudo solicitar el despliegue: {reason}",
+                    "targetNone": "Primero elige dónde debe ejecutarse la app: Ninguno no despliega nada.",
+                    "deploymentId": "Despliegue {id}",
+                    "warningsHeader": "Advertencias"
+                },
+                "preconditions": {
+                    "specInvalid": "La especificación de la app (.works/works.yml) tiene errores. Corrígelos en la página de la especificación de la app.",
+                    "licenseBlocksTarget": "La licencia de la app no permite alojarla en este destino.",
+                    "licenseAttestationMissing": "Certifica la licencia de la app antes de desplegarla.",
+                    "envRequiredUnset": "Todavía no se han establecido algunos valores de entorno obligatorios.",
+                    "dependencyNotReady": "Una dependencia que necesita la app aún no está lista.",
+                    "noGreenBuild": "Aún no hay ninguna compilación correcta que desplegar. Inicia primero una compilación.",
+                    "noGreenBuildForHead": "El último commit de la rama de despliegue aún no se ha compilado correctamente.",
+                    "buildImageMissing": "La compilación no tiene ninguna imagen que desplegar.",
+                    "nothingToDeploy": "Aún no hay nada que desplegar: ni compilación ni imagen publicada.",
+                    "imageNotPinned": "Esta imagen se referencia por etiqueta. Fíjala por digest para que cada despliegue ejecute la misma imagen.",
+                    "imageNotFound": "No se encuentra la imagen en su registro.",
+                    "imagePrivateUnsupported": "Esta imagen no se puede descargar sin credenciales. Ever Works solo despliega imágenes publicadas cuando son públicas.",
+                    "imageUnresolvable": "No se pudo resolver la referencia de la imagen.",
+                    "primaryDomainMissing": "El dominio principal aún no está configurado.",
+                    "targetNone": "Primero elige dónde debe ejecutarse la app.",
+                    "targetNotChecked": "Primero comprueba la conexión del clúster.",
+                    "clusterChangedUnconfirmed": "El clúster cambió desde el último despliegue. Confirma el cambio para desplegar.",
+                    "managedDisabled": "Próximamente: el alojamiento gestionado para apps aún no está abierto.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps solo ejecuta apps de un Blueprint verificado.",
+                    "quotaExceeded": "Has alcanzado el número de apps que puedes ejecutar en Ever Works Apps.",
+                    "managedIneligible": "Esta app no se puede ejecutar en Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps no puede aceptar apps nuevas ahora mismo.",
+                    "appWorkDeleting": "Este Trabajo de App se está eliminando.",
+                    "paused": "La app está en pausa. Reanúdala para desplegar.",
+                    "deployInProgress": "Hay otro despliegue en curso.",
+                    "cronAuthEnvUnset": "Una llamada programada necesita un valor de autenticación que no está establecido.",
+                    "jobAuthEnvUnset": "Un job necesita un valor de autenticación que no está establecido.",
+                    "volumeReplicas": "Un componente con un volumen solo puede ejecutar una réplica.",
+                    "volumeShrink": "Un volumen no se puede reducir.",
+                    "privilegedPort": "Un componente escucha en un puerto inferior a 1024.",
+                    "cronTooFrequent": "Una llamada programada se ejecuta con más frecuencia de la permitida.",
+                    "managedRootForbidden": "Esta imagen se ejecuta como root.",
+                    "imageUserUnverifiable": "Ever Works no pudo comprobar con qué usuario se ejecuta la imagen.",
+                    "workerNotIsolated": "Los despliegues aún no pueden empezar: esta instancia no tiene un worker aislado de clúster de App.",
+                    "envSourceUnavailable": "Los valores de entorno de la app no se pueden leer ahora mismo.",
+                    "pullCredentialUnavailable": "La credencial para descargar la imagen no está disponible.",
+                    "namespaceForeign": "Ese namespace ya pertenece a otra cosa en el clúster.",
+                    "verificationNamespaceForbidden": "Ese namespace está reservado para ejecuciones de verificación."
+                },
+                "license": {
+                    "loading": "Leyendo la licencia…",
+                    "unavailable": "Los detalles de la licencia aún no están disponibles en esta instancia.",
+                    "error": "No se pudo leer la licencia. Recarga la página para intentarlo de nuevo.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "No se encontró ninguna licencia que reconozcamos.",
+                    "classes": {
+                        "green": "Alojamiento permitido",
+                        "amber": "Tu clúster, después de que confirmes los términos de la licencia",
+                        "red": "Solo tu clúster, después de que confirmes los términos de la licencia",
+                        "unknown": "Licencia desconocida: confirma los términos antes de desplegar",
+                        "unclassified": "Aún sin clasificar"
+                    },
+                    "mixed": "Algunas partes de este repositorio usan una licencia distinta.",
+                    "incomplete": "Este repositorio es demasiado grande para analizarlo por completo.",
+                    "yourClusterAllowed": "Tu clúster: permitido",
+                    "yourClusterAfterConfirm": "Tu clúster: permitido después de que confirmes los términos de la licencia",
+                    "review": "Revisar y confirmar",
+                    "confirmed": "Confirmado el {date}.",
+                    "disclaimer": "Esta es una lectura automatizada de los archivos de licencia del repositorio, no asesoramiento legal.",
+                    "unknownSpdx": "La licencia de este software",
+                    "dialogTitle": "Confirmar los términos de la licencia",
+                    "dialogBody": "{spdx} restringe cómo se puede alojar este software. Ever Works Apps no está disponible para él. Para ejecutarlo en tu propio clúster, confirma:",
+                    "noText": "El registro de licencias no tiene ninguna declaración para esta licencia.",
+                    "checkbox": "Confirmo la declaración anterior.",
+                    "footer": "Registramos quién confirmó, cuándo, y para qué licencia y commit.",
+                    "cancel": "Cancelar",
+                    "confirm": "Confirmar",
+                    "refusals": {
+                        "ownerOnly": "Solo el propietario del Trabajo de App puede certificarla.",
+                        "licenseChanged": "La licencia cambió mientras la revisabas. Revisa los nuevos términos y vuelve a confirmar.",
+                        "attestationNotRequired": "Esta licencia ya no necesita confirmación.",
+                        "licenseUnavailable": "La confirmación de licencia aún no está disponible en esta instancia.",
+                        "route_unavailable": "La confirmación de licencia aún no está disponible en esta instancia.",
+                        "failed": "No se pudo registrar la confirmación. Inténtalo de nuevo."
+                    }
+                },
+                "rollback": {
+                    "button": "Revertir",
+                    "title": "Revertir a un despliegue anterior",
+                    "description": "Elige un despliegue que ya estuvo activo. Su imagen y su especificación de App vuelven a ejecutarse; no se reconstruye nada.",
+                    "pickLabel": "Despliegue al que volver",
+                    "liveAt": "Activo desde {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Estuvo activo antes",
+                    "none": "No hay ningún despliegue activo anterior al que revertir.",
+                    "runJobs": "Volver a ejecutar las tareas previas al despliegue",
+                    "confirm": "Revertir",
+                    "cancel": "Cancelar",
+                    "started": "Reversión iniciada.",
+                    "failed": "No se pudo iniciar la reversión: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Pausar",
+                    "resume": "Reanudar",
+                    "remove": "Quitar del clúster",
+                    "removeTitle": "Quitar esta App de su clúster",
+                    "removeDescription": "La app en ejecución se detiene y se eliminan sus objetos de Kubernetes. El App Work y sus builds se conservan.",
+                    "deleteData": "Eliminar también los datos almacenados (volúmenes y bases de datos de dependencias)",
+                    "deleteDataWarning": "Esto no se puede deshacer.",
+                    "confirmSlugLabel": "Escribe {slug} para confirmar",
+                    "confirmRemove": "Quitar",
+                    "cancel": "Cancelar",
+                    "failed": "No se pudo hacer: {reason}",
+                    "slugMismatch": "El slug que escribiste no coincide con este App Work.",
+                    "accepted": {
+                        "pause": "Pausa solicitada.",
+                        "resume": "Reanudación solicitada.",
+                        "remove": "Eliminación solicitada.",
+                        "cancelDeploy": "Cancelación solicitada."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Los nombres empiezan por una letra o un guion bajo y solo usan A–Z, 0–9 y _.",
+                    "reservedName": "Los nombres que empiezan por EVER_WORKS_ están reservados para la plataforma.",
+                    "valueTooLarge": "Un valor puede tener como máximo 65.536 bytes.",
+                    "controlCharacter": "Los valores no pueden contener un carácter NUL.",
+                    "lengthMismatch": "Debe tener exactamente {expected} caracteres; ese tiene {actual}.",
+                    "tooShort": "Debe tener al menos {min} caracteres.",
+                    "tooLong": "Debe tener como máximo {max} caracteres.",
+                    "patternMismatch": "No coincide con el patrón que pide esta app.",
+                    "generatedValueUseRotate": "Este valor se genera. Rótalo para sustituirlo.",
+                    "neverRotateNotAcknowledged": "Esta app indica que este valor no debe cambiar nunca. Confirma que lo entiendes antes de rotarlo.",
+                    "rotateConfirmationMismatch": "El nombre que escribiste no coincide con el nombre de este valor.",
+                    "secureStorageUnavailable": "El almacenamiento seguro no está configurado en esta instalación, así que no se pueden guardar valores.",
+                    "tooManyValues": "Una app puede tener como máximo 300 valores.",
+                    "valuesTooLarge": "Los valores de una app pueden sumar como máximo 1 MiB.",
+                    "malformedLine": "No es una línea NAME=value válida.",
+                    "rotateRateLimited": "Demasiadas rotaciones. Inténtalo de nuevo más tarde."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Pendiente",
+                    "awaitingConfig": "Necesita tu configuración",
+                    "provisioning": "Aprovisionando",
+                    "ready": "Lista",
+                    "degraded": "Degradada",
+                    "failed": "Fallida",
+                    "kept": "Conservada: ya no se gestiona",
+                    "deleting": "Eliminando",
+                    "deleted": "Eliminada",
+                    "notInSpec": "La especificación de la app ya no la usa: datos conservados"
+                },
+                "backup": {
+                    "none": "Sin copias de seguridad automáticas. Si se pierde este volumen, los datos desaparecen.",
+                    "notConfigured": "Copias de seguridad: no configuradas",
+                    "healthy": "Copias de seguridad: última completada {time}",
+                    "overdue": "Copias de seguridad: atrasadas; última completada {time}",
+                    "failing": "Copias de seguridad: el último intento falló",
+                    "external": "Copias de seguridad: gestionadas por tu proveedor de {kind}",
+                    "unknown": "Copias de seguridad: no se pudieron comprobar"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Tu clúster no tiene una clase de almacenamiento predeterminada. Elige una en la configuración de dependencias.",
+                    "clusterUnreachable": "No se pudo acceder a tu clúster.",
+                    "smtpConnectFailed": "No se pudo conectar con el servidor de correo.",
+                    "smtpTlsFailed": "Falló el handshake TLS del servidor de correo.",
+                    "smtpAuthRefused": "El servidor rechazó el inicio de sesión.",
+                    "bucketUnreadable": "El bucket {bucket} no existe o no se puede leer.",
+                    "volumeNotReady": "El volumen no estuvo listo en {minutes} minutos.",
+                    "extensionUnavailable": "Extensiones no disponibles: {names}.",
+                    "platformServerRefused": "Ese servidor contiene datos de la plataforma Ever Works. Elige otro.",
+                    "deadlineExceeded": "El aprovisionamiento no terminó a tiempo.",
+                    "namespaceNotOwned": "Ese namespace pertenece a otra app. Elige otro.",
+                    "namespaceBaselineMissing": "Al namespace le faltan sus límites y políticas base.",
+                    "clusterPermissionMissing": "Ever Works no tiene permiso para crear esta dependencia en tu clúster.",
+                    "operatorNamespaceUnknown": "El namespace del operador no está establecido en la configuración de dependencias.",
+                    "volumeExpansionUnsupported": "La clase de almacenamiento {storageClass} no puede ampliar este volumen.",
+                    "sizeShrinkRefused": "El almacenamiento de una dependencia no se puede reducir. Si necesitas uno más pequeño, elimina primero sus datos.",
+                    "relayIneligible": "Esta app no puede usar el relé de correo de Ever Works.",
+                    "relaySuspended": "El relé de correo de Ever Works está suspendido.",
+                    "providerNotSupported": "Ese proveedor no puede servir esta dependencia.",
+                    "dependencyNotDeclared": "La especificación de la app no declara esta dependencia.",
+                    "confirmationMismatch": "El nombre que escribiste no coincide.",
+                    "deleteInProgress": "Los datos de esta dependencia ya se están eliminando.",
+                    "notGenerated": "Ese valor no se genera, así que no hay nada que rotar.",
+                    "notAppWork": "Este Trabajo no es una app.",
+                    "targetNone": "Esta app todavía no está configurada para desplegarse en ningún sitio. Elige un destino de despliegue para aprovisionar sus dependencias.",
+                    "targetNotChecked": "Tu clúster aún no ha superado su comprobación. Comprueba la conexión y vuelve a intentarlo."
+                }
             }
         },
         "newPage": {
@@ -6894,7 +7514,8 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
                 "repo": "Repositorio",
-                "company": "Company"
+                "company": "Company",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6907,7 +7528,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Un repositorio de código existente como Work: las tareas, los objetivos y las ejecuciones de la flota se vinculan a él. No se genera ni despliega nada.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Ejecuta y evoluciona cualquier repositorio de GitHub: vincúlalo o haz un fork y luego elige dónde se ejecuta."
             },
             "submit": "Create",
             "submitTitle": "Crear",
@@ -6952,7 +7574,8 @@
                 "blog": "Blog",
                 "directory": "Directorio",
                 "awesome-repo": "Repo Awesome",
-                "repo": "Repositorio"
+                "repo": "Repositorio",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "Un sitio web de varias páginas para un negocio, servicio o marca — contenido generado + código.",
@@ -6960,7 +7583,8 @@
                 "blog": "Un blog con categorías, RSS, resaltado de código y contenido optimizado para SEO.",
                 "directory": "Un sitio de directorio curado con búsqueda, filtros y datos estructurados de elementos.",
                 "awesome-repo": "Un repo de lista awesome — índice markdown, enlaces categorizados y metadatos actualizables.",
-                "repo": "Un repositorio de código existente como Work: las tareas, los objetivos y las ejecuciones de la flota se vinculan a él. No se genera ni despliega nada."
+                "repo": "Un repositorio de código existente como Work: las tareas, los objetivos y las ejecuciones de la flota se vinculan a él. No se genera ni despliega nada.",
+                "app": "Ejecuta y evoluciona cualquier repositorio de GitHub: vincúlalo o haz un fork y luego elige dónde se ejecuta."
             },
             "promptHints": {
                 "minLength": "Añade una descripción (al menos 10 caracteres) para comenzar.",
@@ -7365,6 +7989,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "p. ej. «https://github.com/owner/repo — una app de código abierto de la que quieres tu propia copia»",
+                "formTitle": "Nuevo Trabajo de App",
+                "formSubtitle": "Empieza desde cualquier repositorio de GitHub. Ever Works lo vincula o crea tu propia copia, y luego te ayuda a ejecutarlo y a seguir cambiándolo.",
+                "urlLabel": "URL del repositorio",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Cualquier repositorio de GitHub que tu cuenta conectada pueda leer.",
+                "checkButton": "Comprobar repositorio",
+                "checking": "Comprobando…",
+                "tabPaste": "Pegar una URL",
+                "tabCatalog": "Explorar el catálogo de Apps",
+                "catalogComingSoon": "El catálogo de Apps se abrirá aquí pronto. Por ahora, pega la URL de un repositorio.",
+                "stars": "{count, plural, =1 {1 estrella} other {# estrellas}}",
+                "defaultBranch": "Rama predeterminada: {branch}",
+                "largeRepository": "Repositorio grande ({size})",
+                "moved": "Movido a {fullName}",
+                "isFork": "Este repositorio es un fork de {parent}.",
+                "ownFork": "Este es tu fork de {parent}. Ever Works seguirá a {parent} como upstream.",
+                "publicForkNote": "Los forks de repositorios públicos son públicos.",
+                "archivedNote": "Este repositorio está archivado. La sincronización con upstream permanece desactivada.",
+                "licenseChip": "Licencia: {spdx}",
+                "licenseNotDetected": "Licencia: no detectada",
+                "licenseClass": {
+                    "green": "Alojamiento permitido",
+                    "amber": "Tu clúster, después de que certifiques la licencia",
+                    "red": "Tu clúster, después de que certifiques la licencia",
+                    "unknown": "Licencia desconocida: la certificarás antes de desplegar"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint verificado",
+                    "available": "Blueprint disponible",
+                    "none": "Sin Blueprint: un agente averiguará cómo ejecutarlo",
+                    "unavailable": "Comprobación de Blueprint no disponible"
+                },
+                "existingAppWork": "Ya tienes un Trabajo de App para este repositorio: {name}.",
+                "openExistingAppWork": "Abrirlo",
+                "scanIncomplete": "No se comprobaron todas las cuentas en busca de un fork existente.",
+                "modesTitle": "¿Cómo debe usar Ever Works este repositorio?",
+                "modes": {
+                    "link": {
+                        "title": "Vincular",
+                        "titleOwnFork": "Vincular: sin seguir a upstream",
+                        "description": "Usa este repositorio tal como está. Puedes hacer push en él, así que los cambios llegan aquí directamente."
+                    },
+                    "fork": {
+                        "title": "Fork",
+                        "description": "Crea tu propio fork. Puedes sincronizarlo con upstream y proponer cambios de vuelta."
+                    },
+                    "private-copy": {
+                        "title": "Copia privada",
+                        "description": "Crea un repositorio privado con el mismo código."
+                    }
+                },
+                "unavailable": "No disponible: {reason}",
+                "forkInto": "Hacer fork en",
+                "copyInto": "Copiar en",
+                "ownerFilter": "Buscar cuentas",
+                "ownerOrganization": "organización",
+                "ownerNotChecked": "no se comprobó si hay un fork existente",
+                "existingFork": "Ya tienes un fork: {fullName}. Ever Works lo usará.",
+                "privateCopyTradeOff": "Una copia privada no está vinculada al original en GitHub, por lo que no puede abrir pull requests al proyecto original. Los cambios de upstream llegan como pull requests en tu copia.",
+                "linkSetupNote": "Ever Works abre un pull request que añade un archivo, .works/works.yml. Fusiónalo para terminar.",
+                "existingForkSetupNote": "Ever Works no creó este fork, así que abre un pull request que añade .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works abre un pull request que añade .works/works.yml y los archivos del Blueprint. Fusiónalo para terminar.",
+                "existingForkSetupNoteBlueprint": "Ever Works no creó este fork, así que abre un pull request que añade .works/works.yml y los archivos del Blueprint.",
+                "promptsTitle": "Valores que necesita esta app",
+                "promptHint": "El Blueprint {name} los solicita. Puedes cambiarlos más tarde en Configuración.",
+                "promptRequired": "Obligatorio",
+                "promptsIncomplete": "Primero rellena los valores que necesita la app.",
+                "autoProvision": "Dejar que un agente averigüe cómo ejecutarla",
+                "autoProvisionHelp": "Empieza cuando el repositorio esté listo. Consume tokens de IA y minutos de runner de compilación, dentro de los límites de aprovisionamiento. Puedes cancelarlo, o desmarcar esta opción e iniciarlo más tarde desde el Resumen con Aprovisionar.",
+                "deployTargetTitle": "¿Dónde debe ejecutarse?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Ninguno: no desplegar todavía",
+                        "description": "Puedes elegir un destino más tarde."
+                    },
+                    "your-cluster": {
+                        "title": "Tu clúster",
+                        "description": "Ejecútala en tu propio clúster de Kubernetes. Añadirás la conexión en la pestaña Implementar."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Próximamente: el alojamiento gestionado para apps aún no está abierto."
+                    }
+                },
+                "submit": {
+                    "link": "Vincular y crear Trabajo de App",
+                    "fork": "Hacer fork y crear Trabajo de App",
+                    "private-copy": "Copiar y crear Trabajo de App"
+                },
+                "submitPending": "Creando…",
+                "nameLabel": "Nombre",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Descripción",
+                "slugHelp": "Identificador apto para URL. Se deriva del nombre del repositorio; edítalo para cambiarlo.",
+                "invalidSlug": "Usa solo letras minúsculas, dígitos y guiones, por ejemplo tasks-app",
+                "cancel": "Cancelar",
+                "createFailed": "No se pudo crear el Trabajo de App. Inténtalo de nuevo.",
+                "success": {
+                    "link": "Trabajo de App creado.",
+                    "fork": "Fork solicitado: te avisaremos cuando esté listo.",
+                    "private-copy": "Copia iniciada: te avisaremos cuando esté lista."
+                },
+                "reasons": {
+                    "invalid_url": "Introduce la URL de un repositorio de GitHub, como https://github.com/owner/repo",
+                    "provider_not_connected": "Conecta GitHub para crear un Trabajo de App.",
+                    "insufficient_scope": "Vuelve a conectar GitHub para conceder acceso a los repositorios.",
+                    "not_found": "No encontramos este repositorio, o tu cuenta de GitHub no puede leerlo.",
+                    "sso_authorization_required": "{owner} requiere que autorices Ever Works para su organización en GitHub.",
+                    "oauth_app_restricted": "{owner} restringe el acceso de terceros. Pide a un propietario de {owner} que apruebe Ever Works, o elige otra cuenta.",
+                    "empty_repository": "Este repositorio todavía no tiene commits.",
+                    "no_push_access": "No puedes hacer push en este repositorio.",
+                    "archived": "Los repositorios archivados son de solo lectura.",
+                    "forking_disabled": "El propietario de este repositorio no permite forks ni copias.",
+                    "own_repository": "Este repositorio es tuyo: vincúlalo en su lugar.",
+                    "target_owner_unavailable": "Esta cuenta no está disponible en tu conexión de GitHub.",
+                    "target_owner_forbidden": "No puedes crear repositorios en {owner}.",
+                    "too_large_for_private_copy": "Demasiado grande para una copia privada ({size}). Haz un fork en su lugar.",
+                    "uses_lfs": "Usa Git LFS, que una copia privada no puede trasladar. Haz un fork en su lugar.",
+                    "copy_name_unavailable": "{owner} ya tiene repositorios llamados desde {name} hasta {name}-copy-5.",
+                    "in_use_by_another_account": "Otra cuenta ya usa este repositorio en Ever Works. Pide a su propietario que te añada como miembro.",
+                    "app_work_exists": "Ya tienes un Trabajo de App para {fullName}: {workName}.",
+                    "create_in_progress": "Este Trabajo de App ya se está creando.",
+                    "rate_limited": "GitHub está limitando la frecuencia de tu cuenta. Inténtalo de nuevo a las {time}.",
+                    "managed_hosting_unavailable": "Próximamente: el alojamiento gestionado para apps aún no está abierto.",
+                    "cluster_target_unavailable": "No hay instalada ninguna opción de despliegue que pueda ejecutar apps.",
+                    "app_works_disabled": "Los Trabajos de App no están disponibles en esta instancia.",
+                    "blueprint_mismatch": "El Blueprint de este repositorio ha cambiado. Vuelve a comprobar el repositorio."
+                },
+                "catalog": {
+                    "searchLabel": "Buscar en el catálogo de Apps",
+                    "searchPlaceholder": "Buscar apps, por ejemplo umami o calendar",
+                    "listLabel": "Blueprints de App",
+                    "loading": "Cargando el catálogo de Apps…",
+                    "unavailable": "El catálogo de Apps no está disponible ahora mismo. Pega la URL de un repositorio en su lugar.",
+                    "disabled": "Los Trabajos de App no están disponibles en esta instancia.",
+                    "error": "No se pudo cargar el catálogo de Apps. Inténtalo de nuevo o pega la URL de un repositorio.",
+                    "empty": "Todavía no hay Blueprints de App publicados. Pega la URL de un repositorio en su lugar.",
+                    "noMatches": "Ninguna app coincide con tu búsqueda.",
+                    "pick": "Empezar desde {name}",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "Próximamente",
+                    "verified": "Verificado",
+                    "upstreamLine": "De {repo}",
+                    "runsOn": "Se ejecuta en: {targets}",
+                    "targetYourCluster": "Tu clúster",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Aún no disponible",
+                    "fallbackNote": "Se muestran los Blueprints de App encontrados en GitHub: el catálogo seleccionado no está disponible ahora mismo."
+                }
             }
         },
         "gitProvider": {
@@ -9266,6 +10042,13 @@
                 "started": "Importación iniciada exitosamente",
                 "failed": "Fallo al importar trabajo",
                 "fetchReposFailed": "Fallo al obtener repositorios"
+            },
+            "app": {
+                "repositoryUrlRequired": "Introduce la URL de un repositorio de GitHub, como https://github.com/owner/repo",
+                "repositoryModeRequired": "Elige cómo usar este repositorio: Vincular, Fork o Copia privada.",
+                "targetOwnerRequired": "Elige la cuenta en la que crear el repositorio.",
+                "invalidUrl": "Introduce la URL de un repositorio de GitHub, como https://github.com/owner/repo",
+                "inspectFailed": "No se pudo comprobar este repositorio. Inténtalo de nuevo."
             }
         },
         "generator": {

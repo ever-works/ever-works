@@ -130,6 +130,8 @@ describe('chip-values — the server-safe home of the chip catalogs', () => {
                 'directory',
                 'awesome-repo',
                 'repo',
+                // APW-01 T23 — the App chip (fail-closed; absent while disabled).
+                'app',
                 'company',
             ]);
 
@@ -151,6 +153,8 @@ describe('chip-values — the server-safe home of the chip catalogs', () => {
                 'directory',
                 'awesome-repo',
                 'repo',
+                // APW-01 T23 — the App Work kind.
+                'app',
             ]);
 
             expect([...ALL_WORK_KIND_CHIP_VALUES]).toEqual([

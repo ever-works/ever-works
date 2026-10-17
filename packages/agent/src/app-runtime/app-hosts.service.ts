@@ -495,7 +495,11 @@ export class AppHostsService implements AppRenderHostSource {
         private readonly ops?: AppHostsOpDispatcher,
         @Optional()
         @Inject(APP_HOSTS_APPS_DOMAIN)
-        private readonly appsDomain?: { getDomain(): string | null },
+        private readonly appsDomain?: {
+            getDomain(): string | null;
+            /** APW-10 lite — the managed target's apex (`EVER_WORKS_APPS_MANAGED_DOMAIN`), when set. */
+            getManagedDomain?(): string | null;
+        },
         @Optional()
         @Inject(APP_DEPLOY_SPEC_SOURCE)
         private readonly specs?: AppDeploySpecSource,
@@ -553,7 +557,7 @@ export class AppHostsService implements AppRenderHostSource {
         const customPrimary = requestedPrimary
             ? (verified.find((domain) => sameHost(domain, requestedPrimary)) ?? null)
             : null;
-        const managed = this.managedHost(work, settings);
+        const managed = this.managedHost(work, settings, state?.target ?? null);
         const primary = customPrimary ?? managed;
         const primaryKind: AppHostKind = customPrimary ? 'custom' : 'managed';
 
@@ -630,16 +634,32 @@ export class AppHostsService implements AppRenderHostSource {
     private managedHost(
         work: AppHostsWorkView,
         settings: AppHostsRuntimeStateView['targetSettings'],
+        target: string | null = null,
     ): string | null {
         if (settings?.managedSubdomain === false) return null;
 
         const label = text(work.managedSubdomain);
         if (!label) return null;
 
-        const apex = this.resolveAppsDomain();
+        const apex =
+            (target === 'ever-works-apps' ? this.resolveManagedDomain() : null) ??
+            this.resolveAppsDomain();
         if (!apex) return null;
 
         return `${label}.${apex}`;
+    }
+
+    /**
+     * APW-10 lite — the managed target's own apex, `<label>.<EVER_WORKS_APPS_MANAGED_DOMAIN>`, so an
+     * operator can host managed apps under a different zone from member clusters. `null` (unset,
+     * or no reader bound) ⇒ the shared apps apex below.
+     */
+    private resolveManagedDomain(): string | null {
+        try {
+            return text(this.appsDomain?.getManagedDomain?.()) || null;
+        } catch {
+            return null;
+        }
     }
 
     /** §8.3:1129-1132 — `config.everWorks.apps.getDomain()`, with the documented default behind it. */

@@ -24,7 +24,7 @@ import { API_URL } from '@/lib/constants';
  *
  * The API half is read over HTTP rather than from this process's environment
  * on purpose (APW11-G12): the web and the API are separate deployments, and a
- * web-side copy of `EVER_WORKS_LAUNCHER_ENABLED` would drift from the API's
+ * web-side copy of `EVER_WORKS_APP_LAUNCHER_ENABLED` would drift from the API's
  * answer — showing a surface the API answers 404 for, or hiding one it serves.
  *
  * ## The budget

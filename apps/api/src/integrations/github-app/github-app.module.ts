@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { WorkModule } from '@ever-works/agent/services';
 import { ImportModule } from '@ever-works/agent/import';
@@ -24,7 +25,17 @@ import { GitHubAppSyncService } from './github-app-sync.service';
  * consolidated receiver fans out to it.
  */
 @Module({
-    imports: [DatabaseModule, HttpModule, AuthModule, WorkModule, ImportModule, UsersModule],
+    imports: [
+        DatabaseModule,
+        HttpModule,
+        AuthModule,
+        WorkModule,
+        ImportModule,
+        UsersModule,
+        // The webhook installer auto-claim records itself in the owner's
+        // activity log (GitHubAppOnboardingService.claimForRecordedInstaller).
+        ActivityLogModule,
+    ],
     providers: [GitHubAppService, GitHubAppOnboardingService, GitHubAppSyncService],
     controllers: [GitHubAppController],
     exports: [GitHubAppService, GitHubAppOnboardingService, GitHubAppSyncService],

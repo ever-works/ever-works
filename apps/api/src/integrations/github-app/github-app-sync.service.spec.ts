@@ -5,6 +5,10 @@ jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/import', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
+// Only a DI token here — the claim rules are pinned in its own spec.
+jest.mock('./github-app-onboarding.service', () => ({
+    GitHubAppOnboardingService: class {},
+}));
 jest.mock('@ever-works/agent/config', () => ({
     config: {
         subscriptions: {
@@ -53,6 +57,9 @@ describe('GitHubAppSyncService', () => {
             findByDataRepoFullName: jest.fn().mockResolvedValue([]),
             update: jest.fn().mockResolvedValue(null),
         };
+        const onboardingService = {
+            claimForRecordedInstaller: jest.fn().mockResolvedValue(null),
+        };
 
         const service = new GitHubAppSyncService(
             gitHubAppService as any,
@@ -61,6 +68,7 @@ describe('GitHubAppSyncService', () => {
             sourceRepoAnalyzerService as any,
             workImportService as any,
             workRepository as any,
+            onboardingService as any,
         );
 
         return {
@@ -69,6 +77,7 @@ describe('GitHubAppSyncService', () => {
             gitHubAppInstallationRepository,
             gitHubAppInstallationRepoRepository,
             workRepository,
+            onboardingService,
         };
     };
 
@@ -239,6 +248,135 @@ describe('GitHubAppSyncService', () => {
         } as any);
 
         expect(result).toBeNull();
+    });
+
+    // Prod 2026-10-17 — the App was made public and installed on four more
+    // orgs straight from github.com. The verified `installation.created`
+    // webhook recorded each row with `createdByGithubUserId` (the sender) but
+    // `createdByUserId` stayed NULL, because only the setup-URL redirect ever
+    // claimed one. A verified delivery now claims it for the recorded
+    // installer; the claim rules themselves live in the onboarding spec.
+    describe('handleWebhook — installer auto-claim (verified deliveries only)', () => {
+        const CREATED = {
+            action: 'created',
+            installation: {
+                id: 12345,
+                app_slug: 'ever-works',
+                account: { login: 'ever-co', type: 'Organization' },
+                target_type: 'Organization',
+            },
+            sender: { id: 7001 },
+        };
+        const recordedRow = {
+            id: 'installation-row-1',
+            installationId: '12345',
+            accountLogin: 'ever-co',
+            createdByUserId: null,
+            createdByGithubUserId: '7001',
+        };
+
+        it('claims the recorded row for an App-secret-verified installation.created, before syncing', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            gitHubAppInstallationRepository.upsertFromGithub.mockResolvedValue(recordedRow);
+            const claimedRow = { ...recordedRow, createdByUserId: 'user-owner' };
+            onboardingService.claimForRecordedInstaller.mockResolvedValue(claimedRow);
+            const syncSpy = jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            const result = await service.handleWebhook('installation', CREATED, {
+                appSecretVerified: true,
+            });
+
+            expect(gitHubAppInstallationRepository.upsertFromGithub).toHaveBeenCalledWith(
+                expect.objectContaining({ createdByGithubUserId: '7001' }),
+            );
+            expect(onboardingService.claimForRecordedInstaller).toHaveBeenCalledWith(recordedRow);
+            expect(syncSpy).toHaveBeenCalledWith('12345');
+            expect(result).toEqual(claimedRow);
+        });
+
+        it.each([
+            ['no context (a caller that did not verify)', undefined],
+            ['appSecretVerified: false (per-install secret)', { appSecretVerified: false }],
+        ])('never claims for %s', async (_label, context) => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            gitHubAppInstallationRepository.upsertFromGithub.mockResolvedValue(recordedRow);
+            const syncSpy = jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            const result = await service.handleWebhook('installation', CREATED, context);
+
+            expect(onboardingService.claimForRecordedInstaller).not.toHaveBeenCalled();
+            expect(syncSpy).toHaveBeenCalledWith('12345');
+            expect(result).toEqual(recordedRow);
+        });
+
+        it('leaves an already-claimed row untouched (no claim attempt)', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            const owned = { ...recordedRow, createdByUserId: 'user-someone' };
+            gitHubAppInstallationRepository.upsertFromGithub.mockResolvedValue(owned);
+            jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            const result = await service.handleWebhook('installation', CREATED, {
+                appSecretVerified: true,
+            });
+
+            expect(onboardingService.claimForRecordedInstaller).not.toHaveBeenCalled();
+            expect(result).toEqual(owned);
+        });
+
+        it('never fails installation sync when the claim throws', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            gitHubAppInstallationRepository.upsertFromGithub.mockResolvedValue(recordedRow);
+            onboardingService.claimForRecordedInstaller.mockRejectedValue(new Error('DB down'));
+            const syncSpy = jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            await expect(
+                service.handleWebhook('installation', CREATED, { appSecretVerified: true }),
+            ).resolves.toEqual(recordedRow);
+            expect(syncSpy).toHaveBeenCalledWith('12345');
+        });
+
+        it('does not claim on installation.deleted', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+
+            await service.handleWebhook(
+                'installation',
+                { ...CREATED, action: 'deleted' },
+                { appSecretVerified: true },
+            );
+
+            expect(gitHubAppInstallationRepository.markDeleted).toHaveBeenCalledWith(
+                '12345',
+                expect.any(Date),
+            );
+            expect(onboardingService.claimForRecordedInstaller).not.toHaveBeenCalled();
+        });
+
+        it('retries the claim on a verified installation_repositories delivery', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue(recordedRow);
+            const syncSpy = jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            await service.handleWebhook(
+                'installation_repositories',
+                { installation: { id: 12345 } },
+                { appSecretVerified: true },
+            );
+
+            expect(onboardingService.claimForRecordedInstaller).toHaveBeenCalledWith(recordedRow);
+            expect(syncSpy).toHaveBeenCalledWith('12345');
+        });
+
+        it('does not look the row up or claim on an unverified installation_repositories delivery', async () => {
+            const { service, gitHubAppInstallationRepository, onboardingService } = createService();
+            jest.spyOn(service, 'syncInstallation').mockResolvedValue(null as any);
+
+            await service.handleWebhook('installation_repositories', {
+                installation: { id: 12345 },
+            });
+
+            expect(gitHubAppInstallationRepository.findByInstallationId).not.toHaveBeenCalled();
+            expect(onboardingService.claimForRecordedInstaller).not.toHaveBeenCalled();
+        });
     });
 
     // EW-628 G6 — `push` handler now resolves the data-repo full_name to

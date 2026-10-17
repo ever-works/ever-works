@@ -491,6 +491,13 @@ export enum ActivityActionType {
     // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
     // the publishable allow-list, so this member is unpublished by construction.
     APP_BUILD = 'app_build',
+    // APW-06 T28 (lane aw-deploy-2, 2026-10-17) — the runtime families (R-2): one row per relayed
+    // §9.4 event, written by `AppRuntimeActivityListener`. `action` is the dotted event name
+    // (`app.deploy.started`, `app.job.failed`, `app.smoke.passed`, …) and `metadata` carries ids
+    // and names only (ACC-06-41). Additive members — `actionType` is a plain varchar.
+    APP_DEPLOY = 'app_deploy',
+    APP_JOB = 'app_job',
+    APP_SMOKE = 'app_smoke',
     // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
     //   - INTEGRATION_WRITE: one row per successful write an integration key
     //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy

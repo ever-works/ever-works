@@ -98,6 +98,7 @@ import {
     type AppRuntimeEnvSource,
     type AppsTierPolicy,
 } from './ports';
+import { isAppClusterWorkerContext } from './worker-context';
 
 /* -------------------------------------------------------------------------- *
  * Vocabulary this file adds
@@ -427,20 +428,39 @@ export class AppDeployPreconditionsService {
         // ---- 1 · dispatcher availability (§9.2, APW06-G02) -------------------
         // First, and final: "the request returns the precondition `worker_not_isolated`
         // (422) and creates no row". Nothing below this line may run for that answer.
-        if (!this.hasIsolatedDispatcher()) {
+        //
+        // Decision B1 (2026-10-17, owner-delegated): inside the isolated App runtime worker the
+        // question "is an isolated dispatcher available?" is answered by the run itself — it IS
+        // the isolated worker (the task refused to start without §6.2's attestation,
+        // `appClusterWorkerRefusal()`), so §5.6 step 1's re-check of a dequeued Deployment skips
+        // the gate when it names its own `deploymentId` and that Deployment must
+        // hold the deploy lock — the bypass applies only to the lock-holding Deployment, so it can
+        // never start one the API did not lock (cancelled, superseded or timed out after
+        // dispatch). The API process never carries the worker-context flag, so its answer is
+        // unchanged, and a worker run whose Deployment lost the lock meets the ordinary gate.
+        const workerDeployment = this.isWorkerDeployment(request);
+        const earlyState = workerDeployment ? await this.readState(workId) : undefined;
+        const holdsLock =
+            workerDeployment &&
+            Boolean(earlyState?.deployLockId) &&
+            String(earlyState?.deployLockId) === String(request?.deploymentId);
+        if (!holdsLock && !this.hasIsolatedDispatcher()) {
             unmet.push({
                 code: 'worker_not_isolated',
-                message:
-                    'No isolated worker is available to run App cluster work, so this Deployment ' +
-                    'cannot be dispatched. Production requires an operator to attest the App ' +
-                    'cluster worker; nothing was queued.',
+                message: workerDeployment
+                    ? "This Deployment does not hold its App Work's deploy lock (it was cancelled, " +
+                      'superseded or timed out after dispatch), so the isolated worker did not ' +
+                      'start it.'
+                    : 'No isolated worker is available to run App cluster work, so this Deployment ' +
+                      'cannot be dispatched. Production requires an operator to attest the App ' +
+                      'cluster worker; nothing was queued.',
             });
 
             return { unmet, advisory, warnings, context, ready: false };
         }
 
         // ---- 2 · the runtime state (T17, plan §7.2) --------------------------
-        const state = await this.readState(workId);
+        const state = earlyState !== undefined ? earlyState : await this.readState(workId);
         if (!state) {
             warnings.push({
                 code: APP_DEPLOY_WARNING_RUNTIME_STATE_UNAVAILABLE,
@@ -521,6 +541,15 @@ export class AppDeployPreconditionsService {
      * request, create the row and strand it (the "no in-process fallback" rule,
      * §9.2:1261-1266).
      */
+    /**
+     * Decision B1: `true` ⇔ this evaluation is §5.6 step 1's re-check inside the isolated App
+     * runtime worker, for a named Deployment. Only `TriggerAppRuntimeModule`'s bootstrap arms the
+     * worker-context flag, so the API's request path always answers `false` here.
+     */
+    private isWorkerDeployment(request: AppDeployPreconditionRequest): boolean {
+        return isAppClusterWorkerContext() && Boolean(request?.deploymentId);
+    }
+
     private hasIsolatedDispatcher(): boolean {
         if (!this.dispatchers || typeof this.dispatchers.resolve !== 'function') {
             return false;

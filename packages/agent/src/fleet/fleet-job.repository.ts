@@ -254,6 +254,43 @@ export class FleetJobRepository {
     }
 
     /**
+     * Fleet usage limits — hand a job this node still holds UNDER THIS CLAIM
+     * back to the queue because its model CLI ran out of quota. Same pinned
+     * WHERE clause as {@link complete}, so a stale holder cannot park the
+     * current holder's claim.
+     *
+     * The row re-enters `queued` exactly as a reclaim leaves it (no holder,
+     * no lease), plus three things only this path writes:
+     *  - `attempts` refunded — the job did not fail, the seat did;
+     *  - `queuedAt` = the RESET instant, so the queue SLA measures the wait
+     *    from when the work can actually run again, not from the limit;
+     *  - `usageLimitParks` + 1, the backstop that bounds how often one job
+     *    may be parked at all (`FLEET_JOB_MAX_USAGE_LIMIT_PARKS`).
+     * `leaseGeneration` is left alone: the NEXT claim advances it.
+     */
+    async parkForUsageLimit(
+        id: string,
+        nodeId: string,
+        leaseGeneration: number,
+        patch: { attempts: number; queuedAt: Date; usageLimitParks: number; queuedReason: string },
+    ): Promise<boolean> {
+        const updated = await this.repository.update(
+            { id, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]), leaseGeneration },
+            {
+                status: 'queued',
+                nodeId: null,
+                leaseExpiresAt: null,
+                startedAt: null,
+                attempts: patch.attempts,
+                queuedAt: patch.queuedAt,
+                queuedReason: patch.queuedReason,
+                usageLimitParks: patch.usageLimitParks,
+            },
+        );
+        return (updated.affected ?? 0) === 1;
+    }
+
+    /**
      * Jobs whose claim has lapsed. Scoped to a single owner when
      * `userId` is supplied (the inline reclaim on the lease path) and
      * global when it is not (the cron sweep).

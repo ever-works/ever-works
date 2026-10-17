@@ -320,6 +320,37 @@ const PUSH_CREDENTIAL_EXPORTS = [
 	'FleetPushAttributionError'
 ] as const;
 
+// Fleet usage limits (#2682) — `fleet-model-usage-limit.types.ts`, pinned in
+// `fleet-model-usage-limit.spec.ts`.
+const USAGE_LIMIT_EXPORTS = [
+	'FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT',
+	'FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON',
+	'FLEET_MODEL_USAGE_LIMIT_FALLBACK_MS',
+	'FLEET_MODEL_USAGE_LIMIT_MIN_MS',
+	'FLEET_MODEL_USAGE_LIMIT_MAX_MS',
+	'FLEET_MODEL_USAGE_LIMIT_RESET_SLACK_MS',
+	'FLEET_JOB_MAX_USAGE_LIMIT_PARKS',
+	'FLEET_MODEL_USAGE_LIMIT_MAX_MESSAGE_LENGTH',
+	'detectFleetModelUsageLimit',
+	'clampRetryAfterMs',
+	'readFleetJobModelUsageLimit',
+	'activeFleetNodeModelThrottles',
+	'describeFleetModelProvider',
+	'describeFleetModelUsageLimitWindow'
+] as const;
+
+// Fleet commit messages (#2682, 10-09 handover item 7) —
+// `fleet-commit-message.types.ts`, pinned in `fleet-commit-message.spec.ts`.
+const COMMIT_MESSAGE_EXPORTS = [
+	'FLEET_COMMIT_TYPES',
+	'FLEET_COMMIT_SUBJECT_MAX_LENGTH',
+	'fleetCommitTypeFromTitle',
+	'isFleetCommitType',
+	'composeFleetTaskCommitMessage',
+	'classifyFleetChangedPaths',
+	'retypeFleetCommitMessage'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -331,7 +362,9 @@ const ALL_EXPORTS = [
 	...RUN_SECRETS_EXPORTS,
 	...QUESTION_EXPORTS,
 	...RUN_CREDENTIAL_EXPORTS,
-	...PUSH_CREDENTIAL_EXPORTS
+	...PUSH_CREDENTIAL_EXPORTS,
+	...USAGE_LIMIT_EXPORTS,
+	...COMMIT_MESSAGE_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -389,7 +422,18 @@ const FUNCTION_EXPORTS = [
 	'sanitizeFleetPushIdentityText',
 	'fleetPushCommitIdentity',
 	'composeFleetPushCommitMessage',
-	'FleetPushAttributionError'
+	'FleetPushAttributionError',
+	'detectFleetModelUsageLimit',
+	'clampRetryAfterMs',
+	'readFleetJobModelUsageLimit',
+	'activeFleetNodeModelThrottles',
+	'describeFleetModelProvider',
+	'describeFleetModelUsageLimitWindow',
+	'fleetCommitTypeFromTitle',
+	'isFleetCommitType',
+	'composeFleetTaskCommitMessage',
+	'classifyFleetChangedPaths',
+	'retypeFleetCommitMessage'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -404,7 +448,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 212 runtime symbols', () => {
+	it('exposes exactly these 233 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -454,8 +498,12 @@ describe('fleet barrel', () => {
 		// `fleet-node.types.ts`, an existing module.
 		// → 212 with remote node limits (self-build slice AS): the six
 		// resource-limit bounds and the reported-limit cap, same module.
+		// → 233 with model usage limits + commit typing (#2682): the fourteen
+		// symbols of `fleet-model-usage-limit.types.ts` and the seven of
+		// `fleet-commit-message.types.ts` — two NEW modules, so the witness
+		// table below gains two rows.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(212);
+		expect(Object.keys(fleet)).toHaveLength(233);
 	});
 
 	it.each([
@@ -468,7 +516,9 @@ describe('fleet barrel', () => {
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
 		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS'],
 		['fleet-run-credential.types.js', 'FLEET_RUN_TOKEN_PREFIX'],
-		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY']
+		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY'],
+		['fleet-model-usage-limit.types.js', 'FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT'],
+		['fleet-commit-message.types.js', 'FLEET_COMMIT_TYPES']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

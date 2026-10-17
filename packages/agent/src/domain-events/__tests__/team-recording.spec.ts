@@ -178,6 +178,23 @@ describe('team recording points', () => {
         expect(await versionOf(Team, team.id)).toBe(2);
     });
 
+    // Review 2026-10-17 F7 (P1) / F29: the copy `update` loaded must not write its
+    // `version` back over a concurrent bump (a member added meanwhile).
+    it('update never writes back a stale version: the bump continues from the current one', async () => {
+        const team = await newTeam();
+        const stale = await dataSource.getRepository(Team).findOneByOrFail({ id: team.id });
+        // A concurrent child change moved the team to version 3 after `stale` was read.
+        await dataSource.getRepository(Team).update({ id: team.id }, { version: 3 });
+        jest.spyOn(dataSource.getRepository(Team), 'findOne').mockResolvedValueOnce(stale);
+
+        const returned = await teams.update(ORG_A, team.id, { name: 'Platform Core' });
+
+        expect(returned.version).toBe(4);
+        expect(await versionOf(Team, team.id)).toBe(4);
+        const updated = (await events()).find((event) => event.type === 'team.updated');
+        expect(updated?.aggregateVersion).toBe(4);
+    });
+
     it('roster changes record team.member.* child events that bump the team version', async () => {
         const team = await newTeam();
         await teams.addMember(OWNER, ORG_A, team.id, {

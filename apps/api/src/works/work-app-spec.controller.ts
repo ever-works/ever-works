@@ -4,6 +4,7 @@ import {
     Get,
     HttpException,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Post,
@@ -12,7 +13,13 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerException } from '@nestjs/throttler';
-import { APP_SPEC_FILE_MAX_BYTES, APP_SOURCE_SPEC_FILE } from '@ever-works/contracts';
+import {
+    APP_SPEC_FILE_MAX_BYTES,
+    APP_SOURCE_SPEC_FILE,
+    LICENSE_ATTEST_PER_MIN,
+} from '@ever-works/contracts';
+import type { LicenseAttestation } from '@ever-works/contracts';
+import { AppLicenseService } from '@ever-works/agent/app-license';
 import type { WorkAppSpecLinks } from '@ever-works/contracts';
 import {
     AppSpecService,
@@ -175,7 +182,66 @@ export class WorkAppSpecController {
         private readonly appSpec: AppSpecService,
         /** The provider read the `links.file` block is built from (plan §4.3:578). */
         private readonly git: GitFacadeService,
+        /**
+         * APW-03 T44 — the attestation record's one writer. Appended LAST and
+         * `@Optional()` so every positional construction in the specs keeps
+         * compiling; absent, the attest route answers `503 licenseUnavailable`.
+         */
+        @Optional()
+        private readonly licenses?: AppLicenseService,
     ) {}
+
+    /**
+     * `POST /api/works/:id/app-license/attest` — the OWNER attests the App Work's
+     * current licence classification (APW-03 T44, R-3, FR-57…FR-60).
+     *
+     * The caller must see the Work (`404 not_found` otherwise, ACC-03-41), must be its
+     * owner (`403 ownerOnly` — a manager included, ACC-03-34), the licence must need an
+     * attestation (`422 attestationNotRequired`), and — when the body names the
+     * classification the caller reviewed — it must still be current (`409
+     * licenseChanged`). 10 per minute per member.
+     */
+    @Post(':id/app-license/attest')
+    @ApiOperation({
+        summary: 'Attest an App Work’s licence (owner only)',
+        description:
+            'Records the owner’s attestation for the current amber, red or unknown licence classification, ' +
+            'which your-cluster deploys require. Errors: 403 ownerOnly, 409 licenseChanged, ' +
+            '422 attestationNotRequired, 404 not_found.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'The attestation record.' })
+    @ApiResponse({ status: 403, description: '`ownerOnly` — only the owner may attest.' })
+    @ApiResponse({ status: 404, description: '`not_found`.' })
+    @ApiResponse({ status: 409, description: '`licenseChanged` — the classification moved.' })
+    @ApiResponse({ status: 422, description: '`attestationNotRequired`.' })
+    async attestLicense(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: { spdx?: string | null; class?: string | null } = {},
+    ): Promise<{ attestation: LicenseAttestation }> {
+        await this.authorize(id, auth.userId, 'view');
+        this.takeAllowance(`attest:${auth.userId}`, LICENSE_ATTEST_PER_MIN);
+        if (!this.licenses) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'licenseUnavailable',
+                    message: 'The licence service is not available in this installation.',
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+        const expected =
+            body && (body.spdx !== undefined || body.class !== undefined)
+                ? {
+                      ...(body.spdx !== undefined ? { spdx: body.spdx } : {}),
+                      ...(body.class !== undefined ? { class: body.class } : {}),
+                  }
+                : undefined;
+        const attestation = await this.licenses.attest(id, auth.userId, expected);
+        return { attestation };
+    }
 
     /**
      * `GET /api/works/:id/app-spec` — the App spec state of one App Work

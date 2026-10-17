@@ -9,6 +9,7 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import type { WorkBuild } from '../entities/work-build.entity';
 import { appBuildBlock } from './app-build-prepare.runner';
+import { AppBuildRunDiscoveryService } from './app-build-run-discovery.service';
 import {
     APP_BUILD_SPEC_SOURCE,
     AppBuildsService,
@@ -181,6 +182,18 @@ export interface AppBuildSweepSummary {
     readonly lostFinalized: number;
     /** Lost: Builds whose `markNeverAdoptedLost` or `finalize` threw (an unreadable spec is the default). */
     readonly lostFailed: number;
+    /** Discovery (T21a): runs recorded through `recordProviderRun(…, 'poll')` this tick. */
+    readonly discoveryRunsRecorded?: number;
+    /** Discovery (T21a): Builds those runs created. */
+    readonly discoveryBuildsCreated?: number;
+    /** Silent pass (§7.4): open Builds silent past the window that were offered a watch. */
+    readonly silentDispatched?: number;
+    /** Silent pass: offers that threw. */
+    readonly silentFailed?: number;
+    /** Orphan pass (§7.4): verification secrets removed this tick. */
+    readonly orphanSecretsRemoved?: number;
+    /** Orphan pass: removals that threw. */
+    readonly orphanSecretsFailed?: number;
 }
 
 /** A summary with every counter at zero. */
@@ -233,6 +246,10 @@ export class AppBuildSweepService {
         @Optional()
         @Inject(APP_BUILD_SPEC_SOURCE)
         private readonly specs?: AppBuildSpecSource,
+        // T21a — run discovery, run before the silent pass (§7.4a). Optional so a
+        // graph without it (and every existing spec) still runs the other passes.
+        @Optional()
+        private readonly discovery?: AppBuildRunDiscoveryService,
     ) {}
 
     /**
@@ -310,7 +327,117 @@ export class AppBuildSweepService {
             this.logger.warn(`App builds: the sweep's lost read failed (${errorText(error)}).`);
         }
 
-        return { ...emptySummary(null), passesFailed, ...redrive, ...lost };
+        // T21a — discovery BEFORE the silent pass (§7.4a), so a run with no
+        // delivery is a Build by the time the silent pass looks for open ones.
+        // A discovery failure never stops the silent pass.
+        let discoveryRunsRecorded = 0;
+        let discoveryBuildsCreated = 0;
+        if (this.discovery) {
+            try {
+                const found = await this.discovery.discover(nowMs);
+                discoveryRunsRecorded = found.runsRecorded;
+                discoveryBuildsCreated = found.buildsCreated;
+            } catch (error) {
+                passesFailed += 1;
+                this.logger.warn(
+                    `App builds: the sweep's run discovery failed (${errorText(error)}).`,
+                );
+            }
+        }
+
+        let silent = { silentDispatched: 0, silentFailed: 0 };
+        try {
+            silent = await this.silentPass(nowMs);
+        } catch (error) {
+            passesFailed += 1;
+            this.logger.warn(`App builds: the sweep's silent read failed (${errorText(error)}).`);
+        }
+
+        // §7.4:1404-1405 — the backstop for a verification secret the watch's
+        // terminal transition could not remove (2026-10-17).
+        let orphans = { orphanSecretsRemoved: 0, orphanSecretsFailed: 0 };
+        try {
+            orphans = await this.orphanSecretPass(nowMs);
+        } catch (error) {
+            passesFailed += 1;
+            this.logger.warn(
+                `App builds: the sweep's orphaned-secret read failed (${errorText(error)}).`,
+            );
+        }
+
+        return {
+            ...emptySummary(null),
+            passesFailed,
+            ...redrive,
+            ...lost,
+            discoveryRunsRecorded,
+            discoveryBuildsCreated,
+            ...silent,
+            ...orphans,
+        };
+    }
+
+    /** Verification secrets still recorded 40 minutes after their run started — remove them. */
+    private async orphanSecretPass(
+        nowMs: number,
+    ): Promise<{ orphanSecretsRemoved: number; orphanSecretsFailed: number }> {
+        const orphans = await this.builds.findWithOrphanedVerifySecrets(
+            nowMs,
+            APP_BUILD_SWEEP_BATCH,
+        );
+        let orphanSecretsRemoved = 0;
+        let orphanSecretsFailed = 0;
+        for (const build of orphans) {
+            try {
+                if (await this.service.removeOrphanedVerifySecret(build.id))
+                    orphanSecretsRemoved += 1;
+            } catch (error) {
+                orphanSecretsFailed += 1;
+                this.logger.warn(
+                    `App builds: removing the orphaned verification secret of build ${build.id} failed (${errorText(error)}).`,
+                );
+            }
+        }
+        return { orphanSecretsRemoved, orphanSecretsFailed };
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Pass 3 — the silent Builds (§7.4, T21 remainder)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Offer a watch to every open Build silent for longer than
+     * `APP_BUILD_POLL_AFTER_SILENCE_MS` (90 s), at most `APP_BUILD_SWEEP_BATCH`
+     * (200) per tick, oldest first (`findSilentNonTerminal`'s order). Without this
+     * a Build whose run no delivery reports would be observed once after its
+     * dispatch and never again, so it could never reach `succeeded` and never
+     * publish `app.build.succeeded` (ACC-05-11: terminal within 3 minutes).
+     *
+     * `dispatchWatch` falls back in process when no job runtime takes it, and the
+     * watch runner's lease makes a repeated offer harmless.
+     */
+    private async silentPass(
+        nowMs: number,
+    ): Promise<{ silentDispatched: number; silentFailed: number }> {
+        const silent = await this.builds.findSilentNonTerminal(
+            nowMs,
+            APP_BUILD_POLL_AFTER_SILENCE_MS,
+            APP_BUILD_SWEEP_BATCH,
+        );
+        let silentDispatched = 0;
+        let silentFailed = 0;
+        for (const build of silent) {
+            try {
+                await this.service.dispatchWatch({ buildId: build.id, reason: 'sweep' });
+                silentDispatched += 1;
+            } catch (error) {
+                silentFailed += 1;
+                this.logger.warn(
+                    `App builds: offering a watch to silent build ${build.id} failed (${errorText(error)}).`,
+                );
+            }
+        }
+        return { silentDispatched, silentFailed };
     }
 
     /* ---------------------------------------------------------------------- *

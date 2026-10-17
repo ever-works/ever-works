@@ -30,9 +30,16 @@ interface WorksClientProps {
         totalItems: number;
         generatingCount: number;
     };
+    /** Work kinds whose flag resolved to disabled (APW-01 T23 — hides the App chip). */
+    disabledKinds?: string[];
 }
 
-export default function WorksClient({ initialWorks, totalWorks, initialStats }: WorksClientProps) {
+export default function WorksClient({
+    initialWorks,
+    totalWorks,
+    initialStats,
+    disabledKinds,
+}: WorksClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const t = useTranslations('dashboard.works');
@@ -272,7 +279,7 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 the manual/import flows that previously lived behind
                 that single CTA. Same shape as `/missions` and
                 `/ideas`. */}
-            <WorksCreateComposer />
+            <WorksCreateComposer {...(disabledKinds ? { disabledKinds } : {})} />
 
             {/* Search bar */}
             <div className="mb-8">

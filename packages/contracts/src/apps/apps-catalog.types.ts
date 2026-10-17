@@ -600,3 +600,62 @@ export interface BlueprintResolutionMiss {
  * narrows the union without a cast.
  */
 export type BlueprintResolution = BlueprintResolutionMatch | BlueprintResolutionMiss;
+
+// ---------------------------------------------------------------------------
+// The listing projection served by `GET /api/apps-catalog` (lane aw-web-3)
+// ---------------------------------------------------------------------------
+
+/**
+ * One selectable-or-not App row of the catalog repository's `manifest.json`,
+ * as `GET /api/apps-catalog` serves it to the create form.
+ *
+ * The live `ever-works/templates` `manifest.json` is the **listing** shape
+ * (catalog.md §2 "A pure listing", 2026-09-26): `templates[]` rows with
+ * `kind`, `template { repo, ref, sha }`, `appSource`, `blueprint { id, version }`,
+ * `upstreams[]`, `license`, `managedHosting`, `trademark`. The fuller per-entry
+ * contract of catalog.md §3 ({@link AppsCatalogEntry}: icon, category,
+ * minResources, verification evidence, the computed `managed` reason) is a
+ * target the file does not carry yet, so the API projects BOTH shapes onto this
+ * smaller one rather than inventing the missing fields.
+ */
+export interface AppsCatalogListingItem {
+	/** The Blueprint id (`cal`, `umami`) — what inspect and create take as `blueprintId`. */
+	id: string;
+	name: string;
+	summary: string;
+	status: AppsCatalogEntryStatus;
+	/** `false` for a `placeholder` row: listed, never picked. */
+	selectable: boolean;
+	featured: boolean;
+	tags: readonly string[];
+	/** The app's own repository — what the form pastes. `null` only for a placeholder. */
+	upstream: { repo: string; url: string; defaultBranch: string | null } | null;
+	blueprint: {
+		/** `ever-works/cal-template`. */
+		repo: string;
+		version: string | null;
+		/** The pinned tag or branch. */
+		ref: string | null;
+		sha: string | null;
+		verified: boolean;
+	};
+	license: { spdx: string | null; class: 'green' | 'amber' | 'unknown' };
+	managedHosting: { allowed: boolean; reason: string | null };
+	trademark: { notice: string | null; displayNameSuffix: string | null } | null;
+	/** Every listed row may run on Your cluster (a `red` row is never listed, R-3). */
+	yourCluster: boolean;
+}
+
+/** `GET /api/apps-catalog` — one page of {@link AppsCatalogListingItem}. */
+export interface AppsCatalogListingResponse {
+	items: readonly AppsCatalogListingItem[];
+	total: number;
+	/** `false` when the manifest could not be read; `items` is then empty. */
+	available: boolean;
+	page: number;
+	limit: number;
+	source: 'manifest';
+	/** The catalog repository and ref the rows came from (`EVER_WORKS_APPS_CATALOG_REPO` / `_REF`). */
+	repo: string;
+	ref: string;
+}

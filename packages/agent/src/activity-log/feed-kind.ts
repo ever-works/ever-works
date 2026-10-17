@@ -414,6 +414,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Revisiting it means a *different* value here, never an omission —
     // `feed-kind.spec.ts:14-19` fails on a member with no entry.
     [ActivityActionType.APP_BUILD]: 'deliveryWhenCompleted',
+    // APW-06 T28 (lane aw-deploy-2) — a Deployment is the runtime's long-running operation, so it
+    // reads as `work` while it runs and `delivery` once it is live, like a Build; a failed
+    // Deployment, job or smoke run is a `problem` through the failed-status rule. Jobs and smoke
+    // runs are checks on a live app, so they stay `work`.
+    [ActivityActionType.APP_DEPLOY]: 'deliveryWhenCompleted',
+    [ActivityActionType.APP_JOB]: 'work',
+    [ActivityActionType.APP_SMOKE]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

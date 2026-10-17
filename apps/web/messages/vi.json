@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Tạo Work một lần hoặc theo lịch",
                     "deploy": "Triển khai Work",
                     "tasks": "Nhiệm vụ cho Work này",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Các container image được dựng từ kho mã của bạn"
                 },
                 "tasks": "Nhiệm vụ",
                 "posts": "Bài viết",
                 "pages": "Trang",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Bản dựng"
             },
             "members": {
                 "title": "Thành viên đội ngũ",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Kho nguồn: {fullName}",
+                    "fork": "Bản fork: {fullName}",
+                    "private-copy": "Bản sao riêng tư: {fullName}",
+                    "link": "Đã liên kết: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Đang chuẩn bị bản fork của bạn",
+                    "forkBody": "GitHub đang tạo {fullName}. Việc này thường mất chưa đến một phút; kho mã lớn có thể lâu hơn.",
+                    "copyTitle": "Đang chuẩn bị bản sao riêng tư của bạn",
+                    "copyBody": "Đang sao chép {upstream} vào {fullName}. Kho mã lớn hơn sẽ mất nhiều thời gian hơn.",
+                    "linkTitle": "Đang hoàn tất thiết lập",
+                    "linkBody": "Đang mở một pull request thêm .works/works.yml vào {fullName}.",
+                    "blueprintTitle": "Đang áp dụng Blueprint {name}",
+                    "blueprintBody": "Ever Works đang chuẩn bị App Work của bạn và sẽ ghi .works/works.yml cùng các tệp của Blueprint."
+                },
+                "setupPrClosed": "Pull request thiết lập đã bị đóng mà không được hợp nhất.",
+                "timedOut": "Bản fork của bạn đang mất hơn 15 phút.",
+                "failedAccess": "Ever Works đã mất quyền truy cập GitHub khi đang chuẩn bị App Work này.",
+                "failedOther": "Chuẩn bị App Work này thất bại: {reason}",
+                "waitingForSetupPr": "Hãy hợp nhất pull request thiết lập để hoàn tất.",
+                "tryAgain": "Thử lại",
+                "openOnGitHub": "Mở trên GitHub",
+                "reconnectGitHub": "Kết nối lại GitHub",
+                "openPullRequest": "Mở pull request",
+                "retryLimit": "Bạn đã dùng hết 3 lần thử lại trong giờ này. Hãy thử lại sau.",
+                "retryFailed": "Không thể bắt đầu lần thử khác. Hãy thử lại.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml trên nhánh mặc định không phải YAML hợp lệ. Hãy sửa hoặc xóa tệp, rồi thử lại.",
+                    "works_yml_other_kind": ".works/works.yml đã khai báo một loại Work khác. Hãy đặt kind: app hoặc xóa tệp, rồi thử lại.",
+                    "push_rejected": "GitHub liên tục từ chối commit thêm .works/works.yml.",
+                    "provider_unsupported": "Không thể tự động thiết lập nhà cung cấp Git của kho mã này.",
+                    "too_large_for_private_copy": "Kho mã quá lớn để tạo bản sao riêng tư. Hãy tạo bản fork.",
+                    "uses_lfs": "Kho mã dùng Git LFS, thứ mà bản sao riêng tư không thể chuyển theo. Hãy tạo bản fork.",
+                    "other": "Đã xảy ra lỗi khi thiết lập kho mã."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Kho mã Work",
+                    "upstream": "Kho nguồn",
+                    "relationLabel": "Quan hệ",
+                    "readinessLabel": "Mức sẵn sàng",
+                    "readiness": {
+                        "preparing": "Đang chuẩn bị",
+                        "ready": "Sẵn sàng",
+                        "timed_out": "Hết thời gian",
+                        "failed": "Thất bại",
+                        "waiting_for_setup_pr": "Đang chờ pull request thiết lập"
+                    },
+                    "relations": {
+                        "link": "Đã liên kết",
+                        "fork": "Bản fork",
+                        "private-copy": "Bản sao riêng tư"
+                    },
+                    "appSpecLabel": "Spec ứng dụng",
+                    "appSpecStatus": {
+                        "valid": "Hợp lệ",
+                        "valid_with_warnings": "Hợp lệ, có cảnh báo",
+                        "invalid": "Có lỗi",
+                        "missing": "Chưa được viết",
+                        "unreadable": "Không đọc được",
+                        "pending": "Đang được kiểm tra",
+                        "unknown": "Chưa kiểm tra"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Không có lỗi} =1 {1 lỗi} other {# lỗi}} · {warnings, plural, =0 {không có cảnh báo} =1 {1 cảnh báo} other {# cảnh báo}}",
+                    "openAppSpec": "Mở Spec ứng dụng",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "Hiện không thể tải thông tin App.",
+                    "builds": "Bản dựng",
+                    "deploy": "Triển khai",
+                    "upstreamTab": "Kho nguồn",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Phát triển nó cùng agent",
+                    "body": "Yêu cầu agent của Work thay đổi ứng dụng — thêm tính năng, sửa lỗi, nâng cấp phụ thuộc. Agent làm việc trong Kho mã Work và mở pull request.",
+                    "button": "Trò chuyện về App này"
+                }
+            },
+            "builds": {
+                "title": "Bản dựng",
+                "subtitle": "Được dựng trên runner do GitHub lưu trữ trong {repository} · image {imageRepository}",
+                "subtitleNoImage": "Được dựng trên runner do GitHub lưu trữ trong {repository}",
+                "subtitleGeneric": "Các container image được dựng từ kho mã của App Work này.",
+                "startBuild": "Bắt đầu dựng",
+                "starting": "Đang bắt đầu…",
+                "refresh": "Làm mới",
+                "cancel": "Hủy",
+                "cancelling": "Đang hủy…",
+                "viewerDisabled": "Bạn cần quyền chỉnh sửa để làm việc này.",
+                "deployable": "Có thể triển khai",
+                "notDeployableLine": "Không thể triển khai — {reason}",
+                "pagination": "Đang hiển thị {start}–{end} trên {total}",
+                "listLabel": "Các bản dựng của App Work này",
+                "openDetails": "Mở bản dựng #{number}",
+                "status": {
+                    "queued": "Đang chờ",
+                    "running": "Đang chạy",
+                    "succeeded": "Thành công",
+                    "failed": "Thất bại",
+                    "cancelled": "Đã hủy",
+                    "blocked": "Bị chặn"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Thủ công",
+                    "verification": "Xác minh"
+                },
+                "notDeployable": {
+                    "notSucceeded": "Bản dựng không thành công",
+                    "pullRequest": "Được dựng từ một pull request",
+                    "verification": "Được dựng để xác minh",
+                    "specInvalid": "Spec ứng dụng tại commit này có lỗi",
+                    "staleInputs": "Được dựng với giá trị build cũ hơn",
+                    "secretCheckFailed": "Kiểm tra secret không đạt",
+                    "digestUnconfirmed": "Không thể xác nhận image đã push",
+                    "criticalVulnerability": "Có lỗ hổng nghiêm trọng đã có bản sửa",
+                    "unsigned": "Image chưa được ký"
+                },
+                "blocked": {
+                    "workflowPending": "Đang chờ workflow build được hợp nhất.",
+                    "workflowEditedByHand": "Workflow build đã bị chỉnh sửa thủ công.",
+                    "workflowWriteFailed": "Ever Works không thể ghi workflow build vào kho mã. Một quy tắc trên kho mã này từ chối thay đổi.",
+                    "actionsDisabled": "GitHub Actions đang tắt cho kho mã này.",
+                    "missingBuildValues": "Đang chờ {count, plural, =1 {1 giá trị build} other {# giá trị build}}: {names}",
+                    "runnerTooSmall": "Bản dựng này cần {needed} nhưng runner cho kho mã {visibility} chỉ cho phép {max}.",
+                    "tooManyBuildValues": "Bản dựng này dùng {count} giá trị build; tối đa chỉ được 50.",
+                    "buildValueTooLarge": "{name} quá lớn để truyền vào bản dựng (tối đa 48 KB).",
+                    "secretLimitReached": "Kho mã không còn chỗ cho thêm secret.",
+                    "strategyNotSupported": "Runner do GitHub lưu trữ không thể dựng với chiến lược “{strategy}”. Hãy thêm Dockerfile và đặt build.strategy thành dockerfile.",
+                    "specInvalid": "Spec ứng dụng tại commit này có lỗi.",
+                    "gitConnectionMissing": "Ever Works không thể truy cập kho mã này bằng kết nối GitHub của bạn.",
+                    "repositoryUnavailable": "{repository} đã được lưu trữ, bị xóa hoặc không còn khả dụng với kết nối GitHub của bạn.",
+                    "managedConcurrencyLimit": "Đang chờ các bản dựng khác: tối đa {perWork} mỗi ứng dụng và {perAccount} mỗi tài khoản chạy cùng lúc.",
+                    "buildValueNameReserved": "{name} được Ever Works dành riêng và không thể truyền vào bản dựng. Hãy đổi tên mục môi trường.",
+                    "buildServicePortRequired": "Dịch vụ build {service} cần một cổng: Ever Works không biết “{image}” lắng nghe trên cổng nào.",
+                    "verificationDependencyUnsupported": "Quá trình xác minh chưa thể khởi động {kind}. Thay vào đó, việc kiểm tra sẽ chạy trên cụm.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Xem xét pull request",
+                    "turnOnActions": "Bật lên",
+                    "setValue": "Đặt giá trị",
+                    "useLargerRunner": "Dùng runner lớn hơn",
+                    "openRepositorySettings": "Mở cài đặt kho mã",
+                    "reconnectGithub": "Kết nối lại GitHub",
+                    "rebuild": "Dựng lại",
+                    "openEnvironment": "Mở Môi trường"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Hết bộ nhớ",
+                        "suggestion": "Tăng build.resources.memory (hiện là {memory}) hoặc giảm kích thước heap của bản dựng. Trên runner này, một bản dựng có thể dùng tối đa {max}."
+                    },
+                    "diskFull": {
+                        "title": "Hết dung lượng đĩa",
+                        "suggestion": "Bật “Giải phóng đĩa runner” trong cài đặt build, hoặc thu nhỏ build context bằng tệp .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile thất bại ở bước {step}/{total}",
+                        "suggestion": "Bước thất bại là: {command}. Hãy sửa trong {dockerfile} rồi push, hoặc nhờ một agent sửa."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Không thể tải phụ thuộc",
+                        "suggestion": "Một registry gói hoặc base image không phản hồi. Hãy dựng lại sau vài phút; nếu vẫn lỗi, hãy ghim các phiên bản bạn phụ thuộc."
+                    },
+                    "registryPushDenied": {
+                        "title": "Không thể push image",
+                        "suggestion": "Cho phép workflow trong kho mã này ghi package (Settings ▸ Actions ▸ General ▸ Workflow permissions), rồi dựng lại."
+                    },
+                    "missingBuildValue": {
+                        "title": "Thiếu một giá trị build: {names}",
+                        "suggestion": "Đặt nó trong Cài đặt ▸ Môi trường, rồi dựng lại."
+                    },
+                    "secretInImage": {
+                        "title": "Một secret lẽ ra đã bị công bố bên trong image: {name}",
+                        "suggestion": "Chỉ dùng giá trị này ở một giai đoạn build trước đó, hoặc truyền nó dưới dạng build secret mount. Chưa có gì được push."
+                    },
+                    "timeout": {
+                        "title": "Mất hơn {minutes} phút",
+                        "suggestion": "Tăng build.resources.timeoutMinutes (tối đa 180) hoặc tăng tốc bản dựng bằng bộ nhớ đệm."
+                    },
+                    "workflowInvalid": {
+                        "title": "Tệp workflow không hợp lệ",
+                        "suggestion": "GitHub không thể chạy workflow build. Hãy xem xét pull request đang mở từ Ever Works để khôi phục nó."
+                    },
+                    "digestMismatch": {
+                        "title": "Không thể xác nhận image đã push",
+                        "suggestion": "Registry báo cáo một image khác với bản dựng. Hãy dựng lại; không có gì chưa xác nhận sẽ được triển khai."
+                    },
+                    "verificationFailed": {
+                        "title": "Ứng dụng không vượt qua smoke test",
+                        "suggestion": "{failed}/{total} smoke test thất bại. Xem kết quả bên dưới."
+                    },
+                    "egressBlocked": {
+                        "title": "Truy cập mạng bị chặn",
+                        "suggestion": "Bản dựng đã cố truy cập {hosts}, vốn không nằm trong danh sách cho phép của trình dựng. Hãy lấy những gì bạn cần từ kho mã nguồn hoặc một registry được phép, rồi dựng lại."
+                    },
+                    "lost": {
+                        "title": "Mất dấu bản dựng này",
+                        "suggestion": "GitHub đã ngừng phản hồi về bản dựng này. Hãy kiểm tra trên GitHub."
+                    },
+                    "unknown": {
+                        "title": "Đã xảy ra lỗi khác",
+                        "suggestion": "Mở log trên GitHub, hoặc nhờ một agent xem xét."
+                    },
+                    "askAgent": "Nhờ agent sửa lỗi này",
+                    "excerptLabel": "Các dòng cuối của log"
+                },
+                "cancelReason": {
+                    "user": "Đã bị một thành viên hủy",
+                    "superseded": "Đã được thay bằng một bản dựng mới hơn"
+                },
+                "detail": {
+                    "title": "Bản dựng #{number} · {sha} · {status}",
+                    "loading": "Đang tải chi tiết bản dựng…",
+                    "close": "Đóng",
+                    "trigger": "Nguồn kích hoạt",
+                    "triggeredBy": "{trigger} — bởi {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Thời lượng",
+                    "durationValue": "{duration} (chờ {queued})",
+                    "image": "Image",
+                    "tags": "Thẻ",
+                    "deployable": "Có thể triển khai",
+                    "yes": "Có",
+                    "buildValues": "Giá trị build",
+                    "buildValuesValue": "{count, plural, =1 {Đã đồng bộ 1} other {Đã đồng bộ #}}: {names}",
+                    "noBuildValues": "Không có",
+                    "receipt": "Biên nhận",
+                    "verification": "Xác minh",
+                    "copy": "Sao chép",
+                    "copied": "Đã sao chép tham chiếu image.",
+                    "copyFailed": "Không thể sao chép tham chiếu image.",
+                    "viewLogs": "Xem log trên GitHub",
+                    "rebuildThisCommit": "Dựng lại commit này",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} phút runner · do tài khoản GitHub của bạn chi trả",
+                    "minutesPlatform": "{minutes} phút runner · do Ever Works chi trả",
+                    "checksMinutes": "trong đó {checksMinutes} phút chạy kiểm tra App",
+                    "costUnknown": "Chưa có báo cáo số phút runner"
+                },
+                "verification": {
+                    "componentsReady": "Các thành phần đã khởi động",
+                    "componentsNotReady": "Các thành phần không khởi động",
+                    "job": "Job {name} thoát với mã {exitCode}",
+                    "jobNoExit": "Job {name} không hoàn tất",
+                    "smokePassed": "Đạt: {name}",
+                    "smokeFailed": "Không đạt: {name} — mong đợi {expected}, nhận được {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Chưa có bản dựng nào. Bản dựng đầu tiên sẽ bắt đầu khi workflow build có trong kho mã.",
+                    "unavailable": "Bản dựng chưa khả dụng trên phiên bản này."
+                },
+                "errors": {
+                    "loadFailed": "Không thể tải các bản dựng. Hãy thử làm mới trang.",
+                    "rebuildRateLimited": "Bạn đã bắt đầu quá nhiều bản dựng trong giờ này. Hãy thử lại sau {minutes, plural, =1 {1 phút} other {# phút}}.",
+                    "commitNotReachable": "Commit đó không nằm trên nhánh được theo dõi.",
+                    "nothingToBuild": "App Work này chạy một image đã xuất bản, nên không có gì để dựng.",
+                    "notCancellable": "Bản dựng này đã hoàn tất, nên không thể hủy.",
+                    "providerUnavailable": "Hiện không có nhà cung cấp build nào khả dụng. Hãy thử lại sau.",
+                    "startFailed": "Không thể bắt đầu bản dựng. Hãy thử lại.",
+                    "cancelFailed": "Không thể hủy bản dựng này. Hãy thử lại.",
+                    "detailFailed": "Không thể tải bản dựng này. Hãy thử lại."
+                },
+                "toasts": {
+                    "started": "Đã đưa bản dựng vào hàng đợi.",
+                    "deduped": "Đã có một bản dựng cho commit này trong hàng đợi.",
+                    "cancelled": "Đã hủy bản dựng."
+                },
+                "pullToken": {
+                    "title": "Thêm token kéo image",
+                    "body": "Image này là riêng tư. Cụm của bạn cần một token chỉ có quyền đọc package để tải nó về.",
+                    "stepCreate": "1. Tạo một token classic chỉ chọn “read:packages”.",
+                    "stepPaste": "2. Dán nó vào đây.",
+                    "label": "Token",
+                    "submit": "Kiểm tra và lưu",
+                    "saving": "Đang kiểm tra…",
+                    "tooBroad": "Token này có nhiều quyền hơn chỉ đọc package. Hãy tạo token chỉ có read:packages.",
+                    "fineGrained": "Đây là token fine-grained. Hãy tạo một token classic chỉ chọn read:packages.",
+                    "cannotRead": "Token này không thể đọc {imageRepository}.",
+                    "publicImage": "Image này đã công khai — không cần token.",
+                    "noImageYet": "Chưa có bản dựng nào hoàn tất. Hãy thêm token kéo image sau bản dựng thành công đầu tiên.",
+                    "savedExpires": "Đã lưu token kéo image. Token hết hạn vào {date}.",
+                    "savedNoExpiry": "Đã lưu token kéo image. Token không hết hạn.",
+                    "tokenSet": "Đã lưu một token kéo image. Dán token mới để thay thế.",
+                    "expiringSoon": "Token kéo image hết hạn vào {date}. Hãy thêm token mới trước thời điểm đó.",
+                    "viewerDisabled": "Bạn cần quyền chỉnh sửa để làm việc này.",
+                    "failed": "Không thể lưu token kéo image. Hãy thử lại."
+                },
+                "overview": {
+                    "title": "Bản dựng mới nhất",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Bản dựng có thể triển khai: commit này",
+                    "deployableOther": "Bản dựng có thể triển khai: {sha}",
+                    "noDeployable": "Chưa có bản dựng có thể triển khai",
+                    "open": "Mở Bản dựng"
+                }
+            },
+            "appDeploy": {
+                "title": "Triển khai",
+                "notRunning": "Ứng dụng này chưa chạy ở đâu cả.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Mở ứng dụng",
+                "source": "Nguồn",
+                "buildsLink": "Xem Bản dựng",
+                "buildsHint": "Bản dựng vẫn chạy dù đích là gì.",
+                "stale": "Kiểm tra lần cuối {minutes, plural, =1 {1 phút} other {# phút}} trước",
+                "status": {
+                    "notDeployed": "Chưa triển khai",
+                    "live": "Đang hoạt động",
+                    "degraded": "Suy giảm",
+                    "down": "Ngừng hoạt động",
+                    "unreachable": "Không thể kết nối tới cụm của bạn",
+                    "paused": "Tạm dừng",
+                    "deleting": "Đang xóa…"
+                },
+                "target": {
+                    "heading": "Nó nên chạy ở đâu?",
+                    "current": "(hiện tại)",
+                    "none": {
+                        "label": "Không — chưa triển khai",
+                        "description": "Bản dựng vẫn chạy."
+                    },
+                    "yourCluster": {
+                        "label": "Cụm của bạn",
+                        "description": "Chạy trên một cụm Kubernetes do bạn kiểm soát."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Chúng tôi chạy nó cho bạn.",
+                        "unavailable": "Sắp ra mắt — dịch vụ lưu trữ được quản lý cho ứng dụng chưa mở.",
+                        "ineligible": "Chưa khả dụng cho ứng dụng này."
+                    },
+                    "connect": "Kết nối cụm của bạn",
+                    "reconnect": "Thay đổi kết nối cụm",
+                    "connected": "Đã kết nối · {version}",
+                    "connectedNoVersion": "Đã kết nối",
+                    "checkFailed": "Lần kiểm tra cụm gần nhất đã thất bại.",
+                    "notChecked": "Chưa kết nối cụm nào.",
+                    "save": "Dùng đích này",
+                    "saving": "Đang lưu…",
+                    "saved": "Đã lưu đích.",
+                    "saveFailed": "Không thể lưu đích: {reason}",
+                    "changeNote": "Thay đổi đích không gỡ bỏ bất cứ thứ gì đang chạy.",
+                    "routeUnavailable": "Thay đổi đích chưa khả dụng trên phiên bản này."
+                },
+                "connect": {
+                    "title": "Kết nối cụm của bạn",
+                    "description": "Dán kubeconfig của một service account trong cụm mà ứng dụng này sẽ chạy.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Dán kubeconfig của bạn…",
+                    "kubeconfigHelp": "Dùng token của service account. Không hỗ trợ lệnh, tệp cục bộ và proxy.",
+                    "kubeconfigStored": "kubeconfig của bạn đã được gửi một lần và được lưu ở dạng mã hóa. Dán kubeconfig mới để thay thế, hoặc kiểm tra lại bản đã lưu.",
+                    "contextLabel": "Context (tùy chọn)",
+                    "contextHelp": "Để trống để dùng context hiện tại của kubeconfig.",
+                    "check": "Kiểm tra kết nối",
+                    "checking": "Đang kiểm tra…",
+                    "checkAgain": "Kiểm tra lại",
+                    "checkTimedOut": "Việc kiểm tra không hoàn tất trong 30 giây. Hãy thử lại.",
+                    "checkFailed": "Không thể kiểm tra kết nối: {reason}",
+                    "unavailable": "Kết nối cụm chưa khả dụng trên phiên bản này.",
+                    "kubeconfigTooLarge": "kubeconfig này lớn hơn 64 KiB.",
+                    "kubeconfigRequired": "Hãy dán kubeconfig trước.",
+                    "ingressClass": "Ingress class",
+                    "ingressDefault": "{name} (mặc định)",
+                    "ingressNone": "Không tìm thấy ingress class",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Chứng chỉ từ issuer",
+                        "external": "Xử lý bên ngoài cụm",
+                        "edge": "Kết thúc tại biên",
+                        "none": "Không có TLS (chỉ http)"
+                    },
+                    "issuer": "Issuer",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Được chọn khi ứng dụng được triển khai lần đầu",
+                    "isolation": "Cô lập mạng",
+                    "isolationOn": "Bật (khuyến nghị)",
+                    "isolationOff": "Tắt",
+                    "isolationOffWarning": "Nếu không cô lập mạng, các workload khác trên cụm có thể truy cập ứng dụng này và cơ sở dữ liệu của nó.",
+                    "cancel": "Hủy",
+                    "save": "Lưu",
+                    "saving": "Đang lưu…",
+                    "saveBlocked": "Có thể lưu khi việc kiểm tra đạt với đầy đủ quyền bắt buộc.",
+                    "saved": "Đã kết nối cụm.",
+                    "saveFailed": "Không thể lưu kết nối cụm: {reason}"
+                },
+                "check": {
+                    "ok": "Đã kết nối",
+                    "version": "Kubernetes {version}",
+                    "failed": "Kiểm tra cụm thất bại.",
+                    "kubeconfigRefused": "kubeconfig này {reason}. Hãy dùng token của service account.",
+                    "notPublic": "Ever Works chỉ có thể truy cập các cụm có địa chỉ công khai.",
+                    "permissions": "Quyền",
+                    "allPermissions": "Có đầy đủ mọi quyền bắt buộc.",
+                    "missing": "Thiếu: {verb} {resource}",
+                    "optionalMissing": "Tùy chọn, đang thiếu: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Triển khai ngay",
+                    "deploying": "Đang gửi yêu cầu…",
+                    "started": "Đã bắt đầu triển khai.",
+                    "queued": "Đã xếp hàng — sẽ bắt đầu khi Lượt triển khai đang chạy hoàn tất.",
+                    "deduplicated": "Lượt triển khai đó đã được yêu cầu.",
+                    "inProgress": "Một Lượt triển khai khác đang chạy ({id}). Hãy chờ nó hoàn tất, rồi triển khai lại.",
+                    "preconditionsHeader": "Hãy khắc phục những điều này trước khi triển khai:",
+                    "workerNotIsolated": "Chưa thể bắt đầu triển khai: phiên bản này không có worker cụm App được cô lập.",
+                    "notAppWork": "Work này không phải App Work, nên không thể triển khai theo cách này.",
+                    "failed": "Không thể yêu cầu Lượt triển khai: {reason}",
+                    "targetNone": "Hãy chọn nơi ứng dụng sẽ chạy trước — Không sẽ không triển khai gì cả.",
+                    "deploymentId": "Lượt triển khai {id}",
+                    "warningsHeader": "Cảnh báo"
+                },
+                "preconditions": {
+                    "specInvalid": "Spec ứng dụng (.works/works.yml) có lỗi. Hãy sửa chúng trên trang Spec ứng dụng.",
+                    "licenseBlocksTarget": "Giấy phép của ứng dụng không cho phép lưu trữ nó trên đích này.",
+                    "licenseAttestationMissing": "Hãy xác nhận giấy phép của ứng dụng trước khi triển khai.",
+                    "envRequiredUnset": "Một số giá trị env bắt buộc chưa được đặt.",
+                    "dependencyNotReady": "Một phụ thuộc mà ứng dụng cần chưa sẵn sàng.",
+                    "noGreenBuild": "Chưa có Bản dựng thành công nào để triển khai. Hãy bắt đầu một Bản dựng trước.",
+                    "noGreenBuildForHead": "Commit mới nhất trên nhánh triển khai chưa được dựng thành công.",
+                    "buildImageMissing": "Bản dựng không có image để triển khai.",
+                    "nothingToDeploy": "Chưa có gì để triển khai: không có Bản dựng cũng không có image đã xuất bản.",
+                    "imageNotPinned": "Image này được tham chiếu theo tag. Hãy ghim nó theo digest để mọi Lượt triển khai đều chạy cùng một image.",
+                    "imageNotFound": "Không tìm thấy image trong registry của nó.",
+                    "imagePrivateUnsupported": "Không thể tải image này mà không có thông tin xác thực. Ever Works chỉ triển khai image đã xuất bản khi chúng công khai.",
+                    "imageUnresolvable": "Không thể phân giải tham chiếu image.",
+                    "primaryDomainMissing": "Tên miền chính chưa được thiết lập.",
+                    "targetNone": "Hãy chọn nơi ứng dụng sẽ chạy trước.",
+                    "targetNotChecked": "Hãy kiểm tra kết nối cụm trước.",
+                    "clusterChangedUnconfirmed": "Cụm đã thay đổi kể từ Lượt triển khai gần nhất. Hãy xác nhận thay đổi để triển khai.",
+                    "managedDisabled": "Sắp ra mắt — dịch vụ lưu trữ được quản lý cho ứng dụng chưa mở.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps chỉ chạy ứng dụng từ Blueprint đã xác minh.",
+                    "quotaExceeded": "Bạn đã đạt số lượng ứng dụng tối đa có thể chạy trên Ever Works Apps.",
+                    "managedIneligible": "Ứng dụng này không thể chạy trên Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps hiện không thể nhận ứng dụng mới.",
+                    "appWorkDeleting": "App Work này đang bị xóa.",
+                    "paused": "Ứng dụng đang tạm dừng. Hãy tiếp tục nó để triển khai.",
+                    "deployInProgress": "Một Lượt triển khai khác đang chạy.",
+                    "cronAuthEnvUnset": "Một lệnh gọi theo lịch cần giá trị xác thực chưa được đặt.",
+                    "jobAuthEnvUnset": "Một job cần giá trị xác thực chưa được đặt.",
+                    "volumeReplicas": "Thành phần có volume chỉ có thể chạy một replica.",
+                    "volumeShrink": "Không thể thu nhỏ volume.",
+                    "privilegedPort": "Một thành phần lắng nghe trên cổng dưới 1024.",
+                    "cronTooFrequent": "Một lệnh gọi theo lịch chạy thường xuyên hơn mức cho phép.",
+                    "managedRootForbidden": "Image này chạy dưới quyền root.",
+                    "imageUserUnverifiable": "Ever Works không thể kiểm tra image chạy dưới người dùng nào.",
+                    "workerNotIsolated": "Chưa thể bắt đầu triển khai: phiên bản này không có worker cụm App được cô lập.",
+                    "envSourceUnavailable": "Hiện không thể đọc các giá trị env của ứng dụng.",
+                    "pullCredentialUnavailable": "Không có thông tin xác thực để kéo image.",
+                    "namespaceForeign": "Namespace đó đã thuộc về một thứ khác trên cụm.",
+                    "verificationNamespaceForbidden": "Namespace đó được dành riêng cho các lượt chạy xác minh."
+                },
+                "license": {
+                    "loading": "Đang đọc giấy phép…",
+                    "unavailable": "Thông tin giấy phép chưa khả dụng trên phiên bản này.",
+                    "error": "Không thể đọc giấy phép. Hãy tải lại trang để thử lại.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Không tìm thấy giấy phép nào mà chúng tôi nhận diện được.",
+                    "classes": {
+                        "green": "Cho phép lưu trữ",
+                        "amber": "Cụm của bạn, sau khi bạn xác nhận điều khoản giấy phép",
+                        "red": "Chỉ cụm của bạn, sau khi bạn xác nhận điều khoản giấy phép",
+                        "unknown": "Không rõ giấy phép — hãy xác nhận điều khoản trước khi triển khai",
+                        "unclassified": "Chưa được phân loại"
+                    },
+                    "mixed": "Một số phần của kho mã này dùng giấy phép khác.",
+                    "incomplete": "Kho mã này quá lớn để quét toàn bộ.",
+                    "yourClusterAllowed": "Cụm của bạn: được phép",
+                    "yourClusterAfterConfirm": "Cụm của bạn: được phép sau khi bạn xác nhận điều khoản giấy phép",
+                    "review": "Xem xét và xác nhận",
+                    "confirmed": "Đã xác nhận vào {date}.",
+                    "disclaimer": "Đây là kết quả đọc tự động các tệp giấy phép của kho mã, không phải tư vấn pháp lý.",
+                    "unknownSpdx": "Giấy phép của phần mềm này",
+                    "dialogTitle": "Xác nhận điều khoản giấy phép",
+                    "dialogBody": "{spdx} hạn chế cách lưu trữ phần mềm này. Ever Works Apps không khả dụng cho nó. Để chạy nó trên cụm của riêng bạn, hãy xác nhận:",
+                    "noText": "Sổ đăng ký giấy phép không có tuyên bố cho giấy phép này.",
+                    "checkbox": "Tôi xác nhận tuyên bố ở trên.",
+                    "footer": "Chúng tôi ghi lại ai đã xác nhận, khi nào, và cho giấy phép cùng commit nào.",
+                    "cancel": "Hủy",
+                    "confirm": "Xác nhận",
+                    "refusals": {
+                        "ownerOnly": "Chỉ chủ sở hữu App Work mới có thể xác nhận.",
+                        "licenseChanged": "Giấy phép đã thay đổi trong lúc bạn xem xét. Hãy xem lại điều khoản mới và xác nhận lại.",
+                        "attestationNotRequired": "Giấy phép này không còn cần xác nhận nữa.",
+                        "licenseUnavailable": "Xác nhận giấy phép chưa khả dụng trên phiên bản này.",
+                        "route_unavailable": "Xác nhận giấy phép chưa khả dụng trên phiên bản này.",
+                        "failed": "Không thể ghi lại xác nhận. Hãy thử lại."
+                    }
+                },
+                "rollback": {
+                    "button": "Hoàn tác",
+                    "title": "Quay lại một lần triển khai trước đó",
+                    "description": "Chọn một lần triển khai đã từng hoạt động. Image và đặc tả ứng dụng của nó sẽ chạy lại; không có gì được build lại.",
+                    "pickLabel": "Lần triển khai để quay lại",
+                    "liveAt": "Hoạt động từ {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Đã từng hoạt động trước đây",
+                    "none": "Không có lần triển khai đang hoạt động nào trước đó để quay lại.",
+                    "runJobs": "Chạy lại các tác vụ trước khi triển khai",
+                    "confirm": "Hoàn tác",
+                    "cancel": "Hủy",
+                    "started": "Đã bắt đầu hoàn tác.",
+                    "failed": "Không thể bắt đầu hoàn tác: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Tạm dừng",
+                    "resume": "Tiếp tục",
+                    "remove": "Gỡ khỏi cụm",
+                    "removeTitle": "Gỡ ứng dụng này khỏi cụm của nó",
+                    "removeDescription": "Ứng dụng đang chạy sẽ dừng và các đối tượng Kubernetes của nó bị xóa. App Work và các bản build vẫn được giữ lại.",
+                    "deleteData": "Xóa cả dữ liệu đã lưu (volume và cơ sở dữ liệu phụ thuộc)",
+                    "deleteDataWarning": "Không thể hoàn tác thao tác này.",
+                    "confirmSlugLabel": "Nhập {slug} để xác nhận",
+                    "confirmRemove": "Gỡ",
+                    "cancel": "Hủy",
+                    "failed": "Không thể thực hiện: {reason}",
+                    "slugMismatch": "Slug bạn nhập không khớp với App Work này.",
+                    "accepted": {
+                        "pause": "Đã yêu cầu tạm dừng.",
+                        "resume": "Đã yêu cầu tiếp tục.",
+                        "remove": "Đã yêu cầu gỡ.",
+                        "cancelDeploy": "Đã yêu cầu hủy."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Tên bắt đầu bằng chữ cái hoặc dấu gạch dưới và chỉ dùng A–Z, 0–9 và _.",
+                    "reservedName": "Tên bắt đầu bằng EVER_WORKS_ được dành riêng cho nền tảng.",
+                    "valueTooLarge": "Một giá trị có thể dài tối đa 65.536 byte.",
+                    "controlCharacter": "Giá trị không được chứa ký tự NUL.",
+                    "lengthMismatch": "Phải có đúng {expected} ký tự — giá trị này có {actual}.",
+                    "tooShort": "Phải có ít nhất {min} ký tự.",
+                    "tooLong": "Chỉ được tối đa {max} ký tự.",
+                    "patternMismatch": "Giá trị không khớp với mẫu mà ứng dụng này yêu cầu.",
+                    "generatedValueUseRotate": "Giá trị này được tạo tự động. Hãy xoay vòng (rotate) để thay thế nó.",
+                    "neverRotateNotAcknowledged": "Ứng dụng này cho biết giá trị này không bao giờ được thay đổi. Hãy xác nhận rằng bạn hiểu điều đó trước khi xoay vòng.",
+                    "rotateConfirmationMismatch": "Tên bạn nhập không khớp với tên của giá trị này.",
+                    "secureStorageUnavailable": "Kho lưu trữ bảo mật chưa được cấu hình trên bản cài đặt này, nên không thể lưu giá trị.",
+                    "tooManyValues": "Một ứng dụng có thể chứa tối đa 300 giá trị.",
+                    "valuesTooLarge": "Tổng dung lượng giá trị của một ứng dụng tối đa là 1 MiB.",
+                    "malformedLine": "Không phải dòng NAME=value hợp lệ.",
+                    "rotateRateLimited": "Quá nhiều lần xoay vòng. Hãy thử lại sau."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Đang chờ",
+                    "awaitingConfig": "Cần cài đặt của bạn",
+                    "provisioning": "Đang cấp phát",
+                    "ready": "Sẵn sàng",
+                    "degraded": "Suy giảm",
+                    "failed": "Thất bại",
+                    "kept": "Được giữ lại — không còn được quản lý",
+                    "deleting": "Đang xóa",
+                    "deleted": "Đã xóa",
+                    "notInSpec": "Spec ứng dụng không còn dùng — dữ liệu được giữ lại"
+                },
+                "backup": {
+                    "none": "Không có sao lưu tự động. Nếu volume này bị mất, dữ liệu sẽ mất theo.",
+                    "notConfigured": "Sao lưu: chưa cấu hình",
+                    "healthy": "Sao lưu: hoàn tất lần cuối {time}",
+                    "overdue": "Sao lưu: quá hạn — hoàn tất lần cuối {time}",
+                    "failing": "Sao lưu: lần thử gần nhất thất bại",
+                    "external": "Sao lưu: do nhà cung cấp {kind} của bạn quản lý",
+                    "unknown": "Sao lưu: không thể kiểm tra"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Cụm của bạn không có storage class mặc định. Hãy chọn một storage class trong Cài đặt phụ thuộc.",
+                    "clusterUnreachable": "Không thể kết nối tới cụm của bạn.",
+                    "smtpConnectFailed": "Không thể kết nối tới máy chủ thư.",
+                    "smtpTlsFailed": "Bắt tay TLS với máy chủ thư thất bại.",
+                    "smtpAuthRefused": "Máy chủ đã từ chối đăng nhập.",
+                    "bucketUnreadable": "Bucket {bucket} không tồn tại hoặc không thể đọc.",
+                    "volumeNotReady": "Volume không sẵn sàng trong vòng {minutes} phút.",
+                    "extensionUnavailable": "Tiện ích mở rộng không khả dụng: {names}.",
+                    "platformServerRefused": "Máy chủ đó chứa dữ liệu nền tảng Ever Works. Hãy chọn máy chủ khác.",
+                    "deadlineExceeded": "Cấp phát không hoàn tất kịp thời.",
+                    "namespaceNotOwned": "Namespace đó thuộc về một ứng dụng khác. Hãy chọn namespace khác.",
+                    "namespaceBaselineMissing": "Namespace thiếu các giới hạn và chính sách cơ bản.",
+                    "clusterPermissionMissing": "Ever Works không có quyền tạo phụ thuộc này trong cụm của bạn.",
+                    "operatorNamespaceUnknown": "Namespace của operator chưa được đặt trong Cài đặt phụ thuộc.",
+                    "volumeExpansionUnsupported": "Storage class {storageClass} không thể mở rộng volume này.",
+                    "sizeShrinkRefused": "Không thể thu nhỏ dung lượng lưu trữ của một phụ thuộc. Hãy xóa dữ liệu của nó trước nếu bạn cần dung lượng nhỏ hơn.",
+                    "relayIneligible": "Ứng dụng này không thể dùng mail relay của Ever Works.",
+                    "relaySuspended": "Mail relay của Ever Works đang bị tạm ngưng.",
+                    "providerNotSupported": "Nhà cung cấp đó không thể phục vụ phụ thuộc này.",
+                    "dependencyNotDeclared": "Spec ứng dụng không khai báo phụ thuộc này.",
+                    "confirmationMismatch": "Tên bạn nhập không khớp.",
+                    "deleteInProgress": "Dữ liệu của phụ thuộc này đang được xóa.",
+                    "notGenerated": "Giá trị đó không được tạo tự động, nên không có gì để xoay vòng.",
+                    "notAppWork": "Work này không phải là ứng dụng.",
+                    "targetNone": "Ứng dụng này chưa được thiết lập để triển khai ở đâu cả. Hãy chọn một đích triển khai để cấp phát các phụ thuộc của nó.",
+                    "targetNotChecked": "Cụm của bạn chưa vượt qua bước kiểm tra. Hãy kiểm tra kết nối, rồi thử lại."
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "Kho mã",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Chạy và phát triển bất kỳ kho mã GitHub nào — liên kết hoặc fork nó, rồi chọn nơi nó chạy."
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Kho mã"
+                "repo": "Kho mã",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai."
+                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai.",
+                "app": "Chạy và phát triển bất kỳ kho mã GitHub nào — liên kết hoặc fork nó, rồi chọn nơi nó chạy."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "vd. “https://github.com/owner/repo — một ứng dụng mã nguồn mở bạn muốn có bản sao riêng”",
+                "formTitle": "App Work mới",
+                "formSubtitle": "Bắt đầu từ bất kỳ kho mã GitHub nào. Ever Works liên kết nó hoặc tạo bản sao của riêng bạn, rồi giúp bạn chạy và tiếp tục thay đổi nó.",
+                "urlLabel": "URL kho mã",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Bất kỳ kho mã GitHub nào mà tài khoản đã kết nối của bạn có thể đọc.",
+                "checkButton": "Kiểm tra kho mã",
+                "checking": "Đang kiểm tra…",
+                "tabPaste": "Dán URL",
+                "tabCatalog": "Duyệt danh mục App",
+                "catalogComingSoon": "Danh mục App sắp có tại đây. Hiện tại, hãy dán URL kho mã.",
+                "stars": "{count, plural, =1 {1 sao} other {# sao}}",
+                "defaultBranch": "Nhánh mặc định: {branch}",
+                "largeRepository": "Kho mã lớn ({size})",
+                "moved": "Đã chuyển sang {fullName}",
+                "isFork": "Kho mã này là bản fork của {parent}.",
+                "ownFork": "Đây là bản fork của bạn từ {parent}. Ever Works sẽ theo dõi {parent} làm kho nguồn.",
+                "publicForkNote": "Bản fork của kho mã công khai cũng là công khai.",
+                "archivedNote": "Kho mã này đã được lưu trữ. Đồng bộ với kho nguồn vẫn tắt.",
+                "licenseChip": "Giấy phép: {spdx}",
+                "licenseNotDetected": "Giấy phép: không phát hiện",
+                "licenseClass": {
+                    "green": "Cho phép lưu trữ",
+                    "amber": "Cụm của bạn, sau khi bạn xác nhận giấy phép",
+                    "red": "Cụm của bạn, sau khi bạn xác nhận giấy phép",
+                    "unknown": "Không rõ giấy phép — bạn sẽ xác nhận trước khi triển khai"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint đã xác minh",
+                    "available": "Có sẵn Blueprint",
+                    "none": "Không có Blueprint — một agent sẽ tìm cách chạy nó",
+                    "unavailable": "Không thể kiểm tra Blueprint"
+                },
+                "existingAppWork": "Bạn đã có một App Work cho kho mã này: {name}.",
+                "openExistingAppWork": "Mở",
+                "scanIncomplete": "Chưa kiểm tra mọi tài khoản để tìm bản fork hiện có.",
+                "modesTitle": "Ever Works nên dùng kho mã này như thế nào?",
+                "modes": {
+                    "link": {
+                        "title": "Liên kết",
+                        "titleOwnFork": "Liên kết — không theo dõi kho nguồn",
+                        "description": "Dùng kho mã này như hiện tại. Bạn có thể push vào nó, nên thay đổi được đưa trực tiếp vào đây."
+                    },
+                    "fork": {
+                        "title": "Fork",
+                        "description": "Tạo bản fork của riêng bạn. Bạn có thể đồng bộ nó với kho nguồn và đề xuất thay đổi ngược lại."
+                    },
+                    "private-copy": {
+                        "title": "Bản sao riêng tư",
+                        "description": "Tạo một kho mã riêng tư với cùng mã nguồn."
+                    }
+                },
+                "unavailable": "Không khả dụng: {reason}",
+                "forkInto": "Fork vào",
+                "copyInto": "Sao chép vào",
+                "ownerFilter": "Tìm tài khoản",
+                "ownerOrganization": "tổ chức",
+                "ownerNotChecked": "chưa kiểm tra bản fork hiện có",
+                "existingFork": "Bạn đã có một bản fork: {fullName}. Ever Works sẽ dùng nó.",
+                "privateCopyTradeOff": "Bản sao riêng tư không được liên kết với bản gốc trên GitHub, nên không thể mở pull request tới dự án gốc. Thay đổi từ kho nguồn sẽ đến dưới dạng pull request trong bản sao của bạn.",
+                "linkSetupNote": "Ever Works sẽ mở một pull request thêm một tệp, .works/works.yml. Hãy hợp nhất nó để hoàn tất.",
+                "existingForkSetupNote": "Ever Works không tạo bản fork này, nên sẽ mở một pull request thêm .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works sẽ mở một pull request thêm .works/works.yml và các tệp của Blueprint. Hãy hợp nhất nó để hoàn tất.",
+                "existingForkSetupNoteBlueprint": "Ever Works không tạo bản fork này, nên sẽ mở một pull request thêm .works/works.yml và các tệp của Blueprint.",
+                "promptsTitle": "Các giá trị ứng dụng này cần",
+                "promptHint": "Blueprint {name} yêu cầu các giá trị này. Bạn có thể thay đổi chúng sau trong Cài đặt.",
+                "promptRequired": "Bắt buộc",
+                "promptsIncomplete": "Hãy điền các giá trị ứng dụng cần trước.",
+                "autoProvision": "Để một agent tìm cách chạy nó",
+                "autoProvisionHelp": "Bắt đầu khi kho mã sẵn sàng. Quá trình này tiêu tốn token AI và số phút của runner build, trong giới hạn cấp phát. Bạn có thể hủy, hoặc bỏ chọn mục này và bắt đầu sau từ Tổng quan bằng “Cấp phát”.",
+                "deployTargetTitle": "Nó nên chạy ở đâu?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Không — chưa triển khai",
+                        "description": "Bạn có thể chọn đích sau."
+                    },
+                    "your-cluster": {
+                        "title": "Cụm của bạn",
+                        "description": "Chạy trên cụm Kubernetes của riêng bạn. Bạn sẽ thêm kết nối trong tab Triển khai."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Sắp ra mắt — dịch vụ lưu trữ được quản lý cho ứng dụng chưa mở."
+                    }
+                },
+                "submit": {
+                    "link": "Liên kết và tạo App Work",
+                    "fork": "Fork và tạo App Work",
+                    "private-copy": "Sao chép và tạo App Work"
+                },
+                "submitPending": "Đang tạo…",
+                "nameLabel": "Tên",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Mô tả",
+                "slugHelp": "Mã định danh thân thiện với URL. Lấy từ tên kho mã — chỉnh sửa để ghi đè.",
+                "invalidSlug": "Chỉ dùng chữ thường, chữ số và dấu gạch ngang, ví dụ tasks-app",
+                "cancel": "Hủy",
+                "createFailed": "Không thể tạo App Work. Hãy thử lại.",
+                "success": {
+                    "link": "Đã tạo App Work.",
+                    "fork": "Đã yêu cầu fork — chúng tôi sẽ báo khi nó sẵn sàng.",
+                    "private-copy": "Đã bắt đầu sao chép — chúng tôi sẽ báo khi nó sẵn sàng."
+                },
+                "reasons": {
+                    "invalid_url": "Nhập URL kho mã GitHub, ví dụ https://github.com/owner/repo",
+                    "provider_not_connected": "Kết nối GitHub để tạo App Work.",
+                    "insufficient_scope": "Kết nối lại GitHub để cấp quyền truy cập kho mã.",
+                    "not_found": "Chúng tôi không tìm thấy kho mã này, hoặc tài khoản GitHub của bạn không thể đọc nó.",
+                    "sso_authorization_required": "{owner} yêu cầu bạn ủy quyền Ever Works cho tổ chức này trên GitHub.",
+                    "oauth_app_restricted": "{owner} hạn chế quyền truy cập của bên thứ ba. Hãy nhờ một chủ sở hữu của {owner} phê duyệt Ever Works, hoặc chọn tài khoản khác.",
+                    "empty_repository": "Kho mã này chưa có commit nào.",
+                    "no_push_access": "Bạn không thể push vào kho mã này.",
+                    "archived": "Kho mã đã lưu trữ chỉ có quyền đọc.",
+                    "forking_disabled": "Chủ sở hữu kho mã này không cho phép fork hoặc sao chép.",
+                    "own_repository": "Bạn sở hữu kho mã này — hãy liên kết nó.",
+                    "target_owner_unavailable": "Tài khoản này không có trong kết nối GitHub của bạn.",
+                    "target_owner_forbidden": "Bạn không thể tạo kho mã trong {owner}.",
+                    "too_large_for_private_copy": "Quá lớn để tạo bản sao riêng tư ({size}). Hãy fork nó.",
+                    "uses_lfs": "Dùng Git LFS, thứ mà bản sao riêng tư không thể chuyển theo. Hãy fork nó.",
+                    "copy_name_unavailable": "{owner} đã có các kho mã tên từ {name} đến {name}-copy-5.",
+                    "in_use_by_another_account": "Một tài khoản khác đã dùng kho mã này trong Ever Works. Hãy nhờ chủ sở hữu của nó thêm bạn làm thành viên.",
+                    "app_work_exists": "Bạn đã có một App Work cho {fullName}: {workName}.",
+                    "create_in_progress": "App Work này đang được tạo.",
+                    "rate_limited": "GitHub đang giới hạn tốc độ tài khoản của bạn. Hãy thử lại lúc {time}.",
+                    "managed_hosting_unavailable": "Sắp ra mắt — dịch vụ lưu trữ được quản lý cho ứng dụng chưa mở.",
+                    "cluster_target_unavailable": "Chưa cài đặt tùy chọn triển khai nào có thể chạy ứng dụng.",
+                    "app_works_disabled": "App Work không khả dụng trên phiên bản này.",
+                    "blueprint_mismatch": "Blueprint của kho mã này đã thay đổi. Hãy kiểm tra lại kho mã."
+                },
+                "catalog": {
+                    "searchLabel": "Tìm trong danh mục App",
+                    "searchPlaceholder": "Tìm ứng dụng — ví dụ umami hoặc calendar",
+                    "listLabel": "Blueprint App",
+                    "loading": "Đang tải danh mục App…",
+                    "unavailable": "Danh mục App hiện không khả dụng. Hãy dán URL kho mã.",
+                    "disabled": "App Work không khả dụng trên phiên bản này.",
+                    "error": "Không thể tải danh mục App. Hãy thử lại hoặc dán URL kho mã.",
+                    "empty": "Chưa có Blueprint App nào được xuất bản. Hãy dán URL kho mã.",
+                    "noMatches": "Không có ứng dụng nào khớp với tìm kiếm của bạn.",
+                    "pick": "Bắt đầu từ {name}",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "Sắp ra mắt",
+                    "verified": "Đã xác minh",
+                    "upstreamLine": "Từ {repo}",
+                    "runsOn": "Chạy trên: {targets}",
+                    "targetYourCluster": "Cụm của bạn",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Chưa khả dụng",
+                    "fallbackNote": "Đang hiển thị các Blueprint App tìm thấy trên GitHub — danh mục tuyển chọn hiện không khả dụng."
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "Nhập đã bắt đầu thành công",
                 "failed": "Nhập công việc thất bại",
                 "fetchReposFailed": "Lấy kho lưu trữ thất bại"
+            },
+            "app": {
+                "repositoryUrlRequired": "Nhập URL kho mã GitHub, ví dụ https://github.com/owner/repo",
+                "repositoryModeRequired": "Chọn cách dùng kho mã này: Liên kết, Fork hoặc Bản sao riêng tư.",
+                "targetOwnerRequired": "Chọn tài khoản để tạo kho mã.",
+                "invalidUrl": "Nhập URL kho mã GitHub, ví dụ https://github.com/owner/repo",
+                "inspectFailed": "Không thể kiểm tra kho mã này. Hãy thử lại."
             }
         },
         "generator": {

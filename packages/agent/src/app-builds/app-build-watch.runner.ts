@@ -554,19 +554,38 @@ export class AppBuildWatchRunner implements AppBuildWatchRunnerPort {
             return 0;
         }
 
-        try {
-            await binding.deleteVerifyPromptedSecret();
-        } catch (error) {
-            this.logger.warn(
-                `App builds: removing the per-run verification secret of build ${
-                    before.id
-                } failed (${errorText(error)}); §7.4's orphan pass will retry it.`,
+        const deleteVerifyPromptedSecret = binding.deleteVerifyPromptedSecret.bind(binding);
+
+        // Under the Work's verification-secret lock (2026-10-17), shared with
+        // `startVerification` and the sweep's orphan pass: `EW_VERIFY__PROMPTED` is
+        // ONE repository secret, so a newer verification of the same Work that is
+        // already open owns it — this run's record is cleared and the secret is left
+        // for that run. A held lock defers the deletion to the orphan pass.
+        const locked = await this.service.withVerifySecretLock(before.workId, async () => {
+            if (await this.service.hasOtherOpenVerification(before)) {
+                await this.clearVerifySecretNames(before.id);
+                return 0;
+            }
+            try {
+                await deleteVerifyPromptedSecret();
+            } catch (error) {
+                this.logger.warn(
+                    `App builds: removing the per-run verification secret of build ${
+                        before.id
+                    } failed (${errorText(error)}); §7.4's orphan pass will retry it.`,
+                );
+                return 0;
+            }
+            await this.clearVerifySecretNames(before.id);
+            return 1;
+        });
+        if (!locked.acquired) {
+            this.logger.debug(
+                `App builds: the verification-secret lock of work ${before.workId} is held; §7.4's orphan pass removes build ${before.id}'s secret.`,
             );
             return 0;
         }
-
-        await this.clearVerifySecretNames(before.id);
-        return 1;
+        return locked.result ?? 0;
     }
 
     /** The row half of the deletion above: the secret is gone, so the record of it goes too. */

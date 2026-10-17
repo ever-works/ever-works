@@ -1290,19 +1290,41 @@ export class AppUpstreamSyncService {
             }
         }
 
-        const open = await context.budget.call(() =>
-            this.git.listPullRequests(
-                row.dataOwner,
-                row.dataRepo,
-                { state: 'open', perPage: 100 },
-                options,
-            ),
-        );
-        const match = (open ?? []).find(
-            (pullRequest) => String(pullRequest?.head ?? '') === APP_UPSTREAM_SYNC_BRANCH,
-        );
+        // The provider's own `head` filter (`owner:branch`), so a repository with more than
+        // one page of open pull requests still finds the sync pull request in ONE read
+        // (HANDOVER-2026-09-20 §5 P3 item 11: page 1 only ⇒ a duplicate sync PR every run).
+        // Every returned row is ALSO matched locally — a provider that ignores the filter
+        // must not hand back an unrelated pull request — and when it evidently ignored it
+        // (a full page, no match) the scan pages on, bounded and inside the run budget.
+        const head = `${row.dataOwner}:${APP_UPSTREAM_SYNC_BRANCH}`;
+        for (let page = 1; page <= APP_UPSTREAM_SYNC_PR_SCAN_MAX_PAGES; page++) {
+            if (page > 1 && context.budget.exhausted) {
+                break;
+            }
+            const open = await context.budget.call(() =>
+                this.git.listPullRequests(
+                    row.dataOwner,
+                    row.dataRepo,
+                    {
+                        state: 'open',
+                        head,
+                        perPage: APP_UPSTREAM_SYNC_PR_SCAN_PAGE_SIZE,
+                        ...(page > 1 ? { page } : {}),
+                    },
+                    options,
+                ),
+            );
+            const rows = Array.isArray(open) ? open : [];
+            const match = rows.find((pullRequest) => isSyncPullRequestHead(pullRequest?.head));
+            if (match) {
+                return { number: match.number, url: String(match.url ?? '') };
+            }
+            if (rows.length < APP_UPSTREAM_SYNC_PR_SCAN_PAGE_SIZE) {
+                break;
+            }
+        }
 
-        return match ? { number: match.number, url: String(match.url ?? '') } : null;
+        return null;
     }
 
     /**
@@ -1732,6 +1754,21 @@ const APP_SYNC_MERGEABLE_REREADS = 3;
 
 /** …and the gap between them. */
 const APP_SYNC_MERGEABLE_REREAD_MS = 5_000;
+
+/** The sync-PR scan's page size — the provider maximum. */
+export const APP_UPSTREAM_SYNC_PR_SCAN_PAGE_SIZE = 100;
+
+/**
+ * The most pages the sync-PR scan reads when the provider ignored the `head` filter —
+ * four (≤ 400 open pull requests), inside FR-49's 20-call run budget.
+ */
+export const APP_UPSTREAM_SYNC_PR_SCAN_MAX_PAGES = 4;
+
+/** `ever-works/upstream-sync`, as a provider spells a head: bare, or `owner:branch`. */
+function isSyncPullRequestHead(head: unknown): boolean {
+    const value = String(head ?? '');
+    return value === APP_UPSTREAM_SYNC_BRANCH || value.endsWith(`:${APP_UPSTREAM_SYNC_BRANCH}`);
+}
 
 /**
  * The outcome already on the row — what a divergence-only run settles with (§6.3

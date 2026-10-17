@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { APP_SPEC_EVALUATE_COALESCE_MS } from '@ever-works/contracts';
 import type {
     AppLicenseEvidence,
@@ -180,6 +180,29 @@ export class WorkAppSpecStateRepository {
     /** The state row of one App Work, or `null` when it has none yet. */
     async findByWorkId(workId: string): Promise<WorkAppSpecState | null> {
         return this.repository.findOne({ where: { workId } });
+    }
+
+    /**
+     * APW-11 FR-57 — the App spec display names of several App Works in ONE query
+     * (the App Launcher's `APP_SPEC_DISPLAY_NAMES`). A Work with no row, or a row
+     * with no display name, maps to `null`, so the launcher falls back to the
+     * Work's own name.
+     */
+    async findDisplayNamesByWorkIds(
+        workIds: readonly string[],
+    ): Promise<Map<string, string | null>> {
+        const ids = [...new Set(workIds.filter((id) => typeof id === 'string' && id.length > 0))];
+        const names = new Map<string, string | null>(ids.map((id) => [id, null]));
+        if (ids.length === 0) return names;
+        const rows = await this.repository.find({
+            where: { workId: In(ids) },
+            select: { workId: true, displayName: true },
+        });
+        for (const row of rows) {
+            const name = typeof row.displayName === 'string' ? row.displayName.trim() : '';
+            names.set(row.workId, name.length > 0 ? name : null);
+        }
+        return names;
     }
 
     /**
@@ -515,6 +538,100 @@ export class WorkAppSpecStateRepository {
             .execute();
 
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-03 T28 — write the Blueprint apply columns the apply service owns
+     * (`blueprintRepo`, `blueprintApplyStatus`, `blueprintApplyError`,
+     * `blueprintApplyRef`, `displayName`). Unguarded on purpose: one Work has one
+     * apply in flight (`applyInProgress`), and an absent field is left untouched.
+     */
+    async patchBlueprint(
+        workId: string,
+        patch: Partial<
+            Pick<
+                WorkAppSpecState,
+                | 'blueprintRepo'
+                | 'blueprintSha'
+                | 'blueprintApplyStatus'
+                | 'blueprintApplyError'
+                | 'blueprintApplyRef'
+                | 'displayName'
+            >
+        >,
+    ): Promise<boolean> {
+        const set: Partial<WorkAppSpecState> = {};
+        for (const [key, value] of Object.entries(patch)) {
+            if (value !== undefined) {
+                (set as Record<string, unknown>)[key] = value;
+            }
+        }
+        if (Object.keys(set).length === 0) {
+            return false;
+        }
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set(set)
+            .where('workId = :workId', { workId })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-03 T44 — store (or clear, with `null`) the owner's single attestation
+     * record (C3, R-3). Guarded by the licence the caller judged, so an attest
+     * that raced a re-classification writes nothing (`409 licenseChanged`).
+     */
+    async writeAttestation(
+        workId: string,
+        attestation: WorkAppSpecState['attestation'],
+        expected?: { licenseSpdx: string | null; licenseClass: string | null },
+    ): Promise<boolean> {
+        const query = this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set({ attestation: attestation ?? null })
+            .where('workId = :workId', { workId });
+        if (expected) {
+            if (expected.licenseSpdx === null) {
+                query.andWhere('"licenseSpdx" IS NULL');
+            } else {
+                query.andWhere('"licenseSpdx" = :spdx', { spdx: expected.licenseSpdx });
+            }
+            if (expected.licenseClass === null) {
+                query.andWhere('"licenseClass" IS NULL');
+            } else {
+                query.andWhere('"licenseClass" = :cls', { cls: expected.licenseClass });
+            }
+        }
+        const result = await query.execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-03 T42 — reserve the next licence evaluation sequence
+     * (`licenseRequestedSeq + 1`) and answer it, for an in-process evaluation
+     * that then writes through {@link writeLicense}. `null` when the Work has no
+     * state row.
+     */
+    async nextLicenseSeq(workId: string): Promise<number | null> {
+        const row = await this.findByWorkId(workId);
+        if (!row) {
+            return null;
+        }
+        const next =
+            Math.max(
+                toNumber(row.licenseRequestedSeq as never),
+                toNumber(row.licenseEvaluatedSeq as never),
+            ) + 1;
+        await this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set({ licenseRequestedSeq: next })
+            .where('workId = :workId', { workId })
+            .execute();
+        return next;
     }
 
     /**

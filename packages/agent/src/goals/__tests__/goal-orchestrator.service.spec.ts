@@ -1009,6 +1009,39 @@ describe('GoalOrchestratorService — advanceDue', () => {
         expect(summary.results).toHaveLength(2);
     });
 
+    // Review 2026-10-17 F13 (P1): the tick's batch is a copy; Gauzy re-opened the
+    // Definition of Done meanwhile, so the loop must not complete the Goal.
+    it('decides on the Goal as it is now, not the copy the tick read', async () => {
+        const { service, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        goals.find.mockResolvedValueOnce([
+            { ...goals._rows[0], dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'done' }] },
+        ]);
+
+        const summary = await service.advanceDue();
+
+        expect(summary.completed).toBe(0);
+        expect(summary.dispatched).toBe(1);
+        expect(goals._rows[0].loopStatus).toBe('running');
+    });
+
+    it('skips a Goal whose loop was paused after the tick read it', async () => {
+        const { service, goals, tasksService } = build({
+            goal: { loopStatus: 'paused', assignedAgentId: 'agent-7' },
+        });
+        goals.find.mockResolvedValueOnce([{ ...goals._rows[0], loopStatus: 'running' }]);
+
+        const summary = await service.advanceDue();
+
+        expect(summary.results).toEqual([]);
+        expect(tasksService.create).not.toHaveBeenCalled();
+    });
+
     it('never picks up an archived Goal', async () => {
         const { service, goals } = build({
             goal: { loopStatus: 'running', archivedAt: new Date('2026-08-10T00:00:00.000Z') },

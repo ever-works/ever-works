@@ -53,10 +53,32 @@ import { FacadesModule } from '../facades/facades.module';
 import { AppEnvCrypto } from '../app-env/app-env-crypto';
 import { AppEnvModule } from '../app-env/app-env.module';
 import { APP_DEPENDENCIES_SERVICE } from '../app-runtime/app-runtime-deletion.service';
-import { APP_DEPENDENCY_CONFIG_CIPHER, AppDependenciesService } from './app-dependencies.service';
+import {
+    APP_DEPENDENCY_CONFIG_CIPHER,
+    APP_DEPENDENCY_SPEC_SOURCE,
+    AppDependenciesService,
+} from './app-dependencies.service';
+import { AppSpecModule } from '../app-spec/app-spec.module';
+import { AppRuntimeStateModule } from '../app-runtime/app-runtime-state.module';
+import { DatabaseModule } from '../database/database.module';
+import { AppDependencySpecSourceAdapter } from './app-dependency-spec.source';
+import {
+    AppDependencyConfigCipherRelay,
+    AppDependencyProvisionDispatchRelay,
+    AppDependencyRowsRelay,
+} from './app-dependency-worker.relays';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([WorkAppDependency]), FacadesModule, AppEnvModule],
+    imports: [
+        TypeOrmModule.forFeature([WorkAppDependency]),
+        FacadesModule,
+        AppEnvModule,
+        // A0.10 (lane aw-deploy-2) — the spec source's two reads: the effective App spec and the
+        // deploy target. Both modules are leaves with respect to this one (no cycle).
+        AppSpecModule,
+        AppRuntimeStateModule,
+        DatabaseModule,
+    ],
     providers: [
         WorkAppDependencyRepository,
         AppDependenciesService,
@@ -64,12 +86,23 @@ import { APP_DEPENDENCY_CONFIG_CIPHER, AppDependenciesService } from './app-depe
         // would be a second thing to rotate.
         { provide: APP_DEPENDENCY_CONFIG_CIPHER, useExisting: AppEnvCrypto },
         { provide: APP_DEPENDENCIES_SERVICE, useExisting: AppDependenciesService },
+        // A0.10 / APW-07 T25 (lane aw-deploy-2) — the dependency spec source, and the three API ends
+        // of the isolated worker's `app-dependency-provision` proxies (rows, cipher, re-dispatch).
+        AppDependencySpecSourceAdapter,
+        { provide: APP_DEPENDENCY_SPEC_SOURCE, useExisting: AppDependencySpecSourceAdapter },
+        AppDependencyRowsRelay,
+        AppDependencyConfigCipherRelay,
+        AppDependencyProvisionDispatchRelay,
     ],
     exports: [
         AppDependenciesService,
         WorkAppDependencyRepository,
         APP_DEPENDENCY_CONFIG_CIPHER,
         APP_DEPENDENCIES_SERVICE,
+        AppDependencySpecSourceAdapter,
+        AppDependencyRowsRelay,
+        AppDependencyConfigCipherRelay,
+        AppDependencyProvisionDispatchRelay,
     ],
 })
 export class AppDependenciesModule {}

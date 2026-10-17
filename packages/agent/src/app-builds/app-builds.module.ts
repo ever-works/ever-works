@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AppBuildPullTokenReader } from './app-build-pull-token.reader';
 import { ModuleRef } from '@nestjs/core';
 import { getOptionalProvider } from '../utils/optional-provider.util';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,11 +16,20 @@ import { AppBuildRepository } from '../database/repositories/app-build.repositor
 import { WorkBuild } from '../entities/work-build.entity';
 import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 import { UsageModule } from '../usage/usage.module';
-import { AppBuildPullTokenService } from './app-build-pull-token.service';
+import {
+    APP_BUILD_PLATFORM_SETTINGS_WRITER,
+    AppBuildPullTokenService,
+    type AppBuildPlatformManagedSettingsWriter,
+} from './app-build-pull-token.service';
+import { AppBuildRunDiscoveryService } from './app-build-run-discovery.service';
+import { AppBuildsListener } from './app-builds.listener';
+import { WorkOwnershipService } from '../services/work-ownership.service';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { AppBuildPrepareRunner } from './app-build-prepare.runner';
 import { AppBuildWatchRunner } from './app-build-watch.runner';
 import { AppBuildSweepService } from './app-build-sweep.service';
 import {
+    APP_BUILD_EDIT_ACCESS,
     APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_PREPARE_RUNNER,
     APP_BUILD_RUNNER_RECIPE_SOURCE,
@@ -27,6 +37,7 @@ import {
     APP_BUILD_WATCH_RUNNER,
     APP_BUILD_WORK_SOURCE,
     AppBuildsService,
+    type AppBuildEditAccess,
     type AppBuildPluginResolver,
     type AppBuildRunnerRecipeSource,
     type AppBuildSpecSource,
@@ -34,9 +45,11 @@ import {
 } from './app-builds.service';
 import {
     BUILD_REPOSITORY_FACTS_SOURCE,
+    BUILD_SETTINGS_SOURCE,
     BUILD_TOKEN_SOURCE,
     BuildFacadeService,
     type BuildRepositoryFactsSource,
+    type BuildSettingsSource,
     type BuildTokenSource,
 } from './build-facade.service';
 import { GitBuildTokenSource } from './git-build-token.source';
@@ -112,9 +125,18 @@ import { GitFacadeService } from '../facades/git.facade';
  *   as the API does. It stays lazy rather than an import here: importing
  *   `AppRuntimeEnvModule` would drag `FacadesModule` in through
  *   `AppDependenciesModule` and stop this module compiling standalone;
- * - **unbound everywhere**: `APP_BUILD_PLATFORM_SETTINGS_WRITER` (§4.12),
- *   `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04). Binding a
- *   placeholder for any of them would make an unconfigured installation look
+ * - **bound HERE since 2026-10-17** (outstanding-work A0.4): `APP_BUILD_EDIT_ACCESS`
+ *   over a locally provided `WorkOwnershipService` (its two repositories come
+ *   from `DatabaseModule`), and `APP_BUILD_PLATFORM_SETTINGS_WRITER` over
+ *   `PluginSettingsService.writePlatformManagedWorkSettings`, looked up lazily
+ *   like the facade's sources (the plugins module is `@Global()` at the API root
+ *   and absent when this module compiles alone — the writer then refuses, so
+ *   `AppBuildPullTokenService.save` still answers `503 pullTokenUnavailable`
+ *   rather than claiming a save). `BUILD_SETTINGS_SOURCE` (the build plugin's
+ *   resolved Work settings) the same way. `AppBuildsListener` (T22) and
+ *   `AppBuildRunDiscoveryService` (T21a) are provided here too;
+ * - **unbound everywhere**: `APP_PROVISION_EVENTS_PORT` (APW-04). Binding a
+ *   placeholder for it would make an unconfigured installation look
  *   configured, which is the failure mode `AppWorksModule`'s docstring names for
  *   exactly this reason (`app-works-port-dormancy.spec.ts` counts them).
  *
@@ -201,6 +223,8 @@ import { GitFacadeService } from '../facades/git.facade';
         DistributedTaskLockService,
         AppBuildsService,
         AppBuildPullTokenService,
+        // Lane aw-deploy-3 — the stored pull token, read by Work id for the worker's pull credential.
+        AppBuildPullTokenReader,
         AppBuildPrepareRunner,
         // APW-05 T21 (first slice) — the sweep's re-drive and never-adopted `lost`
         // passes; see the class docstring's T21 section.
@@ -243,6 +267,13 @@ import { GitFacadeService } from '../facades/git.facade';
                     if (!gitFacade) return null;
                     return new GitBuildTokenSource(gitFacade).getBuildToken(input);
                 },
+                // 2026-10-17 — the workflow-capable credential with its kind and
+                // scopes (`GitFacadeService.getBuildCredential`).
+                getBuildCredential: async (input) => {
+                    const gitFacade = getOptionalProvider<GitFacadeService>(ref, GitFacadeService);
+                    if (!gitFacade) return null;
+                    return new GitBuildTokenSource(gitFacade).getBuildCredential(input);
+                },
             }),
             inject: [ModuleRef],
         },
@@ -262,12 +293,112 @@ import { GitFacadeService } from '../facades/git.facade';
                         ref,
                         WorkUpstreamStateRepository,
                     );
-                    if (!states) return null;
-                    return new UpstreamBuildFactsSource(states).getBuildRepositoryFacts(input);
+                    const facts = states
+                        ? await new UpstreamBuildFactsSource(states).getBuildRepositoryFacts(input)
+                        : null;
+                    // 2026-10-17 — the tracked branch, from APW-03's state row, so the
+                    // facade's binding names the branch a Build may run for (FR-14)
+                    // instead of assuming `main`.
+                    let trackedBranch: string | null = null;
+                    const specStates = getOptionalProvider<WorkAppSpecStateRepository>(
+                        ref,
+                        WorkAppSpecStateRepository,
+                    );
+                    if (specStates) {
+                        try {
+                            const state = await specStates.findByWorkId(input.workId);
+                            const branch =
+                                typeof state?.trackedBranch === 'string'
+                                    ? state.trackedBranch.trim()
+                                    : '';
+                            trackedBranch = branch.length > 0 ? branch : null;
+                        } catch {
+                            trackedBranch = null;
+                        }
+                    }
+                    if (!facts && !trackedBranch) return null;
+                    return {
+                        visibility: facts?.visibility ?? 'private',
+                        createdByAppWork: facts?.createdByAppWork ?? false,
+                        ...(trackedBranch ? { trackedBranch } : {}),
+                    };
                 },
             }),
             inject: [ModuleRef],
         },
+        // 2026-10-17 — the build plugin's resolved Work settings (plan §4.4: the
+        // larger-runner keys, the generator switches, the pull token). Lazy for the
+        // reason every source above is: `PluginSettingsService` lives in the
+        // `@Global()` plugins module. Secrets included; never logged.
+        {
+            provide: BUILD_SETTINGS_SOURCE,
+            useFactory: (ref: ModuleRef): BuildSettingsSource => ({
+                getBuildSettings: async ({ pluginId, workId, userId }) => {
+                    const settings = getOptionalProvider<PluginSettingsService>(
+                        ref,
+                        PluginSettingsService,
+                    );
+                    if (!settings) return null;
+                    const resolved = await settings.getResolvedSettings(pluginId, {
+                        scope: 'work',
+                        workId,
+                        userId,
+                        includeSecrets: true,
+                    });
+                    const values: Record<string, unknown> = {};
+                    for (const [key, entry] of Object.entries(resolved ?? {})) {
+                        if (entry && entry.value !== undefined) values[key] = entry.value;
+                    }
+                    return values;
+                },
+            }),
+            inject: [ModuleRef],
+        },
+        // 2026-10-17 — APW-05 T23's edit check. `WorkOwnershipService` is provided
+        // locally (its repositories come from `DatabaseModule`), the same way
+        // `ComparisonGenerationModule` provides it. Fail-closed: a throw (no
+        // access, missing Work) is `false`.
+        WorkOwnershipService,
+        {
+            provide: APP_BUILD_EDIT_ACCESS,
+            useFactory: (ownership: WorkOwnershipService): AppBuildEditAccess => ({
+                isEditor: async (workId: string, userId?: string) => {
+                    if (!userId) return false;
+                    try {
+                        await ownership.ensureCanEdit(workId, userId);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                },
+            }),
+            inject: [WorkOwnershipService],
+        },
+        // 2026-10-17 — §4.12's platform-managed write (the pull token). Lazy like
+        // the settings source; with no `PluginSettingsService` in the injector
+        // the call throws and `AppBuildPullTokenService.save` answers
+        // `503 pullTokenUnavailable` — a refusal, never a claimed save.
+        {
+            provide: APP_BUILD_PLATFORM_SETTINGS_WRITER,
+            useFactory: (ref: ModuleRef): AppBuildPlatformManagedSettingsWriter => ({
+                writePlatformManagedWorkSettings: async (pluginId, workId, values) => {
+                    const settings = getOptionalProvider<PluginSettingsService>(
+                        ref,
+                        PluginSettingsService,
+                    );
+                    if (!settings) {
+                        throw new Error(
+                            'PluginSettingsService is not available in this injector; the pull token was not stored.',
+                        );
+                    }
+                    return settings.writePlatformManagedWorkSettings(pluginId, workId, values);
+                },
+            }),
+            inject: [ModuleRef],
+        },
+        // T22 — the three re-prepare triggers (§7.6), and T21a — run discovery.
+        AppBuildsListener,
+        AppBuildRunDiscoveryService,
         // APW-05 — the six facts a Build row cannot be written without. Unbound,
         // `requestPrepare` answered `workUnavailable` for every App Work, so no
         // Build could be requested at all.
@@ -372,6 +503,7 @@ import { GitFacadeService } from '../facades/git.facade';
         },
     ],
     exports: [
+        AppBuildPullTokenReader,
         AppBuildRepository,
         AppBuildPreparationRepository,
         AppBuildsService,
@@ -379,6 +511,7 @@ import { GitFacadeService } from '../facades/git.facade';
         AppBuildPrepareRunner,
         AppBuildWatchRunner,
         AppBuildSweepService,
+        AppBuildRunDiscoveryService,
         // Exported as well as provided: a token bound in `providers` and absent
         // from `exports` resolves to `undefined` at every `@Optional() @Inject()`
         // site in another module, silently — which is exactly the defect
@@ -390,6 +523,9 @@ import { GitFacadeService } from '../facades/git.facade';
         APP_BUILD_WORK_SOURCE,
         APP_BUILD_SPEC_SOURCE,
         APP_BUILD_RUNNER_RECIPE_SOURCE,
+        BUILD_SETTINGS_SOURCE,
+        APP_BUILD_EDIT_ACCESS,
+        APP_BUILD_PLATFORM_SETTINGS_WRITER,
     ],
 })
 export class AppBuildsModule {}

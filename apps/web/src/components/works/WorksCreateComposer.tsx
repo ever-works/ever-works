@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
+    AppWindow,
     BookOpen,
     Files,
     FolderInput,
@@ -22,6 +23,10 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
+import {
+    HIDDEN_WHEN_DISABLED_WORK_KINDS,
+    isHiddenWhenDisabled,
+} from '@/lib/work-kinds/flag-gated-kinds';
 
 /**
  * Dashboard polish (2026-05-27) — Work-specific composer mounted at
@@ -38,7 +43,14 @@ import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
  *     → `/works/new?mode=import`. We do NOT introduce a second
  *     creation surface — the canvas pages are the same.
  */
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
+type InitialWorkKind =
+    | 'website'
+    | 'landing-page'
+    | 'blog'
+    | 'directory'
+    | 'awesome-repo'
+    | 'repo'
+    | 'app';
 
 const WORK_KIND_ORDER: InitialWorkKind[] = [
     'website',
@@ -48,6 +60,9 @@ const WORK_KIND_ORDER: InitialWorkKind[] = [
     'awesome-repo',
     // Self-build slice D (EW-766) — an existing code repository as a Work.
     'repo',
+    // APW-01 T23 — the App Work. Fail-closed: absent unless the caller says
+    // the kind is enabled (see `disabledKinds` below).
+    'app',
 ];
 
 const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
@@ -57,6 +72,7 @@ const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     directory: FolderOpen,
     'awesome-repo': Star,
     repo: GitBranch,
+    app: AppWindow,
 };
 
 const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
@@ -96,6 +112,12 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
         'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
     ],
+    // APW-01 §6.1 — the composer placeholder for the App chip.
+    app: [
+        'e.g. "https://github.com/owner/repo — an open-source app you want your own copy of"',
+        'e.g. "https://github.com/calcom/cal.com — scheduling I want to run on my own cluster"',
+        'e.g. "https://github.com/umami-software/umami — analytics I want to host and evolve"',
+    ],
 };
 
 const PROMPT_INPUT_ID = 'works-quick-add';
@@ -107,9 +129,24 @@ const KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
     directory: 'directory',
     'awesome-repo': 'awesome list repo',
     repo: 'code repository',
+    app: 'app from a GitHub repository',
 };
 
-export function WorksCreateComposer() {
+export interface WorksCreateComposerProps {
+    /**
+     * Work-kind chip values whose `works-<value>` flag resolved to disabled
+     * server-side (`getDisabledWorkKinds`). A fail-closed kind in this list
+     * (`app`, APW-01 T23 / FR-47) is left out of the row entirely.
+     *
+     * Defaults to the fail-closed list itself, so a caller that does not
+     * evaluate flags can never surface the App chip by omission.
+     */
+    disabledKinds?: readonly string[];
+}
+
+export function WorksCreateComposer({
+    disabledKinds = HIDDEN_WHEN_DISABLED_WORK_KINDS,
+}: WorksCreateComposerProps = {}) {
     const t = useTranslations('dashboard.workCreation');
     const router = useRouter();
     const [prompt, setPrompt] = useState('');
@@ -127,14 +164,18 @@ export function WorksCreateComposer() {
         [selectedKind],
     );
 
+    const disabledSet = useMemo(() => new Set<string>(disabledKinds), [disabledKinds]);
+
     const chips: ReadonlyArray<PromptChip<InitialWorkKind>> = useMemo(
         () =>
-            WORK_KIND_ORDER.map((k) => ({
-                value: k,
-                label: t(`kinds.${k}`),
-                Icon: WORK_KIND_ICONS[k],
-            })),
-        [t],
+            WORK_KIND_ORDER.filter((k) => !(isHiddenWhenDisabled(k) && disabledSet.has(k))).map(
+                (k) => ({
+                    value: k,
+                    label: t(`kinds.${k}`),
+                    Icon: WORK_KIND_ICONS[k],
+                }),
+            ),
+        [t, disabledSet],
     );
 
     const submit = () => {
@@ -146,7 +187,9 @@ export function WorksCreateComposer() {
         startSubmit(() => {
             // A Repository Work has nothing to generate — hand the text
             // (a repo URL, typically) to the Repository form, no chat turn.
-            if (selectedKind === 'repo') {
+            // An App Work (APW-01 T23) also starts from a repository URL on its
+            // own form; same canonical-only rule.
+            if (selectedKind === 'repo' || selectedKind === 'app') {
                 // Only canonical coordinates may ride in the query string:
                 // pasted remotes routinely carry a token in the user-info
                 // section, and a query parameter reaches browser history,
@@ -156,7 +199,7 @@ export function WorksCreateComposer() {
                 const canonical = canonicalRepositoryUrl(description);
                 const params = new URLSearchParams({
                     mode: 'manual',
-                    kind: 'repo',
+                    kind: selectedKind,
                     ...(canonical ? { prompt: canonical } : {}),
                 });
                 router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);

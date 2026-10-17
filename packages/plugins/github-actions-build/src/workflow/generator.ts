@@ -922,6 +922,14 @@ export function stripTrailingNewlines(text: string): string {
  * names) refuses the file otherwise — `property "secretcheck" is not defined in
  * object type {build: …}` — which is how the reference was caught here rather than
  * in a customer's run.
+ *
+ * **One single-quoted jq filter across two lines (ledger C35).** The filter used
+ * to close its quote at the end of the first line, which ended the `jq` command
+ * with half an object (a jq compile error) and left the second line opening a
+ * quote that never closed (a bash syntax error) — so the step failed, no result
+ * was ever written, and every Build read `absent`. The quote now spans both
+ * lines; `result-artifact.generator.spec.ts` runs the step's script through
+ * `bash -n` and evaluates it, so this cannot regress silently.
  */
 function resultStep(job: 'build' | 'verify', secretCheckPresent: boolean): string[] {
 	const script =
@@ -942,7 +950,7 @@ function resultStep(job: 'build' | 'verify', secretCheckPresent: boolean): strin
 					`jq -n --arg buildId "\${{ inputs.ew_build_id }}" --arg sha "$EW_SHA" \\`,
 					`  --arg imageRepository "$EW_IMAGE" --arg digest "$digest" --arg secretCheck "$secret_check" \\`,
 					`  --arg tag "$EW_IMAGE:sha-$EW_SHA" \\`,
-					`  '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,'`,
+					`  '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,`,
 					`    digest:$digest,tags:[$tag],secretCheck:$secretCheck,verification:{jobs:[],smoke:[]}}' > ${APP_BUILD_RESULT_ARTIFACT_FILE}`
 				]
 			: [
@@ -953,7 +961,7 @@ function resultStep(job: 'build' | 'verify', secretCheckPresent: boolean): strin
 					`jq -n --arg buildId "\${{ inputs.ew_build_id }}" --arg sha "$EW_SHA" \\`,
 					`  --arg imageRepository "$EW_IMAGE" --arg reusedDigest "$reused_digest" \\`,
 					`  --argjson localBuild "$local_build" \\`,
-					`  '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,'`,
+					`  '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,`,
 					`    reusedDigest:$reusedDigest,localBuild:$localBuild,verification:{jobs:[],smoke:[]}}' > ${APP_BUILD_RESULT_ARTIFACT_FILE}`
 				];
 	return ['      - name: Write result', '        if: always()', '        run: |', ...scalarBlock(script, 10)];

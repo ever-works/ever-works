@@ -233,6 +233,61 @@ describe('IntegrationTasksWriteController', () => {
         );
     });
 
+    // Review 2026-10-17 F8 (P1): a refused assignee / extra Team undoes the create.
+    it('undoes the task and its link when an extra Team or an assignee is refused', async () => {
+        const { controller, tasks, teamResources, links } = setup();
+        tasks.addAssignee.mockRejectedValueOnce(new Error('Task actor is not reachable'));
+        await expect(
+            controller.create(
+                user,
+                {
+                    title: 'Ship it',
+                    assignees: [{ type: 'agent', id: 'foreign-agent' }],
+                    externalRef: { source: 'gauzy', externalId: 'g-1' },
+                },
+                'gauzy:conn-1',
+                req(),
+                res(),
+            ),
+        ).rejects.toThrow('Task actor is not reachable');
+        expect(tasks.remove).toHaveBeenCalledWith('owner-1', 'task-1', expect.anything());
+        expect(links.removeAllFor).toHaveBeenCalledWith(ORG, 'task', 'task-1');
+
+        const second = setup();
+        second.teamResources.attach.mockRejectedValueOnce(new Error('Team not found'));
+        await expect(
+            second.controller.create(
+                user,
+                { title: 'Ship it', teamIds: ['team-a', 'foreign-team'] },
+                undefined,
+                req(),
+                res(),
+            ),
+        ).rejects.toThrow('Team not found');
+        expect(second.tasks.remove).toHaveBeenCalledWith('owner-1', 'task-1', expect.anything());
+        expect(teamResources.attach).not.toHaveBeenCalled();
+
+        // The task could not be removed: its link stays, so a retry finds it (no duplicate),
+        // and the original error still answers.
+        const stuck = setup();
+        stuck.tasks.addAssignee.mockRejectedValueOnce(new Error('Task actor is not reachable'));
+        stuck.tasks.remove.mockRejectedValueOnce(new Error('db down'));
+        await expect(
+            stuck.controller.create(
+                user,
+                {
+                    title: 'Ship it',
+                    assignees: [{ type: 'agent', id: 'foreign-agent' }],
+                    externalRef: { source: 'gauzy', externalId: 'g-1' },
+                },
+                'gauzy:conn-1',
+                req(),
+                res(),
+            ),
+        ).rejects.toThrow('Task actor is not reachable');
+        expect(stuck.links.removeAllFor).not.toHaveBeenCalled();
+    });
+
     it("refuses an externalRef of another integration's source", async () => {
         const { controller, tasks } = setup();
         await expect(

@@ -126,12 +126,18 @@ describe('FleetTaskWorkspaceProvisioner.finalize — a fleet publish is never to
 			// No identity and no credential: exactly the shape a caller with
 			// no job channel (a test, an embedder) always got — plus
 			// `hardenRepoHooks`, which a fleet finalize sets on EVERY commit
-			// (slice AL), commit-only and provider-less included.
+			// (slice AL), commit-only and provider-less included — plus
+			// `commitMessageFor` (#2682), the staged-paths re-typer every fleet
+			// finalize hands the provider (docs-only → `docs`, tests-only → `test`).
 			expect(Object.keys(finalize.mock.calls[0]![1]).sort()).toEqual([
 				'commitMessage',
+				'commitMessageFor',
 				'hardenRepoHooks',
 				'push'
 			]);
+			expect(typeof (finalize.mock.calls[0]![1] as { commitMessageFor?: unknown }).commitMessageFor).toBe(
+				'function'
+			);
 		} finally {
 			cleanup();
 		}

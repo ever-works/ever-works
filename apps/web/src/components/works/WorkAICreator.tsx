@@ -60,7 +60,14 @@ import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { getWorkCapabilities } from '@ever-works/contracts';
 
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
+type InitialWorkKind =
+    | 'website'
+    | 'landing-page'
+    | 'blog'
+    | 'directory'
+    | 'awesome-repo'
+    | 'repo'
+    | 'app';
 
 /**
  * `repo` never reaches the AI creator: registering a repository needs a
@@ -69,10 +76,14 @@ type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awes
  * contract. The composers route the Repository chip to the manual form
  * instead; this drops it defensively for any caller that does not.
  */
-type AiCreatableWorkKind = Exclude<InitialWorkKind, 'repo'>;
+//
+// `app` (APW-01 T23, ACC-01-14) never reaches it either: an App Work forks or
+// links somebody's repository, which only the App form's explicit mode and
+// owner choice may do. The AI action's schema refuses the kind as well.
+type AiCreatableWorkKind = Exclude<InitialWorkKind, 'repo' | 'app'>;
 
 function aiCreatableKind(kind?: InitialWorkKind): AiCreatableWorkKind | undefined {
-    return kind && kind !== 'repo' ? kind : undefined;
+    return kind && kind !== 'repo' && kind !== 'app' ? kind : undefined;
 }
 
 interface WorkAICreatorProps {

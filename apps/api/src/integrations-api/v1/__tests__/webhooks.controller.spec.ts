@@ -10,6 +10,8 @@ jest.mock('../../../auth/services/integration-key.service', () => ({
     INTEGRATION_KEY_REVOKED_EVENT: 'integration-key.revoked',
 }));
 
+import 'reflect-metadata';
+import { REQUIRE_SCOPES_KEY } from '../../../auth/integration/integration.decorators';
 import { IntegrationWebhooksController } from '../webhooks.controller';
 import { IntegrationKeyRevokedWebhooksListener } from '../../../webhooks/integration-key-revoked.listener';
 
@@ -49,6 +51,18 @@ describe('IntegrationWebhooksController', () => {
         ...overrides,
     });
     const owner = { type: 'integration_key', id: 'key-1' };
+
+    // Review 2026-10-17 F12: subscribing delivers the change feed, so it needs the
+    // feed's scope too; reading, rotating, testing and deleting do not.
+    it('requires events:read to create or change a subscription', () => {
+        const proto = IntegrationWebhooksController.prototype as unknown as Record<string, object>;
+        const scopes = (name: string) => Reflect.getMetadata(REQUIRE_SCOPES_KEY, proto[name]);
+        expect(scopes('create')).toEqual(['webhooks:manage', 'events:read']);
+        expect(scopes('update')).toEqual(['webhooks:manage', 'events:read']);
+        for (const name of ['list', 'rotate', 'test', 'remove']) {
+            expect(scopes(name)).toEqual(['webhooks:manage']);
+        }
+    });
 
     const setup = () => {
         const webhooks = {

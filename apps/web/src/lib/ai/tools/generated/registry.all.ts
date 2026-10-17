@@ -2,6 +2,7 @@ import { OPERATION_REGISTRY, type OperationSpec } from './registry';
 import { WAVE2_OPERATIONS } from './registry.wave2';
 import { WAVE3_OPERATIONS } from './registry.wave3';
 import { WAVE5_OPERATIONS } from './registry.wave5';
+import { APP_WORKS_OPERATIONS } from './registry.app-works';
 
 /**
  * The complete generated-tool registry: Wave-1 seed + Wave-2 expansion +
@@ -14,4 +15,6 @@ export const ALL_OPERATIONS: OperationSpec[] = [
     ...WAVE2_OPERATIONS,
     ...WAVE3_OPERATIONS,
     ...WAVE5_OPERATIONS,
+    // APW-08 T26 — the App Works chat tools (evolve / provision).
+    ...APP_WORKS_OPERATIONS,
 ].filter((op) => (seen.has(op.toolName) ? false : (seen.add(op.toolName), true)));

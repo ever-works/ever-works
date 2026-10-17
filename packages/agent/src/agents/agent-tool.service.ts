@@ -68,6 +68,8 @@ import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { buildInboxTools } from '../inbox/agent-inbox-tools';
+// APW-08 T26 — the App change chat tools. A leaf: every import it has is type-only.
+import { buildAppChangeTools } from '../app-works/agent-app-change-tools';
 import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
@@ -553,6 +555,21 @@ export class AgentToolService {
                             ? runContext.runId
                             : null,
                     service: inbox.service,
+                }),
+            );
+        }
+
+        // APW-08 T26 — `request_app_change` / `get_app_change`: the chat half of the evolve
+        // loop. The factory gates `request_app_change` on canAssignTasks || canCommitToRepo
+        // and owner-checks the model-supplied Work id per call.
+        if (sources.appChanges) {
+            const appChanges = sources.appChanges;
+            add('app-changes', () =>
+                buildAppChangeTools({
+                    agent,
+                    service: appChanges.service,
+                    authorize: (userId, workId, level) =>
+                        appChanges.authorize(userId, workId, level),
                 }),
             );
         }

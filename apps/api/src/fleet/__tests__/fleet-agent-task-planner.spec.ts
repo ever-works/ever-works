@@ -522,7 +522,9 @@ describe('FleetAgentTaskPlannerService', () => {
         expect(plan!.git).toEqual({
             commit: true,
             push: true,
-            commitMessage: 'feat(task): TSK-7 agent run output',
+            // 10-09 handover item 7: a conventional commit from the Task
+            // title ("Fix the flaky login spec"), the slug in the body.
+            commitMessage: 'fix: the flaky login spec\n\nTask: TSK-7',
         });
 
         const { execution } = plan!;

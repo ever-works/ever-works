@@ -489,6 +489,35 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		expect(outcome.gateStatus).toBe('green');
 	});
 
+	it('reports a usage limit as its own outcome and skips the checks and the publish', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const sentence = "You've hit your weekly limit · resets Oct 19, 3am (Europe/Paris)";
+		const io = baseIo({
+			spawnFn,
+			usageLimitClock: { now: () => Date.parse('2026-10-17T15:27:00Z'), timeZone: 'Europe/Paris' },
+			scratchFs: scratchFs(
+				JSON.stringify({ type: 'result', is_error: true, subtype: 'success', result: sentence })
+			)
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		// Only the model ran: no acceptance check, no commit, no push.
+		expect(commands).toHaveLength(1);
+		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+		expect(outcome.status).toBe('failed');
+		expect(outcome.gateStatus).toBe('none');
+		expect(outcome.failureKind).toBe('model_usage_limit');
+		expect(outcome.modelUsageLimit).toEqual({
+			provider: 'claude-code',
+			window: 'weekly',
+			resetsAt: '2026-10-19T01:00:00.000Z',
+			retryAfter: '2026-10-19T01:01:00.000Z',
+			message: sentence
+		});
+		expect(outcome.failureReason).toContain('usage limit, retry after 2026-10-19T01:01:00.000Z');
+	});
+
 	it('fails the job on a red required check even when the model succeeded', async () => {
 		const { spawnFn } = recordingSpawn([['pnpm test', 1]]);
 		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn }));

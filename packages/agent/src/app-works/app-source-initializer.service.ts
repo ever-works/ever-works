@@ -474,12 +474,34 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
         }
 
         // ── step 2a: the Blueprint path ───────────────────────────────────────
+        //
+        // APW-03 T28 (2026-10-17): when the bound apply service can COMPOSE the
+        // Blueprint inline, its document becomes the base of the minimal path below,
+        // so the Blueprint spec and `spec.source` land together in ONE commit (a
+        // repository this Work created) or ONE setup pull request (anything else) —
+        // the file still has exactly one writer per run. A service without `compose`
+        // keeps the original "request and wait" contract.
+        let base = current.value;
+        let blueprintApplied = false;
         if (context.blueprintId && !recordsBlueprint(current.value, context.blueprintId)) {
-            return this.requestBlueprint(context);
+            const inline = inlineApplyOf(this.blueprintApply);
+            if (!inline) {
+                return this.requestBlueprint(context);
+            }
+            const composed = await this.composeBlueprint(context, inline);
+            if (composed.status !== 'ok') {
+                return this.fail(context, composed.reason);
+            }
+            base = composed.value;
+            blueprintApplied = true;
         }
 
         // ── steps 3–6: the minimal path ───────────────────────────────────────
-        const minimal = await this.initializeSource(context, current.value, head.value);
+        const minimal = await this.initializeSource(context, base, head.value);
+
+        if (blueprintApplied) {
+            await this.reportBlueprintLanding(context, minimal);
+        }
 
         // ── step 7: one Activity row per outcome ──────────────────────────────
         await this.recordActivity(context, minimal, Boolean(context.blueprintId));
@@ -500,6 +522,12 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
 
         // ── step 8: follow-ups, only when the source is on the default branch ──
         if (minimal.outcome === 'initialized' || minimal.outcome === 'unchanged') {
+            if (context.blueprintId && !blueprintApplied && minimal.outcome === 'unchanged') {
+                // The merged setup pull request of a Blueprint apply re-invokes the
+                // handler and finds its document: that IS the apply landing.
+                await this.reportBlueprintMerged(context, minimal.sha);
+            }
+            await this.requestSpecEvaluation(context);
             await this.runFollowUps(context, minimal.sha);
         }
 
@@ -676,6 +704,121 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
     /* ---------------------------------------------------------------------- *
      * Step 2a — the Blueprint path (plan §6 step 2, ACC-01-19)
      * ---------------------------------------------------------------------- */
+
+    /** APW-03 T28's inline compose: the Blueprint document, or the named refusal. */
+    private async composeBlueprint(
+        context: InitializerContext,
+        inline: InlineBlueprintApply,
+    ): Promise<ReadResult<string>> {
+        const blueprintId = context.blueprintId as string;
+        try {
+            const composed = await inline.compose({
+                workId: context.work.id,
+                blueprintId,
+                relation: context.relation,
+                matchSource: context.blueprintMatchSource,
+                userId: context.work.userId,
+                // The source a private Blueprint is judged against (`allowsPrivateBlueprint`):
+                // the upstream for a fork or private copy, the Work Repository for a link.
+                sourceOwner:
+                    context.relation === 'link'
+                        ? context.owner
+                        : (context.record.upstream?.owner ?? null),
+            });
+            if (composed?.status === 'composed' && typeof composed.text === 'string') {
+                if (composed.dropped && composed.dropped.length > 0) {
+                    this.logger.log(
+                        `App source initializer: Blueprint "${blueprintId}" for work ${context.work.id} ` +
+                            `was adapted for relation ${context.relation} (dropped ${composed.dropped.join(', ')}).`,
+                    );
+                }
+                return { status: 'ok', value: composed.text };
+            }
+            const code = firstNonEmpty(composed?.code) ?? 'unavailable';
+            await this.safe(() =>
+                inline.recordOutcome(
+                    context.work.id,
+                    { kind: 'failed', reason: code },
+                    context.work.userId,
+                ),
+            );
+            return { status: 'failed', reason: `${BLUEPRINT_FAILURE_PREFIX}${code}` };
+        } catch (error) {
+            this.logger.warn(
+                `App source initializer: composing Blueprint "${blueprintId}" for work ` +
+                    `${context.work.id} threw (${errorText(error)}).`,
+            );
+            return {
+                status: 'failed',
+                reason: APP_SOURCE_INITIALIZER_FAILURES.blueprintRequestFailed,
+            };
+        }
+    }
+
+    /** After the minimal path landed (or failed) a composed Blueprint — T28's report. */
+    private async reportBlueprintLanding(
+        context: InitializerContext,
+        minimal: MinimalPathResult,
+    ): Promise<void> {
+        const inline = inlineApplyOf(this.blueprintApply);
+        if (!inline) return;
+        const landing: InlineBlueprintLanding =
+            minimal.outcome === 'failed'
+                ? { kind: 'failed', reason: minimal.reason ?? 'unexpected' }
+                : minimal.outcome === 'waiting_for_setup_pr'
+                  ? {
+                        kind: 'pull_request',
+                        number: minimal.setupPullRequestNumber ?? 0,
+                        url: minimal.setupPullRequestUrl ?? '',
+                    }
+                  : {
+                        kind: 'commit',
+                        sha: minimal.sha ?? '',
+                        url: minimal.sha ? commitWebUrl(context, minimal.sha) : '',
+                    };
+        await this.safe(() => inline.recordOutcome(context.work.id, landing, context.work.userId));
+    }
+
+    /** The setup pull request that carried a Blueprint merged — record `applied`. */
+    private async reportBlueprintMerged(
+        context: InitializerContext,
+        sha: string | null,
+    ): Promise<void> {
+        const inline = inlineApplyOf(this.blueprintApply);
+        if (!inline || !sha) return;
+        await this.safe(() =>
+            inline.recordOutcome(
+                context.work.id,
+                { kind: 'commit', sha, url: commitWebUrl(context, sha) },
+                context.work.userId,
+            ),
+        );
+    }
+
+    /**
+     * FR-19 — evaluate the App spec now that `.works/works.yml` is on the default branch
+     * (`blueprint_applied` when the Work carries a Blueprint, else `created`). Never
+     * fatal: the spec page's lazy head check evaluates later anyway.
+     */
+    private async requestSpecEvaluation(context: InitializerContext): Promise<void> {
+        if (!this.appSpec || typeof this.appSpec.requestEvaluation !== 'function') return;
+        try {
+            await this.appSpec.requestEvaluation(
+                context.work.id,
+                context.blueprintId ? 'blueprint_applied' : 'created',
+                {
+                    tenantId: context.work.tenantId ?? null,
+                    organizationId: context.work.organizationId ?? null,
+                    providerId: context.gitOptions.providerId ?? null,
+                },
+            );
+        } catch (error) {
+            this.logger.warn(
+                `App source initializer: requesting the App spec evaluation of work ${context.work.id} ` +
+                    `failed (${errorText(error)}).`,
+            );
+        }
+    }
 
     /**
      * Ask APW-03's apply job to compose `source` + the Blueprint spec in one commit (or
@@ -1383,6 +1526,42 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
 
 /** The one §4.2 code that still answers `blueprint_requested` (plan `:829-830`). */
 const APPLY_IN_PROGRESS_CODE = 'applyInProgress';
+
+/** What the landing path did with a composed Blueprint (T28's `recordOutcome` input). */
+type InlineBlueprintLanding =
+    | { kind: 'commit'; sha: string; url?: string }
+    | { kind: 'pull_request'; number: number; url: string }
+    | { kind: 'failed'; reason: string };
+
+/** APW-03 T28's inline half (`AppBlueprintApplyService.compose` / `recordOutcome`). */
+interface InlineBlueprintApply {
+    compose(input: {
+        workId: string;
+        blueprintId: string;
+        relation: AppRepositoryMode;
+        matchSource?: string | null;
+        userId?: string;
+        sourceOwner?: string | null;
+    }): Promise<{ status: string; text?: string; dropped?: readonly string[]; code?: string }>;
+    recordOutcome(workId: string, landing: InlineBlueprintLanding, userId?: string): Promise<void>;
+}
+
+/** The inline half of the bound apply service, when it has one. */
+function inlineApplyOf(
+    service: AppBlueprintApplyCapability | undefined,
+): InlineBlueprintApply | null {
+    const candidate = service as Partial<InlineBlueprintApply> | undefined;
+    return candidate &&
+        typeof candidate.compose === 'function' &&
+        typeof candidate.recordOutcome === 'function'
+        ? (candidate as InlineBlueprintApply)
+        : null;
+}
+
+/** The provider web URL of one commit in the Work Repository (GitHub's shape). */
+function commitWebUrl(context: { owner: string; repo: string }, sha: string): string {
+    return `https://github.com/${context.owner}/${context.repo}/commit/${sha}`;
+}
 
 /** The `failed/blueprint_<code>` prefix plan §6 step 2 fixes. */
 const BLUEPRINT_FAILURE_PREFIX = 'blueprint_';

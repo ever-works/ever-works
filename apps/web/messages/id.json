@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Buat Work, sekali atau terjadwal",
                     "deploy": "Deploy Work",
                     "tasks": "Tugas untuk Work ini",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Image kontainer yang di-build dari repositori Anda"
                 },
                 "tasks": "Tugas",
                 "posts": "Postingan",
                 "pages": "Halaman",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Build"
             },
             "members": {
                 "title": "Anggota Tim",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Fork: {fullName}",
+                    "private-copy": "Salinan pribadi: {fullName}",
+                    "link": "Ditautkan: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Menyiapkan fork Anda",
+                    "forkBody": "GitHub sedang membuat {fullName}. Biasanya ini memakan waktu kurang dari satu menit; repositori besar bisa lebih lama.",
+                    "copyTitle": "Menyiapkan salinan pribadi Anda",
+                    "copyBody": "Menyalin {upstream} ke {fullName}. Repositori yang lebih besar memerlukan waktu lebih lama.",
+                    "linkTitle": "Menyelesaikan penyiapan",
+                    "linkBody": "Membuka pull request yang menambahkan .works/works.yml ke {fullName}.",
+                    "blueprintTitle": "Menerapkan Blueprint {name}",
+                    "blueprintBody": "Ever Works sedang menyiapkan Karya App Anda dan akan menulis .works/works.yml beserta file Blueprint."
+                },
+                "setupPrClosed": "Pull request penyiapan ditutup tanpa digabungkan.",
+                "timedOut": "Fork Anda memakan waktu lebih dari 15 menit.",
+                "failedAccess": "Ever Works kehilangan akses ke GitHub saat menyiapkan Karya App ini.",
+                "failedOther": "Gagal menyiapkan Karya App ini: {reason}",
+                "waitingForSetupPr": "Gabungkan pull request penyiapan untuk menyelesaikan.",
+                "tryAgain": "Coba lagi",
+                "openOnGitHub": "Buka di GitHub",
+                "reconnectGitHub": "Hubungkan ulang GitHub",
+                "openPullRequest": "Buka pull request",
+                "retryLimit": "Anda telah menggunakan ketiga percobaan ulang untuk jam ini. Coba lagi nanti.",
+                "retryFailed": "Tidak dapat memulai percobaan lain. Coba lagi.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml di branch default bukan YAML yang valid. Perbaiki atau hapus file tersebut, lalu coba lagi.",
+                    "works_yml_other_kind": ".works/works.yml sudah mendeklarasikan jenis Karya yang berbeda. Atur kind: app atau hapus file tersebut, lalu coba lagi.",
+                    "push_rejected": "GitHub terus menolak commit yang menambahkan .works/works.yml.",
+                    "provider_unsupported": "Penyedia Git repositori ini tidak dapat disiapkan secara otomatis.",
+                    "too_large_for_private_copy": "Repositori terlalu besar untuk salinan pribadi. Buat fork sebagai gantinya.",
+                    "uses_lfs": "Repositori menggunakan Git LFS, yang tidak dapat dibawa oleh salinan pribadi. Buat fork sebagai gantinya.",
+                    "other": "Terjadi kesalahan saat menyiapkan repositori."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Repositori Karya",
+                    "upstream": "Upstream",
+                    "relationLabel": "Relasi",
+                    "readinessLabel": "Kesiapan",
+                    "readiness": {
+                        "preparing": "Menyiapkan",
+                        "ready": "Siap",
+                        "timed_out": "Waktu habis",
+                        "failed": "Gagal",
+                        "waiting_for_setup_pr": "Menunggu pull request penyiapan"
+                    },
+                    "relations": {
+                        "link": "Ditautkan",
+                        "fork": "Fork",
+                        "private-copy": "Salinan pribadi"
+                    },
+                    "appSpecLabel": "Spesifikasi App",
+                    "appSpecStatus": {
+                        "valid": "Valid",
+                        "valid_with_warnings": "Valid, dengan peringatan",
+                        "invalid": "Ada kesalahan",
+                        "missing": "Belum ditulis",
+                        "unreadable": "Tidak dapat dibaca",
+                        "pending": "Sedang diperiksa",
+                        "unknown": "Belum diperiksa"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Tidak ada kesalahan} =1 {1 kesalahan} other {# kesalahan}} · {warnings, plural, =0 {tidak ada peringatan} =1 {1 peringatan} other {# peringatan}}",
+                    "openAppSpec": "Buka spesifikasi App",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "Detail App tidak dapat dimuat saat ini.",
+                    "builds": "Build",
+                    "deploy": "Penerapan",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Kembangkan dengan agennya",
+                    "body": "Minta agen Karya untuk mengubah aplikasi — menambahkan fitur, memperbaiki bug, meningkatkan dependensi. Agen bekerja di Repositori Karya dan membuka pull request.",
+                    "button": "Mengobrol tentang App ini"
+                }
+            },
+            "builds": {
+                "title": "Build",
+                "subtitle": "Di-build di runner yang di-host GitHub di {repository} · image {imageRepository}",
+                "subtitleNoImage": "Di-build di runner yang di-host GitHub di {repository}",
+                "subtitleGeneric": "Image kontainer yang di-build dari repositori Karya App ini.",
+                "startBuild": "Mulai build",
+                "starting": "Memulai…",
+                "refresh": "Segarkan",
+                "cancel": "Batal",
+                "cancelling": "Membatalkan…",
+                "viewerDisabled": "Anda memerlukan akses edit untuk melakukan ini.",
+                "deployable": "Dapat diterapkan",
+                "notDeployableLine": "Tidak dapat diterapkan — {reason}",
+                "pagination": "Menampilkan {start}–{end} dari {total}",
+                "listLabel": "Build Karya App ini",
+                "openDetails": "Buka build #{number}",
+                "status": {
+                    "queued": "Dalam antrean",
+                    "running": "Berjalan",
+                    "succeeded": "Berhasil",
+                    "failed": "Gagal",
+                    "cancelled": "Dibatalkan",
+                    "blocked": "Diblokir"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Manual",
+                    "verification": "Verifikasi"
+                },
+                "notDeployable": {
+                    "notSucceeded": "Build tidak berhasil",
+                    "pullRequest": "Di-build dari pull request",
+                    "verification": "Di-build untuk verifikasi",
+                    "specInvalid": "Spesifikasi App pada commit ini memiliki kesalahan",
+                    "staleInputs": "Di-build dengan nilai build yang lebih lama",
+                    "secretCheckFailed": "Pemeriksaan rahasia tidak lolos",
+                    "digestUnconfirmed": "Image yang di-push tidak dapat dikonfirmasi",
+                    "criticalVulnerability": "Kerentanan kritis memiliki perbaikan yang tersedia",
+                    "unsigned": "Image tidak ditandatangani"
+                },
+                "blocked": {
+                    "workflowPending": "Menunggu workflow build digabungkan.",
+                    "workflowEditedByHand": "Workflow build diedit secara manual.",
+                    "workflowWriteFailed": "Ever Works tidak dapat menulis workflow build ke repositori. Aturan di repositori ini menolak perubahan tersebut.",
+                    "actionsDisabled": "GitHub Actions dinonaktifkan untuk repositori ini.",
+                    "missingBuildValues": "Menunggu {count, plural, =1 {1 nilai build} other {# nilai build}}: {names}",
+                    "runnerTooSmall": "Build ini memerlukan {needed}, tetapi runner untuk repositori {visibility} mengizinkan {max}.",
+                    "tooManyBuildValues": "Build ini menggunakan {count} nilai build; maksimal 50 yang diizinkan.",
+                    "buildValueTooLarge": "{name} terlalu besar untuk diteruskan ke build (maksimal 48 KB).",
+                    "secretLimitReached": "Repositori tidak memiliki ruang untuk rahasia lagi.",
+                    "strategyNotSupported": "Runner yang di-host GitHub tidak dapat melakukan build dengan strategi \"{strategy}\". Tambahkan Dockerfile dan atur build.strategy ke dockerfile.",
+                    "specInvalid": "Spesifikasi App pada commit ini memiliki kesalahan.",
+                    "gitConnectionMissing": "Ever Works tidak dapat menjangkau repositori ini dengan koneksi GitHub Anda.",
+                    "repositoryUnavailable": "{repository} telah diarsipkan, dihapus, atau tidak lagi tersedia untuk koneksi GitHub Anda.",
+                    "managedConcurrencyLimit": "Menunggu build lain: maksimal {perWork} per aplikasi dan {perAccount} per akun berjalan bersamaan.",
+                    "buildValueNameReserved": "{name} dicadangkan oleh Ever Works dan tidak dapat diteruskan ke build. Ganti nama entri lingkungan tersebut.",
+                    "buildServicePortRequired": "Layanan build {service} memerlukan port: Ever Works tidak tahu port mana yang didengarkan oleh \"{image}\".",
+                    "verificationDependencyUnsupported": "Verifikasi belum dapat memulai {kind}. Pemeriksaan dijalankan di kluster sebagai gantinya.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Tinjau pull request",
+                    "turnOnActions": "Aktifkan",
+                    "setValue": "Atur nilainya",
+                    "useLargerRunner": "Gunakan runner yang lebih besar",
+                    "openRepositorySettings": "Buka pengaturan repositori",
+                    "reconnectGithub": "Hubungkan ulang GitHub",
+                    "rebuild": "Build ulang",
+                    "openEnvironment": "Buka Lingkungan"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Kehabisan memori",
+                        "suggestion": "Naikkan build.resources.memory (saat ini {memory}) atau kurangi ukuran heap build. Di runner ini, build dapat menggunakan maksimal {max}."
+                    },
+                    "diskFull": {
+                        "title": "Kehabisan ruang disk",
+                        "suggestion": "Aktifkan \"Reclaim runner disk\" di pengaturan build, atau perkecil konteks build dengan file .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile gagal pada langkah {step} dari {total}",
+                        "suggestion": "Langkah yang gagal adalah: {command}. Perbaiki di {dockerfile} lalu push, atau minta agen untuk memperbaikinya."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Tidak dapat mengunduh dependensi",
+                        "suggestion": "Registri paket atau image dasar tidak merespons. Build ulang dalam beberapa menit; jika terus gagal, sematkan versi yang Anda andalkan."
+                    },
+                    "registryPushDenied": {
+                        "title": "Tidak dapat melakukan push image",
+                        "suggestion": "Izinkan workflow di repositori ini untuk menulis paket (Settings ▸ Actions ▸ General ▸ Workflow permissions), lalu build ulang."
+                    },
+                    "missingBuildValue": {
+                        "title": "Nilai build tidak ada: {names}",
+                        "suggestion": "Atur di Pengaturan ▸ Lingkungan, lalu build ulang."
+                    },
+                    "secretInImage": {
+                        "title": "Sebuah rahasia akan dipublikasikan di dalam image: {name}",
+                        "suggestion": "Gunakan nilai ini hanya di tahap build sebelumnya, atau teruskan sebagai mount rahasia build. Tidak ada yang di-push."
+                    },
+                    "timeout": {
+                        "title": "Memakan waktu lebih dari {minutes} menit",
+                        "suggestion": "Naikkan build.resources.timeoutMinutes (maksimal 180) atau percepat build dengan caching."
+                    },
+                    "workflowInvalid": {
+                        "title": "File workflow tidak valid",
+                        "suggestion": "GitHub tidak dapat menjalankan workflow build. Tinjau pull request terbuka dari Ever Works untuk memulihkannya."
+                    },
+                    "digestMismatch": {
+                        "title": "Image yang di-push tidak dapat dikonfirmasi",
+                        "suggestion": "Registri melaporkan image yang berbeda dari yang dilaporkan build. Build ulang; tidak ada yang belum dikonfirmasi yang akan diterapkan."
+                    },
+                    "verificationFailed": {
+                        "title": "Aplikasi tidak lolos smoke test",
+                        "suggestion": "{failed} dari {total} smoke test gagal. Lihat hasilnya di bawah."
+                    },
+                    "egressBlocked": {
+                        "title": "Akses jaringan diblokir",
+                        "suggestion": "Build mencoba menjangkau {hosts}, yang tidak ada dalam daftar izin builder. Ambil yang Anda butuhkan dari repositori sumber Anda atau registri yang diizinkan, lalu build ulang."
+                    },
+                    "lost": {
+                        "title": "Kehilangan jejak build ini",
+                        "suggestion": "GitHub berhenti memberi informasi tentang build ini. Periksa di GitHub."
+                    },
+                    "unknown": {
+                        "title": "Terjadi kesalahan lain",
+                        "suggestion": "Buka log di GitHub, atau minta agen untuk memeriksanya."
+                    },
+                    "askAgent": "Minta agen untuk memperbaiki ini",
+                    "excerptLabel": "Baris terakhir log"
+                },
+                "cancelReason": {
+                    "user": "Dibatalkan oleh anggota",
+                    "superseded": "Digantikan oleh build yang lebih baru"
+                },
+                "detail": {
+                    "title": "Build #{number} · {sha} · {status}",
+                    "loading": "Memuat detail build…",
+                    "close": "Tutup",
+                    "trigger": "Pemicu",
+                    "triggeredBy": "{trigger} — oleh {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Durasi",
+                    "durationValue": "{duration} (dalam antrean {queued})",
+                    "image": "Image",
+                    "tags": "Tag",
+                    "deployable": "Dapat diterapkan",
+                    "yes": "Ya",
+                    "buildValues": "Nilai build",
+                    "buildValuesValue": "{count, plural, =1 {1 disinkronkan} other {# disinkronkan}}: {names}",
+                    "noBuildValues": "Tidak ada",
+                    "receipt": "Tanda terima",
+                    "verification": "Verifikasi",
+                    "copy": "Salin",
+                    "copied": "Referensi image disalin.",
+                    "copyFailed": "Tidak dapat menyalin referensi image.",
+                    "viewLogs": "Lihat log di GitHub",
+                    "rebuildThisCommit": "Build ulang commit ini",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} menit runner · dibayar oleh akun GitHub Anda",
+                    "minutesPlatform": "{minutes} menit runner · dibayar oleh Ever Works",
+                    "checksMinutes": "{checksMinutes} di antaranya menjalankan pemeriksaan App",
+                    "costUnknown": "Menit runner belum dilaporkan"
+                },
+                "verification": {
+                    "componentsReady": "Komponen telah dimulai",
+                    "componentsNotReady": "Komponen tidak dapat dimulai",
+                    "job": "Job {name} keluar dengan kode {exitCode}",
+                    "jobNoExit": "Job {name} tidak selesai",
+                    "smokePassed": "Lolos: {name}",
+                    "smokeFailed": "Gagal: {name} — diharapkan {expected}, didapat {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Belum ada build. Build pertama dimulai saat workflow build sudah ada di repositori.",
+                    "unavailable": "Build belum tersedia di instans ini."
+                },
+                "errors": {
+                    "loadFailed": "Build tidak dapat dimuat. Coba segarkan halaman.",
+                    "rebuildRateLimited": "Anda telah memulai terlalu banyak build dalam jam ini. Coba lagi dalam {minutes, plural, =1 {1 menit} other {# menit}}.",
+                    "commitNotReachable": "Commit tersebut tidak ada di branch yang dilacak.",
+                    "nothingToBuild": "Karya App ini menjalankan image yang dipublikasikan, jadi tidak ada yang perlu di-build.",
+                    "notCancellable": "Build ini sudah selesai, jadi tidak dapat dibatalkan.",
+                    "providerUnavailable": "Tidak ada penyedia build yang tersedia saat ini. Coba lagi nanti.",
+                    "startFailed": "Tidak dapat memulai build. Coba lagi.",
+                    "cancelFailed": "Tidak dapat membatalkan build ini. Coba lagi.",
+                    "detailFailed": "Tidak dapat memuat build ini. Coba lagi."
+                },
+                "toasts": {
+                    "started": "Build dimasukkan ke antrean.",
+                    "deduped": "Build untuk commit ini sudah ada dalam antrean.",
+                    "cancelled": "Build dibatalkan."
+                },
+                "pullToken": {
+                    "title": "Tambahkan token pull",
+                    "body": "Image ini bersifat pribadi. Kluster Anda memerlukan token yang hanya dapat membaca paket untuk mengunduhnya.",
+                    "stepCreate": "1. Buat token klasik dengan hanya \"read:packages\" yang dicentang.",
+                    "stepPaste": "2. Tempel di sini.",
+                    "label": "Token",
+                    "submit": "Periksa dan simpan",
+                    "saving": "Memeriksa…",
+                    "tooBroad": "Token ini dapat melakukan lebih dari sekadar membaca paket. Buat token dengan hanya read:packages.",
+                    "fineGrained": "Ini adalah token fine-grained. Buat token klasik dengan hanya read:packages yang dicentang.",
+                    "cannotRead": "Token ini tidak dapat membaca {imageRepository}.",
+                    "publicImage": "Image ini sudah publik — tidak diperlukan token.",
+                    "noImageYet": "Belum ada build yang selesai. Tambahkan token pull setelah build pertama berhasil.",
+                    "savedExpires": "Token pull disimpan. Token kedaluwarsa pada {date}.",
+                    "savedNoExpiry": "Token pull disimpan. Token tidak kedaluwarsa.",
+                    "tokenSet": "Token pull sudah disimpan. Tempel token baru untuk menggantinya.",
+                    "expiringSoon": "Token pull kedaluwarsa pada {date}. Tambahkan token baru sebelum tanggal tersebut.",
+                    "viewerDisabled": "Anda memerlukan akses edit untuk melakukan ini.",
+                    "failed": "Tidak dapat menyimpan token pull. Coba lagi."
+                },
+                "overview": {
+                    "title": "Build terbaru",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Build yang dapat diterapkan: commit ini",
+                    "deployableOther": "Build yang dapat diterapkan: {sha}",
+                    "noDeployable": "Belum ada build yang dapat diterapkan",
+                    "open": "Buka Build"
+                }
+            },
+            "appDeploy": {
+                "title": "Penerapan",
+                "notRunning": "Aplikasi ini belum berjalan di mana pun.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Buka aplikasi",
+                "source": "Sumber",
+                "buildsLink": "Lihat Build",
+                "buildsHint": "Build tetap berjalan apa pun targetnya.",
+                "stale": "Terakhir diperiksa {minutes, plural, =1 {1 menit} other {# menit}} yang lalu",
+                "status": {
+                    "notDeployed": "Belum diterapkan",
+                    "live": "Aktif",
+                    "degraded": "Menurun",
+                    "down": "Mati",
+                    "unreachable": "Tidak dapat menjangkau kluster Anda",
+                    "paused": "Dijeda",
+                    "deleting": "Menghapus…"
+                },
+                "target": {
+                    "heading": "Di mana aplikasi ini harus berjalan?",
+                    "current": "(saat ini)",
+                    "none": {
+                        "label": "Tidak ada — jangan terapkan dulu",
+                        "description": "Build tetap berjalan."
+                    },
+                    "yourCluster": {
+                        "label": "Kluster Anda",
+                        "description": "Berjalan di kluster Kubernetes yang Anda kendalikan."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Kami menjalankannya untuk Anda.",
+                        "unavailable": "Segera hadir — hosting terkelola untuk aplikasi belum dibuka.",
+                        "ineligible": "Belum tersedia untuk aplikasi ini."
+                    },
+                    "connect": "Hubungkan kluster Anda",
+                    "reconnect": "Ubah koneksi kluster",
+                    "connected": "Terhubung · {version}",
+                    "connectedNoVersion": "Terhubung",
+                    "checkFailed": "Pemeriksaan kluster terakhir gagal.",
+                    "notChecked": "Belum ada kluster yang terhubung.",
+                    "save": "Gunakan target ini",
+                    "saving": "Menyimpan…",
+                    "saved": "Target disimpan.",
+                    "saveFailed": "Tidak dapat menyimpan target: {reason}",
+                    "changeNote": "Mengubah target tidak menghapus apa pun yang sudah berjalan.",
+                    "routeUnavailable": "Mengubah target belum tersedia di instans ini."
+                },
+                "connect": {
+                    "title": "Hubungkan kluster Anda",
+                    "description": "Tempel kubeconfig untuk service account di kluster tempat aplikasi ini akan berjalan.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Tempel kubeconfig Anda…",
+                    "kubeconfigHelp": "Gunakan token service account. Perintah, file lokal, dan proxy tidak didukung.",
+                    "kubeconfigStored": "Kubeconfig Anda dikirim sekali dan disimpan dalam bentuk terenkripsi. Tempel yang baru untuk menggantinya, atau periksa ulang yang tersimpan.",
+                    "contextLabel": "Konteks (opsional)",
+                    "contextHelp": "Biarkan kosong untuk menggunakan konteks saat ini dari kubeconfig.",
+                    "check": "Periksa koneksi",
+                    "checking": "Memeriksa…",
+                    "checkAgain": "Periksa lagi",
+                    "checkTimedOut": "Pemeriksaan tidak selesai dalam 30 detik. Coba lagi.",
+                    "checkFailed": "Tidak dapat memeriksa koneksi: {reason}",
+                    "unavailable": "Menghubungkan kluster belum tersedia di instans ini.",
+                    "kubeconfigTooLarge": "Kubeconfig ini lebih besar dari 64 KiB.",
+                    "kubeconfigRequired": "Tempel kubeconfig terlebih dahulu.",
+                    "ingressClass": "Kelas ingress",
+                    "ingressDefault": "{name} (default)",
+                    "ingressNone": "Tidak ditemukan kelas ingress",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Sertifikat dari issuer",
+                        "external": "Ditangani di luar kluster",
+                        "edge": "Diterminasi di edge",
+                        "none": "Tanpa TLS (hanya http)"
+                    },
+                    "issuer": "Issuer",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Dipilih saat aplikasi pertama kali diterapkan",
+                    "isolation": "Isolasi jaringan",
+                    "isolationOn": "Aktif (disarankan)",
+                    "isolationOff": "Nonaktif",
+                    "isolationOffWarning": "Tanpa isolasi jaringan, beban kerja lain di kluster dapat menjangkau aplikasi ini dan database-nya.",
+                    "cancel": "Batal",
+                    "save": "Simpan",
+                    "saving": "Menyimpan…",
+                    "saveBlocked": "Simpan tersedia setelah pemeriksaan lolos dengan semua izin yang diperlukan.",
+                    "saved": "Kluster terhubung.",
+                    "saveFailed": "Tidak dapat menyimpan koneksi kluster: {reason}"
+                },
+                "check": {
+                    "ok": "Terhubung",
+                    "version": "Kubernetes {version}",
+                    "failed": "Pemeriksaan kluster gagal.",
+                    "kubeconfigRefused": "Kubeconfig ini {reason}. Gunakan token service account sebagai gantinya.",
+                    "notPublic": "Ever Works hanya dapat menjangkau kluster di alamat publik.",
+                    "permissions": "Izin",
+                    "allPermissions": "Semua izin yang diperlukan tersedia.",
+                    "missing": "Tidak ada: {verb} {resource}",
+                    "optionalMissing": "Opsional, tidak ada: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Terapkan sekarang",
+                    "deploying": "Meminta…",
+                    "started": "Penerapan dimulai.",
+                    "queued": "Dalam antrean — dimulai saat Penerapan yang sedang berjalan selesai.",
+                    "deduplicated": "Penerapan tersebut sudah diminta.",
+                    "inProgress": "Penerapan lain sedang berjalan ({id}). Tunggu hingga selesai, lalu terapkan lagi.",
+                    "preconditionsHeader": "Perbaiki hal-hal ini sebelum penerapan:",
+                    "workerNotIsolated": "Penerapan belum dapat dimulai: instans ini tidak memiliki worker kluster App yang terisolasi.",
+                    "notAppWork": "Karya ini bukan Karya App, jadi tidak dapat diterapkan dengan cara ini.",
+                    "failed": "Tidak dapat meminta Penerapan: {reason}",
+                    "targetNone": "Pilih terlebih dahulu tempat aplikasi akan berjalan — Tidak ada berarti tidak menerapkan apa pun.",
+                    "deploymentId": "Penerapan {id}",
+                    "warningsHeader": "Peringatan"
+                },
+                "preconditions": {
+                    "specInvalid": "Spesifikasi App (.works/works.yml) memiliki kesalahan. Perbaiki di halaman spesifikasi App.",
+                    "licenseBlocksTarget": "Lisensi aplikasi tidak mengizinkan hosting di target ini.",
+                    "licenseAttestationMissing": "Nyatakan lisensi aplikasi sebelum menerapkannya.",
+                    "envRequiredUnset": "Beberapa nilai env yang wajib belum diatur.",
+                    "dependencyNotReady": "Dependensi yang dibutuhkan aplikasi belum siap.",
+                    "noGreenBuild": "Belum ada Build yang berhasil untuk diterapkan. Mulai Build terlebih dahulu.",
+                    "noGreenBuildForHead": "Commit terbaru di branch penerapan belum berhasil di-build.",
+                    "buildImageMissing": "Build tidak memiliki image untuk diterapkan.",
+                    "nothingToDeploy": "Belum ada yang dapat diterapkan: tidak ada Build dan tidak ada image yang dipublikasikan.",
+                    "imageNotPinned": "Image ini direferensikan dengan tag. Sematkan dengan digest agar setiap Penerapan menjalankan image yang sama.",
+                    "imageNotFound": "Image tidak dapat ditemukan di registrinya.",
+                    "imagePrivateUnsupported": "Image ini tidak dapat diunduh tanpa kredensial. Ever Works hanya menerapkan image yang dipublikasikan jika bersifat publik.",
+                    "imageUnresolvable": "Referensi image tidak dapat diselesaikan.",
+                    "primaryDomainMissing": "Domain utama belum disiapkan.",
+                    "targetNone": "Pilih terlebih dahulu tempat aplikasi akan berjalan.",
+                    "targetNotChecked": "Periksa koneksi kluster terlebih dahulu.",
+                    "clusterChangedUnconfirmed": "Kluster telah berubah sejak Penerapan terakhir. Konfirmasi perubahan tersebut untuk menerapkan.",
+                    "managedDisabled": "Segera hadir — hosting terkelola untuk aplikasi belum dibuka.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps hanya menjalankan aplikasi dari Blueprint yang terverifikasi.",
+                    "quotaExceeded": "Anda telah mencapai batas jumlah aplikasi yang dapat dijalankan di Ever Works Apps.",
+                    "managedIneligible": "Aplikasi ini tidak dapat berjalan di Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps tidak dapat menerima aplikasi baru saat ini.",
+                    "appWorkDeleting": "Karya App ini sedang dihapus.",
+                    "paused": "Aplikasi dijeda. Lanjutkan untuk menerapkan.",
+                    "deployInProgress": "Penerapan lain sedang berjalan.",
+                    "cronAuthEnvUnset": "Panggilan terjadwal memerlukan nilai autentikasi yang belum diatur.",
+                    "jobAuthEnvUnset": "Sebuah job memerlukan nilai autentikasi yang belum diatur.",
+                    "volumeReplicas": "Komponen dengan volume hanya dapat menjalankan satu replika.",
+                    "volumeShrink": "Volume tidak dapat diperkecil.",
+                    "privilegedPort": "Sebuah komponen mendengarkan port di bawah 1024.",
+                    "cronTooFrequent": "Sebuah panggilan terjadwal berjalan lebih sering daripada yang diizinkan.",
+                    "managedRootForbidden": "Image ini berjalan sebagai root.",
+                    "imageUserUnverifiable": "Ever Works tidak dapat memeriksa pengguna yang menjalankan image.",
+                    "workerNotIsolated": "Penerapan belum dapat dimulai: instans ini tidak memiliki worker kluster App yang terisolasi.",
+                    "envSourceUnavailable": "Nilai env aplikasi tidak dapat dibaca saat ini.",
+                    "pullCredentialUnavailable": "Kredensial untuk menarik image tidak tersedia.",
+                    "namespaceForeign": "Namespace tersebut sudah dimiliki oleh hal lain di kluster.",
+                    "verificationNamespaceForbidden": "Namespace tersebut dicadangkan untuk proses verifikasi."
+                },
+                "license": {
+                    "loading": "Membaca lisensi…",
+                    "unavailable": "Detail lisensi belum tersedia di instans ini.",
+                    "error": "Tidak dapat membaca lisensi. Muat ulang halaman untuk mencoba lagi.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Tidak ditemukan lisensi yang kami kenali.",
+                    "classes": {
+                        "green": "Hosting diizinkan",
+                        "amber": "Kluster Anda, setelah Anda mengonfirmasi ketentuan lisensi",
+                        "red": "Hanya kluster Anda, setelah Anda mengonfirmasi ketentuan lisensi",
+                        "unknown": "Lisensi tidak diketahui — konfirmasi ketentuannya sebelum penerapan",
+                        "unclassified": "Belum diklasifikasikan"
+                    },
+                    "mixed": "Sebagian repositori ini menggunakan lisensi yang berbeda.",
+                    "incomplete": "Repositori ini terlalu besar untuk dipindai sepenuhnya.",
+                    "yourClusterAllowed": "Kluster Anda: diizinkan",
+                    "yourClusterAfterConfirm": "Kluster Anda: diizinkan setelah Anda mengonfirmasi ketentuan lisensi",
+                    "review": "Tinjau dan konfirmasi",
+                    "confirmed": "Dikonfirmasi pada {date}.",
+                    "disclaimer": "Ini adalah pembacaan otomatis atas file lisensi repositori, bukan nasihat hukum.",
+                    "unknownSpdx": "Lisensi perangkat lunak ini",
+                    "dialogTitle": "Konfirmasi ketentuan lisensi",
+                    "dialogBody": "{spdx} membatasi cara perangkat lunak ini boleh di-host. Ever Works Apps tidak tersedia untuknya. Untuk menjalankannya di kluster Anda sendiri, konfirmasi:",
+                    "noText": "Registri lisensi tidak memiliki pernyataan untuk lisensi ini.",
+                    "checkbox": "Saya mengonfirmasi pernyataan di atas.",
+                    "footer": "Kami mencatat siapa yang mengonfirmasi, kapan, dan untuk lisensi serta commit mana.",
+                    "cancel": "Batal",
+                    "confirm": "Konfirmasi",
+                    "refusals": {
+                        "ownerOnly": "Hanya pemilik Karya App yang dapat menyatakan lisensi.",
+                        "licenseChanged": "Lisensi berubah saat Anda meninjaunya. Tinjau ketentuan baru dan konfirmasi lagi.",
+                        "attestationNotRequired": "Lisensi ini tidak lagi memerlukan konfirmasi.",
+                        "licenseUnavailable": "Konfirmasi lisensi belum tersedia di instans ini.",
+                        "route_unavailable": "Konfirmasi lisensi belum tersedia di instans ini.",
+                        "failed": "Tidak dapat mencatat konfirmasi. Coba lagi."
+                    }
+                },
+                "rollback": {
+                    "button": "Kembalikan",
+                    "title": "Kembali ke Deployment sebelumnya",
+                    "description": "Pilih Deployment yang pernah live. Image dan spesifikasi App-nya berjalan lagi; tidak ada yang dibangun ulang.",
+                    "pickLabel": "Deployment tujuan",
+                    "liveAt": "Live sejak {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Pernah live sebelumnya",
+                    "none": "Tidak ada Deployment live sebelumnya untuk dikembalikan.",
+                    "runJobs": "Jalankan lagi job pra-deploy",
+                    "confirm": "Kembalikan",
+                    "cancel": "Batal",
+                    "started": "Pengembalian dimulai.",
+                    "failed": "Tidak dapat memulai pengembalian: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Jeda",
+                    "resume": "Lanjutkan",
+                    "remove": "Hapus dari cluster",
+                    "removeTitle": "Hapus App ini dari cluster-nya",
+                    "removeDescription": "App yang berjalan dihentikan dan objek Kubernetes-nya dihapus. App Work dan Build-nya tetap ada.",
+                    "deleteData": "Hapus juga data tersimpan (volume dan database dependensi)",
+                    "deleteDataWarning": "Tindakan ini tidak dapat dibatalkan.",
+                    "confirmSlugLabel": "Ketik {slug} untuk mengonfirmasi",
+                    "confirmRemove": "Hapus",
+                    "cancel": "Batal",
+                    "failed": "Tidak dapat melakukannya: {reason}",
+                    "slugMismatch": "Slug yang Anda ketik tidak cocok dengan App Work ini.",
+                    "accepted": {
+                        "pause": "Penjedaan diminta.",
+                        "resume": "Pelanjutan diminta.",
+                        "remove": "Penghapusan diminta.",
+                        "cancelDeploy": "Pembatalan diminta."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Nama diawali huruf atau garis bawah dan hanya menggunakan A–Z, 0–9, dan _.",
+                    "reservedName": "Nama yang diawali EVER_WORKS_ dicadangkan untuk platform.",
+                    "valueTooLarge": "Sebuah nilai dapat berukuran maksimal 65.536 byte.",
+                    "controlCharacter": "Nilai tidak boleh berisi karakter NUL.",
+                    "lengthMismatch": "Harus tepat {expected} karakter — yang ini {actual}.",
+                    "tooShort": "Minimal {min} karakter.",
+                    "tooLong": "Maksimal {max} karakter.",
+                    "patternMismatch": "Itu tidak cocok dengan pola yang diminta aplikasi ini.",
+                    "generatedValueUseRotate": "Nilai ini dihasilkan secara otomatis. Rotasi untuk menggantinya.",
+                    "neverRotateNotAcknowledged": "Aplikasi ini menyatakan nilai ini tidak boleh berubah. Konfirmasi bahwa Anda memahaminya sebelum merotasi.",
+                    "rotateConfirmationMismatch": "Nama yang Anda ketik tidak cocok dengan nama nilai ini.",
+                    "secureStorageUnavailable": "Penyimpanan aman tidak dikonfigurasi di instalasi ini, sehingga nilai tidak dapat disimpan.",
+                    "tooManyValues": "Sebuah aplikasi dapat menyimpan maksimal 300 nilai.",
+                    "valuesTooLarge": "Total nilai sebuah aplikasi maksimal 1 MiB.",
+                    "malformedLine": "Bukan baris NAME=value yang valid.",
+                    "rotateRateLimited": "Terlalu banyak rotasi. Coba lagi nanti."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Tertunda",
+                    "awaitingConfig": "Memerlukan pengaturan Anda",
+                    "provisioning": "Menyediakan",
+                    "ready": "Siap",
+                    "degraded": "Menurun",
+                    "failed": "Gagal",
+                    "kept": "Disimpan — tidak lagi dikelola",
+                    "deleting": "Menghapus",
+                    "deleted": "Dihapus",
+                    "notInSpec": "Tidak lagi digunakan oleh spesifikasi App — data disimpan"
+                },
+                "backup": {
+                    "none": "Tidak ada cadangan otomatis. Jika volume ini hilang, datanya akan hilang.",
+                    "notConfigured": "Cadangan: belum dikonfigurasi",
+                    "healthy": "Cadangan: terakhir selesai {time}",
+                    "overdue": "Cadangan: terlambat — terakhir selesai {time}",
+                    "failing": "Cadangan: percobaan terakhir gagal",
+                    "external": "Cadangan: dikelola oleh penyedia {kind} Anda",
+                    "unknown": "Cadangan: tidak dapat diperiksa"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Kluster Anda tidak memiliki storage class default. Pilih salah satu di pengaturan Dependensi.",
+                    "clusterUnreachable": "Tidak dapat menjangkau kluster Anda.",
+                    "smtpConnectFailed": "Tidak dapat terhubung ke server email.",
+                    "smtpTlsFailed": "Handshake TLS server email gagal.",
+                    "smtpAuthRefused": "Proses masuk ditolak oleh server.",
+                    "bucketUnreadable": "Bucket {bucket} tidak ada atau tidak dapat dibaca.",
+                    "volumeNotReady": "Volume tidak siap dalam {minutes} menit.",
+                    "extensionUnavailable": "Ekstensi tidak tersedia: {names}.",
+                    "platformServerRefused": "Server tersebut menyimpan data platform Ever Works. Pilih server lain.",
+                    "deadlineExceeded": "Penyediaan tidak selesai tepat waktu.",
+                    "namespaceNotOwned": "Namespace tersebut milik aplikasi lain. Pilih namespace lain.",
+                    "namespaceBaselineMissing": "Namespace tidak memiliki batasan dan kebijakan dasarnya.",
+                    "clusterPermissionMissing": "Ever Works tidak memiliki izin untuk membuat dependensi ini di kluster Anda.",
+                    "operatorNamespaceUnknown": "Namespace operator belum diatur di pengaturan Dependensi.",
+                    "volumeExpansionUnsupported": "Storage class {storageClass} tidak dapat memperbesar volume ini.",
+                    "sizeShrinkRefused": "Penyimpanan dependensi tidak dapat diperkecil. Hapus datanya terlebih dahulu jika Anda memerlukan yang lebih kecil.",
+                    "relayIneligible": "Aplikasi ini tidak dapat menggunakan relay email Ever Works.",
+                    "relaySuspended": "Relay email Ever Works ditangguhkan.",
+                    "providerNotSupported": "Penyedia tersebut tidak dapat melayani dependensi ini.",
+                    "dependencyNotDeclared": "Spesifikasi App tidak mendeklarasikan dependensi ini.",
+                    "confirmationMismatch": "Nama yang Anda ketik tidak cocok.",
+                    "deleteInProgress": "Data dependensi ini sedang dihapus.",
+                    "notGenerated": "Nilai tersebut tidak dihasilkan secara otomatis, jadi tidak ada yang perlu dirotasi.",
+                    "notAppWork": "Karya ini bukan aplikasi.",
+                    "targetNone": "Aplikasi ini belum diatur untuk diterapkan di mana pun. Pilih target penerapan untuk menyediakan dependensinya.",
+                    "targetNotChecked": "Kluster Anda belum lolos pemeriksaan. Periksa koneksi, lalu coba lagi."
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "Repositori",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Repositori kode yang sudah ada sebagai Work — Task, Goal, dan eksekusi fleet melekat padanya. Tidak ada yang dibuat atau dideploy.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Jalankan dan kembangkan repositori GitHub apa pun — tautkan atau fork, lalu pilih tempat menjalankannya."
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Repositori"
+                "repo": "Repositori",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "Repositori kode yang sudah ada sebagai Work — Task, Goal, dan eksekusi fleet melekat padanya. Tidak ada yang dibuat atau dideploy."
+                "repo": "Repositori kode yang sudah ada sebagai Work — Task, Goal, dan eksekusi fleet melekat padanya. Tidak ada yang dibuat atau dideploy.",
+                "app": "Jalankan dan kembangkan repositori GitHub apa pun — tautkan atau fork, lalu pilih tempat menjalankannya."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "mis. \"https://github.com/owner/repo — aplikasi open-source yang ingin Anda miliki salinannya sendiri\"",
+                "formTitle": "Karya App baru",
+                "formSubtitle": "Mulai dari repositori GitHub apa pun. Ever Works menautkannya atau membuat salinan milik Anda sendiri, lalu membantu Anda menjalankan dan terus mengubahnya.",
+                "urlLabel": "URL repositori",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Repositori GitHub apa pun yang dapat dibaca oleh akun Anda yang terhubung.",
+                "checkButton": "Periksa repositori",
+                "checking": "Memeriksa…",
+                "tabPaste": "Tempel URL",
+                "tabCatalog": "Jelajahi katalog Aplikasi",
+                "catalogComingSoon": "Katalog Aplikasi akan segera tersedia di sini. Untuk saat ini, tempel URL repositori.",
+                "stars": "{count, plural, =1 {1 bintang} other {# bintang}}",
+                "defaultBranch": "Branch default: {branch}",
+                "largeRepository": "Repositori besar ({size})",
+                "moved": "Dipindahkan ke {fullName}",
+                "isFork": "Repositori ini adalah fork dari {parent}.",
+                "ownFork": "Ini adalah fork Anda dari {parent}. Ever Works akan mengikuti {parent} sebagai upstream.",
+                "publicForkNote": "Fork dari repositori publik bersifat publik.",
+                "archivedNote": "Repositori ini diarsipkan. Sinkronisasi upstream tetap nonaktif.",
+                "licenseChip": "Lisensi: {spdx}",
+                "licenseNotDetected": "Lisensi: tidak terdeteksi",
+                "licenseClass": {
+                    "green": "Hosting diizinkan",
+                    "amber": "Kluster Anda, setelah Anda menyatakan lisensinya",
+                    "red": "Kluster Anda, setelah Anda menyatakan lisensinya",
+                    "unknown": "Lisensi tidak diketahui — Anda akan menyatakannya sebelum penerapan"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint terverifikasi",
+                    "available": "Blueprint tersedia",
+                    "none": "Tidak ada Blueprint — agen akan mencari cara menjalankannya",
+                    "unavailable": "Pemeriksaan Blueprint tidak tersedia"
+                },
+                "existingAppWork": "Anda sudah memiliki Karya App untuk repositori ini: {name}.",
+                "openExistingAppWork": "Buka",
+                "scanIncomplete": "Tidak semua akun diperiksa untuk fork yang sudah ada.",
+                "modesTitle": "Bagaimana Ever Works harus menggunakan repositori ini?",
+                "modes": {
+                    "link": {
+                        "title": "Tautkan",
+                        "titleOwnFork": "Tautkan — jangan ikuti upstream",
+                        "description": "Gunakan repositori ini apa adanya. Anda dapat melakukan push ke repositori ini, sehingga perubahan langsung masuk ke sini."
+                    },
+                    "fork": {
+                        "title": "Fork",
+                        "description": "Buat fork milik Anda sendiri. Anda dapat menyinkronkannya dengan upstream dan mengusulkan perubahan kembali."
+                    },
+                    "private-copy": {
+                        "title": "Salinan pribadi",
+                        "description": "Buat repositori pribadi dengan kode yang sama."
+                    }
+                },
+                "unavailable": "Tidak tersedia: {reason}",
+                "forkInto": "Fork ke",
+                "copyInto": "Salin ke",
+                "ownerFilter": "Cari akun",
+                "ownerOrganization": "organisasi",
+                "ownerNotChecked": "tidak diperiksa untuk fork yang sudah ada",
+                "existingFork": "Anda sudah memiliki fork: {fullName}. Ever Works akan menggunakannya.",
+                "privateCopyTradeOff": "Salinan pribadi tidak ditautkan ke repositori asli di GitHub, sehingga tidak dapat membuka pull request ke proyek asli. Perubahan upstream masuk sebagai pull request di salinan Anda.",
+                "linkSetupNote": "Ever Works membuka pull request yang menambahkan satu file, .works/works.yml. Gabungkan untuk menyelesaikan.",
+                "existingForkSetupNote": "Ever Works tidak membuat fork ini, jadi Ever Works membuka pull request yang menambahkan .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works membuka pull request yang menambahkan .works/works.yml dan file Blueprint. Gabungkan untuk menyelesaikan.",
+                "existingForkSetupNoteBlueprint": "Ever Works tidak membuat fork ini, jadi Ever Works membuka pull request yang menambahkan .works/works.yml dan file Blueprint.",
+                "promptsTitle": "Nilai yang dibutuhkan aplikasi ini",
+                "promptHint": "Blueprint {name} meminta nilai-nilai ini. Anda dapat mengubahnya nanti di Pengaturan.",
+                "promptRequired": "Wajib",
+                "promptsIncomplete": "Isi terlebih dahulu nilai yang dibutuhkan aplikasi.",
+                "autoProvision": "Biarkan agen mencari cara menjalankannya",
+                "autoProvisionHelp": "Dimulai saat repositori siap. Proses ini menggunakan token AI dan menit runner build, dalam batas penyediaan. Anda dapat membatalkannya, atau hapus centang ini dan mulai nanti dari Ringkasan dengan Sediakan.",
+                "deployTargetTitle": "Di mana aplikasi ini harus berjalan?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Tidak ada — jangan terapkan dulu",
+                        "description": "Anda dapat memilih target nanti."
+                    },
+                    "your-cluster": {
+                        "title": "Kluster Anda",
+                        "description": "Jalankan di kluster Kubernetes milik Anda sendiri. Anda akan menambahkan koneksinya di tab Penerapan."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Segera hadir — hosting terkelola untuk aplikasi belum dibuka."
+                    }
+                },
+                "submit": {
+                    "link": "Tautkan dan buat Karya App",
+                    "fork": "Fork dan buat Karya App",
+                    "private-copy": "Salin dan buat Karya App"
+                },
+                "submitPending": "Membuat…",
+                "nameLabel": "Nama",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Deskripsi",
+                "slugHelp": "Pengenal yang ramah URL. Diturunkan dari nama repositori — edit untuk menggantinya.",
+                "invalidSlug": "Gunakan hanya huruf kecil, angka, dan tanda hubung, misalnya tasks-app",
+                "cancel": "Batal",
+                "createFailed": "Tidak dapat membuat Karya App. Coba lagi.",
+                "success": {
+                    "link": "Karya App dibuat.",
+                    "fork": "Fork diminta — kami akan memberi tahu Anda saat siap.",
+                    "private-copy": "Penyalinan dimulai — kami akan memberi tahu Anda saat siap."
+                },
+                "reasons": {
+                    "invalid_url": "Masukkan URL repositori GitHub seperti https://github.com/owner/repo",
+                    "provider_not_connected": "Hubungkan GitHub untuk membuat Karya App.",
+                    "insufficient_scope": "Hubungkan ulang GitHub untuk memberikan akses repositori.",
+                    "not_found": "Kami tidak dapat menemukan repositori ini, atau akun GitHub Anda tidak dapat membacanya.",
+                    "sso_authorization_required": "{owner} mengharuskan Anda mengotorisasi Ever Works untuk organisasinya di GitHub.",
+                    "oauth_app_restricted": "{owner} membatasi akses pihak ketiga. Minta pemilik {owner} untuk menyetujui Ever Works, atau pilih akun lain.",
+                    "empty_repository": "Repositori ini belum memiliki commit.",
+                    "no_push_access": "Anda tidak dapat melakukan push ke repositori ini.",
+                    "archived": "Repositori yang diarsipkan bersifat hanya-baca.",
+                    "forking_disabled": "Pemilik repositori ini tidak mengizinkan fork atau salinan.",
+                    "own_repository": "Anda adalah pemilik repositori ini — tautkan saja.",
+                    "target_owner_unavailable": "Akun ini tidak tersedia di koneksi GitHub Anda.",
+                    "target_owner_forbidden": "Anda tidak dapat membuat repositori di {owner}.",
+                    "too_large_for_private_copy": "Terlalu besar untuk salinan pribadi ({size}). Buat fork sebagai gantinya.",
+                    "uses_lfs": "Menggunakan Git LFS, yang tidak dapat dibawa oleh salinan pribadi. Buat fork sebagai gantinya.",
+                    "copy_name_unavailable": "{owner} sudah memiliki repositori bernama {name} hingga {name}-copy-5.",
+                    "in_use_by_another_account": "Akun lain sudah menggunakan repositori ini di Ever Works. Minta pemiliknya untuk menambahkan Anda sebagai anggota.",
+                    "app_work_exists": "Anda sudah memiliki Karya App untuk {fullName}: {workName}.",
+                    "create_in_progress": "Karya App ini sedang dibuat.",
+                    "rate_limited": "GitHub sedang membatasi laju akun Anda. Coba lagi pada {time}.",
+                    "managed_hosting_unavailable": "Segera hadir — hosting terkelola untuk aplikasi belum dibuka.",
+                    "cluster_target_unavailable": "Tidak ada opsi penerapan yang dapat menjalankan aplikasi yang terpasang.",
+                    "app_works_disabled": "Karya App tidak tersedia di instans ini.",
+                    "blueprint_mismatch": "Blueprint untuk repositori ini telah berubah. Periksa repositori lagi."
+                },
+                "catalog": {
+                    "searchLabel": "Cari di katalog Aplikasi",
+                    "searchPlaceholder": "Cari aplikasi — misalnya umami atau calendar",
+                    "listLabel": "Blueprint aplikasi",
+                    "loading": "Memuat katalog Aplikasi…",
+                    "unavailable": "Katalog Aplikasi tidak tersedia saat ini. Tempel URL repositori sebagai gantinya.",
+                    "disabled": "Karya App tidak tersedia di instans ini.",
+                    "error": "Tidak dapat memuat katalog Aplikasi. Coba lagi, atau tempel URL repositori.",
+                    "empty": "Belum ada Blueprint aplikasi yang dipublikasikan. Tempel URL repositori sebagai gantinya.",
+                    "noMatches": "Tidak ada aplikasi yang cocok dengan pencarian Anda.",
+                    "pick": "Mulai dari {name}",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "Segera hadir",
+                    "verified": "Terverifikasi",
+                    "upstreamLine": "Dari {repo}",
+                    "runsOn": "Berjalan di: {targets}",
+                    "targetYourCluster": "Kluster Anda",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Belum tersedia",
+                    "fallbackNote": "Menampilkan Blueprint aplikasi yang ditemukan di GitHub — katalog kurasi tidak tersedia saat ini."
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "Impor dimulai dengan sukses",
                 "failed": "Gagal mengimpor karya",
                 "fetchReposFailed": "Gagal mengambil repositori"
+            },
+            "app": {
+                "repositoryUrlRequired": "Masukkan URL repositori GitHub seperti https://github.com/owner/repo",
+                "repositoryModeRequired": "Pilih cara menggunakan repositori ini: Tautkan, Fork, atau Salinan pribadi.",
+                "targetOwnerRequired": "Pilih akun tempat repositori akan dibuat.",
+                "invalidUrl": "Masukkan URL repositori GitHub seperti https://github.com/owner/repo",
+                "inspectFailed": "Tidak dapat memeriksa repositori ini. Coba lagi."
             }
         },
         "generator": {

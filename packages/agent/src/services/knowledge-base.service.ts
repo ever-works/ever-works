@@ -942,7 +942,19 @@ export class KnowledgeBaseService {
             ? await this.documentRepository.findOrgByPath(organizationId, idOrPath)
             : await this.documentRepository.findOrgById(organizationId, idOrPath);
 
-        if (!doc) {
+        // Review 2026-10-17 F14: only what a Work actually inherits, the same predicate
+        // as `listInheritableForOrg` / `resolveInheritableDocuments`. Any class is
+        // accepted at org scope now (EW-P3-2), so without it every org document (any
+        // class, draft, archived or proposed) was readable by any Work viewer,
+        // invited users from other tenants included. 404, so existence never leaks.
+        if (
+            !doc ||
+            !(KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>).includes(
+                doc.kbDocumentClass,
+            ) ||
+            doc.status !== 'active' ||
+            doc.reviewState === KbReviewState.PROPOSED
+        ) {
             throw new NotFoundException(
                 `KB inherited document not found: org=${organizationId} ${idOrPath}`,
             );

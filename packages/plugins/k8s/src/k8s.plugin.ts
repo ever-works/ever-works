@@ -368,8 +368,9 @@ const REGISTRY_SCHEMA: JsonSchema = {
 };
 
 export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
-	readonly id = 'k8s';
-	readonly name = 'Kubernetes';
+	// `string`, not the literal: APW-10 lite's `k8s-apps-tier` plugin extends this class with its own id.
+	readonly id: string = 'k8s';
+	readonly name: string = 'Kubernetes';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'deployment';
 	/**
@@ -377,7 +378,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * never replaced — `'deployment'` is what every pre-existing routing decision in the platform selects on.
 	 */
 	readonly capabilities: readonly string[] = ['deployment', 'app-dependency'];
-	readonly providerName = 'kubernetes';
+	readonly providerName: string = 'kubernetes';
 
 	/**
 	 * This plugin implements APW-06's App members (below), so `isAppDeploymentPlugin` narrows it and
@@ -1471,7 +1472,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		);
 		const provider = descriptor ? this.dependencyProviderFor(descriptor.id) : null;
 		if (!provider) return { supported: false, reason: 'providerNotSupported' };
-		return provider.supports(kind, target);
+		return provider.supports(kind, this.dependencyProviderTarget(target));
+	}
+
+	/**
+	 * The target the in-cluster providers are asked about. This class: the target itself. APW-10 lite's
+	 * `k8s-apps-tier` subclass publishes the SAME providers for `ever-works-apps` (they provision inside the
+	 * App's own namespace either way) and maps its target onto the one the providers implement.
+	 */
+	protected dependencyProviderTarget(target: AppDependencyTarget): AppDependencyTarget {
+		return target;
 	}
 
 	/**
@@ -1549,13 +1559,22 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * call it. A ref with no `target` at all is read as `your-cluster`, which is how the App modules
 	 * themselves default it (`minimalRenderInput`, `app-lifecycle.ts`).
 	 */
-	private assertThisPluginServes(ref: AppTargetRef | undefined): void {
+	protected assertThisPluginServes(ref: AppTargetRef | undefined): void {
 		const target = ref?.target;
-		if (target === undefined || target === 'your-cluster') return;
+		if (this.servesAppTarget(target)) return;
 		throw new K8sPluginError(
 			'NOT_CONFIGURED',
-			`The Kubernetes plugin serves App Work targets on 'your-cluster' only; '${target}' is served by the apps-tier plugin (APW-06 R-5).`
+			`The ${this.name} plugin does not serve App Work target '${target}'; 'your-cluster' is served by the k8s plugin and 'ever-works-apps' by the apps-tier plugin (APW-06 R-5).`
 		);
+	}
+
+	/**
+	 * Which App Work targets this plugin serves. This class: `your-cluster` (and a ref that names
+	 * none, the pre-target call shape). APW-10 lite's `k8s-apps-tier` subclass answers
+	 * `ever-works-apps` only, so neither plugin can be handed the other target's credential.
+	 */
+	protected servesAppTarget(target: string | undefined): boolean {
+		return target === undefined || target === 'your-cluster';
 	}
 
 	/**
@@ -1571,7 +1590,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * The **pinned** YAML is what the `src/app/*` modules receive — it is the credential they hand
 	 * to `KubernetesApiService`, and therefore the one the client loads.
 	 */
-	private async guardedAppCredential(credential: string, kubeContext?: string | null): Promise<string> {
+	protected async guardedAppCredential(credential: string, kubeContext?: string | null): Promise<string> {
 		const allowlist = readClusterPrivateAllowlist();
 		if (allowlist.invalid.length > 0) {
 			// Plan §6.1: an entry that does not parse never widens the policy — it is reported, then

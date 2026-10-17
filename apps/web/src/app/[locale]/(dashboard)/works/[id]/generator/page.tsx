@@ -7,7 +7,7 @@ import { GeneratorForm } from '@/components/works/detail/generator/GeneratorForm
 import { GenerationProgress } from '@/components/works/detail/generator/GenerationProgress';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canGenerate } from '@/lib/permissions';
-import { isRepositoryWorkKind } from '@ever-works/contracts';
+import { isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
 import { notFound } from 'next/navigation';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,6 +42,11 @@ export default async function WorkGeneratorPage({ params, searchParams }: Params
     // generator action for the kind — so the page is not served either
     // (the tab is hidden in `WorkTabs`; this covers a typed URL).
     if (isRepositoryWorkKind(work.kind)) {
+        notFound();
+    }
+    // APW-01 T24 (spec S10, ACC-01-11) — an App Work has no generator either:
+    // its code is somebody's repository, built and deployed as is. Same refusal.
+    if (isAppWorkKind(work.kind)) {
         notFound();
     }
 

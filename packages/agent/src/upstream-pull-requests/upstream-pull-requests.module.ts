@@ -3,12 +3,14 @@ import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { AppWorksModule } from '../app-works/app-works.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { TasksDomainModule } from '../tasks-domain/tasks.module';
 import {
     UPSTREAM_CREDENTIAL_STORE,
     UpstreamCredentialService,
 } from './upstream-credential.service';
 import { UpstreamCredentialStateStore } from './upstream-credential.store';
 import { UpstreamContributionBudgetService } from './upstream-contribution-budget.service';
+import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.service';
 
 /**
  * APW-09 (Upstream pull requests) — the epic's agent-side module, and the home
@@ -105,11 +107,16 @@ import { UpstreamContributionBudgetService } from './upstream-contribution-budge
         FacadesModule,
         // T44: the Work budget the contribution-run gate books against.
         BudgetsModule,
+        // APW-09 (lane aw-ai) — `TaskRepository` for the upstream-PR open service's
+        // "a Task of this Work" read. `AppWorksModule` imports it too, but does not re-export it.
+        TasksDomainModule,
     ],
     providers: [
         UpstreamCredentialStateStore,
         UpstreamCredentialService,
         UpstreamContributionBudgetService,
+        // APW-09 (lane aw-ai, 2026-10-17) — `POST /api/works/:id/upstream-pr`'s service.
+        UpstreamPullRequestOpenService,
         {
             provide: UPSTREAM_CREDENTIAL_STORE,
             useExisting: UpstreamCredentialStateStore,
@@ -119,6 +126,7 @@ import { UpstreamContributionBudgetService } from './upstream-contribution-budge
         UpstreamCredentialStateStore,
         UpstreamCredentialService,
         UpstreamContributionBudgetService,
+        UpstreamPullRequestOpenService,
         UPSTREAM_CREDENTIAL_STORE,
     ],
 })

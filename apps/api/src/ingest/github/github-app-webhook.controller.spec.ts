@@ -123,7 +123,10 @@ describe('GitHubAppWebhookController (POST /api/github-app/webhooks — legacy r
         await expect(
             controller.handleWebhook(req as never, signature, 'installation'),
         ).resolves.toEqual({ ok: true });
-        expect(appSync.handleWebhook).toHaveBeenCalledWith('installation', INSTALL_BODY);
+        // App-secret verified → the sync leg may auto-claim for the installer.
+        expect(appSync.handleWebhook).toHaveBeenCalledWith('installation', INSTALL_BODY, {
+            appSecretVerified: true,
+        });
     });
 
     it('rethrows an App-sync failure, as it always did (GitHub retry is load-bearing)', async () => {

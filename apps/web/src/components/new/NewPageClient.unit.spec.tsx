@@ -62,7 +62,10 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         // as the inert "Soon" span — i.e. the same 10 live chips this
         // test has always asserted. With every other flag fail-open, the
         // resulting button-option list is exactly the live chip order.
-        const { container } = render(<NewPageClient disabledKinds={['store']} />);
+        // APW-01 T23 — `app` is fail-closed: the server pre-seeds it into the
+        // disabled set unless `works-app` / EVER_WORKS_APP_WORKS_ENABLED turns it
+        // on, so the production state passes it here too.
+        const { container } = render(<NewPageClient disabledKinds={['store', 'app']} />);
         const chipButtons = Array.from(
             container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
@@ -86,6 +89,30 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             'dashboard.newPage.chips.repo',
             'dashboard.newPage.chips.company',
         ]);
+    });
+
+    describe('APW-01 T23 — the fail-closed App chip (FR-47, ACC-01-13)', () => {
+        it('is ABSENT — no button and no "Soon" span — while `app` is disabled', () => {
+            const { container } = render(<NewPageClient disabledKinds={['store', 'app']} />);
+            expect(container.querySelector('[data-testid="new-chip-app"]')).toBeNull();
+            const labels = Array.from(container.querySelectorAll('button[role="option"]')).map(
+                (b) => b.textContent?.trim(),
+            );
+            expect(labels).not.toContain('dashboard.newPage.chips.app');
+            // Every other disabled kind still renders its inert "Soon" chip.
+            const store = container.querySelector('span[data-testid="new-chip-store"]');
+            expect(store?.getAttribute('aria-disabled')).toBe('true');
+        });
+
+        it('renders as a live chip between Repository and Company once enabled', () => {
+            const { container } = render(<NewPageClient disabledKinds={['store']} />);
+            const labels = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected]'),
+            ).map((b) => b.textContent?.trim());
+            const repoIndex = labels.indexOf('dashboard.newPage.chips.repo');
+            expect(labels[repoIndex + 1]).toBe('dashboard.newPage.chips.app');
+            expect(labels[repoIndex + 2]).toBe('dashboard.newPage.chips.company');
+        });
     });
 
     it('renders a chip as the inert "Soon" span when its kind is in disabledKinds', () => {

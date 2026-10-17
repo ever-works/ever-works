@@ -265,6 +265,19 @@ export const fleetAPI = {
         });
     },
 
+    /**
+     * Fleet usage limits — "clear limit now" for one CLI (`provider`) or every
+     * CLI (`null`) on a node, before its reset.
+     */
+    clearNodeModelThrottle: async (nodeId: string, provider: string | null) => {
+        return serverMutation<FleetNodeView>({
+            endpoint: `${BASE}/nodes/${nodeId}/clear-model-throttle`,
+            data: { provider },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
     /** `null` clears the owner's ceiling back to the deployment default. */
     setCostCeiling: async (dailyCeilingCents: number | null) => {
         return serverMutation<FleetCostCeilingView>({

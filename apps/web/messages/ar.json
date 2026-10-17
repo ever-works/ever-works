@@ -3613,7 +3613,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3700,6 +3701,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4525,12 +4540,14 @@
                     "generator": "توليد الـWork مرة واحدة أو وفق جدول",
                     "deploy": "نشر الـWork",
                     "tasks": "مهام هذا العمل",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "صور حاويات مبنية من مستودعك"
                 },
                 "tasks": "المهام",
                 "posts": "المقالات",
                 "pages": "الصفحات",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "عمليات البناء"
             },
             "members": {
                 "title": "أعضاء الفريق",
@@ -6875,6 +6892,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "المصدر الأصلي: {fullName}",
+                    "fork": "نسخة متفرعة: {fullName}",
+                    "private-copy": "نسخة خاصة: {fullName}",
+                    "link": "مرتبط: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "جارٍ تجهيز نسختك المتفرعة",
+                    "forkBody": "يُنشئ GitHub المستودع {fullName}. يستغرق ذلك عادةً أقل من دقيقة؛ وقد تستغرق المستودعات الكبيرة وقتًا أطول.",
+                    "copyTitle": "جارٍ تجهيز نسختك الخاصة",
+                    "copyBody": "جارٍ نسخ {upstream} إلى {fullName}. تستغرق المستودعات الأكبر وقتًا أطول.",
+                    "linkTitle": "جارٍ إنهاء الإعداد",
+                    "linkBody": "جارٍ فتح طلب سحب يضيف .works/works.yml إلى {fullName}.",
+                    "blueprintTitle": "جارٍ تطبيق الـBlueprint ‏{name}",
+                    "blueprintBody": "يجهّز Ever Works عمل App الخاص بك وسيكتب .works/works.yml مع ملفات الـBlueprint."
+                },
+                "setupPrClosed": "أُغلق طلب سحب الإعداد دون دمجه.",
+                "timedOut": "تستغرق نسختك المتفرعة أكثر من 15 دقيقة.",
+                "failedAccess": "فقد Ever Works الوصول إلى GitHub أثناء تجهيز عمل App هذا.",
+                "failedOther": "فشل تجهيز عمل App هذا: {reason}",
+                "waitingForSetupPr": "ادمج طلب سحب الإعداد لإنهاء الإعداد.",
+                "tryAgain": "حاول مرة أخرى",
+                "openOnGitHub": "فتح على GitHub",
+                "reconnectGitHub": "إعادة ربط GitHub",
+                "openPullRequest": "فتح طلب السحب",
+                "retryLimit": "استنفدت المحاولات الثلاث المتاحة لهذه الساعة. حاول مرة أخرى لاحقًا.",
+                "retryFailed": "تعذّر بدء محاولة أخرى. حاول مرة أخرى.",
+                "failedReasons": {
+                    "works_yml_unparseable": "الملف .works/works.yml في الفرع الافتراضي ليس YAML صالحًا. أصلح الملف أو احذفه، ثم حاول مرة أخرى.",
+                    "works_yml_other_kind": "يُعلن الملف .works/works.yml بالفعل عن نوع مختلف من الأعمال. اضبط kind: app أو احذف الملف، ثم حاول مرة أخرى.",
+                    "push_rejected": "واصل GitHub رفض الـcommit الذي يضيف .works/works.yml.",
+                    "provider_unsupported": "لا يمكن إعداد مزوّد Git الخاص بهذا المستودع تلقائيًا.",
+                    "too_large_for_private_copy": "المستودع كبير جدًا على النسخة الخاصة. أنشئ نسخة متفرعة بدلًا من ذلك.",
+                    "uses_lfs": "يستخدم المستودع Git LFS، الذي لا يمكن للنسخة الخاصة نقله. أنشئ نسخة متفرعة بدلًا من ذلك.",
+                    "other": "حدث خطأ أثناء إعداد المستودع."
+                },
+                "overview": {
+                    "title": "التطبيق",
+                    "repository": "مستودع العمل",
+                    "upstream": "المصدر الأصلي (upstream)",
+                    "relationLabel": "العلاقة",
+                    "readinessLabel": "الجاهزية",
+                    "readiness": {
+                        "preparing": "قيد التجهيز",
+                        "ready": "جاهز",
+                        "timed_out": "انتهت المهلة",
+                        "failed": "فشل",
+                        "waiting_for_setup_pr": "بانتظار طلب سحب الإعداد"
+                    },
+                    "relations": {
+                        "link": "مرتبط",
+                        "fork": "نسخة متفرعة",
+                        "private-copy": "نسخة خاصة"
+                    },
+                    "appSpecLabel": "مواصفات التطبيق",
+                    "appSpecStatus": {
+                        "valid": "صالحة",
+                        "valid_with_warnings": "صالحة، مع تحذيرات",
+                        "invalid": "تحتوي على أخطاء",
+                        "missing": "لم تُكتب بعد",
+                        "unreadable": "تعذّرت قراءتها",
+                        "pending": "قيد الفحص",
+                        "unknown": "لم تُفحص بعد"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {لا أخطاء} =1 {خطأ واحد} two {خطآن} few {# أخطاء} many {# خطأً} other {# خطأ}} · {warnings, plural, =0 {لا تحذيرات} =1 {تحذير واحد} two {تحذيران} few {# تحذيرات} many {# تحذيرًا} other {# تحذير}}",
+                    "openAppSpec": "فتح مواصفات التطبيق",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "تعذّر تحميل تفاصيل التطبيق حاليًا.",
+                    "builds": "عمليات البناء",
+                    "deploy": "نشر",
+                    "upstreamTab": "المصدر الأصلي (upstream)",
+                    "blueprintLabel": "الـBlueprint"
+                },
+                "chat": {
+                    "title": "طوّره مع وكيله",
+                    "body": "اطلب من وكيل العمل تغيير التطبيق — إضافة ميزة، أو إصلاح خلل، أو ترقية تبعية. يعمل الوكيل في مستودع العمل ويفتح طلبات سحب.",
+                    "button": "الدردشة حول هذا التطبيق"
+                }
+            },
+            "builds": {
+                "title": "عمليات البناء",
+                "subtitle": "يُبنى على مشغّلات مستضافة لدى GitHub في {repository} · الصورة {imageRepository}",
+                "subtitleNoImage": "يُبنى على مشغّلات مستضافة لدى GitHub في {repository}",
+                "subtitleGeneric": "صور حاويات مبنية من مستودع عمل App هذا.",
+                "startBuild": "بدء البناء",
+                "starting": "جارٍ البدء…",
+                "refresh": "تحديث",
+                "cancel": "إلغاء",
+                "cancelling": "جارٍ الإلغاء…",
+                "viewerDisabled": "تحتاج إلى صلاحية التعديل للقيام بذلك.",
+                "deployable": "قابل للنشر",
+                "notDeployableLine": "غير قابل للنشر — {reason}",
+                "pagination": "عرض {start}–{end} من {total}",
+                "listLabel": "عمليات بناء عمل App هذا",
+                "openDetails": "فتح البناء رقم {number}",
+                "status": {
+                    "queued": "في قائمة الانتظار",
+                    "running": "قيد التشغيل",
+                    "succeeded": "نجح",
+                    "failed": "فشل",
+                    "cancelled": "أُلغي",
+                    "blocked": "محظور"
+                },
+                "trigger": {
+                    "push": "دفع (push)",
+                    "pullRequest": "طلب السحب #{number}",
+                    "manual": "يدوي",
+                    "verification": "تحقق"
+                },
+                "notDeployable": {
+                    "notSucceeded": "لم ينجح البناء",
+                    "pullRequest": "مبني من طلب سحب",
+                    "verification": "مبني للتحقق",
+                    "specInvalid": "تحتوي مواصفات التطبيق في هذا الـcommit على أخطاء",
+                    "staleInputs": "مبني بقيم بناء أقدم",
+                    "secretCheckFailed": "لم ينجح فحص الأسرار",
+                    "digestUnconfirmed": "تعذّر تأكيد الصورة المدفوعة",
+                    "criticalVulnerability": "توجد ثغرة حرجة يتوفر لها إصلاح",
+                    "unsigned": "الصورة غير موقّعة"
+                },
+                "blocked": {
+                    "workflowPending": "بانتظار دمج سير عمل البناء.",
+                    "workflowEditedByHand": "عُدّل سير عمل البناء يدويًا.",
+                    "workflowWriteFailed": "تعذّر على Ever Works كتابة سير عمل البناء في المستودع. توجد قاعدة في هذا المستودع ترفض التغيير.",
+                    "actionsDisabled": "GitHub Actions متوقف لهذا المستودع.",
+                    "missingBuildValues": "بانتظار {count, plural, =1 {قيمة بناء واحدة} two {قيمتي بناء} few {# قيم بناء} many {# قيمة بناء} other {# قيمة بناء}}: {names}",
+                    "runnerTooSmall": "يحتاج هذا البناء إلى {needed} لكن المشغّل الخاص بالمستودعات {visibility} يسمح بـ{max}.",
+                    "tooManyBuildValues": "يستخدم هذا البناء {count} من قيم البناء؛ والحد الأقصى المسموح به 50.",
+                    "buildValueTooLarge": "{name} كبير جدًا لتمريره إلى عملية بناء (الحد الأقصى 48 KB).",
+                    "secretLimitReached": "لا توجد مساحة في المستودع لمزيد من الأسرار.",
+                    "strategyNotSupported": "لا تستطيع المشغّلات المستضافة لدى GitHub البناء باستراتيجية «{strategy}». أضف ملف Dockerfile واضبط build.strategy على dockerfile.",
+                    "specInvalid": "تحتوي مواصفات التطبيق في هذا الـcommit على أخطاء.",
+                    "gitConnectionMissing": "لا يستطيع Ever Works الوصول إلى هذا المستودع عبر اتصال GitHub الخاص بك.",
+                    "repositoryUnavailable": "{repository} مؤرشف أو محذوف أو لم يعد متاحًا لاتصال GitHub الخاص بك.",
+                    "managedConcurrencyLimit": "بانتظار عمليات بناء أخرى: يُشغَّل في الوقت نفسه {perWork} كحد أقصى لكل تطبيق و{perAccount} لكل حساب.",
+                    "buildValueNameReserved": "{name} محجوز من قِبل Ever Works ولا يمكن تمريره إلى عملية بناء. أعد تسمية إدخال البيئة.",
+                    "buildServicePortRequired": "تحتاج خدمة البناء {service} إلى منفذ: لا يعرف Ever Works المنفذ الذي تستمع عليه «{image}».",
+                    "verificationDependencyUnsupported": "لا يمكن لعملية التحقق تشغيل {kind} بعد. يُجرى الفحص على المجموعة (cluster) بدلًا من ذلك.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "مراجعة طلب السحب",
+                    "turnOnActions": "تشغيله",
+                    "setValue": "تعيينها",
+                    "useLargerRunner": "استخدام مشغّل أكبر",
+                    "openRepositorySettings": "فتح إعدادات المستودع",
+                    "reconnectGithub": "إعادة ربط GitHub",
+                    "rebuild": "إعادة البناء",
+                    "openEnvironment": "فتح البيئة"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "نفدت الذاكرة",
+                        "suggestion": "ارفع build.resources.memory (حاليًا {memory}) أو قلّل حجم الـheap الخاص بالبناء. على هذا المشغّل يمكن للبناء استخدام {max} كحد أقصى."
+                    },
+                    "diskFull": {
+                        "title": "نفدت مساحة القرص",
+                        "suggestion": "فعّل «استعادة قرص المشغّل» في إعدادات البناء، أو صغّر سياق البناء باستخدام ملف .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "فشل ملف Dockerfile في الخطوة {step} من {total}",
+                        "suggestion": "الخطوة الفاشلة كانت: {command}. أصلحها في {dockerfile} وادفع التغيير، أو اطلب من وكيل إصلاحها."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "تعذّر تنزيل التبعيات",
+                        "suggestion": "لم يستجب سجل حزم أو سجل صور أساسية. أعد البناء بعد بضع دقائق؛ وإذا استمر الفشل، فثبّت إصدارات ما تعتمد عليه."
+                    },
+                    "registryPushDenied": {
+                        "title": "تعذّر دفع الصورة",
+                        "suggestion": "اسمح لسير العمل في هذا المستودع بكتابة الحزم (Settings ▸ Actions ▸ General ▸ Workflow permissions)، ثم أعد البناء."
+                    },
+                    "missingBuildValue": {
+                        "title": "قيمة بناء مفقودة: {names}",
+                        "suggestion": "عيّنها في الإعدادات ▸ البيئة، ثم أعد البناء."
+                    },
+                    "secretInImage": {
+                        "title": "كان سرٌّ سيُنشر داخل الصورة: {name}",
+                        "suggestion": "استخدم هذه القيمة في مرحلة بناء سابقة فقط، أو مرّرها كسر بناء مُركَّب (secret mount). لم يُدفع أي شيء."
+                    },
+                    "timeout": {
+                        "title": "استغرق أكثر من {minutes} دقيقة",
+                        "suggestion": "ارفع build.resources.timeoutMinutes (الحد الأقصى 180) أو سرّع البناء باستخدام التخزين المؤقت."
+                    },
+                    "workflowInvalid": {
+                        "title": "ملف سير العمل غير صالح",
+                        "suggestion": "لا يستطيع GitHub تشغيل سير عمل البناء. راجع طلب السحب المفتوح من Ever Works لاستعادته."
+                    },
+                    "digestMismatch": {
+                        "title": "تعذّر تأكيد الصورة المدفوعة",
+                        "suggestion": "أبلغ السجل عن صورة مختلفة عمّا أبلغ عنه البناء. أعد البناء؛ لن يُنشر أي شيء غير مؤكَّد."
+                    },
+                    "verificationFailed": {
+                        "title": "لم يجتز التطبيق اختبارات الدخان (smoke tests)",
+                        "suggestion": "فشل {failed} من أصل {total} من اختبارات الدخان. اطّلع على النتائج أدناه."
+                    },
+                    "egressBlocked": {
+                        "title": "حُظر الوصول إلى الشبكة",
+                        "suggestion": "حاول البناء الوصول إلى {hosts}، وهي غير مدرجة في قائمة المسموح بها لدى أداة البناء. احصل على ما تحتاجه من مستودعك المصدر أو من سجل مسموح به، ثم أعد البناء."
+                    },
+                    "lost": {
+                        "title": "فُقد تتبّع هذا البناء",
+                        "suggestion": "توقف GitHub عن الرد بشأن هذا البناء. تحقّق منه على GitHub."
+                    },
+                    "unknown": {
+                        "title": "حدث خطأ آخر",
+                        "suggestion": "افتح السجلات على GitHub، أو اطلب من وكيل إلقاء نظرة."
+                    },
+                    "askAgent": "اطلب من وكيل إصلاح هذا",
+                    "excerptLabel": "آخر أسطر السجل"
+                },
+                "cancelReason": {
+                    "user": "ألغاه أحد الأعضاء",
+                    "superseded": "استُبدل ببناء أحدث"
+                },
+                "detail": {
+                    "title": "البناء رقم {number} · {sha} · {status}",
+                    "loading": "جارٍ تحميل تفاصيل البناء…",
+                    "close": "إغلاق",
+                    "trigger": "المُشغِّل",
+                    "triggeredBy": "{trigger} — بواسطة {name}",
+                    "commit": "الـcommit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "المشغّل",
+                    "duration": "المدة",
+                    "durationValue": "{duration} (في الانتظار {queued})",
+                    "image": "الصورة",
+                    "tags": "الوسوم",
+                    "deployable": "قابل للنشر",
+                    "yes": "نعم",
+                    "buildValues": "قيم البناء",
+                    "buildValuesValue": "{count, plural, =1 {قيمة واحدة متزامنة} two {قيمتان متزامنتان} few {# قيم متزامنة} many {# قيمة متزامنة} other {# قيمة متزامنة}}: {names}",
+                    "noBuildValues": "لا شيء",
+                    "receipt": "الإيصال",
+                    "verification": "التحقق",
+                    "copy": "نسخ",
+                    "copied": "نُسخ مرجع الصورة.",
+                    "copyFailed": "تعذّر نسخ مرجع الصورة.",
+                    "viewLogs": "عرض السجلات على GitHub",
+                    "rebuildThisCommit": "إعادة بناء هذا الـcommit",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} دقيقة تشغيل · يدفعها حسابك على GitHub",
+                    "minutesPlatform": "{minutes} دقيقة تشغيل · يدفعها Ever Works",
+                    "checksMinutes": "{checksMinutes} منها لتشغيل فحوصات التطبيق",
+                    "costUnknown": "لم يُبلَّغ عن دقائق التشغيل بعد"
+                },
+                "verification": {
+                    "componentsReady": "بدأت المكوّنات",
+                    "componentsNotReady": "لم تبدأ المكوّنات",
+                    "job": "انتهت المهمة {name} برمز الخروج {exitCode}",
+                    "jobNoExit": "لم تنتهِ المهمة {name}",
+                    "smokePassed": "نجح: {name}",
+                    "smokeFailed": "فشل: {name} — المتوقع {expected}، والفعلي {observed}"
+                },
+                "empty": {
+                    "noBuilds": "لا توجد عمليات بناء بعد. يبدأ أول بناء عندما يصبح سير عمل البناء في المستودع.",
+                    "unavailable": "عمليات البناء غير متاحة على هذه النسخة بعد."
+                },
+                "errors": {
+                    "loadFailed": "تعذّر تحميل عمليات البناء. جرّب تحديث الصفحة.",
+                    "rebuildRateLimited": "بدأت عددًا كبيرًا جدًا من عمليات البناء خلال هذه الساعة. حاول مرة أخرى بعد {minutes, plural, =1 {دقيقة واحدة} two {دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}}.",
+                    "commitNotReachable": "هذا الـcommit غير موجود في الفرع المتتبَّع.",
+                    "nothingToBuild": "يشغّل عمل App هذا صورة منشورة، لذا لا يوجد ما يُبنى.",
+                    "notCancellable": "انتهى هذا البناء بالفعل، لذا لا يمكن إلغاؤه.",
+                    "providerUnavailable": "لا يتوفر مزوّد بناء حاليًا. حاول مرة أخرى لاحقًا.",
+                    "startFailed": "تعذّر بدء البناء. حاول مرة أخرى.",
+                    "cancelFailed": "تعذّر إلغاء هذا البناء. حاول مرة أخرى.",
+                    "detailFailed": "تعذّر تحميل هذا البناء. حاول مرة أخرى."
+                },
+                "toasts": {
+                    "started": "أُضيف البناء إلى قائمة الانتظار.",
+                    "deduped": "يوجد بالفعل بناء لهذا الـcommit في قائمة الانتظار.",
+                    "cancelled": "أُلغي البناء."
+                },
+                "pullToken": {
+                    "title": "إضافة رمز سحب",
+                    "body": "هذه الصورة خاصة. تحتاج مجموعتك (cluster) إلى رمز لا يستطيع سوى قراءة الحزم لتنزيلها.",
+                    "stepCreate": "1. أنشئ رمزًا كلاسيكيًا مع تحديد «read:packages» فقط.",
+                    "stepPaste": "2. الصقه هنا.",
+                    "label": "الرمز",
+                    "submit": "فحص وحفظ",
+                    "saving": "جارٍ الفحص…",
+                    "tooBroad": "يستطيع هذا الرمز فعل أكثر من قراءة الحزم. أنشئ رمزًا بصلاحية read:packages فقط.",
+                    "fineGrained": "هذا رمز دقيق الصلاحيات (fine-grained). أنشئ رمزًا كلاسيكيًا مع تحديد read:packages فقط.",
+                    "cannotRead": "لا يستطيع هذا الرمز قراءة {imageRepository}.",
+                    "publicImage": "هذه الصورة عامة بالفعل — لا حاجة إلى رمز.",
+                    "noImageYet": "لا يوجد بناء مكتمل بعد. أضف رمز سحب بعد أول بناء ناجح.",
+                    "savedExpires": "حُفظ رمز السحب. تنتهي صلاحيته في {date}.",
+                    "savedNoExpiry": "حُفظ رمز السحب. لا تنتهي صلاحيته.",
+                    "tokenSet": "يوجد رمز سحب محفوظ. الصق رمزًا جديدًا لاستبداله.",
+                    "expiringSoon": "تنتهي صلاحية رمز السحب في {date}. أضف رمزًا جديدًا قبل ذلك.",
+                    "viewerDisabled": "تحتاج إلى صلاحية التعديل للقيام بذلك.",
+                    "failed": "تعذّر حفظ رمز السحب. حاول مرة أخرى."
+                },
+                "overview": {
+                    "title": "أحدث بناء",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "البناء القابل للنشر: هذا الـcommit",
+                    "deployableOther": "البناء القابل للنشر: {sha}",
+                    "noDeployable": "لا يوجد بناء قابل للنشر بعد",
+                    "open": "فتح عمليات البناء"
+                }
+            },
+            "appDeploy": {
+                "title": "نشر",
+                "notRunning": "لا يعمل هذا التطبيق في أي مكان بعد.",
+                "runningOn": "{state} · {target}",
+                "openApp": "فتح التطبيق",
+                "source": "المصدر",
+                "buildsLink": "عرض عمليات البناء",
+                "buildsHint": "تستمر عمليات البناء أيًّا كانت الوجهة.",
+                "stale": "آخر فحص قبل {minutes, plural, =1 {دقيقة واحدة} two {دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}}",
+                "status": {
+                    "notDeployed": "غير منشور",
+                    "live": "يعمل",
+                    "degraded": "أداء متراجع",
+                    "down": "متوقف",
+                    "unreachable": "تعذّر الوصول إلى مجموعتك (cluster)",
+                    "paused": "متوقف مؤقتًا",
+                    "deleting": "جارٍ الحذف…"
+                },
+                "target": {
+                    "heading": "أين يجب أن يعمل؟",
+                    "current": "(الحالية)",
+                    "none": {
+                        "label": "لا شيء — لا تنشر بعد",
+                        "description": "تستمر عمليات البناء."
+                    },
+                    "yourCluster": {
+                        "label": "مجموعتك (cluster)",
+                        "description": "يعمل على مجموعة Kubernetes تتحكم بها."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "نشغّله نيابةً عنك.",
+                        "unavailable": "قريبًا — الاستضافة المُدارة للتطبيقات غير متاحة بعد.",
+                        "ineligible": "غير متاح بعد لهذا التطبيق."
+                    },
+                    "connect": "ربط مجموعتك (cluster)",
+                    "reconnect": "تغيير اتصال المجموعة",
+                    "connected": "متصل · {version}",
+                    "connectedNoVersion": "متصل",
+                    "checkFailed": "فشل آخر فحص للمجموعة.",
+                    "notChecked": "لم تُربط أي مجموعة بعد.",
+                    "save": "استخدام هذه الوجهة",
+                    "saving": "جارٍ الحفظ…",
+                    "saved": "حُفظت الوجهة.",
+                    "saveFailed": "تعذّر حفظ الوجهة: {reason}",
+                    "changeNote": "تغيير الوجهة لا يزيل أي شيء يعمل بالفعل.",
+                    "routeUnavailable": "تغيير الوجهة غير متاح على هذه النسخة بعد."
+                },
+                "connect": {
+                    "title": "ربط مجموعتك (cluster)",
+                    "description": "الصق ملف kubeconfig لحساب خدمة في المجموعة التي يجب أن يعمل عليها هذا التطبيق.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "الصق ملف kubeconfig الخاص بك…",
+                    "kubeconfigHelp": "استخدم رمز حساب خدمة. الأوامر والملفات المحلية والوكلاء (proxies) غير مدعومة.",
+                    "kubeconfigStored": "أُرسل ملف kubeconfig الخاص بك مرة واحدة ويُخزَّن مشفّرًا. الصق ملفًا جديدًا لاستبداله، أو افحص الملف المخزَّن مرة أخرى.",
+                    "contextLabel": "السياق (اختياري)",
+                    "contextHelp": "اتركه فارغًا لاستخدام السياق الحالي في kubeconfig.",
+                    "check": "فحص الاتصال",
+                    "checking": "جارٍ الفحص…",
+                    "checkAgain": "الفحص مرة أخرى",
+                    "checkTimedOut": "لم ينتهِ الفحص خلال 30 ثانية. حاول مرة أخرى.",
+                    "checkFailed": "تعذّر فحص الاتصال: {reason}",
+                    "unavailable": "ربط مجموعة غير متاح على هذه النسخة بعد.",
+                    "kubeconfigTooLarge": "ملف kubeconfig هذا أكبر من 64 KiB.",
+                    "kubeconfigRequired": "الصق ملف kubeconfig أولًا.",
+                    "ingressClass": "فئة الـIngress",
+                    "ingressDefault": "{name} (افتراضي)",
+                    "ingressNone": "لم يُعثر على فئة Ingress",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "شهادات من جهة الإصدار",
+                        "external": "تُدار خارج المجموعة",
+                        "edge": "يُنهى عند الحافة (edge)",
+                        "none": "بدون TLS (http فقط)"
+                    },
+                    "issuer": "جهة الإصدار (Issuer)",
+                    "namespace": "مساحة الأسماء (Namespace)",
+                    "namespaceAuto": "تُختار عند نشر التطبيق لأول مرة",
+                    "isolation": "عزل الشبكة",
+                    "isolationOn": "مُفعَّل (موصى به)",
+                    "isolationOff": "مُعطَّل",
+                    "isolationOffWarning": "بدون عزل الشبكة، تستطيع أحمال العمل الأخرى على المجموعة الوصول إلى هذا التطبيق وقواعد بياناته.",
+                    "cancel": "إلغاء",
+                    "save": "حفظ",
+                    "saving": "جارٍ الحفظ…",
+                    "saveBlocked": "يتاح الحفظ بعد نجاح الفحص مع توفر كل الصلاحيات المطلوبة.",
+                    "saved": "رُبطت المجموعة.",
+                    "saveFailed": "تعذّر حفظ اتصال المجموعة: {reason}"
+                },
+                "check": {
+                    "ok": "متصل",
+                    "version": "Kubernetes {version}",
+                    "failed": "فشل فحص المجموعة.",
+                    "kubeconfigRefused": "ملف kubeconfig هذا {reason}. استخدم رمز حساب خدمة بدلًا من ذلك.",
+                    "notPublic": "لا يستطيع Ever Works الوصول إلا إلى المجموعات ذات العنوان العام.",
+                    "permissions": "الصلاحيات",
+                    "allPermissions": "كل الصلاحيات المطلوبة متوفرة.",
+                    "missing": "مفقودة: {verb} {resource}",
+                    "optionalMissing": "اختيارية، مفقودة: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "النشر الآن",
+                    "deploying": "جارٍ الطلب…",
+                    "started": "بدأ النشر.",
+                    "queued": "في قائمة الانتظار — يبدأ عند انتهاء عملية النشر الجارية.",
+                    "deduplicated": "طُلبت عملية النشر هذه بالفعل.",
+                    "inProgress": "توجد عملية نشر أخرى جارية ({id}). انتظر حتى تنتهي، ثم انشر مرة أخرى.",
+                    "preconditionsHeader": "أصلح ما يلي قبل النشر:",
+                    "workerNotIsolated": "لا يمكن بدء عمليات النشر بعد: لا يوجد في هذه النسخة عامل (worker) معزول لمجموعة التطبيقات.",
+                    "notAppWork": "هذا العمل ليس عمل App، لذا لا يمكن نشره بهذه الطريقة.",
+                    "failed": "تعذّر طلب النشر: {reason}",
+                    "targetNone": "اختر أولًا مكان تشغيل التطبيق — الخيار «لا شيء» لا ينشر أي شيء.",
+                    "deploymentId": "عملية النشر {id}",
+                    "warningsHeader": "تحذيرات"
+                },
+                "preconditions": {
+                    "specInvalid": "تحتوي مواصفات التطبيق (.works/works.yml) على أخطاء. أصلحها في صفحة مواصفات التطبيق.",
+                    "licenseBlocksTarget": "لا يسمح ترخيص التطبيق باستضافته على هذه الوجهة.",
+                    "licenseAttestationMissing": "أقرّ بترخيص التطبيق قبل نشره.",
+                    "envRequiredUnset": "بعض قيم البيئة المطلوبة لم تُعيَّن بعد.",
+                    "dependencyNotReady": "تبعية يحتاجها التطبيق ليست جاهزة بعد.",
+                    "noGreenBuild": "لا يوجد بناء ناجح للنشر بعد. ابدأ بناءً أولًا.",
+                    "noGreenBuildForHead": "لم يُبنَ آخر commit في فرع النشر بنجاح بعد.",
+                    "buildImageMissing": "لا يحتوي البناء على صورة للنشر.",
+                    "nothingToDeploy": "لا يوجد ما يُنشر بعد: لا بناء ولا صورة منشورة.",
+                    "imageNotPinned": "يُشار إلى هذه الصورة بوسم. ثبّتها بالـdigest لكي تشغّل كل عملية نشر الصورة نفسها.",
+                    "imageNotFound": "تعذّر العثور على الصورة في السجل الخاص بها.",
+                    "imagePrivateUnsupported": "لا يمكن تنزيل هذه الصورة دون بيانات اعتماد. لا ينشر Ever Works الصور المنشورة إلا إذا كانت عامة.",
+                    "imageUnresolvable": "تعذّر تحديد مرجع الصورة.",
+                    "primaryDomainMissing": "لم يُعدّ النطاق الأساسي بعد.",
+                    "targetNone": "اختر أولًا مكان تشغيل التطبيق.",
+                    "targetNotChecked": "افحص اتصال المجموعة أولًا.",
+                    "clusterChangedUnconfirmed": "تغيّرت المجموعة منذ آخر عملية نشر. أكّد التغيير للنشر.",
+                    "managedDisabled": "قريبًا — الاستضافة المُدارة للتطبيقات غير متاحة بعد.",
+                    "managedScopeUnverifiedBlueprint": "لا يشغّل Ever Works Apps إلا التطبيقات المبنية على Blueprint موثّق.",
+                    "quotaExceeded": "بلغت الحد الأقصى لعدد التطبيقات التي يمكنك تشغيلها على Ever Works Apps.",
+                    "managedIneligible": "لا يمكن تشغيل هذا التطبيق على Ever Works Apps.",
+                    "managedSandboxUnavailable": "لا يستطيع Ever Works Apps استقبال تطبيقات جديدة حاليًا.",
+                    "appWorkDeleting": "يجري حذف عمل App هذا.",
+                    "paused": "التطبيق متوقف مؤقتًا. استأنفه للنشر.",
+                    "deployInProgress": "توجد عملية نشر أخرى جارية.",
+                    "cronAuthEnvUnset": "يحتاج استدعاء مجدول إلى قيمة مصادقة لم تُعيَّن.",
+                    "jobAuthEnvUnset": "تحتاج مهمة إلى قيمة مصادقة لم تُعيَّن.",
+                    "volumeReplicas": "المكوّن الذي يحتوي على وحدة تخزين (volume) يمكنه تشغيل نسخة متماثلة واحدة فقط.",
+                    "volumeShrink": "لا يمكن تصغير وحدة التخزين.",
+                    "privilegedPort": "يستمع أحد المكوّنات على منفذ أقل من 1024.",
+                    "cronTooFrequent": "يعمل استدعاء مجدول بتكرار أكبر من المسموح به.",
+                    "managedRootForbidden": "تعمل هذه الصورة بصلاحيات root.",
+                    "imageUserUnverifiable": "تعذّر على Ever Works التحقق من المستخدم الذي تعمل به الصورة.",
+                    "workerNotIsolated": "لا يمكن بدء عمليات النشر بعد: لا يوجد في هذه النسخة عامل (worker) معزول لمجموعة التطبيقات.",
+                    "envSourceUnavailable": "تتعذّر قراءة قيم البيئة الخاصة بالتطبيق حاليًا.",
+                    "pullCredentialUnavailable": "بيانات الاعتماد اللازمة لسحب الصورة غير متاحة.",
+                    "namespaceForeign": "مساحة الأسماء هذه تخص شيئًا آخر على المجموعة بالفعل.",
+                    "verificationNamespaceForbidden": "مساحة الأسماء هذه محجوزة لعمليات التحقق."
+                },
+                "license": {
+                    "loading": "جارٍ قراءة الترخيص…",
+                    "unavailable": "تفاصيل الترخيص غير متاحة على هذه النسخة بعد.",
+                    "error": "تعذّرت قراءة الترخيص. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "لم يُعثر على ترخيص نتعرّف عليه.",
+                    "classes": {
+                        "green": "الاستضافة مسموح بها",
+                        "amber": "على مجموعتك (cluster)، بعد تأكيد شروط الترخيص",
+                        "red": "على مجموعتك (cluster) فقط، بعد تأكيد شروط الترخيص",
+                        "unknown": "الترخيص غير معروف — أكّد الشروط قبل النشر",
+                        "unclassified": "لم يُصنَّف بعد"
+                    },
+                    "mixed": "تستخدم أجزاء من هذا المستودع ترخيصًا مختلفًا.",
+                    "incomplete": "هذا المستودع كبير جدًا بحيث يتعذّر فحصه بالكامل.",
+                    "yourClusterAllowed": "مجموعتك (cluster): مسموح",
+                    "yourClusterAfterConfirm": "مجموعتك (cluster): مسموح بعد تأكيد شروط الترخيص",
+                    "review": "مراجعة وتأكيد",
+                    "confirmed": "أُكّد في {date}.",
+                    "disclaimer": "هذه قراءة آلية لملفات الترخيص في المستودع، وليست استشارة قانونية.",
+                    "unknownSpdx": "ترخيص هذا البرنامج",
+                    "dialogTitle": "تأكيد شروط الترخيص",
+                    "dialogBody": "يقيّد {spdx} طريقة استضافة هذا البرنامج. Ever Works Apps غير متاح له. لتشغيله على مجموعتك الخاصة، أكّد ما يلي:",
+                    "noText": "لا يحتوي سجل التراخيص على بيان لهذا الترخيص.",
+                    "checkbox": "أؤكد البيان أعلاه.",
+                    "footer": "نسجّل من أكّد، ومتى، ولأي ترخيص وأي commit.",
+                    "cancel": "إلغاء",
+                    "confirm": "تأكيد",
+                    "refusals": {
+                        "ownerOnly": "لا يستطيع الإقرار إلا مالك عمل App.",
+                        "licenseChanged": "تغيّر الترخيص أثناء مراجعتك له. راجع الشروط الجديدة وأكّد مرة أخرى.",
+                        "attestationNotRequired": "لم يعد هذا الترخيص يحتاج إلى تأكيد.",
+                        "licenseUnavailable": "تأكيد الترخيص غير متاح على هذه النسخة بعد.",
+                        "route_unavailable": "تأكيد الترخيص غير متاح على هذه النسخة بعد.",
+                        "failed": "تعذّر تسجيل التأكيد. حاول مرة أخرى."
+                    }
+                },
+                "rollback": {
+                    "button": "التراجع",
+                    "title": "التراجع إلى عملية نشر سابقة",
+                    "description": "اختر عملية نشر كانت مباشرة من قبل. تعمل صورتها ومواصفات التطبيق الخاصة بها مرة أخرى، ولا يُعاد بناء أي شيء.",
+                    "pickLabel": "عملية النشر المراد الرجوع إليها",
+                    "liveAt": "مباشرة منذ {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "كانت مباشرة سابقًا",
+                    "none": "لا توجد عملية نشر مباشرة سابقة للتراجع إليها.",
+                    "runJobs": "تشغيل مهام ما قبل النشر مرة أخرى",
+                    "confirm": "التراجع",
+                    "cancel": "إلغاء",
+                    "started": "بدأ التراجع.",
+                    "failed": "تعذّر بدء التراجع: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "إيقاف مؤقت",
+                    "resume": "استئناف",
+                    "remove": "إزالة من العنقود",
+                    "removeTitle": "إزالة هذا التطبيق من عنقوده",
+                    "removeDescription": "يتوقف التطبيق قيد التشغيل وتُحذف كائنات Kubernetes الخاصة به. يبقى عمل التطبيق وعمليات البناء الخاصة به.",
+                    "deleteData": "احذف البيانات المخزنة أيضًا (وحدات التخزين وقواعد بيانات التبعيات)",
+                    "deleteDataWarning": "لا يمكن التراجع عن هذا.",
+                    "confirmSlugLabel": "اكتب {slug} للتأكيد",
+                    "confirmRemove": "إزالة",
+                    "cancel": "إلغاء",
+                    "failed": "تعذّر تنفيذ ذلك: {reason}",
+                    "slugMismatch": "المعرّف الذي كتبته لا يطابق عمل التطبيق هذا.",
+                    "accepted": {
+                        "pause": "تم طلب الإيقاف المؤقت.",
+                        "resume": "تم طلب الاستئناف.",
+                        "remove": "تم طلب الإزالة.",
+                        "cancelDeploy": "تم طلب الإلغاء."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "تبدأ الأسماء بحرف أو شرطة سفلية ولا تستخدم إلا A–Z و0–9 و_.",
+                    "reservedName": "الأسماء التي تبدأ بـEVER_WORKS_ محجوزة للمنصة.",
+                    "valueTooLarge": "يمكن أن تبلغ القيمة 65,536 بايت كحد أقصى.",
+                    "controlCharacter": "لا يمكن أن تحتوي القيم على الحرف NUL.",
+                    "lengthMismatch": "يجب أن تتكون من {expected} حرفًا بالضبط — وهذه تتكون من {actual}.",
+                    "tooShort": "يجب ألا تقل عن {min} حرفًا.",
+                    "tooLong": "يجب ألا تزيد على {max} حرفًا.",
+                    "patternMismatch": "لا تطابق هذه القيمة النمط الذي يطلبه هذا التطبيق.",
+                    "generatedValueUseRotate": "هذه القيمة مولّدة. دوّرها لاستبدالها.",
+                    "neverRotateNotAcknowledged": "يشير هذا التطبيق إلى أن هذه القيمة يجب ألا تتغير أبدًا. أكّد أنك تفهم ذلك قبل التدوير.",
+                    "rotateConfirmationMismatch": "الاسم الذي كتبته لا يطابق اسم هذه القيمة.",
+                    "secureStorageUnavailable": "التخزين الآمن غير مهيّأ في هذا التثبيت، لذا لا يمكن تخزين القيم.",
+                    "tooManyValues": "يمكن أن يحتوي التطبيق على 300 قيمة كحد أقصى.",
+                    "valuesTooLarge": "يمكن أن يبلغ مجموع قيم التطبيق 1 MiB كحد أقصى.",
+                    "malformedLine": "ليس سطرًا صالحًا بصيغة NAME=value.",
+                    "rotateRateLimited": "عدد كبير جدًا من عمليات التدوير. حاول مرة أخرى لاحقًا."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "قيد الانتظار",
+                    "awaitingConfig": "تحتاج إلى إعداداتك",
+                    "provisioning": "قيد التجهيز",
+                    "ready": "جاهزة",
+                    "degraded": "أداء متراجع",
+                    "failed": "فشلت",
+                    "kept": "محتفظ بها — لم تعد مُدارة",
+                    "deleting": "جارٍ الحذف",
+                    "deleted": "محذوفة",
+                    "notInSpec": "لم تعد مواصفات التطبيق تستخدمها — البيانات محفوظة"
+                },
+                "backup": {
+                    "none": "لا توجد نسخ احتياطية تلقائية. إذا فُقدت وحدة التخزين هذه، فستضيع البيانات.",
+                    "notConfigured": "النسخ الاحتياطية: غير مهيّأة",
+                    "healthy": "النسخ الاحتياطية: آخر نسخة مكتملة {time}",
+                    "overdue": "النسخ الاحتياطية: متأخرة — آخر نسخة مكتملة {time}",
+                    "failing": "النسخ الاحتياطية: فشلت آخر محاولة",
+                    "external": "النسخ الاحتياطية: يديرها مزوّد {kind} الخاص بك",
+                    "unknown": "النسخ الاحتياطية: تعذّر الفحص"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "لا تحتوي مجموعتك (cluster) على فئة تخزين افتراضية. اختر واحدة في إعدادات التبعيات.",
+                    "clusterUnreachable": "تعذّر الوصول إلى مجموعتك (cluster).",
+                    "smtpConnectFailed": "تعذّر الاتصال بخادم البريد.",
+                    "smtpTlsFailed": "فشلت مصافحة TLS مع خادم البريد.",
+                    "smtpAuthRefused": "رفض الخادم تسجيل الدخول.",
+                    "bucketUnreadable": "الحاوية (bucket) ‏{bucket} غير موجودة أو تتعذّر قراءتها.",
+                    "volumeNotReady": "لم تصبح وحدة التخزين جاهزة خلال {minutes} دقيقة.",
+                    "extensionUnavailable": "الإضافات غير متاحة: {names}.",
+                    "platformServerRefused": "يحتوي هذا الخادم على بيانات منصة Ever Works. اختر خادمًا آخر.",
+                    "deadlineExceeded": "لم ينتهِ التجهيز في الوقت المحدد.",
+                    "namespaceNotOwned": "مساحة الأسماء هذه تخص تطبيقًا آخر. اختر مساحة أخرى.",
+                    "namespaceBaselineMissing": "تفتقد مساحة الأسماء إلى الحدود والسياسات الأساسية الخاصة بها.",
+                    "clusterPermissionMissing": "لا يملك Ever Works صلاحية إنشاء هذه التبعية في مجموعتك (cluster).",
+                    "operatorNamespaceUnknown": "لم تُعيَّن مساحة الأسماء الخاصة بالـoperator في إعدادات التبعيات.",
+                    "volumeExpansionUnsupported": "لا تستطيع فئة التخزين {storageClass} توسيع وحدة التخزين هذه.",
+                    "sizeShrinkRefused": "لا يمكن تقليص تخزين التبعية. احذف بياناتها أولًا إذا كنت تحتاج إلى تخزين أصغر.",
+                    "relayIneligible": "لا يمكن لهذا التطبيق استخدام مرحّل البريد الخاص بـEver Works.",
+                    "relaySuspended": "مرحّل البريد الخاص بـEver Works معلّق.",
+                    "providerNotSupported": "لا يستطيع هذا المزوّد تقديم هذه التبعية.",
+                    "dependencyNotDeclared": "لا تُعلن مواصفات التطبيق عن هذه التبعية.",
+                    "confirmationMismatch": "الاسم الذي كتبته غير مطابق.",
+                    "deleteInProgress": "يجري حذف بيانات هذه التبعية بالفعل.",
+                    "notGenerated": "هذه القيمة غير مولّدة، لذا لا يوجد ما يُدوَّر.",
+                    "notAppWork": "هذا العمل ليس تطبيقًا.",
+                    "targetNone": "لم يُضبط هذا التطبيق للنشر في أي مكان بعد. اختر وجهة نشر لتجهيز تبعياته.",
+                    "targetNotChecked": "لم تجتز مجموعتك (cluster) الفحص بعد. افحص الاتصال، ثم حاول مرة أخرى."
+                }
             }
         },
         "newPage": {
@@ -6894,7 +7514,8 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
                 "repo": "مستودع",
-                "company": "Company"
+                "company": "Company",
+                "app": "تطبيق"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6907,7 +7528,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "مستودع كود موجود كعمل — ترتبط به المهام والأهداف وعمليات الأسطول. لا يتم توليد أو نشر أي شيء.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "شغّل أي مستودع GitHub وطوّره — اربطه أو أنشئ نسخة متفرعة منه، ثم اختر مكان تشغيله."
             },
             "submit": "Create",
             "submitTitle": "إنشاء",
@@ -6952,7 +7574,8 @@
                 "blog": "مدونة",
                 "directory": "دليل",
                 "awesome-repo": "مستودع رائع",
-                "repo": "مستودع"
+                "repo": "مستودع",
+                "app": "تطبيق"
             },
             "kindDescriptions": {
                 "website": "موقع متعدد الصفحات للأعمال أو الخدمات أو العلامات التجارية — محتوى مولد + كود.",
@@ -6960,7 +7583,8 @@
                 "blog": "مدونة مع فئات، RSS، تمييز الكود، ومحتوى جاهز لمحركات البحث.",
                 "directory": "موقع دليل مختار مع بحث، فلتر، وبيانات عنصر منظم.",
                 "awesome-repo": "مستودق قائمة رائع — فهرس ماركداون، روابط مصنفة، وبيانات قابلة للتحديث.",
-                "repo": "مستودع كود موجود كعمل — ترتبط به المهام والأهداف وعمليات الأسطول. لا يتم توليد أو نشر أي شيء."
+                "repo": "مستودع كود موجود كعمل — ترتبط به المهام والأهداف وعمليات الأسطول. لا يتم توليد أو نشر أي شيء.",
+                "app": "شغّل أي مستودع GitHub وطوّره — اربطه أو أنشئ نسخة متفرعة منه، ثم اختر مكان تشغيله."
             },
             "promptHints": {
                 "minLength": "أضف وصفًا (على الأقل 10 أحرف) للبدء.",
@@ -7365,6 +7989,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "مثال: «https://github.com/owner/repo — تطبيق مفتوح المصدر تريد نسختك الخاصة منه»",
+                "formTitle": "عمل App جديد",
+                "formSubtitle": "ابدأ من أي مستودع GitHub. يربطه Ever Works أو ينشئ نسختك الخاصة منه، ثم يساعدك على تشغيله ومواصلة تطويره.",
+                "urlLabel": "رابط المستودع",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "أي مستودع GitHub يستطيع حسابك المتصل قراءته.",
+                "checkButton": "فحص المستودع",
+                "checking": "جارٍ الفحص…",
+                "tabPaste": "لصق رابط",
+                "tabCatalog": "تصفّح كتالوج التطبيقات",
+                "catalogComingSoon": "سيُفتح كتالوج التطبيقات هنا قريبًا. الصق رابط مستودع في الوقت الحالي.",
+                "stars": "{count, plural, =0 {لا نجوم} =1 {نجمة واحدة} two {نجمتان} few {# نجوم} many {# نجمة} other {# نجمة}}",
+                "defaultBranch": "الفرع الافتراضي: {branch}",
+                "largeRepository": "مستودع كبير ({size})",
+                "moved": "نُقل إلى {fullName}",
+                "isFork": "هذا المستودع نسخة متفرعة من {parent}.",
+                "ownFork": "هذه نسختك المتفرعة من {parent}. سيتابع Ever Works المستودع {parent} كمصدر أصلي (upstream).",
+                "publicForkNote": "النسخ المتفرعة من المستودعات العامة تكون عامة.",
+                "archivedNote": "هذا المستودع مؤرشف. ستبقى المزامنة مع المصدر الأصلي متوقفة.",
+                "licenseChip": "الترخيص: {spdx}",
+                "licenseNotDetected": "الترخيص: لم يُكتشف",
+                "licenseClass": {
+                    "green": "الاستضافة مسموح بها",
+                    "amber": "على مجموعتك (cluster)، بعد أن تقرّ بالترخيص",
+                    "red": "على مجموعتك (cluster)، بعد أن تقرّ بالترخيص",
+                    "unknown": "الترخيص غير معروف — ستقرّ به قبل النشر"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint موثّق",
+                    "available": "يتوفر Blueprint",
+                    "none": "لا يوجد Blueprint — سيكتشف وكيل طريقة تشغيله",
+                    "unavailable": "فحص الـBlueprint غير متاح"
+                },
+                "existingAppWork": "لديك بالفعل عمل App لهذا المستودع: {name}.",
+                "openExistingAppWork": "افتحه",
+                "scanIncomplete": "لم يُفحص كل حساب بحثًا عن نسخة متفرعة موجودة.",
+                "modesTitle": "كيف يجب أن يستخدم Ever Works هذا المستودع؟",
+                "modes": {
+                    "link": {
+                        "title": "ربط",
+                        "titleOwnFork": "ربط — دون متابعة المصدر الأصلي",
+                        "description": "استخدم هذا المستودع كما هو. يمكنك الدفع إليه، لذا تصل التغييرات إليه مباشرة."
+                    },
+                    "fork": {
+                        "title": "نسخة متفرعة",
+                        "description": "أنشئ نسختك المتفرعة الخاصة. يمكنك مزامنتها مع المصدر الأصلي واقتراح التغييرات عليه."
+                    },
+                    "private-copy": {
+                        "title": "نسخة خاصة",
+                        "description": "أنشئ مستودعًا خاصًا يحتوي على الكود نفسه."
+                    }
+                },
+                "unavailable": "غير متاح: {reason}",
+                "forkInto": "إنشاء النسخة المتفرعة في",
+                "copyInto": "النسخ إلى",
+                "ownerFilter": "البحث في الحسابات",
+                "ownerOrganization": "مؤسسة",
+                "ownerNotChecked": "لم يُفحص بحثًا عن نسخة متفرعة موجودة",
+                "existingFork": "لديك بالفعل نسخة متفرعة: {fullName}. سيستخدمها Ever Works.",
+                "privateCopyTradeOff": "النسخة الخاصة غير مرتبطة بالأصل على GitHub، لذا لا يمكنها فتح طلبات سحب إلى المشروع الأصلي. تصل تغييرات المصدر الأصلي كطلبات سحب في نسختك.",
+                "linkSetupNote": "يفتح Ever Works طلب سحب يضيف ملفًا واحدًا هو .works/works.yml. ادمجه لإنهاء الإعداد.",
+                "existingForkSetupNote": "لم يُنشئ Ever Works هذه النسخة المتفرعة، لذا يفتح طلب سحب يضيف .works/works.yml.",
+                "linkSetupNoteBlueprint": "يفتح Ever Works طلب سحب يضيف .works/works.yml وملفات الـBlueprint. ادمجه لإنهاء الإعداد.",
+                "existingForkSetupNoteBlueprint": "لم يُنشئ Ever Works هذه النسخة المتفرعة، لذا يفتح طلب سحب يضيف .works/works.yml وملفات الـBlueprint.",
+                "promptsTitle": "القيم التي يحتاجها هذا التطبيق",
+                "promptHint": "يطلب الـBlueprint ‏{name} هذه القيم. يمكنك تغييرها لاحقًا في الإعدادات.",
+                "promptRequired": "مطلوب",
+                "promptsIncomplete": "املأ القيم التي يحتاجها التطبيق أولًا.",
+                "autoProvision": "دع وكيلًا يكتشف طريقة تشغيله",
+                "autoProvisionHelp": "يبدأ عندما يصبح المستودع جاهزًا. يستهلك رموز الذكاء الاصطناعي ودقائق مشغّلات البناء ضمن حدود التجهيز. يمكنك إلغاؤه، أو إلغاء تحديد هذا الخيار وبدئه لاحقًا من «نظرة عامة» عبر «تجهيز».",
+                "deployTargetTitle": "أين يجب أن يعمل؟",
+                "deployTargets": {
+                    "none": {
+                        "title": "لا شيء — لا تنشر بعد",
+                        "description": "يمكنك اختيار وجهة لاحقًا."
+                    },
+                    "your-cluster": {
+                        "title": "مجموعتك (cluster)",
+                        "description": "شغّله على مجموعة Kubernetes الخاصة بك. ستضيف الاتصال في علامة تبويب «نشر»."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "قريبًا — الاستضافة المُدارة للتطبيقات غير متاحة بعد."
+                    }
+                },
+                "submit": {
+                    "link": "ربط وإنشاء عمل App",
+                    "fork": "إنشاء نسخة متفرعة وعمل App",
+                    "private-copy": "نسخ وإنشاء عمل App"
+                },
+                "submitPending": "جارٍ الإنشاء…",
+                "nameLabel": "الاسم",
+                "slugLabel": "المعرّف المختصر (slug)",
+                "descriptionLabel": "الوصف",
+                "slugHelp": "معرّف مناسب للروابط. مشتق من اسم المستودع — عدّله لتجاوزه.",
+                "invalidSlug": "استخدم الأحرف الإنجليزية الصغيرة والأرقام والشرطات فقط، مثل tasks-app",
+                "cancel": "إلغاء",
+                "createFailed": "تعذّر إنشاء عمل App. حاول مرة أخرى.",
+                "success": {
+                    "link": "تم إنشاء عمل App.",
+                    "fork": "تم طلب النسخة المتفرعة — سنخبرك عندما تصبح جاهزة.",
+                    "private-copy": "بدأ النسخ — سنخبرك عندما تصبح النسخة جاهزة."
+                },
+                "reasons": {
+                    "invalid_url": "أدخل رابط مستودع GitHub مثل https://github.com/owner/repo",
+                    "provider_not_connected": "اربط GitHub لإنشاء عمل App.",
+                    "insufficient_scope": "أعد ربط GitHub لمنح صلاحية الوصول إلى المستودعات.",
+                    "not_found": "لم نعثر على هذا المستودع، أو أن حسابك على GitHub لا يستطيع قراءته.",
+                    "sso_authorization_required": "تتطلب {owner} أن تفوّض Ever Works لمؤسستها على GitHub.",
+                    "oauth_app_restricted": "تقيّد {owner} وصول الجهات الخارجية. اطلب من أحد مالكي {owner} الموافقة على Ever Works، أو اختر حسابًا آخر.",
+                    "empty_repository": "لا يحتوي هذا المستودع على أي commits بعد.",
+                    "no_push_access": "لا يمكنك الدفع إلى هذا المستودع.",
+                    "archived": "المستودعات المؤرشفة للقراءة فقط.",
+                    "forking_disabled": "لا يسمح مالك هذا المستودع بالنسخ المتفرعة أو النسخ.",
+                    "own_repository": "أنت تملك هذا المستودع — اربطه بدلًا من ذلك.",
+                    "target_owner_unavailable": "هذا الحساب غير متاح عبر اتصال GitHub الخاص بك.",
+                    "target_owner_forbidden": "لا يمكنك إنشاء مستودعات في {owner}.",
+                    "too_large_for_private_copy": "كبير جدًا على النسخة الخاصة ({size}). أنشئ نسخة متفرعة بدلًا من ذلك.",
+                    "uses_lfs": "يستخدم Git LFS، الذي لا يمكن للنسخة الخاصة نقله. أنشئ نسخة متفرعة بدلًا من ذلك.",
+                    "copy_name_unavailable": "لدى {owner} بالفعل مستودعات بالأسماء من {name} حتى {name}-copy-5.",
+                    "in_use_by_another_account": "يستخدم حساب آخر هذا المستودع بالفعل في Ever Works. اطلب من مالكه إضافتك كعضو.",
+                    "app_work_exists": "لديك بالفعل عمل App للمستودع {fullName}: {workName}.",
+                    "create_in_progress": "يجري إنشاء عمل App هذا بالفعل.",
+                    "rate_limited": "يفرض GitHub حدًا لمعدل الطلبات على حسابك. حاول مرة أخرى في {time}.",
+                    "managed_hosting_unavailable": "قريبًا — الاستضافة المُدارة للتطبيقات غير متاحة بعد.",
+                    "cluster_target_unavailable": "لا يوجد خيار نشر مثبّت يمكنه تشغيل التطبيقات.",
+                    "app_works_disabled": "أعمال App غير متاحة على هذه النسخة.",
+                    "blueprint_mismatch": "تغيّر الـBlueprint الخاص بهذا المستودع. افحص المستودع مرة أخرى."
+                },
+                "catalog": {
+                    "searchLabel": "البحث في كتالوج التطبيقات",
+                    "searchPlaceholder": "ابحث عن التطبيقات — مثل umami أو calendar",
+                    "listLabel": "Blueprints التطبيقات",
+                    "loading": "جارٍ تحميل كتالوج التطبيقات…",
+                    "unavailable": "كتالوج التطبيقات غير متاح حاليًا. الصق رابط مستودع بدلًا من ذلك.",
+                    "disabled": "أعمال App غير متاحة على هذه النسخة.",
+                    "error": "تعذّر تحميل كتالوج التطبيقات. حاول مرة أخرى، أو الصق رابط مستودع.",
+                    "empty": "لم تُنشر أي Blueprints للتطبيقات بعد. الصق رابط مستودع بدلًا من ذلك.",
+                    "noMatches": "لا توجد تطبيقات تطابق بحثك.",
+                    "pick": "ابدأ من {name}",
+                    "statusBeta": "تجريبي",
+                    "statusPlaceholder": "قريبًا",
+                    "verified": "موثّق",
+                    "upstreamLine": "من {repo}",
+                    "runsOn": "يعمل على: {targets}",
+                    "targetYourCluster": "مجموعتك (cluster)",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "غير متاح بعد",
+                    "fallbackNote": "تُعرض Blueprints التطبيقات الموجودة على GitHub — الكتالوج المنسّق غير متاح حاليًا."
+                }
             }
         },
         "gitProvider": {
@@ -9266,6 +10042,13 @@
                 "started": "بدأ الاستيراد بنجاح",
                 "failed": "فشل في استيراد العمل",
                 "fetchReposFailed": "فشل في جلب المستودعات"
+            },
+            "app": {
+                "repositoryUrlRequired": "أدخل رابط مستودع GitHub مثل https://github.com/owner/repo",
+                "repositoryModeRequired": "اختر طريقة استخدام هذا المستودع: ربط أو نسخة متفرعة أو نسخة خاصة.",
+                "targetOwnerRequired": "اختر الحساب الذي سيُنشأ فيه المستودع.",
+                "invalidUrl": "أدخل رابط مستودع GitHub مثل https://github.com/owner/repo",
+                "inspectFailed": "تعذّر فحص هذا المستودع. حاول مرة أخرى."
             }
         },
         "generator": {

@@ -1161,6 +1161,45 @@ export const config = {
             },
 
             /**
+             * APW-09 FR-46 — the operator kill switch for upstream pull requests. ON unless
+             * `APP_WORKS_UPSTREAM_PRS_ENABLED` is exactly `'false'`; read per call.
+             */
+            /**
+             * APW-10 lite — the apex managed-target App hosts live under
+             * (`<label>.<EVER_WORKS_APPS_MANAGED_DOMAIN>`). A plain dotted DNS name or `null`
+             * (unset or malformed ⇒ the shared apps apex, `getDomain()`, is used instead).
+             */
+            managedTargetDomain(): string | null {
+                const raw = (process.env.EVER_WORKS_APPS_MANAGED_DOMAIN ?? '').trim().toLowerCase();
+                if (!raw) return null;
+                // Label-wise (no nested-quantifier regex over operator input): 2+ labels, each a
+                // DNS-1123 label, the last alphabetic.
+                const labels = raw.split('.');
+                const ok =
+                    raw.length <= 253 &&
+                    labels.length >= 2 &&
+                    labels.every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) &&
+                    /^[a-z]{2,63}$/.test(labels[labels.length - 1]);
+                return ok ? raw : null;
+            },
+
+            upstreamPullRequestsEnabled() {
+                return process.env.APP_WORKS_UPSTREAM_PRS_ENABLED !== 'false';
+            },
+
+            /**
+             * APW-09 FR-41 — the operator deny list: upstream repositories (`owner/repo`,
+             * comma- or whitespace-separated, case-insensitive) no proposal may target.
+             * Read per call, so an entry takes effect without a restart of the reader.
+             */
+            upstreamDenyList(): readonly string[] {
+                return (process.env.APP_WORKS_UPSTREAM_DENY_LIST ?? '')
+                    .split(/[\s,]+/)
+                    .map((entry) => entry.trim().toLowerCase())
+                    .filter((entry) => entry.includes('/'));
+            },
+
+            /**
              * APW-06 T19 — the apex an App Work's managed subdomain lives under
              * (`EVER_WORKS_APPS_DOMAIN`, plan §8.3, spec FR-40, Resolution R-16).
              *
@@ -1718,6 +1757,35 @@ export const config = {
          * that is legitimately still retrying. Without the clamp,
          * `AGENT_RUN_STUCK_SWEEP_MINUTES=30` would silently reintroduce that.
          */
+        /**
+         * Self-build slice AT — days a TERMINAL run keeps its `agent_run_logs`
+         * timeline before the nightly retention pass deletes it
+         * (`AGENT_RUN_LOG_RETENTION_DAYS`, default 90, clamped to [7, 3650]).
+         * The run row — status, summary, cost, timings — is kept and stamped
+         * `logsPurgedAt`, the same "bodies go, the row stays" posture as the
+         * fleet job purge. A nonsense value degrades to the default.
+         */
+        getRunLogRetentionDays(): number {
+            return clampedIntEnv(process.env.AGENT_RUN_LOG_RETENTION_DAYS, 90, 7, 3650);
+        },
+        /**
+         * Self-build slice AT — days a TERMINAL run ROW is kept before the
+         * retention pass deletes it (cascading what is left of its timeline
+         * and transcript). OPT-IN: unset or `0` keeps run rows forever, which
+         * is the default because the cost dashboards, the Task history and the
+         * audit tables (inbox items, escalations, usage events) name runs by
+         * id. When set it is clamped to [30, 3650], and a row is only ever
+         * deleted after its logs were purged.
+         */
+        getRunRetentionDays(): number {
+            const raw = parseInt(process.env.AGENT_RUN_RETENTION_DAYS ?? '', 10);
+            if (!Number.isFinite(raw) || raw <= 0) return 0;
+            return Math.min(Math.max(raw, 30), 3650);
+        },
+        /** Self-build slice AT — the retention pass's off switch (`AGENT_RUN_RETENTION_ENABLED=false`). */
+        isRunRetentionEnabled(): boolean {
+            return process.env.AGENT_RUN_RETENTION_ENABLED !== 'false';
+        },
         getRunStuckSweepMinutes() {
             const ceilingMinutes = Math.ceil(Math.max(3600, this.getMaxRunDurationSeconds()) / 60);
             const floor = ceilingMinutes * 3;

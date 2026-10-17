@@ -13,6 +13,8 @@ import { ShinyText } from '@/components/ui/ShinyText';
 import { AnimatedClock } from '@/components/ui/AnimatedClock';
 import { WorkAgentsDropdown } from './WorkAgentsDropdown';
 import { WorkKindBadge } from '../shared/WorkKindBadge';
+import { AppSourceRelation } from '../app/AppSourceRelation';
+import type { AppSourceRelationSummary } from '@/lib/works/app-source-relation';
 import type { Agent } from '@/lib/api/agents';
 
 interface WorkHeaderProps {
@@ -23,6 +25,8 @@ interface WorkHeaderProps {
     agentsTotal?: number;
     /** Which of `agents` are ASSIGNED (detachable) rather than pinned. */
     assignedAgentIds?: string[];
+    /** APW-01 T24 — an App Work's relation to its repository (spec §6.4). */
+    appSource?: AppSourceRelationSummary | null;
 }
 
 export function WorkHeader({
@@ -30,6 +34,7 @@ export function WorkHeader({
     agents = [],
     agentsTotal,
     assignedAgentIds = [],
+    appSource = null,
 }: WorkHeaderProps) {
     const t = useTranslations('dashboard.workDetail');
     const { repoLinks } = useWorkDetail();
@@ -118,6 +123,8 @@ export function WorkHeader({
                             {/* Work type — leads the row so the kind is the
                                 first thing read under the title. */}
                             <WorkKindBadge kind={work.kind} variant="inline" />
+                            {/* APW-01 T24 — right after the App chip (spec §6.4). */}
+                            {appSource && <AppSourceRelation summary={appSource} />}
 
                             {/* Slug */}
                             <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">

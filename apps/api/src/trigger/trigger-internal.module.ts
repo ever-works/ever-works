@@ -41,7 +41,9 @@ import { AppSpecModule } from '@ever-works/agent/app-spec';
 import { AppBuildsModule } from '@ever-works/agent/app-builds';
 // APW-06 §5.1 — `AppDeployBuildSourceAdapter`, the Build source the controller
 // publishes for the isolated App runtime worker's `APP_DEPLOY_BUILD_SOURCE` proxy.
-import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
+import { AppDeployRequestModule, AppRuntimeStateModule } from '@ever-works/agent/app-runtime';
+import { AppRuntimeEnvModule } from '@ever-works/agent/app-env';
+import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
 
 @Module({
     imports: [
@@ -177,6 +179,12 @@ import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
         // `WorksModule` and `DeployModule`; Nest caches a static module per class, so this
         // import adds an edge, not a second adapter or a second deploy lock.
         AppDeployRequestModule,
+        // APW-06 T71 (A0.7) — `WorkAppRuntimeStateRepository` and `AppEnvRuntimeSource` for the
+        // controller's two new `remoteMap` names (the isolated worker proxies both by name).
+        AppRuntimeStateModule,
+        AppRuntimeEnvModule,
+        // A0.10 (lane aw-deploy-2) — the dependency worker's five remote names.
+        AppDependenciesModule,
         // APW-06 T71 — `DistributedTaskLockService` is provided by THIS module (below) for the
         // controller's remote target of the same name, and it needs its repository: `forFeature`
         // here is the wiring `apps/api/src/data-sync/data-sync.module.ts` documents as the

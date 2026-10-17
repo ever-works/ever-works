@@ -421,6 +421,88 @@ export class PluginSettingsService {
     }
 
     /**
+     * APW-05 §4.12 (`APW05-G07`) — write platform-managed Work settings, such as
+     * the build plugin's registry `pullToken` and `pullTokenExpiresAt`.
+     *
+     * Three properties make this a separate entry point from
+     * {@link updateWorkSettings} (plan §4.12:1116-1119):
+     *
+     *  - `x-secret` keys are **encrypted** exactly like every other write;
+     *  - `validateSettings` and the schema/scope validation are **skipped** — the
+     *    caller (`AppBuildPullTokenService`) has already checked the token against
+     *    the registry, and a value the generic validator would refuse (a
+     *    platform-managed key) must still be storable by the platform itself;
+     *  - the `plugin:settings-changed` event carries `platformManaged: true`, which
+     *    is what the Builds listener keys its `pullTokenSaved` prepare on.
+     *
+     * Only keys the plugin's schema declares are written; anything else is
+     * dropped, so this cannot be used to smuggle arbitrary settings in.
+     */
+    async writePlatformManagedWorkSettings(
+        pluginId: string,
+        workId: string,
+        values: Record<string, unknown>,
+    ): Promise<void> {
+        const registered = this.registry.get(pluginId);
+        if (!registered) {
+            throw new Error(`Plugin "${pluginId}" not found`);
+        }
+        await loadPluginSchema(registered.plugin, registered);
+        const definitions = registered.plugin.settingsSchema
+            ? this.extractSettingDefinitions(registered.plugin.settingsSchema)
+            : [];
+        const declared = new Set(definitions.map((def) => def.key));
+        const secretKeys = new Set(definitions.filter((def) => def.secret).map((def) => def.key));
+
+        const regularSettings: Record<string, unknown> = {};
+        const secretSettings: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(values)) {
+            if (!declared.has(key)) continue;
+            if (secretKeys.has(key)) secretSettings[key] = value;
+            else regularSettings[key] = value;
+        }
+        const changedKeys = [...Object.keys(regularSettings), ...Object.keys(secretSettings)];
+        if (changedKeys.length === 0) return;
+
+        const existing = await this.workPluginRepository.findByWorkAndPlugin(workId, pluginId);
+        const existingSecretsPlain = this.decryptSecrets(existing?.secretSettings);
+        if (existing) {
+            await this.workPluginRepository.updateSettings(
+                workId,
+                pluginId,
+                { ...existing.settings, ...regularSettings },
+                this.encryptSecrets({ ...existingSecretsPlain, ...secretSettings }),
+            );
+        } else {
+            const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
+            if (!pluginEntity) {
+                throw new Error(`Plugin entity not found for ${pluginId}`);
+            }
+            await this.workPluginRepository.create({
+                workId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                settings: regularSettings,
+                secretSettings: this.encryptSecrets(secretSettings),
+            });
+        }
+
+        this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
+            pluginId,
+            changedKeys,
+            scope: 'work',
+            workId,
+            platformManaged: true,
+            timestamp: Date.now(),
+        });
+
+        // Key names only — never a value.
+        this.logger.debug(
+            `Wrote platform-managed work settings (${changedKeys.join(', ')}) for plugin ${pluginId}, work ${workId}`,
+        );
+    }
+
+    /**
      * Shared validation and settings separation for all update methods.
      * Handles: plugin lookup, configMode enforcement, schema filtering,
      * scope validation, settings validation, and regular/secret separation.

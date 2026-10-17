@@ -28,6 +28,8 @@ const VALID_CHIP_TYPES: ChipType[] = [
     'awesome-repo',
     // Self-build slice D (EW-766) — an existing code repository as a Work.
     'repo',
+    // APW-01 T23 — `/new?type=app`; a disabled App kind falls back below.
+    'app',
     // EW-662 (Phase 10) — Company joins the live chip set so
     // `/new?type=company` lands directly on the Register-Company flow.
     'company',

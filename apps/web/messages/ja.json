@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Work を 1 回またはスケジュールで生成",
                     "deploy": "Work をデプロイ",
                     "tasks": "このワークのタスク",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "リポジトリからビルドされたコンテナイメージ"
                 },
                 "tasks": "タスク",
                 "posts": "投稿",
                 "pages": "ページ",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "ビルド"
             },
             "members": {
                 "title": "チームメンバー",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "アップストリーム: {fullName}",
+                    "fork": "フォーク: {fullName}",
+                    "private-copy": "プライベートコピー: {fullName}",
+                    "link": "リンク済み: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "フォークを準備中",
+                    "forkBody": "GitHub が {fullName} を作成しています。通常は 1 分以内に完了しますが、大きなリポジトリではさらに時間がかかることがあります。",
+                    "copyTitle": "プライベートコピーを準備中",
+                    "copyBody": "{upstream} を {fullName} にコピーしています。大きなリポジトリほど時間がかかります。",
+                    "linkTitle": "セットアップを完了中",
+                    "linkBody": "{fullName} に .works/works.yml を追加するプルリクエストを作成しています。",
+                    "blueprintTitle": "{name} Blueprint を適用中",
+                    "blueprintBody": "Ever Works が App Work を準備しており、Blueprint のファイルとともに .works/works.yml を書き込みます。"
+                },
+                "setupPrClosed": "セットアップ用のプルリクエストがマージされずにクローズされました。",
+                "timedOut": "フォークの作成に 15 分以上かかっています。",
+                "failedAccess": "この App Work の準備中に、Ever Works が GitHub へのアクセスを失いました。",
+                "failedOther": "この App Work の準備に失敗しました: {reason}",
+                "waitingForSetupPr": "セットアップ用のプルリクエストをマージすると完了します。",
+                "tryAgain": "再試行",
+                "openOnGitHub": "GitHub で開く",
+                "reconnectGitHub": "GitHub を再接続",
+                "openPullRequest": "プルリクエストを開く",
+                "retryLimit": "この 1 時間の再試行 3 回をすべて使いました。後でもう一度お試しください。",
+                "retryFailed": "再試行を開始できませんでした。もう一度お試しください。",
+                "failedReasons": {
+                    "works_yml_unparseable": "デフォルトブランチの .works/works.yml が有効な YAML ではありません。ファイルを修正または削除してから、もう一度お試しください。",
+                    "works_yml_other_kind": ".works/works.yml ではすでに別の種類の Work が宣言されています。kind: app を設定するかファイルを削除してから、もう一度お試しください。",
+                    "push_rejected": "GitHub が .works/works.yml を追加するコミットを拒否し続けました。",
+                    "provider_unsupported": "このリポジトリの Git プロバイダーは自動でセットアップできません。",
+                    "too_large_for_private_copy": "このリポジトリはプライベートコピーには大きすぎます。代わりにフォークを作成してください。",
+                    "uses_lfs": "このリポジトリは Git LFS を使用しており、プライベートコピーには引き継げません。代わりにフォークを作成してください。",
+                    "other": "リポジトリのセットアップ中に問題が発生しました。"
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Work リポジトリ",
+                    "upstream": "アップストリーム",
+                    "relationLabel": "関係",
+                    "readinessLabel": "準備状況",
+                    "readiness": {
+                        "preparing": "準備中",
+                        "ready": "準備完了",
+                        "timed_out": "タイムアウト",
+                        "failed": "失敗",
+                        "waiting_for_setup_pr": "セットアップ用プルリクエストを待機中"
+                    },
+                    "relations": {
+                        "link": "リンク済み",
+                        "fork": "フォーク",
+                        "private-copy": "プライベートコピー"
+                    },
+                    "appSpecLabel": "アプリスペック",
+                    "appSpecStatus": {
+                        "valid": "有効",
+                        "valid_with_warnings": "有効 (警告あり)",
+                        "invalid": "エラーあり",
+                        "missing": "未作成",
+                        "unreadable": "読み取れませんでした",
+                        "pending": "確認中",
+                        "unknown": "未確認"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {エラーなし} =1 {エラー 1 件} other {エラー # 件}} · {warnings, plural, =0 {警告なし} =1 {警告 1 件} other {警告 # 件}}",
+                    "openAppSpec": "アプリスペックを開く",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "現在、App の詳細を読み込めませんでした。",
+                    "builds": "ビルド",
+                    "deploy": "デプロイ",
+                    "upstreamTab": "アップストリーム",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "エージェントと一緒に進化させる",
+                    "body": "Work のエージェントにアプリの変更を依頼できます — 機能の追加、バグの修正、依存関係のアップグレードなど。エージェントは Work リポジトリで作業し、プルリクエストを作成します。",
+                    "button": "この App についてチャット"
+                }
+            },
+            "builds": {
+                "title": "ビルド",
+                "subtitle": "{repository} の GitHub ホストランナーでビルド · イメージ {imageRepository}",
+                "subtitleNoImage": "{repository} の GitHub ホストランナーでビルド",
+                "subtitleGeneric": "この App Work のリポジトリからビルドされたコンテナイメージ。",
+                "startBuild": "ビルドを開始",
+                "starting": "開始中…",
+                "refresh": "更新",
+                "cancel": "キャンセル",
+                "cancelling": "キャンセル中…",
+                "viewerDisabled": "この操作には編集権限が必要です。",
+                "deployable": "デプロイ可能",
+                "notDeployableLine": "デプロイ不可 — {reason}",
+                "pagination": "{total} 件中 {start}–{end} 件を表示",
+                "listLabel": "この App Work のビルド",
+                "openDetails": "ビルド #{number} を開く",
+                "status": {
+                    "queued": "待機中",
+                    "running": "実行中",
+                    "succeeded": "成功",
+                    "failed": "失敗",
+                    "cancelled": "キャンセル済み",
+                    "blocked": "ブロック中"
+                },
+                "trigger": {
+                    "push": "プッシュ",
+                    "pullRequest": "PR #{number}",
+                    "manual": "手動",
+                    "verification": "検証"
+                },
+                "notDeployable": {
+                    "notSucceeded": "ビルドが成功しませんでした",
+                    "pullRequest": "プルリクエストからビルドされました",
+                    "verification": "検証用にビルドされました",
+                    "specInvalid": "このコミットのアプリスペックにエラーがあります",
+                    "staleInputs": "古いビルド値でビルドされました",
+                    "secretCheckFailed": "シークレットチェックに合格しませんでした",
+                    "digestUnconfirmed": "プッシュされたイメージを確認できませんでした",
+                    "criticalVulnerability": "修正が提供されている重大な脆弱性があります",
+                    "unsigned": "イメージが署名されていません"
+                },
+                "blocked": {
+                    "workflowPending": "ビルドワークフローのマージを待っています。",
+                    "workflowEditedByHand": "ビルドワークフローが手動で編集されました。",
+                    "workflowWriteFailed": "Ever Works はビルドワークフローをリポジトリに書き込めませんでした。このリポジトリのルールが変更を拒否しています。",
+                    "actionsDisabled": "このリポジトリでは GitHub Actions がオフになっています。",
+                    "missingBuildValues": "{count, plural, =1 {1 件のビルド値} other {# 件のビルド値}}を待っています: {names}",
+                    "runnerTooSmall": "このビルドには {needed} が必要ですが、{visibility} リポジトリ用のランナーでは {max} までです。",
+                    "tooManyBuildValues": "このビルドは {count} 件のビルド値を使用しています。上限は 50 件です。",
+                    "buildValueTooLarge": "{name} は大きすぎてビルドに渡せません (最大 48 KB)。",
+                    "secretLimitReached": "このリポジトリにはこれ以上シークレットを追加できません。",
+                    "strategyNotSupported": "GitHub ホストランナーでは「{strategy}」ストラテジーでビルドできません。Dockerfile を追加し、build.strategy を dockerfile に設定してください。",
+                    "specInvalid": "このコミットのアプリスペックにエラーがあります。",
+                    "gitConnectionMissing": "Ever Works はあなたの GitHub 接続でこのリポジトリにアクセスできません。",
+                    "repositoryUnavailable": "{repository} はアーカイブまたは削除されたか、あなたの GitHub 接続で利用できなくなりました。",
+                    "managedConcurrencyLimit": "他のビルドを待っています: 同時に実行できるのはアプリごとに最大 {perWork} 件、アカウントごとに最大 {perAccount} 件です。",
+                    "buildValueNameReserved": "{name} は Ever Works で予約されているため、ビルドに渡せません。環境のエントリー名を変更してください。",
+                    "buildServicePortRequired": "ビルドサービス {service} にはポートが必要です: Ever Works は「{image}」がどのポートで待ち受けるかを把握していません。",
+                    "verificationDependencyUnsupported": "検証ではまだ {kind} を起動できません。代わりにクラスター上でチェックを実行します。",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "プルリクエストを確認",
+                    "turnOnActions": "オンにする",
+                    "setValue": "設定する",
+                    "useLargerRunner": "より大きなランナーを使用",
+                    "openRepositorySettings": "リポジトリの設定を開く",
+                    "reconnectGithub": "GitHub を再接続",
+                    "rebuild": "再ビルド",
+                    "openEnvironment": "環境を開く"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "メモリ不足",
+                        "suggestion": "build.resources.memory (現在 {memory}) を増やすか、ビルドのヒープサイズを減らしてください。このランナーでは、ビルドが使用できるのは最大 {max} です。"
+                    },
+                    "diskFull": {
+                        "title": "ディスク容量不足",
+                        "suggestion": "ビルド設定で「ランナーのディスクを解放」をオンにするか、.dockerignore ファイルでビルドコンテキストを小さくしてください。"
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile がステップ {step}/{total} で失敗しました",
+                        "suggestion": "失敗したステップ: {command}。{dockerfile} で修正してプッシュするか、エージェントに修正を依頼してください。"
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "依存関係をダウンロードできませんでした",
+                        "suggestion": "パッケージまたはベースイメージのレジストリが応答しませんでした。数分後に再ビルドしてください。失敗が続く場合は、依存するバージョンを固定してください。"
+                    },
+                    "registryPushDenied": {
+                        "title": "イメージをプッシュできませんでした",
+                        "suggestion": "このリポジトリのワークフローにパッケージの書き込みを許可してから (Settings ▸ Actions ▸ General ▸ Workflow permissions)、再ビルドしてください。"
+                    },
+                    "missingBuildValue": {
+                        "title": "ビルド値が不足しています: {names}",
+                        "suggestion": "設定 ▸ 環境 で設定してから、再ビルドしてください。"
+                    },
+                    "secretInImage": {
+                        "title": "シークレットがイメージ内に公開されるところでした: {name}",
+                        "suggestion": "この値は前のビルドステージでのみ使用するか、ビルドシークレットマウントとして渡してください。何もプッシュされていません。"
+                    },
+                    "timeout": {
+                        "title": "{minutes} 分を超えました",
+                        "suggestion": "build.resources.timeoutMinutes (最大 180) を増やすか、キャッシュを使ってビルドを高速化してください。"
+                    },
+                    "workflowInvalid": {
+                        "title": "ワークフローファイルが無効です",
+                        "suggestion": "GitHub がビルドワークフローを実行できません。Ever Works が作成したプルリクエストを確認して、ワークフローを復元してください。"
+                    },
+                    "digestMismatch": {
+                        "title": "プッシュされたイメージを確認できませんでした",
+                        "suggestion": "レジストリが報告したイメージがビルドのものと異なります。再ビルドしてください。確認されていないものはデプロイされません。"
+                    },
+                    "verificationFailed": {
+                        "title": "アプリがスモークテストに合格しませんでした",
+                        "suggestion": "{total} 件中 {failed} 件のスモークテストが失敗しました。下の結果を確認してください。"
+                    },
+                    "egressBlocked": {
+                        "title": "ネットワークアクセスがブロックされました",
+                        "suggestion": "ビルドが {hosts} にアクセスしようとしましたが、ビルダーの許可リストに含まれていません。必要なものはソースリポジトリまたは許可されたレジストリから取得してから、再ビルドしてください。"
+                    },
+                    "lost": {
+                        "title": "このビルドを追跡できなくなりました",
+                        "suggestion": "GitHub がこのビルドについて応答しなくなりました。GitHub で確認してください。"
+                    },
+                    "unknown": {
+                        "title": "その他の問題が発生しました",
+                        "suggestion": "GitHub でログを開くか、エージェントに調査を依頼してください。"
+                    },
+                    "askAgent": "エージェントに修正を依頼",
+                    "excerptLabel": "ログの最後の行"
+                },
+                "cancelReason": {
+                    "user": "メンバーがキャンセルしました",
+                    "superseded": "新しいビルドに置き換えられました"
+                },
+                "detail": {
+                    "title": "ビルド #{number} · {sha} · {status}",
+                    "loading": "ビルドの詳細を読み込み中…",
+                    "close": "閉じる",
+                    "trigger": "トリガー",
+                    "triggeredBy": "{trigger} — {name} による実行",
+                    "commit": "コミット",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "ランナー",
+                    "duration": "所要時間",
+                    "durationValue": "{duration} (待機 {queued})",
+                    "image": "イメージ",
+                    "tags": "タグ",
+                    "deployable": "デプロイ可能",
+                    "yes": "はい",
+                    "buildValues": "ビルド値",
+                    "buildValuesValue": "{count, plural, =1 {1 件同期済み} other {# 件同期済み}}: {names}",
+                    "noBuildValues": "なし",
+                    "receipt": "レシート",
+                    "verification": "検証",
+                    "copy": "コピー",
+                    "copied": "イメージ参照をコピーしました。",
+                    "copyFailed": "イメージ参照をコピーできませんでした。",
+                    "viewLogs": "GitHub でログを表示",
+                    "rebuildThisCommit": "このコミットを再ビルド",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "ランナー {minutes} 分 · あなたの GitHub アカウントに課金",
+                    "minutesPlatform": "ランナー {minutes} 分 · Ever Works が負担",
+                    "checksMinutes": "うち {checksMinutes} 分は App チェックの実行",
+                    "costUnknown": "ランナーの使用分数はまだ報告されていません"
+                },
+                "verification": {
+                    "componentsReady": "コンポーネントが起動しました",
+                    "componentsNotReady": "コンポーネントが起動しませんでした",
+                    "job": "ジョブ {name} が {exitCode} で終了しました",
+                    "jobNoExit": "ジョブ {name} が完了しませんでした",
+                    "smokePassed": "合格: {name}",
+                    "smokeFailed": "不合格: {name} — 期待値 {expected}、実際 {observed}"
+                },
+                "empty": {
+                    "noBuilds": "ビルドはまだありません。ビルドワークフローがリポジトリに追加されると、最初のビルドが開始されます。",
+                    "unavailable": "このインスタンスではまだビルドを利用できません。"
+                },
+                "errors": {
+                    "loadFailed": "ビルドを読み込めませんでした。ページを更新してみてください。",
+                    "rebuildRateLimited": "この 1 時間に開始したビルドが多すぎます。{minutes, plural, =1 {1 分後} other {# 分後}}にもう一度お試しください。",
+                    "commitNotReachable": "そのコミットは追跡中のブランチにありません。",
+                    "nothingToBuild": "この App Work は公開済みイメージを実行するため、ビルドするものはありません。",
+                    "notCancellable": "このビルドはすでに完了しているため、キャンセルできません。",
+                    "providerUnavailable": "現在利用できるビルドプロバイダーがありません。後でもう一度お試しください。",
+                    "startFailed": "ビルドを開始できませんでした。もう一度お試しください。",
+                    "cancelFailed": "このビルドをキャンセルできませんでした。もう一度お試しください。",
+                    "detailFailed": "このビルドを読み込めませんでした。もう一度お試しください。"
+                },
+                "toasts": {
+                    "started": "ビルドをキューに追加しました。",
+                    "deduped": "このコミットのビルドはすでにキューにあります。",
+                    "cancelled": "ビルドをキャンセルしました。"
+                },
+                "pullToken": {
+                    "title": "プルトークンを追加",
+                    "body": "このイメージはプライベートです。ダウンロードするには、パッケージの読み取りのみが可能なトークンがクラスターに必要です。",
+                    "stepCreate": "1. 「read:packages」のみにチェックを入れたクラシックトークンを作成します。",
+                    "stepPaste": "2. ここに貼り付けます。",
+                    "label": "トークン",
+                    "submit": "確認して保存",
+                    "saving": "確認中…",
+                    "tooBroad": "このトークンにはパッケージの読み取り以上の権限があります。read:packages のみのトークンを作成してください。",
+                    "fineGrained": "これは fine-grained トークンです。read:packages のみにチェックを入れたクラシックトークンを作成してください。",
+                    "cannotRead": "このトークンでは {imageRepository} を読み取れません。",
+                    "publicImage": "このイメージはすでに公開されています。トークンは不要です。",
+                    "noImageYet": "完了したビルドはまだありません。最初のビルドが成功した後にプルトークンを追加してください。",
+                    "savedExpires": "プルトークンを保存しました。有効期限は {date} です。",
+                    "savedNoExpiry": "プルトークンを保存しました。有効期限はありません。",
+                    "tokenSet": "プルトークンは保存済みです。置き換えるには新しいトークンを貼り付けてください。",
+                    "expiringSoon": "プルトークンの有効期限は {date} です。それまでに新しいトークンを追加してください。",
+                    "viewerDisabled": "この操作には編集権限が必要です。",
+                    "failed": "プルトークンを保存できませんでした。もう一度お試しください。"
+                },
+                "overview": {
+                    "title": "最新のビルド",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "デプロイ可能なビルド: このコミット",
+                    "deployableOther": "デプロイ可能なビルド: {sha}",
+                    "noDeployable": "デプロイ可能なビルドはまだありません",
+                    "open": "ビルドを開く"
+                }
+            },
+            "appDeploy": {
+                "title": "デプロイ",
+                "notRunning": "このアプリはまだどこでも実行されていません。",
+                "runningOn": "{state} · {target}",
+                "openApp": "アプリを開く",
+                "source": "ソース",
+                "buildsLink": "ビルドを見る",
+                "buildsHint": "ターゲットに関係なく、ビルドは実行されます。",
+                "stale": "最終確認: {minutes, plural, =1 {1 分前} other {# 分前}}",
+                "status": {
+                    "notDeployed": "未デプロイ",
+                    "live": "稼働中",
+                    "degraded": "低下",
+                    "down": "停止",
+                    "unreachable": "クラスターに接続できません",
+                    "paused": "一時停止中",
+                    "deleting": "削除中…"
+                },
+                "target": {
+                    "heading": "どこで実行しますか？",
+                    "current": "(現在)",
+                    "none": {
+                        "label": "なし — まだデプロイしない",
+                        "description": "ビルドは引き続き実行されます。"
+                    },
+                    "yourCluster": {
+                        "label": "あなたのクラスター",
+                        "description": "あなたが管理する Kubernetes クラスターで実行します。"
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "私たちが代わりに実行します。",
+                        "unavailable": "近日公開 — アプリのマネージドホスティングはまだ提供されていません。",
+                        "ineligible": "このアプリではまだ利用できません。"
+                    },
+                    "connect": "クラスターを接続",
+                    "reconnect": "クラスター接続を変更",
+                    "connected": "接続済み · {version}",
+                    "connectedNoVersion": "接続済み",
+                    "checkFailed": "前回のクラスターチェックに失敗しました。",
+                    "notChecked": "まだクラスターが接続されていません。",
+                    "save": "このターゲットを使用",
+                    "saving": "保存中…",
+                    "saved": "ターゲットを保存しました。",
+                    "saveFailed": "ターゲットを保存できませんでした: {reason}",
+                    "changeNote": "ターゲットを変更しても、すでに実行中のものは削除されません。",
+                    "routeUnavailable": "このインスタンスではまだターゲットを変更できません。"
+                },
+                "connect": {
+                    "title": "クラスターを接続",
+                    "description": "このアプリを実行するクラスターのサービスアカウント用 kubeconfig を貼り付けてください。",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "kubeconfig を貼り付け…",
+                    "kubeconfigHelp": "サービスアカウントのトークンを使用してください。コマンド、ローカルファイル、プロキシはサポートされていません。",
+                    "kubeconfigStored": "kubeconfig は一度だけ送信され、暗号化して保存されています。置き換えるには新しいものを貼り付けるか、保存済みのものを再確認してください。",
+                    "contextLabel": "コンテキスト (任意)",
+                    "contextHelp": "空欄の場合は kubeconfig の現在のコンテキストを使用します。",
+                    "check": "接続を確認",
+                    "checking": "確認中…",
+                    "checkAgain": "再確認",
+                    "checkTimedOut": "確認が 30 秒以内に完了しませんでした。もう一度お試しください。",
+                    "checkFailed": "接続を確認できませんでした: {reason}",
+                    "unavailable": "このインスタンスではまだクラスターを接続できません。",
+                    "kubeconfigTooLarge": "この kubeconfig は 64 KiB を超えています。",
+                    "kubeconfigRequired": "まず kubeconfig を貼り付けてください。",
+                    "ingressClass": "Ingress クラス",
+                    "ingressDefault": "{name} (デフォルト)",
+                    "ingressNone": "Ingress クラスが見つかりません",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Issuer からの証明書",
+                        "external": "クラスター外で処理",
+                        "edge": "エッジで終端",
+                        "none": "TLS なし (http のみ)"
+                    },
+                    "issuer": "Issuer",
+                    "namespace": "名前空間",
+                    "namespaceAuto": "アプリの初回デプロイ時に選択されます",
+                    "isolation": "ネットワーク分離",
+                    "isolationOn": "オン (推奨)",
+                    "isolationOff": "オフ",
+                    "isolationOffWarning": "ネットワーク分離がないと、クラスター上の他のワークロードがこのアプリとそのデータベースにアクセスできます。",
+                    "cancel": "キャンセル",
+                    "save": "保存",
+                    "saving": "保存中…",
+                    "saveBlocked": "必要な権限がすべて揃った状態で確認に合格すると、保存できます。",
+                    "saved": "クラスターを接続しました。",
+                    "saveFailed": "クラスター接続を保存できませんでした: {reason}"
+                },
+                "check": {
+                    "ok": "接続済み",
+                    "version": "Kubernetes {version}",
+                    "failed": "クラスターチェックに失敗しました。",
+                    "kubeconfigRefused": "この kubeconfig は {reason}。代わりにサービスアカウントのトークンを使用してください。",
+                    "notPublic": "Ever Works がアクセスできるのは、公開アドレスのクラスターのみです。",
+                    "permissions": "権限",
+                    "allPermissions": "必要な権限はすべて揃っています。",
+                    "missing": "不足: {verb} {resource}",
+                    "optionalMissing": "任意、不足: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "今すぐデプロイ",
+                    "deploying": "リクエスト中…",
+                    "started": "デプロイを開始しました。",
+                    "queued": "キューに追加しました。実行中のデプロイが完了すると開始します。",
+                    "deduplicated": "そのデプロイはすでにリクエストされています。",
+                    "inProgress": "別のデプロイが実行中です ({id})。完了するまで待ってから、もう一度デプロイしてください。",
+                    "preconditionsHeader": "デプロイする前に、次の問題を解決してください:",
+                    "workerNotIsolated": "デプロイはまだ開始できません: このインスタンスには分離された App クラスターワーカーがありません。",
+                    "notAppWork": "この Work は App Work ではないため、この方法ではデプロイできません。",
+                    "failed": "デプロイをリクエストできませんでした: {reason}",
+                    "targetNone": "まずアプリを実行する場所を選択してください。「なし」では何もデプロイされません。",
+                    "deploymentId": "デプロイ {id}",
+                    "warningsHeader": "警告"
+                },
+                "preconditions": {
+                    "specInvalid": "アプリスペック (.works/works.yml) にエラーがあります。アプリスペックのページで修正してください。",
+                    "licenseBlocksTarget": "アプリのライセンスでは、このターゲットでのホスティングが許可されていません。",
+                    "licenseAttestationMissing": "デプロイする前に、アプリのライセンスを証明してください。",
+                    "envRequiredUnset": "必須の環境変数の値がまだ設定されていません。",
+                    "dependencyNotReady": "アプリに必要な依存関係がまだ準備できていません。",
+                    "noGreenBuild": "デプロイできる成功したビルドがまだありません。まずビルドを開始してください。",
+                    "noGreenBuildForHead": "デプロイブランチの最新コミットはまだビルドに成功していません。",
+                    "buildImageMissing": "ビルドにデプロイするイメージがありません。",
+                    "nothingToDeploy": "デプロイするものがまだありません: ビルドも公開済みイメージもありません。",
+                    "imageNotPinned": "このイメージはタグで参照されています。すべてのデプロイで同じイメージが実行されるよう、ダイジェストで固定してください。",
+                    "imageNotFound": "イメージがレジストリに見つかりません。",
+                    "imagePrivateUnsupported": "このイメージは認証情報なしではダウンロードできません。Ever Works が公開済みイメージをデプロイするのは、パブリックな場合のみです。",
+                    "imageUnresolvable": "イメージ参照を解決できませんでした。",
+                    "primaryDomainMissing": "プライマリドメインがまだ設定されていません。",
+                    "targetNone": "まずアプリを実行する場所を選択してください。",
+                    "targetNotChecked": "まずクラスター接続を確認してください。",
+                    "clusterChangedUnconfirmed": "前回のデプロイ以降にクラスターが変更されました。デプロイするには変更を確認してください。",
+                    "managedDisabled": "近日公開 — アプリのマネージドホスティングはまだ提供されていません。",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps で実行できるのは、検証済み Blueprint のアプリのみです。",
+                    "quotaExceeded": "Ever Works Apps で実行できるアプリの数の上限に達しました。",
+                    "managedIneligible": "このアプリは Ever Works Apps で実行できません。",
+                    "managedSandboxUnavailable": "Ever Works Apps は現在、新しいアプリを受け付けられません。",
+                    "appWorkDeleting": "この App Work は削除中です。",
+                    "paused": "アプリは一時停止中です。デプロイするには再開してください。",
+                    "deployInProgress": "別のデプロイが実行中です。",
+                    "cronAuthEnvUnset": "スケジュール呼び出しに必要な認証値が設定されていません。",
+                    "jobAuthEnvUnset": "ジョブに必要な認証値が設定されていません。",
+                    "volumeReplicas": "ボリュームを持つコンポーネントは、レプリカを 1 つしか実行できません。",
+                    "volumeShrink": "ボリュームを縮小することはできません。",
+                    "privilegedPort": "コンポーネントが 1024 未満のポートで待ち受けています。",
+                    "cronTooFrequent": "スケジュール呼び出しの実行頻度が上限を超えています。",
+                    "managedRootForbidden": "このイメージは root として実行されます。",
+                    "imageUserUnverifiable": "Ever Works は、イメージがどのユーザーとして実行されるかを確認できませんでした。",
+                    "workerNotIsolated": "デプロイはまだ開始できません: このインスタンスには分離された App クラスターワーカーがありません。",
+                    "envSourceUnavailable": "現在、アプリの環境変数の値を読み取れません。",
+                    "pullCredentialUnavailable": "イメージをプルするための認証情報を利用できません。",
+                    "namespaceForeign": "その名前空間は、クラスター上ですでに別のものに属しています。",
+                    "verificationNamespaceForbidden": "その名前空間は検証の実行用に予約されています。"
+                },
+                "license": {
+                    "loading": "ライセンスを読み取り中…",
+                    "unavailable": "このインスタンスではまだライセンスの詳細を利用できません。",
+                    "error": "ライセンスを読み取れませんでした。ページを再読み込みしてもう一度お試しください。",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "認識できるライセンスが見つかりませんでした。",
+                    "classes": {
+                        "green": "ホスティング可",
+                        "amber": "ライセンス条項を確認した後、あなたのクラスターで実行可",
+                        "red": "ライセンス条項を確認した後、あなたのクラスターでのみ実行可",
+                        "unknown": "ライセンス不明 — デプロイ前に条項を確認してください",
+                        "unclassified": "未分類"
+                    },
+                    "mixed": "このリポジトリの一部では別のライセンスが使用されています。",
+                    "incomplete": "このリポジトリは大きすぎて、完全にはスキャンできません。",
+                    "yourClusterAllowed": "あなたのクラスター: 許可",
+                    "yourClusterAfterConfirm": "あなたのクラスター: ライセンス条項の確認後に許可",
+                    "review": "確認して同意",
+                    "confirmed": "{date} に確認済み。",
+                    "disclaimer": "これはリポジトリのライセンスファイルを自動で読み取った結果であり、法的助言ではありません。",
+                    "unknownSpdx": "このソフトウェアのライセンス",
+                    "dialogTitle": "ライセンス条項を確認",
+                    "dialogBody": "{spdx} は、このソフトウェアのホスティング方法を制限しています。このソフトウェアには Ever Works Apps を利用できません。自分のクラスターで実行するには、次の内容を確認してください:",
+                    "noText": "ライセンスレジストリには、このライセンスに関する記述がありません。",
+                    "checkbox": "上記の内容を確認しました。",
+                    "footer": "確認した人、日時、対象のライセンスとコミットを記録します。",
+                    "cancel": "キャンセル",
+                    "confirm": "確認",
+                    "refusals": {
+                        "ownerOnly": "証明できるのは App Work のオーナーのみです。",
+                        "licenseChanged": "確認中にライセンスが変更されました。新しい条項を確認して、もう一度同意してください。",
+                        "attestationNotRequired": "このライセンスでは確認が不要になりました。",
+                        "licenseUnavailable": "このインスタンスではまだライセンスの確認を利用できません。",
+                        "route_unavailable": "このインスタンスではまだライセンスの確認を利用できません。",
+                        "failed": "確認を記録できませんでした。もう一度お試しください。"
+                    }
+                },
+                "rollback": {
+                    "button": "ロールバック",
+                    "title": "以前のデプロイにロールバック",
+                    "description": "以前に稼働していたデプロイを選んでください。そのイメージとアプリ仕様が再び実行されます。再ビルドは行われません。",
+                    "pickLabel": "戻り先のデプロイ",
+                    "liveAt": "{when, date, medium} {when, time, short} から稼働",
+                    "liveAtUnknown": "以前に稼働していました",
+                    "none": "ロールバックできる以前の稼働中デプロイはありません。",
+                    "runJobs": "デプロイ前ジョブを再実行する",
+                    "confirm": "ロールバック",
+                    "cancel": "キャンセル",
+                    "started": "ロールバックを開始しました。",
+                    "failed": "ロールバックを開始できませんでした: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "一時停止",
+                    "resume": "再開",
+                    "remove": "クラスタから削除",
+                    "removeTitle": "このアプリをクラスタから削除",
+                    "removeDescription": "実行中のアプリが停止し、その Kubernetes オブジェクトが削除されます。App Work とそのビルドは残ります。",
+                    "deleteData": "保存データも削除する（ボリュームと依存関係のデータベース）",
+                    "deleteDataWarning": "この操作は元に戻せません。",
+                    "confirmSlugLabel": "確認のため {slug} と入力してください",
+                    "confirmRemove": "削除",
+                    "cancel": "キャンセル",
+                    "failed": "実行できませんでした: {reason}",
+                    "slugMismatch": "入力したスラッグがこの App Work と一致しません。",
+                    "accepted": {
+                        "pause": "一時停止をリクエストしました。",
+                        "resume": "再開をリクエストしました。",
+                        "remove": "削除をリクエストしました。",
+                        "cancelDeploy": "キャンセルをリクエストしました。"
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "名前は英字またはアンダースコアで始まり、A–Z、0–9、_ のみを使用します。",
+                    "reservedName": "EVER_WORKS_ で始まる名前はプラットフォーム用に予約されています。",
+                    "valueTooLarge": "値は最大 65,536 バイトまでです。",
+                    "controlCharacter": "値に NUL 文字を含めることはできません。",
+                    "lengthMismatch": "ちょうど {expected} 文字である必要があります (入力は {actual} 文字です)。",
+                    "tooShort": "{min} 文字以上である必要があります。",
+                    "tooLong": "{max} 文字以下である必要があります。",
+                    "patternMismatch": "このアプリが求めるパターンに一致しません。",
+                    "generatedValueUseRotate": "この値は生成されたものです。置き換えるにはローテーションしてください。",
+                    "neverRotateNotAcknowledged": "このアプリでは、この値を決して変更してはならないとされています。ローテーションする前に、理解したことを確認してください。",
+                    "rotateConfirmationMismatch": "入力した名前がこの値の名前と一致しません。",
+                    "secureStorageUnavailable": "このインストールではセキュアストレージが構成されていないため、値を保存できません。",
+                    "tooManyValues": "1 つのアプリに保持できる値は最大 300 件です。",
+                    "valuesTooLarge": "アプリの値の合計は最大 1 MiB までです。",
+                    "malformedLine": "有効な NAME=value 形式の行ではありません。",
+                    "rotateRateLimited": "ローテーションの回数が多すぎます。後でもう一度お試しください。"
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "保留中",
+                    "awaitingConfig": "設定が必要です",
+                    "provisioning": "プロビジョニング中",
+                    "ready": "準備完了",
+                    "degraded": "低下",
+                    "failed": "失敗",
+                    "kept": "保持 — 管理対象外",
+                    "deleting": "削除中",
+                    "deleted": "削除済み",
+                    "notInSpec": "アプリスペックで使用されなくなりました — データは保持"
+                },
+                "backup": {
+                    "none": "自動バックアップはありません。このボリュームが失われると、データも失われます。",
+                    "notConfigured": "バックアップ: 未構成",
+                    "healthy": "バックアップ: 最終完了 {time}",
+                    "overdue": "バックアップ: 期限超過 — 最終完了 {time}",
+                    "failing": "バックアップ: 前回の試行に失敗しました",
+                    "external": "バックアップ: {kind} プロバイダーが管理",
+                    "unknown": "バックアップ: 確認できませんでした"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "クラスターにデフォルトのストレージクラスがありません。依存関係の設定で選択してください。",
+                    "clusterUnreachable": "クラスターに接続できませんでした。",
+                    "smtpConnectFailed": "メールサーバーに接続できませんでした。",
+                    "smtpTlsFailed": "メールサーバーとの TLS ハンドシェイクに失敗しました。",
+                    "smtpAuthRefused": "サーバーがサインインを拒否しました。",
+                    "bucketUnreadable": "バケット {bucket} が存在しないか、読み取れません。",
+                    "volumeNotReady": "ボリュームが {minutes} 分以内に準備完了になりませんでした。",
+                    "extensionUnavailable": "利用できない拡張機能: {names}。",
+                    "platformServerRefused": "そのサーバーには Ever Works プラットフォームのデータがあります。別のサーバーを選択してください。",
+                    "deadlineExceeded": "プロビジョニングが時間内に完了しませんでした。",
+                    "namespaceNotOwned": "その名前空間は別のアプリに属しています。別の名前空間を選択してください。",
+                    "namespaceBaselineMissing": "名前空間にベースラインの制限とポリシーがありません。",
+                    "clusterPermissionMissing": "Ever Works には、クラスター内にこの依存関係を作成する権限がありません。",
+                    "operatorNamespaceUnknown": "依存関係の設定で、オペレーターの名前空間が設定されていません。",
+                    "volumeExpansionUnsupported": "ストレージクラス {storageClass} ではこのボリュームを拡張できません。",
+                    "sizeShrinkRefused": "依存関係のストレージは縮小できません。小さくする必要がある場合は、先にデータを削除してください。",
+                    "relayIneligible": "このアプリは Ever Works のメールリレーを使用できません。",
+                    "relaySuspended": "Ever Works のメールリレーは停止されています。",
+                    "providerNotSupported": "そのプロバイダーではこの依存関係を提供できません。",
+                    "dependencyNotDeclared": "アプリスペックでこの依存関係が宣言されていません。",
+                    "confirmationMismatch": "入力した名前が一致しません。",
+                    "deleteInProgress": "この依存関係のデータはすでに削除中です。",
+                    "notGenerated": "その値は生成されたものではないため、ローテーションするものはありません。",
+                    "notAppWork": "この Work はアプリではありません。",
+                    "targetNone": "このアプリはまだデプロイ先が設定されていません。依存関係をプロビジョニングするには、デプロイターゲットを選択してください。",
+                    "targetNotChecked": "クラスターはまだチェックに合格していません。接続を確認してから、もう一度お試しください。"
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "リポジトリ",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "既存のコードリポジトリを Work として登録 — タスク、ゴール、フリート実行がそこに紐づきます。生成もデプロイも行われません。",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "任意の GitHub リポジトリを実行し、進化させます。リンクまたはフォークして、実行場所を選びます。"
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "リポジトリ"
+                "repo": "リポジトリ",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "既存のコードリポジトリを Work として登録 — タスク、ゴール、フリート実行がそこに紐づきます。生成もデプロイも行われません。"
+                "repo": "既存のコードリポジトリを Work として登録 — タスク、ゴール、フリート実行がそこに紐づきます。生成もデプロイも行われません。",
+                "app": "任意の GitHub リポジトリを実行し、進化させます。リンクまたはフォークして、実行場所を選びます。"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "例: 「https://github.com/owner/repo — 自分用のコピーがほしいオープンソースのアプリ」",
+                "formTitle": "新しい App Work",
+                "formSubtitle": "任意の GitHub リポジトリから始めましょう。Ever Works がリンクするか自分用のコピーを作成し、実行と継続的な変更をサポートします。",
+                "urlLabel": "リポジトリ URL",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "接続済みのアカウントで読み取れる任意の GitHub リポジトリ。",
+                "checkButton": "リポジトリを確認",
+                "checking": "確認中…",
+                "tabPaste": "URL を貼り付け",
+                "tabCatalog": "App カタログを見る",
+                "catalogComingSoon": "App カタログはまもなくここで公開されます。今はリポジトリの URL を貼り付けてください。",
+                "stars": "{count, plural, =1 {スター 1 件} other {スター # 件}}",
+                "defaultBranch": "デフォルトブランチ: {branch}",
+                "largeRepository": "大きなリポジトリ ({size})",
+                "moved": "{fullName} に移動しました",
+                "isFork": "このリポジトリは {parent} のフォークです。",
+                "ownFork": "これは {parent} のあなたのフォークです。Ever Works は {parent} をアップストリームとして追跡します。",
+                "publicForkNote": "公開リポジトリのフォークは公開されます。",
+                "archivedNote": "このリポジトリはアーカイブされています。アップストリームの同期はオフのままです。",
+                "licenseChip": "ライセンス: {spdx}",
+                "licenseNotDetected": "ライセンス: 検出されませんでした",
+                "licenseClass": {
+                    "green": "ホスティング可",
+                    "amber": "ライセンスを証明した後、あなたのクラスターで実行可",
+                    "red": "ライセンスを証明した後、あなたのクラスターで実行可",
+                    "unknown": "ライセンス不明 — デプロイ前に証明していただきます"
+                },
+                "blueprintBadge": {
+                    "verified": "検証済み Blueprint",
+                    "available": "Blueprint あり",
+                    "none": "Blueprint なし — エージェントが実行方法を判断します",
+                    "unavailable": "Blueprint を確認できません"
+                },
+                "existingAppWork": "このリポジトリの App Work はすでにあります: {name}。",
+                "openExistingAppWork": "開く",
+                "scanIncomplete": "既存のフォークについて、すべてのアカウントを確認できたわけではありません。",
+                "modesTitle": "Ever Works でこのリポジトリをどのように使いますか？",
+                "modes": {
+                    "link": {
+                        "title": "リンク",
+                        "titleOwnFork": "リンク — アップストリームを追跡しない",
+                        "description": "このリポジトリをそのまま使います。プッシュできるので、変更はここに直接反映されます。"
+                    },
+                    "fork": {
+                        "title": "フォーク",
+                        "description": "自分用のフォークを作成します。アップストリームと同期したり、変更を提案したりできます。"
+                    },
+                    "private-copy": {
+                        "title": "プライベートコピー",
+                        "description": "同じコードでプライベートリポジトリを作成します。"
+                    }
+                },
+                "unavailable": "利用できません: {reason}",
+                "forkInto": "フォーク先",
+                "copyInto": "コピー先",
+                "ownerFilter": "アカウントを検索",
+                "ownerOrganization": "組織",
+                "ownerNotChecked": "既存のフォークを確認していません",
+                "existingFork": "フォークはすでにあります: {fullName}。Ever Works はこれを使用します。",
+                "privateCopyTradeOff": "プライベートコピーは GitHub 上で元のリポジトリとリンクされないため、元のプロジェクトにプルリクエストを送れません。アップストリームの変更は、コピー内のプルリクエストとして届きます。",
+                "linkSetupNote": "Ever Works が .works/works.yml という 1 つのファイルを追加するプルリクエストを作成します。マージすると完了です。",
+                "existingForkSetupNote": "このフォークは Ever Works が作成したものではないため、.works/works.yml を追加するプルリクエストを作成します。",
+                "linkSetupNoteBlueprint": "Ever Works が .works/works.yml と Blueprint のファイルを追加するプルリクエストを作成します。マージすると完了です。",
+                "existingForkSetupNoteBlueprint": "このフォークは Ever Works が作成したものではないため、.works/works.yml と Blueprint のファイルを追加するプルリクエストを作成します。",
+                "promptsTitle": "このアプリに必要な値",
+                "promptHint": "{name} Blueprint がこれらの値を求めています。後から設定で変更できます。",
+                "promptRequired": "必須",
+                "promptsIncomplete": "まずアプリに必要な値を入力してください。",
+                "autoProvision": "エージェントに実行方法を判断させる",
+                "autoProvisionHelp": "リポジトリの準備ができると開始します。プロビジョニングの上限内で AI トークンとビルドランナーの分数を消費します。キャンセルすることも、このチェックを外して後で概要の「Provision」から開始することもできます。",
+                "deployTargetTitle": "どこで実行しますか？",
+                "deployTargets": {
+                    "none": {
+                        "title": "なし — まだデプロイしない",
+                        "description": "ターゲットは後で選択できます。"
+                    },
+                    "your-cluster": {
+                        "title": "あなたのクラスター",
+                        "description": "自分の Kubernetes クラスターで実行します。接続はデプロイタブで追加します。"
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "近日公開 — アプリのマネージドホスティングはまだ提供されていません。"
+                    }
+                },
+                "submit": {
+                    "link": "リンクして App Work を作成",
+                    "fork": "フォークして App Work を作成",
+                    "private-copy": "コピーして App Work を作成"
+                },
+                "submitPending": "作成中…",
+                "nameLabel": "名前",
+                "slugLabel": "スラッグ",
+                "descriptionLabel": "説明",
+                "slugHelp": "URL に使える識別子。リポジトリ名から生成されます。編集して上書きできます。",
+                "invalidSlug": "小文字、数字、ハイフンのみを使用してください (例: tasks-app)",
+                "cancel": "キャンセル",
+                "createFailed": "App Work を作成できませんでした。もう一度お試しください。",
+                "success": {
+                    "link": "App Work を作成しました。",
+                    "fork": "フォークをリクエストしました。準備ができたらお知らせします。",
+                    "private-copy": "コピーを開始しました。準備ができたらお知らせします。"
+                },
+                "reasons": {
+                    "invalid_url": "https://github.com/owner/repo のような GitHub リポジトリの URL を入力してください",
+                    "provider_not_connected": "App Work を作成するには GitHub を接続してください。",
+                    "insufficient_scope": "リポジトリへのアクセスを許可するには GitHub を再接続してください。",
+                    "not_found": "このリポジトリが見つからないか、あなたの GitHub アカウントでは読み取れません。",
+                    "sso_authorization_required": "{owner} では、GitHub でその組織に対して Ever Works を承認する必要があります。",
+                    "oauth_app_restricted": "{owner} はサードパーティのアクセスを制限しています。{owner} のオーナーに Ever Works の承認を依頼するか、別のアカウントを選択してください。",
+                    "empty_repository": "このリポジトリにはまだコミットがありません。",
+                    "no_push_access": "このリポジトリにはプッシュできません。",
+                    "archived": "アーカイブされたリポジトリは読み取り専用です。",
+                    "forking_disabled": "このリポジトリのオーナーはフォークやコピーを許可していません。",
+                    "own_repository": "このリポジトリはあなたが所有しています。代わりにリンクしてください。",
+                    "target_owner_unavailable": "このアカウントはあなたの GitHub 接続では利用できません。",
+                    "target_owner_forbidden": "{owner} にはリポジトリを作成できません。",
+                    "too_large_for_private_copy": "プライベートコピーには大きすぎます ({size})。代わりにフォークしてください。",
+                    "uses_lfs": "Git LFS を使用しており、プライベートコピーには引き継げません。代わりにフォークしてください。",
+                    "copy_name_unavailable": "{owner} には {name} から {name}-copy-5 までの名前のリポジトリがすでにあります。",
+                    "in_use_by_another_account": "別のアカウントがすでに Ever Works でこのリポジトリを使用しています。そのオーナーにメンバーとして追加してもらってください。",
+                    "app_work_exists": "{fullName} の App Work はすでにあります: {workName}。",
+                    "create_in_progress": "この App Work はすでに作成中です。",
+                    "rate_limited": "GitHub があなたのアカウントにレート制限をかけています。{time} にもう一度お試しください。",
+                    "managed_hosting_unavailable": "近日公開 — アプリのマネージドホスティングはまだ提供されていません。",
+                    "cluster_target_unavailable": "アプリを実行できるデプロイオプションがインストールされていません。",
+                    "app_works_disabled": "このインスタンスでは App Work を利用できません。",
+                    "blueprint_mismatch": "このリポジトリの Blueprint が変更されました。リポジトリをもう一度確認してください。"
+                },
+                "catalog": {
+                    "searchLabel": "App カタログを検索",
+                    "searchPlaceholder": "アプリを検索 — 例: umami、calendar",
+                    "listLabel": "App Blueprint",
+                    "loading": "App カタログを読み込み中…",
+                    "unavailable": "App カタログは現在利用できません。代わりにリポジトリの URL を貼り付けてください。",
+                    "disabled": "このインスタンスでは App Work を利用できません。",
+                    "error": "App カタログを読み込めませんでした。もう一度お試しいただくか、リポジトリの URL を貼り付けてください。",
+                    "empty": "公開されている App Blueprint はまだありません。代わりにリポジトリの URL を貼り付けてください。",
+                    "noMatches": "検索に一致するアプリはありません。",
+                    "pick": "{name} から始める",
+                    "statusBeta": "ベータ",
+                    "statusPlaceholder": "近日公開",
+                    "verified": "検証済み",
+                    "upstreamLine": "{repo} から",
+                    "runsOn": "実行先: {targets}",
+                    "targetYourCluster": "あなたのクラスター",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "まだ利用できません",
+                    "fallbackNote": "GitHub で見つかった App Blueprint を表示しています。キュレーション済みカタログは現在利用できません。"
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "インポートが正常に開始されました",
                 "failed": "ワークのインポートに失敗しました",
                 "fetchReposFailed": "リポジトリの取得に失敗しました"
+            },
+            "app": {
+                "repositoryUrlRequired": "https://github.com/owner/repo のような GitHub リポジトリの URL を入力してください",
+                "repositoryModeRequired": "このリポジトリの使い方を選択してください: リンク、フォーク、またはプライベートコピー。",
+                "targetOwnerRequired": "リポジトリを作成するアカウントを選択してください。",
+                "invalidUrl": "https://github.com/owner/repo のような GitHub リポジトリの URL を入力してください",
+                "inspectFailed": "このリポジトリを確認できませんでした。もう一度お試しください。"
             }
         },
         "generator": {

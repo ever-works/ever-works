@@ -115,6 +115,21 @@ setup URL, and callback URL are derived with sensible defaults from
 - **Given** the OAuth `state` payload has `installationId` empty or
   `issuedAt` falsy, **when** `verifyState` parses the body, **then**
   it throws `BadRequestException('Invalid GitHub App state payload')`.
+- **Given** the callback does not present the browser-binding nonce whose
+  sha256 the state carries (10-09 fleet handover item 13) — `beginSetup`
+  returns `{ url, binding, bindingTtlSeconds }`, the web setup route keeps
+  `binding` in the HttpOnly `ew_github_app_setup` cookie
+  (`Path=/api/github-app`, SameSite=Lax, 10 minutes) and the web callback
+  route forwards it to the API as `X-Ever-Works-Setup-Binding` and clears
+  it — **when** `verifyState` runs, **then** it throws
+  `BadRequestException('Finish the GitHub App setup in the browser where you started it')`
+  before the code is exchanged or anything is written. The state HMAC key
+  is derived from `config.auth.secret()` for this purpose only
+  (`ever-works:github-app-setup-state:v2`).
+- **Given** a valid callback, **when** the claim is written, **then** the
+  local user, its `github` provider account, the App user link, the
+  installation row and its ownership claim commit in ONE transaction: a
+  conflict at any step leaves nothing behind (item 13).
 - **Given** GitHub responds to the access-token exchange with
   `{ error, error_description }`, **when**
   `GitHubAppService.exchangeUserCode` reads `data.error`, **then**

@@ -776,6 +776,8 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 'build',
                 'domain-change',
                 'spec-applied',
+                // 2026-10-17 — a runtime env change queues like `spec-applied`.
+                'env-changed',
             ]);
             expect(h.store.rows).toHaveLength(1);
         });
@@ -1130,8 +1132,10 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 'target-saved',
             ]);
             // …and FR-23's sixth source, which that list omits (§5.8:886-889).
-            expect(APP_DEPLOY_TRIGGERS).toHaveLength(6);
+            // 2026-10-17 — `env-changed` appended after `spec-applied` (lane aw-env-redeploy).
+            expect(APP_DEPLOY_TRIGGERS).toHaveLength(7);
             expect(APP_DEPLOY_TRIGGERS[5]).toBe('spec-applied');
+            expect(APP_DEPLOY_TRIGGERS[6]).toBe('env-changed');
 
             expect(normaliseTrigger('build')).toBe('build');
             expect(normaliseTrigger('spec-applied')).toBe('spec-applied');

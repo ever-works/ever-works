@@ -207,6 +207,17 @@ export interface WorkspaceFinalizeOptions {
 	 * Optional and additive: a provider that predates it ignores it.
 	 */
 	publishSha?: string;
+	/**
+	 * Rewrite the commit message once the change is STAGED, from the paths it
+	 * touches — e.g. re-type a conventional commit to `docs` when only docs
+	 * changed (fleet commit messages). Called at most once, after `add -A`,
+	 * with repository-relative POSIX paths, and only when there is something
+	 * to commit. Its answer replaces `commitMessage` only when it is a
+	 * non-empty string without NUL / CR; a throw keeps `commitMessage`.
+	 * Optional and additive: a provider that predates it commits
+	 * `commitMessage` as before.
+	 */
+	commitMessageFor?: (changedPaths: readonly string[], commitMessage: string) => string;
 }
 
 /**

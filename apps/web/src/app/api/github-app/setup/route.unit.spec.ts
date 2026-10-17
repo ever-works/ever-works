@@ -54,11 +54,23 @@ describe('GET /api/github-app/setup', () => {
     it('sends the browser on to the GitHub authorize URL the API returned', async () => {
         const authorize =
             'https://github.com/login/oauth/authorize?client_id=Iv23&state=s1gned&redirect_uri=x';
-        const fetchMock = apiAnswers({ url: authorize });
+        const fetchMock = apiAnswers({
+            url: authorize,
+            binding: 'nonce-1',
+            bindingTtlSeconds: 600,
+        });
 
-        const url = locationOf(await GET(setupRequest()));
+        const response = await GET(setupRequest());
+        const url = locationOf(response);
 
         expect(url.toString()).toBe(authorize);
+        // Item 13: the setup is bound to THIS browser by an HttpOnly cookie
+        // scoped to the App routes, which the callback forwards to the API.
+        const cookie = response.headers.get('set-cookie') ?? '';
+        expect(cookie).toContain('ew_github_app_setup=nonce-1');
+        expect(cookie.toLowerCase()).toContain('httponly');
+        expect(cookie).toContain('Path=/api/github-app');
+        expect(cookie.toLowerCase()).toContain('samesite=lax');
         const calledUrl = new URL(String(fetchMock.mock.calls[0][0]));
         expect(calledUrl.pathname).toMatch(/\/github-app\/setup$/);
         expect(calledUrl.searchParams.get('installation_id')).toBe('169597044');
@@ -69,6 +81,10 @@ describe('GET /api/github-app/setup', () => {
         it.each([
             ['API refusal', () => apiAnswers({ message: 'boom' }, 502)],
             ['API answer without url', () => apiAnswers({})],
+            [
+                'API answer without a browser binding (item 13)',
+                () => apiAnswers({ url: 'https://github.com/login/oauth/authorize?state=s' }),
+            ],
             ['unparseable url', () => apiAnswers({ url: 'not a url' })],
             ['non-https url', () => apiAnswers({ url: 'http://github.com/login/oauth/authorize' })],
             [

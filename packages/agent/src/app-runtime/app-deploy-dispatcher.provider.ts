@@ -56,6 +56,7 @@ import { config } from '../config';
 import { JOB_RUNTIME_PROVIDER_REGISTRY, type JobRuntimeProviderRegistry } from '../tasks';
 import { APP_DEPLOY_DISPATCHER } from './app-deploy-request.service';
 import { APP_DEPLOY_DISPATCHER_AVAILABILITY } from './app-deploy-preconditions.service';
+import { APP_CLUSTER_OP_DISPATCHER } from './app-runtime-deletion.service';
 
 /**
  * The shape both probes read: `isEnabled()` then `resolve()`.
@@ -130,5 +131,71 @@ export function buildAppDeployDispatcherProviders(): Provider[] {
         // The availability probe reads the same object. `useExisting` rather than
         // a second factory, so the two can never answer differently.
         { provide: APP_DEPLOY_DISPATCHER_AVAILABILITY, useExisting: APP_DEPLOY_DISPATCHER },
+    ];
+}
+
+/* -------------------------------------------------------------------------- *
+ * APW-06 T31/T32 (lane aw-deploy-2, 2026-10-17) — the `app-cluster-op` dispatcher
+ * -------------------------------------------------------------------------- */
+
+/** One `app-cluster-op` payload as the dispatcher forwards it — ids, never a credential. */
+export interface AppClusterOpDispatchPayload {
+    op: string;
+    workId: string;
+    requestId?: string | null;
+    userId?: string | null;
+    [key: string]: unknown;
+}
+
+/** `APP_CLUSTER_OP_DISPATCHER`'s view, as every consumer reads it (`dispatch(payload, opts)`). */
+export interface AppClusterOpDispatchGate {
+    dispatch(
+        payload: AppClusterOpDispatchPayload,
+        opts?: { delayMs?: number },
+    ): Promise<string | null>;
+    isEnabled(): boolean;
+}
+
+/**
+ * The API's `APP_CLUSTER_OP_DISPATCHER`: the active job runtime's `dispatchAppClusterOp`
+ * (`TriggerService`), behind the same attestation as the deploy gate. Answers `null` — never
+ * throws, never runs the op in-process (FR-5) — when no runtime or no attestation is there.
+ */
+export function appClusterOpDispatcherGate(
+    registry: AppDeployRuntimeLookup | null | undefined,
+): AppClusterOpDispatchGate {
+    const runtime = (): {
+        dispatchAppClusterOp?: (
+            payload: AppClusterOpDispatchPayload,
+            opts?: { delayMs?: number },
+        ) => Promise<string | null>;
+    } | null => {
+        if (!registry) return null;
+        try {
+            return (registry.getActive()?.dispatchers ?? null) as never;
+        } catch {
+            return null;
+        }
+    };
+    return {
+        isEnabled: () =>
+            appClusterDispatchAttested() && typeof runtime()?.dispatchAppClusterOp === 'function',
+        dispatch: async (payload, opts) => {
+            if (!appClusterDispatchAttested()) return null;
+            const dispatchers = runtime();
+            if (typeof dispatchers?.dispatchAppClusterOp !== 'function') return null;
+            return dispatchers.dispatchAppClusterOp(payload, opts);
+        },
+    };
+}
+
+/** `{ provide: APP_CLUSTER_OP_DISPATCHER }` for the API's module graph. */
+export function buildAppClusterOpDispatcherProviders(): Provider[] {
+    return [
+        {
+            provide: APP_CLUSTER_OP_DISPATCHER,
+            useFactory: (registry?: AppDeployRuntimeLookup) => appClusterOpDispatcherGate(registry),
+            inject: [{ token: JOB_RUNTIME_PROVIDER_REGISTRY, optional: true }],
+        },
     ];
 }

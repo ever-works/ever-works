@@ -111,7 +111,13 @@ export const APP_BUILD_BLOCKED_REASONS = [
 	'managedConcurrencyLimit',
 	'buildValueNameReserved',
 	'buildServicePortRequired',
-	'verificationDependencyUnsupported'
+	'verificationDependencyUnsupported',
+	// 2026-10-17 (aw-builds-2): the credential the build runs with cannot write
+	// under `.github/workflows/` — an OAuth token without the `workflow` scope, or
+	// a GitHub App installation without `Workflows: write` (APW-02 plan §4's
+	// permission matrix, "Push a workflow file"). Before this every such refusal
+	// surfaced as a generic 403/404 `workflowWriteFailed`.
+	'workflowPermissionMissing'
 ] as const;
 
 /** `work_builds.blockedReason` — plan §3.2:435–451 + §4.5:827 + §4.10:1056. */
@@ -951,6 +957,109 @@ export interface AppBuildDetail extends AppBuildSummary {
 	canEdit: boolean;
 }
 
+/* ------------------------------------------------------------------------- *
+ * HTTP contract of the Builds routes (plan §5, APW-05 T23) — the shapes the
+ * API answers and the web client (`apps/web/src/lib/api/app-builds.ts`) reads.
+ * ------------------------------------------------------------------------- */
+
+/** The stable error codes the Builds routes answer with (plan §5:1209-1212). */
+export const APP_BUILD_API_ERROR_CODES = [
+	'notAppWork',
+	'buildNotFound',
+	'rebuildRateLimited',
+	'commitNotReachable',
+	'nothingToBuild',
+	'notCancellable',
+	'buildProviderUnavailable',
+	'appWorksDisabled',
+	'editAccessRequired',
+	'pullTokenNoImageYet',
+	'pullTokenPublicImage',
+	'pullTokenTooBroad',
+	'pullTokenFineGrained',
+	'pullTokenCannotRead',
+	'pullTokenUnavailable'
+] as const;
+
+/** One stable Builds-route error code. */
+export type AppBuildApiErrorCode = (typeof APP_BUILD_API_ERROR_CODES)[number];
+
+/** The error body every refused Builds route answers (`retryAfterMinutes` only on `rebuildRateLimited`). */
+export interface AppBuildApiError {
+	status: 'error';
+	code: AppBuildApiErrorCode;
+	message: string;
+	retryAfterMinutes?: number;
+}
+
+/** `GET /api/works/:id/builds` query (plan §5:1194). */
+export interface AppBuildListQuery {
+	/** ≥ 1, default 1. */
+	page?: number;
+	/** 1–{@link APP_BUILD_LIST_MAX_PAGE_SIZE}, default {@link APP_BUILD_LIST_PAGE_SIZE}. */
+	pageSize?: number;
+	/** One status, or several comma-separated. */
+	status?: AppBuildStatus | AppBuildStatus[];
+	/** One trigger, or several comma-separated. */
+	trigger?: AppBuildTrigger | AppBuildTrigger[];
+	branch?: string;
+	pullRequest?: number;
+}
+
+/** `pullAccess` — the registry pull token's public facts, never the token (plan §4.12, §5:1200). */
+export interface AppBuildPullAccess {
+	visibility: 'public' | 'private' | 'unknown';
+	tokenSet: boolean;
+	tokenExpiresAt: string | null;
+}
+
+/** `GET /api/works/:id/builds` answer (plan §5:1194). */
+export interface AppBuildListResponse {
+	items: AppBuildSummary[];
+	total: number;
+	page: number;
+	pageSize: number;
+	/** The resolved build plugin; `null` when none is resolvable. The web never embeds a plugin id (Constitution II). */
+	provider: { pluginId: string; name: string; buildKind: AppBuildKind } | null;
+	repository: { fullName: string; visibility: 'public' | 'private' } | null;
+	imageRepository: string | null;
+	/** The preparation row's workflow state; `{ state: 'none', pullRequestUrl: null }` when there is none (`APW05-G03`). */
+	workflow: { state: AppBuildWorkflowState; pullRequestUrl: string | null };
+	pullAccess: AppBuildPullAccess;
+	/** Whether the caller may Rebuild, Cancel or save a pull token. */
+	canEdit: boolean;
+}
+
+/** `POST /api/works/:id/builds` body (plan §5:1196). */
+export interface AppBuildRequestBody {
+	/** 40 hex; defaults to the tracked branch's head. */
+	commitSha?: string;
+	mode?: 'build';
+}
+
+/** `POST /api/works/:id/builds` → `202` (plan §5:1196). */
+export interface AppBuildRequestResponse {
+	build: AppBuildSummary;
+	deduped: boolean;
+}
+
+/** `POST /api/works/:id/builds/:buildId/cancel` → `202` (plan §5:1197). */
+export interface AppBuildCancelResponse {
+	build: AppBuildSummary;
+}
+
+/** `PUT /api/works/:id/builds/pull-token` body (plan §5:1198, `APW05-G07`). */
+export interface AppBuildPullTokenBody {
+	token: string;
+}
+
+/** `PUT /api/works/:id/builds/pull-token` → `202` — never the token (plan §5:1198). */
+export interface AppBuildPullTokenResponse {
+	pullAccess: AppBuildPullAccess;
+	/** Days until the token expires when that is inside the FR-51 warning window, else `null`. */
+	expiresInDays: number | null;
+}
+
 /**
  * `AppBuildEventPayload` — the shared readonly payload of every
  * `app.build.*` event (plan §7.8:1516–1531).
@@ -990,6 +1099,67 @@ export interface BuildRunRef {
 	readonly pullRequestNumber?: number;
 	readonly displayTitle: string;
 	readonly createdAt: string;
+}
+
+/**
+ * A GitHub workflow run as both intake paths see it — the REST
+ * `GET …/actions/workflows/{file}/runs` item (run discovery, §7.4a) and the
+ * `workflow_run` webhook's `workflow_run` object (§7.5) are the same shape.
+ * Only the fields {@link githubRunToBuildRunRef} reads.
+ */
+export interface GitHubWorkflowRunLike {
+	readonly id?: number | string | null;
+	readonly run_attempt?: number | null;
+	readonly event?: string | null;
+	readonly status?: string | null;
+	readonly head_sha?: string | null;
+	readonly head_branch?: string | null;
+	readonly head_repository?: { readonly full_name?: string | null } | null;
+	readonly pull_requests?: ReadonlyArray<{ readonly number?: number | null }> | null;
+	readonly display_title?: string | null;
+	readonly created_at?: string | null;
+	readonly path?: string | null;
+}
+
+/**
+ * Map one GitHub run onto {@link BuildRunRef} — ONE mapping for the webhook
+ * consumer and run discovery, so the two intake paths cannot disagree about
+ * what a run is (plan §7.5's "the rules are identical whichever path found the
+ * run").
+ *
+ * `workflow_dispatch` is the platform's own dispatch and becomes `manual` (the
+ * adoption path); `queued`/`requested`/`waiting`/`pending` collapse to `queued`,
+ * `in_progress` to `running`, and anything else (`completed`) stays as GitHub
+ * spelled it. `null` for a run with no id or no head commit — nothing a Build
+ * could be recorded against.
+ */
+export function githubRunToBuildRunRef(run: GitHubWorkflowRunLike): BuildRunRef | null {
+	const id = run.id === null || run.id === undefined ? '' : String(run.id).trim();
+	const headSha = typeof run.head_sha === 'string' ? run.head_sha.trim() : '';
+	if (!id || !headSha) return null;
+
+	const rawEvent = (run.event ?? '').trim();
+	const event = rawEvent === 'workflow_dispatch' ? 'manual' : rawEvent || 'push';
+	const rawStatus = (run.status ?? '').trim();
+	const status = ['queued', 'requested', 'waiting', 'pending'].includes(rawStatus)
+		? 'queued'
+		: rawStatus === 'in_progress'
+			? 'running'
+			: rawStatus || 'queued';
+	const pullRequestNumber = run.pull_requests?.find((pr) => typeof pr?.number === 'number')?.number;
+
+	return {
+		providerRunId: id,
+		runAttempt: typeof run.run_attempt === 'number' && run.run_attempt > 0 ? run.run_attempt : 1,
+		event,
+		status,
+		headSha,
+		headBranch: (run.head_branch ?? '').trim(),
+		headRepositoryFullName: (run.head_repository?.full_name ?? '').trim(),
+		...(typeof pullRequestNumber === 'number' ? { pullRequestNumber } : {}),
+		displayTitle: run.display_title ?? '',
+		createdAt: run.created_at ?? ''
+	};
 }
 
 /** Where a run was found — the two intake paths share one accept rule set (plan §7.5:1445–1452). */
@@ -1132,7 +1302,9 @@ export const APP_BUILD_BLOCKED_REASON_ACTIONS = {
 	managedConcurrencyLimit: null,
 	buildValueNameReserved: 'openEnvironment',
 	secretLimitReached: 'openRepositorySettings',
-	gitConnectionMissing: 'reconnectGithub'
+	gitConnectionMissing: 'reconnectGithub',
+	// Reconnecting GitHub with the `workflow` scope is the member's fix.
+	workflowPermissionMissing: 'reconnectGithub'
 } as const satisfies Record<AppBuildBlockedReason, AppBuildBlockedAction | null>;
 
 /**

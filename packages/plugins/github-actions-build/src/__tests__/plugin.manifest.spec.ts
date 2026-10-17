@@ -247,13 +247,17 @@ describe('github-actions-build — the build capability declaration (T7, R-13)',
 		);
 	});
 
-	it('declares `checkImageAccess` now that it does something, and still not `listRecentRuns`', () => {
-		// The contract makes both optional and a caller materialises them, so a
+	it('declares `checkImageAccess`, `listRecentRuns` and `repositoryWriter` now that each does something', () => {
+		// The contract makes all three optional and a caller materialises them, so a
 		// throwing placeholder would claim a wiring that does not exist. T14 gave
-		// `checkImageAccess` a real implementation (`registry/ghcr-access.ts`), so it
-		// is declared; T12's run discovery is still unwritten, so it is not.
+		// `checkImageAccess` a real implementation (`registry/ghcr-access.ts`); run
+		// discovery (T21a, 2026-10-17) gave `listRecentRuns` one, and the clone-free
+		// writer `prepareRepository` delivers through (`repo/octokit-repository-writer.ts`)
+		// landed with it — so all three are declared. (Until 2026-10-17 this case
+		// pinned `listRecentRuns` as undefined, because it was still unwritten.)
 		expect(typeof (plugin as unknown as Record<string, unknown>).checkImageAccess).toBe('function');
-		expect((plugin as unknown as Record<string, unknown>).listRecentRuns).toBeUndefined();
+		expect(typeof (plugin as unknown as Record<string, unknown>).listRecentRuns).toBe('function');
+		expect(typeof (plugin as unknown as Record<string, unknown>).repositoryWriter).toBe('function');
 	});
 
 	it('declares no validateSettings for the pull token — that check is T29s (plan §4.12)', () => {

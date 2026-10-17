@@ -59,6 +59,11 @@ export * from './app/app-rollout.js';
 // the name cannot be re-resolved between the check and the call. Exported so
 // APW-07 and APW-10 reach it through the package root rather than a deep import.
 export * from './app/app-kubeconfig.guard.js';
+// APW-10 lite — the in-cluster dependency providers' descriptors, so the managed tier's plugin publishes
+// the same providers for its own target instead of re-declaring them.
+export { POSTGRES_PROVIDER_DESCRIPTOR } from './app-dependencies/postgres.provider.js';
+export { REDIS_PROVIDER_DESCRIPTOR } from './app-dependencies/redis.provider.js';
+export { OBJECT_STORAGE_PROVIDER_DESCRIPTOR } from './app-dependencies/object-storage.provider.js';
 // The deployer (APW-06 T12, plan §5.5–§5.7) — the phase machine and the rollback,
 // applying what the renderers above produce. Its `deployApp` is
 // `IDeploymentPlugin.deployApp`'s exact signature, and `AppDeployerApi` is the

@@ -107,6 +107,22 @@ export class AgentRunLogRepository {
         private readonly repository: Repository<AgentRunLog>,
     ) {}
 
+    /**
+     * Self-build slice AT — delete every timeline row of these runs (the
+     * retention pass, for TERMINAL runs past `AGENT_RUN_LOG_RETENTION_DAYS`).
+     * Returns the rows deleted.
+     */
+    async deleteForRuns(runIds: string[]): Promise<number> {
+        if (runIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .delete()
+            .from(AgentRunLog)
+            .where('runId IN (:...runIds)', { runIds })
+            .execute();
+        return result.affected ?? 0;
+    }
+
     async append(args: {
         runId: string;
         level: 'INFO' | 'WARN' | 'ERROR';

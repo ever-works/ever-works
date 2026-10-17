@@ -80,6 +80,8 @@ export type FleetAuditAction =
 	| 'node.cost-ceiling'
 	/** Per-node resource-limit ceiling set or cleared (self-build slice AS). */
 	| 'node.limits'
+	/** Owner cleared a model usage-limit throttle on a node before its reset. */
+	| 'node.model-throttle-clear'
 	/** Pause / resume — by the owner, or by the node itself. */
 	| 'node.pause'
 	/** Disable / re-enable (the owner's harder stop). */
@@ -126,6 +128,7 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.capabilities',
 	'node.cost-ceiling',
 	'node.limits',
+	'node.model-throttle-clear',
 	'node.pause',
 	'node.disable',
 	'node.drain',
