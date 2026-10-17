@@ -174,4 +174,60 @@ describe('ScopeStampingSubscriber (EW-657 Phase 5b)', () => {
             expect(dataSource.subscribers).toEqual([otherSubscriber]);
         });
     });
+
+    describe('record visibility default (EW-P1-3, owner decision D11)', () => {
+        const visibilityColumns = [
+            'id',
+            'tenantId',
+            'organizationId',
+            'visibility',
+            'visibilityExplicit',
+        ];
+
+        it('an org-scoped row stamped here starts `organization`, not explicit', () => {
+            const entity: Record<string, unknown> = { id: 'x' };
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-1' }, () => {
+                subscriber.beforeInsert(makeEvent(entity, visibilityColumns));
+            });
+            expect(entity.visibility).toBe('organization');
+            expect(entity.visibilityExplicit).toBe(false);
+        });
+
+        it('an org-scoped Task created on a Team starts `team`', () => {
+            const entity: Record<string, unknown> = { id: 'x', teamId: 'team-1' };
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-1' }, () => {
+                subscriber.beforeInsert(makeEvent(entity, [...visibilityColumns, 'teamId']));
+            });
+            expect(entity.visibility).toBe('team');
+        });
+
+        it('a personal-scope row stays `private`', () => {
+            const entity: Record<string, unknown> = { id: 'x' };
+            scopeContext.runWith({ tenantId: 't-1', organizationId: null }, () => {
+                subscriber.beforeInsert(makeEvent(entity, visibilityColumns));
+            });
+            expect(entity.visibility).toBe('private');
+        });
+
+        it('keeps a visibility the caller chose (e.g. private by hand)', () => {
+            const entity: Record<string, unknown> = {
+                id: 'x',
+                visibility: 'private',
+                visibilityExplicit: true,
+            };
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-1' }, () => {
+                subscriber.beforeInsert(makeEvent(entity, visibilityColumns));
+            });
+            expect(entity.visibility).toBe('private');
+            expect(entity.visibilityExplicit).toBe(true);
+        });
+
+        it('does not touch entities without the visibility columns', () => {
+            const entity: Record<string, unknown> = { id: 'x' };
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-1' }, () => {
+                subscriber.beforeInsert(makeEvent(entity, ['id', 'tenantId', 'organizationId']));
+            });
+            expect(entity).not.toHaveProperty('visibility');
+        });
+    });
 });

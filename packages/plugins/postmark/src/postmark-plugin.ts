@@ -13,7 +13,7 @@ import type {
 	PluginCategory,
 	JsonSchema
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, normalizeMessageId, parseMessageIdList } from '@ever-works/plugin';
 
 /**
  * Resolve the configured API token. Plugin settings come from
@@ -34,6 +34,19 @@ function resolveInboundSecret(options: EmailOptions): string | undefined {
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
 	const fromEnv = process.env.POSTMARK_INBOUND_SECRET;
 	return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
+}
+
+/**
+ * Operator opt-out (EW-P4-3): accept inbound webhooks that carry no
+ * signature when no secret is configured. Off unless the env var is the
+ * exact string `'true'`, so a typo or an empty value stays secure. Meant for
+ * a local/dev stack with no public webhook URL — never for an environment
+ * a provider can reach.
+ */
+const EMAIL_INBOUND_ALLOW_UNSIGNED_ENV = 'EMAIL_INBOUND_ALLOW_UNSIGNED';
+
+function unsignedInboundAllowed(): boolean {
+	return process.env[EMAIL_INBOUND_ALLOW_UNSIGNED_ENV] === 'true';
 }
 
 /**
@@ -64,12 +77,46 @@ function angleAddress(value: string): string | null {
 	return null;
 }
 
+/**
+ * EW-P4-3 — split a raw address-list header (`To` / `Cc`) on the commas that
+ * SEPARATE mailboxes, not the ones inside a quoted display name or an angle
+ * address: `"Doe, John" <john@x>, jane@x` is two mailboxes. Linear time (the
+ * header is sender-written and read before verification).
+ */
+function splitAddressList(raw: string): string[] {
+	const parts: string[] = [];
+	let current = '';
+	let inQuote = false;
+	let inAngle = false;
+	for (let i = 0; i < raw.length; i += 1) {
+		const ch = raw[i];
+		if (ch === '\\' && inQuote && i + 1 < raw.length) {
+			current += ch + raw[i + 1];
+			i += 1;
+			continue;
+		}
+		if (ch === '"' && !inAngle) inQuote = !inQuote;
+		else if (ch === '<' && !inQuote) inAngle = true;
+		else if (ch === '>' && !inQuote) inAngle = false;
+		if (ch === ',' && !inQuote && !inAngle) {
+			parts.push(current);
+			current = '';
+			continue;
+		}
+		current += ch;
+	}
+	parts.push(current);
+	return parts;
+}
+
 interface PostmarkInboundPayload {
 	readonly MessageID: string;
 	readonly From: string;
 	readonly FromName?: string;
 	readonly ToFull?: Array<{ readonly Email: string; readonly Name?: string }>;
 	readonly To?: string;
+	readonly CcFull?: Array<{ readonly Email: string; readonly Name?: string }>;
+	readonly Cc?: string;
 	readonly Subject: string;
 	readonly TextBody?: string;
 	readonly HtmlBody?: string;
@@ -137,6 +184,10 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 				ReplyTo: input.replyTo,
 				Tag: input.metadata?.tag,
 				Metadata: input.metadata,
+				// EW-P4-3 — RFC threading (Message-ID / In-Reply-To / References).
+				Headers: input.headers
+					? Object.entries(input.headers).map(([Name, Value]) => ({ Name, Value }))
+					: undefined,
 				Attachments: input.attachments?.map((a) => ({
 					Name: a.filename,
 					Content: a.content,
@@ -187,16 +238,20 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 	verifyWebhookSignature(_rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void {
 		const expected = resolveInboundSecret(options);
 		if (!expected) {
-			// Security: signature verification is an operator opt-in (matches the
-			// mailgun plugin + the IEmailInboundPlugin contract, which only
-			// mandates throwing on MISMATCH). Accepting an unsigned inbound
-			// webhook means ANY caller who knows the public webhook URL can
-			// inject mail into a tenant's scope, so surface a loud operator
-			// warning to make the unsigned state visible in logs/alerting.
-			// (Flipping the default to reject-when-unsigned is a cross-cutting
-			// behavior change — tracked as a re-deferred finding.)
+			// Security (EW-P4-3): FAIL CLOSED. With no secret there is nothing to
+			// authenticate the caller against, and the route is public: accepting
+			// the webhook would let ANY caller who knows the URL inject mail into a
+			// tenant's scope (it used to be accepted with only a warning). The
+			// facade answers this throw with a 401, as for a mismatch.
+			if (!unsignedInboundAllowed()) {
+				throw new Error(
+					`Postmark inbound: no \`inboundWebhookSecret\`/POSTMARK_INBOUND_SECRET configured; refusing an unsigned webhook (${EMAIL_INBOUND_ALLOW_UNSIGNED_ENV}=true accepts it on a local stack only).`
+				);
+			}
+			// The operator opted out explicitly: accept, loudly, so the unsigned
+			// state stays visible in logs/alerting.
 			console.warn(
-				'[postmark] inbound webhook accepted WITHOUT signature verification: no `inboundWebhookSecret`/POSTMARK_INBOUND_SECRET configured. Configure a secret to authenticate inbound mail.'
+				`[postmark] inbound webhook accepted WITHOUT signature verification: no \`inboundWebhookSecret\`/POSTMARK_INBOUND_SECRET configured and ${EMAIL_INBOUND_ALLOW_UNSIGNED_ENV}=true. Configure a secret to authenticate inbound mail.`
 			);
 			return;
 		}
@@ -241,9 +296,24 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		_options: EmailOptions
 	): Promise<EmailInboundMessage> {
 		const payload = JSON.parse(rawBody.toString('utf8')) as PostmarkInboundPayload;
+		// EW-P4-3 — RFC threading headers, from the original message's
+		// headers (Postmark's own `MessageID` is its id, not the header).
+		const header = (name: string): string | undefined =>
+			payload.Headers?.find((h) => typeof h?.Name === 'string' && h.Name.toLowerCase() === name)?.Value;
+		const messageIdHeader = normalizeMessageId(header('message-id'));
+		const inReplyTo = parseMessageIdList(header('in-reply-to'))[0];
+		const references = parseMessageIdList(header('references'));
 		// The same bare mailboxes `extractInboundRecipients` names (the raw
 		// `To` fallback may carry a display name).
 		const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [parseEmailAddress(payload.To)] : []);
+		// EW-P4-3 — Cc is recorded (never routed on). `CcFull` is bare;
+		// the raw `Cc` header fallback may carry display names.
+		const cc = (
+			payload.CcFull?.map((c) => c.Email) ??
+			(payload.Cc ? splitAddressList(payload.Cc).map((part) => parseEmailAddress(part)) : [])
+		).filter(
+			(address): address is string => typeof address === 'string' && address.length > 0 && address.includes('@')
+		);
 		const attachments: EmailAttachment[] =
 			payload.Attachments?.map((a) => ({
 				filename: a.Name,
@@ -256,6 +326,7 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 			providerMessageId: payload.MessageID,
 			from: payload.From,
 			to,
+			...(cc.length > 0 ? { cc } : {}),
 			subject: payload.Subject,
 			bodyText: payload.TextBody ?? '',
 			bodyHtml: payload.HtmlBody,
@@ -265,7 +336,10 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 				spamScore: payload.SpamScore ?? null,
 				headers: payload.Headers ?? [],
 				fromName: payload.FromName ?? null
-			}
+			},
+			...(messageIdHeader ? { messageIdHeader } : {}),
+			...(inReplyTo ? { inReplyTo } : {}),
+			...(references.length > 0 ? { references } : {})
 		};
 	}
 

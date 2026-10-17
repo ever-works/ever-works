@@ -39,6 +39,10 @@ const { StripeRelayAdminController } = require('../stripe-relay-admin.controller
 const { StripeRelayDeadLetterNotFoundError } = require('../stripe-relay.service');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { IsPlatformAdminGuard } = require('@src/auth/guards/platform-admin.guard');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const {
+    IntegrationForbiddenGuard,
+} = require('../../../auth/integration/integration-forbidden.guard');
 
 function relayService(overrides: Record<string, unknown> = {}) {
     return {
@@ -175,7 +179,10 @@ describe('Stripe relay access control', () => {
         );
 
     it('puts every admin dead-letter route behind IsPlatformAdminGuard', () => {
+        // EW-P1-2 adds IntegrationForbiddenGuard: integration keys (`ew_int_…`)
+        // can never reach admin routes, whatever scopes they hold.
         expect(Reflect.getMetadata(GUARDS_METADATA, StripeRelayAdminController)).toEqual([
+            IntegrationForbiddenGuard,
             IsPlatformAdminGuard,
         ]);
     });

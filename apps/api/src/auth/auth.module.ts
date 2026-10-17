@@ -4,6 +4,8 @@ import { AuthService } from './services/auth.service';
 import { AnonymousAuthService } from './services/anonymous-auth.service';
 import { ClaimAccountService } from './services/claim-account.service';
 import { ApiKeyService } from './services/api-key.service';
+import { IntegrationKeyService } from './services/integration-key.service';
+import { IntegrationForbiddenGuard } from './integration/integration-forbidden.guard';
 import { CAPTCHA_FETCH, CaptchaVerifierService } from './services/captcha-verifier.service';
 import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { AuthController } from './controllers/auth.controller';
@@ -58,6 +60,10 @@ import { UsernameAllocatorService } from '../users/services/username-allocator.s
         AnonymousAuthService,
         ClaimAccountService,
         ApiKeyService,
+        // EW-P1-2 — integration keys (create / list / revoke) and the guard that
+        // keeps integration keys off session-only controllers.
+        IntegrationKeyService,
+        IntegrationForbiddenGuard,
         {
             provide: CAPTCHA_FETCH,
             useFactory: () => fetch,
@@ -128,6 +134,8 @@ import { UsernameAllocatorService } from '../users/services/username-allocator.s
         AnonymousAuthService,
         ClaimAccountService,
         ApiKeyService,
+        IntegrationKeyService,
+        IntegrationForbiddenGuard,
         CaptchaVerifierService,
         OAuthStateService,
         AuthSessionGuard,

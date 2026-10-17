@@ -27,6 +27,19 @@ export class UpdateProfileDto {
     avatar?: string;
 
     @ApiPropertyOptional({
+        description:
+            'EW-P2-6 — optional display name (e.g. "Ada Lovelace"); null or empty clears it.',
+        maxLength: 100,
+    })
+    @IsString()
+    @IsOptional()
+    @MaxLength(100)
+    @Matches(/^[^\r\n\x00-\x1F\x7F]*$/, {
+        message: 'displayName must not contain newline or control characters',
+    })
+    displayName?: string | null;
+
+    @ApiPropertyOptional({
         description: 'Custom git committer name (overrides username for commits)',
         maxLength: 120,
     })

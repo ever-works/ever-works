@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { RecordVisibilityModule } from '../record-visibility/record-visibility.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { Agent } from '../entities/agent.entity';
+import { Goal } from '../entities/goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { Organization } from '../entities/organization.entity';
 import { Task } from '../entities/task.entity';
@@ -25,6 +28,10 @@ import { TeamsService } from './teams.service';
  */
 @Module({
     imports: [
+        // Domain events (EW-P1-1 B2) — the publisher the team services record through.
+        DomainEventsModule,
+        // Record visibility (EW-P1-3) — automatic Team ↔ Organization scope.
+        RecordVisibilityModule,
         TypeOrmModule.forFeature([
             Team,
             TeamMember,
@@ -37,6 +44,7 @@ import { TeamsService } from './teams.service';
             Mission,
             WorkProposal,
             Task,
+            Goal,
         ]),
     ],
     providers: [TeamsService, OrgChartService, TeamResourcesService],

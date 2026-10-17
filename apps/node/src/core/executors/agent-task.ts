@@ -40,6 +40,7 @@ import {
 } from '@ever-works/contracts';
 import { FleetClientError } from '../fleet-client';
 import {
+	buildNodeCheckEnv,
 	fitNodeOutcomeToResultBudget,
 	normalizeChecks,
 	runNodeCommandStep,
@@ -79,6 +80,8 @@ import {
 	ModelCliCommandError,
 	modelCliMcpIsolationEnv,
 	parseModelCliResult,
+	readCodexUserSettings,
+	type CodexUserSettings,
 	redactCommandResult,
 	type ModelCliPaths,
 	MODEL_CLI_EMPTY_MCP_CONFIG,
@@ -1361,6 +1364,18 @@ async function runModelStep(
 		// BEFORE building its command line. A probe that cannot answer drops
 		// nothing — the command is then exactly what it always was.
 		const droppedFlags = await optionalFlagsToDrop(jobId, execution, executable, io);
+		// Control 16: every Codex run starts with `--ignore-user-config`, and
+		// only the owner's sandbox mode and model defaults are kept (see
+		// CodexUserSettings). Read once per job; a config that cannot be read
+		// keeps nothing, which never weakens the isolation itself.
+		const codexUserSettings =
+			execution.provider === 'codex'
+				? await readOwnerCodexSettings(
+						jobId,
+						io,
+						effectiveCodexHome(io, modelEnvOverlay, execution.envPassthrough, execution.envGrants)
+					)
+				: undefined;
 		// ONE model invocation: write the prompt, build and gate the command,
 		// spawn, parse. Run once for a fresh session — or, slice AU, once with
 		// `--resume` and, only when the CLI could not open that session at
@@ -1382,6 +1397,7 @@ async function runModelStep(
 					...(mounts && mounts.length > 0 ? { mounts } : {}),
 					...(bridge.cli ? { mcp: bridge.cli } : {}),
 					...(emptyMcpConfigPath ? { emptyMcpConfigPath } : {}),
+					...(codexUserSettings ? { codexUserSettings } : {}),
 					...(resumeSessionId ? { resumeSessionId } : {}),
 					...(io.platform ? { platform: io.platform } : {}),
 					...(streamClaude ? { stream: true } : {}),
@@ -1837,6 +1853,60 @@ export function resolveRealHomeDir(io: Pick<AgentTaskIo, 'parentEnv' | 'platform
 		}
 	}
 	return homedir();
+}
+
+/**
+ * Control 16: the owner Codex settings a fleet run keeps under
+ * `--ignore-user-config`, read from `<codexHome>/config.toml`, where
+ * `codexHome` is the home the spawned Codex uses ({@link effectiveCodexHome}). Reads only, and only the three keys
+ * {@link readCodexUserSettings} knows; their VALUES are bare identifiers by
+ * construction. Unwired reader, absent file or read error: `{}` (Codex's own
+ * defaults, the run an owner with no config gets).
+ */
+async function readOwnerCodexSettings(jobId: string, io: AgentTaskIo, codexHome: string): Promise<CodexUserSettings> {
+	const read = io.sessionConfigFs?.readFile?.bind(io.sessionConfigFs);
+	if (!read) return {};
+	try {
+		return readCodexUserSettings(await read(join(codexHome, 'config.toml')));
+	} catch (error) {
+		io.logger?.warn(
+			`[fleet-node] job ${jobId}: could not read the Codex config to keep its sandbox and model defaults; the ` +
+				`run uses Codex's own defaults (still under --ignore-user-config): ${describeContainmentError(error)}`
+		);
+		return {};
+	}
+}
+
+/**
+ * The Codex home the SPAWNED model step uses, so its settings are read from
+ * the home it authenticates from (review on #2635).
+ *
+ * Computed by the command runner's own env builder, fed the run's real
+ * overlay and only the `CODEX_HOME` entries of its passthrough and grants.
+ * The child's `CODEX_HOME` depends on nothing else, and the filter keeps the
+ * builder's credential-selection log from firing twice. That gives:
+ * - an isolated run: the overlay's `CODEX_HOME`, which is the session home
+ *   (`modelSessionHome.codex`, else `<real home>/.codex`);
+ * - a downgraded or switched-off run: the parent's `CODEX_HOME` ONLY when
+ *   this run passes or grants it, since it is not on the allowlist;
+ * - otherwise Codex's default, `<real home>/.codex`.
+ */
+function effectiveCodexHome(
+	io: AgentTaskIo,
+	envOverlay: NodeCommandEnvOverlay | undefined,
+	envPassthrough: readonly string[] | undefined,
+	envGrants: readonly string[] | undefined
+): string {
+	const isCodexHome = (name: string): boolean => name.toUpperCase() === 'CODEX_HOME';
+	const childEnv = buildNodeCheckEnv(
+		envPassthrough?.filter(isCodexHome) ?? null,
+		io.parentEnv,
+		envGrants?.filter(isCodexHome) ?? null,
+		envOverlay
+	);
+	const key = Object.keys(childEnv).find(isCodexHome);
+	const value = key === undefined ? undefined : childEnv[key];
+	return typeof value === 'string' && value.trim() ? value.trim() : join(resolveRealHomeDir(io), '.codex');
 }
 
 function describeContainmentError(error: unknown): string {

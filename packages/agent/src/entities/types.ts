@@ -123,21 +123,40 @@ export const ALL_INVITATION_ROLES = [
 ] as const;
 
 /**
- * Roles on an Organization membership or invitation.
+ * Roles on an Organization membership (EW-P2-6, integration plan doc 07).
  *
- * Exactly one value today, on purpose. `OrganizationMembershipService`
- * currently defines `ensureAdmin` as `return this.ensureMember(...)`, and its
- * docblock explicitly forbids adding a role check without a product decision.
- * Shipping an `admin` option before that decision would put a control in the
- * UI that grants nothing — worse than having no control at all. When per-Org
- * roles land, widen this tuple; the DB column is already sized for it.
+ * - `owner` — the Tenant owner. A member of every Organization of the Tenant by
+ *   construction: there is no roster row for it, so the role is synthesized.
+ * - `admin` — a roster member the Tenant owner promoted. Today the role grants ONE
+ *   thing: creating integration keys pinned to the Organizations the member
+ *   administers (`IntegrationKeyService`). `OrganizationMembershipService.ensureAdmin`
+ *   deliberately still equals `ensureMember`: widening any other write path is a
+ *   separate product decision.
+ * - `member` — every other roster member (the default, and every existing row).
  */
-export const ORGANIZATION_MEMBER_ROLES = ['member'] as const;
+export const ORGANIZATION_MEMBER_ROLES = ['owner', 'admin', 'member'] as const;
 
 export type OrganizationMemberRole = (typeof ORGANIZATION_MEMBER_ROLES)[number];
 
-/** Invitations carry the role the membership will be created with. */
-export type OrganizationInvitationRole = OrganizationMemberRole;
+/** Roles a roster row can hold (the owner has none: it is the Tenant owner). */
+export const ORGANIZATION_ROSTER_ROLES = ['admin', 'member'] as const;
+
+export type OrganizationRosterRole = (typeof ORGANIZATION_ROSTER_ROLES)[number];
+
+/** Roles that administer an Organization (create integration keys pinned to it). */
+export const ORGANIZATION_ADMIN_ROLES: readonly OrganizationMemberRole[] = ['owner', 'admin'];
+
+export function isOrganizationAdminRole(role: string | null | undefined): boolean {
+    return role === 'owner' || role === 'admin';
+}
+
+/**
+ * Invitations carry the role the membership will be created with: always `member`.
+ * A member becomes `admin` only when the Tenant owner promotes them.
+ */
+export const ORGANIZATION_INVITATION_ROLES = ['member'] as const;
+
+export type OrganizationInvitationRole = (typeof ORGANIZATION_INVITATION_ROLES)[number];
 
 /**
  * Lifecycle of an `OrganizationInvitation`.

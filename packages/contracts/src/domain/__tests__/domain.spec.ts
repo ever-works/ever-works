@@ -54,7 +54,14 @@ describe('the app work kind', () => {
 			'app'
 		]);
 		// The three platform-minted kinds still follow, in their own order.
-		expect([...WORK_KINDS]).toEqual([...USER_SELECTABLE_WORK_KINDS, 'company', 'campaign', 'default']);
+		expect([...WORK_KINDS]).toEqual([
+			...USER_SELECTABLE_WORK_KINDS,
+			'company',
+			'campaign',
+			// EW-P2-4 — the repo-less Project kind, minted by its own route only.
+			'project',
+			'default'
+		]);
 	});
 
 	it('isAppWorkKind accepts only the app kind, with the same loose input as normalizeWorkKind', () => {

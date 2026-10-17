@@ -12,6 +12,7 @@ import {
     Res,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
@@ -115,6 +116,8 @@ const VALID_KINDS = new Set<string>(Object.values(CreditLedgerKind));
 @ApiBearerAuth('JWT-auth')
 @Controller('api/credits')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class CreditsController {
     private readonly logger = new Logger(CreditsController.name);
 

@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createAgentViaAPI } from './helpers/agents-tasks';
+import { decodeQuotedPrintable, isMailhogAvailable, waitForMessageTo } from './helpers/mailhog';
 
 /**
  * Agent inbox + messaging (COMPLEX, cross-feature) — the per-Agent email
@@ -135,6 +136,9 @@ const NO_FROM = 'From address not found';
 // BEFORE from-address resolution, so a foreign agentId 404s with this message.
 const NO_AGENT = 'Agent not found';
 const NO_BODY = 'Email requires bodyText, bodyHtml, or a template';
+// EW-P4-3 (#2614): the send path refuses an UNVERIFIED sending address (403) before
+// the body is validated or a draft is held.
+const NOT_VERIFIED = 'is not verified';
 const NOT_FOUND_MSG = 'Message not found';
 const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -179,6 +183,32 @@ async function createOutboundAddress(
     return ((await res.json()) as { address: EmailAddress }).address;
 }
 
+/**
+ * Verify a sending address the way its owner does (EW-P4-3): trigger the
+ * confirmation email, read it from MailHog, and follow its
+ * `/email-address/verify/<token>` link to `GET /api/email/verify/:token`.
+ */
+async function verifyAddressViaConfirmationMail(
+    request: APIRequestContext,
+    token: string,
+    addr: EmailAddress,
+): Promise<void> {
+    const trigger = await request.post(`${API_BASE}/api/email/addresses/${addr.id}/verify`, {
+        headers: authedHeaders(token),
+    });
+    expect(trigger.status(), `verify trigger body=${await trigger.text().catch(() => '')}`).toBe(
+        201,
+    );
+    const mail = await waitForMessageTo(request, addr.address, { timeoutMs: 20_000 });
+    expect(mail, `a confirmation email reaches ${addr.address}`).toBeTruthy();
+    const body = decodeQuotedPrintable(mail!.Content.Body);
+    const verifyToken = /email-address\/verify\/([A-Za-z0-9._~-]+)/.exec(body)?.[1];
+    expect(verifyToken, 'the confirmation email carries a verify link').toBeTruthy();
+    const confirm = await request.get(`${API_BASE}/api/email/verify/${verifyToken}`);
+    expect(confirm.status(), `confirm body=${await confirm.text().catch(() => '')}`).toBe(200);
+    expect(((await confirm.json()) as { verified?: boolean }).verified).toBe(true);
+}
+
 async function seededToken(request: APIRequestContext): Promise<string> {
     const s = loadSeededTestUser();
     const res = await request.post(`${API_BASE}/api/auth/login`, {
@@ -195,7 +225,7 @@ test.describe('Agent inbox + messaging', () => {
     //          (from-address resolution → body), and a failed provider
     //          send leaves the inbox empty (no phantom rows).
     // ----------------------------------------------------------------
-    test('new agent inbox is empty; compose validates from-address then body; failed send adds no row', async ({
+    test('new agent inbox is empty; compose validates from-address, then refuses an UNVERIFIED sender (403) before the body', async ({
         request,
     }) => {
         const user: RegisteredUser = await registerUserViaAPI(request);
@@ -224,9 +254,52 @@ test.describe('Agent inbox + messaging', () => {
         expect((await noAddr.json()).message).toContain(NO_ADDRESS);
 
         // Give the user an outbound (reply-from) address; pass it explicitly so
-        // from-address resolution SUCCEEDS — now body validation must still fire
-        // (a no-key provider can't mask the 400) when the body is missing.
+        // from-address resolution SUCCEEDS. EW-P4-3: while that address is still
+        // UNVERIFIED the send is refused (403) before the body is even looked at.
         const addr = await createOutboundAddress(request, token);
+        const unverified = await request.post(`${API_BASE}/api/email/messages`, {
+            headers: authedHeaders(token),
+            data: {
+                agentId: agent.id,
+                fromAddressId: addr.id,
+                to: ['dest@example.com'],
+                subject: uniq('s'),
+            },
+        });
+        expect(
+            unverified.status(),
+            `unverified body=${await unverified.text().catch(() => '')}`,
+        ).toBe(403);
+        expect((await unverified.json()).message).toContain(NOT_VERIFIED);
+        // The refused send held nothing: no draft, no phantom inbox row.
+        expect((await listInbox(request, token, agent.id)).length, 'refused send adds no row').toBe(
+            0,
+        );
+    });
+
+    // ----------------------------------------------------------------
+    // FLOW 1b — With a VERIFIED sender (EW-P4-3: confirmed through its
+    //           confirmation email), compose validates the body, and a
+    //           failed provider send still leaves the inbox empty.
+    //           Needs MailHog to read the confirmation; skips without it.
+    // ----------------------------------------------------------------
+    test('a VERIFIED sender: compose validates the body (400), and a failed provider send adds no row', async ({
+        request,
+    }) => {
+        test.skip(
+            !(await isMailhogAvailable(request)),
+            'MailHog is not available on this stack: the sender cannot be verified',
+        );
+        const user: RegisteredUser = await registerUserViaAPI(request);
+        const token = user.access_token;
+        const agent = await createAgentViaAPI(request, token, {
+            name: uniq('Inbox verified'),
+            scope: 'tenant',
+        });
+        const addr = await createOutboundAddress(request, token);
+        await verifyAddressViaConfirmationMail(request, token, addr);
+
+        // Body validation must still fire (a no-key provider can't mask the 400).
         const noBody = await request.post(`${API_BASE}/api/email/messages`, {
             headers: authedHeaders(token),
             data: {

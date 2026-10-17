@@ -1,0 +1,52 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/webhook-subscription.schema.json",
+	"title": "Webhook v2 subscription DTO (B.5, /webhooks)",
+	"description": "Owned by the integration key that created it; disabled when the key is revoked. `secret` is returned ONCE, by POST /webhooks and POST /webhooks/:id/rotate-secret only. The HMAC key is the UTF-8 bytes of that string exactly as returned (do not base64-decode it).",
+	"type": "object",
+	"required": [
+		"id",
+		"url",
+		"events",
+		"organizationIds",
+		"excludeOriginTags",
+		"status",
+		"version",
+		"createdAt",
+		"updatedAt"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"url": { "type": "string", "format": "uri", "maxLength": 2048 },
+		"description": { "type": ["string", "null"], "maxLength": 500 },
+		"events": {
+			"description": "Catalog types or `<domain>.*` wildcards. task.runtime_updated is delivered only when named explicitly.",
+			"type": "array",
+			"minItems": 1,
+			"items": { "type": "string", "maxLength": 64 }
+		},
+		"organizationIds": {
+			"description": "Subset of the key's pinned organizations.",
+			"type": "array",
+			"minItems": 1,
+			"items": { "$ref": "../common.schema.json#/$defs/Uuid" }
+		},
+		"excludeOriginTags": {
+			"description": "Events whose origin.tag is in this list are not delivered (loop prevention), e.g. [\"gauzy:<connectionId>\"].",
+			"type": "array",
+			"items": { "type": "string", "maxLength": 100 }
+		},
+		"status": { "type": "string", "enum": ["active", "paused", "failed", "disabled"] },
+		"version": { "description": "Subscription protocol version: always 2 here.", "const": 2 },
+		"secret": {
+			"description": "Only in the POST /webhooks and rotate-secret responses.",
+			"type": "string",
+			"minLength": 32
+		},
+		"consecutiveFailures": { "type": "integer", "minimum": 0 },
+		"lastDeliveryAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" }
+	},
+	"additionalProperties": false
+}

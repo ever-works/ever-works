@@ -449,14 +449,22 @@ test.describe('Team resources — grouped-by-type contract', () => {
         return res.json();
     }
 
-    test('an empty team lists EXACTLY the five buckets, all empty arrays (never missing keys)', async ({
+    test('an empty team lists EXACTLY the six buckets (goal since EW-P1-3), all empty arrays (never missing keys)', async ({
         request,
     }) => {
         const ctx = await buildOwnerCtx(request, 'Buckets');
         const team = await createTeamViaAPI(request, ctx, { name: `Empty Buckets ${teamStamp()}` });
         const grouped = await listResources(request, ctx, team.id);
-        expect(Object.keys(grouped).sort()).toEqual(['agent', 'idea', 'mission', 'task', 'work']);
-        for (const key of ['work', 'task', 'agent', 'mission', 'idea']) {
+        // EW-P1-3 (record visibility): Goals sit on Teams too, as `team_resources` type `goal`.
+        expect(Object.keys(grouped).sort()).toEqual([
+            'agent',
+            'goal',
+            'idea',
+            'mission',
+            'task',
+            'work',
+        ]);
+        for (const key of ['work', 'task', 'agent', 'mission', 'idea', 'goal']) {
             expect(grouped[key]).toEqual([]);
         }
     });

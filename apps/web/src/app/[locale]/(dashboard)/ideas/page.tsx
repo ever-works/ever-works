@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { RecordViewTabs } from '@/components/record-visibility';
+import { parseRecordTab, withRecordTab } from '@/lib/record-visibility';
 import { getTranslations } from 'next-intl/server';
 import {
     workProposalsAPI,
@@ -37,6 +40,8 @@ const MATCH_CANDIDATE_LIMIT = 100;
 
 type IdeasStatusFilter = 'actionable' | 'all' | 'done' | WorkProposalStatus;
 type IdeasSearchParams = Promise<{
+    /** Record visibility (EW-P1-3) list tab. */
+    tab?: string | string[];
     status?: string | string[];
     search?: string | string[];
     offset?: string | string[];
@@ -87,6 +92,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
     const status = normalizeStatusFilter(firstParam(params.status));
     const search = firstParam(params.search)?.trim() || undefined;
     const offset = Math.max(0, parseInt(firstParam(params.offset) ?? '0', 10) || 0);
+    const tab = parseRecordTab(params.tab);
 
     let allIdeas: WorkProposal[] = [];
     let loadError: string | null = null;
@@ -97,6 +103,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
     try {
         [allIdeas, works] = await Promise.all([
             workProposalsAPI.list(statusesForFilter(status), {
+                view: tab,
                 search,
                 offset,
                 limit: PAGE_SIZE + 1,
@@ -117,6 +124,8 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
 
     return (
         <IdeasPageClient
+            key={tab}
+            tab={tab}
             initialIdeas={pageIdeas}
             loadError={loadError}
             matchedWorkIds={matchIdeasToWorks(pageIdeas, works)}
@@ -125,9 +134,20 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
                 offset,
                 hasPrevious: offset > 0,
                 hasNext,
-                previousHref: buildIdeasHref({ status, search, offset: prevOffset }),
-                nextHref: buildIdeasHref({ status, search, offset: nextOffset }),
+                previousHref: withRecordTab(
+                    buildIdeasHref({ status, search, offset: prevOffset }),
+                    tab,
+                ),
+                nextHref: withRecordTab(
+                    buildIdeasHref({ status, search, offset: nextOffset }),
+                    tab,
+                ),
             }}
+            tabs={
+                <Suspense fallback={null}>
+                    <RecordViewTabs />
+                </Suspense>
+            }
         />
     );
 }

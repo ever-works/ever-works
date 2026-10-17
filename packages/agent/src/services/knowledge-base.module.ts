@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DatabaseModule } from '../database/database.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { FacadesModule } from '../facades/facades.module';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
@@ -87,6 +88,9 @@ import { WorkOwnershipService } from './work-ownership.service';
         // `NotificationsModule` imports only `DatabaseModule`, so there
         // is no cycle.
         NotificationsModule,
+        // EW-P3-2 — `kb.document.*` domain events (`DomainEventPublisher`, a
+        // leaf module over the outbox tables: no cycle).
+        DomainEventsModule,
         TypeOrmModule.forFeature([
             WorkKnowledgeDocument,
             WorkKnowledgeUpload,

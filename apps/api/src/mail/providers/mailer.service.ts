@@ -81,7 +81,29 @@ export class MailerService {
         );
     }
 
-    async sendMail(data: SendMailOptions): Promise<void> {
+    /**
+     * EW-P4-3 — whether `sendMail` actually DELIVERS mail with the current
+     * configuration. `false` when it would only log: the faker provider
+     * (`MAILER_PROVIDER` unset or `none`), or `resend` with no client (no
+     * `RESEND_APIKEY`), which falls back to the faker. A flow whose whole point
+     * is that a person receives the email (an address confirmation link) must
+     * not report "sent" then.
+     */
+    canDeliver(): boolean {
+        const provider = config.mail.provider();
+        if (provider === 'smtp') return true;
+        if (provider === 'resend') return !!this.resend;
+        return false;
+    }
+
+    /**
+     * @param options.strict EW-P4-3 — a flow whose whole point is that the
+     * email ARRIVES (an address confirmation link) passes `strict: true`: a
+     * provider that answers with an error then throws instead of returning as
+     * if it sent. Without it the behaviour is unchanged for every existing
+     * caller (an SMTP failure already throws; a Resend error is now logged).
+     */
+    async sendMail(data: SendMailOptions, options: { strict?: boolean } = {}): Promise<void> {
         const provider = config.mail.provider();
         const recipient = data.to ? this.getDestination(data.to).join(', ') : 'unknown';
 
@@ -117,6 +139,19 @@ export class MailerService {
                     subject: data.subject,
                     html,
                 });
+                // The Resend SDK RESOLVES with `{ error }` on an API error rather
+                // than rejecting. Say so instead of logging a send that did not
+                // happen (EW-P4-3).
+                const failure = (result as { error?: { name?: string; message?: string } | null })
+                    .error;
+                if (failure) {
+                    const reason = `${failure.name ?? 'error'}: ${failure.message ?? 'unknown error'}`;
+                    this.logger.error(`Resend refused the email to=${recipient}: ${reason}`);
+                    if (options.strict) {
+                        throw new Error(`Resend refused the email: ${reason}`);
+                    }
+                    break;
+                }
                 this.logger.log(
                     `Email sent via Resend to=${recipient} id=${result.data?.id ?? 'unknown'}`,
                 );

@@ -171,7 +171,7 @@ const meta = (key: string): unknown[] => Reflect.getMetadata(key, WorkModule) ??
 
 describe('WorkModule', () => {
     describe('imports', () => {
-        it('imports the documented 14-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog/AppWorksModule + ActivityLogModule)', () => {
+        it('imports the documented 15-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog/AppWorksModule + ActivityLogModule + DomainEventsModule)', () => {
             const imports = meta('imports') as Array<{ name?: string }>;
             const names = imports.map((m) => m?.name).filter(Boolean) as string[];
 
@@ -197,10 +197,13 @@ describe('WorkModule', () => {
                     // `kind: 'app'`. Without this import the create path would
                     // answer `500` with the named "not wired" message instead.
                     'AppWorksModule',
+                    // EW-P1-1 B2: provides the `DomainEventPublisher` the work
+                    // services record `work.*` domain events through.
+                    'DomainEventsModule',
                 ]),
             );
             // Pin the count too — silent additions break this regression guard.
-            expect(imports).toHaveLength(14);
+            expect(imports).toHaveLength(15);
         });
 
         it('does NOT import PluginsModule directly (it is registered globally via forRoot at the app root, per JSDoc)', () => {

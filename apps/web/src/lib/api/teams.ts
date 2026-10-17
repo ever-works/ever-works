@@ -39,7 +39,7 @@ export interface TeamDetail extends Team {
     childTeamIds: string[];
 }
 
-export type TeamResourceType = 'work' | 'task' | 'agent' | 'mission' | 'idea';
+export type TeamResourceType = 'work' | 'task' | 'agent' | 'mission' | 'idea' | 'goal';
 
 export interface TeamResourceItem {
     id: string;
@@ -57,6 +57,8 @@ export interface TeamResourcesGrouped {
     agent: TeamResourceItem[];
     mission: TeamResourceItem[];
     idea: TeamResourceItem[];
+    /** EW-P1-3: Goals sit on Teams too. Optional: an older API answers without it. */
+    goal?: TeamResourceItem[];
 }
 
 export interface ResourceTeamRef {
@@ -240,7 +242,7 @@ export const teamsAPI = {
                 { method: 'GET' },
             );
         } catch {
-            return { work: [], task: [], agent: [], mission: [], idea: [] };
+            return { work: [], task: [], agent: [], mission: [], idea: [], goal: [] };
         }
     },
 

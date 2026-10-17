@@ -37,6 +37,7 @@ describe('AuthService', () => {
             UserRepository,
             | 'findByEmail'
             | 'findByEmailForSocialAuth'
+            | 'findByIdForSocialAuth'
             | 'findById'
             | 'findOne'
             | 'create'
@@ -50,6 +51,7 @@ describe('AuthService', () => {
         Pick<
             AuthAccountRepository,
             | 'findProviderAccount'
+            | 'findProviderAccountByAccountId'
             | 'upsertProviderAccount'
             | 'findProviderAccountsByUserId'
             | 'isAccessTokenExpired'
@@ -62,6 +64,7 @@ describe('AuthService', () => {
         userRepo = {
             findByEmail: jest.fn(),
             findByEmailForSocialAuth: jest.fn(),
+            findByIdForSocialAuth: jest.fn(),
             findById: jest.fn(),
             findOne: jest.fn(),
             create: jest.fn(),
@@ -72,6 +75,7 @@ describe('AuthService', () => {
         } as any;
         authAccountRepo = {
             findProviderAccount: jest.fn(),
+            findProviderAccountByAccountId: jest.fn(),
             upsertProviderAccount: jest.fn(),
             findProviderAccountsByUserId: jest.fn(),
             isAccessTokenExpired: jest.fn(),
@@ -260,6 +264,181 @@ describe('AuthService', () => {
             );
         });
 
+        // Self-build handover item 13: the provider IDENTITY decides first.
+        describe('provider identity before email', () => {
+            it('signs in the user linked to THIS provider account even after the provider email changed', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue({
+                    id: 'acc-1',
+                    userId: 'u-1',
+                    providerId: 'github',
+                    accountId: 'gh-1',
+                } as any);
+                userRepo.findByIdForSocialAuth.mockResolvedValue({
+                    id: 'u-1',
+                    email: 'old@b.co',
+                    isActive: true,
+                    emailVerified: true,
+                } as any);
+                userRepo.updateForSocialAuth.mockResolvedValue({ id: 'u-1' } as any);
+                authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
+
+                const result = await service.validateSocialUser(
+                    socialUser({ email: 'new@b.co' }) as any,
+                );
+
+                expect(authAccountRepo.findProviderAccountByAccountId).toHaveBeenCalledWith(
+                    'github',
+                    'gh-1',
+                );
+                expect(userRepo.findByEmailForSocialAuth).not.toHaveBeenCalled();
+                expect(userRepo.create).not.toHaveBeenCalled();
+                expect(result).toEqual({ id: 'u-1' });
+                expect(authAccountRepo.upsertProviderAccount).toHaveBeenCalledWith(
+                    expect.objectContaining({ userId: 'u-1', accountId: 'gh-1' }),
+                );
+            });
+
+            it('the linked user wins over another user who owns the reported email', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue({
+                    id: 'acc-a',
+                    userId: 'u-a',
+                } as any);
+                userRepo.findByIdForSocialAuth.mockResolvedValue({
+                    id: 'u-a',
+                    email: 'a@b.co',
+                    isActive: true,
+                    emailVerified: true,
+                } as any);
+                userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                    id: 'u-b',
+                    isActive: true,
+                } as any);
+                userRepo.updateForSocialAuth.mockResolvedValue({ id: 'u-a' } as any);
+                authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
+
+                await service.validateSocialUser(socialUser({ email: 'b@b.co' }) as any);
+
+                expect(userRepo.updateForSocialAuth).toHaveBeenCalledWith('u-a', expect.anything());
+                expect(authAccountRepo.upsertProviderAccount).toHaveBeenCalledWith(
+                    expect.objectContaining({ userId: 'u-a' }),
+                );
+            });
+
+            it('TAKEOVER GUARD: an unverified email of a user linked to a DIFFERENT account of the provider is refused', async () => {
+                // The victim has their own GitHub link; a different GitHub account
+                // presents the victim's address unverified. The old check accepted
+                // any github link on this user, and the upsert then re-pointed the
+                // victim's link at the newcomer's account id and tokens.
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue(null);
+                userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                    id: 'u-victim',
+                    email: 'sa@b.co',
+                    isActive: true,
+                    emailVerified: true,
+                } as any);
+                authAccountRepo.findProviderAccount.mockResolvedValue({
+                    id: 'acc-victim',
+                    userId: 'u-victim',
+                    accountId: 'gh-victim',
+                } as any);
+
+                await expect(
+                    service.validateSocialUser(
+                        socialUser({ providerUserId: 'gh-attacker', emailVerified: false }) as any,
+                    ),
+                ).rejects.toThrow(
+                    'Unable to link this social account because the provider email is not verified',
+                );
+                expect(userRepo.updateForSocialAuth).not.toHaveBeenCalled();
+                expect(authAccountRepo.upsertProviderAccount).not.toHaveBeenCalled();
+            });
+
+            it('does not mark the user email verified from a DIFFERENT verified provider address', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue({
+                    id: 'acc-1',
+                    userId: 'u-1',
+                } as any);
+                userRepo.findByIdForSocialAuth.mockResolvedValue({
+                    id: 'u-1',
+                    email: 'old@b.co',
+                    isActive: true,
+                    emailVerified: false,
+                } as any);
+                userRepo.updateForSocialAuth.mockResolvedValue({ id: 'u-1' } as any);
+                authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
+
+                await service.validateSocialUser(socialUser({ email: 'new@b.co' }) as any);
+
+                expect(userRepo.updateForSocialAuth).toHaveBeenCalledWith(
+                    'u-1',
+                    expect.objectContaining({ emailVerified: false }),
+                );
+            });
+
+            it('falls back to the email match when the provider account is not linked yet (first sign-in)', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue(null);
+                userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                    id: 'u-1',
+                    email: 'sa@b.co',
+                    isActive: true,
+                    emailVerified: false,
+                } as any);
+                userRepo.updateForSocialAuth.mockResolvedValue({ id: 'u-1' } as any);
+                authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
+
+                await service.validateSocialUser(socialUser() as any);
+
+                expect(userRepo.updateForSocialAuth).toHaveBeenCalledWith(
+                    'u-1',
+                    expect.objectContaining({ emailVerified: true }),
+                );
+            });
+
+            it('stores the link under the SAME trimmed account id it looks the link up by', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue(null);
+                userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                    id: 'u-1',
+                    email: 'sa@b.co',
+                    isActive: true,
+                    emailVerified: true,
+                } as any);
+                userRepo.updateForSocialAuth.mockResolvedValue({ id: 'u-1' } as any);
+                authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);
+
+                await service.validateSocialUser(socialUser({ providerUserId: '  gh-1  ' }) as any);
+
+                expect(authAccountRepo.findProviderAccountByAccountId).toHaveBeenCalledWith(
+                    'github',
+                    'gh-1',
+                );
+                expect(authAccountRepo.upsertProviderAccount).toHaveBeenCalledWith(
+                    expect.objectContaining({ accountId: 'gh-1' }),
+                );
+            });
+
+            it('refuses, writing nothing, when the linked local user cannot be loaded (dangling link)', async () => {
+                authAccountRepo.findProviderAccountByAccountId.mockResolvedValue({
+                    id: 'acc-gone',
+                    userId: 'u-gone',
+                } as any);
+                userRepo.findByIdForSocialAuth.mockResolvedValue(null);
+                userRepo.findByEmailForSocialAuth.mockResolvedValue({
+                    id: 'u-other',
+                    email: 'sa@b.co',
+                    isActive: true,
+                    emailVerified: true,
+                } as any);
+
+                await expect(service.validateSocialUser(socialUser() as any)).rejects.toThrow(
+                    ConflictException,
+                );
+                expect(userRepo.findByEmailForSocialAuth).not.toHaveBeenCalled();
+                expect(userRepo.create).not.toHaveBeenCalled();
+                expect(userRepo.updateForSocialAuth).not.toHaveBeenCalled();
+                expect(authAccountRepo.upsertProviderAccount).not.toHaveBeenCalled();
+            });
+        });
+
         it('throws UnauthorizedException when account suspended', async () => {
             userRepo.findByEmailForSocialAuth.mockResolvedValue({
                 id: 'u-1',
@@ -285,15 +464,21 @@ describe('AuthService', () => {
             );
         });
 
-        it('allows unverified email when provider link already exists', async () => {
-            userRepo.findByEmailForSocialAuth.mockResolvedValue({
+        it('allows unverified email when THIS provider account is already linked to the user', async () => {
+            authAccountRepo.findProviderAccountByAccountId.mockResolvedValue({
+                id: 'acc-1',
+                userId: 'u-1',
+                providerId: 'github',
+                accountId: 'gh-1',
+            } as any);
+            userRepo.findByIdForSocialAuth.mockResolvedValue({
                 id: 'u-1',
+                email: 'sa@b.co',
                 isActive: true,
                 username: 'old',
                 avatar: 'old.png',
                 emailVerified: true,
             } as any);
-            authAccountRepo.findProviderAccount.mockResolvedValue({ id: 'acc-1' } as any);
             const updated = { id: 'u-1', email: 'sa@b.co' };
             userRepo.updateForSocialAuth.mockResolvedValue(updated as any);
             authAccountRepo.upsertProviderAccount.mockResolvedValue({} as any);

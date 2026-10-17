@@ -1,0 +1,233 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/task.schema.json",
+	"title": "Task DTO (B.6, /tasks)",
+	"description": "One Ever Works task with its edge sets embedded, so a consumer can diff them against its snapshot. `status` is never writable with PATCH: it moves through POST /tasks/:id/transition {to, mode:'sync'}. Also the `data` of task.created/updated/transitioned/deleted and task.runtime_updated.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": [
+		"slug",
+		"title",
+		"description",
+		"status",
+		"priority",
+		"labels",
+		"teamIds",
+		"workId",
+		"missionId",
+		"ideaId",
+		"goalId",
+		"agentId",
+		"parentTaskId",
+		"assignees",
+		"watchers",
+		"approvers",
+		"reviewers",
+		"blockedBy",
+		"relations",
+		"runtime",
+		"webUrl"
+	],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": {
+			"description": "Bumped by every user-meaningful change incl. edge changes; NOT bumped by runtime-only writes (PR/CI/run state, see task.runtime_updated)."
+		},
+		"visibility": true,
+		"visibilityExplicit": true,
+		"owner": true,
+		"createdBy": {
+			"description": "From tasks.createdByType/createdById; `integration` when created by an integration without act-as."
+		},
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"slug": { "description": "T-<n>, unique per owner.", "type": "string", "maxLength": 16 },
+		"title": { "type": "string", "minLength": 1, "maxLength": 200 },
+		"description": { "description": "Markdown / plain text.", "type": ["string", "null"] },
+		"status": { "$ref": "#/$defs/TaskStatus" },
+		"priority": { "type": "string", "enum": ["p0", "p1", "p2", "p3", "p4"] },
+		"labels": {
+			"type": "array",
+			"items": { "type": "string", "maxLength": 80 },
+			"uniqueItems": true
+		},
+		"workId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"missionId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"ideaId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"goalId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"agentId": {
+			"description": "The agent working the task (tasks.agentId), distinct from assignees.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
+		"parentTaskId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"assignees": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/PrincipalRef" }
+		},
+		"watchers": {
+			"description": "User ids (watchers are users only).",
+			"type": "array",
+			"items": { "$ref": "../common.schema.json#/$defs/Uuid" },
+			"uniqueItems": true
+		},
+		"approvers": {
+			"description": "EW-only gate, read-only for integrations (01 §7).",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["type", "id", "state"],
+				"properties": {
+					"type": { "type": "string", "enum": ["user", "agent"] },
+					"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+					"state": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+				},
+				"additionalProperties": false
+			}
+		},
+		"reviewers": {
+			"description": "EW-only, advisory, read-only for integrations.",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["type", "id", "state"],
+				"properties": {
+					"type": { "type": "string", "enum": ["user", "agent"] },
+					"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+					"state": { "type": "string", "enum": ["pending", "requested-changes", "approved"] }
+				},
+				"additionalProperties": false
+			}
+		},
+		"blockedBy": {
+			"description": "Ids of tasks that block this one (task_blocks.blockedByTaskId).",
+			"type": "array",
+			"items": { "$ref": "../common.schema.json#/$defs/Uuid" },
+			"uniqueItems": true
+		},
+		"relations": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["taskId", "kind"],
+				"properties": {
+					"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+					"kind": { "type": "string", "enum": ["related", "duplicates", "follow-up"] }
+				},
+				"additionalProperties": false
+			}
+		},
+		"startedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"completedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"isRecurringTemplate": {
+			"description": "true for a recurring template row (never synced; only its instances are).",
+			"type": "boolean"
+		},
+		"hiddenFromBoard": { "type": "boolean" },
+		"runtime": {
+			"description": "Machine-owned run/PR/CI state. Display only; changes to it alone emit task.runtime_updated and bump neither version nor updatedAt.",
+			"type": "object",
+			"required": ["prUrl", "prState", "ciState", "latestRunStatus"],
+			"properties": {
+				"prUrl": { "type": ["string", "null"], "maxLength": 2048 },
+				"prState": { "type": ["string", "null"], "maxLength": 32 },
+				"ciState": { "type": ["string", "null"], "maxLength": 32 },
+				"latestRunStatus": { "type": ["string", "null"], "maxLength": 32 }
+			},
+			"additionalProperties": false
+		},
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"dueAt": {
+			"description": "EW-P2-3 (live). null when unset.",
+			"$ref": "../common.schema.json#/$defs/NullableDateTime"
+		},
+		"startAt": {
+			"description": "EW-P2-3 (live). null when unset.",
+			"$ref": "../common.schema.json#/$defs/NullableDateTime"
+		},
+		"estimateMinutes": {
+			"description": "EW-P2-3 (live). null when unset.",
+			"type": ["integer", "null"],
+			"minimum": 0
+		},
+		"deleted": { "description": "Only on task.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"TaskStatus": {
+			"type": "string",
+			"enum": ["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"]
+		},
+		"PrincipalRef": {
+			"type": "object",
+			"required": ["type", "id"],
+			"properties": {
+				"type": { "type": "string", "enum": ["user", "agent"] },
+				"id": { "$ref": "../common.schema.json#/$defs/Uuid" }
+			},
+			"additionalProperties": false
+		},
+		"TaskAssigneeEvent": {
+			"description": "`data` of task.assignee.added/removed (aggregate = the task).",
+			"type": "object",
+			"required": ["taskId", "type", "id"],
+			"properties": {
+				"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"type": { "type": "string", "enum": ["user", "agent"] },
+				"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		},
+		"TaskWatcherEvent": {
+			"description": "`data` of task.watcher.added/removed.",
+			"type": "object",
+			"required": ["taskId", "userId"],
+			"properties": {
+				"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"userId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		},
+		"TaskBlockEvent": {
+			"description": "`data` of task.block.added/removed: `blockedByTaskId` blocks `taskId`.",
+			"type": "object",
+			"required": ["taskId", "blockedByTaskId"],
+			"properties": {
+				"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"blockedByTaskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		},
+		"TaskRelationEvent": {
+			"description": "`data` of task.relation.added/removed.",
+			"type": "object",
+			"required": ["taskId", "relatedTaskId", "kind"],
+			"properties": {
+				"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"relatedTaskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"kind": { "type": "string", "enum": ["related", "duplicates", "follow-up"] },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		},
+		"TaskAttachmentEvent": {
+			"description": "`data` of task.attachment.added/removed (P3).",
+			"type": "object",
+			"required": ["taskId", "uploadId", "role"],
+			"properties": {
+				"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"uploadId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+				"role": { "type": "string", "enum": ["initial", "result"] },
+				"filename": { "type": ["string", "null"] },
+				"contentType": { "type": ["string", "null"] },
+				"deleted": { "const": true }
+			},
+			"additionalProperties": false
+		}
+	}
+}

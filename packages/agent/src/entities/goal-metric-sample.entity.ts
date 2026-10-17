@@ -15,9 +15,10 @@ import { PortableDateColumn } from './_types';
  * behind progress display and evaluation history (Goals & Metrics
  * spec FR-10, PR-8).
  *
- * Written exclusively by `GoalEvaluationService` after a successful
+ * Written by `GoalEvaluationService` after a successful
  * `MetricsFacadeService.getMetricValue` read (scheduled tick or
- * manual `POST /me/goals/:id/evaluate-now`). Rows are immutable —
+ * manual `POST /me/goals/:id/evaluate-now`), and — for a Goal whose metric
+ * source is external (EW-P2-2) — by `GoalsService.recordExternalSample`. Rows are immutable —
  * no `updatedAt`, no update path. Failed provider reads append
  * nothing (spec FR-5: failures record no usage and no sample).
  *
@@ -31,6 +32,8 @@ import { PortableDateColumn } from './_types';
  */
 @Entity({ name: 'goal_metric_samples' })
 @Index('idx_goal_metric_samples_goal_sampled', ['goalId', 'sampledAt'])
+// EW-P2-2 — the latest pushed value of one criterion (migration 1795140000000).
+@Index('idx_goal_metric_samples_goal_criterion_sampled', ['goalId', 'criterionId', 'sampledAt'])
 export class GoalMetricSample {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -48,6 +51,15 @@ export class GoalMetricSample {
 
     @Column({ type: 'float' })
     value: number;
+
+    /**
+     * EW-P2-2 — the criterion an EXTERNAL sample measures (`POST
+     * /api/integrations/v1/goals/:id/samples {criterionId}`, a Goal whose metric
+     * source is `pluginId: 'external'`). NULL = the Goal's own metric, which is every
+     * provider-read row (migration 1795140000000-AddGoalMetricSampleCriterionId).
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    criterionId?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;

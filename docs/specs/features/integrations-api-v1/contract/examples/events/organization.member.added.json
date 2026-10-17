@@ -1,0 +1,39 @@
+{
+	"id": "evt_01JABZ3S2G2H4J6K8M0N2P4Q6R",
+	"seq": "102952",
+	"type": "organization.member.added",
+	"version": 1,
+	"occurredAt": "2026-10-15T18:00:00.000Z",
+	"tenantId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"aggregate": {
+		"type": "organization",
+		"id": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+		"version": 9
+	},
+	"actor": {
+		"type": "system",
+		"id": "invitation-accept",
+		"label": null
+	},
+	"origin": {
+		"tag": null,
+		"integrationKeyId": null
+	},
+	"changedFields": ["members"],
+	"data": {
+		"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+		"userId": "b4e6a8c0-2d3f-4a71-9bac-1d2e3f4a5b67",
+		"username": "oksana",
+		"displayName": null,
+		"email": "oksana@example.com",
+		"emailVerified": true,
+		"avatarUrl": null,
+		"role": "member",
+		"isActive": true,
+		"joinedAt": "2026-10-15T18:10:00.000Z",
+		"updatedAt": "2026-10-15T18:10:00.000Z",
+		"everIdSubjects": []
+	},
+	"previous": {}
+}

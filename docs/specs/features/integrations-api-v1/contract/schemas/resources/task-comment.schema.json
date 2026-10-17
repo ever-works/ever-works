@@ -1,0 +1,65 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/task-comment.schema.json",
+	"title": "Task comment DTO (B.6, /tasks/:id/comments)",
+	"description": "A task_chat_messages row. A comment is a child of the task aggregate: it has no version of its own, and comment routes do not take If-Match in v1 (Ever Works' 5-minute edit window applies to human authors). Also the `data` of task.comment.created/updated/deleted (aggregate = the task, with the task's new version).",
+	"type": "object",
+	"required": [
+		"id",
+		"taskId",
+		"organizationId",
+		"authorType",
+		"authorId",
+		"body",
+		"mentions",
+		"editedAt",
+		"createdAt",
+		"updatedAt",
+		"externalLinks"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"taskId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"organizationId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"authorType": { "type": "string", "enum": ["user", "agent", "integration"] },
+		"authorId": {
+			"description": "users.id, agents.id, or the integration key id when authorType = integration.",
+			"type": "string",
+			"maxLength": 100
+		},
+		"externalAuthor": {
+			"description": "Display data for an author outside Ever Works (an unmapped Gauzy employee).",
+			"type": ["object", "null"],
+			"required": ["name"],
+			"properties": {
+				"name": { "type": "string", "maxLength": 200 },
+				"avatarUrl": { "type": ["string", "null"], "maxLength": 2048 },
+				"source": { "type": "string", "maxLength": 100, "examples": ["gauzy"] }
+			},
+			"additionalProperties": false
+		},
+		"body": { "type": "string" },
+		"mentions": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["type"],
+				"properties": {
+					"type": { "type": "string", "enum": ["user", "agent", "kb"] },
+					"id": { "type": ["string", "null"] },
+					"slug": { "type": ["string", "null"] }
+				},
+				"additionalProperties": false
+			}
+		},
+		"editedAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"externalLinks": {
+			"type": "array",
+			"items": { "$ref": "../common.schema.json#/$defs/ExternalLink" }
+		},
+		"deleted": { "description": "Only on task.comment.deleted.", "const": true }
+	},
+	"additionalProperties": false
+}

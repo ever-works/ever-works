@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
 import { normalizeCommitSha } from '@ever-works/contracts';
@@ -14,7 +15,7 @@ import {
     PROMOTION_LANE_WATCHER,
     type PromotionLaneWatcher,
 } from '../policy/promotion-merge-guard.port';
-import { resolveTaskRepository } from './task-repository';
+import { pickOwnerRepo, requireTaskRepository } from './task-repository';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -132,6 +133,10 @@ export class TaskPrStatusService {
         @Optional()
         @Inject(PROMOTION_LANE_WATCHER)
         private readonly promotionLane?: PromotionLaneWatcher,
+        // Domain events (EW-P1-1 B2) — a PR/CI state change is runtime-only:
+        // `task.runtime_updated`, no version or updatedAt bump. Appended LAST
+        // + @Optional (positional-spec arity rule).
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -371,6 +376,36 @@ export class TaskPrStatusService {
     // ── Internals ─────────────────────────────────────────────────────
 
     /**
+     * `task.runtime_updated` when a field the integration DTO shows
+     * (`runtime.prState` / `runtime.ciState`) actually changed — the 2-minute
+     * poll must not flood the outbox with no-op reads. Best-effort.
+     */
+    private async recordRuntimeChange(
+        task: Task,
+        patch: { prState?: unknown; ciState?: unknown },
+    ): Promise<void> {
+        const publisher = this.domainEvents;
+        if (!publisher) return;
+        const previous: Record<string, unknown> = {};
+        if ('prState' in patch && patch.prState !== task.prState)
+            previous.prState = task.prState ?? null;
+        if ('ciState' in patch && patch.ciState !== task.ciState)
+            previous.ciState = task.ciState ?? null;
+        if (Object.keys(previous).length === 0) return;
+        try {
+            await publisher.transaction((manager) =>
+                publisher.runtime(manager, task.id, {
+                    changedFields: ['runtime'],
+                    previous: { runtime: previous },
+                    actor: { type: 'system', id: 'pr-status-cron', label: null },
+                }),
+            );
+        } catch (err) {
+            this.logger.warn(`Could not record task.runtime_updated for task ${task.id}: ${err}`);
+        }
+    }
+
+    /**
      * Provider read + cache write for one Task, single-flighted.
      * Returns the Task with the fresh cache values applied in memory
      * (so the caller can answer without a re-read).
@@ -400,6 +435,7 @@ export class TaskPrStatusService {
             // recorded BEFORE this read, so a moved head is detectable below.
             const previousPrHead = task.prHeadSha ?? null;
             await this.tasks.updatePrStatusCache(task.id, patch);
+            await this.recordRuntimeChange(task, patch);
             // CI feedback + autonomous fix loop (slice AC, EW-806): the
             // provider's answer includes the pull request's CURRENT head,
             // which is the most authoritative statement of it anywhere —
@@ -615,8 +651,8 @@ export class TaskPrStatusService {
             throw new NotFoundException(`Task ${task.id} has no reachable Work.`);
         }
         return {
-            owner: resolveTaskRepository(work).owner,
-            repo: resolveTaskRepository(work).repo,
+            // EW-P2-4 — refused (400) for a repo-less Work, never a derived name.
+            ...pickOwnerRepo(requireTaskRepository(work, 'pull request status')),
             baseRef:
                 (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main',
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },

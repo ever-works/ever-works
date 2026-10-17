@@ -44,7 +44,9 @@ import { EmailModule } from '../email/email.module';
 import { EmailService } from '../email/email.service';
 import {
     INBOUND_EMAIL_TASK_SPAWNER,
+    INBOUND_EMAIL_ATTACHMENT_STORE,
     type InboundEmailTaskSpawner,
+    type InboundEmailAttachmentStore,
 } from '@ever-works/agent/notifications';
 import {
     agentHeartbeatTriggerAdapter,
@@ -59,7 +61,7 @@ import {
 // names the roles it chooses between. Same two imports, and the same rule,
 // as `repos[role]` in `packages/agent/src/works/repository-work-guard.ts`
 // (`hasRepositoryRole`) — the ONE place that knowledge lives.
-import { getWorkCapabilities, isAppWorkKind } from '@ever-works/contracts';
+import { getWorkCapabilities, isAppWorkKind, workKindHasRepository } from '@ever-works/contracts';
 import { lstat, realpath } from 'node:fs/promises';
 import {
     join as joinPath,
@@ -68,6 +70,13 @@ import {
     sep as pathSep,
 } from 'node:path';
 import type { RepositoryRole } from '@ever-works/contracts/api';
+import {
+    formatInboundEmailChatPost,
+    inboundEmailAttachmentList,
+    inboundEmailReplyHint,
+} from './inbound-email-task-chat';
+import { UploadsModule } from '../uploads/uploads.module';
+import { UploadsService } from '../uploads/uploads.service';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
 // The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
@@ -470,6 +479,10 @@ async function assertRealWriteTarget(
         // Named Conversations — supplies ConversationMessageService for the
         // AGENT_RUN_CONVERSATION_REPLY_POSTER binding below.
         ConversationsModule,
+        // EW-P4-3 — UploadsService for the INBOUND_EMAIL_ATTACHMENT_STORE
+        // binding below. Already in this graph through ApiSkillsModule; it
+        // imports only Auth/Database/Facades, so no cycle is introduced.
+        UploadsModule,
         // AW-23 — the identity card's "Waiting on you" reason counts
         // PENDING approval proposals alongside open escalations.
         // AgentApprovalsModule is a leaf (its own entities and nothing
@@ -602,25 +615,132 @@ async function assertRealWriteTarget(
         // the task-tracking flow dispatches `agent-task-execute`. When this
         // token is unbound the dispatcher persists the message but spawns
         // no Task (graceful no-op).
+        //
+        // EW-P4-3 — a reply that threads (In-Reply-To / References) onto an
+        // email already linked to a Task is posted on THAT Task's chat
+        // instead (`appendInboundEmailToTask`), mentioning the receiving
+        // agent so it picks the reply up. The email text is defused first
+        // (see `inbound-email-task-chat.ts`). Any failure (a secret in the
+        // body, a deleted task) makes the dispatcher spawn a new Task, as
+        // before, so a reply is never lost.
         {
             provide: INBOUND_EMAIL_TASK_SPAWNER,
-            inject: [TasksService],
-            useFactory: (tasks: TasksService): InboundEmailTaskSpawner => ({
-                async spawnTaskForInboundEmail({ agentId, userId, subject, bodyText, from }) {
+            inject: [TasksService, TaskChatService, AgentRepository],
+            useFactory: (
+                tasks: TasksService,
+                chat: TaskChatService,
+                agents: AgentRepository,
+            ): InboundEmailTaskSpawner => ({
+                async spawnTaskForInboundEmail({
+                    agentId,
+                    userId,
+                    emailMessageId,
+                    subject,
+                    bodyText,
+                    from,
+                    tenantId,
+                    organizationId,
+                    attachments,
+                }) {
                     const title = subject?.trim()
                         ? subject.trim().slice(0, 200)
                         : `Inbound email from ${from}`;
-                    const task = await tasks.create(userId, {
+                    const body = bodyText?.trim() ? bodyText.trim().slice(0, 8000) : '';
+                    // EW-P4-3 — a public webhook has no request scope, so the
+                    // Task is placed explicitly: where its assignee, the
+                    // receiving Agent, lives. Not the address's scope: an
+                    // address may be bound to an Agent of another scope (a
+                    // personal Agent on an org address), and `addAssignee`
+                    // then could not reach the Agent from the Task (review on
+                    // #2612). The address's tenant / organization (`tenantId`
+                    // / `organizationId`) is still stamped on the email row.
+                    // An Agent that cannot be resolved keeps the old,
+                    // unscoped create.
+                    void tenantId;
+                    void organizationId;
+                    const agent = await agents.findByIdAndUser(agentId, userId).catch(() => null);
+                    const scope =
+                        agent && (agent.tenantId || agent.organizationId)
+                            ? {
+                                  tenantId: agent.tenantId ?? null,
+                                  organizationId: agent.organizationId ?? null,
+                              }
+                            : undefined;
+                    const data = {
                         title,
-                        description: bodyText?.trim() ? bodyText.trim().slice(0, 8000) : null,
+                        // EW-P4-3 — the attachments it came with, and the
+                        // message id the agent replies in thread with.
+                        description:
+                            `${body}${inboundEmailAttachmentList(attachments)}${inboundEmailReplyHint(emailMessageId)}`.trim(),
                         labels: ['inbound-email'],
-                        createdByType: 'agent',
+                        createdByType: 'agent' as const,
                         createdById: agentId,
-                    });
+                    };
+                    const task = scope
+                        ? await tasks.create(userId, data, scope)
+                        : await tasks.create(userId, data);
                     // Assign the receiving agent so the task-tracking flow
                     // fans out agent-task-execute for it.
                     await tasks.addAssignee(userId, task.id, 'agent', agentId);
                     return { taskId: task.id };
+                },
+                async appendInboundEmailToTask({
+                    taskId,
+                    agentId,
+                    userId,
+                    emailMessageId,
+                    subject,
+                    bodyText,
+                    from,
+                    attachments,
+                }) {
+                    const agent = await agents.findByIdAndUser(agentId, userId);
+                    if (!agent?.slug) return null;
+                    // Posted as the address owner (whose mailbox received it);
+                    // only the receiving agent's mention is live.
+                    await chat.post(
+                        userId,
+                        {
+                            taskId,
+                            authorType: 'user',
+                            authorId: userId,
+                            body: formatInboundEmailChatPost({
+                                agentSlug: agent.slug,
+                                emailMessageId,
+                                from,
+                                subject,
+                                bodyText,
+                                attachments,
+                            }),
+                        },
+                        { ownedAgentSlugs: new Map([[agent.slug, agent.id]]) },
+                    );
+                    return { taskId };
+                },
+            }),
+        },
+        // EW-P4-3 — INBOUND_EMAIL_ATTACHMENT_STORE binding: inbound email
+        // attachments go through the SAME upload pipeline as any file a user
+        // uploads (MIME allow-list checked against magic bytes, size cap,
+        // content-hash key; the sender's filename never reaches storage),
+        // owned by the receiving address's owner and recorded in its scope.
+        // A refused file throws; the dispatcher lists it as not stored.
+        {
+            provide: INBOUND_EMAIL_ATTACHMENT_STORE,
+            inject: [UploadsService],
+            useFactory: (uploads: UploadsService): InboundEmailAttachmentStore => ({
+                async store({ userId, tenantId, organizationId, filename, mimeType, content }) {
+                    const saved = await uploads.saveFile(
+                        userId,
+                        {
+                            buffer: content,
+                            mimetype: mimeType,
+                            size: content.length,
+                            originalname: filename,
+                        },
+                        { ownershipScope: { tenantId, organizationId } },
+                    );
+                    return { uploadId: saved.id, url: saved.url };
                 },
             }),
         },
@@ -892,6 +1012,15 @@ async function assertRealWriteTarget(
                     if (!work) {
                         throw new Error(
                             `${tool}: Work ${workId} not found — cannot resolve its git provider, owner or repo.`,
+                        );
+                    }
+                    // EW-P2-4 — a repo-less (Project) Work has nothing to commit
+                    // to or open a pull request against: refuse before any
+                    // derived repository name is resolved.
+                    if (!workKindHasRepository(work.kind)) {
+                        throw new Error(
+                            `${tool}: Work ${workId} is a "${work.kind}" Work with no repository — ` +
+                                `there is nothing to commit to or open a pull request against.`,
                         );
                     }
                     const providerId = (work.gitProvider ?? '').trim();
@@ -1619,6 +1748,7 @@ async function assertRealWriteTarget(
                     bodyHtml,
                     template,
                     fromAddressId,
+                    inReplyToMessageId,
                 }) {
                     // AW-05 — `origin: 'agent'`: this is the Agent writing, so
                     // its inbox's approve-before-send mode applies (a person
@@ -1634,6 +1764,8 @@ async function assertRealWriteTarget(
                             bodyHtml,
                             template,
                             fromAddressId,
+                            // EW-P4-3 — reply in thread (owner-scoped in EmailService).
+                            ...(inReplyToMessageId ? { inReplyToMessageId } : {}),
                         },
                         { origin: 'agent' },
                     );
@@ -1942,6 +2074,8 @@ async function assertRealWriteTarget(
         AGENT_DOMAIN_TOOL_SOURCES,
         AGENT_MCP_TOOL_SOURCE,
         INBOUND_EMAIL_TASK_SPAWNER,
+        // EW-P4-3 — read by the agent-side inbound dispatcher (@Global()).
+        INBOUND_EMAIL_ATTACHMENT_STORE,
         RUN_STEERING_PORT,
         TERMINAL_SESSION_DISPATCHER,
         TERMINAL_SESSION_STARTER,

@@ -8,7 +8,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { Task, type TaskActorType } from './task.entity';
+import { Task, type TaskAuthorType, type TaskExternalAuthor } from './task.entity';
 import { PortableDateColumn } from './_types';
 
 export interface TaskChatMention {
@@ -30,6 +30,8 @@ export interface TaskChatAttachmentRef {
 @Entity({ name: 'task_chat_messages' })
 @Index('idx_task_chat_task_created', ['taskId', 'createdAt'])
 @Index('idx_task_chat_author', ['authorType', 'authorId'])
+// Integration API v1 comment lists (migration 1795080300000).
+@Index('idx_task_chat_task_updated', ['taskId', 'updatedAt', 'id'])
 export class TaskChatMessage {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -41,8 +43,9 @@ export class TaskChatMessage {
     @JoinColumn({ name: 'taskId' })
     task?: Task;
 
-    @Column({ type: 'varchar', length: 8 })
-    authorType: TaskActorType;
+    // EW-P1-2: widened 8 → 16 (migration 1795060100000) for `'integration'`.
+    @Column({ type: 'varchar', length: 16 })
+    authorType: TaskAuthorType;
 
     @Column({ type: 'uuid' })
     authorId: string;
@@ -55,6 +58,13 @@ export class TaskChatMessage {
 
     @Column({ type: 'simple-json', nullable: true })
     attachments?: TaskChatAttachmentRef[] | null;
+
+    /**
+     * EW-P1-2 — display attribution when an integration posts WITHOUT acting
+     * as a user (`authorType = 'integration'`, `authorId` = the key id).
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    externalAuthor?: TaskExternalAuthor | null;
 
     @PortableDateColumn({ nullable: true })
     editedAt?: Date | null;

@@ -8,6 +8,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { RecordVisibility } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { Work } from './work.entity';
 
@@ -50,6 +51,11 @@ export enum WorkProposalSource {
     USER_MANUAL = 'user-manual',
     /** Idea spawned by a Mission tick (spec §1.3, §4.4). */
     MISSION = 'mission',
+    /**
+     * Idea created by an integration (integration contract v1 B.6, EW-P2-1, e.g. from Ever Gauzy).
+     * Always created `pending` and never built by the integration (spend safety D9).
+     */
+    EXTERNAL = 'external',
 }
 
 /**
@@ -95,6 +101,9 @@ export interface WorkProposalRecommendedPlugin {
 }
 
 @Entity({ name: 'work_proposals' })
+@Index('idx_work_proposals_org_visibility', ['organizationId', 'visibility'])
+// Integration API v1 keyset lists (EW-P2, migration 1795120000000-AddP2IntegrationKeysetIndexes).
+@Index('idx_work_proposals_org_updated', ['organizationId', 'updatedAt', 'id'])
 @Index('idx_work_proposals_user_status_mission_generated', [
     'userId',
     'status',
@@ -226,6 +235,42 @@ export class WorkProposal {
 
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
+
+    /**
+     * Record visibility (EW-P1-3, `docs/specs/features/record-visibility/spec.md`).
+     * Ownership (`userId`) is unchanged; this only ADDS readers of an org-scope row:
+     * `private` = the owner and the participants, `team` = also the members of the
+     * row's Teams and Work, `organization` = also every member of the Organization.
+     * Existing org rows were backfilled by migration 1795070000000 (owner decision D11).
+     */
+    @Column({ type: 'varchar', length: 16, default: 'private' })
+    visibility: RecordVisibility;
+
+    /**
+     * `true` once somebody chose `visibility` by hand: the automatic Team ↔
+     * Organization changes then stop. `private` is only ever set by hand.
+     */
+    @Column({ type: 'boolean', default: false })
+    visibilityExplicit: boolean;
+
+    /**
+     * Aggregate version for event ordering (integration plan EW-P2, `docs/specs/features/domain-events/spec.md`
+     * §4; migration 1795100000000-AddP2AggregateSyncColumns). Starts at 1 and is bumped by `bumpAggregateVersion` at every recorded
+     * change. A plain column on purpose, NOT `@VersionColumn` (see `Task.version`).
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
+
+    /**
+     * Who created the record when it was not the owning user (migration 1795100000000-AddP2AggregateSyncColumns):
+     * `integration` + the integration key id for an integration write (EW-P2). NULL =
+     * the owner created it.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    createdByType?: 'user' | 'agent' | 'integration' | null;
+
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    createdById?: string | null;
 
     @CreateDateColumn()
     generatedAt: Date;

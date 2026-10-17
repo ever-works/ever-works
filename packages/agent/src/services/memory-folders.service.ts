@@ -20,6 +20,11 @@ import { UserUploadRepository } from '../database/repositories/user-upload.repos
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import {
+    type AggregateTombstone,
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 
 /** One node of the /memory Files tree, with its per-folder file count. */
 export interface MemoryFolderTreeNode {
@@ -88,6 +93,9 @@ function folderDepthError(): UnprocessableEntityException {
  *    destroyed: Memory Files is additive, bytes-deletion is out of scope.
  *  - cross-user access to any folder id is a 404, never a 403.
  */
+/** The `kb.folder.*` types an organization library folder records (EW-P3-2). */
+type KbFolderEventType = 'kb.folder.created' | 'kb.folder.updated';
+
 @Injectable()
 export class MemoryFoldersService {
     private readonly logger = new Logger(MemoryFoldersService.name);
@@ -100,6 +108,10 @@ export class MemoryFoldersService {
         // without the activity module) still construct — same posture as
         // KnowledgeBaseService.
         @Optional() private readonly activityLog?: ActivityLogService,
+        // EW-P3-2 — `kb.folder.*` domain events for organization library
+        // folders (never a person's own folders), recorded right after each
+        // write (best-effort). Appended LAST + @Optional, like `activityLog`.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /** All folders of the user, parents-first, with per-folder file counts. */
@@ -355,38 +367,60 @@ export class MemoryFoldersService {
         organizationId: string,
         userId: string,
         input: { name: string; parentId?: string | null },
+        options: {
+            /**
+             * EW-P3-2 (the T17a pattern) — runs right after the folder row is
+             * written, in the tree's transaction (the integration API's
+             * `externalRef` link): a throw undoes the create.
+             */
+            readonly withinCreate?: (folder: MemoryFolder, manager: EntityManager) => Promise<void>;
+        } = {},
     ): Promise<MemoryFolder> {
         const name = this.validateName(input.name);
         let folder: MemoryFolder;
         try {
-            folder = await this.folders.withOrganizationTree(organizationId, async (tree) => {
-                const parent = input.parentId
-                    ? await this.requireOrganizationFolderIn(tree, organizationId, input.parentId)
-                    : null;
-                if (parent && folderDepth(parent.path) + 1 > KB_LIBRARY_FOLDER_MAX_DEPTH) {
-                    throw folderDepthError();
-                }
-                const count = await tree.countByOrganization(organizationId);
-                if (count >= KB_LIBRARY_FOLDERS_MAX_PER_ORG) {
-                    throw new UnprocessableEntityException({
-                        status: 'error',
-                        code: 'FolderLimitReached',
-                        message: `You have ${KB_LIBRARY_FOLDERS_MAX_PER_ORG} folders, the maximum. Delete one to add another.`,
+            folder = await this.folders.withOrganizationTree(
+                organizationId,
+                async (tree, manager) => {
+                    const parent = input.parentId
+                        ? await this.requireOrganizationFolderIn(
+                              tree,
+                              organizationId,
+                              input.parentId,
+                          )
+                        : null;
+                    if (parent && folderDepth(parent.path) + 1 > KB_LIBRARY_FOLDER_MAX_DEPTH) {
+                        throw folderDepthError();
+                    }
+                    const count = await tree.countByOrganization(organizationId);
+                    if (count >= KB_LIBRARY_FOLDERS_MAX_PER_ORG) {
+                        throw new UnprocessableEntityException({
+                            status: 'error',
+                            code: 'FolderLimitReached',
+                            message: `You have ${KB_LIBRARY_FOLDERS_MAX_PER_ORG} folders, the maximum. Delete one to add another.`,
+                        });
+                    }
+                    await this.assertSiblingNameFree(
+                        tree,
+                        organizationId,
+                        parent?.id ?? null,
+                        name,
+                    );
+                    const path = this.childPath(parent?.path ?? '', name);
+                    const created = await tree.create({
+                        userId,
+                        name,
+                        parentId: parent?.id ?? null,
+                        path,
+                        ownerAgentId: null,
+                        syncRepo: null,
+                        scope: MemoryFolderScope.ORGANIZATION,
+                        organizationId,
                     });
-                }
-                await this.assertSiblingNameFree(tree, organizationId, parent?.id ?? null, name);
-                const path = this.childPath(parent?.path ?? '', name);
-                return tree.create({
-                    userId,
-                    name,
-                    parentId: parent?.id ?? null,
-                    path,
-                    ownerAgentId: null,
-                    syncRepo: null,
-                    scope: MemoryFolderScope.ORGANIZATION,
-                    organizationId,
-                });
-            });
+                    if (options.withinCreate) await options.withinCreate(created, manager);
+                    return created;
+                },
+            );
         } catch (error) {
             throw await this.siblingNameConflictOr(error, organizationId, input.parentId, name);
         }
@@ -401,6 +435,7 @@ export class MemoryFoldersService {
                 organizationId,
             },
         );
+        await this.recordKbFolder('kb.folder.created', folder.id);
         return folder;
     }
 
@@ -450,6 +485,9 @@ export class MemoryFoldersService {
                     organizationId,
                 },
             );
+            await this.recordSubtreeMoved(organizationId, outcome.folder, outcome.newPath, {
+                name: outcome.folder.name,
+            });
         }
         return this.requireOrganizationFolder(organizationId, folderId);
     }
@@ -468,6 +506,7 @@ export class MemoryFoldersService {
         newParentId: string | null,
     ): Promise<MemoryFolder> {
         let folderName = '';
+        let moved: { folder: MemoryFolder; newPath: string } | null = null;
         try {
             await this.folders.withOrganizationTree(organizationId, async (tree) => {
                 const folder = await this.requireOrganizationFolderIn(
@@ -511,6 +550,7 @@ export class MemoryFoldersService {
                 );
                 await tree.updateOrganizationSubtreePaths(organizationId, folder.path, newPath);
                 await tree.update(folder.id, { parentId: newParent?.id ?? null });
+                moved = { folder, newPath };
             });
         } catch (error) {
             throw await this.siblingNameConflictOr(
@@ -520,6 +560,12 @@ export class MemoryFoldersService {
                 folderName,
                 folderId,
             );
+        }
+        if (moved) {
+            const { folder, newPath } = moved as { folder: MemoryFolder; newPath: string };
+            await this.recordSubtreeMoved(organizationId, folder, newPath, {
+                parentId: folder.parentId ?? null,
+            });
         }
         return this.requireOrganizationFolder(organizationId, folderId);
     }
@@ -542,6 +588,11 @@ export class MemoryFoldersService {
         folderId: string,
         unfile: (folderIds: string[], manager?: EntityManager) => Promise<number>,
     ): Promise<{ deletedFolders: number; unfiledDocuments: number }> {
+        // EW-P3-2 — `kb.folder.deleted` tombstones (version bump + last
+        // snapshot) for the subtree are taken BEFORE the delete, each in a
+        // transaction of its own (best-effort; a failed delete leaves only a
+        // version gap), and recorded once the folders are gone.
+        const tombstones = await this.kbFolderTombstones(organizationId, folderId);
         const { folder, subtree, unfiledDocuments } = await this.folders.withOrganizationTree(
             organizationId,
             async (tree, manager) => {
@@ -570,6 +621,16 @@ export class MemoryFoldersService {
                 organizationId,
             },
         );
+        const deletedIds = new Set(subtree.map((row) => row.id));
+        for (const tombstone of tombstones) {
+            if (!deletedIds.has(tombstone.id)) continue;
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) => publisher.deleted(manager, tombstone, 'kb.folder.deleted'),
+                (message) => this.logger.warn(message),
+                `kb.folder.deleted for ${tombstone.id}`,
+            );
+        }
         return { deletedFolders: subtree.length, unfiledDocuments };
     }
 
@@ -635,6 +696,84 @@ export class MemoryFoldersService {
             return siblingNameConflict(clash?.name ?? name);
         } catch {
             return siblingNameConflict(name);
+        }
+    }
+
+    // ─── Domain events (EW-P3-2) ─────────────────────────────────────────
+
+    /** One `kb.folder.*` event for an organization library folder (best-effort). */
+    private async recordKbFolder(
+        type: KbFolderEventType,
+        folderId: string,
+        changedFields: string[] = [],
+        previous: Record<string, unknown> = {},
+    ): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                type === 'kb.folder.created'
+                    ? publisher.created(manager, 'kb_folder', folderId, type)
+                    : publisher.changed(manager, 'kb_folder', folderId, type, {
+                          changedFields,
+                          previous,
+                      }),
+            (message) => this.logger.warn(message),
+            `${type} for ${folderId}`,
+        );
+    }
+
+    /**
+     * A rename or a move rewrote the paths of a whole subtree: the folder
+     * itself records `kb.folder.updated` with what changed (`name` or
+     * `parentId`, and `path`), every descendant with its new `path`.
+     */
+    private async recordSubtreeMoved(
+        organizationId: string,
+        before: MemoryFolder,
+        newPath: string,
+        previous: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.domainEvents) return;
+        const rows = await this.folders
+            .listOrganizationSubtree(organizationId, newPath)
+            .catch(() => [] as MemoryFolder[]);
+        const own = Object.keys(previous);
+        await this.recordKbFolder('kb.folder.updated', before.id, [...own, 'path'], {
+            ...previous,
+            path: before.path,
+        });
+        for (const row of rows) {
+            if (row.id === before.id) continue;
+            await this.recordKbFolder('kb.folder.updated', row.id, ['path'], {
+                path: `${before.path}${row.path.slice(newPath.length)}`,
+            });
+        }
+    }
+
+    /** The `kb.folder.deleted` tombstones of a folder and its subtree (best-effort). */
+    private async kbFolderTombstones(
+        organizationId: string,
+        folderId: string,
+    ): Promise<AggregateTombstone[]> {
+        if (!this.domainEvents) return [];
+        const publisher = this.domainEvents;
+        try {
+            const folder = await this.folders.findOrganizationFolder(organizationId, folderId);
+            if (!folder) return [];
+            const rows = await this.folders.listOrganizationSubtree(organizationId, folder.path);
+            const tombstones: AggregateTombstone[] = [];
+            for (const row of rows) {
+                const tombstone = await publisher.transaction((manager) =>
+                    publisher.beforeDelete(manager, 'kb_folder', row.id),
+                );
+                if (tombstone) tombstones.push(tombstone);
+            }
+            return tombstones;
+        } catch (error) {
+            this.logger.warn(
+                `Could not take the kb.folder.deleted tombstones under ${folderId}: ${(error as Error).message}`,
+            );
+            return [];
         }
     }
 

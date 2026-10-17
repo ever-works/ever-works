@@ -9,7 +9,7 @@ import {
 import { OrganizationInvitationRepository } from '../database/repositories/organization-invitation.repository';
 import { OrganizationInvitation } from '../entities/organization-invitation.entity';
 import {
-    ORGANIZATION_MEMBER_ROLES,
+    ORGANIZATION_INVITATION_ROLES,
     OrganizationInvitationRole,
     OrganizationInvitationStatus,
 } from '../entities/types';
@@ -236,7 +236,7 @@ export class OrganizationInvitationService {
     }
 
     private assertRole(role: OrganizationInvitationRole): void {
-        if (!ORGANIZATION_MEMBER_ROLES.includes(role)) {
+        if (!ORGANIZATION_INVITATION_ROLES.includes(role)) {
             throw new BadRequestException('invalid_role');
         }
     }

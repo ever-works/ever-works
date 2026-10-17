@@ -435,33 +435,39 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
         );
     });
 
-    test('triggerVerification checks ownership before the provider call (foreign 404 vs own 500)', async ({
+    test('triggerVerification checks ownership before sending (foreign 404; own 201, the confirmation is sent)', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
         const intruder = await registerUserViaAPI(request);
         const addr = await createAddress(request, owner.access_token);
 
-        // A foreign caller is stopped by the ownership lookup BEFORE the
-        // provider boundary — a clean 404, never the provider 500 the owner
-        // would hit (so a stranger learns nothing about the address wiring).
+        // A foreign caller is stopped by the ownership lookup BEFORE anything
+        // is sent: a clean 404 (so a stranger learns nothing about the address).
         const foreign = await request.post(`${API_BASE}/api/email/addresses/${addr.id}/verify`, {
             headers: authedHeaders(intruder.access_token),
         });
         expect(foreign.status(), `body=${await foreign.text().catch(() => '')}`).toBe(404);
         expect(((await foreign.json()) as ApiErrorBody).message).toBe(ADDR_NOT_FOUND);
 
-        // The owner clears ownership and reaches the keyless provider boundary,
-        // which 500s on this stack (no provider key / no MailHog). We assert the
-        // ENV-ADAPTIVE boundary status, not a delivered mail — the ownership
-        // gate is the security contract, the 500 is the keyless-provider tell.
+        // The owner clears ownership and the platform SENDS the confirmation
+        // email (EW-P4-3, #2614: verification is real now, through the platform
+        // mailer). Before that this path hit the keyless provider and 500'd.
         const own = await request.post(`${API_BASE}/api/email/addresses/${addr.id}/verify`, {
             headers: authedHeaders(owner.access_token),
         });
-        expect(own.status(), `own trigger body=${await own.text().catch(() => '')}`).toBe(500);
+        expect(own.status(), `own trigger body=${await own.text().catch(() => '')}`).toBe(201);
+        const sent = (await own.json()) as {
+            messageRef?: unknown;
+            sent?: unknown;
+            expiresAt?: unknown;
+        };
+        expect(sent.sent).toBe(true);
+        expect(typeof sent.messageRef).toBe('string');
+        expect(Number.isNaN(Date.parse(String(sent.expiresAt)))).toBe(false);
 
-        // The address remains owner-scoped and unverified afterwards (the
-        // failed trigger neither verified it nor leaked it to the intruder).
+        // The address stays owner-scoped and UNVERIFIED until the link in that
+        // email is clicked (sending verifies nothing), and never leaks to the intruder.
         const ownerRow = (await listAddresses(request, owner.access_token)).find(
             (x) => x.id === addr.id,
         );

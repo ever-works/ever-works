@@ -30,7 +30,7 @@ const temporaryRoot = (prefix: string): string =>
 const fleetBindingKey = (taskId: string, repositoryId = 'ever/repository'): string =>
 	`fleet-${createHash('sha256').update(repositoryId).update('\0').update(taskId).digest('hex').slice(0, 32)}`;
 
-describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { timeout: 20_000 }, () => {
+describe('FleetTaskWorkspaceProvisioner — real Git worktrees', { timeout: 20_000, concurrent: false }, () => {
 	let ownedRoot: string;
 	let seedDir: string;
 	let originDir: string;

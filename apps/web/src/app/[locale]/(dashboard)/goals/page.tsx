@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { RecordViewTabs } from '@/components/record-visibility';
+import { parseRecordTab, withRecordTab } from '@/lib/record-visibility';
 import { getTranslations } from 'next-intl/server';
 import { goalsAPI, type Goal, type GoalStatus } from '@/lib/api/goals';
 import { GoalsList } from '@/components/goals';
@@ -12,6 +15,8 @@ const GOAL_STATUSES: GoalStatus[] = ['draft', 'active', 'paused', 'completed'];
 const PAGE_SIZE = 24;
 
 type GoalsSearchParams = Promise<{
+    /** Record visibility (EW-P1-3) list tab. */
+    tab?: string | string[];
     status?: string | string[];
     offset?: string | string[];
     archived?: string | string[];
@@ -49,11 +54,13 @@ export default async function GoalsPage({ searchParams }: { searchParams: GoalsS
     // `?archived=true` is the archived VIEW; anything else (including an
     // absent param) is the live catalog, which the API already defaults to.
     const archived = firstParam(params.archived) === 'true';
+    const tab = parseRecordTab(params.tab);
 
     let goals: Goal[] = [];
     let loadError: string | null = null;
     try {
         goals = await goalsAPI.list({
+            view: tab,
             status,
             offset,
             limit: PAGE_SIZE + 1,
@@ -70,20 +77,33 @@ export default async function GoalsPage({ searchParams }: { searchParams: GoalsS
 
     return (
         <GoalsList
+            key={tab}
+            tab={tab}
             goals={pageGoals}
             loadError={loadError}
             filters={{ status, archived }}
             archiveHrefs={{
-                live: buildGoalsHref({ status }),
-                archived: buildGoalsHref({ status, archived: true }),
+                live: withRecordTab(buildGoalsHref({ status }), tab),
+                archived: withRecordTab(buildGoalsHref({ status, archived: true }), tab),
             }}
             pagination={{
                 offset,
                 hasPrevious: offset > 0,
                 hasNext,
-                previousHref: buildGoalsHref({ status, archived, offset: prevOffset }),
-                nextHref: buildGoalsHref({ status, archived, offset: nextOffset }),
+                previousHref: withRecordTab(
+                    buildGoalsHref({ status, archived, offset: prevOffset }),
+                    tab,
+                ),
+                nextHref: withRecordTab(
+                    buildGoalsHref({ status, archived, offset: nextOffset }),
+                    tab,
+                ),
             }}
+            tabs={
+                <Suspense fallback={null}>
+                    <RecordViewTabs />
+                </Suspense>
+            }
         />
     );
 }

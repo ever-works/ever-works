@@ -1,0 +1,38 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/visibility-changed.schema.json",
+	"title": "`data` of <aggregate>.visibility_changed (B.4)",
+	"description": "A change TO private carries only {id, visibility:'private'} so consumers can stop syncing without seeing the content. A change between team and organization carries the full DTO of the aggregate (validate it against that resource schema).",
+	"oneOf": [
+		{
+			"type": "object",
+			"required": ["id", "visibility"],
+			"properties": {
+				"id": {
+					"$ref": "../common.schema.json#/$defs/Uuid"
+				},
+				"visibility": {
+					"const": "private"
+				}
+			},
+			"additionalProperties": false
+		},
+		{
+			"type": "object",
+			"required": ["id", "visibility", "version"],
+			"properties": {
+				"id": {
+					"$ref": "../common.schema.json#/$defs/Uuid"
+				},
+				"visibility": {
+					"description": "team or organization only: a change to private always uses the id-only first branch.",
+					"type": "string",
+					"enum": ["team", "organization"]
+				},
+				"version": {
+					"$ref": "../common.schema.json#/$defs/Version"
+				}
+			}
+		}
+	]
+}

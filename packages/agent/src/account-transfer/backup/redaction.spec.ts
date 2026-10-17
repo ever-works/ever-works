@@ -317,6 +317,7 @@ describe('workspace backup redaction', () => {
                 prefix: 'ew_live_ab',
                 isActive: true,
                 hashedKey: secretLiteral,
+                previousHashedKey: secretLiteral,
             });
 
             expect(row).toEqual({ id: 'k1', name: 'CI', prefix: 'ew_live_ab', isActive: true });

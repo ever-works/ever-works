@@ -51,6 +51,8 @@ describe('TasksController — board-run active scope', () => {
             list: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
             create: jest.fn().mockResolvedValue({ id: taskId }),
             getOne: jest.fn().mockResolvedValue({ id: taskId, workId: null, ...everScope }),
+            // Record visibility (EW-P1-3): GET /tasks/:id reads through getReadable.
+            getReadable: jest.fn().mockResolvedValue({ id: taskId, workId: null, ...everScope }),
             update: jest.fn().mockResolvedValue({ id: taskId }),
             listSubtasks: jest.fn().mockResolvedValue({ rows: [], total: 0, doneCount: 0 }),
             remove: jest.fn().mockResolvedValue({ deleted: true }),
@@ -194,6 +196,7 @@ describe('TasksController — board-run active scope', () => {
             'list',
             'create',
             'getOne',
+            'getReadable',
             'update',
             'listSubtasks',
             'remove',

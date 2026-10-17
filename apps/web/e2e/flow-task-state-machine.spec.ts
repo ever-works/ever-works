@@ -20,7 +20,7 @@ import { createTaskViaAPI, transitionTaskViaAPI } from './helpers/agents-tasks';
  *   in_review → in_progress, blocked, done, cancelled
  *   blocked   → todo, in_progress, cancelled   (restores previousStatus)
  *   done      → in_progress (re-open)
- *   cancelled → (terminal — empty target set)
+ *   cancelled → backlog, todo   (re-open — EW-P1-6)
  *
  * Side-effect columns (probed against the live stack before asserting):
  *   - any → in_progress : stamps `startedAt` (only if null).
@@ -208,7 +208,7 @@ test.describe('Task state machine — exhaustive lattice + guard branches (API)'
         expect(after.completedAt, 'rejected force did not stamp completedAt').toBeNull();
     });
 
-    test('blocked stash/recover + cancelled terminal sink + unknown-enum guard precedence', async ({
+    test('blocked stash/recover + cancelled re-open only into backlog/todo + unknown-enum guard precedence', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -233,16 +233,16 @@ test.describe('Task state machine — exhaustive lattice + guard branches (API)'
         expect(recoveredRow.status).toBe('todo');
         expect(recoveredRow.previousStatus, 'leaving blocked clears previousStatus').toBeNull();
 
-        // ── Branch 2: cancelled is a terminal sink. ───────────────────
+        // ── Branch 2: cancelled re-opens only into backlog/todo (EW-P1-6). ──
         const t2 = await createTaskViaAPI(request, token, { title: `Cancelled branch ${stamp}` });
         await transitionTaskViaAPI(request, token, t2.id, 'todo');
         const afterCancel = await transitionTaskViaAPI(request, token, t2.id, 'cancelled');
         expect(afterCancel.status).toBe('cancelled');
         expect((await getTask(request, token, t2.id)).status).toBe('cancelled');
 
-        // Every legal-looking forward move out of cancelled is rejected 400 —
-        // the cancelled adjacency set is empty.
-        for (const dest of ['todo', 'in_progress', 'done', 'cancelled', 'backlog']) {
+        // Every move out of cancelled except the re-open (backlog, todo) is
+        // rejected 400.
+        for (const dest of ['in_progress', 'done', 'cancelled', 'in_review', 'blocked']) {
             const res = await rawTransition(request, token, t2.id, { to: dest });
             expect(
                 res.status(),
@@ -261,6 +261,9 @@ test.describe('Task state machine — exhaustive lattice + guard branches (API)'
         expect((await forcedOutOfCancel.json()).message).toMatch(/cannot transition/i);
         // Still cancelled after all the rejected attempts.
         expect((await getTask(request, token, t2.id)).status).toBe('cancelled');
+        // The re-open itself is a legal move.
+        const reopened = await transitionTaskViaAPI(request, token, t2.id, 'backlog');
+        expect(reopened.status, 'cancelled → backlog re-opens').toBe('backlog');
 
         // ── Branch 3: unknown status enum → 400, rejected by the DTO-level
         // `@IsEnum(TaskStatus)` guard. This validation fires in the global

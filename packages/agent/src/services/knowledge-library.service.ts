@@ -39,6 +39,11 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { MemoryFoldersService } from './memory-folders.service';
 import { WorkOwnershipService } from './work-ownership.service';
 import { renderKbMarkdownExport } from './kb-markdown-export';
+import { In } from 'typeorm';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 
 /**
  * Who is acting on the library, and within which Organization.
@@ -96,6 +101,9 @@ export class KnowledgeLibraryService {
         private readonly ownership: WorkOwnershipService,
         private readonly works: WorkRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // EW-P3-2 — `kb.document.moved` for filed / unfiled documents
+        // (best-effort, after the write). Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     // ─── Reads ───────────────────────────────────────────────────────────
@@ -302,6 +310,7 @@ export class KnowledgeLibraryService {
                 doc,
                 { fromFolderId: doc.folderId ?? null, toFolderId: input.folderId },
             );
+            await this.recordMoved(doc.id, doc.folderId ?? null);
         }
         return { filed: toMove.length, folderId: input.folderId };
     }
@@ -350,9 +359,15 @@ export class KnowledgeLibraryService {
     async createFolder(
         actor: KnowledgeLibraryActor,
         input: { name: string; parentId?: string | null },
+        options: Parameters<MemoryFoldersService['createOrganizationFolder']>[3] = {},
     ): Promise<MemoryFolder> {
         this.assertCanManageOrganization(actor);
-        return this.folders.createOrganizationFolder(actor.organizationId, actor.userId, input);
+        return this.folders.createOrganizationFolder(
+            actor.organizationId,
+            actor.userId,
+            input,
+            options,
+        );
     }
 
     async renameFolder(
@@ -389,17 +404,31 @@ export class KnowledgeLibraryService {
         folderId: string,
     ): Promise<{ deletedFolders: number; unfiledDocuments: number }> {
         this.assertCanManageOrganization(actor);
-        return this.folders.deleteOrganizationFolder(
+        // EW-P3-2 — the documents the delete unfiles, read inside its own
+        // transaction, record `kb.document.moved` once it has committed.
+        const unfiled: Array<{ id: string; folderId: string | null }> = [];
+        const result = await this.folders.deleteOrganizationFolder(
             actor.organizationId,
             actor.userId,
             folderId,
             // Unfiled inside the folder delete's own transaction, so a delete
             // that fails puts every document back where it was.
-            (ids, manager) =>
-                manager
+            async (ids, manager) => {
+                if (this.domainEvents && manager && ids.length > 0) {
+                    const rows = await manager
+                        .getRepository(WorkKnowledgeDocument)
+                        .find({ where: { folderId: In(ids) }, select: ['id', 'folderId'] });
+                    unfiled.push(
+                        ...rows.map((row) => ({ id: row.id, folderId: row.folderId ?? null })),
+                    );
+                }
+                return manager
                     ? this.documents.clearFolders(ids, manager)
-                    : this.documents.clearFolders(ids),
+                    : this.documents.clearFolders(ids);
+            },
         );
+        for (const doc of unfiled) await this.recordMoved(doc.id, doc.folderId);
+        return result;
     }
 
     // ─── Export ──────────────────────────────────────────────────────────
@@ -544,6 +573,20 @@ export class KnowledgeLibraryService {
         for (const workId of workIds) {
             await this.ownership.ensureCanEdit(workId, actor.userId);
         }
+    }
+
+    /** `kb.document.moved` for one filed / unfiled document (best-effort, after the write). */
+    private async recordMoved(documentId: string, fromFolderId: string | null): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                publisher.changed(manager, 'kb_document', documentId, 'kb.document.moved', {
+                    changedFields: ['folderId'],
+                    previous: { folderId: fromFolderId },
+                }),
+            (message) => this.logger.warn(message),
+            `kb.document.moved for ${documentId}`,
+        );
     }
 
     private assertCanManageOrganization(actor: KnowledgeLibraryActor): void {

@@ -14,6 +14,7 @@ import {
 	modelCliMcpIsolationEnv,
 	parseModelCliResult,
 	quoteShellPath,
+	readCodexUserSettings,
 	MODEL_CLI_REDACTED
 } from './model-cli';
 
@@ -238,7 +239,7 @@ describe('buildModelCliCommand — codex', () => {
 			platform: POSIX
 		});
 		expect(command).toBe(
-			'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" -m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+			'"/usr/local/bin/codex" exec --ignore-user-config --json --sandbox workspace-write -C "/work/ws" -m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
 		);
 	});
 
@@ -339,7 +340,7 @@ describe('buildModelCliCommand — writable mount grants', () => {
 			platform: POSIX
 		});
 		expect(command).toBe(
-			'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" ' +
+			'"/usr/local/bin/codex" exec --ignore-user-config --json --sandbox workspace-write -C "/work/ws" ' +
 				'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" ' +
 				'--add-dir "/fleet/repositories/ws-pool/worktrees/fleet-ws" ' +
 				'-m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
@@ -415,7 +416,7 @@ describe('buildModelCliCommand — writable mount grants', () => {
 					platform: POSIX
 				})
 			).toBe(
-				'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" -m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+				'"/usr/local/bin/codex" exec --ignore-user-config --json --sandbox workspace-write -C "/work/ws" -m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
 			);
 		}
 	);
@@ -785,11 +786,188 @@ describe('assertMcpIsolationInCommand', () => {
 		);
 	});
 
-	it('does not gate codex, which has no switch to check for', () => {
+	it('gates codex on exec --ignore-user-config (control 16): what the builder produces passes', () => {
 		const command = built({ execution: execution({ provider: 'codex' }), executable: '/usr/local/bin/codex' });
+		expect(command).toContain(' exec --ignore-user-config --json ');
 		expect(() =>
 			assertMcpIsolationInCommand({ command, execution: execution({ provider: 'codex' }) })
 		).not.toThrow();
+	});
+
+	it('refuses a codex command that would load the owner config.toml', () => {
+		for (const command of [
+			'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" - < "a" > "b"',
+			'"/usr/local/bin/codex" exec --json --ignore-user-configs --sandbox workspace-write - < "a" > "b"'
+		]) {
+			expect(() =>
+				assertMcpIsolationInCommand({ command, execution: execution({ provider: 'codex' }) })
+			).toThrowError(/does not carry exec --ignore-user-config/);
+		}
+	});
+});
+
+describe('readCodexUserSettings / codexUserSettings (control 16)', () => {
+	const OWNER_CONFIG = [
+		'notify = ["notify-send", "codex"]',
+		'model = "gpt-6-astra"',
+		"model_reasoning_effort = 'high' # owner default",
+		'',
+		'[desktop]',
+		'model = "not-this-one"',
+		'',
+		'[plugins."unified-computer-use@openai-bundled"]',
+		'enabled = true',
+		'',
+		'[mcp_servers.node_repl]',
+		'command = "node_repl.exe"',
+		'',
+		'[windows]',
+		'sandbox = "elevated"'
+	].join('\n');
+
+	it('reads only the three kept keys, each from its own table', () => {
+		expect(readCodexUserSettings(OWNER_CONFIG)).toEqual({
+			model: 'gpt-6-astra',
+			reasoningEffort: 'high',
+			windowsSandbox: 'elevated'
+		});
+		expect(readCodexUserSettings(OWNER_CONFIG.replace(/\n/g, '\r\n'))).toEqual({
+			model: 'gpt-6-astra',
+			reasoningEffort: 'high',
+			windowsSandbox: 'elevated'
+		});
+	});
+
+	it('skips the CONTENT of multiline strings: an example model / [windows] line in instructions is text (review)', () => {
+		const config = [
+			'developer_instructions = """',
+			'When asked, say: model = "gpt-example"',
+			'[windows]',
+			'sandbox = "unelevated"',
+			'"""',
+			'model = "gpt-6-astra"',
+			"notes = '''",
+			"model_reasoning_effort = 'low'",
+			"'''",
+			'model_reasoning_effort = "high"',
+			'[windows]',
+			'sandbox = "elevated"'
+		].join('\n');
+		expect(readCodexUserSettings(config)).toEqual({
+			model: 'gpt-6-astra',
+			reasoningEffort: 'high',
+			windowsSandbox: 'elevated'
+		});
+	});
+
+	it('a triple quote in a COMMENT opens no multiline string, so later settings still count (review)', () => {
+		const config = [
+			'# Instructions use """ blocks',
+			'model = "gpt-6-astra"',
+			'[windows]',
+			'sandbox = "elevated"'
+		].join('\n');
+		expect(readCodexUserSettings(config)).toEqual({ model: 'gpt-6-astra', windowsSandbox: 'elevated' });
+	});
+
+	it('a triple quote MID-value opens no multiline string either', () => {
+		const config = ['title = \'a """ b\'', 'model = "gpt-6-astra"'].join('\n');
+		expect(readCodexUserSettings(config)).toEqual({ model: 'gpt-6-astra' });
+	});
+
+	it('a multiline value under a quoted key with spaces is still skipped', () => {
+		const config = ['"my notes" = """', 'model = "gpt-4"', '"""', 'model = "gpt-6-astra"'].join('\n');
+		expect(readCodexUserSettings(config)).toEqual({ model: 'gpt-6-astra' });
+	});
+
+	it('an ESCAPED \""" inside a basic multiline string does not close it (review)', () => {
+		const body = [
+			'notes = """',
+			String.raw`an escaped \""" stays inside`,
+			'model = "inside"',
+			'"""',
+			'model = "gpt-6-astra"'
+		];
+		expect(readCodexUserSettings(body.join('\n'))).toEqual({ model: 'gpt-6-astra' });
+		const opening = [String.raw`notes = """starts \""" here`, 'model = "inside"', '"""', 'model = "gpt-6-astra"'];
+		expect(readCodexUserSettings(opening.join('\n'))).toEqual({ model: 'gpt-6-astra' });
+	});
+
+	it('an escaped BACKSLASH before """ still closes, and a literal string has no escapes', () => {
+		const basic = ['notes = """', String.raw`ends with a backslash \\"""`, 'model = "gpt-6-astra"'];
+		expect(readCodexUserSettings(basic.join('\n'))).toEqual({ model: 'gpt-6-astra' });
+		const literal = ["notes = '''", String.raw`a literal \''' closes`, 'model = "gpt-6-astra"'];
+		expect(readCodexUserSettings(literal.join('\n'))).toEqual({ model: 'gpt-6-astra' });
+	});
+
+	it('a line of many ESCAPED delimiters keeps the string open', () => {
+		const escapedRun = ('\\'.repeat(3) + '"""').repeat(10_000);
+		expect(readCodexUserSettings(['notes = """', escapedRun, 'model = "x"'].join('\n'))).toEqual({});
+	});
+
+	it('parses table headers by position, so a pathological header line stays cheap and unrecognised (CodeQL)', () => {
+		const hostile = '[' + '\t'.repeat(50_000) + 'Z';
+		expect(readCodexUserSettings(`${hostile}\nmodel = "x"`)).toEqual({});
+		expect(readCodexUserSettings('[windows] # the sandbox\nsandbox = "elevated"')).toEqual({
+			windowsSandbox: 'elevated'
+		});
+	});
+
+	it('forwards nothing it cannot prove is a bare identifier (the values reach a SHELL command line)', () => {
+		expect(
+			readCodexUserSettings(
+				['model = "gpt & calc"', 'model_reasoning_effort = "$(whoami)"', '[windows]', 'sandbox = "a b"'].join(
+					'\n'
+				)
+			)
+		).toEqual({});
+		expect(readCodexUserSettings('model = gpt-6')).toEqual({});
+		expect(readCodexUserSettings('[[profiles]]\nmodel = "x"')).toEqual({});
+		expect(readCodexUserSettings(null)).toEqual({});
+		expect(readCodexUserSettings('')).toEqual({});
+	});
+
+	it('emits --ignore-user-config ALWAYS, and puts back only the kept settings', () => {
+		const base = {
+			execution: execution({ provider: 'codex' as const, model: undefined }),
+			executable: '/usr/local/bin/codex',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			platform: POSIX
+		};
+		expect(buildModelCliCommand(base)).toBe(
+			'"/usr/local/bin/codex" exec --ignore-user-config --json --sandbox workspace-write -C "/work/ws" - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+		expect(buildModelCliCommand({ ...base, codexUserSettings: readCodexUserSettings(OWNER_CONFIG) })).toBe(
+			'"/usr/local/bin/codex" exec --ignore-user-config --json --sandbox workspace-write -C "/work/ws" ' +
+				'-c windows.sandbox=elevated -c model_reasoning_effort=high -m gpt-6-astra - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+	});
+
+	it("the job's own model wins over the owner's default", () => {
+		const command = buildModelCliCommand({
+			execution: execution({ provider: 'codex', model: 'gpt-5.3-codex' }),
+			executable: '/usr/local/bin/codex',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			platform: POSIX,
+			codexUserSettings: { model: 'gpt-6-astra' }
+		});
+		expect(command).toContain('-m gpt-5.3-codex');
+		expect(command).not.toContain('gpt-6-astra');
+	});
+
+	it('refuses a hand-built setting that is not a bare identifier, even if it skipped the reader', () => {
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution({ provider: 'codex' }),
+				executable: '/usr/local/bin/codex',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				platform: POSIX,
+				codexUserSettings: { windowsSandbox: 'elevated & calc' }
+			})
+		).toThrowError(ModelCliCommandError);
 	});
 });
 

@@ -28,7 +28,9 @@ export const SWITCHES = [
 	'EVER_WORKS_APP_WORKS_ENABLED',
 	'APP_WORKS_CLOUD_PUSH_ENABLED',
 	'EVER_WORKS_APP_LAUNCHER_ENABLED',
-	'EVER_WORKS_APPS_MANAGED_ENABLED'
+	'EVER_WORKS_APPS_MANAGED_ENABLED',
+	// EW-P2-4 — the repo-less Project Work kind ships dormant too.
+	'EVER_WORKS_PROJECT_WORKS_ENABLED'
 ];
 
 const unquote = (value) =>

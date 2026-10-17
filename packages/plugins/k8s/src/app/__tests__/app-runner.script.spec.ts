@@ -35,7 +35,7 @@ import type { AddressInfo } from 'node:net';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
 	APP_RUNNER_CONFIGMAP_REQUESTS_KEY,
@@ -53,6 +53,10 @@ import {
 	type AppRunnerRecord,
 	type AppRunnerRequestData
 } from '../app-runner.script';
+
+// Each case runs the real runner script against a local server; on a CPU-throttled CI
+// runner that can outlast the package's 10 s default (self-build handover item 14).
+vi.setConfig({ testTimeout: 30_000 });
 
 // --- harness ----------------------------------------------------------------
 
@@ -177,7 +181,11 @@ async function runRunner(payload: AppRunnerPayload | null, env: Record<string, s
 
 	vm.runInContext(APP_RUNNER_SCRIPT, context, { filename: 'ever-works-runner.js' });
 
-	const deadline = Date.now() + 8_000;
+	// A HANG guard, not a timing assertion: the loop returns as soon as the script
+	// exits. 8 s against the package's 10 s `testTimeout` failed healthy runs on
+	// CPU-throttled CI runners (self-build handover item 14), so this file allows 30 s
+	// (see `vi.setConfig` below the imports) and the guard 25 s.
+	const deadline = Date.now() + 25_000;
 	while (exitCode === null && Date.now() < deadline) {
 		await new Promise((resolve) => setTimeout(resolve, 5));
 	}

@@ -4,9 +4,20 @@ import {
     BadRequestException,
     NotFoundException,
     ForbiddenException,
+    Optional,
 } from '@nestjs/common';
-import { WebhookSubscriptionRepository } from '@ever-works/agent/database';
-import type { WebhookSubscription } from '@ever-works/agent/entities';
+import {
+    OrganizationRepository,
+    UserRepository,
+    WebhookSubscriptionRepository,
+} from '@ever-works/agent/database';
+import type {
+    WebhookSubscription,
+    WebhookSubscriptionOwnerType,
+    WebhookSubscriptionStatus,
+} from '@ever-works/agent/entities';
+import { DOMAIN_EVENT_TYPES, isDomainEventType } from '@ever-works/contracts';
+import { DomainEventFeedService } from '@ever-works/agent/domain-events';
 // Security: reuse the canonical lexical SSRF guard shared with the delivery
 // path (packages/agent/src/utils/ssrf-guard.ts) instead of a weaker inline
 // hostname check. It strips IPv6 brackets, and covers IPv4-mapped IPv6,
@@ -23,14 +34,75 @@ export interface WebhookSubscriptionView {
     accountId: string;
     workId: string | null;
     url: string;
-    status: 'active' | 'paused' | 'failed';
+    status: WebhookSubscriptionStatus;
     consecutiveFailures: number;
     lastDeliveryAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+    /** 1 = legacy work/deploy events; 2 = domain events (webhooks v2). */
+    version: 1 | 2;
+    /** v2 fields (null on v1 rows). */
+    ownerType: WebhookSubscriptionOwnerType;
+    /**
+     * The owning user or integration key (`api_keys.id`); null on v1 rows. Lets
+     * Settings → Integrations → Ever Gauzy list each key's subscriptions (EW-P1-7).
+     */
+    ownerId: string | null;
+    events: string[] | null;
+    organizationIds: string[] | null;
+    excludeOriginTags: string[] | null;
+    description: string | null;
+}
+
+/** Webhooks v2 (EW-P1-5) create input: `events` + `organizationIds` make a v2 subscription. */
+export interface CreateWebhookV2Input {
+    readonly url: string;
+    readonly events: readonly string[];
+    readonly organizationIds: readonly string[];
+    readonly excludeOriginTags?: readonly string[];
+    readonly description?: string | null;
+}
+
+/** PATCH input: `status` for every subscription; the rest for v2 only. */
+export interface UpdateWebhookInput {
+    readonly status?: 'active' | 'paused';
+    readonly url?: string;
+    readonly events?: readonly string[];
+    readonly organizationIds?: readonly string[];
+    readonly excludeOriginTags?: readonly string[];
+    readonly description?: string | null;
 }
 
 const MAX_PER_ACCOUNT = 25;
+
+/** v2 rotation: how long the previous secret keeps signing (as a second `v1=`). */
+const DEFAULT_ROTATION_GRACE_HOURS = 24;
+
+/**
+ * Webhooks v2 event filters: a catalog type, `<prefix>.*` for a prefix some
+ * catalog type has, or `*`. Opt-in types (task.runtime_updated) are delivered
+ * only when named exactly; patterns never widen to them.
+ */
+export function assertValidEventPatterns(patterns: readonly string[]): string[] {
+    const cleaned = [...new Set(patterns.map((p) => p.trim()).filter((p) => p.length > 0))];
+    if (cleaned.length === 0) {
+        throw new BadRequestException('events must name at least one event type or pattern');
+    }
+    if (cleaned.length > 200) {
+        throw new BadRequestException('events takes at most 200 types or patterns');
+    }
+    for (const pattern of cleaned) {
+        if (pattern === '*' || isDomainEventType(pattern)) continue;
+        if (pattern.endsWith('.*')) {
+            const prefix = pattern.slice(0, -1);
+            if (DOMAIN_EVENT_TYPES.some((type) => type.startsWith(prefix))) continue;
+        }
+        throw new BadRequestException(
+            `events: "${pattern}" is not a catalog event type, "<prefix>.*" or "*"`,
+        );
+    }
+    return cleaned;
+}
 
 @Injectable()
 export class WebhooksService {
@@ -40,11 +112,172 @@ export class WebhooksService {
         private readonly repo: WebhookSubscriptionRepository,
         private readonly secrets: WebhookSecretService,
         private readonly workOwnership: WorkOwnershipService,
+        // Webhooks v2 (EW-P1-5): organization access checks. Optional and last so
+        // hand-built test graphs keep constructing; v2 creation refuses without them.
+        @Optional() private readonly users?: UserRepository,
+        @Optional() private readonly organizations?: OrganizationRepository,
+        // The change-feed head a new v2 subscription starts after (exact
+        // "only new events"). Optional + last.
+        @Optional() private readonly feed?: DomainEventFeedService,
     ) {}
 
+    /**
+     * Every subscription of the account, whatever its status: a paused or
+     * failed subscription stays visible so it can be resumed (Settings > Webhooks).
+     */
     async listForAccount(accountId: string): Promise<WebhookSubscriptionView[]> {
-        const rows = await this.repo.listActiveForAccount(accountId);
+        const rows = await this.repo.listForAccount(accountId);
         return rows.map((row) => this.toView(row));
+    }
+
+    /**
+     * Integration API v1 (EW-P1-5): the v2 subscriptions one owner holds in the
+     * account, e.g. those an integration key created. Another owner's
+     * subscriptions in the same account are not listed.
+     */
+    async listForOwner(
+        accountId: string,
+        owner: { type: WebhookSubscriptionOwnerType; id: string },
+    ): Promise<WebhookSubscriptionView[]> {
+        const rows = await this.repo.listForOwner(owner.type, owner.id);
+        return rows.filter((row) => row.accountId === accountId).map((row) => this.toView(row));
+    }
+
+    /**
+     * The subscription, when it is in the account AND held by `owner`; else 404
+     * (an integration key never sees or changes the account's other webhooks).
+     */
+    async findOwnedBy(
+        accountId: string,
+        id: string,
+        owner: { type: WebhookSubscriptionOwnerType; id: string },
+    ): Promise<WebhookSubscriptionView> {
+        const row = await this.findOwn(accountId, id);
+        if ((row.ownerType ?? 'user') !== owner.type || row.ownerId !== owner.id) {
+            throw new NotFoundException('Webhook subscription not found');
+        }
+        return this.toView(row);
+    }
+
+    /**
+     * Webhooks v2 (EW-P1-5): a subscription to the domain events of the given
+     * organizations. The account must belong to each organization (the rule of
+     * OrganizationMembershipService.ensureAdmin: the organization's tenant is
+     * the user's). `owner` defaults to the account itself.
+     */
+    async createV2(
+        accountId: string,
+        input: CreateWebhookV2Input,
+        owner: { type: WebhookSubscriptionOwnerType; id: string } = { type: 'user', id: accountId },
+    ): Promise<{ subscription: WebhookSubscriptionView; signingSecret: string }> {
+        this.assertValidUrl(input.url);
+        const events = assertValidEventPatterns(input.events);
+        const organizationIds = await this.assertOrganizationsAccessible(
+            accountId,
+            input.organizationIds,
+        );
+        const excludeOriginTags = this.cleanOriginTags(input.excludeOriginTags);
+
+        const existing = await this.repo.listActiveForAccount(accountId);
+        if (existing.length >= MAX_PER_ACCOUNT) {
+            throw new BadRequestException(
+                `Account is already at the per-account limit of ${MAX_PER_ACCOUNT} active subscriptions`,
+            );
+        }
+
+        const { raw, encrypted } = this.secrets.generateSecret();
+        const firstOrg = await this.organizations?.findById(organizationIds[0]);
+        const row = await this.repo.createV2({
+            accountId,
+            ownerType: owner.type,
+            ownerId: owner.id,
+            url: input.url,
+            secretEncrypted: encrypted,
+            events,
+            organizationIds,
+            excludeOriginTags,
+            description: input.description?.trim() || null,
+            tenantId: firstOrg?.tenantId ?? null,
+            organizationId: organizationIds.length === 1 ? organizationIds[0] : null,
+            startAfterSeq: this.feed ? await this.feed.head() : null,
+        });
+        return { subscription: this.toView(row), signingSecret: raw };
+    }
+
+    /**
+     * PATCH: `status: 'paused'` pauses and `status: 'active'` resumes (and
+     * resets the failure streak of) any subscription; `url`, `events`,
+     * `organizationIds`, `excludeOriginTags` and `description` change a v2 one.
+     * A `disabled` subscription (its owner lost access) cannot be resumed.
+     */
+    async update(
+        accountId: string,
+        id: string,
+        input: UpdateWebhookInput,
+    ): Promise<WebhookSubscriptionView> {
+        const row = await this.findOwn(accountId, id);
+        const isV2 = Number(row.version) === 2;
+        const touchesV2 =
+            input.url !== undefined ||
+            input.events !== undefined ||
+            input.organizationIds !== undefined ||
+            input.excludeOriginTags !== undefined ||
+            input.description !== undefined;
+        if (touchesV2 && !isV2) {
+            throw new BadRequestException(
+                'Only status can change on a v1 subscription; create a v2 subscription (events + organizationIds) instead',
+            );
+        }
+        if (input.status !== undefined && row.status === 'disabled') {
+            // Neither pause nor resume: pausing would turn `disabled` into
+            // something a second PATCH could resume.
+            throw new BadRequestException(
+                'This subscription was disabled because its owner lost access; create a new one',
+            );
+        }
+        if (input.status === 'active' && row.status !== 'active') {
+            // Resuming counts against the same limit as creating.
+            const active = await this.repo.listActiveForAccount(accountId);
+            if (active.filter((sub) => sub.id !== row.id).length >= MAX_PER_ACCOUNT) {
+                throw new BadRequestException(
+                    `Account is already at the per-account limit of ${MAX_PER_ACCOUNT} active subscriptions`,
+                );
+            }
+        }
+        if (touchesV2) {
+            const patch: Parameters<WebhookSubscriptionRepository['updateV2']>[1] = {};
+            if (input.url !== undefined) {
+                this.assertValidUrl(input.url);
+                patch.url = input.url;
+            }
+            if (input.events !== undefined) patch.events = assertValidEventPatterns(input.events);
+            if (input.organizationIds !== undefined) {
+                patch.organizationIds = await this.assertOrganizationsAccessible(
+                    accountId,
+                    input.organizationIds,
+                );
+                // Keep the ownership stamp (what backups and scope filters read)
+                // in step with the subscribed organizations.
+                const firstOrg = await this.organizations?.findById(patch.organizationIds[0]);
+                patch.organizationId =
+                    patch.organizationIds.length === 1 ? patch.organizationIds[0] : null;
+                patch.tenantId = firstOrg?.tenantId ?? row.tenantId ?? null;
+            }
+            if (input.excludeOriginTags !== undefined) {
+                patch.excludeOriginTags = this.cleanOriginTags(input.excludeOriginTags);
+            }
+            if (input.description !== undefined) {
+                patch.description = input.description?.trim() || null;
+            }
+            await this.repo.updateV2(row.id, patch);
+        }
+        if (input.status === 'paused') {
+            await this.repo.pause(row.id);
+        } else if (input.status === 'active') {
+            await this.repo.resume(row.id);
+        }
+        const updated = await this.repo.findById(row.id);
+        return this.toView(updated ?? row);
     }
 
     /**
@@ -120,7 +353,16 @@ export class WebhooksService {
     ): Promise<{ subscription: WebhookSubscriptionView; signingSecret: string }> {
         const row = await this.findOwn(accountId, id);
         const { raw, encrypted } = this.secrets.generateSecret();
-        await this.repo.updateSecret(row.id, encrypted);
+        if (Number(row.version) === 2) {
+            // v2: the previous secret keeps signing as a second `v1=` for the
+            // grace window, so receivers can roll their verifier without a gap.
+            await this.repo.updateSecret(row.id, encrypted, {
+                secretEncrypted: row.secretEncrypted,
+                expiresAt: new Date(Date.now() + rotationGraceMs()),
+            });
+        } else {
+            await this.repo.updateSecret(row.id, encrypted);
+        }
         const updated = await this.repo.findById(row.id);
         return {
             subscription: this.toView(updated ?? row),
@@ -167,7 +409,47 @@ export class WebhooksService {
             lastDeliveryAt: row.lastDeliveryAt,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
+            version: Number(row.version) === 2 ? 2 : 1,
+            ownerType: row.ownerType ?? 'user',
+            ownerId: row.ownerId ?? null,
+            events: row.events ?? null,
+            organizationIds: row.organizationIds ?? null,
+            excludeOriginTags: row.excludeOriginTags ?? null,
+            description: row.description ?? null,
         };
+    }
+
+    /** Each organization must exist and share the account's tenant (404 otherwise, never 403). */
+    private async assertOrganizationsAccessible(
+        accountId: string,
+        organizationIds: readonly string[],
+    ): Promise<string[]> {
+        const ids = [...new Set(organizationIds)];
+        if (ids.length === 0) {
+            throw new BadRequestException('organizationIds must name at least one organization');
+        }
+        if (!this.users || !this.organizations) {
+            throw new BadRequestException('Webhooks v2 are not available in this deployment');
+        }
+        const user = await this.users.findById(accountId);
+        for (const orgId of ids) {
+            const org = await this.organizations.findById(orgId);
+            if (!user?.tenantId || !org || org.tenantId !== user.tenantId) {
+                throw new NotFoundException(`Organization ${orgId} not found`);
+            }
+        }
+        return ids;
+    }
+
+    private cleanOriginTags(tags: readonly string[] | undefined): string[] {
+        const cleaned = [...new Set((tags ?? []).map((t) => t.trim()).filter((t) => t.length > 0))];
+        if (cleaned.length > 20) {
+            throw new BadRequestException('excludeOriginTags takes at most 20 tags');
+        }
+        if (cleaned.some((t) => t.length > 100)) {
+            throw new BadRequestException('an origin tag is at most 100 characters');
+        }
+        return cleaned;
     }
 
     private assertValidUrl(url: string): void {
@@ -218,4 +500,12 @@ export class WebhooksService {
             }
         }
     }
+}
+
+/** `WEBHOOK_SECRET_ROTATION_GRACE_HOURS` (default 24; 0 = no grace). */
+function rotationGraceMs(): number {
+    const env = process.env.WEBHOOK_SECRET_ROTATION_GRACE_HOURS;
+    const raw = env ? Number(env) : Number.NaN;
+    const hours = Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_ROTATION_GRACE_HOURS;
+    return hours * 60 * 60 * 1000;
 }

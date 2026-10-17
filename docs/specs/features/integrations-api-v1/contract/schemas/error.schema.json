@@ -1,0 +1,136 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/error.schema.json",
+	"title": "Error envelope (contract v1, B.1)",
+	"description": "Every non-2xx response under /api/integrations/v1 has this body. `code` is the stable, machine-readable key; `message` is for humans and may change. Status ↔ code pairs are listed in x-status-codes.",
+	"type": "object",
+	"required": ["error"],
+	"properties": {
+		"error": {
+			"type": "object",
+			"required": ["code", "message"],
+			"properties": {
+				"code": { "$ref": "#/$defs/ErrorCode" },
+				"message": { "type": "string", "maxLength": 2000 },
+				"details": {
+					"description": "Code-specific details. For `transition_blocked` see TransitionBlockedDetails; for `validation_failed` see ValidationDetails; for `version_mismatch` see VersionMismatchDetails. Unknown keys must be ignored.",
+					"type": "object"
+				}
+			},
+			"additionalProperties": false,
+			"allOf": [
+				{
+					"if": { "properties": { "code": { "const": "transition_blocked" } } },
+					"then": {
+						"required": ["details"],
+						"properties": { "details": { "$ref": "#/$defs/TransitionBlockedDetails" } }
+					}
+				},
+				{
+					"if": { "properties": { "code": { "const": "version_mismatch" } } },
+					"then": { "properties": { "details": { "$ref": "#/$defs/VersionMismatchDetails" } } }
+				},
+				{
+					"if": { "properties": { "code": { "const": "validation_failed" } } },
+					"then": { "properties": { "details": { "$ref": "#/$defs/ValidationDetails" } } }
+				}
+			]
+		}
+	},
+	"additionalProperties": false,
+	"x-status-codes": {
+		"400": ["validation_failed"],
+		"401": ["invalid_key"],
+		"403": ["scope_missing", "org_not_pinned", "act_as_forbidden"],
+		"404": ["not_found"],
+		"409": ["transition_blocked", "duplicate_external_ref", "conflict"],
+		"410": ["cursor_expired"],
+		"412": ["version_mismatch"],
+		"422": ["domain_rule"],
+		"429": ["rate_limited"]
+	},
+	"$defs": {
+		"ErrorCode": {
+			"type": "string",
+			"enum": [
+				"validation_failed",
+				"invalid_key",
+				"scope_missing",
+				"org_not_pinned",
+				"act_as_forbidden",
+				"not_found",
+				"transition_blocked",
+				"duplicate_external_ref",
+				"conflict",
+				"cursor_expired",
+				"version_mismatch",
+				"domain_rule",
+				"rate_limited",
+				"internal_error"
+			],
+			"x-notes": "`internal_error` (5xx) is the catch-all for unexpected server faults; consumers retry it with back-off like any 5xx. 429 responses also carry a Retry-After header (seconds)."
+		},
+		"TransitionBlockedDetails": {
+			"type": "object",
+			"required": ["blockers", "pendingApprovers", "path"],
+			"properties": {
+				"from": { "type": "string" },
+				"to": { "type": "string" },
+				"blockers": {
+					"description": "Open blocking tasks (task_blocks rows whose blocker is not done/cancelled).",
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["taskId"],
+						"properties": {
+							"taskId": { "type": "string", "format": "uuid" },
+							"slug": { "type": ["string", "null"] },
+							"title": { "type": ["string", "null"] },
+							"status": { "type": ["string", "null"] }
+						}
+					}
+				},
+				"pendingApprovers": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["type", "id"],
+						"properties": {
+							"type": { "type": "string", "enum": ["user", "agent"] },
+							"id": { "type": "string", "format": "uuid" },
+							"state": { "type": "string", "enum": ["pending", "rejected"] }
+						}
+					}
+				},
+				"path": {
+					"description": "The legal path EW attempted (statuses after `from`), up to and including the hop that failed.",
+					"type": "array",
+					"items": { "type": "string" }
+				}
+			}
+		},
+		"VersionMismatchDetails": {
+			"type": "object",
+			"properties": {
+				"expected": { "description": "The version sent in If-Match.", "type": "integer" },
+				"current": { "description": "The aggregate's current version.", "type": "integer" }
+			}
+		},
+		"ValidationDetails": {
+			"type": "object",
+			"properties": {
+				"fields": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["path", "message"],
+						"properties": {
+							"path": { "type": "string" },
+							"message": { "type": "string" }
+						}
+					}
+				}
+			}
+		}
+	}
+}

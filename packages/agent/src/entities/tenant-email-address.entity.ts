@@ -77,6 +77,15 @@ export class TenantEmailAddress {
     @PortableDateColumn({ nullable: true })
     verificationTokenExpiresAt?: Date | null;
 
+    /**
+     * EW-P4-3 — when a confirmation email was last SENT for this address
+     * (`POST /api/email/addresses/:id/verify`). Drives the resend cooldown;
+     * claimed with a compare-and-set so two quick clicks send one email.
+     * NULL = never sent (the token `createAddress` mints is never mailed).
+     */
+    @PortableDateColumn({ nullable: true })
+    verificationSentAt?: Date | null;
+
     @Column({ type: 'boolean', default: false })
     defaultForReplies: boolean;
 

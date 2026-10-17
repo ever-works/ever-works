@@ -14,6 +14,7 @@ import {
     Post,
     Put,
     Query,
+    Optional,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -21,6 +22,8 @@ import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import type { WorkProposal } from '@ever-works/agent/entities';
 import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
+import { normalizeRecordListView } from '@ever-works/contracts';
+import { ScopeContextService } from '../scope';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
@@ -117,6 +120,8 @@ export class WorkProposalsController {
         private readonly service: WorkProposalsApiService,
         // Phase 7 PR U — per-Idea budget summary.
         private readonly budgetService: BudgetService,
+        // Record visibility (EW-P1-3) — the active scope for the shared / org tabs.
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     /**
@@ -156,12 +161,23 @@ export class WorkProposalsController {
             query.statuses && query.statuses.length > 0
                 ? query.statuses
                 : [WorkProposalStatus.PENDING];
-        const proposals = await this.service.list(auth.userId, statuses, {
+        const opts = {
             missionId: query.missionId,
             search: query.search?.trim() || undefined,
             limit: query.limit,
             offset: query.offset,
-        });
+        };
+        const view = normalizeRecordListView(query.view);
+        const proposals =
+            view === 'mine'
+                ? await this.service.list(auth.userId, statuses, opts)
+                : await this.service.listVisible(
+                      auth.userId,
+                      view,
+                      statuses,
+                      opts,
+                      this.scopeContext?.getScope(),
+                  );
         return proposals.map(toResponseDto);
     }
 
@@ -230,7 +246,13 @@ export class WorkProposalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<WorkProposalResponseDto> {
-        const proposal = await this.service.getForUser(auth.userId, id);
+        // Record visibility (EW-P1-3): READ through the access policy; every write
+        // route keeps the owner-only paths.
+        const proposal = await this.service.getReadable(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
         if (!proposal) throw new NotFoundException('Proposal not found');
         return toResponseDto(proposal);
     }

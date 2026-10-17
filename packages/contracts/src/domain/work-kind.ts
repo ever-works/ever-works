@@ -57,8 +57,14 @@ export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number]
  *     lead lists, drafts, and reports a go-to-market pipeline produces. Like
  *     `company` it is minted by a dedicated flow (template activation), not
  *     by the general create path, so it stays out of the chip catalog.
+ *   - `project` — a repo-less Work (EW-P2-4): plain project tracking, and the
+ *     Ever Works side of a Gauzy project (Gauzy ↔ Ever Works integration, D3).
+ *     No repositories, no deploy, no generator: Tasks run without a
+ *     repository. Minted only by its own create route, behind the
+ *     `EVER_WORKS_PROJECT_WORKS_ENABLED` switch (default OFF), so it stays out
+ *     of the chip catalog. Inserted before `default`, which stays last.
  */
-export const WORK_KINDS = [...USER_SELECTABLE_WORK_KINDS, 'company', 'campaign', 'default'] as const;
+export const WORK_KINDS = [...USER_SELECTABLE_WORK_KINDS, 'company', 'campaign', 'project', 'default'] as const;
 
 export type WorkKind = (typeof WORK_KINDS)[number];
 
@@ -133,4 +139,18 @@ export function isRepositoryWorkKind(value?: string | null): boolean {
  */
 export function isAppWorkKind(value?: string | null): boolean {
 	return normalizeWorkKind(value) === 'app';
+}
+
+/**
+ * True when `value` names the Project kind (`project`, EW-P2-4) — the one
+ * repo-less kind: no data, work or website repository, no deploy, no
+ * generator. Callers that would clone, generate into, build or deploy a
+ * Work's repository refuse it; Tasks on it run without a repository.
+ *
+ * A KIND test, like `isRepositoryWorkKind`, for the same reason: the content
+ * pipelines are refused by kind. Accepts the same loose input as
+ * `normalizeWorkKind` and never throws.
+ */
+export function isProjectWorkKind(value?: string | null): boolean {
+	return normalizeWorkKind(value) === 'project';
 }

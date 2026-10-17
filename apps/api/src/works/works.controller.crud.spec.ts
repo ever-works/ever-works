@@ -260,6 +260,18 @@ describe('WorksController — core CRUD endpoints', () => {
             );
         });
 
+        // EW-P2-4 — the works-list kind filter.
+        it('forwards a known kind (normalised) and refuses an unknown one with 400', async () => {
+            await controller.getWorks(auth, undefined, undefined, undefined, ' Project ');
+            expect(s.workQueryService.getWorks).toHaveBeenLastCalledWith(
+                { limit: undefined, offset: undefined, search: undefined, kind: 'project' },
+                { id: 'user-1' },
+            );
+            await expect(
+                controller.getWorks(auth, undefined, undefined, undefined, 'spaceship'),
+            ).rejects.toMatchObject({ status: 400 });
+        });
+
         it('passes undefined for all query fields when not provided', async () => {
             await controller.getWorks(auth);
 

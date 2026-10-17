@@ -130,3 +130,8 @@ export * from './apps-tier.types.js';
 // existing table or category changes; a plugin that never declares
 // `stats-sink` compiles and behaves exactly as before.
 export * from './stats-sink.interface.js';
+// Domain events (EW-P1-1) — the `domain-event-subscriber` capability:
+// `IDomainEventSubscriberPlugin` (patterns + `onDomainEvent`), its delivery
+// context and guard. Additive: a plugin that never declares it compiles and
+// behaves exactly as before.
+export * from './domain-event-subscriber.interface.js';

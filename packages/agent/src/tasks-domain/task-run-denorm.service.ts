@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 
 /**
  * Statuses `TaskRunDenormService` mirrors onto the Task row. Matches the
@@ -35,7 +36,13 @@ export type TaskRunTerminalStatus = 'completed' | 'failed' | 'cancelled';
 export class TaskRunDenormService {
     private readonly logger = new Logger(TaskRunDenormService.name);
 
-    constructor(private readonly tasks: TaskRepository) {}
+    constructor(
+        private readonly tasks: TaskRepository,
+        // Domain events (EW-P1-1 B2) — a run-status change is a runtime-only
+        // write: it records `task.runtime_updated` and bumps neither the task's
+        // version nor its updatedAt. Optional (positional-spec arity rule).
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
+    ) {}
 
     /** New run dispatched for the Task — unconditional pointer install. */
     async recordQueued(taskId: string, runId: string): Promise<boolean> {
@@ -56,6 +63,22 @@ export class TaskRunDenormService {
         return this.write(taskId, runId, status, runId);
     }
 
+    /** Best-effort `task.runtime_updated` — telemetry, never allowed to fail the run. */
+    private async recordRuntime(taskId: string, status: string): Promise<void> {
+        const publisher = this.domainEvents;
+        if (!publisher) return;
+        try {
+            await publisher.transaction((manager) =>
+                publisher.runtime(manager, taskId, {
+                    changedFields: ['runtime'],
+                    actor: { type: 'system', id: 'agent-run', label: `run ${status}` },
+                }),
+            );
+        } catch (err) {
+            this.logger.warn(`Could not record task.runtime_updated for task ${taskId}: ${err}`);
+        }
+    }
+
     private async write(
         taskId: string,
         runId: string,
@@ -68,7 +91,9 @@ export class TaskRunDenormService {
                 { latestRunId: runId, latestRunStatus: status },
                 expectRunId,
             );
-            if (!applied) {
+            if (applied) {
+                await this.recordRuntime(taskId, status);
+            } else {
                 // Not an error: either the task row is gone, or a newer run
                 // already owns the pointer — both mean "nothing to mirror".
                 this.logger.debug(

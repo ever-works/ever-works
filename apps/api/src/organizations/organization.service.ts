@@ -3,11 +3,17 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     UnauthorizedException,
 } from '@nestjs/common';
+import { DomainEventPublisher, recordAfterWrite } from '@ever-works/agent/domain-events';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import { DataSource, type EntityManager } from 'typeorm';
+import {
+    OrganizationRepository,
+    UserRepository,
+    serializeOnSingleConnection,
+} from '@ever-works/agent/database';
 import { isUniqueConstraintError } from '@ever-works/agent/utils';
 import type {
     Organization,
@@ -454,6 +460,9 @@ export class OrganizationService {
         private readonly organizationRepository: OrganizationRepository,
         private readonly tenantBootstrap: TenantBootstrapService,
         private readonly usernameAllocator: UsernameAllocatorService,
+        // Domain events (EW-P1-1 B2) — `organization.updated`, recorded right
+        // after the write. Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -493,6 +502,12 @@ export class OrganizationService {
              * non-null.
              */
             vision?: string | null;
+            /**
+             * EW-P2-6 — the id to create the Organization with: `POST
+             * /api/integrations/v1/organizations` reserves the key's pin for it
+             * before anything is written. Omitted (every app path): generated.
+             */
+            id?: string;
         },
     ): Promise<Organization> {
         const trimmedName = name?.trim();
@@ -529,7 +544,7 @@ export class OrganizationService {
         // they would have got a second later. A 409 would be us reporting our
         // own race back to a user who did nothing wrong.
         return this.withSlugCollisionRetry(slugBase, (slug) =>
-            this.dataSource.transaction(async (manager) => {
+            this.inQueuedTransaction(async (manager) => {
                 // Use the manager's repository so the INSERT lands in the
                 // same transaction as the backfill UPDATEs below.
                 //
@@ -543,6 +558,7 @@ export class OrganizationService {
                 // for a blank field the modal submitted untouched.
                 const vision = this.normalizeVision(extra?.vision);
                 const org = manager.getRepository<Organization>('organizations').create({
+                    ...(extra?.id ? { id: extra.id } : {}),
                     tenantId: tenant.id,
                     slug,
                     displayName: trimmedName,
@@ -555,6 +571,13 @@ export class OrganizationService {
                     visionUpdatedAt: vision !== null ? new Date() : null,
                 });
                 const saved = await manager.getRepository<Organization>('organizations').save(org);
+                // EW-P2-6 — `organization.created` commits with the Organization.
+                await this.domainEvents?.created(
+                    manager,
+                    'organization',
+                    saved.id,
+                    'organization.created',
+                );
 
                 // Step (d): pin the new Org as the user's last-seen scope
                 // so the next login lands on it. Only do this if the user
@@ -597,6 +620,20 @@ export class OrganizationService {
 
                 return saved;
             }),
+        );
+    }
+
+    /**
+     * `dataSource.transaction`, queued on single-connection drivers (better-sqlite3:
+     * local/self-hosted installs, CI and e2e). Every caller shares ONE query runner
+     * there, so an unqueued transaction overlapping a queued one (domain events, record
+     * visibility) nests as its savepoint and fails on commit ("no such savepoint").
+     * Postgres runs it at once, unchanged. The work must not queue again on this
+     * DataSource; everything inside goes through the given `manager`.
+     */
+    private inQueuedTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return serializeOnSingleConnection(this.dataSource.manager, () =>
+            this.dataSource.transaction(work),
         );
     }
 
@@ -825,7 +862,7 @@ export class OrganizationService {
         const tenantId = user.tenantId;
         const newOrgId = org.id;
 
-        return this.dataSource.transaction(async (manager) => {
+        return this.inQueuedTransaction(async (manager) => {
             // Postgres: cap the transaction so a runaway backfill
             // doesn't hold locks indefinitely on prod traffic. SQLite
             // doesn't recognize this; wrap in a try so the call is a
@@ -1113,6 +1150,32 @@ export class OrganizationService {
                     : sanitizeOrganizationConnectionPolicy(connectionPolicy);
         }
         await this.organizationRepository.update(organizationId, updatePayload);
+        const changedFields = ['slug', 'displayName', 'legalName', 'countryCode'].filter(
+            (field) => field in updatePayload,
+        );
+        if (changedFields.length > 0) {
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.changed(
+                        manager,
+                        'organization',
+                        organizationId,
+                        'organization.updated',
+                        {
+                            changedFields,
+                            previous: Object.fromEntries(
+                                changedFields.map((field) => [
+                                    field,
+                                    (org as unknown as Record<string, unknown>)[field] ?? null,
+                                ]),
+                            ),
+                        },
+                    ),
+                (message) => this.logger.warn(message),
+                `organization.updated for ${organizationId}`,
+            );
+        }
         const updated = await this.organizationRepository.findById(organizationId);
         if (!updated) {
             // Race with a concurrent delete — surface as NotFound.

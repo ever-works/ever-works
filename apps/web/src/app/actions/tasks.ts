@@ -48,6 +48,10 @@ export async function createTaskAction(input: {
     maxGateAttempts?: number | null;
     /** Multi-repo: extra repositories by registry connection. */
     extraRepos?: TaskExtraRepo[] | null;
+    /** EW-P2-3 — planning dates (ISO) + estimate in whole minutes. */
+    dueAt?: string | null;
+    startAt?: string | null;
+    estimateMinutes?: number | null;
 }): Promise<Task> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -77,6 +81,9 @@ export async function updateTaskAction(
             | 'ideaId'
             | 'agentId'
             | 'extraRepos'
+            | 'dueAt'
+            | 'startAt'
+            | 'estimateMinutes'
         >
     >,
 ): Promise<Task> {

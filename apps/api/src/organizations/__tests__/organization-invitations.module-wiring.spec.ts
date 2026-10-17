@@ -60,6 +60,9 @@ const EXPECTED_COLLABORATORS = [
     // subscriptions barrel — and AuthModule with it — into this module's load
     // graph, which is the circular import the assertions below exist to catch.
     'Object',
+    // Domain events (EW-P1-1 B2) — `organization.member.*` recording,
+    // `@Optional()` and appended last.
+    'DomainEventPublisher',
 ];
 
 describe('Organization invitations — module wiring', () => {

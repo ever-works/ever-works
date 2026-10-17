@@ -129,4 +129,37 @@ describe('TaskNotificationService', () => {
         );
         expect(sent).toBe(1);
     });
+
+    // EW-P2-3 — one due-soon notice per DEADLINE, not per day.
+    it('keys task_due_soon by the due date, so a moved deadline is a new notice', async () => {
+        const ctx = (dueAt: string) => ({
+            taskId: 't1',
+            taskSlug: 'T-1',
+            taskTitle: 'Ship it',
+            extra: { dueAt },
+        });
+        await svc.emit('task_due_soon', ctx('2026-10-16T20:00:00.000Z'), ['u']);
+        await svc.emit('task_due_soon', ctx('2026-10-16T22:00:00.000Z'), ['u']);
+        const keys = notifications.create.mock.calls.map((c: any) => c[0]?.deduplicationKey);
+        expect(keys).toEqual([
+            'task:t1:task_due_soon:due:2026-10-16T20:00:00.000Z',
+            'task:t1:task_due_soon:due:2026-10-16T22:00:00.000Z',
+        ]);
+    });
+
+    it('emitCounted reports how many recipients it tried', async () => {
+        notifications.create.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce({});
+        const result = await svc.emitCounted(
+            'task_due_soon',
+            {
+                taskId: 't',
+                taskSlug: 'T-1',
+                taskTitle: 'x',
+                extra: { dueAt: '2026-10-16T20:00:00.000Z' },
+            },
+            ['u-a', 'u-b'],
+        );
+        expect(result).toEqual({ sent: 1, recipients: 2 });
+        expect(svc.canDeliver()).toBe(true);
+    });
 });

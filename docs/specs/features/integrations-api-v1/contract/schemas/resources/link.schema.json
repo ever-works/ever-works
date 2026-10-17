@@ -1,0 +1,46 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/link.schema.json",
+	"title": "External record link DTO (B.6, /links)",
+	"description": "One external_record_links row: an Ever Works record ↔ an external record, org-scoped, unique on both sides per (organizationId, source, installationId, entityType).",
+	"type": "object",
+	"required": [
+		"organizationId",
+		"entityType",
+		"entityId",
+		"source",
+		"installationId",
+		"externalId",
+		"externalUrl",
+		"createdAt",
+		"updatedAt"
+	],
+	"properties": {
+		"organizationId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"entityType": {
+			"type": "string",
+			"enum": [
+				"member",
+				"agent",
+				"team",
+				"work",
+				"mission",
+				"goal",
+				"idea",
+				"task",
+				"task_comment",
+				"inbox_item",
+				"kb_document",
+				"kb_folder"
+			]
+		},
+		"entityId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"source": { "type": "string", "maxLength": 100 },
+		"installationId": { "type": ["string", "null"], "maxLength": 200 },
+		"externalId": { "type": "string", "maxLength": 200 },
+		"externalUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" }
+	},
+	"additionalProperties": false
+}

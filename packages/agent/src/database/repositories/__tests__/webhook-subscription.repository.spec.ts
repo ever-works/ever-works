@@ -1,3 +1,4 @@
+import { Not } from 'typeorm';
 import type { Repository } from 'typeorm';
 import { WebhookSubscriptionRepository } from '../webhook-subscription.repository';
 import { WebhookSubscription } from '../../../entities/webhook-subscription.entity';
@@ -172,7 +173,11 @@ describe('WebhookSubscriptionRepository', () => {
     describe('pause', () => {
         it('sets status="paused" without touching lastDeliveryAt', async () => {
             await service.pause('w1');
-            expect(repository.update).toHaveBeenCalledWith('w1', { status: 'paused' });
+            // Webhooks v2: a `disabled` subscription is never turned into `paused`.
+            expect(repository.update).toHaveBeenCalledWith(
+                { id: 'w1', status: Not('disabled') },
+                { status: 'paused' },
+            );
         });
     });
 

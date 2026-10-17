@@ -54,6 +54,9 @@ import type { KbConsolidationMarker } from '../services/memory-consolidation';
 @Index('idx_wkd_folder', ['folderId'])
 @Index('idx_wkd_org_status_revision_at', ['organizationId', 'status', 'revisionAt'])
 @Index('idx_wkd_work_status_revision_at', ['workId', 'status', 'revisionAt'])
+// Integration API v1 keyset list of an organization's documents (EW-P3-2) —
+// migration 1795130200000.
+@Index('idx_wkd_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class WorkKnowledgeDocument {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -276,4 +279,15 @@ export class WorkKnowledgeDocument {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for `kb.document.*` domain events and the `ETag` of
+     * `GET /api/integrations/v1/kb/documents/:id` (EW-P3-2; same rule as tasks —
+     * `docs/specs/features/domain-events/spec.md` §4). Bumped by
+     * `bumpAggregateVersion` on every recorded change (status, review, lock,
+     * folder, …), unlike `revision`, which moves only on a content change. A
+     * plain column, NOT `@VersionColumn`. Migration 1795130200000.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

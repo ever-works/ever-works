@@ -1,0 +1,87 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/inbox-item.schema.json",
+	"title": "Inbox item DTO (P3, GET /inbox/items, GET /inbox/items/:id)",
+	"description": "One Inbox message addressed to ONE human, its recipient: a question an agent run asked, an approval request, an escalation mirror or a system notice. Also the `data` of inbox.item.* events. Not a ResourceBase: an inbox item is the recipient's message, not an organization resource, so it has no owner, visibility, teams or external links. `organizationId` is null for a message outside any organization; such items are recorded for in-process listeners but never served to integrations. Fleet provenance (node names, branches, mount directories) is not exposed. Replies and state changes act as `recipientUserId` only.",
+	"type": "object",
+	"required": [
+		"id",
+		"organizationId",
+		"version",
+		"createdAt",
+		"updatedAt",
+		"recipientUserId",
+		"kind",
+		"title",
+		"body",
+		"options",
+		"sourceType",
+		"status",
+		"unread",
+		"answeredAt",
+		"answerText",
+		"answerOptionId",
+		"agentId",
+		"agentRunId",
+		"taskId",
+		"workId",
+		"escalationId",
+		"proposalId"
+	],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"organizationId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"version": { "$ref": "../common.schema.json#/$defs/Version" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"recipientUserId": {
+			"description": "The human the message is for. Always set.",
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		},
+		"kind": { "type": "string", "enum": ["question", "approval", "escalation", "notice"] },
+		"title": { "type": "string", "maxLength": 300 },
+		"body": { "type": "string" },
+		"options": {
+			"description": "Structured answer buttons (question / approval items); null = free-text reply only.",
+			"type": ["array", "null"],
+			"items": { "$ref": "#/$defs/InboxItemOption" }
+		},
+		"sourceType": {
+			"description": "Which producer filed it. Open set; consumers must accept unknown values.",
+			"type": "string",
+			"maxLength": 24,
+			"examples": ["agent-run", "fleet-run", "escalation", "proposal", "system", "work"]
+		},
+		"status": { "type": "string", "enum": ["open", "answered", "archived"] },
+		"unread": { "type": "boolean" },
+		"answeredAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"answerText": { "type": ["string", "null"] },
+		"answerOptionId": { "type": ["string", "null"], "maxLength": 64 },
+		"agentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"agentRunId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"taskId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"workId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"escalationId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"proposalId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on inbox.item.deleted.", "const": true }
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"InboxItemOption": {
+			"type": "object",
+			"required": ["id", "label"],
+			"properties": {
+				"id": {
+					"description": "Stable token sent back as the reply's optionId.",
+					"type": "string",
+					"maxLength": 64
+				},
+				"label": { "type": "string" },
+				"description": { "type": "string" },
+				"recommended": { "type": "boolean" }
+			},
+			"additionalProperties": false
+		}
+	}
+}

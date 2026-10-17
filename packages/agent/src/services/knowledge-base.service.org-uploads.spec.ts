@@ -144,9 +144,9 @@ describe('KnowledgeBaseService — global Memory uploads', () => {
         expect(overlayDispatcher.dispatchKbOrgOverlayFanout).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects a non-inheritable class on the plain org-document path', async () => {
-        // The Memory upload path opts in explicitly; every other caller
-        // must keep getting the original 400.
+    it('accepts every class on the plain org-document path, but fans out only the inheritable ones', async () => {
+        // EW-P3-2 — every class may live at organization scope; inheritance
+        // into Works stays limited to legal / style / seo.
         await expect(
             service.createOrgDocument(ORG_ID, USER_ID, {
                 path: 'x.md',
@@ -154,7 +154,16 @@ describe('KnowledgeBaseService — global Memory uploads', () => {
                 body: 'x',
                 class: 'freeform' as never,
             }),
-        ).rejects.toThrow(/must have class in/);
+        ).resolves.toBeDefined();
+        expect(overlayDispatcher.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
+        await expect(
+            service.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'y.md',
+                title: 'y',
+                body: 'y',
+                class: 'not-a-class' as never,
+            }),
+        ).rejects.toThrow(/Unknown KB document class/);
     });
 
     it('marks the row SKIPPED and returns no document when nothing can be extracted', async () => {

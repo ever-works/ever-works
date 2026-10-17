@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RecordVisibilityModule } from '../record-visibility/record-visibility.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { Goal } from '../entities/goal.entity';
 import { GoalEvent } from '../entities/goal-event.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
@@ -37,6 +39,10 @@ import { GoalsService } from './goals.service';
  */
 @Module({
     imports: [
+        // Record visibility (EW-P1-3) — RecordAccessPolicy for the shared reads.
+        RecordVisibilityModule,
+        // EW-P2-2 — `goal.*` domain events (GoalsService, evaluation, orchestrator).
+        DomainEventsModule,
         TypeOrmModule.forFeature([
             Goal,
             GoalMetricSample,

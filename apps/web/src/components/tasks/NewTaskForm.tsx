@@ -29,6 +29,10 @@ import {
 import { sanitizeName, sanitizePrompt } from '@/lib/utils/sanitize';
 
 type CreateTaskFn = (input: {
+    /** EW-P2-3 — planning dates (ISO) + estimate in whole minutes. */
+    dueAt?: string | null;
+    startAt?: string | null;
+    estimateMinutes?: number | null;
     title: string;
     description?: string | null;
     priority?: TaskPriority;
@@ -105,6 +109,39 @@ function slugifyTitle(title: string): string {
 /** "Blank task" vs "From template" — the two shapes this form creates. */
 type CreationMode = 'blank' | 'template';
 
+/**
+ * EW-P2-3 — turn the form's planning inputs into the create payload. A date
+ * input yields `YYYY-MM-DD`: the due date is the END of that local day and the
+ * start date its beginning, so "due on the 20th" stays due all of the 20th.
+ */
+export function planningPayload(
+    dueDate: string,
+    startDate: string,
+    estimateRaw: string,
+): {
+    dueAt?: string;
+    startAt?: string;
+    estimateMinutes?: number;
+    error?: 'errorStartAfterDue' | 'errorEstimate';
+} {
+    const dueAt = dueDate ? new Date(`${dueDate}T23:59:59`) : null;
+    const startAt = startDate ? new Date(`${startDate}T00:00:00`) : null;
+    if (dueAt && startAt && startAt.getTime() > dueAt.getTime()) {
+        return { error: 'errorStartAfterDue' };
+    }
+    let estimateMinutes: number | undefined;
+    if (estimateRaw.trim() !== '') {
+        const n = Number(estimateRaw);
+        if (!Number.isInteger(n) || n < 0 || n > 525600) return { error: 'errorEstimate' };
+        estimateMinutes = n;
+    }
+    return {
+        dueAt: dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt.toISOString() : undefined,
+        startAt: startAt && !Number.isNaN(startAt.getTime()) ? startAt.toISOString() : undefined,
+        estimateMinutes,
+    };
+}
+
 export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const t = useTranslations('dashboard.tasksPage.newDialog');
     const router = useRouter();
@@ -122,6 +159,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<TaskPriority>('p3');
     const [labelsRaw, setLabelsRaw] = useState('');
+    // EW-P2-3 — planning: due date, start date (YYYY-MM-DD) and estimate (minutes).
+    const [dueDate, setDueDate] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [estimateRaw, setEstimateRaw] = useState('');
     // Once the user edits the Labels field (or a template/URL pre-fills it) we
     // stop auto-deriving labels from the title so we never clobber their input.
     const [labelsTouched, setLabelsTouched] = useState(false);
@@ -292,10 +333,18 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         .split(',')
                         .map((l) => l.trim())
                         .filter(Boolean);
+                    const planning = planningPayload(dueDate, startDate, estimateRaw);
+                    if (planning.error) {
+                        setError(t(planning.error));
+                        return;
+                    }
                     const task = await createTask({
                         title: title.trim(),
                         description: description.trim() || null,
                         priority,
+                        dueAt: planning.dueAt,
+                        startAt: planning.startAt,
+                        estimateMinutes: planning.estimateMinutes,
                         labels: labels.length ? labels : undefined,
                         workId: workChoice || null,
                         missionId: scopeCount === 1 ? missionId : null,
@@ -549,6 +598,66 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                                     setLabelsRaw(e.target.value);
                                 }}
                                 placeholder={t('labelsPlaceholder')}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            />
+                        </div>
+                    </div>
+                )}
+                {/* EW-P2-3 — planning: due date, start date, estimate. */}
+                {mode === 'blank' && (
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label
+                                className="block text-xs text-text-secondary mb-1"
+                                htmlFor="new-task-due"
+                            >
+                                {t('dueDate')}
+                            </label>
+                            <input
+                                id="new-task-due"
+                                type="date"
+                                value={dueDate}
+                                onChange={(e) => setDueDate(e.target.value)}
+                                disabled={pending}
+                                data-testid="new-task-due"
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                className="block text-xs text-text-secondary mb-1"
+                                htmlFor="new-task-start"
+                            >
+                                {t('startDate')}
+                            </label>
+                            <input
+                                id="new-task-start"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                disabled={pending}
+                                data-testid="new-task-start"
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                className="block text-xs text-text-secondary mb-1"
+                                htmlFor="new-task-estimate"
+                            >
+                                {t('estimateMinutes')}
+                            </label>
+                            <input
+                                id="new-task-estimate"
+                                type="number"
+                                min={0}
+                                max={525600}
+                                step={1}
+                                inputMode="numeric"
+                                value={estimateRaw}
+                                onChange={(e) => setEstimateRaw(e.target.value)}
+                                disabled={pending}
+                                data-testid="new-task-estimate"
                                 className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
                             />
                         </div>

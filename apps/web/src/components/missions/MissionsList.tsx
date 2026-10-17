@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { RECORD_TAB_PARAM, withRecordTab, type RecordListView } from '@/lib/record-visibility';
+import { useState, useTransition, useEffect, type ReactNode } from 'react';
 import { HelpLink } from '@/components/help/HelpLink';
 import { Target, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
@@ -22,6 +23,10 @@ import type { Mission, MissionStatus } from '@/lib/api/missions';
 const MISSION_STATUSES: MissionStatus[] = ['active', 'paused', 'completed', 'failed'];
 
 interface MissionsListProps {
+    /** Record visibility (EW-P1-3): the active tab, kept by the filter form and Reset. */
+    tab?: RecordListView;
+    /** Record visibility (EW-P1-3): the Mine | Shared with me | Organization tabs. */
+    tabs?: ReactNode;
     missions: Mission[];
     loadError?: string | null;
     filters?: {
@@ -66,6 +71,8 @@ export function MissionsList({
     loadError = null,
     filters,
     pagination,
+    tabs,
+    tab = 'mine',
 }: MissionsListProps) {
     const t = useTranslations('dashboard.missionsPage');
     const [draft, setDraft] = useState('');
@@ -125,6 +132,7 @@ export function MissionsList({
         <div className="w-full">
             {/* Header */}
             <PageHeader icon={Target} title={t('title')} subtitle={t('subtitle')} tone="mission" />
+            {tabs}
 
             {/* Quick-add composer — modeled on the marketing site's
                 landing prompt. Used by both empty and populated
@@ -171,6 +179,9 @@ export function MissionsList({
             </div>
 
             <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
+                {tab !== 'mine' ? (
+                    <input type="hidden" name={RECORD_TAB_PARAM} value={tab} />
+                ) : null}
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
                         {t('filterBar.search')}
@@ -209,7 +220,11 @@ export function MissionsList({
                     <Button type="submit" size="sm">
                         {t('filterBar.apply')}
                     </Button>
-                    <Button href={ROUTES.DASHBOARD_MISSIONS} size="sm" variant="ghost">
+                    <Button
+                        href={withRecordTab(ROUTES.DASHBOARD_MISSIONS, tab)}
+                        size="sm"
+                        variant="ghost"
+                    >
                         {t('filterBar.reset')}
                     </Button>
                 </div>

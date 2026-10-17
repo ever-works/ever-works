@@ -46,6 +46,7 @@ import {
 	toStatusView,
 	toWorkerStatusView
 } from './identity';
+import { startRuntimeInOrder } from './start-order';
 import { createTray } from './tray';
 
 /**
@@ -158,8 +159,14 @@ function bootstrap(): void {
 		});
 		workerStatus = toWorkerStatusView(created.worker?.getState());
 		runtime = created;
-		void created.loop.start();
-		void created.worker?.start();
+		// The worker leases only after a heartbeat has been ACCEPTED (#2598 a):
+		// that answer brings the saved limit ceiling and the version verdict,
+		// and both must be in force before the first lease.
+		void startRuntimeInOrder(created, () => runtime === created).catch((error: unknown) => {
+			logger.error(
+				`Could not start the worker: ${logger.redact(error instanceof Error ? error.message : String(error))}`
+			);
+		});
 	};
 
 	const disconnect = async (): Promise<void> => {

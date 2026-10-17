@@ -5,7 +5,7 @@ import { TaskWorkspaceService, tokenFreeCloneUrl } from '../task-workspace.servi
 type ServiceArgs = ConstructorParameters<typeof TaskWorkspaceService>;
 type WorkDouble = Pick<
     Awaited<ReturnType<ServiceArgs[0]['findById']>> & object,
-    'id' | 'gitProvider' | 'taskIsolationBaseBranch' | 'getRepoOwner' | 'getDataRepo'
+    'id' | 'gitProvider' | 'taskIsolationBaseBranch' | 'getRepoOwner' | 'getDataRepo' | 'kind'
 >;
 
 /**
@@ -20,6 +20,7 @@ type WorkDouble = Pick<
 function makeWork(over: Partial<WorkDouble> = {}): WorkDouble {
     return {
         id: 'work-1',
+        kind: 'default',
         gitProvider: 'github',
         taskIsolationBaseBranch: null,
         getRepoOwner: () => 'acme',
@@ -114,6 +115,16 @@ describe('TaskWorkspaceService.describeFleetWorkspace', () => {
         expect(
             await build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' }),
         ).toBeNull();
+    });
+
+    // EW-P2-4 — a repo-less Project Work: `null` is the planner's "no
+    // repository to work in" refusal, and no repository is looked up.
+    it('is null for a Project Work, without asking the provider for a repository', async () => {
+        works.findById.mockResolvedValue(makeWork({ kind: 'project' }));
+        await expect(
+            build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' }),
+        ).resolves.toBeNull();
+        expect(gitFacade.getRepository).not.toHaveBeenCalled();
     });
 
     it('fails loudly without a git facade', async () => {

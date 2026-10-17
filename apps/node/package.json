@@ -1,6 +1,6 @@
 {
 	"name": "ever-works-node",
-	"version": "0.2.1",
+	"version": "0.2.4",
 	"description": "Ever Works Node - headless execution node (CLI + long-running service): fleet enrollment, heartbeat and capability reporting",
 	"author": {
 		"name": "Ever Co. LTD",
@@ -47,6 +47,6 @@
 		"@types/node": "^26.6.4",
 		"esbuild": "^0.25.12",
 		"typescript": "^5.9.3",
-		"vitest": "^4.1.0"
+		"vitest": "^5.0.5"
 	}
 }

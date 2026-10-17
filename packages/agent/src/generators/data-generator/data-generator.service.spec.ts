@@ -127,6 +127,17 @@ describe('DataGeneratorService runtime YAML certification', () => {
         expect(assertRuntimeCompatible).not.toHaveBeenCalled();
     });
 
+    it('never clones a derived data repository for a Work with no repository (EW-P2-4 Project Work)', async () => {
+        const projectWork = { ...work, kind: 'project' } as unknown as Work;
+        // A tolerant read answers empty; a direct repository read is refused.
+        await expect(service.getItems(projectWork, user)).resolves.toEqual([]);
+        await expect(service.getConfig(projectWork, user)).rejects.toMatchObject({ status: 400 });
+        await expect(service.getCategoriesTags(projectWork, user)).rejects.toMatchObject({
+            status: 400,
+        });
+        expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+    });
+
     it('allows recreate generation to replace a malformed legacy corpus', async () => {
         const compatibilityError = new RuntimeYamlCompatibilityError(
             'data/broken/broken.yml',

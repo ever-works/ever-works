@@ -1,0 +1,24 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/inbox-reply-result.schema.json",
+	"title": "Inbox reply result (P3, POST /inbox/items/:id/reply)",
+	"description": "What answering an inbox item did (CR-4). `item` is the inbox item after the answer. `routed` is what happened to the record behind it; `restart` is what happened to the work (the agent run) behind it. `routed: already-decided` means another answer won the race: the item carries the winning answer and nothing was routed. Both are open sets: consumers must accept unknown values.",
+	"type": "object",
+	"required": ["item", "routed", "restart"],
+	"properties": {
+		"item": { "$ref": "inbox-item.schema.json" },
+		"routed": {
+			"type": "string",
+			"examples": ["steered", "resumed", "approved", "rejected", "escalation-resolved", "already-decided", "none"]
+		},
+		"restart": {
+			"type": "string",
+			"examples": ["injected", "resumed", "queued", "failed", "none"]
+		},
+		"runId": {
+			"description": "The run now carrying the answer (steered = the same run, resumed = the new one).",
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		}
+	},
+	"additionalProperties": false
+}

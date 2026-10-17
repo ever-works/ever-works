@@ -1,5 +1,6 @@
 'use client';
 
+import { RecordVisibilityPanel } from '@/components/record-visibility';
 import { useMemo, useState, useTransition } from 'react';
 import {
     Activity,
@@ -521,6 +522,11 @@ export function GoalDetailClient({
                     </button>
                 ))}
             </div>
+
+            {/* Record visibility (EW-P1-3): who can see this Goal, and its Teams. */}
+            <section className={`${sectionCard} mb-6`} data-testid="goal-visibility">
+                <RecordVisibilityPanel aggregate="goal" id={goal.id} showTeams />
+            </section>
 
             {tab === 'dod' ? <GoalDodPanel goal={goal} onGoalChange={setGoal} /> : null}
 

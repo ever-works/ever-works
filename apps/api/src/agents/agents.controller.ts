@@ -1,3 +1,4 @@
+import { normalizeRecordListView } from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -360,6 +361,7 @@ export class AgentsController {
         const { rows, total } = await this.service.list(
             auth.userId,
             {
+                view: normalizeRecordListView(query.view),
                 scope: query.scope,
                 status: query.status,
                 missionId: query.missionId,
@@ -780,7 +782,9 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        return this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
+        // Record visibility (EW-P1-3): READ through the access policy; every other
+        // route keeps the owner-only `service.getOne` gate.
+        return this.service.getReadable(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Patch(':id')

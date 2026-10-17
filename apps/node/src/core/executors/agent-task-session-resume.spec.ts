@@ -399,7 +399,7 @@ describe('runAgentTaskJob — CLI session resume (self-build slice AU)', () => {
 
 		const model = modelCommands(commands);
 		expect(model).toHaveLength(1);
-		expect(model[0]).toContain('exec --json');
+		expect(model[0]).toContain('exec --ignore-user-config --json');
 		expect(model[0]).not.toContain('resume');
 		expect(fs.instructions).toEqual([FULL]);
 		expect(outcome.model?.resume).toEqual({ outcome: 'skipped', reason: expect.stringContaining('codex') });

@@ -491,6 +491,23 @@ export enum ActivityActionType {
     // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
     // the publishable allow-list, so this member is unpublished by construction.
     APP_BUILD = 'app_build',
+    // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
+    //   - INTEGRATION_WRITE: one row per successful write an integration key
+    //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy
+    //     (<key name>)'` and `details` = `{ integrationKeyId, integrationKind,
+    //     actAsUserId, ownerUserId, method, route, statusCode, originTag,
+    //     resourceId }`. `userId` is the user the write was made for (the
+    //     act-as user, else the key owner) so it lands in their feed.
+    //   - INTEGRATION_KEY_CREATED / _ROTATED / _REVOKED: the key lifecycle,
+    //     `details` = `{ keyId, name, integrationKind, scopes,
+    //     organizationIds, prefix }` — never a secret or a digest.
+    // Additive members — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Feed kind: the write is `work`, the lifecycle is
+    // `system`; none is publishable (the Shared-view list is an allow-list).
+    INTEGRATION_WRITE = 'integration_write',
+    INTEGRATION_KEY_CREATED = 'integration_key_created',
+    INTEGRATION_KEY_ROTATED = 'integration_key_rotated',
+    INTEGRATION_KEY_REVOKED = 'integration_key_revoked',
 }
 
 /**

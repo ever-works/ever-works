@@ -1,0 +1,31 @@
+{
+	"id": "evt_01JABZ3R0F1G3H5J7K9M1N3P5Q",
+	"seq": "102951",
+	"type": "task.visibility_changed",
+	"version": 1,
+	"occurredAt": "2026-10-15T18:00:00.000Z",
+	"tenantId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"aggregate": {
+		"type": "task",
+		"id": "e7b9d1f3-5a6c-4da4-8edf-4a5b6c7d8e9a",
+		"version": 20
+	},
+	"actor": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"origin": {
+		"tag": null,
+		"integrationKeyId": null
+	},
+	"changedFields": ["visibility"],
+	"data": {
+		"id": "e7b9d1f3-5a6c-4da4-8edf-4a5b6c7d8e9a",
+		"visibility": "private"
+	},
+	"previous": {
+		"visibility": "team"
+	}
+}

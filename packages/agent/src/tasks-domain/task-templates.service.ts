@@ -21,6 +21,7 @@ import { UserTaskCounterRepository } from '../database/repositories/task-side.re
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { normalizeTaskExtraRepos } from './task-extra-repos';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -195,6 +196,10 @@ export class TaskTemplatesService {
         // absent means a step WITH extraRepos is refused (never silently
         // accepted unchecked), exactly like the Task path.
         @Optional() private readonly repoConnections?: RepoConnectionRepository,
+        // Domain events (EW-P1-1 B2) — `task.created` for every Task an
+        // instantiation creates, inside its transaction. Appended LAST +
+        // @Optional (positional-spec arity rule).
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -413,6 +418,14 @@ export class TaskTemplatesService {
                             approverId: userId,
                         }),
                     );
+                }
+            }
+
+            // Domain events (EW-P1-1 B2): one `task.created` per created Task,
+            // in this same transaction and after every edge above exists.
+            if (this.domainEvents) {
+                for (const created of [parent, ...subtasks]) {
+                    await this.domainEvents.created(manager, 'task', created.id, 'task.created');
                 }
             }
 
@@ -690,13 +703,16 @@ export class TaskTemplatesService {
     }
 
     private slugify(raw: string): string {
-        const slug = raw
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 80)
-            .replace(/-+$/g, '');
+        // Dash trims by loop, not `/^-+|-+$/`: CodeQL flags that pattern as
+        // polynomial (js/polynomial-redos). Same result, linear by construction.
+        const slug = trimDashes(
+            trimDashes(
+                raw
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[^a-z0-9]+/g, '-'),
+            ).slice(0, 80),
+        );
         if (!slug) throw new BadRequestException('Template slug cannot be empty.');
         return slug;
     }
@@ -735,4 +751,13 @@ export class TaskTemplatesService {
             this.logger.warn(`Failed to log template instantiation: ${err}`);
         }
     }
+}
+
+/** `value` without its leading and trailing `-` runs, in linear time. */
+function trimDashes(value: string): string {
+    let start = 0;
+    let end = value.length;
+    while (start < end && value[start] === '-') start += 1;
+    while (end > start && value[end - 1] === '-') end -= 1;
+    return value.slice(start, end);
 }

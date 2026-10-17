@@ -64,6 +64,7 @@ function mentionCommentBody(overrides: Record<string, unknown> = {}) {
             body: '@ever-works is this migration safe to roll back?',
             html_url: 'https://example.com/octo/site/pull/7#issuecomment-42',
             user: { login: 'octocat', type: 'User' },
+            author_association: 'MEMBER',
         },
         ...overrides,
     };
@@ -606,6 +607,7 @@ describe('GitHubPrReviewBridgeService', () => {
                     id: 77,
                     body: '@ever-works why was this loop unrolled?',
                     user: { login: 'octocat', type: 'User' },
+                    author_association: 'COLLABORATOR',
                 },
             });
             await flush();
@@ -616,6 +618,42 @@ describe('GitHubPrReviewBridgeService', () => {
                 }),
             );
         });
+
+        // Self-build handover item 11: a mention is an instruction to the
+        // reviewer, so only somebody who could steer a run may give one —
+        // the same OWNER / MEMBER / COLLABORATOR rule as a review (#2579).
+        it.each([
+            'NONE',
+            'CONTRIBUTOR',
+            'FIRST_TIME_CONTRIBUTOR',
+            'FIRST_TIMER',
+            'MANNEQUIN',
+            undefined,
+        ])(
+            'ignores an @ever-works mention from an outsider (author_association=%s): no ingest, no paid review',
+            async (association) => {
+                const { service, eventIngestService, prReviewService } = createService();
+                const body = mentionCommentBody();
+                (body.comment as any).author_association = association;
+                const result = await service.handleEvent(BINDING, 'issue_comment', body);
+                await flush();
+                expect(result.ingested).toBeNull();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(['OWNER', 'MEMBER', 'COLLABORATOR', 'owner'])(
+            'accepts a mention from %s (case-insensitive, like the review gate)',
+            async (association) => {
+                const { service, prReviewService } = createService();
+                const body = mentionCommentBody();
+                (body.comment as any).author_association = association;
+                await service.handleEvent(BINDING, 'issue_comment', body);
+                await flush();
+                expect(prReviewService.reviewPullRequest).toHaveBeenCalledTimes(1);
+            },
+        );
     });
 
     /**
@@ -1816,6 +1854,36 @@ describe('GitHubPrReviewBridgeService', () => {
                         reviewerLabel: 'Copilot',
                         reviewerKind: 'bot',
                         severity: null,
+                    }),
+                );
+            });
+
+            // Self-build handover item 11: a bot's REPLY inside a review thread
+            // ("Thanks for the fix…") used to become a new rejection and could
+            // buy a paid fix run for a thank-you.
+            it('does NOT record a trusted bot reply in a review thread that carries no severity marker', async () => {
+                const { service, rejections } = createService();
+                const body = botReviewComment(
+                    'coderabbitai[bot]',
+                    '`@evereq` Verified the fix by code inspection. The worker starts once, and the guard prevents startup after disconnect.',
+                );
+                (body.comment as any).in_reply_to_id = 500;
+                await service.handleEvent(BINDING, 'pull_request_review_comment', body);
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
+
+            it('still records a bot reply in a thread that IS tagged as a finding (severity marker)', async () => {
+                const { service, rejections } = createService();
+                const body = botReviewComment(
+                    'greptile-apps[bot]',
+                    '<a href="#"><img alt="P1" src="https://greptile-static-assets.s3.amazonaws.com/badges/p1.svg?v=9" align="top"></a> The fix is incomplete: the retry path still skips the guard.',
+                );
+                (body.comment as any).in_reply_to_id = 500;
+                await service.handleEvent(BINDING, 'pull_request_review_comment', body);
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        severity: 'critical',
+                        reviewerLabel: 'greptile-apps[bot]',
                     }),
                 );
             });

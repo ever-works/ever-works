@@ -1,4 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+    BadRequestException,
+    HttpException,
+    HttpStatus,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import {
     ArrayMaxSize,
@@ -9,6 +18,7 @@ import {
     IsObject,
     IsOptional,
     IsString,
+    IsUUID,
     MaxLength,
     ValidateNested,
 } from 'class-validator';
@@ -22,7 +32,13 @@ import {
     AgentInboxRepository,
 } from '@ever-works/agent/database';
 import type { TenantEmailAddress, EmailAddressDirection } from '@ever-works/agent/entities';
-import { EmailFacadeService } from '@ever-works/agent/facades';
+import {
+    EmailFacadeService,
+    EmailSenderNotVerifiedException,
+    emailSenderVerificationRequired,
+    replyHeadersFor,
+} from '@ever-works/agent/facades';
+import { MailService } from '../mail/mail.service';
 import { EmailDraftService } from '@ever-works/agent/email';
 import type { EmailSendOrigin } from '@ever-works/contracts';
 
@@ -31,6 +47,27 @@ import type { EmailSendOrigin } from '@ever-works/contracts';
  * issuance. A leaked confirmation link must not verify an address forever.
  */
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * EW-P4-3 — the least time between two confirmation emails for one address.
+ * The address is the caller's to type, so without it the route would mail
+ * anyone, repeatedly, from the platform.
+ */
+export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+
+/** EW-P4-3 — where the confirmation link lands (a public web page, see apps/web). */
+export const EMAIL_ADDRESS_VERIFY_PATH = '/email-address/verify';
+
+/** EW-P4-3 — what `POST /api/email/addresses/:id/verify` answers. */
+export interface TriggerVerificationResult {
+    messageRef: string;
+    /** `true` when a confirmation email went out now. */
+    sent: boolean;
+    /** `true` when the address was already verified (nothing sent). */
+    alreadyVerified?: boolean;
+    /** When the link just sent stops working (ISO 8601). */
+    expiresAt?: string;
+}
 
 // Security: these request bodies are bound directly via `@Body()` in
 // email.controller.ts. The global ValidationPipe (main.ts) runs with
@@ -131,6 +168,15 @@ export class SendMessageInput {
     @IsString()
     @MaxLength(256)
     readonly fromAddressId?: string;
+
+    /**
+     * EW-P4-3 — reply in thread: the `email_messages.id` (one of the caller's
+     * own messages) this message answers. Sets `In-Reply-To` / `References`
+     * from it, so the recipient's mail client threads the reply.
+     */
+    @IsOptional()
+    @IsUUID()
+    readonly inReplyToMessageId?: string;
 }
 
 /**
@@ -180,12 +226,24 @@ export class EmailService {
         // address. @Optional() and appended LAST: absent, the sending address
         // resolves exactly as before (explicit, then primary assignment).
         @Optional() private readonly inboxes?: AgentInboxRepository,
+        // EW-P4-3 — platform mail delivers the address confirmation link.
+        // @Optional() and appended LAST: absent, triggering a verification
+        // answers 503 instead of pretending to send one.
+        @Optional() private readonly mail?: MailService,
     ) {}
+
+    private readonly logger = new Logger(EmailService.name);
 
     async listAddresses(
         userId: string,
         direction?: EmailAddressDirection,
+        options: { includeDisabled?: boolean } = {},
     ): Promise<TenantEmailAddress[]> {
+        // EW-P4-3 — the settings page lists disabled addresses too, so they
+        // can be enabled again; every other caller keeps active ones only.
+        if (options.includeDisabled) {
+            return this.addresses.findAllByUser(userId, direction);
+        }
         return this.addresses.findActiveByUser(userId, direction);
     }
 
@@ -231,14 +289,112 @@ export class EmailService {
     }
 
     /**
-     * Trigger the provider's verification flow. Persists the token on the
-     * row so `GET /api/email/verify/:tokenId` can confirm it later.
+     * EW-P4-3 — send the address a confirmation email. A fresh one-time token
+     * (24 h) replaces any earlier one on the row and goes out in a link to the
+     * public `/email-address/verify/<token>` page, which confirms it through
+     * `GET /api/email/verify/:token` — proving whoever registered the address
+     * can read its mail. Until then nothing can be SENT from it.
+     *
+     * Before EW-P4-3 this only asked the provider plugin for a token and threw
+     * it away: no email went out, and `verified` was never checked anywhere.
+     *
+     * - Already verified: nothing is sent (`alreadyVerified: true`).
+     * - Disabled: 400. Within a minute of the last link: 429.
+     * - No platform mail wired: 503 (never a silent "sent").
+     * The provider plugin's own `verifyAddress` still runs, best-effort, so a
+     * provider that registers sender signatures keeps doing so.
      */
-    async triggerVerification(userId: string, id: string): Promise<{ messageRef: string }> {
+    async triggerVerification(userId: string, id: string): Promise<TriggerVerificationResult> {
         const row = await this.findOwnedOrThrow(userId, id);
         const messageRef = `verify-${row.id}-${Date.now()}`;
-        await this.emailFacade.verifyAddress(row.address, { userId, addressId: row.id });
-        return { messageRef };
+        if (row.verified) {
+            return { messageRef, sent: false, alreadyVerified: true };
+        }
+        if (row.disabledAt) {
+            throw new BadRequestException('This address is disabled. Enable it first.');
+        }
+        // Never a silent "sent": with no mail module, or a mailer that only
+        // logs (MAILER_PROVIDER unset / `none`, or Resend without a key), the
+        // link would never arrive.
+        if (!this.mail || !this.mail.canDeliver()) {
+            throw new ServiceUnavailableException(
+                'Platform email is not configured, so the confirmation email cannot be sent.',
+            );
+        }
+
+        // One email per cooldown, even for concurrent clicks: the send is
+        // claimed with a compare-and-set on `verificationSentAt` (NULL = never
+        // sent; the token `createAddress` mints is never mailed).
+        const sentAt = new Date();
+        const claimed = await this.addresses.claimVerificationSend(
+            row.id,
+            new Date(sentAt.getTime() - VERIFICATION_RESEND_COOLDOWN_MS),
+            sentAt,
+        );
+        if (!claimed) {
+            throw new HttpException(
+                'A confirmation email was just sent to this address. Wait a minute before sending another.',
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+
+        const verificationToken = randomBytes(24).toString('base64url');
+        const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+        await this.addresses.update(row.id, {
+            verificationToken,
+            verificationTokenExpiresAt: expiresAt,
+        });
+        try {
+            await this.mail.sendNotificationEmail(
+                row.address,
+                row.address,
+                {
+                    title: 'Confirm this email address',
+                    message:
+                        `${row.address} was added as an email address for AI agents on your workspace. ` +
+                        'Confirm it to let agents send from it. The link works for 24 hours. ' +
+                        'If you did not expect this email, ignore it: nothing will be sent from this address.',
+                    eventTitle: 'Email address confirmation',
+                    actionUrl: `${EMAIL_ADDRESS_VERIFY_PATH}/${verificationToken}`,
+                    actionLabel: 'Confirm this address',
+                    settingsPath: '/settings/integrations/emails',
+                },
+                // A refused email must not read as sent (Resend answers errors
+                // without throwing).
+                { strict: true },
+            );
+        } catch (error) {
+            // Nothing went out: put the row back exactly as it was — the
+            // previous link (token + expiry) keeps working, and the cooldown is
+            // given back so the owner can retry at once — and say why instead
+            // of "sent".
+            await this.addresses
+                .update(row.id, {
+                    verificationSentAt: row.verificationSentAt ?? null,
+                    verificationToken: row.verificationToken ?? null,
+                    verificationTokenExpiresAt: row.verificationTokenExpiresAt ?? null,
+                })
+                .catch(() => undefined);
+            this.logger.warn(
+                `Confirmation email for address ${row.id} was not sent: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            throw new ServiceUnavailableException(
+                'The confirmation email could not be sent. Check the platform email settings and try again.',
+            );
+        }
+
+        try {
+            await this.emailFacade.verifyAddress(row.address, { userId, addressId: row.id });
+        } catch (error) {
+            this.logger.debug(
+                `Provider-side verifyAddress for ${row.id} did not run: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return { messageRef, sent: true, expiresAt: expiresAt.toISOString() };
     }
 
     async confirmVerification(token: string): Promise<{ verified: boolean }> {
@@ -312,6 +468,11 @@ export class EmailService {
         if (!address) {
             throw new NotFoundException('Agent has no outbound email address assigned');
         }
+        // EW-P4-3 — refuse up front (before a draft is held) when the sending
+        // address was never verified; the facade enforces the same rule.
+        if (!address.verified && emailSenderVerificationRequired()) {
+            throw new EmailSenderNotVerifiedException(address.address);
+        }
 
         // Render a React-Email template (server-side) into HTML + text
         // when supplied; otherwise use the caller-provided bodies.
@@ -329,6 +490,22 @@ export class EmailService {
         const messageRef = `compose-${input.agentId}-${Date.now()}`;
         const origin: EmailSendOrigin = options.origin ?? 'human';
 
+        // EW-P4-3 — reply in thread. Owner-scoped: a message of another
+        // account answers 404, exactly like a missing one.
+        let headers: Record<string, string> | undefined;
+        let replyTaskId: string | undefined;
+        let replyConversationId: string | undefined;
+        if (input.inReplyToMessageId) {
+            const parent = await this.messages.findByIdAndUserId(input.inReplyToMessageId, userId);
+            if (!parent) throw new NotFoundException('Message to reply to not found');
+            const replyHeaders = replyHeadersFor(parent);
+            headers = Object.keys(replyHeaders).length > 0 ? replyHeaders : undefined;
+            // The reply belongs to the same Task, or the same conversation,
+            // as the message it answers — so the next reply threads back there.
+            replyTaskId = parent.taskId ?? undefined;
+            replyConversationId = replyTaskId ? undefined : (parent.conversationId ?? undefined);
+        }
+
         // AW-05 — an Agent's message goes through the draft loop, which
         // either sends it (inbox sends on its own) or holds it for a person.
         if (origin === 'agent' && this.drafts) {
@@ -345,6 +522,9 @@ export class EmailService {
                 bodyHtml,
                 messageRef,
                 runId: options.runId,
+                taskId: replyTaskId,
+                conversationId: replyConversationId,
+                headers,
             });
             if (outcome.held === false) {
                 return { messageRef, ...outcome.result };
@@ -369,8 +549,16 @@ export class EmailService {
                 bodyText,
                 bodyHtml,
                 messageRef,
+                headers,
             },
-            { userId, agentId: input.agentId, addressId: address.id, origin },
+            {
+                userId,
+                agentId: input.agentId,
+                addressId: address.id,
+                origin,
+                taskId: replyTaskId,
+                conversationId: replyConversationId,
+            },
         );
         return { messageRef, ...result };
     }

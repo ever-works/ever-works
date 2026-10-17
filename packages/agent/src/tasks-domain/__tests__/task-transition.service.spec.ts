@@ -56,8 +56,13 @@ describe('TaskTransitionService', () => {
         it('backlog → done disallowed', () => {
             expect(svc.canTransition(TaskStatus.BACKLOG, TaskStatus.DONE)).toBe(false);
         });
-        it('cancelled is terminal', () => {
-            expect(svc.canTransition(TaskStatus.CANCELLED, TaskStatus.TODO)).toBe(false);
+        // EW-P1-6 — cancelled is no longer terminal: it re-opens into the
+        // backlog or todo, and nowhere else.
+        it('cancelled re-opens into backlog or todo only', () => {
+            expect(svc.canTransition(TaskStatus.CANCELLED, TaskStatus.TODO)).toBe(true);
+            expect(svc.canTransition(TaskStatus.CANCELLED, TaskStatus.BACKLOG)).toBe(true);
+            expect(svc.canTransition(TaskStatus.CANCELLED, TaskStatus.IN_PROGRESS)).toBe(false);
+            expect(svc.canTransition(TaskStatus.CANCELLED, TaskStatus.DONE)).toBe(false);
         });
         it('done → in_progress allows reopen', () => {
             expect(svc.canTransition(TaskStatus.DONE, TaskStatus.IN_PROGRESS)).toBe(true);

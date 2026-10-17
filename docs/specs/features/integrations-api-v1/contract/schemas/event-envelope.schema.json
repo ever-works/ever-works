@@ -1,0 +1,126 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/event-envelope.schema.json",
+	"title": "Domain event envelope (contract v1, B.3)",
+	"description": "One domain event, exactly as served by GET /api/integrations/v1/events, delivered by webhooks v2 (one event per POST, body = this envelope) and handed to EW plugins (IDomainEventSubscriberPlugin). The `data` shape per `type` is listed in ../event-catalog.v1.json.",
+	"type": "object",
+	"required": [
+		"id",
+		"seq",
+		"type",
+		"version",
+		"occurredAt",
+		"tenantId",
+		"organizationId",
+		"aggregate",
+		"actor",
+		"origin",
+		"changedFields",
+		"data",
+		"previous"
+	],
+	"properties": {
+		"id": {
+			"description": "evt_<ULID>. Globally unique; the dedupe key for consumers (also sent as X-Ever-Works-Event-Id).",
+			"type": "string",
+			"pattern": "^evt_[0-9A-HJKMNP-TV-Z]{26}$"
+		},
+		"seq": {
+			"description": "Feed position: assigned by Ever Works when it dispatches the event, strictly increasing and gap-free in the feed, so paging with `after` never misses a committed event.",
+			"$ref": "common.schema.json#/$defs/Seq"
+		},
+		"type": {
+			"description": "Catalog type, `<aggregate>.<verb>` or `<aggregate>.<child>.<verb>`. See event-catalog.v1.json.",
+			"type": "string",
+			"pattern": "^[a-z][a-z_]*(\\.[a-z][a-z_]*){1,3}$",
+			"maxLength": 64
+		},
+		"version": {
+			"description": "Payload schema version of this event type. v1 of the contract only emits 1.",
+			"type": "integer",
+			"minimum": 1
+		},
+		"occurredAt": {
+			"$ref": "common.schema.json#/$defs/DateTime"
+		},
+		"tenantId": {
+			"$ref": "common.schema.json#/$defs/Uuid"
+		},
+		"organizationId": {
+			"description": "Never null on the integration feed or webhooks: personal-scope events (organizationId null) are recorded for in-process listeners but never served to integrations.",
+			"$ref": "common.schema.json#/$defs/NullableUuid"
+		},
+		"aggregate": {
+			"type": "object",
+			"required": ["type", "id", "version"],
+			"properties": {
+				"type": {
+					"type": "string",
+					"enum": [
+						"organization",
+						"agent",
+						"team",
+						"work",
+						"mission",
+						"goal",
+						"idea",
+						"task",
+						"inbox_item",
+						"kb_document",
+						"kb_folder",
+						"email_message"
+					]
+				},
+				"id": {
+					"$ref": "common.schema.json#/$defs/Uuid"
+				},
+				"version": {
+					"description": "The aggregate's version AFTER the change (A.4). For child events this is the PARENT's new version; for *.deleted it is the last version + 1; for task.runtime_updated it is the unchanged current version. Consumers skip a FULL-SNAPSHOT event whose aggregate.version <= the version already applied; child events and task.runtime_updated are applied by their own rules (spec.md §3), never skipped by version.",
+					"$ref": "common.schema.json#/$defs/Version"
+				}
+			},
+			"additionalProperties": false
+		},
+		"actor": {
+			"$ref": "common.schema.json#/$defs/Actor"
+		},
+		"origin": {
+			"description": "Loop-prevention marker (C.2/C.4). `tag` is the X-Sync-Origin header of the write that caused the event (e.g. gauzy:<connectionId>), null for native EW writes.",
+			"type": "object",
+			"required": ["tag", "integrationKeyId"],
+			"properties": {
+				"tag": {
+					"type": ["string", "null"],
+					"maxLength": 100
+				},
+				"integrationKeyId": {
+					"$ref": "common.schema.json#/$defs/NullableUuid"
+				}
+			},
+			"additionalProperties": false
+		},
+		"changedFields": {
+			"description": "DTO field names that changed. Empty for *.created and *.deleted. For child events: the parent's set field that changed (e.g. [\"assignees\"]).",
+			"type": "array",
+			"items": {
+				"type": "string",
+				"maxLength": 64
+			},
+			"uniqueItems": true
+		},
+		"data": {
+			"description": "Full post-change snapshot in the integration DTO shape (B.6) named by the catalog for this type. Delete events: the last known snapshot plus `deleted: true`. Child events: the child DTO. *.visibility_changed to private: only {id, visibility: 'private'}.",
+			"type": "object"
+		},
+		"previous": {
+			"description": "Previous values of changedFields only. {} when changedFields is empty.",
+			"type": "object"
+		},
+		"correlationId": {
+			"description": "Optional request/run correlation id (e.g. the HTTP request id). Informational.",
+			"type": ["string", "null"],
+			"maxLength": 100
+		}
+	},
+	"additionalProperties": false
+}

@@ -1,0 +1,29 @@
+{
+	"id": "e2b4d6f8-0a1c-4e3f-9b5d-7c8e9f0a1b23",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 2,
+	"createdAt": "2026-10-16T09:00:00.000Z",
+	"updatedAt": "2026-10-16T09:30:00.000Z",
+	"visibility": "organization",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "integration",
+		"id": "b4e6a8c0-2d3f-4a71-9b8c-1d2e3f4a5b67",
+		"label": "Ever Gauzy"
+	},
+	"externalLinks": [],
+	"teamIds": [],
+	"title": "Customer portal",
+	"description": "A self-service portal where customers see their invoices.",
+	"status": "pending",
+	"source": "external",
+	"missionId": null,
+	"targetWorkId": null,
+	"acceptedWorkId": null,
+	"failureMessage": null,
+	"webUrl": "https://app.ever.works/ideas/e2b4d6f8-0a1c-4e3f-9b5d-7c8e9f0a1b23"
+}

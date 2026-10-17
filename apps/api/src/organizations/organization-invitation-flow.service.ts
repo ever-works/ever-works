@@ -7,6 +7,11 @@ import {
     Optional,
 } from '@nestjs/common';
 import {
+    buildMemberSnapshot,
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '@ever-works/agent/domain-events';
+import {
     OrganizationInvitationService,
     type IssuedOrganizationInvitation,
 } from '@ever-works/agent/services';
@@ -94,6 +99,9 @@ export class OrganizationInvitationFlowService {
         @Optional()
         @Inject(SEAT_GUARD)
         private readonly seats?: SeatGuard,
+        // Domain events (EW-P1-1 B2) — `organization.member.added` / `.removed`,
+        // recorded right after the roster write. Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -472,9 +480,34 @@ export class OrganizationInvitationFlowService {
             throw new BadRequestException('cannot_remove_tenant_owner');
         }
 
+        const leaving = this.domainEvents
+            ? await this.members.findByOrgAndUser(orgId, targetUserId)
+            : null;
+        const memberBefore =
+            leaving && this.domainEvents
+                ? await this.domainEvents
+                      .transaction((manager) => buildMemberSnapshot(manager, leaving))
+                      .catch(() => null)
+                : null;
         const removed = await this.members.deleteByOrgAndUser(orgId, targetUserId);
         if (!removed) {
             throw new BadRequestException('not_a_member');
+        }
+        if (memberBefore) {
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) =>
+                    publisher.child(
+                        manager,
+                        'organization',
+                        orgId,
+                        'organization.member.removed',
+                        { ...memberBefore, deleted: true },
+                        { changedFields: ['members'] },
+                    ),
+                (message) => this.logger.warn(message),
+                `organization.member.removed for ${orgId}`,
+            );
         }
 
         if (!organization.tenantId) return;
@@ -488,6 +521,61 @@ export class OrganizationInvitationFlowService {
                 `User ${targetUserId} left tenant ${organization.tenantId} — no memberships remain`,
             );
         }
+    }
+
+    /**
+     * EW-P2-6 — promote a roster member to `admin` or demote them to `member`.
+     *
+     * Only the Tenant owner decides (the owner role is the Tenant owner's alone and
+     * cannot be granted); the target must be on the roster and cannot be the owner.
+     * An `admin` may create integration keys pinned to this Organization; a demotion
+     * takes that away at once — the key principal re-reads the roster on every
+     * request. Records `organization.member.updated` (child: the member).
+     */
+    async setMemberRole(
+        orgId: string,
+        targetUserId: string,
+        role: string,
+        actorUserId: string,
+    ): Promise<OrganizationMemberView> {
+        const organization = await this.membership.ensureMember(orgId, actorUserId);
+        if (!(await this.isTenantOwner(actorUserId, organization.tenantId))) {
+            throw new ForbiddenException('only_the_owner_changes_roles');
+        }
+        if (role !== 'admin' && role !== 'member') {
+            throw new BadRequestException('invalid_role');
+        }
+        if (await this.isTenantOwner(targetUserId, organization.tenantId)) {
+            throw new BadRequestException('cannot_change_owner_role');
+        }
+        const existing = await this.members.findByOrgAndUser(orgId, targetUserId);
+        if (!existing) {
+            throw new BadRequestException('not_a_member');
+        }
+        if (existing.role !== role) {
+            await this.members.updateRole(orgId, targetUserId, role);
+            await recordAfterWrite(
+                this.domainEvents,
+                async (publisher, manager) => {
+                    const member = await buildMemberSnapshot(manager, { ...existing, role });
+                    if (!member) return;
+                    await publisher.child(
+                        manager,
+                        'organization',
+                        orgId,
+                        'organization.member.updated',
+                        member as unknown as Record<string, unknown>,
+                        { changedFields: ['members'], previous: { role: existing.role } },
+                    );
+                },
+                (message) => this.logger.warn(message),
+                `organization.member.updated for ${orgId}`,
+            );
+        }
+        const views = await this.listMembers(orgId, actorUserId);
+        const view = views.find((entry) => entry.userId === targetUserId);
+        if (!view) throw new BadRequestException('not_a_member');
+        return view;
     }
 
     /**
@@ -510,7 +598,7 @@ export class OrganizationInvitationFlowService {
     ): Promise<void> {
         const existing = await this.members.findByOrgAndUser(organizationId, userId);
         if (existing) return;
-        await this.members.create({
+        const created = await this.members.create({
             organizationId,
             tenantId,
             userId,
@@ -519,5 +607,22 @@ export class OrganizationInvitationFlowService {
             invitationId: extra.invitationId ?? null,
             joinedAt: new Date(),
         });
+        await recordAfterWrite(
+            this.domainEvents,
+            async (publisher, manager) => {
+                const member = await buildMemberSnapshot(manager, created);
+                if (!member) return;
+                await publisher.child(
+                    manager,
+                    'organization',
+                    organizationId,
+                    'organization.member.added',
+                    member as unknown as Record<string, unknown>,
+                    { changedFields: ['members'] },
+                );
+            },
+            (message) => this.logger.warn(message),
+            `organization.member.added for ${organizationId}`,
+        );
     }
 }

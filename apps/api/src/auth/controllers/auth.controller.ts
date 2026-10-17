@@ -15,6 +15,7 @@ import {
     ForbiddenException,
     UseInterceptors,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../integration/integration-forbidden.guard';
 import {
     ApiTags,
     ApiOperation,
@@ -55,6 +56,8 @@ import { EverIdProvidersInterceptor } from '../interceptors/ever-id-providers.in
 
 @ApiTags('Auth')
 @Controller('api/auth')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class AuthController {
     private readonly logger = new Logger(AuthController.name);
 

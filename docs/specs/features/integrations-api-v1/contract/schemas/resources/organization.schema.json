@@ -1,0 +1,21 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/organization.schema.json",
+	"title": "Organization DTO (B.6, GET /organization)",
+	"description": "The organization named by X-Scope-Slug. Read-only in v1 (org:write is P2). `version` is bumped by roster changes too, so organization.member.* events can carry it as aggregate.version.",
+	"type": "object",
+	"required": ["id", "tenantId", "slug", "displayName", "version", "createdAt", "updatedAt"],
+	"properties": {
+		"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"tenantId": { "$ref": "../common.schema.json#/$defs/Uuid" },
+		"slug": { "type": "string", "minLength": 1, "maxLength": 64 },
+		"displayName": { "type": "string", "maxLength": 200 },
+		"legalName": { "type": ["string", "null"], "maxLength": 200 },
+		"countryCode": { "type": ["string", "null"], "maxLength": 2 },
+		"version": { "$ref": "../common.schema.json#/$defs/Version" },
+		"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"updatedAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" }
+	},
+	"additionalProperties": false
+}

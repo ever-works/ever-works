@@ -54,7 +54,7 @@
 		"@types/react": "~19.2.18",
 		"@types/react-dom": "~19.2.7",
 		"cspell": "^10.4.0",
-		"postcss": "^8.5.23",
+		"postcss": "^8.5.30",
 		"tailwind-merge": "^3.4.0",
 		"tailwindcss": "^4.2.2",
 		"typescript": "~5.9.3"

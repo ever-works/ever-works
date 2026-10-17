@@ -11,6 +11,8 @@ export * from './task-gate-runner.service';
 export * from './task-gate-judge.service';
 export * from './check-env';
 export * from './task-transition.service';
+// EW-P1-6 — sync-transition path search and the `409 transition_blocked`.
+export * from './task-transition-path';
 export * from './task-chat.service';
 export * from './task-dispatcher';
 export * from './run-steering-port';
@@ -39,7 +41,14 @@ export * from './task-extra-repos';
 export * from './repo-declared-commands';
 export * from './task-notification.service';
 export * from './task-templates.service';
-export { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
+export {
+    Task,
+    TaskPriority,
+    TaskStatus,
+    type TaskActorType,
+    type TaskAuthorType,
+    type TaskExternalAuthor,
+} from '../entities/task.entity';
 export { TaskAssignee } from '../entities/task-assignee.entity';
 export { TaskReviewer, type TaskReviewState } from '../entities/task-reviewer.entity';
 export { TaskApprover, type TaskApprovalState } from '../entities/task-approver.entity';

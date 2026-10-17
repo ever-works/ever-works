@@ -211,6 +211,14 @@ export interface GitHubWebhookBody {
         line?: number | null;
         original_line?: number | null;
         pull_request_review_id?: number;
+        /**
+         * `pull_request_review_comment` only: the comment this one answers
+         * inside a review thread, or absent for the thread's first comment.
+         * A trusted bot's REPLY in a thread is conversation, not a new
+         * finding, unless it carries a severity marker
+         * ({@link classifyReviewBotComment}).
+         */
+        in_reply_to_id?: number | null;
     };
     /**
      * Orchestration M9 - `pull_request_review` deliveries. A human
@@ -970,7 +978,11 @@ export class GitHubPrReviewBridgeService {
         const comment = body.comment;
         if (!comment || typeof comment.id !== 'number') return;
         const raw = comment.body ?? '';
-        const verdict = classifyReviewBotComment({ action: body.action, body: raw });
+        const verdict = classifyReviewBotComment({
+            action: body.action,
+            body: raw,
+            inReplyTo: comment.in_reply_to_id ?? null,
+        });
         if (verdict.kind === 'ignore') {
             this.logger.debug(
                 `Reviewer-bot ${eventName} ${comment.id} (${body.action ?? 'no action'}) by ${
@@ -1326,6 +1338,21 @@ export class GitHubPrReviewBridgeService {
                 return null;
             }
             if (!text.toLowerCase().includes(EVER_WORKS_MENTION)) {
+                return null;
+            }
+            // A mention is an INSTRUCTION to the reviewer, so the same rule as
+            // a review applies (#2579): only an OWNER, MEMBER or COLLABORATOR of
+            // the repository may give one. On a public repository any GitHub
+            // account can comment `@ever-works …`, and each such comment used to
+            // start a paid AI review with that stranger's text as its prompt
+            // (self-build handover item 11). Fails closed: a missing or unknown
+            // association is an outsider.
+            if (classifyReviewAuthor(comment, this.reviewBotPolicy()) !== 'human') {
+                this.logger.debug(
+                    `Ignored an @ever-works mention from @${comment.user?.login ?? 'unknown'} (author_association=${
+                        comment.author_association ?? 'missing'
+                    }) on ${fullName}: only an OWNER, MEMBER or COLLABORATOR can ask for a review.`,
+                );
                 return null;
             }
             // issue_comment fires for plain issues too — only PR threads

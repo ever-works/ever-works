@@ -714,6 +714,133 @@ describe('WorkLifecycleService', () => {
         });
     });
 
+    // EW-P2-4 — the repo-less Project Work kind, behind its switch.
+    describe('createProjectWork (EW-P2-4)', () => {
+        const saved = process.env.EVER_WORKS_PROJECT_WORKS_ENABLED;
+        afterEach(() => {
+            if (saved === undefined) delete process.env.EVER_WORKS_PROJECT_WORKS_ENABLED;
+            else process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = saved;
+        });
+
+        it.each([undefined, '', 'false', 'TRUE', '1'])(
+            'refuses with project_works_disabled when the switch is %j (only exactly "true" is on)',
+            async (value) => {
+                if (value === undefined) delete process.env.EVER_WORKS_PROJECT_WORKS_ENABLED;
+                else process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = value;
+                await expect(
+                    service.createProjectWork(user, { name: 'Relaunch', slug: 'relaunch' }),
+                ).rejects.toMatchObject({
+                    status: 400,
+                    response: expect.objectContaining({ code: 'project_works_disabled' }),
+                });
+                expect(workRepository.create).not.toHaveBeenCalled();
+            },
+        );
+
+        it('persists a bare kind=project Work with no repository, template, generation or deploy', async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            const persisted = { id: 'w-p', kind: 'project', name: 'Relaunch' } as any;
+            workRepository.create.mockResolvedValue(persisted);
+
+            const result = await service.createProjectWork(user, {
+                name: 'Relaunch',
+                slug: 'relaunch',
+                description: 'Website relaunch',
+            });
+
+            expect(workRepository.create).toHaveBeenCalledTimes(1);
+            const [dto] = workRepository.create.mock.calls[0];
+            expect(dto).toMatchObject({
+                kind: 'project',
+                status: 'active',
+                slug: 'relaunch',
+                name: 'Relaunch',
+                description: 'Website relaunch',
+                userId: user.id,
+            });
+            expect(dto.deployProvider).toBeNull();
+            expect(dto.websiteTemplateId).toBeUndefined();
+            expect(dataGenerator.getItems).not.toHaveBeenCalled();
+            expect(result).toBe(persisted);
+        });
+
+        it('records work.created (this path emits no work.created app event for the bridge)', async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            workRepository.create.mockResolvedValue({ id: 'w-p', kind: 'project' } as any);
+            const manager = { tx: true } as never;
+            const publisher = {
+                transaction: jest.fn(async (fn: (m: never) => Promise<unknown>) => fn(manager)),
+                created: jest.fn().mockResolvedValue(undefined),
+            };
+            (service as unknown as { domainEvents: unknown }).domainEvents = publisher;
+
+            await service.createProjectWork(user, { name: 'Relaunch', slug: 'relaunch' });
+
+            expect(publisher.created).toHaveBeenCalledWith(manager, 'work', 'w-p', 'work.created');
+        });
+
+        it('withinCreate: the row, work.created and the hook share ONE transaction (T17a pattern)', async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            workRepository.create.mockResolvedValue({ id: 'w-p', kind: 'project' } as any);
+            const manager = { tx: true } as never;
+            const publisher = {
+                transaction: jest.fn(async (fn: (m: never) => Promise<unknown>) => fn(manager)),
+                created: jest.fn().mockResolvedValue(undefined),
+            };
+            (service as unknown as { domainEvents: unknown }).domainEvents = publisher;
+            const withinCreate = jest.fn().mockResolvedValue(undefined);
+
+            const result = await service.createProjectWork(
+                user,
+                { name: 'Relaunch', slug: 'relaunch' },
+                { withinCreate },
+            );
+
+            expect(publisher.transaction).toHaveBeenCalledTimes(1);
+            expect(workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ kind: 'project' }),
+                user,
+                manager,
+            );
+            expect(publisher.created).toHaveBeenCalledWith(manager, 'work', 'w-p', 'work.created');
+            expect(withinCreate).toHaveBeenCalledWith({ id: 'w-p', kind: 'project' }, manager);
+            expect(result).toMatchObject({ id: 'w-p' });
+        });
+
+        it("withinCreate: the hook's own error reaches the caller as thrown (not normalized)", async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            workRepository.create.mockResolvedValue({ id: 'w-p', kind: 'project' } as any);
+            const publisher = {
+                transaction: jest.fn(async (fn: (m: never) => Promise<unknown>) => fn({} as never)),
+                created: jest.fn().mockResolvedValue(undefined),
+            };
+            (service as unknown as { domainEvents: unknown }).domainEvents = publisher;
+            class LostRace extends Error {}
+            const lost = new LostRace('the link lost its race');
+
+            await expect(
+                service.createProjectWork(
+                    user,
+                    { name: 'Relaunch', slug: 'relaunch' },
+                    { withinCreate: jest.fn().mockRejectedValue(lost) },
+                ),
+            ).rejects.toBe(lost);
+        });
+
+        it('withinCreate without DomainEventsModule is refused (a link outside the transaction would be silent)', async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            (service as unknown as { domainEvents: unknown }).domainEvents = undefined;
+            await expect(
+                service.createProjectWork(
+                    user,
+                    { name: 'Relaunch', slug: 'relaunch' },
+                    { withinCreate: jest.fn() },
+                ),
+            ).rejects.toThrow('needs DomainEventsModule');
+            expect(workRepository.create).not.toHaveBeenCalled();
+        });
+    });
+
     describe('createCompanyWork (EW-665 Phase 13)', () => {
         it('persists a kind=company Work with the chosen status, no repo side-effects', async () => {
             const persisted = {

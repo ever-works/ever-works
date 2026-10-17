@@ -6,6 +6,7 @@ import {
     JoinColumn,
     ManyToOne,
     PrimaryGeneratedColumn,
+    UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { TenantEmailAddress } from './tenant-email-address.entity';
@@ -14,6 +15,24 @@ import type { EmailMessageStatus } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 export type EmailMessageDirection = 'outbound' | 'inbound';
+
+/**
+ * EW-P4-3 — one inbound attachment as recorded on its message. `uploadId` is
+ * the `user_uploads` content id when the bytes were stored (`stored: true`);
+ * an attachment the upload pipeline refused (type not allowed, too large,
+ * over the per-message limits) is still listed, with `stored: false` and the
+ * reason, so nobody is left wondering where it went.
+ */
+export interface EmailMessageAttachmentRecord {
+    filename: string;
+    mimeType: string;
+    size: number;
+    cid?: string | null;
+    stored: boolean;
+    uploadId?: string | null;
+    url?: string | null;
+    reason?: string | null;
+}
 
 /**
  * Notifications v2 — Email Providers (EW-650, EW-667).
@@ -55,6 +74,12 @@ export type EmailMessageDirection = 'outbound' | 'inbound';
 // sent since T?". Both are read on every send.
 @Index('idx_email_messages_agent_direction_sent', ['agentId', 'direction', 'sentAt'])
 @Index('idx_email_messages_user_direction_sent', ['userId', 'direction', 'sentAt'])
+// EW-P4-3 — RFC threading: "which of this owner's messages has Message-ID X?"
+// is asked for every id of an inbound reply's In-Reply-To / References.
+@Index('idx_email_messages_user_message_id_header', ['userId', 'messageIdHeader'])
+// EW-P4-2 — the integration list `GET /api/integrations/v1/email/messages`: one
+// organization's messages ordered by `(updatedAt, id)` (migration 1795130300000).
+@Index('idx_email_messages_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class EmailMessage {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -101,6 +126,24 @@ export class EmailMessage {
     @Column({ type: 'varchar', length: 200, nullable: true })
     providerMessageId?: string | null;
 
+    /**
+     * EW-P4-3 — RFC 5322 `Message-ID` of this message, bare (no angle
+     * brackets; `normalizeMessageId` in `@ever-works/plugin`). Outbound: the
+     * id the platform set on the send. Inbound: the sender's, when the
+     * provider surfaced it. Distinct from `providerMessageId`, the provider's
+     * own handle. NULL when unknown, or longer than 255 characters.
+     */
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    messageIdHeader?: string | null;
+
+    /** EW-P4-3 — first id of `In-Reply-To`, bare. */
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    inReplyTo?: string | null;
+
+    /** EW-P4-3 — ids of `References`, bare, oldest first (at most 50). */
+    @Column({ type: 'simple-json', nullable: true })
+    references?: string[] | null;
+
     @Column({ type: 'varchar', length: 254 })
     from: string;
 
@@ -125,6 +168,13 @@ export class EmailMessage {
 
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, unknown> | null;
+
+    /**
+     * EW-P4-3 — attachments of an inbound message (metadata + where the bytes
+     * went). NULL for a message without attachments, and for outbound rows.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    attachments?: EmailMessageAttachmentRecord[] | null;
 
     /** Caller-supplied idempotency key (`EmailSendInput.messageRef`). */
     @Column({ type: 'varchar', length: 120, nullable: true })
@@ -173,4 +223,22 @@ export class EmailMessage {
 
     @CreateDateColumn()
     createdAt: Date;
+
+    /**
+     * EW-P4-2 — moves on every write to the row (status, delivery status, the
+     * Task link), so `GET /api/integrations/v1/email/messages?updatedSince=`
+     * catches every change. Existing rows start at their `createdAt`
+     * (migration 1795130300000).
+     */
+    @UpdateDateColumn()
+    updatedAt: Date;
+
+    /**
+     * EW-P4-2 — aggregate version of `email.message.*` domain events and the
+     * `ETag` of `GET /api/integrations/v1/email/messages/:id`; bumped by
+     * `bumpAggregateVersion` on every recorded change. A plain column, NOT
+     * `@VersionColumn`.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

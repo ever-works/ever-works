@@ -36,7 +36,7 @@ import type { FleetJob } from '../entities/fleet-job.entity';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { TasksService } from './tasks.service';
-import { resolveTaskRepository, taskRepositoryFullName } from './task-repository';
+import { pickOwnerRepo, requireTaskRepository, taskRepositoryFullName } from './task-repository';
 
 /** Longest note kept on the row. Half of what lands here is node-reported. */
 const DETAIL_MAX = 512;
@@ -1288,8 +1288,8 @@ export class ReleaseVerificationService {
         userId: string,
     ): { owner: string; repo: string; gitOptions: GitFacadeOptions } {
         return {
-            owner: resolveTaskRepository(work).owner,
-            repo: resolveTaskRepository(work).repo,
+            // EW-P2-4 — refused (400) for a repo-less Work, never a derived name.
+            ...pickOwnerRepo(requireTaskRepository(work, 'release verification')),
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
         };
     }
@@ -1438,7 +1438,7 @@ function revertTaskDescription(
     work: Work | null,
     withReading: boolean,
 ): string {
-    const repo = work ? `${taskRepositoryFullName(work)}` : 'the release repository';
+    const repo = (work ? taskRepositoryFullName(work) : null) ?? 'the release repository';
     return [
         `Post-deploy verification FAILED after \`${promotion.headBranch}\` → \`${promotion.baseBranch}\` ` +
             `landed in ${repo}.`,

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
+import { RecordVisibilityModule } from '../record-visibility/record-visibility.module';
 import { FacadesModule } from '../facades/facades.module';
 import { TitlerModule } from '../titler/titler.module';
 import { WorkProposal } from '../entities/work-proposal.entity';
@@ -36,6 +38,10 @@ import {
         ActivityLogModule,
         FacadesModule,
         TitlerModule,
+        // EW-P2-1 - idea.* events (WorkProposalRepository) and integration-created
+        // Ideas' Teams + D11 (WorkProposalService.createExternal).
+        DomainEventsModule,
+        RecordVisibilityModule,
         // PR-6 — User + Organization back VisionContextService's
         // active-Org vision lookup for Idea-generation prompts.
         TypeOrmModule.forFeature([

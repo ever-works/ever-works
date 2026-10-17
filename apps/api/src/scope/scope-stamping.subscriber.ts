@@ -1,6 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntitySubscriberInterface, InsertEvent } from 'typeorm';
+import {
+    applyInsertVisibilityDefault,
+    hasVisibilityColumns,
+    type VisibilityRow,
+} from '@ever-works/agent/entities';
 import { ScopeContextService } from './scope-context.service';
 
 /**
@@ -118,6 +123,15 @@ export class ScopeStampingSubscriber
         }
         if (entity.organizationId === undefined) {
             entity.organizationId = scope.organizationId;
+        }
+
+        // Record visibility (EW-P1-3): the entity's own @BeforeInsert listener
+        // runs BEFORE this subscriber, so a row whose scope is stamped here still
+        // has no visibility. Now that `organizationId` is known, apply the same
+        // D11 default (personal → private, org → team/organization). A value the
+        // caller or the listener already set is kept.
+        if (hasVisibilityColumns(metadata.columns.map((c) => c.propertyName))) {
+            applyInsertVisibilityDefault(entity as VisibilityRow, Boolean(entity.teamId));
         }
     }
 }

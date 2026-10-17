@@ -26,6 +26,18 @@ describe('TitlerService.generateTitle (heuristic)', () => {
         expect(await svc.generateTitle('Hello world;')).toBe('Hello world');
     });
 
+    it('strips a whole trailing run of mixed punctuation, dashes and em dashes included', async () => {
+        expect(await svc.generateTitle('Ship it!?!')).toBe('Ship it');
+        expect(await svc.generateTitle('Ship it —')).toBe('Ship it');
+        expect(await svc.generateTitle('Ship it --;:')).toBe('Ship it');
+        expect(await svc.generateTitle('Wait! Ship it')).toBe('Wait! Ship it');
+    });
+
+    it('keeps a long punctuation run that is NOT at the end (then clips it)', async () => {
+        const hostile = '!'.repeat(200_000) + 'x';
+        expect(await svc.generateTitle(hostile)).toBe('!'.repeat(80));
+    });
+
     it('clips to the default 80-char cap', async () => {
         const longInput =
             'A really comprehensive directory of every single open-source AI agent framework on GitHub';

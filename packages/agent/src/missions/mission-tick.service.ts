@@ -16,6 +16,10 @@ import { WorkProposalService } from '../user-research/work-proposal.service';
 import { MAX_MISSION_WORKS_IN_PROMPT, type MissionWorkContext } from '../user-research/prompts';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { matchesCron } from './cron-matcher';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 
 /**
  * Outcome of running a single Mission tick (either via the
@@ -144,6 +148,9 @@ export class MissionTickService {
         // the previous behaviour.
         @Optional()
         private readonly works?: WorkRepository,
+        // EW-P2-5 — `mission.status_changed` when a fatal tick fails the Mission.
+        // TRAILING + @Optional(): absent records nothing.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     /**
@@ -393,10 +400,29 @@ export class MissionTickService {
             // resume endpoint accepts FAILED. Best-effort - a persistence
             // error must not mask the original failure.
             try {
-                await this.missions.update(
+                const failed = await this.missions.update(
                     { id: mission.id, status: MissionStatus.ACTIVE },
                     { status: MissionStatus.FAILED },
                 );
+                if (failed.affected) {
+                    await recordAfterWrite(
+                        this.domainEvents,
+                        (publisher, manager) =>
+                            publisher.changed(
+                                manager,
+                                'mission',
+                                mission.id,
+                                'mission.status_changed',
+                                {
+                                    changedFields: ['status'],
+                                    previous: { status: MissionStatus.ACTIVE },
+                                    actor: { type: 'system', id: 'mission-tick', label: null },
+                                },
+                            ),
+                        (message) => this.logger.warn(message),
+                        `mission.status_changed for mission ${mission.id}`,
+                    );
+                }
                 await this.recordActivity(
                     mission,
                     ActivityActionType.MISSION_FAILED,

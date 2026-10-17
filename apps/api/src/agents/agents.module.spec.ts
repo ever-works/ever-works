@@ -71,6 +71,7 @@ jest.mock('@ever-works/agent/facades', () => ({
 }));
 jest.mock('@ever-works/agent/notifications', () => ({
     INBOUND_EMAIL_TASK_SPAWNER: 'INBOUND_EMAIL_TASK_SPAWNER',
+    INBOUND_EMAIL_ATTACHMENT_STORE: 'INBOUND_EMAIL_ATTACHMENT_STORE',
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TasksDomainModule: class TasksDomainModule {},
@@ -654,6 +655,247 @@ describe('api-side AgentsModule — AGENT_EMAIL_FACADE approve-before-send', () 
             { origin: 'agent' },
         );
         expect(result).toMatchObject({ held: true, messageId: 'm-2', targetAddress: 'peer@x.com' });
+    });
+
+    // EW-P4-3 — reply in thread.
+    it('passes inReplyToMessageId through to the send', async () => {
+        const sendMessage = jest.fn().mockResolvedValue({
+            messageRef: 'ref',
+            providerMessageId: 'pm-2',
+            accepted: ['ada@x.com'],
+            rejected: [],
+        });
+        await build(sendMessage).sendEmail({
+            userId: 'user-1',
+            agentId: 'agent-1',
+            to: ['ada@x.com'],
+            subject: 'Re: Hi',
+            bodyText: 'Hello again',
+            inReplyToMessageId: 'msg-in-1',
+        });
+        expect(sendMessage).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({ inReplyToMessageId: 'msg-in-1' }),
+            { origin: 'agent' },
+        );
+    });
+});
+
+/**
+ * EW-P4-3 — inbound attachments go through the SAME upload pipeline as a
+ * user's own uploads (type + size validated there), owned by the receiving
+ * address's owner, in its scope.
+ */
+describe('api-side AgentsModule — INBOUND_EMAIL_ATTACHMENT_STORE', () => {
+    it('saves through UploadsService.saveFile with the address scope', async () => {
+        const uploads = {
+            saveFile: jest.fn().mockResolvedValue({ id: 'sha-1', url: '/api/uploads/sha-1' }),
+        };
+        const store = findProvider('INBOUND_EMAIL_ATTACHMENT_STORE')?.useFactory?.(uploads) as {
+            store: (input: Record<string, unknown>) => Promise<{ uploadId: string; url?: string }>;
+        };
+        const content = Buffer.from('%PDF-1');
+        await expect(
+            store.store({
+                userId: 'user-1',
+                tenantId: 'tenant-1',
+                organizationId: 'org-1',
+                filename: 'a.pdf',
+                mimeType: 'application/pdf',
+                content,
+            }),
+        ).resolves.toEqual({ uploadId: 'sha-1', url: '/api/uploads/sha-1' });
+        expect(uploads.saveFile).toHaveBeenCalledWith(
+            'user-1',
+            { buffer: content, mimetype: 'application/pdf', size: 6, originalname: 'a.pdf' },
+            { ownershipScope: { tenantId: 'tenant-1', organizationId: 'org-1' } },
+        );
+    });
+
+    it('is exported, so the agent-side dispatcher can reach it', () => {
+        expect(meta('exports')).toContain('INBOUND_EMAIL_ATTACHMENT_STORE');
+    });
+});
+
+/**
+ * EW-P4-3 — the inbound-email Task spawner: a spawned Task names the email
+ * message id (so the agent can reply in thread), and a reply that threads onto
+ * an existing Task is posted on that Task's chat with only the receiving
+ * agent's mention live.
+ */
+describe('api-side AgentsModule — INBOUND_EMAIL_TASK_SPAWNER', () => {
+    type Spawner = {
+        spawnTaskForInboundEmail: (
+            input: Record<string, unknown>,
+        ) => Promise<{ taskId: string } | null>;
+        appendInboundEmailToTask: (
+            input: Record<string, unknown>,
+        ) => Promise<{ taskId: string } | null>;
+    };
+
+    const input = {
+        agentId: 'agent-1',
+        userId: 'user-1',
+        emailMessageId: 'msg-in-1',
+        subject: 'Need help',
+        bodyText: 'Please @other-bot do it',
+        from: 'ada@x.com',
+    };
+
+    function build(
+        agent: {
+            id: string;
+            slug: string;
+            tenantId?: string | null;
+            organizationId?: string | null;
+        } | null = { id: 'agent-1', slug: 'support-bot' },
+    ) {
+        const tasks = {
+            create: jest.fn().mockResolvedValue({ id: 'task-new' }),
+            addAssignee: jest.fn().mockResolvedValue(undefined),
+        };
+        const chat = { post: jest.fn().mockResolvedValue({ id: 'chat-1' }) };
+        const agents = { findByIdAndUser: jest.fn().mockResolvedValue(agent) };
+        const spawner = findProvider('INBOUND_EMAIL_TASK_SPAWNER')?.useFactory?.(
+            tasks,
+            chat,
+            agents,
+        ) as Spawner;
+        return { spawner, tasks, chat, agents };
+    }
+
+    it('spawns a Task whose description names the email message id', async () => {
+        const { spawner, tasks } = build();
+        await expect(spawner.spawnTaskForInboundEmail(input)).resolves.toEqual({
+            taskId: 'task-new',
+        });
+        expect(tasks.create).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({
+                title: 'Need help',
+                labels: ['inbound-email'],
+                description: expect.stringContaining('inReplyToMessageId=msg-in-1'),
+            }),
+        );
+        expect(tasks.addAssignee).toHaveBeenCalledWith('user-1', 'task-new', 'agent', 'agent-1');
+    });
+
+    it('appends a threaded reply to the existing Task chat, mentioning only the receiving agent', async () => {
+        const { spawner, chat, tasks, agents } = build();
+        await expect(
+            spawner.appendInboundEmailToTask({ ...input, taskId: 'task-original' }),
+        ).resolves.toEqual({ taskId: 'task-original' });
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith('agent-1', 'user-1');
+        expect(tasks.create).not.toHaveBeenCalled();
+        const [userId, post, lookups] = chat.post.mock.calls[0];
+        expect(userId).toBe('user-1');
+        expect(post).toMatchObject({
+            taskId: 'task-original',
+            authorType: 'user',
+            authorId: 'user-1',
+        });
+        expect(post.body.startsWith('@support-bot ')).toBe(true);
+        expect([...String(post.body).matchAll(/@([a-z0-9-]{1,80})\b/g)].map((m) => m[1])).toEqual([
+            'support-bot',
+        ]);
+        expect([...lookups.ownedAgentSlugs.entries()]).toEqual([['support-bot', 'agent-1']]);
+    });
+
+    // EW-P4-3 — the Task lives where its assignee (the receiving Agent) lives,
+    // and names the attachments the email came with.
+    it("creates the Task in the receiving Agent's tenant / organization", async () => {
+        const { spawner, tasks } = build({
+            id: 'agent-1',
+            slug: 'support-bot',
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+        });
+        await spawner.spawnTaskForInboundEmail({
+            ...input,
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+            attachments: [
+                {
+                    filename: 'a.pdf',
+                    mimeType: 'application/pdf',
+                    size: 6,
+                    stored: true,
+                    uploadId: 'sha-1',
+                },
+            ],
+        });
+        const [, created, scope] = tasks.create.mock.calls[0];
+        expect(scope).toEqual({ tenantId: 'tenant-1', organizationId: 'org-1' });
+        expect(created.description).toContain('- a.pdf (application/pdf, 6 bytes, upload sha-1)');
+        expect(tasks.addAssignee).toHaveBeenCalledWith('user-1', 'task-new', 'agent', 'agent-1');
+    });
+
+    // Review on #2612: an org address may be bound to the owner's PERSONAL
+    // Agent (or one of another org). The Task must follow the Agent, or
+    // `addAssignee` cannot reach the Agent from it and delivery stops.
+    it('follows the Agent, not the address, when their scopes differ', async () => {
+        const { spawner, tasks } = build({ id: 'agent-1', slug: 'support-bot' });
+        await spawner.spawnTaskForInboundEmail({
+            ...input,
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+        });
+        expect(tasks.create.mock.calls[0][2]).toBeUndefined();
+        const other = build({
+            id: 'agent-1',
+            slug: 'support-bot',
+            tenantId: 'tenant-1',
+            organizationId: 'org-2',
+        });
+        await other.spawner.spawnTaskForInboundEmail({
+            ...input,
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+        });
+        expect(other.tasks.create.mock.calls[0][2]).toEqual({
+            tenantId: 'tenant-1',
+            organizationId: 'org-2',
+        });
+    });
+
+    it('keeps the old unscoped create when the Agent cannot be resolved', async () => {
+        const { spawner, tasks } = build(null);
+        await spawner.spawnTaskForInboundEmail({ ...input, organizationId: 'org-1' });
+        expect(tasks.create.mock.calls[0][2]).toBeUndefined();
+    });
+
+    it('keeps the personal scope for a personal Agent', async () => {
+        const { spawner, tasks } = build();
+        await spawner.spawnTaskForInboundEmail(input);
+        expect(tasks.create.mock.calls[0][2]).toBeUndefined();
+    });
+
+    it('posts the attachments of a threaded reply on the Task chat', async () => {
+        const { spawner, chat } = build();
+        await spawner.appendInboundEmailToTask({
+            ...input,
+            taskId: 'task-original',
+            attachments: [
+                {
+                    filename: 'scan.pdf',
+                    mimeType: 'application/pdf',
+                    size: 9,
+                    stored: true,
+                    uploadId: 'sha-9',
+                },
+            ],
+        });
+        expect(chat.post.mock.calls[0][1].body).toContain(
+            '- scan.pdf (application/pdf, 9 bytes, upload sha-9)',
+        );
+    });
+
+    it("does not append when the receiving agent is not the owner's", async () => {
+        const { spawner, chat } = build(null);
+        await expect(
+            spawner.appendInboundEmailToTask({ ...input, taskId: 'task-original' }),
+        ).resolves.toBeNull();
+        expect(chat.post).not.toHaveBeenCalled();
     });
 });
 
@@ -1860,6 +2102,19 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
                 /git provider/i,
             );
+            expectNoGitWork(git);
+        });
+
+        // EW-P2-4 — a repo-less Project Work has nothing to commit to.
+        it('refuses a Project Work (no repository) before resolving any repository name', async () => {
+            const work = makeWork({ kind: 'project' });
+            const { facade, git } = build({ work });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /no repository/i,
+            );
+            expect(work.getDataRepo).not.toHaveBeenCalled();
+            expect(work.getWebsiteRepo).not.toHaveBeenCalled();
             expectNoGitWork(git);
         });
 

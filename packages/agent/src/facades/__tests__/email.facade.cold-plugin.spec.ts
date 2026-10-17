@@ -661,5 +661,138 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
 
             expect(unhandled).toEqual([]);
         });
+
+        /**
+         * EW-P4-3 — with NO secret at any scope (no owner secret, no admin
+         * secret, no env var) the shipped plugins used to ACCEPT the webhook
+         * (Postmark with a warning, Mailgun silently), so anyone who knew the
+         * public URL could inject mail. They now refuse it (401), unless the
+         * operator sets the explicit opt-out `EMAIL_INBOUND_ALLOW_UNSIGNED=true`.
+         */
+        describe('with no secret configured at any scope (EW-P4-3)', () => {
+            const ENV_KEYS = [
+                'POSTMARK_INBOUND_SECRET',
+                'MAILGUN_WEBHOOK_SIGNING_KEY',
+                'EMAIL_INBOUND_ALLOW_UNSIGNED',
+            ] as const;
+            const saved: Record<string, string | undefined> = {};
+
+            beforeEach(() => {
+                for (const key of ENV_KEYS) {
+                    saved[key] = process.env[key];
+                    delete process.env[key];
+                }
+            });
+
+            afterEach(() => {
+                for (const key of ENV_KEYS) {
+                    if (saved[key] === undefined) delete process.env[key];
+                    else process.env[key] = saved[key];
+                }
+            });
+
+            it('postmark: refuses an unsigned webhook (401) and never parses it', async () => {
+                const facade = realWorld('postmark', {});
+                const { rawBody } = postmarkWebhook('anything');
+
+                const unhandled = await collectUnhandled(async () => {
+                    await expect(
+                        facade.parseInbound('postmark', rawBody, {}),
+                    ).rejects.toMatchObject({
+                        status: 401,
+                        message: 'Invalid webhook signature',
+                    });
+                    // A guessed Basic credential is no better: there is nothing to check it against.
+                    await expect(
+                        facade.parseInbound('postmark', rawBody, { authorization: basic('guess') }),
+                    ).rejects.toMatchObject({ status: 401 });
+                });
+
+                expect(unhandled).toEqual([]);
+            });
+
+            it('mailgun: refuses an unsigned webhook (401) and never parses it', async () => {
+                const facade = realWorld('mailgun', {});
+                const unsigned = Buffer.from(
+                    new URLSearchParams({
+                        sender: 'sender@example.com',
+                        recipient: RECIPIENT,
+                        subject: 'hello',
+                        'body-plain': 'body',
+                    }).toString(),
+                );
+
+                const unhandled = await collectUnhandled(async () => {
+                    await expect(
+                        facade.parseInbound('mailgun', unsigned, {}),
+                    ).rejects.toMatchObject({
+                        status: 401,
+                        message: 'Invalid webhook signature',
+                    });
+                    // A self-made signature is refused too: no key to check it with.
+                    const selfSigned = mailgunWebhook('attacker-key');
+                    await expect(
+                        facade.parseInbound('mailgun', selfSigned.rawBody, selfSigned.headers),
+                    ).rejects.toMatchObject({ status: 401 });
+                });
+
+                expect(unhandled).toEqual([]);
+            });
+
+            it('postmark: the delivery-event webhook is refused the same way', async () => {
+                const facade = realWorld('postmark', {});
+                const event = Buffer.from(
+                    JSON.stringify({
+                        RecordType: 'Delivery',
+                        MessageID: 'pm-1',
+                        Recipient: 'x@y.test',
+                    }),
+                );
+                await expect(facade.parseEventWebhook('postmark', event, {})).rejects.toMatchObject(
+                    {
+                        status: 401,
+                    },
+                );
+            });
+
+            it("accepts a webhook signed with the address owner's own secret", async () => {
+                const registry = createRegistry();
+                registerRealLazy(registry, new PostmarkPlugin());
+                const { service } = realSettings(registry, {
+                    owner: { inboundWebhookSecret: 'pm-owner' },
+                });
+                const facade = facadeFor(registry, service, addressesStub('postmark'));
+
+                // Only the owner has a secret (no admin, no env), so a
+                // success proves the webhook was verified at the owner scope.
+                const legit = postmarkWebhook('pm-owner');
+                await expect(
+                    facade.parseInbound('postmark', legit.rawBody, legit.headers),
+                ).resolves.toMatchObject({ providerMessageId: 'pm-in-1' });
+                const forged = postmarkWebhook('pm-forged');
+                await expect(
+                    facade.parseInbound('postmark', forged.rawBody, forged.headers),
+                ).rejects.toMatchObject({ status: 401 });
+            });
+
+            it('accepts unsigned only under the explicit opt-out EMAIL_INBOUND_ALLOW_UNSIGNED=true', async () => {
+                process.env.EMAIL_INBOUND_ALLOW_UNSIGNED = 'true';
+                const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+                try {
+                    const facade = realWorld('postmark', {});
+                    const { rawBody } = postmarkWebhook('anything');
+                    await expect(
+                        facade.parseInbound('postmark', rawBody, {}),
+                    ).resolves.toMatchObject({
+                        providerMessageId: 'pm-in-1',
+                    });
+                    expect(warn).toHaveBeenCalledWith(
+                        expect.stringMatching(/WITHOUT signature verification/),
+                    );
+                } finally {
+                    warn.mockRestore();
+                }
+            });
+        });
     });
 });

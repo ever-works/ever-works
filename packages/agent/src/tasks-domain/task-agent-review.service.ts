@@ -41,7 +41,7 @@ import {
     type AgentReviewDispatchReason,
     type AgentReviewVerdictResult,
 } from './task-agent-review';
-import { resolveTaskRepository } from './task-repository';
+import { pickOwnerRepo, requireTaskRepository } from './task-repository';
 
 /** Longest reviewer-supplied summary persisted on the review row. */
 export const AGENT_REVIEW_SUMMARY_MAX_CHARS = 4000;
@@ -1307,8 +1307,8 @@ export class TaskAgentReviewService {
         gitOptions: { userId: string; providerId: string; workId: string };
     } {
         return {
-            owner: resolveTaskRepository(work).owner,
-            repo: resolveTaskRepository(work).repo,
+            // EW-P2-4 — refused (400) for a repo-less Work, never a derived name.
+            ...pickOwnerRepo(requireTaskRepository(work, 'an agent review of a pull request')),
             gitOptions: {
                 userId: task.userId,
                 providerId: work.gitProvider,

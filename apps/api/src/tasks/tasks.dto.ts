@@ -202,6 +202,49 @@ export class CreateTaskDto {
     @IsOptional()
     @IsDateString()
     scheduledAt?: string;
+
+    /** EW-P2-3 — when the Task is due (ISO datetime; planning only, nothing runs then). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: String,
+        format: 'date-time',
+        description:
+            'When the Task is due (ISO datetime). Planning only; drives the due-soon notice.',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsDateString()
+    dueAt?: string | null;
+
+    /** EW-P2-3 — when work is planned to start (ISO datetime; not after dueAt). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: String,
+        format: 'date-time',
+        description: 'When work on the Task is planned to start (ISO datetime, not after dueAt).',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsDateString()
+    startAt?: string | null;
+
+    /** EW-P2-3 — estimated effort in whole minutes (0..525600). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: Number,
+        minimum: 0,
+        maximum: 525600,
+        description: 'Estimated effort in whole minutes (0..525600).',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsInt()
+    @Min(0)
+    @Max(525600)
+    estimateMinutes?: number | null;
 }
 
 export class UpdateTaskDto {
@@ -367,6 +410,49 @@ export class UpdateTaskDto {
     @ValidateIf((_, value) => value !== null)
     @IsDateString()
     scheduledAt?: string | null;
+
+    /** EW-P2-3 — when the Task is due (ISO datetime; planning only, nothing runs then). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: String,
+        format: 'date-time',
+        description:
+            'When the Task is due (ISO datetime). Planning only; drives the due-soon notice.',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsDateString()
+    dueAt?: string | null;
+
+    /** EW-P2-3 — when work is planned to start (ISO datetime; not after dueAt). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: String,
+        format: 'date-time',
+        description: 'When work on the Task is planned to start (ISO datetime, not after dueAt).',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsDateString()
+    startAt?: string | null;
+
+    /** EW-P2-3 — estimated effort in whole minutes (0..525600). */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: Number,
+        minimum: 0,
+        maximum: 525600,
+        description: 'Estimated effort in whole minutes (0..525600).',
+    })
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsInt()
+    @Min(0)
+    @Max(525600)
+    estimateMinutes?: number | null;
 }
 
 export class SetTaskRecurringDto {
@@ -421,6 +507,21 @@ export class TransitionTaskDto {
     @IsOptional()
     @IsBoolean()
     force?: boolean;
+
+    /**
+     * EW-P1-6 — `'sync'` walks the shortest legal path to `to`, one gated
+     * hop at a time, and starts no agent work; a closed gate answers
+     * `409 transition_blocked`. Omitted = today's single-edge move.
+     */
+    @ApiProperty({
+        required: false,
+        enum: ['sync'],
+        description:
+            "'sync' walks the shortest legal path to `to` (every hop gated, no agent run started); a closed gate answers 409 transition_blocked.",
+    })
+    @IsOptional()
+    @IsIn(['sync'])
+    mode?: 'sync';
 }
 
 export class AddAssigneeDto {
@@ -605,6 +706,15 @@ export class RunTasksBatchDto {
  * read. Owner ids stay strict uuids, exactly like the list route.
  */
 export class TaskBoardQueryDto {
+    @ApiPropertyOptional({
+        enum: ['mine', 'shared', 'organization'],
+        description:
+            "Record visibility tab (EW-P1-3). 'mine' = the caller's own Tasks (default, unchanged); 'shared' = Tasks of others the caller takes part in or reaches through a Team / Work; 'organization' = every Task of the active Organization the caller may read.",
+    })
+    @IsOptional()
+    @IsString()
+    view?: string;
+
     @ApiPropertyOptional({
         enum: ['status', 'focus'],
         description:

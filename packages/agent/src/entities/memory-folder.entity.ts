@@ -92,6 +92,9 @@ export enum MemoryFolderScope {
 @Index('idx_memory_folders_org_parent', ['organizationId', 'parentId'], {
     where: `"scope" = 'organization'`,
 })
+// Integration API v1 keyset list of an organization's library folders (EW-P3-2) —
+// migration 1795130200000.
+@Index('idx_memory_folders_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class MemoryFolder {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -139,4 +142,13 @@ export class MemoryFolder {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for `kb.folder.*` domain events and the `ETag` of an
+     * organization library folder (EW-P3-2). Bumped by `bumpAggregateVersion`
+     * on every recorded change; a person's own (`scope = user`) folders never
+     * record one. A plain column, NOT `@VersionColumn`. Migration 1795130200000.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

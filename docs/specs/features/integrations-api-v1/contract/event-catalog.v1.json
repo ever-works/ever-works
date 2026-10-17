@@ -1,0 +1,721 @@
+{
+	"$schema": "./schemas/event-catalog.schema.json",
+	"contract": "ever-works-integrations",
+	"contractVersion": "1",
+	"catalogVersion": 1,
+	"description": "Event catalog v1 (03 Part B.4). One row per event type. `dataSchema` is the JSON Schema of the envelope `data` (null = reserved for a later phase; the type name is fixed but its data schema is published with that phase). `child` marks events about an edge/child row: `aggregate` is the parent with its new version. `optIn` events are excluded from the feed/webhooks unless requested by exact name. Delete/removed events carry the last snapshot plus `deleted: true`.",
+	"events": [
+		{
+			"type": "organization.created",
+			"version": 1,
+			"domain": "organization",
+			"aggregateType": "organization",
+			"dataSchema": "schemas/resources/organization.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "organization.updated",
+			"version": 1,
+			"domain": "organization",
+			"aggregateType": "organization",
+			"dataSchema": "schemas/resources/organization.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "organization.member.added",
+			"version": 1,
+			"domain": "organization",
+			"aggregateType": "organization",
+			"dataSchema": "schemas/resources/member.schema.json",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "organization.member.updated",
+			"version": 1,
+			"domain": "organization",
+			"aggregateType": "organization",
+			"dataSchema": "schemas/resources/member.schema.json",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "organization.member.removed",
+			"version": 1,
+			"domain": "organization",
+			"aggregateType": "organization",
+			"dataSchema": "schemas/resources/member.schema.json",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "agent.created",
+			"version": 1,
+			"domain": "agents",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/agent.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "agent.updated",
+			"version": 1,
+			"domain": "agents",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/agent.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "agent.status_changed",
+			"version": 1,
+			"domain": "agents",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/agent.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "agent.archived",
+			"version": 1,
+			"domain": "agents",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/agent.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "agent.deleted",
+			"version": 1,
+			"domain": "agents",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/agent.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "team.created",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "team.updated",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "team.deleted",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "team.member.added",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json#/$defs/TeamMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "team.member.updated",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json#/$defs/TeamMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "team.member.removed",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json#/$defs/TeamMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "team.resource.added",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json#/$defs/TeamResourceEvent",
+			"phase": "P1",
+			"child": "resource"
+		},
+		{
+			"type": "team.resource.removed",
+			"version": 1,
+			"domain": "teams",
+			"aggregateType": "team",
+			"dataSchema": "schemas/resources/team.schema.json#/$defs/TeamResourceEvent",
+			"phase": "P1",
+			"child": "resource"
+		},
+		{
+			"type": "work.created",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "work.updated",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "work.archived",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "work.deleted",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "work.member.added",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json#/$defs/WorkMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "work.member.updated",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json#/$defs/WorkMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "work.member.removed",
+			"version": 1,
+			"domain": "works",
+			"aggregateType": "work",
+			"dataSchema": "schemas/resources/work.schema.json#/$defs/WorkMemberEvent",
+			"phase": "P1",
+			"child": "member"
+		},
+		{
+			"type": "mission.created",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "mission.updated",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "mission.status_changed",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "mission.deleted",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "mission.goal.linked",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json#/$defs/MissionGoalLinkEvent",
+			"phase": "P2",
+			"child": "goal"
+		},
+		{
+			"type": "mission.goal.unlinked",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json#/$defs/MissionGoalLinkEvent",
+			"phase": "P2",
+			"child": "goal"
+		},
+		{
+			"type": "mission.work.linked",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json#/$defs/MissionWorkLinkEvent",
+			"phase": "P2",
+			"child": "work"
+		},
+		{
+			"type": "mission.work.unlinked",
+			"version": 1,
+			"domain": "missions",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/mission.schema.json#/$defs/MissionWorkLinkEvent",
+			"phase": "P2",
+			"child": "work"
+		},
+		{
+			"type": "goal.created",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.updated",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.status_changed",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.archived",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.unarchived",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.deleted",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "goal.progress_changed",
+			"version": 1,
+			"domain": "goals",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/goal.schema.json",
+			"phase": "P2",
+			"notes": "Throttled to at most 1 per goal per 5 min."
+		},
+		{
+			"type": "idea.created",
+			"version": 1,
+			"domain": "ideas",
+			"aggregateType": "idea",
+			"dataSchema": "schemas/resources/idea.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "idea.updated",
+			"version": 1,
+			"domain": "ideas",
+			"aggregateType": "idea",
+			"dataSchema": "schemas/resources/idea.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "idea.status_changed",
+			"version": 1,
+			"domain": "ideas",
+			"aggregateType": "idea",
+			"dataSchema": "schemas/resources/idea.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "idea.deleted",
+			"version": 1,
+			"domain": "ideas",
+			"aggregateType": "idea",
+			"dataSchema": "schemas/resources/idea.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "task.created",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "task.updated",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "task.transitioned",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "task.deleted",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json",
+			"phase": "P1"
+		},
+		{
+			"type": "task.assignee.added",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskAssigneeEvent",
+			"phase": "P1",
+			"child": "assignee"
+		},
+		{
+			"type": "task.assignee.removed",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskAssigneeEvent",
+			"phase": "P1",
+			"child": "assignee"
+		},
+		{
+			"type": "task.watcher.added",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskWatcherEvent",
+			"phase": "P1",
+			"child": "watcher"
+		},
+		{
+			"type": "task.watcher.removed",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskWatcherEvent",
+			"phase": "P1",
+			"child": "watcher"
+		},
+		{
+			"type": "task.block.added",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskBlockEvent",
+			"phase": "P1",
+			"child": "block"
+		},
+		{
+			"type": "task.block.removed",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskBlockEvent",
+			"phase": "P1",
+			"child": "block"
+		},
+		{
+			"type": "task.relation.added",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskRelationEvent",
+			"phase": "P1",
+			"child": "relation"
+		},
+		{
+			"type": "task.relation.removed",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskRelationEvent",
+			"phase": "P1",
+			"child": "relation"
+		},
+		{
+			"type": "task.comment.created",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task-comment.schema.json",
+			"phase": "P1",
+			"child": "comment"
+		},
+		{
+			"type": "task.comment.updated",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task-comment.schema.json",
+			"phase": "P1",
+			"child": "comment"
+		},
+		{
+			"type": "task.comment.deleted",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task-comment.schema.json",
+			"phase": "P1",
+			"child": "comment"
+		},
+		{
+			"type": "task.attachment.added",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskAttachmentEvent",
+			"phase": "P3",
+			"child": "attachment"
+		},
+		{
+			"type": "task.attachment.removed",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json#/$defs/TaskAttachmentEvent",
+			"phase": "P3",
+			"child": "attachment"
+		},
+		{
+			"type": "task.runtime_updated",
+			"version": 1,
+			"domain": "tasks",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/task.schema.json",
+			"phase": "P1",
+			"optIn": true,
+			"notes": "Runtime-only writes (PR/CI/run state). Bumps neither version nor updatedAt; aggregate.version is the unchanged current version. Excluded from the feed and webhooks unless named explicitly in `types` / `events`."
+		},
+		{
+			"type": "inbox.item.created",
+			"version": 1,
+			"domain": "inbox",
+			"aggregateType": "inbox_item",
+			"dataSchema": "schemas/resources/inbox-item.schema.json",
+			"phase": "P3",
+			"notes": "data.recipientUserId is always set. Recipient-scoped: served (feed, webhooks v2) only to a key that also holds inbox:read; never to a user-owned subscription (CR-4)."
+		},
+		{
+			"type": "inbox.item.answered",
+			"version": 1,
+			"domain": "inbox",
+			"aggregateType": "inbox_item",
+			"dataSchema": "schemas/resources/inbox-item.schema.json",
+			"phase": "P3",
+			"notes": "data.recipientUserId is always set. Recipient-scoped: served (feed, webhooks v2) only to a key that also holds inbox:read; never to a user-owned subscription (CR-4)."
+		},
+		{
+			"type": "inbox.item.state_changed",
+			"version": 1,
+			"domain": "inbox",
+			"aggregateType": "inbox_item",
+			"dataSchema": "schemas/resources/inbox-item.schema.json",
+			"phase": "P3",
+			"notes": "data.recipientUserId is always set. Recipient-scoped: served (feed, webhooks v2) only to a key that also holds inbox:read; never to a user-owned subscription (CR-4)."
+		},
+		{
+			"type": "inbox.item.deleted",
+			"version": 1,
+			"domain": "inbox",
+			"aggregateType": "inbox_item",
+			"dataSchema": "schemas/resources/inbox-item.schema.json",
+			"phase": "P3",
+			"notes": "data.recipientUserId is always set. Recipient-scoped: served (feed, webhooks v2) only to a key that also holds inbox:read; never to a user-owned subscription (CR-4)."
+		},
+		{
+			"type": "kb.document.created",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.updated",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.moved",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.archived",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.unarchived",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.deleted",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.document.review_changed",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_document",
+			"dataSchema": "schemas/resources/kb-document.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.folder.created",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_folder",
+			"dataSchema": "schemas/resources/kb-folder.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.folder.updated",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_folder",
+			"dataSchema": "schemas/resources/kb-folder.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "kb.folder.deleted",
+			"version": 1,
+			"domain": "kb",
+			"aggregateType": "kb_folder",
+			"dataSchema": "schemas/resources/kb-folder.schema.json",
+			"phase": "P3"
+		},
+		{
+			"type": "email.message.received",
+			"version": 1,
+			"domain": "email",
+			"aggregateType": "email_message",
+			"dataSchema": "schemas/resources/email-message.schema.json",
+			"phase": "P4",
+			"notes": "Recipient-scoped: served (feed, webhooks v2) only to a key that also holds email:read; never to a user-owned subscription (CR-11)."
+		},
+		{
+			"type": "email.message.sent",
+			"version": 1,
+			"domain": "email",
+			"aggregateType": "email_message",
+			"dataSchema": "schemas/resources/email-message.schema.json",
+			"phase": "P4",
+			"notes": "Recipient-scoped: served (feed, webhooks v2) only to a key that also holds email:read; never to a user-owned subscription (CR-11)."
+		},
+		{
+			"type": "email.message.status_changed",
+			"version": 1,
+			"domain": "email",
+			"aggregateType": "email_message",
+			"dataSchema": "schemas/resources/email-message.schema.json",
+			"phase": "P4",
+			"notes": "Recipient-scoped: served (feed, webhooks v2) only to a key that also holds email:read; never to a user-owned subscription (CR-11)."
+		},
+		{
+			"type": "task.visibility_changed",
+			"version": 1,
+			"domain": "visibility",
+			"aggregateType": "task",
+			"dataSchema": "schemas/resources/visibility-changed.schema.json",
+			"phase": "P1",
+			"fullDataSchema": "schemas/resources/task.schema.json"
+		},
+		{
+			"type": "agent.visibility_changed",
+			"version": 1,
+			"domain": "visibility",
+			"aggregateType": "agent",
+			"dataSchema": "schemas/resources/visibility-changed.schema.json",
+			"phase": "P1",
+			"fullDataSchema": "schemas/resources/agent.schema.json"
+		},
+		{
+			"type": "goal.visibility_changed",
+			"version": 1,
+			"domain": "visibility",
+			"aggregateType": "goal",
+			"dataSchema": "schemas/resources/visibility-changed.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "mission.visibility_changed",
+			"version": 1,
+			"domain": "visibility",
+			"aggregateType": "mission",
+			"dataSchema": "schemas/resources/visibility-changed.schema.json",
+			"phase": "P2"
+		},
+		{
+			"type": "idea.visibility_changed",
+			"version": 1,
+			"domain": "visibility",
+			"aggregateType": "idea",
+			"dataSchema": "schemas/resources/visibility-changed.schema.json",
+			"phase": "P2"
+		}
+	]
+}

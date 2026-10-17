@@ -27,7 +27,18 @@ export function workKindKey(stored: string): WorksStatsWorkKindKey {
         : 'other';
 }
 
-/** Every Work kind the product knows, as schema keys — the guard test checks none is `other`. */
+/**
+ * Work kinds the published `ever.stats.v1` schema has no `works_by_kind` key
+ * for YET. They are counted under `other` on purpose until a contract release
+ * (`@ever-co/connect-contracts`) adds a key; the guard test then fails until
+ * the kind is removed from this list. Every other kind must have a key.
+ *
+ * - `project` — the repo-less Project Work (EW-P2-4), behind the default-off
+ *   `EVER_WORKS_PROJECT_WORKS_ENABLED` switch.
+ */
+export const WORK_KINDS_WITHOUT_STATS_KEY: readonly string[] = ['project'];
+
+/** Every Work kind the product knows, as schema keys — the guard test checks none is `other` (bar {@link WORK_KINDS_WITHOUT_STATS_KEY}). */
 export function knownWorkKindKeys(): Array<{ kind: string; key: WorksStatsWorkKindKey }> {
     return WORK_KINDS.map((kind) => ({ kind, key: workKindKey(kind) }));
 }

@@ -11,6 +11,7 @@ import {
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../../auth/integration/integration-forbidden.guard';
 import {
     ApiTags,
     ApiBearerAuth,
@@ -38,6 +39,8 @@ type OAuthResponseLike = {
 @ApiBearerAuth('JWT-auth')
 @Controller('api/oauth')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class OAuthController {
     constructor(
         private readonly oauthService: OAuthService,

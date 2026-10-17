@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { KnowledgeDocumentReaderState } from '../entities/knowledge-document-reader-state.entity';
 import { KnowledgeDocumentReaderStateRepository } from '../database/repositories/knowledge-document-reader-state.repository';
 import { KnowledgeBaseModule } from './knowledge-base.module';
@@ -33,6 +34,8 @@ import { WorkOwnershipService } from './work-ownership.service';
     imports: [
         DatabaseModule,
         ActivityLogModule,
+        // EW-P3-2 — `kb.document.moved` when documents are filed or unfiled.
+        DomainEventsModule,
         KnowledgeBaseModule,
         MemoryFilesModule,
         TypeOrmModule.forFeature([KnowledgeDocumentReaderState]),

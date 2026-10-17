@@ -1,0 +1,14 @@
+{
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"userId": "b4e6a8c0-2d3f-4a71-9bac-1d2e3f4a5b67",
+	"username": "oksana",
+	"displayName": null,
+	"email": "oksana@example.com",
+	"emailVerified": true,
+	"avatarUrl": null,
+	"role": "member",
+	"isActive": true,
+	"joinedAt": "2026-10-15T18:10:00.000Z",
+	"updatedAt": "2026-10-15T18:10:00.000Z",
+	"everIdSubjects": []
+}

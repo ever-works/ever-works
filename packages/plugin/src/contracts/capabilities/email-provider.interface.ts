@@ -79,6 +79,16 @@ export interface EmailSendInput {
 	/** Forwarded to provider tags (Postmark Tag, Mailgun v:variable, …). */
 	readonly metadata?: Readonly<Record<string, string>>;
 	/**
+	 * Extra RFC 5322 header fields, forwarded VERBATIM to the provider
+	 * (Postmark `Headers`, Mailgun `h:<Name>`, Resend / SendGrid / Mandrill
+	 * `headers`). The platform uses it for RFC threading (EW-P4-3): the
+	 * facade always sets `Message-ID`, and `In-Reply-To` / `References`
+	 * when the message replies to an earlier one. The facade drops any name
+	 * or value carrying CR/LF before the plugin sees it, so a plugin never
+	 * needs to re-validate them.
+	 */
+	readonly headers?: Readonly<Record<string, string>>;
+	/**
 	 * Idempotency key — REQUIRED when invoked via the agent-run path.
 	 * Plugins MUST de-dupe on this value across retries so a flaky
 	 * webhook ack doesn't double-deliver mail.
@@ -109,6 +119,11 @@ export interface EmailInboundMessage {
 	readonly providerMessageId: string;
 	readonly from: string;
 	readonly to: readonly string[];
+	/**
+	 * EW-P4-3 — `Cc` recipients, bare mailboxes. Recorded only: like `to`,
+	 * never used for routing.
+	 */
+	readonly cc?: readonly string[];
 	readonly subject: string;
 	readonly bodyText: string;
 	readonly bodyHtml?: string;
@@ -116,6 +131,81 @@ export interface EmailInboundMessage {
 	readonly receivedAt: Date;
 	/** Provider-specific metadata (spam score, DKIM result, …). */
 	readonly metadata: Readonly<Record<string, unknown>>;
+	/**
+	 * RFC threading (EW-P4-3) — the message's own `Message-ID`, bare (no
+	 * angle brackets; see {@link normalizeMessageId}). Absent when the
+	 * provider does not surface the header.
+	 */
+	readonly messageIdHeader?: string;
+	/** The first id of the `In-Reply-To` header, bare. */
+	readonly inReplyTo?: string;
+	/** Every id of the `References` header, bare, oldest first. */
+	readonly references?: readonly string[];
+}
+
+/**
+ * Longest `Message-ID` the platform stores (EW-P4-3). RFC 5322 sets no limit;
+ * real ids are far shorter, and one longer than this is not stored (rather
+ * than truncated, which could make two different ids equal).
+ */
+export const EMAIL_MESSAGE_ID_MAX_LENGTH = 255;
+
+/** Most `References` ids kept per message — the newest ones. */
+export const EMAIL_REFERENCES_MAX_IDS = 50;
+
+/**
+ * Normalize one RFC 5322 `msg-id` to the bare form the platform stores and
+ * compares: the text inside the first `<…>` (or the whole trimmed value when
+ * there are no brackets), with no whitespace. `undefined` for an empty, a
+ * multi-line or an over-long id. Linear time: the header is sender-written
+ * and read before anything else trusts it.
+ */
+export function normalizeMessageId(raw: string | null | undefined): string | undefined {
+	if (typeof raw !== 'string') return undefined;
+	let value = raw.trim();
+	const open = value.indexOf('<');
+	if (open !== -1) {
+		const close = value.indexOf('>', open + 1);
+		value = close === -1 ? value.slice(open + 1) : value.slice(open + 1, close);
+	}
+	value = value.trim();
+	if (!value || value.length > EMAIL_MESSAGE_ID_MAX_LENGTH) return undefined;
+	// A msg-id never contains whitespace, angle brackets or control characters.
+	for (let i = 0; i < value.length; i += 1) {
+		const code = value.charCodeAt(i);
+		if (code <= 0x20 || code === 0x7f || value[i] === '<' || value[i] === '>') return undefined;
+	}
+	return value;
+}
+
+/**
+ * Parse a `References` / `In-Reply-To` header value into bare ids, in header
+ * order (oldest first), de-duplicated, keeping at most
+ * {@link EMAIL_REFERENCES_MAX_IDS} — the NEWEST ones, which are the ones a
+ * reply threads on. Ids are taken from `<…>` groups; a value with no brackets
+ * is split on whitespace and commas (some clients send it that way).
+ */
+export function parseMessageIdList(raw: string | readonly string[] | null | undefined): string[] {
+	if (raw == null) return [];
+	const text = Array.isArray(raw) ? raw.join(' ') : String(raw);
+	const ids: string[] = [];
+	if (text.includes('<')) {
+		let open = text.indexOf('<');
+		while (open !== -1) {
+			const close = text.indexOf('>', open + 1);
+			if (close === -1) break;
+			const id = normalizeMessageId(text.slice(open + 1, close));
+			if (id) ids.push(id);
+			open = text.indexOf('<', close + 1);
+		}
+	} else {
+		for (const part of text.split(/[\s,]+/)) {
+			const id = normalizeMessageId(part);
+			if (id) ids.push(id);
+		}
+	}
+	const unique = [...new Set(ids)];
+	return unique.slice(Math.max(0, unique.length - EMAIL_REFERENCES_MAX_IDS));
 }
 
 /**

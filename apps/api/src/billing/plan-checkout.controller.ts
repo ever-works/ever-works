@@ -12,6 +12,7 @@ import {
     ServiceUnavailableException,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthSessionGuard, CurrentUser } from '@src/auth';
@@ -62,6 +63,8 @@ import { CreatePlanCheckoutDto, PlanCheckoutReturnQueryDto } from './dto/plan-ch
 @ApiBearerAuth('JWT-auth')
 @Controller('api/billing')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class PlanCheckoutController {
     constructor(
         private readonly planSubscriptionService: PlanSubscriptionService,

@@ -336,6 +336,8 @@ test.describe('SEC PIN: webhook findOwn — cross-account access masked as 404',
         expect(keys).not.toContain('signingSecret');
         expect(keys).not.toContain('secretEncrypted');
         expect(keys).not.toContain('secret');
+        // Nothing secret-shaped under any name (the v2 view grew; this must not).
+        expect(keys.filter((k) => /secret|hash|token|encrypted|password/i.test(k))).toEqual([]);
         expect(keys.sort()).toEqual(
             [
                 'accountId',
@@ -347,6 +349,14 @@ test.describe('SEC PIN: webhook findOwn — cross-account access masked as 404',
                 'updatedAt',
                 'url',
                 'workId',
+                // Webhooks v2 (EW-P1-5 / EW-P1-7): null on v1 rows, never secret material.
+                'version',
+                'ownerType',
+                'ownerId',
+                'events',
+                'organizationIds',
+                'excludeOriginTags',
+                'description',
             ].sort(),
         );
     });

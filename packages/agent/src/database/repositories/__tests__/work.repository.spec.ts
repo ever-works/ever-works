@@ -831,6 +831,28 @@ describe('WorkRepository', () => {
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
         });
 
+        // EW-P2-4 — the works-list kind filter.
+        it('kind filter: adds `work.kind = :kind`; absent adds nothing', async () => {
+            const first = buildChain<Work[]>('getMany', []);
+            repository.createQueryBuilder.mockReturnValueOnce(
+                first.chain as unknown as SelectQueryBuilder<Work>,
+            );
+            await service.findAllAccessible({ userId: 'u1', kind: 'project' });
+            expect(first.fns.andWhere).toHaveBeenCalledWith('work.kind = :kind', {
+                kind: 'project',
+            });
+
+            const second = buildChain<Work[]>('getMany', []);
+            repository.createQueryBuilder.mockReturnValueOnce(
+                second.chain as unknown as SelectQueryBuilder<Work>,
+            );
+            await service.findAllAccessible({ userId: 'u1' });
+            expect(second.fns.andWhere).not.toHaveBeenCalledWith(
+                'work.kind = :kind',
+                expect.anything(),
+            );
+        });
+
         it('userId only (no memberWorkIds): a simple `work.userId = :userId` where without the OR-Brackets', async () => {
             const { chain, fns } = buildChain<Work[]>('getMany', []);
             repository.createQueryBuilder.mockReturnValueOnce(
@@ -964,6 +986,16 @@ describe('WorkRepository', () => {
             await expect(service.countAllAccessible()).resolves.toBe(0);
             await expect(service.countAllAccessible({ userId: '' })).resolves.toBe(0);
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+        });
+
+        // EW-P2-4 — the works-list kind filter applies to the count too.
+        it('kind filter: adds `work.kind = :kind` to the count', async () => {
+            const { chain, fns } = buildChain<number>('getCount', 2);
+            repository.createQueryBuilder.mockReturnValueOnce(
+                chain as unknown as SelectQueryBuilder<Work>,
+            );
+            await service.countAllAccessible({ userId: 'u1', kind: 'project' });
+            expect(fns.andWhere).toHaveBeenCalledWith('work.kind = :kind', { kind: 'project' });
         });
 
         it('userId only: simple where + getCount', async () => {

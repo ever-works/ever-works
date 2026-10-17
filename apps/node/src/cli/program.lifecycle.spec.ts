@@ -53,7 +53,10 @@ const CLAUDE_HELP = [
 	'  --mcp-config <configs...>   MCP config',
 	'  --strict-mcp-config         Strict MCP',
 	'  --allowedTools <tools...>   Allowed tools',
-	'  --dangerously-skip-permissions  Skip permissions'
+	'  --dangerously-skip-permissions  Skip permissions',
+	'  --verbose                   Verbose',
+	'  -r, --resume [value]        Resume a conversation',
+	'  --fork-session              Fork the resumed session'
 ].join('\n');
 
 function harness(

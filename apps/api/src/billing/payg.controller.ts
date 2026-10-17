@@ -10,6 +10,7 @@ import {
     ServiceUnavailableException,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthSessionGuard, CurrentUser } from '@src/auth';
@@ -44,6 +45,8 @@ import { UpdatePaygDto } from './dto/payg.dto';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/billing/payg')
 @UseGuards(AuthSessionGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class PaygController {
     constructor(private readonly paygService: PaygService) {}
 

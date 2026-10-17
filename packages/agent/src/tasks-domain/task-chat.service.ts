@@ -14,8 +14,8 @@ import {
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
-import type { TaskChatMessage } from '../entities/task-chat-message.entity';
-import type { Task, TaskActorType } from '../entities/task.entity';
+import { TaskChatMessage } from '../entities/task-chat-message.entity';
+import type { Task, TaskAuthorType, TaskExternalAuthor } from '../entities/task.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
@@ -23,6 +23,9 @@ import { AGENT_CHAT_REPLY_DISPATCHER, type AgentChatReplyDispatcher } from './ta
 import { RUN_STEERING_PORT, type RunSteeringPort } from './run-steering-port';
 import { isAgentReviewRunScope } from './task-agent-review';
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
+import { toTaskCommentDto } from '../domain-events/domain-event-snapshots';
+import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
 
 /**
  * Tasks feature — Phase 13.2.
@@ -51,10 +54,13 @@ const KB_LINK_RE = /\[\[([^\]]{1,200})\]\]/g;
 
 export interface PostChatInput {
     taskId: string;
-    authorType: TaskActorType;
+    /** EW-P1-2: `'integration'` when an integration key posts without acting as a user. */
+    authorType: TaskAuthorType;
     authorId: string;
     body: string;
     attachments?: { uploadId: string }[];
+    /** EW-P1-2: display attribution for an `'integration'` author (ignored otherwise). */
+    externalAuthor?: TaskExternalAuthor | null;
 }
 
 export interface MentionLookups {
@@ -93,6 +99,14 @@ export class TaskChatService {
         // Appended LAST + @Optional() per the positional-spec arity rule;
         // without it the path behaves exactly as it did before.
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
+        // Domain events (EW-P1-1 B2) — `task.comment.created` / `.updated`,
+        // recorded in the same transaction as the message write. Appended
+        // LAST + @Optional (positional-spec arity rule).
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // Record visibility (EW-P1-3) — anyone who may read a Task may comment on it
+        // (spec §4). Appended LAST + @Optional() per the positional-spec arity rule;
+        // absent means comments stay owner-only, exactly as before.
+        @Optional() private readonly accessPolicy?: RecordAccessPolicy,
     ) {}
 
     async list(
@@ -101,7 +115,7 @@ export class TaskChatService {
         opts: { limit?: number; offset?: number } = {},
         ownershipScope?: OwnershipScope,
     ): Promise<TaskChatMessage[]> {
-        await this.requireOwnedTask(userId, taskId, ownershipScope);
+        await this.requireReadableTask(userId, taskId, ownershipScope);
         return this.messages.findByTaskId(taskId, opts.limit ?? 50, opts.offset ?? 0);
     }
 
@@ -111,12 +125,16 @@ export class TaskChatService {
         lookups: MentionLookups = {},
         ownershipScope?: OwnershipScope,
     ): Promise<TaskChatMessage> {
-        const task = await this.requireOwnedTask(userId, input.taskId, ownershipScope);
+        const { task, owned } = await this.resolveReadableTask(
+            userId,
+            input.taskId,
+            ownershipScope,
+        );
         this.assertBody(input.body);
 
         const mentions = this.parseMentions(input.body, lookups);
 
-        const row = await this.messages.create({
+        const data: Partial<TaskChatMessage> = {
             taskId: task.id,
             authorType: input.authorType,
             authorId: input.authorId,
@@ -124,7 +142,35 @@ export class TaskChatService {
             mentions: mentions.records.length > 0 ? mentions.records : null,
             attachments:
                 input.attachments && input.attachments.length > 0 ? input.attachments : null,
-        });
+            externalAuthor:
+                input.authorType === 'integration' && input.externalAuthor
+                    ? input.externalAuthor
+                    : null,
+        };
+        const publisher = this.domainEvents;
+        const row = publisher
+            ? await publisher.transaction(async (manager) => {
+                  const created = await this.messages.create(data, manager);
+                  await publisher.child(
+                      manager,
+                      'task',
+                      task.id,
+                      'task.comment.created',
+                      toTaskCommentDto(created, task.organizationId) as unknown as Record<
+                          string,
+                          unknown
+                      >,
+                      {
+                          changedFields: ['comments'],
+                          actor:
+                              input.authorType === 'agent'
+                                  ? { type: 'agent', id: input.authorId, label: null }
+                                  : undefined,
+                      },
+                  );
+                  return created;
+              })
+            : await this.messages.create(data);
 
         // Materialize KB mentions for the Related panel — dedupe on
         // (taskId, kbDocumentId).
@@ -159,7 +205,10 @@ export class TaskChatService {
         // streaming" is the UX contract, and a Task chat is the steering
         // channel. No live run ⇒ today's behaviour, unchanged. Extension, not
         // replacement.
-        if (this.chatDispatcher) {
+        // Record visibility (EW-P1-3): a reader who does not own the Task may comment,
+        // but their @agent mentions only stay on the message — they never start a run
+        // on somebody else's Task (no spend, no agent work in their repository).
+        if (this.chatDispatcher && owned) {
             const agentMentions = mentions.records.filter(
                 (m): m is { type: 'agent'; id: string; slug?: string } =>
                     m.type === 'agent' && typeof m.id === 'string',
@@ -310,11 +359,21 @@ export class TaskChatService {
         newBody: string,
         lookups: MentionLookups = {},
         ownershipScope?: OwnershipScope,
+        // Integration API v1 (EW-P1-4): an integration edits the comments IT
+        // wrote (`authorType: 'integration'`, author = its key) with no edit
+        // window. Appended LAST; absent, the rules below are unchanged.
+        integrationAuthorId?: string,
     ): Promise<TaskChatMessage> {
         const msg = await this.messages.findById(messageId);
         if (!msg) throw new NotFoundException(`Chat message ${messageId} not found.`);
 
-        await this.requireOwnedTask(userId, msg.taskId, ownershipScope);
+        const ownedTask = await this.requireReadableTask(userId, msg.taskId, ownershipScope);
+        if (integrationAuthorId !== undefined) {
+            if (msg.authorType !== 'integration' || msg.authorId !== integrationAuthorId) {
+                throw new ForbiddenException('Only the original author can edit this message.');
+            }
+            return this.applyEdit(msg, ownedTask, newBody, lookups);
+        }
 
         // Authorship — only the original author can edit (when author
         // is a user; agent-authored messages are not user-editable).
@@ -328,6 +387,16 @@ export class TaskChatService {
             throw new ForbiddenException('Edit window has expired (5 minutes).');
         }
 
+        return this.applyEdit(msg, ownedTask, newBody, lookups);
+    }
+
+    private async applyEdit(
+        msg: TaskChatMessage,
+        ownedTask: Task,
+        newBody: string,
+        lookups: MentionLookups,
+    ): Promise<TaskChatMessage> {
+        const messageId = msg.id;
         this.assertBody(newBody);
 
         // Review-fix I3: re-parse mentions on edit AND persist the
@@ -337,11 +406,36 @@ export class TaskChatService {
         // intent.
         const reparsed = this.parseMentions(newBody, lookups);
 
-        await this.messages.updateBodyAndMentions(
-            messageId,
-            newBody,
-            reparsed.records.length > 0 ? reparsed.records : null,
-        );
+        const nextMentions = reparsed.records.length > 0 ? reparsed.records : null;
+        const publisher = this.domainEvents;
+        if (publisher) {
+            await publisher.transaction(async (manager) => {
+                await this.messages.updateBodyAndMentions(
+                    messageId,
+                    newBody,
+                    nextMentions,
+                    manager,
+                );
+                const updated = await manager
+                    .getRepository(TaskChatMessage)
+                    .findOne({ where: { id: messageId } });
+                if (updated) {
+                    await publisher.child(
+                        manager,
+                        'task',
+                        msg.taskId,
+                        'task.comment.updated',
+                        toTaskCommentDto(updated, ownedTask.organizationId) as unknown as Record<
+                            string,
+                            unknown
+                        >,
+                        { changedFields: ['comments'], previous: { body: msg.body } },
+                    );
+                }
+            });
+        } else {
+            await this.messages.updateBodyAndMentions(messageId, newBody, nextMentions);
+        }
 
         // Re-materialize KB mentions. We do NOT delete prior rows —
         // `task_kb_mentions` is task-scoped (not message-scoped), so
@@ -359,6 +453,52 @@ export class TaskChatService {
         const refreshed = await this.messages.findById(messageId);
         if (!refreshed) throw new NotFoundException(`Chat message ${messageId} vanished.`);
         return refreshed;
+    }
+
+    /**
+     * Integration API v1 (EW-P1-4): delete a comment. Only its author may: the
+     * integration key that wrote it (`integrationAuthorId`), or else the user
+     * who wrote it. No time window — the 5-minute window is an edit rule.
+     * Records `task.comment.deleted` (the comment as it was, plus
+     * `deleted: true`) in the same transaction as the delete.
+     */
+    async remove(
+        userId: string,
+        messageId: string,
+        ownershipScope?: OwnershipScope,
+        integrationAuthorId?: string,
+    ): Promise<void> {
+        const msg = await this.messages.findById(messageId);
+        if (!msg) throw new NotFoundException(`Chat message ${messageId} not found.`);
+
+        const ownedTask = await this.requireReadableTask(userId, msg.taskId, ownershipScope);
+        const isAuthor =
+            integrationAuthorId !== undefined
+                ? msg.authorType === 'integration' && msg.authorId === integrationAuthorId
+                : msg.authorType === 'user' && msg.authorId === userId;
+        if (!isAuthor) {
+            throw new ForbiddenException('Only the original author can delete this message.');
+        }
+
+        const publisher = this.domainEvents;
+        if (!publisher) {
+            await this.messages.delete(messageId);
+            return;
+        }
+        await publisher.transaction(async (manager) => {
+            await publisher.child(
+                manager,
+                'task',
+                msg.taskId,
+                'task.comment.deleted',
+                {
+                    ...toTaskCommentDto(msg, ownedTask.organizationId),
+                    deleted: true,
+                } as unknown as Record<string, unknown>,
+                { changedFields: ['comments'] },
+            );
+            await this.messages.delete(messageId, manager);
+        });
     }
 
     /**
@@ -476,14 +616,36 @@ export class TaskChatService {
         }
     }
 
-    private async requireOwnedTask(
+    /**
+     * Record visibility (EW-P1-3, spec §4) — the owner, or anyone `visibleTo(principal)`
+     * admits in the active Organization: participants, Team / Work members and, for an
+     * `organization` Task, every Organization member. 404 otherwise.
+     */
+    private async requireReadableTask(
         userId: string,
         taskId: string,
         ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        const task = await this.tasks.findByIdAndUser(taskId, userId, ownershipScope);
-        if (!task) throw new NotFoundException(`Task ${taskId} not found.`);
-        return task;
+        return (await this.resolveReadableTask(userId, taskId, ownershipScope)).task;
+    }
+
+    /** {@link requireReadableTask}, also saying whether the caller owns the Task. */
+    private async resolveReadableTask(
+        userId: string,
+        taskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ task: Task; owned: boolean }> {
+        const own = await this.tasks.findByIdAndUser(taskId, userId, ownershipScope);
+        if (own) return { task: own, owned: true };
+        if (this.accessPolicy && ownershipScope?.organizationId) {
+            const context = await this.accessPolicy.contextFor(
+                { kind: 'user', userId },
+                ownershipScope,
+            );
+            const visible = await this.tasks.findVisibleById(taskId, context, ownershipScope);
+            if (visible) return { task: visible, owned: false };
+        }
+        throw new NotFoundException(`Task ${taskId} not found.`);
     }
 
     private assertBody(body: string): void {

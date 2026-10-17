@@ -171,7 +171,11 @@ describe('FleetTaskWorkspaceProvisioner — disk floor re-check', () => {
 	});
 });
 
-describe.sequential('FleetTaskWorkspaceProvisioner — lease and usage files (real Git)', { timeout: 30_000 }, () => {
+// Real Git on one shared root: the suites must never run concurrently (vitest 5
+// dropped `describe.sequential`; `concurrent: false` is its replacement).
+const SERIAL_GIT_SUITE = { timeout: 30_000, concurrent: false };
+
+describe('FleetTaskWorkspaceProvisioner — lease and usage files (real Git)', SERIAL_GIT_SUITE, () => {
 	let ownedRoot: string;
 	let originDir: string;
 	let workspaceRoot: string;

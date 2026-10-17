@@ -9,7 +9,9 @@ import {
     HttpCode,
     HttpStatus,
     Header,
+    UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -84,6 +86,8 @@ function assertImportPayloadBounds(payload: AccountExportPayload | undefined | n
 }
 
 @Controller('api/account')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class AccountController {
     constructor(
         private readonly exportService: AccountExportService,

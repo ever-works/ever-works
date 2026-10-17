@@ -34,6 +34,13 @@ describe('emailAddressesAPI — endpoint URL shape (no /api double-prefix)', () 
         expect(serverFetchMock).toHaveBeenCalledWith('/email/addresses');
         await emailAddressesAPI.list('inbound');
         expect(serverFetchMock).toHaveBeenCalledWith('/email/addresses?direction=inbound');
+        // EW-P4-3 — the settings page also lists disabled addresses.
+        await emailAddressesAPI.list(undefined, { includeDisabled: true });
+        expect(serverFetchMock).toHaveBeenCalledWith('/email/addresses?includeDisabled=true');
+        await emailAddressesAPI.list('outbound', { includeDisabled: true });
+        expect(serverFetchMock).toHaveBeenCalledWith(
+            '/email/addresses?direction=outbound&includeDisabled=true',
+        );
     });
 
     it('create POSTs /email/addresses', async () => {

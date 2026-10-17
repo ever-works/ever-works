@@ -20,6 +20,16 @@ import { IdeaFailureKind } from '@ever-works/agent/entities';
 export class ListWorkProposalsQueryDto {
     @ApiProperty({
         required: false,
+        enum: ['mine', 'shared', 'organization'],
+        description:
+            "Record visibility tab (EW-P1-3): 'mine' (default) = own Ideas, unchanged; 'shared' = Ideas of others the caller reaches through a Team; 'organization' = every Idea of the active Organization the caller may read",
+    })
+    @IsOptional()
+    @IsString()
+    view?: string;
+
+    @ApiProperty({
+        required: false,
         isArray: true,
         enum: WorkProposalStatus,
         description: 'Filter by status (default: pending only)',

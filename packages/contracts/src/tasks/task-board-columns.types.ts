@@ -50,7 +50,8 @@ export const TASK_BOARD_TRANSITIONS: Readonly<Record<TaskBoardStatus, readonly T
 	in_review: ['in_progress', 'blocked', 'done', 'cancelled'],
 	blocked: ['todo', 'in_progress', 'cancelled'],
 	done: ['in_progress'],
-	cancelled: []
+	// EW-P1-6 — a cancelled Task re-opens into the backlog or todo.
+	cancelled: ['backlog', 'todo']
 };
 
 /** `status` = one column per status (the shipped board); `focus` = four grouped columns. */

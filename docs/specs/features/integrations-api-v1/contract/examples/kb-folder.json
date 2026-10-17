@@ -1,0 +1,12 @@
+{
+	"id": "8b2d3f40-5c6e-4f70-9b8c-0d1e2f3a4b51",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 1,
+	"createdAt": "2026-10-16T08:00:00.000Z",
+	"updatedAt": "2026-10-16T08:00:00.000Z",
+	"name": "Support",
+	"parentId": null,
+	"path": "/Support",
+	"createdById": "2b6d4e8f-0a3c-4d5e-9f71-8b9c0d1e2f30",
+	"webUrl": "https://app.ever.works/memory?view=library"
+}

@@ -21,6 +21,10 @@ describe('WebhooksService', () => {
         pause: jest.Mock;
         updateSecret: jest.Mock;
         delete: jest.Mock;
+        listForAccount: jest.Mock;
+        createV2: jest.Mock;
+        updateV2: jest.Mock;
+        resume: jest.Mock;
     };
     let secrets: WebhookSecretService;
     let workOwnership: { ensureCanView: jest.Mock };
@@ -47,6 +51,20 @@ describe('WebhooksService', () => {
             pause: jest.fn().mockResolvedValue(undefined),
             updateSecret: jest.fn().mockResolvedValue(undefined),
             delete: jest.fn().mockResolvedValue(undefined),
+            listForAccount: jest.fn().mockResolvedValue([]),
+            createV2: jest.fn().mockImplementation(async (data) => ({
+                id: 'wh-2',
+                workId: null,
+                status: 'active',
+                consecutiveFailures: 0,
+                lastDeliveryAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                version: 2,
+                ...data,
+            })),
+            updateV2: jest.fn().mockResolvedValue(undefined),
+            resume: jest.fn().mockResolvedValue(undefined),
         };
         // Use real secret service in passthrough mode so we can assert
         // the raw secret shape without an encryption key.
@@ -214,7 +232,7 @@ describe('WebhooksService', () => {
 
     describe('listForAccount', () => {
         it('returns canonical views, never includes secretEncrypted', async () => {
-            repo.listActiveForAccount.mockResolvedValueOnce([
+            repo.listForAccount.mockResolvedValueOnce([
                 {
                     id: 'wh-1',
                     accountId: ACCOUNT,
@@ -293,6 +311,215 @@ describe('WebhooksService', () => {
             // old one (we just rotated).
             const writtenEncrypted = repo.updateSecret.mock.calls[0][1] as string;
             expect(writtenEncrypted).not.toBe('old-encrypted');
+        });
+    });
+
+    describe('webhooks v2 (EW-P1-5)', () => {
+        const ORG = '11111111-2222-3333-4444-555555555555';
+        const TENANT_ID = '99999999-8888-7777-6666-555555555555';
+        let users: { findById: jest.Mock };
+        let organizations: { findById: jest.Mock };
+        const v2Row = (overrides: Record<string, unknown> = {}) => ({
+            id: 'wh-2',
+            accountId: ACCOUNT,
+            workId: null,
+            url: 'https://hooks.example.com/ever',
+            secretEncrypted: 'enc-old',
+            status: 'active',
+            consecutiveFailures: 0,
+            lastDeliveryAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            version: 2,
+            ownerType: 'user',
+            events: ['task.*'],
+            organizationIds: [ORG],
+            excludeOriginTags: [],
+            description: null,
+            ...overrides,
+        });
+
+        beforeEach(() => {
+            users = { findById: jest.fn().mockResolvedValue({ id: ACCOUNT, tenantId: TENANT_ID }) };
+            organizations = {
+                findById: jest
+                    .fn()
+                    .mockImplementation(async (id: string) =>
+                        id === ORG ? { id: ORG, tenantId: TENANT_ID } : null,
+                    ),
+            };
+            service = new WebhooksService(
+                repo as any,
+                secrets,
+                workOwnership as any,
+                users as any,
+                organizations as any,
+            );
+        });
+
+        it('creates a user-owned v2 subscription for organizations of the caller tenant', async () => {
+            const result = await service.createV2(ACCOUNT, {
+                url: 'https://hooks.example.com/ever',
+                events: ['task.*', 'team.created', 'task.runtime_updated'],
+                organizationIds: [ORG],
+                excludeOriginTags: [' gauzy:conn-1 '],
+                description: ' Gauzy ',
+            });
+            expect(repo.createV2).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    accountId: ACCOUNT,
+                    ownerType: 'user',
+                    ownerId: ACCOUNT,
+                    events: ['task.*', 'team.created', 'task.runtime_updated'],
+                    organizationIds: [ORG],
+                    excludeOriginTags: ['gauzy:conn-1'],
+                    description: 'Gauzy',
+                    tenantId: TENANT_ID,
+                    organizationId: ORG,
+                }),
+            );
+            expect(result.subscription).toMatchObject({
+                version: 2,
+                events: ['task.*', 'team.created', 'task.runtime_updated'],
+            });
+            expect(result.signingSecret.length).toBeGreaterThanOrEqual(32);
+        });
+
+        it.each([['tasks.*'], ['task.nope'], ['task'], ['']])(
+            'refuses the event filter %j',
+            async (pattern) => {
+                await expect(
+                    service.createV2(ACCOUNT, {
+                        url: 'https://hooks.example.com/ever',
+                        events: [pattern],
+                        organizationIds: [ORG],
+                    }),
+                ).rejects.toThrow(BadRequestException);
+                expect(repo.createV2).not.toHaveBeenCalled();
+            },
+        );
+
+        it('answers 404 for an organization outside the caller tenant (no enumeration)', async () => {
+            await expect(
+                service.createV2(ACCOUNT, {
+                    url: 'https://hooks.example.com/ever',
+                    events: ['*'],
+                    organizationIds: ['00000000-0000-0000-0000-000000000001'],
+                }),
+            ).rejects.toThrow(NotFoundException);
+            expect(repo.createV2).not.toHaveBeenCalled();
+        });
+
+        it('PATCH status active resumes a paused or failed subscription (v1 and v2)', async () => {
+            repo.findById.mockResolvedValue(v2Row({ status: 'failed', consecutiveFailures: 10 }));
+            await service.update(ACCOUNT, 'wh-2', { status: 'active' });
+            expect(repo.resume).toHaveBeenCalledWith('wh-2');
+
+            repo.findById.mockResolvedValue(v2Row({ version: 1, status: 'paused' }));
+            await service.update(ACCOUNT, 'wh-2', { status: 'active' });
+            expect(repo.resume).toHaveBeenCalledTimes(2);
+        });
+
+        it('refuses to resume a disabled subscription, and v2 fields on a v1 one', async () => {
+            repo.findById.mockResolvedValue(v2Row({ status: 'disabled' }));
+            await expect(service.update(ACCOUNT, 'wh-2', { status: 'active' })).rejects.toThrow(
+                BadRequestException,
+            );
+            repo.findById.mockResolvedValue(v2Row({ version: 1 }));
+            await expect(service.update(ACCOUNT, 'wh-2', { events: ['task.*'] })).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(repo.resume).not.toHaveBeenCalled();
+            expect(repo.updateV2).not.toHaveBeenCalled();
+        });
+
+        it('refuses to pause a disabled subscription (pause then resume must not revive it)', async () => {
+            repo.findById.mockResolvedValue(v2Row({ status: 'disabled' }));
+            await expect(service.update(ACCOUNT, 'wh-2', { status: 'paused' })).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(repo.pause).not.toHaveBeenCalled();
+        });
+
+        it('resuming counts against the active-subscription limit', async () => {
+            repo.findById.mockResolvedValue(v2Row({ status: 'paused' }));
+            repo.listActiveForAccount.mockResolvedValueOnce(
+                Array.from({ length: 25 }, (_, i) => v2Row({ id: `other-${i}` })),
+            );
+            await expect(service.update(ACCOUNT, 'wh-2', { status: 'active' })).rejects.toThrow(
+                /limit of 25/,
+            );
+            expect(repo.resume).not.toHaveBeenCalled();
+        });
+
+        it('keeps the ownership stamp in step when organizationIds change', async () => {
+            const ORG_2 = '22222222-3333-4444-5555-666666666666';
+            organizations.findById.mockImplementation(async (id: string) =>
+                id === ORG || id === ORG_2 ? { id, tenantId: TENANT_ID } : null,
+            );
+            repo.findById.mockResolvedValue(v2Row());
+            await service.update(ACCOUNT, 'wh-2', { organizationIds: [ORG_2] });
+            expect(repo.updateV2).toHaveBeenLastCalledWith('wh-2', {
+                organizationIds: [ORG_2],
+                organizationId: ORG_2,
+                tenantId: TENANT_ID,
+            });
+            await service.update(ACCOUNT, 'wh-2', { organizationIds: [ORG, ORG_2] });
+            expect(repo.updateV2).toHaveBeenLastCalledWith('wh-2', {
+                organizationIds: [ORG, ORG_2],
+                organizationId: null,
+                tenantId: TENANT_ID,
+            });
+        });
+
+        it('starts a new subscription after the current feed head', async () => {
+            const feed = { head: jest.fn().mockResolvedValue('4242') };
+            service = new WebhooksService(
+                repo as any,
+                secrets,
+                workOwnership as any,
+                users as any,
+                organizations as any,
+                feed as any,
+            );
+            await service.createV2(ACCOUNT, {
+                url: 'https://hooks.example.com/ever',
+                events: ['*'],
+                organizationIds: [ORG],
+            });
+            expect(repo.createV2).toHaveBeenCalledWith(
+                expect.objectContaining({ startAfterSeq: '4242' }),
+            );
+        });
+
+        it('PATCH changes the filters of a v2 subscription', async () => {
+            repo.findById.mockResolvedValue(v2Row());
+            await service.update(ACCOUNT, 'wh-2', {
+                events: ['task.updated'],
+                excludeOriginTags: ['gauzy:conn-2'],
+                description: null,
+            });
+            expect(repo.updateV2).toHaveBeenCalledWith('wh-2', {
+                events: ['task.updated'],
+                excludeOriginTags: ['gauzy:conn-2'],
+                description: null,
+            });
+        });
+
+        it('rotating a v2 secret keeps the previous one signing for the grace window', async () => {
+            repo.findById.mockResolvedValue(v2Row());
+            const before = Date.now();
+            await service.rotateSecret(ACCOUNT, 'wh-2');
+            const [, , previous] = repo.updateSecret.mock.calls[0];
+            expect(previous.secretEncrypted).toBe('enc-old');
+            expect(previous.expiresAt.getTime()).toBeGreaterThanOrEqual(
+                before + 23 * 60 * 60 * 1000,
+            );
+
+            repo.updateSecret.mockClear();
+            repo.findById.mockResolvedValue(v2Row({ version: 1 }));
+            await service.rotateSecret(ACCOUNT, 'wh-2');
+            expect(repo.updateSecret.mock.calls[0]).toHaveLength(2);
         });
     });
 });

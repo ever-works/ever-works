@@ -1,0 +1,38 @@
+{
+	"id": "2ae2a4c6-8d9f-4ad7-9b02-7d8e9fabbccd",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 2,
+	"createdAt": "2026-09-01T10:00:00.000Z",
+	"updatedAt": "2026-10-10T10:00:00.000Z",
+	"visibility": "team",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"externalLinks": [],
+	"teamIds": ["d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89"],
+	"name": "Acme site",
+	"slug": "acme-site",
+	"description": "Marketing site",
+	"kind": "website",
+	"status": "active",
+	"website": "https://acme.example.com",
+	"repoUrls": ["https://github.com/acme/acme-site"],
+	"members": [
+		{
+			"userId": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+			"role": "owner"
+		},
+		{
+			"userId": "b4e6a8c0-2d3f-4a71-9bac-1d2e3f4a5b67",
+			"role": "editor"
+		}
+	],
+	"webUrl": "https://app.ever.works/works/2ae2a4c6-8d9f-4ad7-9b02-7d8e9fabbccd"
+}

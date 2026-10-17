@@ -158,6 +158,14 @@ export class User {
     @PortableDateColumn({ nullable: true })
     magicLinkExpires?: Date | null;
 
+    /**
+     * EW-P2-6 — an optional human display name (e.g. "Ada Lovelace"), shown where the
+     * `username` handle would be. NULL = show the username. Served as the member DTO's
+     * `displayName` to integrations (migration 1795150000000-AddUserDisplayName).
+     */
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    displayName?: string | null;
+
     // Git committer overrides (optional — fallback to username/email if not set)
     @Column({ type: 'varchar', nullable: true })
     committerName?: string | null;

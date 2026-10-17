@@ -3,6 +3,7 @@ import { FleetClientError, type HeartbeatResponse } from './fleet-client';
 import {
 	HeartbeatLoop,
 	computeBackoffDelay,
+	untilHeartbeatAccepted,
 	type HeartbeatCapableClient,
 	type HeartbeatState,
 	type Scheduler
@@ -591,5 +592,74 @@ describe('HeartbeatLoop onAccepted (Agent computers — the pending live-view hi
 		});
 		await throwing.start();
 		expect(throwing.getState().state).toBe('connected');
+	});
+});
+
+describe('untilHeartbeatAccepted (#2598 a, #2628)', () => {
+	type Listener = (state: HeartbeatState) => void;
+	function observable(initial: HeartbeatState['state']) {
+		let state = { state: initial } as HeartbeatState;
+		const listeners = new Set<Listener>();
+		return {
+			loop: {
+				getState: () => state,
+				onChange: (listener: Listener) => {
+					listeners.add(listener);
+					return () => listeners.delete(listener);
+				}
+			},
+			emit(next: HeartbeatState['state']) {
+				state = { state: next } as HeartbeatState;
+				for (const listener of [...listeners]) listener(state);
+			},
+			listeners
+		};
+	}
+
+	it('resolves true at once when a beat was already accepted', async () => {
+		await expect(untilHeartbeatAccepted(observable('connected').loop)).resolves.toBe(true);
+	});
+
+	it('waits through failed beats and resolves true on the first accepted one, then lets go of its listener', async () => {
+		const o = observable('retrying');
+		let settled: boolean | undefined;
+		void untilHeartbeatAccepted(o.loop).then((value) => {
+			settled = value;
+		});
+		o.emit('retrying');
+		await Promise.resolve();
+		expect(settled).toBeUndefined();
+		o.emit('connected');
+		await Promise.resolve();
+		expect(settled).toBe(true);
+		expect(o.listeners.size).toBe(0);
+	});
+
+	it('resolves false when the loop stops, or when the caller stops waiting', async () => {
+		const stopped = observable('retrying');
+		const a = untilHeartbeatAccepted(stopped.loop);
+		stopped.emit('stopped');
+		await expect(a).resolves.toBe(false);
+
+		let wait = true;
+		const gone = observable('retrying');
+		const b = untilHeartbeatAccepted(gone.loop, () => wait);
+		wait = false;
+		gone.emit('retrying');
+		await expect(b).resolves.toBe(false);
+		expect(gone.listeners.size).toBe(0);
+	});
+
+	it('an unauthorized (sticky) node keeps waiting: it must not lease either', async () => {
+		const o = observable('unauthorized');
+		let settled: boolean | undefined;
+		void untilHeartbeatAccepted(o.loop).then((value) => {
+			settled = value;
+		});
+		await Promise.resolve();
+		expect(settled).toBeUndefined();
+		o.emit('stopped');
+		await Promise.resolve();
+		expect(settled).toBe(false);
 	});
 });

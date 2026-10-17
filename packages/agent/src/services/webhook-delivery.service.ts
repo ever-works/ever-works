@@ -1,6 +1,11 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { isSafeWebhookUrl, safeFetchWithDnsPin, SsrfBlockedError } from '../utils/ssrf-guard';
+import {
+    signWebhookV2,
+    WEBHOOK_V2_EVENT_ID_HEADER,
+    WEBHOOK_V2_SIGNATURE_HEADER,
+} from './webhook-signature-v2';
 
 /**
  * DI token for the optional `WebhookHttpClient` override. Tests and the
@@ -33,6 +38,26 @@ export interface SignedDelivery {
     readonly url: string;
     readonly body: string;
     readonly headers: WebhookHeaders;
+    readonly deliveryId: string;
+}
+
+/**
+ * Webhooks v2 headers (integration contract v1 B.5). No legacy
+ * `sha256=` headers: a v2 receiver verifies `X-Ever-Works-Signature`
+ * (`t=<unix>,v1=<hex>`, one `v1` per live secret during a rotation).
+ */
+export interface WebhookHeadersV2 {
+    readonly 'Content-Type': 'application/json; charset=utf-8';
+    readonly 'X-Ever-Works-Signature': string;
+    readonly 'X-Ever-Works-Event': string;
+    readonly 'X-Ever-Works-Event-Id': string;
+    readonly 'X-Ever-Works-Delivery': string;
+}
+
+export interface SignedDeliveryV2 {
+    readonly url: string;
+    readonly body: string;
+    readonly headers: WebhookHeadersV2;
     readonly deliveryId: string;
 }
 
@@ -77,6 +102,17 @@ export interface WebhookDeliveryRequest {
     readonly deliveryId?: string;
     /** Per-attempt override; defaults to {@link DEFAULT_TIMEOUT_MS}. */
     readonly timeoutMs?: number;
+    /**
+     * Webhooks v2: `2` signs with `X-Ever-Works-Signature: t=,v1=` and sends
+     * `X-Ever-Works-Event-Id`; anything else keeps the v1 headers.
+     */
+    readonly signatureVersion?: 1 | 2;
+    /** v2: a rotated-out secret still in its grace window — signed as a second `v1=`. */
+    readonly previousSecret?: string | null;
+    /** v2: the domain event id; defaults to `payload.id`, then the delivery id. */
+    readonly eventId?: string | null;
+    /** v2: the signing time in unix seconds (tests); defaults to now. */
+    readonly timestampSeconds?: number;
 }
 
 /**
@@ -195,6 +231,37 @@ export class WebhookDeliveryService {
     }
 
     /**
+     * Webhooks v2: build a delivery signed `X-Ever-Works-Signature: t=,v1=` over
+     * `"<t>.<rawBody>"` (one `v1` per live secret) without sending it.
+     */
+    signV2(request: WebhookDeliveryRequest): SignedDeliveryV2 {
+        const body = JSON.stringify(request.payload);
+        if (Buffer.byteLength(body, 'utf8') > WEBHOOK_MAX_BODY_BYTES) {
+            throw new PayloadTooLargeError(Buffer.byteLength(body, 'utf8'));
+        }
+        const deliveryId = request.deliveryId ?? randomUUID();
+        const timestamp = request.timestampSeconds ?? Math.floor(Date.now() / 1000);
+        const secrets = [request.secret];
+        if (request.previousSecret && request.previousSecret !== request.secret) {
+            secrets.push(request.previousSecret);
+        }
+        const payloadId = (request.payload as { id?: unknown }).id;
+        const eventId = request.eventId ?? (typeof payloadId === 'string' ? payloadId : deliveryId);
+        return {
+            url: request.url,
+            body,
+            deliveryId,
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                [WEBHOOK_V2_SIGNATURE_HEADER]: signWebhookV2(body, secrets, timestamp),
+                'X-Ever-Works-Event': request.event,
+                [WEBHOOK_V2_EVENT_ID_HEADER]: eventId,
+                'X-Ever-Works-Delivery': deliveryId,
+            } as WebhookHeadersV2,
+        };
+    }
+
+    /**
      * Sign + POST in one call. Returns a {@link DeliveryResult} with a
      * discriminated `outcome` field; the caller (typically the Trigger.dev
      * task) inspects `outcome` to decide whether to retry, mark failed, or
@@ -213,9 +280,12 @@ export class WebhookDeliveryService {
             };
         }
 
-        let signed: SignedDelivery;
+        let signed: SignedDelivery | SignedDeliveryV2;
         try {
-            signed = this.sign({ ...request, deliveryId });
+            signed =
+                request.signatureVersion === 2
+                    ? this.signV2({ ...request, deliveryId })
+                    : this.sign({ ...request, deliveryId });
         } catch (err) {
             if (err instanceof PayloadTooLargeError) {
                 this.logger.warn(

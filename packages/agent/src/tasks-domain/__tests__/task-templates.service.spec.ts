@@ -123,6 +123,24 @@ describe('TaskTemplatesService', () => {
             ).rejects.toBeInstanceOf(ConflictException);
         });
 
+        it('derives the slug: lower-case, non-alphanumeric runs -> one dash, no edge dashes, 80 chars max', async () => {
+            templates.findBySlugAndUser.mockResolvedValue({ id: 'existing' });
+            const slugFor = async (name: string, slug?: string): Promise<string> => {
+                templates.findBySlugAndUser.mockClear();
+                await svc
+                    .create('u1', { name, ...(slug ? { slug } : {}), steps: [{ title: 'One' }] })
+                    .catch(() => undefined);
+                return templates.findBySlugAndUser.mock.calls[0]?.[0];
+            };
+            expect(await slugFor('  --My   Flow!!  ')).toBe('my-flow');
+            expect(await slugFor('A/B -- C')).toBe('a-b-c');
+            // Cut at 80, and a dash left at the cut is dropped too.
+            expect(await slugFor('a'.repeat(79) + ' b')).toBe('a'.repeat(79));
+            // Long dash runs around an explicit slug collapse and trim away.
+            expect(await slugFor('X', '-'.repeat(100_000) + 'x' + '-'.repeat(100_000))).toBe('x');
+            templates.findBySlugAndUser.mockReset();
+        });
+
         it('create rejects an empty step list', async () => {
             await expect(svc.create('u1', { name: 'X', steps: [] })).rejects.toBeInstanceOf(
                 BadRequestException,

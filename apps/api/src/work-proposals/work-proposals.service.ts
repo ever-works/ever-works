@@ -1,4 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import type { RecordListView } from '@ever-works/contracts';
+import { RecordAccessPolicy } from '@ever-works/agent/record-visibility';
+import type { OwnershipScope } from '@ever-works/agent/database';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -66,6 +69,9 @@ export class WorkProposalsApiService {
         @Optional()
         @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
         private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
+        // Record visibility (EW-P1-3) — the shared / org tabs and the readable get.
+        // Appended LAST + @Optional(): absent means Ideas stay owner-only.
+        @Optional() private readonly accessPolicy?: RecordAccessPolicy,
     ) {}
 
     /**
@@ -287,6 +293,67 @@ export class WorkProposalsApiService {
 
     async getForUser(userId: string, proposalId: string) {
         return this.proposals.getForUser(userId, proposalId);
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — the shared / organization tabs of `/ideas`, read
+     * through `visibleTo(principal)` in the active Organization. The `mine` tab stays
+     * {@link list}, unchanged. Without the policy (or in personal scope) a shared view
+     * is empty and the organization view is the caller's own Ideas.
+     */
+    async listVisible(
+        userId: string,
+        view: RecordListView,
+        statuses: WorkProposalStatus[],
+        opts: { missionId?: string | null; search?: string; limit?: number; offset?: number },
+        scope?: OwnershipScope,
+    ): Promise<WorkProposal[]> {
+        if (!this.accessPolicy) return [];
+        const { rows } = await this.accessPolicy.listVisible<WorkProposal>({
+            aggregate: 'idea',
+            userId,
+            scope,
+            view,
+            orderBy: { column: 'generatedAt', direction: 'DESC' },
+            take: opts.limit,
+            skip: opts.offset,
+            refine: (qb, alias) => {
+                if (statuses.length > 0) {
+                    qb.andWhere(`${alias}.status IN (:...ideaStatuses)`, {
+                        ideaStatuses: statuses,
+                    });
+                }
+                if (opts.missionId) {
+                    qb.andWhere(`${alias}.missionId = :ideaMissionId`, {
+                        ideaMissionId: opts.missionId,
+                    });
+                }
+            },
+            search: { term: opts.search, columns: ['title', 'description'] },
+        });
+        return rows;
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — the READ of one Idea: the owner exactly as
+     * {@link getForUser}, or anyone `visibleTo(principal)` admits in the active
+     * Organization. Only `GET /api/me/work-proposals/:id` uses it; every write keeps the
+     * owner-only paths.
+     */
+    async getReadable(
+        userId: string,
+        proposalId: string,
+        scope?: OwnershipScope,
+    ): Promise<WorkProposal | null> {
+        const own = await this.proposals.getForUser(userId, proposalId);
+        if (own) return own;
+        if (!this.accessPolicy) return null;
+        return this.accessPolicy.findVisibleNotOwned<WorkProposal>({
+            aggregate: 'idea',
+            userId,
+            id: proposalId,
+            scope,
+        });
     }
 
     async isResearching(userId: string): Promise<boolean> {

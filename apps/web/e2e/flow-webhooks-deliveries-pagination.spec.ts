@@ -11,32 +11,36 @@
  *   CHAIN + secret hygiene. flow-webhooks-validation-authz-matrix grids the URL /
  *   workId / status DTOs, the path-param uuid pipe, cross-account 404-masking, and
  *   the ROTATE throttle (5/min). NONE of them pin the actual PAGING contract of the
- *   listing endpoints — which is the surprising, load-bearing truth this file
- *   proves: **there is no paging/filter/sort surface at all.** The controller
- *   (`listDeliveries`) calls `deliveries.list(userId)` with NO opts, so the
- *   service-level `{ limit, subscriptionId }` knobs (and the repo's [1,200] clamp
- *   / createdAt-DESC / default-50 window) are NEVER reachable from HTTP. Every
- *   `?limit` / `?offset` / `?status` / `?subscriptionId` / `?sort` / `?cursor`
- *   query param is INERT. This file pins that inertness, the fixed most-recent
- *   createdAt-DESC window (tie-tolerant), the bare no-metadata envelope, the
- *   redeliver fanout (no dedup), and the untested-elsewhere redeliver throttle
- *   (10/min per account).
+ *   listing endpoints. Since webhooks v2 (EW-P1-5, #2623: "`GET` lists every
+ *   status", "`GET /deliveries?subscriptionId=&limit=` is new") the deliveries
+ *   listing has exactly TWO knobs: `?subscriptionId=<uuid>` (one subscription,
+ *   still account-scoped at the repository) and `?limit` (parseInt, clamped to
+ *   [1,200], unparseable → the default 50). Every other query param (`?offset` /
+ *   `?status` / `?sort` / `?cursor`) is still INERT. This file pins those knobs,
+ *   that inertness, the most-recent createdAt-DESC window (tie-tolerant), the bare
+ *   no-metadata envelope, the redeliver fanout (no dedup), and the untested-
+ *   elsewhere redeliver throttle (10/min per account).
  *
  * PROBED LIVE (http://127.0.0.1:3100, sqlite in-memory — the exact CI driver) on
  * throwaway users BEFORE any assertion. Confirmed contract:
  *
  *   SUBSCRIPTIONS  GET /api/webhooks → { subscriptions: View[] }  (bare envelope)
- *     • listActiveForAccount → status==='active' ONLY; paused/deleted excluded.
+ *     • listForAccount → EVERY status (active, paused, failed, disabled) since
+ *       webhooks v2; a deleted subscription is gone.
+ *     • View = the v1 keys + the v2 keys (version, ownerType, ownerId, events,
+ *       organizationIds, excludeOriginTags, description). Never secret material.
  *     • No `order` clause → membership is order-agnostic (assert by id set).
- *     • `?limit=0&status=paused&sort=x` is INERT — full active set still returned.
+ *     • `?limit=0&status=paused&sort=x` is INERT — the full set is still returned.
  *
  *   DELIVERIES  GET /api/webhooks/deliveries → { deliveries: View[] }  (bare envelope)
- *     • repo window: createdAt DESC, default take=50, clamp [1,200] — but the
- *       controller passes NO opts, so it is ALWAYS the fixed most-recent-50 window.
- *     • `?limit=1|0|-5|99999|abc`, `?status=delivered`, `?subscriptionId=<other>`,
- *       `?offset=`, `?sort=id;DROP TABLE`, `?cursor=…`, `?limit[]=1` → ALL 200, all
- *       return the identical unfiltered id set (proven: `?subscriptionId=S1` still
- *       returns S2's rows; a SQL-injection-style `?sort` is a harmless no-op).
+ *     • repo window: createdAt DESC, default take=50, clamp [1,200].
+ *     • `?limit=N` caps the window: 0 and -5 clamp to 1, 99999 to 200, `abc` falls
+ *       back to the default, and `limit[]=1` is a different key (→ the default).
+ *     • `?subscriptionId=<uuid>` keeps one subscription's rows (scoped to the
+ *       caller's account: another account's id lists nothing); a non-uuid is 400.
+ *     • `?status=delivered`, `?offset=`, `?sort=id;DROP TABLE`, `?cursor=…` → ALL
+ *       200 with the identical unfiltered id set (a SQL-injection-style `?sort` is a
+ *       harmless no-op).
  *     • row keys: id, subscriptionId, event, status('pending'|'delivered'|'failed'
  *       |'retrying'), attempts, lastResponseStatus, lastOutcome, lastError,
  *       durationMs, triggerRunId, lastAttemptAt, createdAt, updatedAt.
@@ -96,6 +100,14 @@ const SUBSCRIPTION_VIEW_KEYS = [
     'lastDeliveryAt',
     'createdAt',
     'updatedAt',
+    // Webhooks v2 (EW-P1-5 / EW-P1-7): null on v1 rows, never secret material.
+    'version',
+    'ownerType',
+    'ownerId',
+    'events',
+    'organizationIds',
+    'excludeOriginTags',
+    'description',
 ] as const;
 
 function stamp(): string {
@@ -196,9 +208,9 @@ function nonIncreasingByCreatedAt(rows: DeliveryView[]): boolean {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// A — SUBSCRIPTIONS listing: bare envelope, active-only, order-agnostic, inert query.
+// A — SUBSCRIPTIONS listing: bare envelope, every status (v2), order-agnostic, inert query.
 // ═════════════════════════════════════════════════════════════════════════════
-test.describe('Webhooks subscriptions listing — envelope, membership, inert paging', () => {
+test.describe('Webhooks subscriptions listing — envelope, membership (every status), inert paging', () => {
     test('a fresh account lists a bare { subscriptions: [] } — empty array, no paging metadata', async ({
         request,
     }) => {
@@ -226,14 +238,14 @@ test.describe('Webhooks subscriptions listing — envelope, membership, inert pa
         const mine = rows.find((r) => r.id === sub.id);
         expect(mine, 'the created subscription is listed').toBeTruthy();
         expect(new Set(Object.keys(mine as object))).toEqual(new Set(SUBSCRIPTION_VIEW_KEYS));
-        expect(mine!.status, 'the active list only ever surfaces active rows').toBe('active');
+        expect(mine!.status, 'a freshly created subscription is active').toBe('active');
         expect(mine!.accountId).toBe(user.user.id);
         expect(mine!.workId).toBeNull();
         // Secret hygiene: no key matches /secret/i and no signingSecret leaks into the list.
         expect(Object.keys(mine as object).some((k) => /secret/i.test(k))).toBe(false);
     });
 
-    test('the listing contains every created id, EXCLUDES paused + deleted, and is order-agnostic', async ({
+    test('the listing contains every created id INCLUDING paused (every status since v2), EXCLUDES deleted, and is order-agnostic', async ({
         request,
     }) => {
         test.setTimeout(60_000);
@@ -258,15 +270,17 @@ test.describe('Webhooks subscriptions listing — envelope, membership, inert pa
         const listed = ids(await listSubs(request, user));
         expect(listed, 'active kept sub #1 is present').toContain(keep1.id);
         expect(listed, 'active kept sub #2 is present').toContain(keep2.id);
-        expect(listed, 'the paused sub is filtered out of the active list').not.toContain(
+        expect(listed, 'the paused sub is still listed (every status, webhooks v2)').toContain(
             paused.id,
         );
         expect(listed, 'the deleted sub is gone from the list').not.toContain(deleted.id);
-        // Fresh account → deterministic: exactly the two survivors.
-        expect(listed.length, 'exactly the two active survivors remain').toBe(2);
+        // Fresh account → deterministic: the two active subs plus the paused one.
+        expect(listed.length, 'exactly the three surviving subscriptions remain').toBe(3);
+        const pausedRow = (await listSubs(request, user)).find((r) => r.id === paused.id);
+        expect(pausedRow?.status, 'the paused sub is listed WITH its paused status').toBe('paused');
     });
 
-    test('subscriptions paging/filter query params are INERT — ?limit=0&status=paused&sort= returns the full active set', async ({
+    test('subscriptions paging/filter query params are INERT — ?limit=0&status=paused&sort= returns the full set', async ({
         request,
     }) => {
         test.setTimeout(60_000);
@@ -309,7 +323,7 @@ test.describe('Webhooks subscriptions listing — envelope, membership, inert pa
 // ═════════════════════════════════════════════════════════════════════════════
 // B — DELIVERIES listing: bare envelope + the (absent) pagination/filter surface.
 // ═════════════════════════════════════════════════════════════════════════════
-test.describe('Webhooks deliveries listing — no paging surface, every query param inert', () => {
+test.describe('Webhooks deliveries listing — ?limit + ?subscriptionId (v2), every other query param inert', () => {
     test('a fresh account lists a bare { deliveries: [] } with NO pagination metadata', async ({
         request,
     }) => {
@@ -358,12 +372,10 @@ test.describe('Webhooks deliveries listing — no paging surface, every query pa
         expect(Number.isNaN(Date.parse(row!.createdAt)), 'createdAt parses as a date').toBe(false);
     });
 
-    test('?limit is INERT — limit=1 does NOT shrink a multi-row window to one', async ({
-        request,
-    }) => {
+    test('?limit=1 caps a multi-row window to its single most recent row', async ({ request }) => {
         test.setTimeout(60_000);
         const user = await registerUserViaAPI(request);
-        const sub = await createSub(request, user, 'limit-inert');
+        const sub = await createSub(request, user, 'limit-cap');
         const seed = await testFire(request, user, sub.id);
         // One redeliver → a second row, so a real page-size of 1 WOULD truncate.
         const redeliverRes = await request.post(`${DELIVERIES_URL}/${seed}/redeliver`, {
@@ -374,11 +386,15 @@ test.describe('Webhooks deliveries listing — no paging surface, every query pa
         const full = await listDeliveries(request, user);
         expect(full.length, 'the fresh account has both rows').toBe(2);
         const limited = await listDeliveries(request, user, '?limit=1');
-        expect(limited.length, '?limit=1 is ignored — the full window still comes back').toBe(2);
-        expect(new Set(ids(limited))).toEqual(new Set(ids(full)));
+        expect(limited.length, '?limit=1 returns exactly one row').toBe(1);
+        expect(ids(full), 'the capped row is one of the account rows').toContain(limited[0].id);
+        // createdAt DESC: the one row kept is a most recent one (ties allowed at
+        // second resolution).
+        const newest = Math.max(...full.map((r) => Date.parse(r.createdAt)));
+        expect(Date.parse(limited[0].createdAt), '?limit=1 keeps a most-recent row').toBe(newest);
     });
 
-    test('degenerate ?limit values (0, -5, 99999, abc, limit[]=1) all 200 with the identical unfiltered set', async ({
+    test('degenerate ?limit values all 200: 0 and -5 clamp to 1, 99999 to the full window, abc and limit[]=1 fall back to the default', async ({
         request,
     }) => {
         test.setTimeout(60_000);
@@ -391,9 +407,17 @@ test.describe('Webhooks deliveries listing — no paging surface, every query pa
 
         const baseline = new Set(ids(await listDeliveries(request, user)));
         expect(baseline.size, 'two rows for this fresh account').toBe(2);
-        for (const q of ['?limit=0', '?limit=-5', '?limit=99999', '?limit=abc', '?limit[]=1']) {
+        // Clamped to [1, 200] (WebhookDeliveryRepository.listForAccount).
+        for (const q of ['?limit=0', '?limit=-5']) {
+            const got = await listDeliveries(request, user, q);
+            expect(got.length, `${q} clamps to one row`).toBe(1);
+            expect(baseline.has(got[0].id), `${q} returns one of the account rows`).toBe(true);
+        }
+        // Above the cap, unparseable, and the array form (`limit[]` is a different
+        // key, so `limit` stays unset → the default 50): the whole two-row window.
+        for (const q of ['?limit=99999', '?limit=abc', '?limit[]=1']) {
             const got = new Set(ids(await listDeliveries(request, user, q)));
-            expect(got, `${q} neither errors nor changes the result set`).toEqual(baseline);
+            expect(got, `${q} returns the full window`).toEqual(baseline);
         }
     });
 
@@ -419,7 +443,7 @@ test.describe('Webhooks deliveries listing — no paging surface, every query pa
         ).toBeTruthy();
     });
 
-    test('?subscriptionId=<one sub> is INERT — the account-wide window still spans EVERY subscription', async ({
+    test("?subscriptionId=<uuid> keeps only that subscription, is 400 for a non-uuid, and lists nothing for another account's subscription", async ({
         request,
     }) => {
         test.setTimeout(60_000);
@@ -430,10 +454,21 @@ test.describe('Webhooks deliveries listing — no paging surface, every query pa
         await testFire(request, user, s2.id);
 
         const scoped = await listDeliveries(request, user, `?subscriptionId=${s1.id}`);
+        expect(scoped.length, 'the s1 filter keeps s1 rows').toBeGreaterThan(0);
         const subsSeen = new Set(scoped.map((r) => r.subscriptionId));
-        expect(subsSeen, 'the subscriptionId filter is ignored — both subs appear').toEqual(
-            new Set([s1.id, s2.id]),
-        );
+        expect(subsSeen, 'only the filtered subscription appears').toEqual(new Set([s1.id]));
+
+        // ParseUUIDPipe: a malformed id is rejected, never silently ignored.
+        const malformed = await request.get(`${DELIVERIES_URL}?subscriptionId=not-a-uuid`, {
+            headers: authedHeaders(user.access_token),
+            timeout: T,
+        });
+        expect(malformed.status(), 'a non-uuid subscriptionId is 400').toBe(400);
+
+        // Account-scoped at the repository: another account filtering by s1 sees nothing.
+        const other = await registerUserViaAPI(request);
+        const foreign = await listDeliveries(request, other, `?subscriptionId=${s1.id}`);
+        expect(foreign, 'another account never sees s1 deliveries').toEqual([]);
     });
 
     test('?offset / ?sort / ?order / ?cursor and a SQL-injection-style sort are all harmless no-ops (200, full set)', async ({

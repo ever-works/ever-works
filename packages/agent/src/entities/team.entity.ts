@@ -39,6 +39,8 @@ export interface TeamMetadata {
 @Index('uq_teams_org_slug', ['organizationId', 'slug'], { unique: true })
 @Index('idx_teams_user', ['userId'])
 @Index('idx_teams_parent', ['parentTeamId'])
+// Integration API v1 keyset lists (migration 1795080300000).
+@Index('idx_teams_org_updated', ['organizationId', 'updatedAt', 'id'])
 export class Team {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -100,4 +102,16 @@ export class Team {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for optimistic concurrency and event ordering (EW-P1-1,
+     * `docs/specs/features/domain-events/spec.md` §4). Starts at 1 and is bumped by
+     * `bumpAggregateVersion` on every recorded change — member and resource changes too.
+     *
+     * A plain column on purpose, NOT `@VersionColumn`: TypeORM adds
+     * `version = version + 1` to every query-builder `.update()` of an entity
+     * with a version column, which would bump it on machine-only writes too.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

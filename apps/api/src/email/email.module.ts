@@ -9,8 +9,9 @@ import { AgentsModule } from '@ever-works/agent/agents';
 import { AuthModule } from '@src/auth';
 // AW-05 — approve-before-send (EmailDraftService + the approvals-queue
 // listener) and the send-policy services the facade gate is bound to.
-import { EmailDraftsModule } from '@ever-works/agent/email';
+import { EmailDomainEventsModule, EmailDraftsModule } from '@ever-works/agent/email';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { MailModule } from '../mail/mail.module';
 import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
 import { EmailSendPolicyController } from './email-send-policy.controller';
@@ -42,9 +43,15 @@ import { EmailDraftReleaseCronService } from './email-draft-release-cron.service
         AgentsModule,
         AuthModule,
         EmailDraftsModule,
+        // EW-P4-2 — records `email.message.*` domain events for every
+        // `email_messages` write (the bridge registers on the repository).
+        EmailDomainEventsModule,
         // Organization policy writes are authorized by the shared membership
         // check. OrganizationsModule imports nothing email-side — no cycle.
         OrganizationsModule,
+        // EW-P4-3 — MailService delivers the address confirmation link.
+        // MailModule imports only the mailer transport — no cycle.
+        MailModule,
     ],
     controllers: [EmailController, EmailSendPolicyController, AgentEmailAssignmentsController],
     providers: [

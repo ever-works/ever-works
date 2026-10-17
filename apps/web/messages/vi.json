@@ -2655,6 +2655,7 @@
                 "appLauncher": "Trình khởi chạy ứng dụng",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "Webhook",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8779,6 +8780,7 @@
             "app": "Ứng dụng",
             "company": "Company",
             "campaign": "Chiến dịch",
+            "project": "Dự án",
             "default": "Work"
         },
         "meetingsPage": {

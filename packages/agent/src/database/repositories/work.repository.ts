@@ -1024,8 +1024,10 @@ export class WorkRepository {
         limit?: number;
         offset?: number;
         search?: string;
+        /** EW-P2-4 — only Works of this persisted kind (exact match). */
+        kind?: string;
     }): Promise<Work[]> {
-        const { userId, memberWorkIds = [], limit, offset, search } = options || {};
+        const { userId, memberWorkIds = [], limit, offset, search, kind } = options || {};
 
         if (!userId) {
             return [];
@@ -1069,6 +1071,11 @@ export class WorkRepository {
             }
         }
 
+        // EW-P2-4 — the works-list kind filter.
+        if (kind) {
+            queryBuilder.andWhere('work.kind = :kind', { kind });
+        }
+
         queryBuilder.orderBy('work.updatedAt', 'DESC');
 
         if (limit) {
@@ -1089,8 +1096,10 @@ export class WorkRepository {
         userId: string;
         memberWorkIds?: string[];
         search?: string;
+        /** EW-P2-4 — only Works of this persisted kind (exact match). */
+        kind?: string;
     }): Promise<number> {
-        const { userId, memberWorkIds = [], search } = options || {};
+        const { userId, memberWorkIds = [], search, kind } = options || {};
 
         if (!userId) {
             return 0;
@@ -1130,6 +1139,11 @@ export class WorkRepository {
                     }),
                 );
             }
+        }
+
+        // EW-P2-4 — the works-list kind filter.
+        if (kind) {
+            queryBuilder.andWhere('work.kind = :kind', { kind });
         }
 
         return queryBuilder.getCount();

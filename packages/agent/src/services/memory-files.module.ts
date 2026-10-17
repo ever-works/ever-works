@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
@@ -43,6 +44,8 @@ import { MemoryFolderSyncService } from './memory-folder-sync.service';
         DatabaseModule,
         FacadesModule,
         ActivityLogModule,
+        // EW-P3-2 — `kb.folder.*` domain events of organization library folders.
+        DomainEventsModule,
         // House pattern (mirrors MissionsModule): a module that provides
         // feature-owned repositories registers their entities itself so
         // the @InjectRepository tokens resolve within THIS module.

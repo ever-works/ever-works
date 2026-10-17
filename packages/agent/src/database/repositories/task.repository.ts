@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, LessThanOrEqual, Repository, type SelectQueryBuilder } from 'typeorm';
+import {
+    Brackets,
+    type EntityManager,
+    LessThanOrEqual,
+    Repository,
+    type SelectQueryBuilder,
+} from 'typeorm';
 import { Task, TaskStatus } from '../../entities/task.entity';
 import {
     buildCaseInsensitiveLikeClause,
@@ -8,8 +14,18 @@ import {
     sanitizeLikePattern,
 } from '../utils';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
+import type { RecordListView } from '@ever-works/contracts';
+import type { RecordAccessContext } from '../../record-visibility/record-access.types';
+import { visibleToPredicate } from '../../record-visibility/visible-to';
 
 export interface ListTasksFilter {
+    /**
+     * Record visibility (EW-P1-3) list tab: `mine` (default, today's owner list),
+     * `shared` or `organization`. Only `TasksService.list` reads it: the repository's
+     * owner list ignores it, and {@link TaskRepository.findVisibleFiltered} takes the
+     * view as an argument.
+     */
+    view?: RecordListView;
     status?: TaskStatus | TaskStatus[];
     priority?: string | string[];
     missionId?: string;
@@ -182,6 +198,72 @@ export class TaskRepository {
             qb.andWhere(scopePredicate.clause, scopePredicate.parameters);
         }
 
+        return this.readFilteredPage(qb, filter);
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — the list through `visibleTo(principal)` instead of
+     * `userId = caller`: own rows, rows the caller takes part in, rows on their Teams /
+     * Works (`team` + `organization`) and, for an Organization member, every
+     * `organization` row. Same filters, order and paging as
+     * {@link findByUserIdFiltered}; `view = 'mine'` is identical to it.
+     */
+    async findVisibleFiltered(
+        context: RecordAccessContext,
+        view: RecordListView,
+        filter: ListTasksFilter = {},
+        scope?: OwnershipScope,
+    ): Promise<{ rows: Task[]; total: number }> {
+        const qb = this.repository.createQueryBuilder('task');
+        const predicate = visibleToPredicate({
+            alias: 'task',
+            aggregate: 'task',
+            context,
+            view,
+            escape: (identifier) => qb.connection.driver.escape(identifier),
+        });
+        qb.where(predicate.clause, predicate.parameters);
+
+        const scopePredicate = ownershipSqlPredicate('task', scope, 'taskScope');
+        if (scopePredicate) {
+            qb.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+
+        return this.readFilteredPage(qb, filter);
+    }
+
+    /**
+     * Record visibility (EW-P1-3) — one Task by id when `visibleTo(principal)` admits
+     * it in the active scope. `null` (→ 404) otherwise, so existence never leaks.
+     */
+    async findVisibleById(
+        id: string,
+        context: RecordAccessContext,
+        scope?: OwnershipScope,
+    ): Promise<Task | null> {
+        const qb = this.repository.createQueryBuilder('task').where('task.id = :taskId', {
+            taskId: id,
+        });
+        const predicate = visibleToPredicate({
+            alias: 'task',
+            aggregate: 'task',
+            context,
+            view: 'organization',
+            escape: (identifier) => qb.connection.driver.escape(identifier),
+        });
+        qb.andWhere(predicate.clause, predicate.parameters);
+        const scopePredicate = ownershipSqlPredicate('task', scope, 'taskScope');
+        if (scopePredicate) {
+            qb.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+        return qb.getOne();
+    }
+
+    /** The shared filter / count / order / page tail of the two list reads. */
+    private async readFilteredPage(
+        qb: SelectQueryBuilder<Task>,
+        filter: ListTasksFilter,
+    ): Promise<{ rows: Task[]; total: number }> {
         if (filter.status) {
             if (Array.isArray(filter.status)) {
                 qb.andWhere('task.status IN (:...statuses)', { statuses: filter.status });
@@ -347,13 +429,17 @@ export class TaskRepository {
         }
     }
 
-    async create(data: Partial<Task>): Promise<Task> {
-        const entity = this.repository.create(data);
-        return this.repository.save(entity);
+    // `manager` (domain events, EW-P1-1): pass the transaction's EntityManager to
+    // write inside it, so the change and its outbox row commit together.
+    async create(data: Partial<Task>, manager?: EntityManager): Promise<Task> {
+        const repository = manager ? manager.getRepository(Task) : this.repository;
+        const entity = repository.create(data);
+        return repository.save(entity);
     }
 
-    async updateById(id: string, data: Partial<Task>): Promise<void> {
-        await this.repository.update(id, data);
+    async updateById(id: string, data: Partial<Task>, manager?: EntityManager): Promise<void> {
+        const repository = manager ? manager.getRepository(Task) : this.repository;
+        await repository.update(id, data);
     }
 
     /**
@@ -535,8 +621,10 @@ export class TaskRepository {
         id: string,
         expectedStatus: Task['status'],
         data: Partial<Task>,
+        manager?: EntityManager,
     ): Promise<boolean> {
-        const result = await this.repository.update({ id, status: expectedStatus }, data);
+        const repository = manager ? manager.getRepository(Task) : this.repository;
+        const result = await repository.update({ id, status: expectedStatus }, data);
         return (result.affected ?? 0) === 1;
     }
 
@@ -571,8 +659,9 @@ export class TaskRepository {
         return (result.affected ?? 0) > 0;
     }
 
-    async deleteById(id: string): Promise<void> {
-        await this.repository.delete(id);
+    async deleteById(id: string, manager?: EntityManager): Promise<void> {
+        const repository = manager ? manager.getRepository(Task) : this.repository;
+        await repository.delete(id);
     }
 
     /**
@@ -766,6 +855,88 @@ export class TaskRepository {
             .addOrderBy('task.id', 'ASC')
             .take(limit)
             .getMany();
+    }
+
+    /**
+     * EW-P2-3 — Tasks due inside `[now, until]` whose due-soon notice has not
+     * gone out for the current `dueAt`, oldest deadline first. Done, cancelled
+     * and recurring templates are skipped (a template's instances carry their
+     * own dates).
+     *
+     * @internal CRON-ONLY — reads across all tenants by design.
+     */
+    async findDueSoonTasks(limit: number, now: Date, until: Date): Promise<Task[]> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.dueAt IS NOT NULL')
+            .andWhere('task.dueAt >= :now', { now })
+            .andWhere('task.dueAt <= :until', { until })
+            .andWhere('task.dueSoonNotifiedAt IS NULL')
+            .andWhere('task.status NOT IN (:...closed)', { closed: ['done', 'cancelled'] })
+            .andWhere('task.isRecurring = :recurring', { recurring: false })
+            .orderBy('task.dueAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
+     * EW-P2-3 — give a due-soon claim back (the notice did not reach everyone),
+     * so the next scan retries. Only the claim stamped at `claimedAt` is
+     * released, never a later one.
+     */
+    async releaseDueSoonClaim(taskId: string, claimedAt: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ dueSoonNotifiedAt: null })
+            .where('id = :id', { id: taskId })
+            .andWhere('dueSoonNotifiedAt = :claimedAt', { claimedAt })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * EW-P2-3 — update a Task only while one planning date still holds the
+     * value the caller validated against (`startAt` ≤ `dueAt` is a rule over
+     * BOTH columns; a PATCH that moves one end must not race a PATCH moving the
+     * other). Answers whether the row was written.
+     */
+    async updateByIdIfUnchanged(
+        id: string,
+        data: Partial<Task>,
+        guard: { field: 'startAt' | 'dueAt'; expected: Date | null },
+        manager?: EntityManager,
+    ): Promise<boolean> {
+        const repository = manager ? manager.getRepository(Task) : this.repository;
+        const query = repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(data)
+            .where('id = :id', { id });
+        if (guard.expected === null) {
+            query.andWhere(`${guard.field} IS NULL`);
+        } else {
+            query.andWhere(`${guard.field} = :expected`, { expected: guard.expected });
+        }
+        const result = await query.execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * EW-P2-3 — claim the due-soon notice for one Task: only the tick that
+     * stamps `dueSoonNotifiedAt` while it is still NULL (and `dueAt` is still
+     * the date it read) sends it, so two ticks or replicas never notify twice.
+     */
+    async casClaimDueSoon(taskId: string, expectedDueAt: Date, now: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ dueSoonNotifiedAt: now })
+            .where('id = :id', { id: taskId })
+            .andWhere('dueAt = :expected', { expected: expectedDueAt })
+            .andWhere('dueSoonNotifiedAt IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
     }
 
     /**

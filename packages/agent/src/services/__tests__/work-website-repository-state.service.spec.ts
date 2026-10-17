@@ -43,6 +43,13 @@ describe('WorkWebsiteRepositoryStateService', () => {
     const buildUser = (overrides: Partial<User> = {}): User =>
         ({ id: 'caller-1', ...overrides }) as User;
 
+    it('answers false for a Work with no repository (EW-P2-4 Project Work) without probing git', async () => {
+        const work = buildWork({ kind: 'project' } as Partial<Work>);
+        await expect(service.isInitialized(work, buildUser())).resolves.toBe(false);
+        expect(gitFacade.hasValidCredentials).not.toHaveBeenCalled();
+        expect(gitFacade.repositoryExists).not.toHaveBeenCalled();
+    });
+
     describe('short-circuit on persisted markers', () => {
         // Pinned via parametrised matrix because each marker is an
         // independent "this work is initialised" signal — a future

@@ -13,11 +13,11 @@ Mailgun email provider plugin for Ever Works (Notifications v2, EW-650).
 | `apiKey`            | yes    | `MAILGUN_API_KEY`             | yes      |
 | `domain`            | no     | `MAILGUN_DOMAIN`              | yes      |
 | `region`            | no     | `MAILGUN_REGION` (`us`/`eu`)  | no (us)  |
-| `webhookSigningKey` | yes    | `MAILGUN_WEBHOOK_SIGNING_KEY` | no       |
+| `webhookSigningKey` | yes    | `MAILGUN_WEBHOOK_SIGNING_KEY` | inbound  |
 
 ## Notes
 
 - Outbound is built on the official **`mailgun.js`** SDK (`messages.create`); metadata is forwarded as Mailgun `v:` custom variables.
 - Inbound HMAC verification uses Node `crypto` — Mailgun ships no SDK helper for inbound-route signature checking.
-- Inbound verifies the Mailgun **HMAC-SHA256** signature — `HMAC(signingKey, timestamp + token)` compared in constant time — and decodes both JSON and form-urlencoded webhook shapes. When no signing key is set, verification is skipped (operator opt-in).
+- Inbound verifies the Mailgun **HMAC-SHA256** signature — `HMAC(signingKey, timestamp + token)` compared in constant time — and decodes both JSON and form-urlencoded webhook shapes. When no signing key is set, inbound webhooks are **refused** (`401`); only `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (that exact string, for a local stack with no public webhook URL) accepts them unsigned.
 - `parseInboundWebhook` maps Mailgun's parsed fields (`sender`/`recipient`/`subject`/`body-plain`/`body-html`). Multipart attachment extraction requires a multipart parser at the controller layer and is left empty here.

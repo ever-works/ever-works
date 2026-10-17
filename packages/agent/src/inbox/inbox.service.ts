@@ -30,6 +30,10 @@ import { AgentEscalationService } from '../agents/agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '../domain-events/domain-event-publisher.service';
 import type { InboxItem } from '../entities/inbox-item.entity';
 import type {
     InboxEscalationRaisedInput,
@@ -177,6 +181,10 @@ export class InboxService implements InboxProducer {
         @Optional() private readonly escalations?: AgentEscalationService,
         @Optional() private readonly notifications?: NotificationService,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // EW-P3-1 — `inbox.item.*` domain events, recorded right after each
+        // write (best-effort, `recordAfterWrite`). Appended LAST + @Optional:
+        // a graph without it (unit tests, the worker) behaves exactly as before.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
 
     // ── reads ─────────────────────────────────────────────────────
@@ -252,9 +260,19 @@ export class InboxService implements InboxProducer {
     // ── read-state / archive ──────────────────────────────────────
 
     async setUnread(id: string, userId: string, unread: boolean): Promise<InboxItemDto> {
+        // Read BEFORE the write: `inbox.item.state_changed` is recorded only
+        // for a real flip (opening an already-read item records nothing).
+        const before = await this.items.findOwned(id, userId);
+        if (!before) throw new NotFoundException(`Inbox item ${id} not found.`);
+        const wasUnread = !!before.unread;
         const changed = await this.items.setUnread(id, userId, unread);
         if (!changed) throw new NotFoundException(`Inbox item ${id} not found.`);
         if (!unread) await this.stampFirstViewed(id, userId);
+        if (wasUnread !== unread) {
+            await this.recordChanged(id, 'inbox.item.state_changed', ['unread'], {
+                unread: wasUnread,
+            });
+        }
         const row = await this.items.findOwned(id, userId);
         if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
         return toInboxItemDto(row);
@@ -268,9 +286,15 @@ export class InboxService implements InboxProducer {
         if (!before) throw new NotFoundException(`Inbox item ${id} not found.`);
         const dismissesParkedRun = isOpenFleetQuestion(before);
         const parkedRunId = before.agentRunId ?? null;
+        const previousStatus = before.status;
 
         const row = await this.items.setArchived(id, userId, archived);
         if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
+        if (row.status !== previousStatus) {
+            await this.recordChanged(id, 'inbox.item.state_changed', ['status'], {
+                status: previousStatus,
+            });
+        }
 
         if (parkedRunId) {
             if (archived && dismissesParkedRun) {
@@ -290,8 +314,34 @@ export class InboxService implements InboxProducer {
         const dismissesParkedRun = isOpenFleetQuestion(row);
         const parkedRunId = row.agentRunId ?? null;
 
+        // The tombstone (version bump + last snapshot) is taken BEFORE the
+        // row goes; `inbox.item.deleted` is recorded once it is gone.
+        // Best-effort like every inbox recording: a failure is logged (the
+        // reconcile repairs the missing tombstone), never thrown.
+        const tombstone = this.domainEvents
+            ? await this.domainEvents
+                  .transaction((manager) =>
+                      this.domainEvents!.beforeDelete(manager, 'inbox_item', id),
+                  )
+                  .catch((err: unknown) => {
+                      this.logger.warn(
+                          `Could not take the inbox.item.deleted tombstone for ${id}: ${
+                              err instanceof Error ? err.message : String(err)
+                          }`,
+                      );
+                      return null;
+                  })
+            : null;
         const deleted = await this.items.deleteOwned(id, userId);
         if (!deleted) throw new NotFoundException(`Inbox item ${id} not found.`);
+        if (tombstone) {
+            await recordAfterWrite(
+                this.domainEvents,
+                (publisher, manager) => publisher.deleted(manager, tombstone, 'inbox.item.deleted'),
+                (message) => this.logger.warn(message),
+                `inbox.item.deleted for ${id}`,
+            );
+        }
 
         if (dismissesParkedRun && parkedRunId) {
             await this.setFleetRunParked(parkedRunId, false, `delete of item ${id}`);
@@ -387,6 +437,7 @@ export class InboxService implements InboxProducer {
             escalationId: input.escalationId,
             organizationId: input.organizationId ?? null,
         });
+        await this.recordCreated(row);
         await this.notifyCreated(row);
         this.logCreated(row);
     }
@@ -428,6 +479,7 @@ export class InboxService implements InboxProducer {
             proposalId: input.proposalId,
             organizationId: input.organizationId ?? null,
         });
+        await this.recordCreated(row);
         await this.notifyCreated(row);
         this.logCreated(row);
     }
@@ -446,6 +498,7 @@ export class InboxService implements InboxProducer {
             workId: input.workId ?? null,
             organizationId: input.organizationId ?? null,
         });
+        await this.recordCreated(row);
         // `notify: false` = this event already reached the human through
         // another producer; file the row, skip the second bell.
         if (input.notify !== false) {
@@ -578,15 +631,25 @@ export class InboxService implements InboxProducer {
                     break;
             }
         } catch (err) {
-            await this.items.reopen(id, userId).catch((reopenErr) => {
+            const reopened = await this.items.reopen(id, userId).catch((reopenErr) => {
                 this.logger.warn(
                     `Inbox item ${id}: routing failed AND the claim could not be released: ${reopenErr}`,
                 );
                 return false;
             });
+            // The claim marked the item read and `reopen` keeps it read (the
+            // human has seen it): that flip is a real state change, so it is
+            // recorded like a mark-read — otherwise a mirror would keep showing
+            // the item unread at an unchanged version.
+            if (reopened && row.unread) {
+                await this.recordChanged(id, 'inbox.item.state_changed', ['unread'], {
+                    unread: true,
+                });
+            }
             throw err;
         }
 
+        await this.recordAnswered(id, row.unread);
         const fresh = await this.items.findOwned(id, userId);
         if (!fresh) throw new NotFoundException(`Inbox item ${id} not found.`);
 
@@ -625,6 +688,7 @@ export class InboxService implements InboxProducer {
         await this.stampFirstViewed(row.id, row.userId);
 
         const handOff = await this.tryResumeLinkedRun(row, row.userId, note);
+        await this.recordAnswered(row.id, row.unread);
         const fresh = await this.items.findOwned(row.id, row.userId);
         if (fresh) {
             this.logAnswered(fresh, 'escalation-resolved', {
@@ -661,6 +725,7 @@ export class InboxService implements InboxProducer {
         const handOff = await this.tryResumeLinkedRun(row, row.userId, label, {
             parkedOnly: true,
         });
+        await this.recordAnswered(row.id, row.unread);
         const fresh = await this.items.findOwned(row.id, row.userId);
         if (fresh) {
             this.logAnswered(fresh, input.decision, {
@@ -669,6 +734,49 @@ export class InboxService implements InboxProducer {
                 decidedByUserId: input.decidedByUserId,
             });
         }
+    }
+
+    // ── domain events (EW-P3-1) ───────────────────────────────────
+
+    /** `inbox.item.created` at version 1, right after the row is filed. */
+    private async recordCreated(row: InboxItem): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                publisher.created(manager, 'inbox_item', row.id, 'inbox.item.created'),
+            (message) => this.logger.warn(message),
+            `inbox.item.created for ${row.id}`,
+        );
+    }
+
+    /** A full-snapshot change of one item (bumps its version). */
+    private async recordChanged(
+        id: string,
+        type: 'inbox.item.answered' | 'inbox.item.state_changed',
+        changedFields: string[],
+        previous: Record<string, unknown>,
+    ): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                publisher.changed(manager, 'inbox_item', id, type, { changedFields, previous }),
+            (message) => this.logger.warn(message),
+            `${type} for ${id}`,
+        );
+    }
+
+    /**
+     * `inbox.item.answered` — whichever door the answer came through (Inbox
+     * reply, escalation resolve, approval decide). Recorded once per answer:
+     * only the caller that won the `markAnswered` claim gets here.
+     */
+    private async recordAnswered(id: string, wasUnread: boolean): Promise<void> {
+        await this.recordChanged(
+            id,
+            'inbox.item.answered',
+            ['status', 'unread', 'answeredAt', 'answerText', 'answerOptionId'],
+            { status: 'open', unread: !!wasUnread },
+        );
     }
 
     // ── internals ─────────────────────────────────────────────────
@@ -730,6 +838,7 @@ export class InboxService implements InboxProducer {
             organizationId: ownedRun?.organizationId ?? null,
             ...(args.sourceMeta !== undefined ? { sourceMeta: args.sourceMeta } : {}),
         });
+        await this.recordCreated(row);
 
         let parked = false;
         if (ownedRun) {

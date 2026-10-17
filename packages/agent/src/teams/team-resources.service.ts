@@ -3,10 +3,15 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
+import type { VisibilityAggregate } from '@ever-works/contracts';
+import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { type EntityManager, In, Repository } from 'typeorm';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { Agent } from '../entities/agent.entity';
+import { Goal } from '../entities/goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { Organization } from '../entities/organization.entity';
 import { Task } from '../entities/task.entity';
@@ -35,7 +40,7 @@ interface ScopedResourceRow {
 /**
  * Teams & Prebuilt Companies — Team ↔ resource association service
  * (operator ask "some Works belong to some Teams", generalized to
- * Works / Tasks / Agents / Missions / Ideas).
+ * Works / Tasks / Agents / Missions / Ideas / Goals).
  *
  * Authorization happens BEFORE these methods run: every route is behind
  * `OrganizationOwnershipGuard` (fail-closed tenant-ownership, 404 posture).
@@ -64,7 +69,54 @@ export class TeamResourcesService {
         private readonly ideas: Repository<WorkProposal>,
         @InjectRepository(Task)
         private readonly tasks: Repository<Task>,
+        // Domain events (EW-P1-1 B2) — `team.resource.*`, plus `task.updated` /
+        // `work.updated` for an attached task or work (their `teamIds` change).
+        // Appended LAST + @Optional.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // EW-P1-3: goals sit on Teams too (`team_resources` type `goal`). After the
+        // domain-event publisher so positional test fixtures keep their indices;
+        // @Optional() because a required parameter cannot follow an optional one.
+        @Optional()
+        @InjectRepository(Goal)
+        private readonly goals?: Repository<Goal>,
+        // Record visibility (EW-P1-3) — attaching a record's first Team narrows it to
+        // `team`, detaching its last widens it to `organization` (while not chosen
+        // by hand). @Optional(): absent means no automatic change.
+        @Optional() private readonly visibility?: RecordVisibilityService,
     ) {}
+
+    /** The resource-side event of a team resource change (its DTO's `teamIds` moved). */
+    private async recordResourceSide(
+        publisher: DomainEventPublisher,
+        manager: EntityManager,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        if (resourceType === 'task') {
+            await publisher.changed(manager, 'task', resourceId, 'task.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'work') {
+            await publisher.changed(manager, 'work', resourceId, 'work.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'idea') {
+            // EW-P2-1: an Idea's Teams are its `team_resources` rows.
+            await publisher.changed(manager, 'idea', resourceId, 'idea.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'goal') {
+            // EW-P2-2: a Goal's Teams are its `team_resources` rows (EW-P1-3 type `goal`).
+            await publisher.changed(manager, 'goal', resourceId, 'goal.updated', {
+                changedFields: ['teamIds'],
+            });
+        } else if (resourceType === 'mission') {
+            // EW-P2-5: a Mission's Teams are its `team_resources` rows (D11).
+            await publisher.changed(manager, 'mission', resourceId, 'mission.updated', {
+                changedFields: ['teamIds'],
+            });
+        }
+    }
 
     /**
      * Attach a resource to a Team. Validates the Team is in the org AND the
@@ -100,7 +152,29 @@ export class TeamResourcesService {
         });
 
         try {
-            const saved = await this.resources.save(row);
+            const publisher = this.domainEvents;
+            const saved = publisher
+                ? await publisher.transaction(async (manager) => {
+                      const added = await manager.getRepository(TeamResource).save(row);
+                      await publisher.child(
+                          manager,
+                          'team',
+                          team.id,
+                          'team.resource.added',
+                          { teamId: team.id, resourceType, resourceId: input.resourceId },
+                          { changedFields: ['resources'] },
+                      );
+                      await this.recomputeVisibilityIn(manager, resourceType, input.resourceId);
+                      await this.recordResourceSide(
+                          publisher,
+                          manager,
+                          resourceType,
+                          input.resourceId,
+                      );
+                      return added;
+                  })
+                : await this.resources.save(row);
+            await this.recomputeVisibility(resourceType, input.resourceId);
             return this.toItem(saved, this.resolveRef(resourceType, resource));
         } catch (error) {
             if (this.isUniqueViolation(error)) {
@@ -119,9 +193,73 @@ export class TeamResourcesService {
     ): Promise<void> {
         const type = this.normalizeResourceType(resourceType);
         await this.getTeamOrThrow(orgId, teamId);
-        const result = await this.resources.delete({ teamId, resourceType: type, resourceId });
+        const publisher = this.domainEvents;
+        const result = publisher
+            ? await publisher.transaction(async (manager) => {
+                  const deleted = await manager
+                      .getRepository(TeamResource)
+                      .delete({ teamId, resourceType: type, resourceId });
+                  if (deleted.affected) {
+                      await publisher.child(
+                          manager,
+                          'team',
+                          teamId,
+                          'team.resource.removed',
+                          { teamId, resourceType: type, resourceId, deleted: true },
+                          { changedFields: ['resources'] },
+                      );
+                      await this.recomputeVisibilityIn(manager, type, resourceId);
+                      await this.recordResourceSide(publisher, manager, type, resourceId);
+                  }
+                  return deleted;
+              })
+            : await this.resources.delete({ teamId, resourceType: type, resourceId });
         if (!result.affected) {
             throw new NotFoundException('Resource is not attached to this team');
+        }
+        await this.recomputeVisibility(type, resourceId);
+    }
+
+    /** Record visibility (EW-P1-3): re-apply D11 to a record whose Teams changed. */
+    private async recomputeVisibility(
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        const aggregate = this.visibilityAggregateOf(resourceType);
+        if (this.visibility && aggregate) {
+            await this.visibility.recomputeAutomatic(aggregate, resourceId);
+        }
+    }
+
+    /**
+     * The same, inside the team-event transaction and BEFORE `recordResourceSide`, so the
+     * task's `task.updated` snapshot already carries the new visibility (and no separate
+     * notice is needed for it). Ideas likewise: `recordResourceSide` records `idea.updated`
+     * for them (EW-P2-1), so a second event would bump the version twice for one change.
+     * Other aggregates get their own `visibility_changed`.
+     */
+    private async recomputeVisibilityIn(
+        manager: EntityManager,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        const aggregate = this.visibilityAggregateOf(resourceType);
+        if (!this.visibility || !aggregate) return;
+        await this.visibility.recomputeAutomaticIn(manager, aggregate, resourceId, {
+            recordEvent: aggregate !== 'task' && aggregate !== 'idea',
+        });
+    }
+
+    private visibilityAggregateOf(resourceType: TeamResourceType): VisibilityAggregate | null {
+        switch (resourceType) {
+            case 'task':
+            case 'goal':
+            case 'mission':
+            case 'idea':
+            case 'agent':
+                return resourceType;
+            default:
+                return null;
         }
     }
 
@@ -139,6 +277,7 @@ export class TeamResourcesService {
             agent: [],
             mission: [],
             idea: [],
+            goal: [],
         };
         if (rows.length === 0) {
             return grouped;
@@ -249,6 +388,11 @@ export class TeamResourcesService {
                 return this.ideas as unknown as Repository<ScopedResourceRow>;
             case 'task':
                 return this.tasks as unknown as Repository<ScopedResourceRow>;
+            case 'goal':
+                if (!this.goals) {
+                    throw new NotFoundException('Goals cannot be attached in this context');
+                }
+                return this.goals as unknown as Repository<ScopedResourceRow>;
         }
     }
 
@@ -296,6 +440,7 @@ export class TeamResourcesService {
             case 'task':
                 return { name: str(e.title), slug: str(e.slug) };
             case 'mission':
+            case 'goal':
                 return { name: str(e.title), slug: null };
             case 'idea':
                 return { name: str(e.title), slug: str(e.slugSuggestion) };

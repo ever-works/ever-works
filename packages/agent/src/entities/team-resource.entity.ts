@@ -5,7 +5,7 @@ import { PortableDateColumn } from './_types';
  * Teams & Prebuilt Companies — Team ↔ resource association
  * (operator ask "some Works belong to some Teams").
  *
- * A polymorphic edge row: one Work / Task / Agent / Mission / Idea attached
+ * A polymorphic edge row: one Work / Task / Agent / Mission / Idea / Goal attached
  * to one Team (mirrors the `TeamMember.memberType` and `TaskAssignee.actorType`
  * patterns). A resource may sit in several Teams — the attachment is an edge,
  * never a column on the resource, so nothing on the Work/Agent/… side changes.
@@ -16,6 +16,8 @@ import { PortableDateColumn } from './_types';
  *   - `agent`   → `agents.id`
  *   - `mission` → `missions.id`
  *   - `idea`    → `work_proposals.id`
+ *   - `goal`    → `goals.id` (EW-P1-3: goals sit on Teams like every other
+ *                 resource; the column is a plain varchar, so no DDL change)
  *
  * There is deliberately NO `@ManyToOne` to any scope/resource entity — the
  * polymorphic `resourceId` cannot be a single FK, and the scope columns
@@ -26,7 +28,7 @@ import { PortableDateColumn } from './_types';
  * (the EW-711 IDOR boundary).
  */
 
-export type TeamResourceType = 'work' | 'task' | 'agent' | 'mission' | 'idea';
+export type TeamResourceType = 'work' | 'task' | 'agent' | 'mission' | 'idea' | 'goal';
 
 /** Canonical list — shared by the DTO validators and the service guards. */
 export const TEAM_RESOURCE_TYPES: readonly TeamResourceType[] = [
@@ -35,6 +37,7 @@ export const TEAM_RESOURCE_TYPES: readonly TeamResourceType[] = [
     'agent',
     'mission',
     'idea',
+    'goal',
 ];
 
 @Entity({ name: 'team_resources' })
@@ -54,7 +57,8 @@ export class TeamResource {
     resourceType: TeamResourceType;
 
     /** `works.id` / `tasks.id` / `agents.id` / `missions.id` /
-     *  `work_proposals.id` depending on `resourceType`; service-validated. */
+     *  `work_proposals.id` / `goals.id` depending on `resourceType`;
+     *  service-validated. */
     @Column({ type: 'uuid' })
     resourceId: string;
 

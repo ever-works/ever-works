@@ -12,15 +12,18 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { WorkProposalRepository } from './work-proposal.repository';
+import { WorkProposalRepository, type CreateExternalIdeaInput } from './work-proposal.repository';
+import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
+import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
 import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
 import type { IdeaWorkKind } from '../entities/idea-work.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { Not, Repository, type EntityManager } from 'typeorm';
 import { UserUpload } from '../entities/user-upload.entity';
 import { Agent, AgentStatus } from '../entities/agent.entity';
+import { Mission } from '../entities/mission.entity';
 import { VisionContextService } from '../services/vision-context.service';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
@@ -216,6 +219,11 @@ export class WorkProposalService {
         @Optional()
         @InjectRepository(Agent)
         private readonly agentsRepo?: Repository<Agent>,
+        // EW-P2-1 — integration-created Ideas: the transaction that writes the row, its
+        // Teams and `idea.created` together, and the Teams / D11 writer. TRAILING +
+        // `@Optional()` like the params above; without them `createExternal` refuses.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
+        @Optional() private readonly recordVisibility?: RecordVisibilityService,
     ) {}
 
     /**
@@ -951,6 +959,118 @@ export class WorkProposalService {
             kind,
         });
         return { outcome: 'failed', ideaId: input.ideaId, kind, message };
+    }
+
+    // ─── EW-P2-1 — Ideas written by an integration ───────────────────
+
+    /**
+     * Create an Idea for an integration (contract v1 B.6 `POST /ideas`): always
+     * `source = external` and `status = pending`, owned by `userId` (the act-as user or
+     * the key's tenant owner, resolved by the caller), `createdBy` = the integration
+     * key. `teamIds` become `team_resources` rows in the pinned Organization, then D11
+     * applies (team when on a Team, else organization) unless the integration picked
+     * `team` / `organization` by hand; `private` answers `422 domain_rule`.
+     *
+     * Spend safety (D9): nothing here queues or builds the Idea. Building stays a user
+     * action in Ever Works (`POST /me/work-proposals/:id/build`).
+     *
+     * `missionId` must name the caller's own non-`private` Mission of the same
+     * Organization (404 otherwise). The row, its Teams and `idea.created` commit together.
+     *
+     * `withinCreate` (T17a pattern) runs in that same transaction, after the row and its
+     * event: the integration API links the new Idea to its `externalRef` there, so the
+     * Idea and its link commit, or roll back, together. A throw undoes the create.
+     */
+    async createExternal(
+        input: Omit<CreateExternalIdeaInput, 'slugSuggestion'> & {
+            teamIds?: readonly string[];
+        },
+        options: {
+            readonly withinCreate?: (
+                idea: { readonly id: string },
+                manager: EntityManager,
+            ) => Promise<void>;
+        } = {},
+    ): Promise<WorkProposal> {
+        if (input.visibility !== undefined) {
+            RecordVisibilityService.assertIntegrationVisibility(input.visibility);
+        }
+        const title = input.title.trim().slice(0, 120);
+        const description = input.description.trim();
+        if (!title) throw new BadRequestException('title is required');
+        if (!description) throw new BadRequestException('description is required');
+        const publisher = this.domainEvents;
+        const visibility = this.recordVisibility;
+        if (!publisher || !visibility) {
+            throw new Error('createExternal needs DomainEventsModule and RecordVisibilityModule');
+        }
+        const teamIds = [...new Set(input.teamIds ?? [])];
+        const id = await publisher.transaction(async (manager) => {
+            if (input.missionId) {
+                // The Mission must be the caller's own (writes are owner-scoped: an Idea on
+                // someone else's Mission would count against its outstanding-Ideas cap) in
+                // the pinned Organization; a foreign, missing or `private` Mission reads the
+                // same (404).
+                const mission = await manager.getRepository(Mission).findOne({
+                    where: {
+                        id: input.missionId,
+                        organizationId: input.organizationId,
+                        userId: input.userId,
+                    },
+                    select: { id: true, visibility: true },
+                });
+                if (!mission || mission.visibility === 'private') {
+                    throw new NotFoundException('Mission not found');
+                }
+            }
+            const row = await this.repo.insertExternal(manager, {
+                ...input,
+                title,
+                description,
+                slugSuggestion: this.proposalKey(title).slice(0, 80) || 'untitled-idea',
+            });
+            if (teamIds.length > 0) {
+                await visibility.setTeamsIn(manager, 'idea', row.id, teamIds, input.userId);
+            }
+            await visibility.recomputeAutomaticIn(manager, 'idea', row.id, { recordEvent: false });
+            await publisher.created(manager, 'idea', row.id, 'idea.created');
+            if (options.withinCreate) await options.withinCreate({ id: row.id }, manager);
+            return row.id;
+        });
+        const created = await this.repo.findById(id);
+        if (!created) throw new NotFoundException('Idea not found');
+        return created;
+    }
+
+    /**
+     * Edit an Idea's title and/or description (integration `PATCH /ideas/:id`; the
+     * contract lets an integration change only these two). Records `idea.updated`.
+     */
+    async updateContent(
+        userId: string,
+        proposalId: string,
+        patch: { title?: string; description?: string },
+    ): Promise<WorkProposal | null> {
+        const next: { title?: string; description?: string } = {};
+        if (patch.title !== undefined) {
+            const title = patch.title.trim().slice(0, 120);
+            if (!title) throw new BadRequestException('title cannot be empty');
+            next.title = title;
+        }
+        if (patch.description !== undefined) {
+            const description = patch.description.trim();
+            if (!description) throw new BadRequestException('description cannot be empty');
+            next.description = description;
+        }
+        return this.repo.updateContent(proposalId, userId, next);
+    }
+
+    /**
+     * Restore a dismissed Idea to pending (integration `POST /ideas/:id/restore`).
+     * `false` when the Idea is not the caller's or is not dismissed.
+     */
+    async restore(userId: string, proposalId: string): Promise<boolean> {
+        return this.repo.markRestored(proposalId, userId);
     }
 
     async getForUser(userId: string, proposalId: string) {

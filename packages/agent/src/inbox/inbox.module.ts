@@ -6,6 +6,7 @@ import { AgentsModule } from '../agents/agents.module';
 import { AgentApprovalsModule } from '../agent-approvals/agent-approvals.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { InboxService } from './inbox.service';
 import { InboxBudgetAlertListener } from './inbox-budget-alert.listener';
 
@@ -46,6 +47,8 @@ import { InboxBudgetAlertListener } from './inbox-budget-alert.listener';
         NotificationsModule,
         // INBOX_ITEM_CREATED / INBOX_ITEM_ANSWERED activity rows.
         ActivityLogModule,
+        // EW-P3-1 — `inbox.item.*` domain events.
+        DomainEventsModule,
     ],
     providers: [InboxItemRepository, InboxService, InboxBudgetAlertListener],
     exports: [InboxItemRepository, InboxService],

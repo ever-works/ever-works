@@ -241,3 +241,91 @@ plugging it into a CI pipeline:
 
     Reuses the originally-signed payload (NOT a freshly-emitted event)
     so the receiver sees exactly what it would have seen the first time.
+
+---
+
+## Webhooks v2 — domain events (EW-P1-5)
+
+> **Contract:** integration contract v1, B.5 —
+> [`integrations-api-v1/spec.md` §5](./integrations-api-v1/spec.md),
+> [signature test vectors](./integrations-api-v1/contract/webhook-signature-vectors.json).
+> **Fan-out:** [`webhook-domain-event-fanout.service.ts`](../../../packages/agent/src/services/webhook-domain-event-fanout.service.ts).
+
+A **v2 subscription** (`version: 2`) receives [domain events](./domain-events/spec.md)
+instead of the five legacy work/deployment events. It is created with
+`events` + `organizationIds`:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  https://apps.ever.works/api/webhooks \
+  -d '{"url":"https://example.com/ever","events":["task.*","team.member.added"],
+       "organizationIds":["<org-id>"],"excludeOriginTags":["gauzy:<connection-id>"]}'
+```
+
+### What a v2 subscription receives
+
+- One event per POST. The body is the event envelope (`id`, `seq`, `type`,
+  `aggregate`, `actor`, `origin`, `changedFields`, `data`, `previous`, …),
+  exactly as `GET /api/integrations/v1/events` serves it.
+- Only events of its `organizationIds`. Never personal-scope events, and
+  never events of `private` aggregates, except the id-only
+  `*.visibility_changed` notice.
+- Only types matching `events`: catalog types, `<prefix>.*` or `*`.
+  `task.runtime_updated` arrives only when named exactly.
+- Never events whose `origin.tag` is listed in `excludeOriginTags`. This is
+  the loop guard for two-way sync.
+- Only events after the subscription was created: it records the change-feed
+  head at creation (`startAfterSeq`) and receives later positions only. It also
+  receives them only while its owner still has access, checked when the
+  delivery is created AND again right before every send or retry:
+    - a user owner must still belong to the organization's tenant;
+    - an integration-key owner must be active, unexpired and still pinned to
+      the organization.
+
+    When the owner is gone or the key is revoked, the subscription becomes
+    `disabled`, and `PATCH` can neither pause nor resume it.
+
+Delivery is **at least once** and **unordered**. Dedupe on the envelope
+`id`, order by `seq` per aggregate, and fill gaps from
+`GET /api/integrations/v1/events`. The fan-out reads the change feed from
+its own cursor (`plugin_event_cursors`, `core:webhooks-v2`), and a unique
+`(subscriptionId, eventId)` index keeps it to one delivery per event. A
+delivery that was created but never enqueued (the API stopped in between) is
+re-enqueued after 5 minutes.
+Retries follow the ladder above; only 5xx and timeouts are retried.
+
+### Headers and signature
+
+| Header                   | Value                                                            |
+| ------------------------ | ---------------------------------------------------------------- |
+| `X-Ever-Works-Event`     | the event type, e.g. `task.updated`                              |
+| `X-Ever-Works-Event-Id`  | the envelope `id` (`evt_<ULID>`)                                 |
+| `X-Ever-Works-Delivery`  | the delivery id (uuid); a redelivery gets a new one              |
+| `X-Ever-Works-Signature` | `t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<rawBody>")>` |
+
+- The HMAC key is the secret string exactly as returned, as UTF-8 bytes.
+- Reject `|now - t| > 300` (inclusive window).
+- Accept when **any** `v1=` matches, compared in constant time.
+- After `POST /api/webhooks/:id/rotate-secret`, the previous secret keeps
+  signing as a second `v1=` for `WEBHOOK_SECRET_ROTATION_GRACE_HOURS`
+  (default 24 h).
+- v2 deliveries carry **no** `X-Ever-Works-Signature-256` /
+  `X-Hub-Signature-256`.
+- The scheme is the same as Gauzy's `verifyWebhookSignature`. The reference
+  verifier is `verifyWebhookV2Signature` in
+  [`webhook-signature-v2.ts`](../../../packages/agent/src/services/webhook-signature-v2.ts).
+  The published vectors are its test.
+
+### Managing subscriptions
+
+- `GET /api/webhooks` lists every subscription, whatever its status
+  (`active`, `paused`, `failed`, `disabled`).
+- `PATCH /api/webhooks/:id`:
+    - `{"status":"paused"}` pauses any subscription;
+    - `{"status":"active"}` resumes a paused or failed one and resets its
+      failure streak (within the 25-active-subscriptions limit);
+    - a v2 subscription also takes `url`, `events`, `organizationIds`,
+      `excludeOriginTags` and `description`.
+- `GET /api/webhooks/deliveries?subscriptionId=<id>&limit=<n>` shows one
+  subscription's deliveries; `POST /api/webhooks/deliveries/:id/redeliver`
+  re-sends one.

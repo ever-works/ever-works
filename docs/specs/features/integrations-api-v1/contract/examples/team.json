@@ -1,0 +1,48 @@
+{
+	"id": "d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 4,
+	"createdAt": "2026-10-01T10:00:00.000Z",
+	"updatedAt": "2026-10-15T18:00:00.000Z",
+	"visibility": "organization",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"externalLinks": [],
+	"name": "Platform",
+	"slug": "platform",
+	"description": null,
+	"parentTeamId": null,
+	"managerAgentId": "c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78",
+	"avatarIcon": null,
+	"members": [
+		{
+			"memberType": "user",
+			"memberId": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+			"role": "lead"
+		},
+		{
+			"memberType": "agent",
+			"memberId": "c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78",
+			"role": "member"
+		}
+	],
+	"resources": [
+		{
+			"resourceType": "task",
+			"resourceId": "e7b9d1f3-5a6c-4da4-8edf-4a5b6c7d8e9a"
+		},
+		{
+			"resourceType": "work",
+			"resourceId": "2ae2a4c6-8d9f-4ad7-9b02-7d8e9fabbccd"
+		}
+	],
+	"webUrl": "https://app.ever.works/teams/d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89"
+}

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, In, Repository, type EntityManager } from 'typeorm';
 import {
     IdeaFailureKind,
     WorkProposal,
@@ -14,6 +14,12 @@ import {
     buildCaseInsensitiveLikeClause,
     prepareCaseInsensitiveContainsPattern,
 } from '../database/utils';
+import {
+    DomainEventPublisher,
+    recordAfterWrite,
+    type AggregateTombstone,
+    type PublishOptions,
+} from '../domain-events/domain-event-publisher.service';
 
 export interface CreateWorkProposalInput {
     userId: string;
@@ -42,19 +48,144 @@ export interface ListWorkProposalOptions {
     offset?: number;
 }
 
+/** The statuses a transition may start from, its target, and the columns it also writes. */
+type IdeaTransition = {
+    readonly from: readonly WorkProposalStatus[];
+    readonly to: WorkProposalStatus;
+    readonly set?: Partial<Pick<WorkProposal, 'acceptedWorkId' | 'failureMessage' | 'failureKind'>>;
+};
+
+/** Input of {@link WorkProposalRepository.createExternal} (EW-P2-1). */
+export interface CreateExternalIdeaInput {
+    userId: string;
+    tenantId: string | null;
+    organizationId: string;
+    title: string;
+    description: string;
+    slugSuggestion: string;
+    missionId?: string | null;
+    /** The integration key that wrote it (`createdBy` unless {@link createdBy} says otherwise). */
+    integrationKeyId: string;
+    /**
+     * Who created it (`writeAttribution`): the integration key, or the person an
+     * `X-Act-As-User` write acts as. Omitted = the integration key.
+     */
+    createdBy?: { type: 'user' | 'agent' | 'integration'; id: string };
+    /** `team` / `organization` by hand; omitted = automatic (D11). */
+    visibility?: 'team' | 'organization';
+}
+
+/**
+ * Data access for Ideas (`work_proposals`). It is also the Ideas' domain-event
+ * recording point (EW-P2-1, `idea.*`): every create, status transition and delete
+ * of the platform goes through here, so recording here covers them all. Recording
+ * is best-effort and runs AFTER the write in its own transaction
+ * ({@link recordAfterWrite}): a failure is logged, never thrown, and the
+ * integration's reconcile repairs a missed event.
+ */
 @Injectable()
 export class WorkProposalRepository {
+    private readonly logger = new Logger(WorkProposalRepository.name);
+
     constructor(
         @InjectRepository(WorkProposal)
         private readonly repository: Repository<WorkProposal>,
+        // EW-P2-1 — `idea.*` domain events. Appended LAST + @Optional(): a graph
+        // without DomainEventsModule (unit tests, the worker) records nothing.
+        @Optional() private readonly domainEvents?: DomainEventPublisher,
     ) {}
+
+    /** Record `idea.created` (no version bump) or a full-snapshot `idea.*` change. */
+    async recordIdeaEvent(id: string, type: string, options: PublishOptions = {}): Promise<void> {
+        await recordAfterWrite(
+            this.domainEvents,
+            (publisher, manager) =>
+                type === 'idea.created'
+                    ? publisher.created(manager, 'idea', id, type, options)
+                    : publisher.changed(manager, 'idea', id, type, options),
+            (message) => this.logger.warn(message),
+            `${type} for idea ${id}`,
+        );
+    }
+
+    /**
+     * A guarded status transition (`from` -> `to`, owner-scoped) that records
+     * `idea.status_changed` with the previous status when the row moved. A write
+     * that leaves the status unchanged (BUILDING -> BUILDING on an auto-retry)
+     * records nothing.
+     */
+    private async transition(
+        id: string,
+        userId: string,
+        transition: IdeaTransition,
+    ): Promise<boolean> {
+        const before = this.domainEvents
+            ? await this.repository.findOne({
+                  where: { id, userId },
+                  select: { id: true, status: true },
+              })
+            : null;
+        const res = await this.repository.update(
+            { id, userId, status: In([...transition.from]) },
+            { ...(transition.set ?? {}), status: transition.to },
+        );
+        const ok = (res.affected ?? 0) > 0;
+        if (ok && before && before.status !== transition.to) {
+            await this.recordIdeaEvent(id, 'idea.status_changed', {
+                changedFields: ['status', ...Object.keys(transition.set ?? {})],
+                previous: { status: before.status },
+            });
+        }
+        return ok;
+    }
 
     async bulkInsert(items: CreateWorkProposalInput[]): Promise<WorkProposal[]> {
         if (items.length === 0) return [];
         const entities = items.map((i) =>
             this.repository.create({ ...i, status: WorkProposalStatus.PENDING }),
         );
-        return this.repository.save(entities);
+        const saved = await this.repository.save(entities);
+        for (const row of saved) await this.recordIdeaEvent(row.id, 'idea.created');
+        return saved;
+    }
+
+    /**
+     * Insert an integration-created Idea (EW-P2-1): always `source = external` and
+     * `status = pending` whatever the caller sent, scope stamped from the pinned
+     * Organization, `createdBy` = the integration key (or the act-as person). No event: the caller sets the
+     * Teams and records `idea.created` once they are in place (see
+     * `WorkProposalService.createExternal`). Takes the caller's transaction.
+     */
+    async insertExternal(
+        manager: EntityManager,
+        input: CreateExternalIdeaInput,
+    ): Promise<WorkProposal> {
+        const repository = manager.getRepository(WorkProposal);
+        return repository.save(
+            repository.create({
+                userId: input.userId,
+                tenantId: input.tenantId,
+                organizationId: input.organizationId,
+                title: input.title,
+                description: input.description,
+                slugSuggestion: input.slugSuggestion,
+                missionId: input.missionId ?? null,
+                targetWorkId: null,
+                extraPrompt: null,
+                suggestedCategories: [],
+                suggestedFields: [],
+                recommendedPlugins: [],
+                generatedPrompt: input.description,
+                reasoning: 'Created by an integration (EW-P2-1).',
+                source: WorkProposalSource.EXTERNAL,
+                status: WorkProposalStatus.PENDING,
+                createdByType: input.createdBy?.type ?? 'integration',
+                createdById: input.createdBy?.id ?? input.integrationKeyId,
+                ...(input.visibility
+                    ? { visibility: input.visibility, visibilityExplicit: true }
+                    : {}),
+            }),
+        );
     }
 
     async findByUser(
@@ -137,16 +268,92 @@ export class WorkProposalRepository {
      * the deletion GUARDS live in `WorkProposalService.delete`.
      */
     async deleteForUser(id: string, userId: string): Promise<boolean> {
+        const publisher = this.domainEvents;
+        // `idea.deleted` carries the last snapshot, taken (and its version claimed)
+        // before the delete, for the caller's own row only.
+        let tombstone: AggregateTombstone | null = null;
+        if (publisher && (await this.repository.exist({ where: { id, userId } }))) {
+            try {
+                tombstone = await publisher.transaction((manager) =>
+                    publisher.beforeDelete(manager, 'idea', id),
+                );
+            } catch (err) {
+                this.logger.warn(`Could not snapshot idea ${id} before delete: ${String(err)}`);
+            }
+        }
         const res = await this.repository.delete({ id, userId });
-        return (res.affected ?? 0) > 0;
+        const ok = (res.affected ?? 0) > 0;
+        if (ok && tombstone) {
+            const last = tombstone;
+            await recordAfterWrite(
+                publisher,
+                (current, manager) => current.deleted(manager, last, 'idea.deleted'),
+                (message) => this.logger.warn(message),
+                `idea.deleted for idea ${id}`,
+            );
+        }
+        return ok;
     }
 
     async markDismissed(id: string, userId: string): Promise<boolean> {
-        const res = await this.repository.update(
-            { id, userId, status: WorkProposalStatus.PENDING },
-            { status: WorkProposalStatus.DISMISSED },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.PENDING],
+            to: WorkProposalStatus.DISMISSED,
+        });
+    }
+
+    /**
+     * Restore a dismissed Idea to PENDING (EW-P2-1, integration `POST /ideas/:id/restore`).
+     * Only from DISMISSED: an Idea that was built, queued or failed has its own paths.
+     */
+    async markRestored(id: string, userId: string): Promise<boolean> {
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.DISMISSED],
+            to: WorkProposalStatus.PENDING,
+        });
+    }
+
+    /**
+     * Edit an Idea's title and/or description (integration `PATCH /ideas/:id`) and
+     * record `idea.updated` with the fields that changed. Answers the row (unchanged
+     * when nothing differs), `null` when it is not the caller's.
+     */
+    async updateContent(
+        id: string,
+        userId: string,
+        patch: { title?: string; description?: string },
+    ): Promise<WorkProposal | null> {
+        const row = await this.repository.findOne({ where: { id, userId } });
+        if (!row) return null;
+        const set: Partial<Pick<WorkProposal, 'title' | 'description'>> = {};
+        const previous: Record<string, unknown> = {};
+        if (patch.title !== undefined && patch.title !== row.title) {
+            set.title = patch.title;
+            previous.title = row.title;
+        }
+        if (patch.description !== undefined && patch.description !== row.description) {
+            set.description = patch.description;
+            previous.description = row.description;
+        }
+        const changedFields = Object.keys(set);
+        if (changedFields.length === 0) return row;
+        const publisher = this.domainEvents;
+        if (!publisher) {
+            await this.repository.update({ id, userId }, set);
+            return this.repository.findOne({ where: { id, userId } });
+        }
+        // The edit and its `idea.updated` commit together (unlike the build lifecycle's
+        // best-effort recording): an integration `PATCH /ideas/:id` runs under its
+        // `If-Match` version, which the publisher re-checks at the version bump, so a
+        // stale write must roll back rather than land without its event.
+        await publisher.transaction(async (manager) => {
+            await manager.getRepository(WorkProposal).update({ id, userId }, set);
+            await publisher.changed(manager, 'idea', id, 'idea.updated', {
+                changedFields,
+                previous,
+            });
+        });
+        return this.repository.findOne({ where: { id, userId } });
     }
 
     /**
@@ -168,11 +375,11 @@ export class WorkProposalRepository {
         workId: string,
         fromStatuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
     ): Promise<boolean> {
-        const res = await this.repository.update(
-            { id, userId, status: In(fromStatuses) },
-            { status: WorkProposalStatus.ACCEPTED, acceptedWorkId: workId },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: fromStatuses,
+            to: WorkProposalStatus.ACCEPTED,
+            set: { acceptedWorkId: workId },
+        });
     }
 
     /**
@@ -183,19 +390,11 @@ export class WorkProposalRepository {
      * post-retry build doesn't carry stale failure data.
      */
     async markQueuedForBuild(id: string, userId: string): Promise<boolean> {
-        const res = await this.repository.update(
-            {
-                id,
-                userId,
-                status: In([WorkProposalStatus.PENDING, WorkProposalStatus.FAILED]),
-            },
-            {
-                status: WorkProposalStatus.QUEUED,
-                failureMessage: null,
-                failureKind: null,
-            },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.PENDING, WorkProposalStatus.FAILED],
+            to: WorkProposalStatus.QUEUED,
+            set: { failureMessage: null, failureKind: null },
+        });
     }
 
     /**
@@ -214,7 +413,7 @@ export class WorkProposalRepository {
         targetWorkId?: string | null;
         extraPrompt?: string | null;
     }): Promise<WorkProposal> {
-        return this.repository.save(
+        const saved = await this.repository.save(
             this.repository.create({
                 userId: input.userId,
                 title: input.title,
@@ -231,6 +430,8 @@ export class WorkProposalRepository {
                 status: WorkProposalStatus.PENDING,
             }),
         );
+        await this.recordIdeaEvent(saved.id, 'idea.created');
+        return saved;
     }
 
     async countPendingByUser(userId: string): Promise<number> {
@@ -274,15 +475,10 @@ export class WorkProposalRepository {
      * affected.
      */
     async markBuilding(id: string, userId: string): Promise<boolean> {
-        const res = await this.repository.update(
-            {
-                id,
-                userId,
-                status: In([WorkProposalStatus.QUEUED, WorkProposalStatus.BUILDING]),
-            },
-            { status: WorkProposalStatus.BUILDING },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.QUEUED, WorkProposalStatus.BUILDING],
+            to: WorkProposalStatus.BUILDING,
+        });
     }
 
     /**
@@ -301,19 +497,11 @@ export class WorkProposalRepository {
         message: string,
         kind: IdeaFailureKind,
     ): Promise<boolean> {
-        const res = await this.repository.update(
-            {
-                id,
-                userId,
-                status: In([WorkProposalStatus.BUILDING, WorkProposalStatus.QUEUED]),
-            },
-            {
-                status: WorkProposalStatus.FAILED,
-                failureMessage: message.slice(0, 5000),
-                failureKind: kind,
-            },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.BUILDING, WorkProposalStatus.QUEUED],
+            to: WorkProposalStatus.FAILED,
+            set: { failureMessage: message.slice(0, 5000), failureKind: kind },
+        });
     }
 
     /**
@@ -325,14 +513,10 @@ export class WorkProposalRepository {
      * if the Idea isn't in ACCEPTED for this user.
      */
     async markRebuildingFromAccepted(id: string, userId: string): Promise<boolean> {
-        const res = await this.repository.update(
-            { id, userId, status: WorkProposalStatus.ACCEPTED },
-            {
-                status: WorkProposalStatus.BUILDING,
-                failureMessage: null,
-                failureKind: null,
-            },
-        );
-        return (res.affected ?? 0) > 0;
+        return this.transition(id, userId, {
+            from: [WorkProposalStatus.ACCEPTED],
+            to: WorkProposalStatus.BUILDING,
+            set: { failureMessage: null, failureKind: null },
+        });
     }
 }

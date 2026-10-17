@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { RequiredDocument } from 'terms-acceptance';
 import { Public } from '../auth/decorators/public.decorator';
@@ -18,6 +19,8 @@ import { TermsAcceptanceService } from './terms-acceptance.service';
 // list, and the form correctly refused to let anyone accept terms it could not
 // identify — disabling the checkbox and blocking every signup.
 @Controller('api/terms')
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class TermsController {
     constructor(private readonly termsAcceptanceService: TermsAcceptanceService) {}
 

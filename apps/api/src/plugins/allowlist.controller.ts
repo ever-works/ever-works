@@ -12,6 +12,7 @@ import {
     Post,
     UseGuards,
 } from '@nestjs/common';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PluginAllowlistRepository } from '@ever-works/agent/plugins';
 import type { PluginAllowlistEntity } from '@ever-works/agent/plugins';
@@ -40,6 +41,8 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('api/admin/plugins/allowlist')
 @UseGuards(AuthSessionGuard, IsPlatformAdminGuard)
+// EW-P1-2 — integration keys (`ew_int_…`) can never call these routes.
+@UseGuards(IntegrationForbiddenGuard)
 export class PluginAllowlistController {
     constructor(private readonly allowlist: PluginAllowlistRepository) {}
 

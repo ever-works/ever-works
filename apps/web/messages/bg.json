@@ -2723,6 +2723,7 @@
                 "appLauncher": "Стартиране на приложения",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "webhooks": "Уебхукове",
                 "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories",
@@ -8809,6 +8810,7 @@
             "app": "Приложение",
             "company": "Company",
             "campaign": "Кампания",
+            "project": "Проект",
             "default": "Work"
         },
         "meetingsPage": {

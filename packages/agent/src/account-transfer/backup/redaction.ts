@@ -102,6 +102,18 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     'EverInstance',
     'EverStatsReport',
     'EverStatsLease',
+    // Domain events (EW-P1-1) — a delivery outbox, the relay's lease row and the
+    // plugin delivery cursors: transient plumbing that a restore must never
+    // replay (a restored outbox row would re-announce an old change).
+    'DomainEvent',
+    'DomainEventRelayState',
+    'PluginEventCursor',
+    // Integration API v1 (EW-P1-4) — links to another system's records (they
+    // name its ids and its installation; a restore into another installation
+    // would point at records that are not there) and the 24 h replay store of
+    // integration responses.
+    'ExternalRecordLink',
+    'IntegrationIdempotencyKey',
     // Encrypted runtime credentials and their per-version snapshots.
     'TenantCredentialSnapshot',
     // Derived and regenerated on demand — an archive of them would be
@@ -334,7 +346,9 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
         'magicLinkToken',
         'isPlatformAdmin',
     ]),
-    ApiKey: Object.freeze(['hashedKey']),
+    // EW-P1-2: `previousHashedKey` is the digest of a just-rotated secret that
+    // still authenticates until `previousKeyGraceUntil` -- key material too.
+    ApiKey: Object.freeze(['hashedKey', 'previousHashedKey']),
     FleetNode: Object.freeze(['enrollmentTokenHash']),
     AuthSession: Object.freeze(['token', 'tokenHash']),
     // AW-18 Shared view. The share-link token is a read capability over the
@@ -473,6 +487,8 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
     verificationTokenExpiresAt: 'A timestamp.',
     tokenRotatedAt: 'A timestamp — when a share link was last regenerated.',
     credentialExpiresAt: 'A timestamp — when a model account’s credential stops working.',
+    previousSecretExpiresAt:
+        'A timestamp — when a rotated-out webhook signing secret stops signing (webhooks v2 grace window). The secret itself is `previousSecretEncrypted`, redacted by name.',
     normalizedContentHash:
         'A digest of a knowledge document’s whitespace-normalized body, used to tell a substantive edit from a reformat. Derived from content the archive already carries in full.',
     includeSecrets:

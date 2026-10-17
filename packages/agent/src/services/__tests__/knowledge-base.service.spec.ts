@@ -1049,12 +1049,12 @@ describe('KnowledgeBaseService', () => {
     });
 
     describe('createOrgDocument', () => {
-        it('rejects non-inheritable classes', async () => {
+        it('rejects an unknown class (every known class may live at organization scope, EW-P3-2)', async () => {
             await expect(
                 service.createOrgDocument(ORG_ID, USER_ID, {
                     path: 'brand/voice.md',
                     title: 'Brand voice',
-                    class: 'brand' as KbDocumentClass,
+                    class: 'not-a-class' as KbDocumentClass,
                     body: 'body',
                 }),
             ).rejects.toBeInstanceOf(BadRequestException);

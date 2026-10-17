@@ -158,7 +158,7 @@ const PRE_IDENTITY_CATEGORIES = [
  * is still counted exactly once, and a member that disappears or is renamed
  * still fails the total.
  */
-const LATER_CAPABILITIES: readonly string[] = ['apps-tier'];
+const LATER_CAPABILITIES: readonly string[] = ['apps-tier', 'domain-event-subscriber'];
 
 /** The seven **Test connection** ids of FR-3, in its order (plan §4.1:340–351). */
 const EVERY_CHECK_ID: readonly IdentityProviderCheck['id'][] = [

@@ -5,8 +5,8 @@
 **Status**: `Draft (v1.1)`
 **Jira Epic**: [EW-650](https://evertech.atlassian.net/browse/EW-650)
 **Created**: 2026-05-26
-**Last updated**: 2026-05-28
-**Version**: v1.1 — added §11 React-Email/composer UI, §12 agent-to-agent communication, §13 sibling-spec cross-references. v1 sections 0–10 unchanged.
+**Last updated**: 2026-10-15
+**Version**: v1.2 — added §14 email fixes for the Gauzy integration (EW-P4-3). v1.1 added §11 React-Email/composer UI, §12 agent-to-agent communication, §13 sibling-spec cross-references. v1 sections 0–10 unchanged except where §14 says so.
 **Owner**: Product (Ruslan)
 **Related code today**:
 
@@ -319,7 +319,7 @@ POST /api/email/events/:pluginId       -- provider delivery events (bounces, ope
 GET  /api/email/verify/:tokenId        -- tenant address verification click-through
 ```
 
-Each `POST` route dispatches to the plugin's `verifyWebhookSignature` + `parseInboundWebhook` / `parseEventWebhook`. Auth: webhook secret stored per plugin instance; rejection on signature mismatch returns 401 with a generic body (`Invalid webhook signature`) — don't leak which secrets are wrong: the plugin's own reason is only logged (`EmailFacadeService.verifyWebhookSignature`). A plugin that cannot load answers 503, so the provider retries; the webhook is never accepted unverified.
+Each `POST` route dispatches to the plugin's `verifyWebhookSignature` + `parseInboundWebhook` / `parseEventWebhook`. Auth: webhook secret stored per plugin instance, and **required** — with no secret configured the webhook is refused too (§14.1); rejection on signature mismatch returns 401 with a generic body (`Invalid webhook signature`) — don't leak which secrets are wrong: the plugin's own reason is only logged (`EmailFacadeService.verifyWebhookSignature`). A plugin that cannot load answers 503, so the provider retries; the webhook is never accepted unverified.
 
 Rate-limited per plugin id (default 600/min — reduces blast radius if a provider mis-routes traffic).
 
@@ -327,7 +327,7 @@ Rate-limited per plugin id (default 600/min — reduces blast radius if a provid
 
 ## 8. Out of scope (v1)
 
-- **Reply-by-email threading.** Inbound messages create or join Tasks via subject parsing; SMTP-level threading (`In-Reply-To` headers) lands in v2.
+- **Reply-by-email threading.** Inbound messages create or join Tasks via subject parsing; SMTP-level threading (`In-Reply-To` headers) lands in v2. _(Landed: §14.2, EW-P4-3.)_
 - **Templates.** Send paths in v1 use plain text + HTML body inlined by the caller. Template management (Mailchimp templates, Postmark templates, etc.) lands in v2.
 - **Calendar / contacts.** Out of scope for this spec — see future `calendar-providers` spec.
 - **Multi-tenant routing.** Today addresses are scoped per `userId`. Multi-tenant work groups land later — see the platform's multi-tenancy track.
@@ -463,3 +463,151 @@ notification-channels ────────────────┘
 ```
 
 `email-providers` and `notification-channels` are independent (can ship in either order). `event-subscriptions` is the user-facing aggregator and depends on at least one channel surface (in-app via v1, plus any of email/Discord/Slack/etc.).
+
+---
+
+## 14. Email fixes for the Gauzy integration (EW-P4-3 — additive)
+
+**Added**: 2026-10-15. **Plan item**: EW-P4-3 in the Gauzy ↔ Ever Works integration plan (`ever-co/homelab` →
+`docs/superpowers/specs/2026-10-15-gauzy-ever-works-integration/07-ever-works-implementation-plan.md`, Phase 4). The
+Gauzy Inbox's agent-mail bridge (plan doc 04 §6) needs these, and each also stands on its own. Shipped as separate small
+PRs, security first; status per item in [tasks.md](./tasks.md) Phase 10.
+
+### 14.1 Inbound webhooks are refused when no secret is configured
+
+Before: the shipped `postmark` and `mailgun` plugins **accepted an unsigned inbound webhook** when no secret was
+configured at the resolved scope (Postmark logged a warning, Mailgun returned silently). The inbound routes are public, so
+anyone who knew `POST /api/email/inbound/<pluginId>` could inject mail into a tenant's scope.
+
+Now **verification is mandatory**:
+
+| Secret at the resolved scope (owner → admin → env) | Request                    | Result                                                  |
+| -------------------------------------------------- | -------------------------- | ------------------------------------------------------- |
+| configured                                         | correctly signed           | accepted (`202`)                                        |
+| configured                                         | unsigned / wrong signature | `401 Invalid webhook signature`                         |
+| **none**                                           | anything                   | **`401 Invalid webhook signature`** (was: accepted)     |
+| none, and `EMAIL_INBOUND_ALLOW_UNSIGNED=true`      | anything                   | accepted, with a loud `console.warn` (operator opt-out) |
+
+- Postmark secret: `inboundWebhookSecret` setting / `POSTMARK_INBOUND_SECRET` (HTTP Basic `postmark:<secret>`).
+  Mailgun key: `webhookSigningKey` setting / `MAILGUN_WEBHOOK_SIGNING_KEY` (HMAC-SHA256 over `timestamp + token`).
+- The same rule covers the delivery-event route (`POST /api/email/events/<pluginId>`), which verifies with the same
+  plugin method at admin/env scope.
+- **Opt-out** `EMAIL_INBOUND_ALLOW_UNSIGNED`: only the exact string `true` enables it (a typo, `1`, `TRUE` or an empty
+  value stays secure). It is meant for a local stack with no public webhook URL and is never set on a deployed
+  environment. It never weakens a configured secret: with a secret set, a missing or wrong signature is still refused.
+- The plugin's own reason (`... refusing an unsigned webhook ...`) is logged; the caller only ever sees the generic 401
+  (§7), so the response does not reveal whether a secret exists.
+- Rollout check (2026-10-15): no deployed environment had an inbound address or an inbound message, so the change broke no
+  working path. An operator who adds an inbound address must also configure the provider secret.
+
+### 14.2 RFC threading (`Message-ID`, `In-Reply-To`, `References`)
+
+Before: threading keyed only on the normalized subject (conversation mode); in task-spawn mode **every** inbound message
+created a new Task; outbound mail carried no threading headers, so replies did not thread in the recipient's client; and
+the Task an inbound message spawned was never written back onto the message.
+
+Now:
+
+- **Columns** on `email_messages` (migration `1795061520000-AddEmailMessageThreadingHeaders`, portable DDL for Postgres,
+  MySQL and better-sqlite3): `messageIdHeader varchar(255)`, `inReplyTo varchar(255)`, `references text` (simple-json
+  list), all nullable; index `(userId, messageIdHeader)`. Ids are stored **bare** (no angle brackets) via
+  `normalizeMessageId` / `parseMessageIdList` in `@ever-works/plugin`; an id over 255 characters is not stored (never
+  truncated); `References` keeps the newest 50 ids.
+- **Contract** (`@ever-works/plugin`): `EmailSendInput.headers` (extra RFC 5322 header fields, forwarded verbatim —
+  Postmark `Headers`, Mailgun `h:<Name>`, Resend / SendGrid / Mandrill `headers`); `EmailInboundMessage.messageIdHeader`,
+  `inReplyTo`, `references` (parsed by the Postmark and Mailgun plugins from the original headers).
+- **Outbound** (`EmailFacadeService.send`): every send carries a `Message-ID` (`<uuid@sending-domain>`, unless the
+  caller set one) and the caller's `In-Reply-To` / `References`; all three are recorded on the row (direct send,
+  reservation, or released draft). Header names that are not RFC 5322 field names and values with CR/LF are dropped
+  before the plugin sees them (no header injection).
+- **Reply in thread**: `POST /api/email/messages` and the Agent `sendEmail` tool accept `inReplyToMessageId` (an
+  `email_messages.id` of the caller's own; another account's answers 404). The send gets `In-Reply-To` = that message's
+  id and `References` = its chain + its id (RFC 5322 §3.6.4), and inherits its `taskId`. A held draft keeps
+  `inReplyTo` / `references` on its row and the release rebuilds the headers.
+- **Inbound** (`DefaultInboundEmailDispatcher`): the ids of `In-Reply-To`, then `References` newest-first (never the
+  message's own id, at most 20) are matched against the **same owner's and the same Agent's** messages — the headers
+  are sender-written, so they can only ever select among that Agent's own mail.
+    - `conversation` mode: a match joins the matched message's conversation; else the normalized subject (as before).
+    - `task-spawn` mode: a match whose message is linked to a Task is handed to the spawner's optional
+      `appendInboundEmailToTask`; the platform binding posts it on that Task's chat (as the address owner, mentioning only
+      the receiving Agent so it picks the reply up; the email text is defused — `@` mentions and `[[…]]` links made
+      inert, forged closing delimiters neutralized, capped well under the 16 KiB chat limit). If there is no match, the
+      adapter cannot append, or appending fails (e.g. the secret scanner rejects the body), a new Task is spawned exactly
+      as before — a reply is never lost.
+    - After a Task is spawned or joined, the message is linked to it (`email_messages.taskId`, only when still empty).
+    - A spawned Task's description ends with the inbound message id and how to reply in thread.
+
+### 14.3 Inbound data: attachments, Cc, metadata, tenant / organization
+
+Before: the inbound webhook handed the dispatcher only from / to / subject / bodies, so **attachments, Cc and the
+provider metadata (spam score, headers) were dropped**, and the row written from the public webhook (no request scope)
+got NULL tenant / organization.
+
+Now:
+
+- **Contract**: `EmailInboundMessage.cc` (bare mailboxes; Postmark `CcFull` / `Cc`, Mailgun `Cc`). Recorded, never
+  routed on — like `to`.
+- **Attachments** (`email_messages.attachments`, simple-json; migration `1795061530000-AddEmailMessageAttachments`,
+  portable DDL): each inbound attachment is stored through the optional `INBOUND_EMAIL_ATTACHMENT_STORE`, which the
+  platform binds to the **same upload pipeline as a user's own uploads** (`UploadsService.saveFile`: MIME allow-list
+  checked against magic bytes, size cap, content-hash storage key — the sender's filename never reaches storage),
+  owned by the receiving address's owner and recorded in the address's tenant / organization (`user_uploads`). Every
+  attachment is listed on the row (`filename`, `mimeType`, `size`, `cid`, `stored`, `uploadId`, `url`, `reason`): one
+  the pipeline refused, one over the per-message limits (20 attachments, 25 MB decoded), an empty one, or any when no
+  store is bound, is listed with `stored: false` and why. A refused attachment never blocks the message. The list
+  itself is bounded for the column (a MySQL `TEXT` holds 65,535 bytes): at most 50 records and 48,000 serialized UTF-8
+  bytes; whatever does not fit is summed in one trailing record (`N more attachments`, total size, how many stored).
+- **Request size**: the inbound-email webhooks (`/api/email/inbound/*`) get their own body-parser limit, mounted ahead of
+  the global 1 MB one (`BODY_LIMIT`, unchanged for every other route): **25 MB** by default — the `proxy-body-size` the
+  ingress already allows on every environment — overridable with `INBOUND_EMAIL_BODY_LIMIT` up to a 50 MB ceiling
+  (invalid or larger values fall back to the default). Base64 adds a third, so roughly 18 MB of attachments fit in one
+  message by default; raising the limit means raising the ingress's `proxy-body-size` too.
+- **Cc and metadata**: `ccAddresses` (at most 100) and `metadata` are kept. Metadata is bounded to 32,000 serialized UTF-8 bytes
+  (first the raw header list is dropped, marked `headersOmitted`; then only the keys are kept, marked `truncated`).
+- **Tenant / organization**: the inbound row — and a conversation it creates — is stamped with the **receiving
+  address's** `tenantId` / `organizationId` (explicit values, so the scope-stamping subscriber's empty request scope
+  never applies). A Task spawned from it is created in the scope of its assignee, **the receiving Agent** (an
+  address may be bound to an Agent of another scope, e.g. the owner's personal Agent on an organization address, and the
+  Agent must stay reachable from the Task; an Agent that cannot be resolved keeps the old unscoped create), and its description lists the attachments (names and types defused like the rest of the
+  email text) with their upload ids.
+
+### 14.4 Add-address wizard and real verification
+
+Before: Settings → Integrations → Email addresses was a list with an `alert('Add-address wizard: implementation in
+follow-up tick')` button and an inert "Edit"; addresses could only be registered through the API. Verification was
+cosmetic: `POST /api/email/addresses/:id/verify` asked the provider plugin for a token and **threw it away** — no email
+went out — and `verified` was **never checked** for sending.
+
+Now:
+
+- **Wizard** (`AddEmailAddressWizard`, §2.1 steps): (1) direction — send / receive / both; (2) provider, filtered by
+  capability (only Postmark and Mailgun receive); (3) address, sender name, "default for replies", and for inbound the
+  webhook URL to register at the provider (on the API's public origin) with how that provider's secret is configured
+  (§14.1); (4) for sending addresses, "Send confirmation email". Each row gets **Send confirmation** (unverified
+  sending addresses), **Disable / Enable** and **Remove** (with a confirmation that names what is lost; disabling keeps
+  the history).
+- **Verification is real**: `POST /api/email/addresses/:id/verify` rotates a fresh one-time token (24 h) and sends the
+  address a confirmation email through **platform mail** (`MailService.sendNotificationEmail`), linking to the public
+  web page `/email-address/verify/<token>`. That page confirms only on a **click** (a server action calling the public
+  `GET /api/email/verify/:token`), so a mail scanner that prefetches the link confirms nothing; it is in
+  `PUBLIC_ROUTES`, since the link is usually opened from the mailbox without a session.
+    - Already verified → nothing sent (`alreadyVerified: true`). Disabled → 400. A second email within 60 s → 429
+      (the address is the caller's to type; the route is also throttled to 5/min per caller). The send is recorded in
+      `tenant_email_addresses.verificationSentAt` (migration `1795061550000-AddTenantEmailAddressVerificationSentAt`)
+      and claimed with a compare-and-set, so concurrent clicks send one email; the token `createAddress` mints is never
+      mailed and never starts the cooldown. No platform mail, or a mailer that would only log (`MAILER_PROVIDER`
+      unset/`none`, Resend without a key) → 503, never a silent "sent". The email is sent `strict`: a provider refusal
+      (Resend answers errors without throwing) → 503 and the cooldown is given back. The provider plugin's own
+      `verifyAddress` still runs, best-effort.
+    - Response (additive): `{ messageRef, sent, alreadyVerified?, expiresAt? }`.
+- **`verified` is enforced for sending**: `EmailService.sendMessage` refuses an unverified sending address up front
+  (before a draft is held) and `EmailFacadeService.send` refuses it as the backstop every outbound path converges on —
+  `403`, `EmailSenderNotVerifiedException`, naming the address and how to confirm it — before the send gate or any
+  provider. Sends with no tenant address (system mail through the first enabled provider) are unaffected; receiving
+  never requires verification. Operator switch: `EMAIL_SENDER_VERIFICATION_REQUIRED=false` (exact string) turns the
+  check off for a self-hosted install with no platform mail to deliver the confirmation; on by default.
+- **Grandfathering** (no-breakage): migration `1795061540000-GrandfatherInUseEmailAddressesVerified` marks every
+  address **already in use** as verified — assigned to an Agent, already sent mail, or pinned by an Agent inbox — so
+  working setups keep sending. Unused, unverified addresses (2 on dev, 0 on stage at rollout) verify through the
+  confirmation email before their first send. `down()` is a no-op by design (a grandfathered row is indistinguishable
+  from a later real verification).

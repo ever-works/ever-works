@@ -1,6 +1,6 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { ApiKeyService } from './api-key.service';
 import type { ApiKeyRepository } from '@ever-works/agent/database';
@@ -16,6 +16,9 @@ describe('ApiKeyService', () => {
             | 'deleteByIdAndUserId'
             | 'findByHashedKey'
             | 'updateLastUsed'
+            | 'findByPreviousHashedKey'
+            | 'findByIdAndUserId'
+            | 'applyRotation'
         >
     >;
 
@@ -27,6 +30,10 @@ describe('ApiKeyService', () => {
             deleteByIdAndUserId: jest.fn(),
             findByHashedKey: jest.fn(),
             updateLastUsed: jest.fn().mockResolvedValue(undefined),
+            // EW-P1-2 — rotation grace lookup + in-place rotation.
+            findByPreviousHashedKey: jest.fn().mockResolvedValue(null),
+            findByIdAndUserId: jest.fn(),
+            applyRotation: jest.fn().mockResolvedValue(true),
         } as any;
         service = new ApiKeyService(repo as unknown as ApiKeyRepository);
     });
@@ -286,6 +293,154 @@ describe('ApiKeyService', () => {
             await expect(service.validateKey(RAW)).resolves.toBe(apiKey);
             // Allow microtasks to flush so the catch() runs without an unhandled rejection
             await new Promise((resolve) => setImmediate(resolve));
+        });
+    });
+    // ── EW-P1-2 — integration keys and in-place rotation ───────────────
+    describe('validateIntegrationKey', () => {
+        const RAW = 'ew_int_' + 'c'.repeat(64);
+        const live = (over: Record<string, unknown> = {}) => ({
+            id: 'int-1',
+            kind: 'integration',
+            expiresAt: null,
+            organizationIds: ['org-1'],
+            ...over,
+        });
+
+        it('accepts an active integration row and stamps lastUsedAt', async () => {
+            const row = live();
+            repo.findByHashedKey.mockResolvedValue(row as any);
+            await expect(service.validateIntegrationKey(RAW)).resolves.toBe(row);
+            expect(repo.findByHashedKey).toHaveBeenCalledWith(
+                createHash('sha256').update(RAW).digest('hex'),
+            );
+            expect(repo.updateLastUsed).toHaveBeenCalledWith('int-1');
+        });
+
+        it('refuses a non-ew_int_ secret without a lookup', async () => {
+            await expect(
+                service.validateIntegrationKey('ew_live_' + 'c'.repeat(64)),
+            ).resolves.toBeNull();
+            expect(repo.findByHashedKey).not.toHaveBeenCalled();
+        });
+
+        it('refuses personal and fleet-run rows (inverse kind gate)', async () => {
+            for (const kind of ['personal', 'fleet-run']) {
+                repo.findByHashedKey.mockResolvedValue(live({ kind }) as any);
+                await expect(service.validateIntegrationKey(RAW)).resolves.toBeNull();
+            }
+        });
+
+        it('refuses an expired key and a key with no pin', async () => {
+            repo.findByHashedKey.mockResolvedValue(
+                live({ expiresAt: new Date(Date.now() - 1) }) as any,
+            );
+            await expect(service.validateIntegrationKey(RAW)).resolves.toBeNull();
+            repo.findByHashedKey.mockResolvedValue(live({ organizationIds: [] }) as any);
+            await expect(service.validateIntegrationKey(RAW)).resolves.toBeNull();
+        });
+
+        it('an integration secret is never accepted as a personal key', async () => {
+            repo.findByHashedKey.mockResolvedValue(live() as any);
+            await expect(service.validateKey(RAW)).resolves.toBeNull();
+        });
+    });
+
+    describe('rotation grace period', () => {
+        const RAW = 'ew_live_' + 'd'.repeat(64);
+
+        it('accepts the previous secret until previousKeyGraceUntil, then refuses it', async () => {
+            repo.findByHashedKey.mockResolvedValue(null);
+            const row = {
+                id: 'k-r',
+                kind: 'personal',
+                expiresAt: null,
+                previousKeyGraceUntil: new Date(Date.now() + 60_000),
+            };
+            repo.findByPreviousHashedKey.mockResolvedValue(row as any);
+            await expect(service.validateKey(RAW)).resolves.toBe(row);
+
+            row.previousKeyGraceUntil = new Date(Date.now() - 1);
+            await expect(service.validateKey(RAW)).resolves.toBeNull();
+        });
+    });
+
+    describe('rotateKey', () => {
+        it('rotates in place: same id, new secret of the same kind, old digest kept for the grace period', async () => {
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'k-1',
+                name: 'Gauzy',
+                kind: 'integration',
+                isActive: true,
+                expiresAt: null,
+                hashedKey: 'old-digest',
+            } as any);
+            const before = Date.now();
+            const out = await service.rotateKey('k-1', 'user-1', 24);
+
+            expect(out.id).toBe('k-1');
+            expect(out.key).toMatch(/^ew_int_[0-9a-f]{64}$/);
+            expect(out.prefix).toBe(out.key.slice(0, 12));
+            expect(repo.applyRotation.mock.calls[0][1]).toBe('old-digest');
+            const patch = repo.applyRotation.mock.calls[0][2];
+            expect(patch.hashedKey).toBe(createHash('sha256').update(out.key).digest('hex'));
+            expect(patch.previousHashedKey).toBe('old-digest');
+            const grace = new Date(patch.previousKeyGraceUntil as Date).getTime();
+            expect(grace).toBeGreaterThanOrEqual(before + 24 * 3_600_000);
+        });
+
+        it('refuses with 409 when another rotation landed first (compare-and-set lost)', async () => {
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'k-1',
+                name: 'Gauzy',
+                kind: 'integration',
+                isActive: true,
+                expiresAt: null,
+                hashedKey: 'old-digest',
+            } as any);
+            repo.applyRotation.mockResolvedValueOnce(false);
+            await expect(service.rotateKey('k-1', 'user-1')).rejects.toThrow(ConflictException);
+        });
+
+        it('rotates a personal key with the ew_live_ prefix', async () => {
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'k-2',
+                name: 'cli',
+                kind: 'personal',
+                isActive: true,
+                expiresAt: null,
+                hashedKey: 'h',
+            } as any);
+            const out = await service.rotateKey('k-2', 'user-1');
+            expect(out.key).toMatch(/^ew_live_/);
+        });
+
+        it('404s a missing, revoked or fleet-run key, and 400s an out-of-range grace or an expired key', async () => {
+            repo.findByIdAndUserId.mockResolvedValue(null);
+            await expect(service.rotateKey('x', 'user-1')).rejects.toThrow('API key not found');
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'x',
+                kind: 'fleet-run',
+                isActive: true,
+            } as any);
+            await expect(service.rotateKey('x', 'user-1')).rejects.toThrow('API key not found');
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'x',
+                kind: 'personal',
+                isActive: false,
+            } as any);
+            await expect(service.rotateKey('x', 'user-1')).rejects.toThrow('API key not found');
+            await expect(service.rotateKey('x', 'user-1', 169)).rejects.toThrow(
+                BadRequestException,
+            );
+            await expect(service.rotateKey('x', 'user-1', -1)).rejects.toThrow(BadRequestException);
+            repo.findByIdAndUserId.mockResolvedValue({
+                id: 'x',
+                kind: 'personal',
+                isActive: true,
+                expiresAt: new Date(Date.now() - 1),
+            } as any);
+            await expect(service.rotateKey('x', 'user-1')).rejects.toThrow(BadRequestException);
+            expect(repo.applyRotation).not.toHaveBeenCalled();
         });
     });
 });

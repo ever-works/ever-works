@@ -1,4 +1,5 @@
 import 'server-only';
+import type { RecordListView } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 import type { Goal } from './goals';
 
@@ -119,6 +120,11 @@ export interface MissionRunNowResponse {
 }
 
 export interface ListMissionsInput {
+    /**
+     * Record visibility (EW-P1-3) list tab, sent as `view`: `mine` (default — omitted),
+     * `shared` or `organization`.
+     */
+    view?: RecordListView;
     status?: MissionStatus;
     search?: string;
     limit?: number;
@@ -131,6 +137,7 @@ function buildListEndpoint(input?: ListMissionsInput): string {
     if (input?.search) params.set('search', input.search);
     if (input?.limit) params.set('limit', String(input.limit));
     if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
+    if (input?.view && input.view !== 'mine') params.set('view', input.view);
     const qs = params.toString();
     return qs ? `/me/missions?${qs}` : '/me/missions';
 }

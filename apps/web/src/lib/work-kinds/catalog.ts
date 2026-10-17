@@ -9,6 +9,7 @@ import {
     Globe,
     Megaphone,
     Star,
+    ClipboardList,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { WORK_KINDS, normalizeWorkKind, type WorkKind } from '@ever-works/contracts';
@@ -96,6 +97,14 @@ export const WORK_KIND_PRESENTATION: Record<WorkKindValue, WorkKindPresentation>
     campaign: {
         icon: Megaphone,
         tone: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    },
+    /**
+     * EW-P2-4 — a repo-less Project Work (plain project tracking, the Ever
+     * Works side of a Gauzy project). `lime` is a tone no other kind uses.
+     */
+    project: {
+        icon: ClipboardList,
+        tone: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300',
     },
     default: {
         icon: FolderClosed,

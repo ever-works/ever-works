@@ -1,0 +1,36 @@
+{
+	"id": "c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78",
+	"organizationId": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"version": 3,
+	"createdAt": "2026-09-20T10:00:00.000Z",
+	"updatedAt": "2026-10-15T17:00:00.000Z",
+	"visibility": "team",
+	"visibilityExplicit": false,
+	"owner": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56"
+	},
+	"createdBy": {
+		"type": "user",
+		"id": "a3d5f7b9-1c2e-4f60-8a9b-0c1d2e3f4a56",
+		"label": "ruslan"
+	},
+	"externalLinks": [],
+	"teamIds": ["d6a8c0e2-4f5b-4c93-9dce-3f4a5b6c7d89"],
+	"name": "Builder",
+	"slug": "builder",
+	"title": "Senior builder",
+	"capabilities": "Ships pull requests.",
+	"status": "active",
+	"scope": "tenant",
+	"scopeTargetId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"reportsToAgentId": null,
+	"avatar": {
+		"mode": "initials",
+		"icon": null,
+		"url": null
+	},
+	"modelId": "claude-opus-5-5",
+	"lastRunAt": "2026-10-15T17:55:00.000Z",
+	"webUrl": "https://app.ever.works/agents/c5f7b9d1-3e4a-4b82-8cbd-2e3f4a5b6c78"
+}

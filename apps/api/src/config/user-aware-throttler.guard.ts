@@ -1,12 +1,21 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import {
+    ThrottlerGuard,
+    type ThrottlerLimitDetail,
+    type ThrottlerRequest,
+} from '@nestjs/throttler';
+import { IntegrationHttpException } from '../auth/integration/integration-http.exception';
+import { integrationLimits, isWriteMethod } from '../auth/integration/integration-limits';
 
 type ThrottledRequest = Record<string, unknown> & {
     user?: {
         userId?: unknown;
         id?: unknown;
         sub?: unknown;
+        authMethod?: unknown;
+        integration?: { keyId?: unknown };
     };
+    method?: unknown;
     url?: unknown;
     originalUrl?: unknown;
     ip?: unknown;
@@ -61,7 +70,83 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
         return super.canActivate(context);
     }
 
+    /**
+     * EW-P1-2 — the integration principal's own tier (plan doc 02 §2). For an
+     * `ew_int_` key the per-route caps (`@Throttle({ long: … })`, 30/min on
+     * most writes) do not apply; instead ONE bucket per key and per kind —
+     * `INTEGRATION_THROTTLE_WRITES_PER_MIN` (600) for writes and
+     * `INTEGRATION_THROTTLE_READS_PER_MIN` (3000) for reads — spans every
+     * route, plus the `short` burst tier per key. The `medium` tier is
+     * skipped: at 300 per 10 s it would undercut the 3000/min read budget.
+     * Every other caller is throttled exactly as before.
+     */
+    protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
+        const { req } = this.getRequestResponse(requestProps.context) as {
+            req: ThrottledRequest;
+        };
+        const keyId = integrationKeyId(req);
+        if (!keyId) return super.handleRequest(requestProps);
+
+        const limits = integrationLimits();
+        const name = requestProps.throttler.name ?? 'default';
+        if (name === 'short') {
+            return super.handleRequest({
+                ...requestProps,
+                limit: limits.burstPerSec,
+                ttl: 1000,
+                blockDuration: 1000,
+                generateKey: () => `integration:${keyId}:burst`,
+            });
+        }
+        if (name === 'long') {
+            const write = isWriteMethod(req.method);
+            return super.handleRequest({
+                ...requestProps,
+                limit: write ? limits.writesPerMin : limits.readsPerMin,
+                ttl: 60_000,
+                blockDuration: 60_000,
+                generateKey: () => `integration:${keyId}:${write ? 'writes' : 'reads'}`,
+            });
+        }
+        return true;
+    }
+
+    /** EW-P1-2 — an integration key gets `429 rate_limited` in the integration envelope. */
+    protected async throwThrottlingException(
+        context: ExecutionContext,
+        throttlerLimitDetail: ThrottlerLimitDetail,
+    ): Promise<void> {
+        const { req, res } = this.getRequestResponse(context) as {
+            req: ThrottledRequest;
+            res: Record<string, any>;
+        };
+        if (integrationKeyId(req)) {
+            // Contract v1 B.1: a 429 carries a plain `Retry-After` (seconds)
+            // next to the per-throttler `Retry-After-<name>` the base sets.
+            this.setResponseHeader(
+                res,
+                'Retry-After',
+                Math.max(1, Math.ceil(throttlerLimitDetail.timeToBlockExpire)),
+            );
+            throw new IntegrationHttpException(
+                429,
+                'rate_limited',
+                'Rate limit exceeded for this integration key.',
+                {
+                    limit: throttlerLimitDetail.limit,
+                    ttlMs: throttlerLimitDetail.ttl,
+                    retryAfterSeconds: throttlerLimitDetail.timeToBlockExpire,
+                },
+            );
+        }
+        return super.throwThrottlingException(context, throttlerLimitDetail);
+    }
+
     protected getTracker(req: ThrottledRequest): Promise<string> {
+        const keyId = integrationKeyId(req);
+        if (keyId) {
+            return Promise.resolve(`integration:${keyId}`);
+        }
         const userId = firstString(req.user?.userId, req.user?.id, req.user?.sub);
         if (userId) {
             return Promise.resolve(`user:${userId}`);
@@ -89,6 +174,13 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
 
         return Promise.resolve(`ip:${ip || 'unknown'}`);
     }
+}
+
+/** The integration key id of an `ew_int_` request, else `null`. */
+function integrationKeyId(req: ThrottledRequest | undefined): string | null {
+    if (req?.user?.authMethod !== 'integration') return null;
+    const keyId = req.user.integration?.keyId;
+    return typeof keyId === 'string' && keyId.length > 0 ? keyId : null;
 }
 
 function firstString(...values: unknown[]): string | null {

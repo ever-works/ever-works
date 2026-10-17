@@ -47,6 +47,12 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
 function makeMocks() {
     const goals = {
         find: jest.fn(),
+        // `evaluateDue` re-reads each claimed Goal before deciding (EW-P2-2 follow-up). By
+        // default the row is unchanged since the due scan: the object the last scan listed.
+        findOne: jest.fn(async (options: { where: { id: string } }): Promise<Goal | null> => {
+            const listed = (await goals.find.mock.results.at(-1)?.value) as Goal[] | undefined;
+            return listed?.find((row) => row.id === options.where.id) ?? null;
+        }),
         update: jest.fn(),
         save: jest.fn(async (g: Goal) => g),
     };
@@ -451,6 +457,56 @@ describe('GoalEvaluationService', () => {
             expect(metricsFacade.getMetricValue).not.toHaveBeenCalled();
             expect(samples.insert).not.toHaveBeenCalled();
             expect(goal.status).toBe(GoalStatus.COMPLETED);
+        });
+
+        it('decides on a fresh read: a Definition-of-Done item ticked after the scan completes the Goal', async () => {
+            const { service, goals, samples } = makeMocks();
+            const scanned = deliveryGoal({
+                nextCheckAt: new Date('2026-07-19T00:00:00.000Z'),
+                dodCriteria: [{ id: 'a', text: 'x', status: 'open' }],
+            });
+            const fresh = deliveryGoal({
+                nextCheckAt: new Date('2026-07-19T01:00:00.000Z'),
+                dodCriteria: [{ id: 'a', text: 'x', status: 'done' }],
+                title: 'Renamed by Ever Gauzy',
+            });
+            goals.find.mockResolvedValue([scanned]);
+            goals.update.mockResolvedValue({ affected: 1 });
+            goals.findOne.mockResolvedValueOnce(fresh);
+
+            const summary = await service.evaluateDue();
+
+            expect(goals.findOne).toHaveBeenCalledWith({ where: { id: 'g1' } });
+            expect(summary.entries[0]).toEqual({ goalId: 'g1', outcome: 'achieved' });
+            // The fresh copy is the one decided and saved; the scan's copy is never written.
+            expect(goals.save).toHaveBeenCalledWith(fresh);
+            expect(fresh.status).toBe(GoalStatus.COMPLETED);
+            expect(scanned.status).toBe(GoalStatus.ACTIVE);
+            expect(samples.insert).not.toHaveBeenCalled();
+        });
+
+        it('skips a Goal paused (or gone) between the scan and its turn, writing nothing', async () => {
+            const { service, goals, metricsFacade } = makeMocks();
+            const first = makeGoal({ id: 'g1', nextCheckAt: new Date('2026-07-19T00:00:00.000Z') });
+            const second = makeGoal({
+                id: 'g2',
+                nextCheckAt: new Date('2026-07-19T00:00:00.000Z'),
+            });
+            goals.find.mockResolvedValue([first, second]);
+            goals.update.mockResolvedValue({ affected: 1 });
+            goals.findOne
+                .mockResolvedValueOnce({ ...first, status: GoalStatus.PAUSED } as Goal)
+                .mockResolvedValueOnce(null);
+
+            const summary = await service.evaluateDue();
+
+            expect(summary).toMatchObject({ evaluated: 0, skipped: 2, failed: 0 });
+            expect(summary.entries).toEqual([
+                { goalId: 'g1', outcome: 'skipped', message: 'Goal is no longer active' },
+                { goalId: 'g2', outcome: 'skipped', message: 'Goal is no longer active' },
+            ]);
+            expect(metricsFacade.getMetricValue).not.toHaveBeenCalled();
+            expect(goals.save).not.toHaveBeenCalled();
         });
 
         it('counts a corrupt metric row as failed and moves on (no sample, schedule advanced)', async () => {

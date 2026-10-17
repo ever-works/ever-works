@@ -110,6 +110,42 @@ export interface HeartbeatLoopOptions {
 }
 
 /**
+ * Resolves `true` once the loop has had an ACCEPTED beat (state
+ * `connected`), at once when it already has. It resolves `false` once
+ * waiting is pointless: the loop reported `stopped`, or `shouldWait()` turned
+ * false (it is re-checked on every state change).
+ *
+ * The worker lanes start only after this (#2598 a for the desktop, #2628 for
+ * the CLI). An accepted beat's answer carries what must be in force before
+ * the first lease, namely the owner's limit ceiling (slice AS) and the version
+ * verdict (slice AR), and the lease API uses the node's `max` as sent.
+ * `start()` resolves after the first ATTEMPT whether or not it was accepted.
+ * `onAccepted`, which applies the answer, runs synchronously right after the
+ * `connected` state change, and the caller's continuation is a microtask after
+ * both.
+ */
+export function untilHeartbeatAccepted(
+	loop: Pick<HeartbeatLoop, 'getState' | 'onChange'>,
+	shouldWait: () => boolean = () => true
+): Promise<boolean> {
+	const verdict = (state: HeartbeatState): boolean | null => {
+		if (state.state === 'connected') return true;
+		if (state.state === 'stopped' || !shouldWait()) return false;
+		return null;
+	};
+	const now = verdict(loop.getState());
+	if (now !== null) return Promise.resolve(now);
+	return new Promise<boolean>((resolve) => {
+		const unsubscribe = loop.onChange((state) => {
+			const settled = verdict(state);
+			if (settled === null) return;
+			unsubscribe();
+			resolve(settled);
+		});
+	});
+}
+
+/**
  * Exponential backoff: the nominal interval while healthy, then
  * `interval * 2^failures` capped at `maxMs`. The first retry therefore already
  * waits longer than the normal cadence — a node that just failed is far more

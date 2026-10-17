@@ -25,6 +25,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
         agent: [],
         mission: [],
         idea: [],
+        goal: [],
     };
 
     const [team, teams, agentsResp, users, resources, worksResp] = await Promise.all([

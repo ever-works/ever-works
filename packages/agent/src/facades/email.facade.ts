@@ -1,4 +1,5 @@
 import {
+    ForbiddenException,
     Inject,
     Injectable,
     Logger,
@@ -38,6 +39,19 @@ import {
     type EmailSendReservation,
 } from '../email/email-send-policy.port';
 import { BaseFacadeService, FacadeError, NoProviderError } from './base.facade';
+// EW-P4-3 — RFC threading helpers (a leaf module: no Nest, no repositories).
+import {
+    buildOutboundHeaders,
+    threadingFieldsOf,
+    type EmailThreadingFields,
+} from './email-threading';
+
+export {
+    buildOutboundHeaders,
+    replyHeadersFor,
+    threadingFieldsOf,
+    type EmailThreadingFields,
+} from './email-threading';
 
 /**
  * AW-05 — provisional `pluginId` on a send reservation (the row is written
@@ -53,6 +67,30 @@ export const EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID = 'pending';
  * answered to the unauthenticated caller.
  */
 const WEBHOOK_SIGNATURE_REJECTED = 'Invalid webhook signature';
+
+/**
+ * EW-P4-3 — operator switch for the sender check. A tenant address must be
+ * VERIFIED (its owner clicked the confirmation link mailed to it) before
+ * anything is sent from it. On unless this env var is the exact string
+ * `'false'` — for a self-hosted install with no platform mail to deliver the
+ * confirmation; never on a deployed environment.
+ */
+export const EMAIL_SENDER_VERIFICATION_REQUIRED_ENV = 'EMAIL_SENDER_VERIFICATION_REQUIRED';
+
+export function emailSenderVerificationRequired(): boolean {
+    return process.env[EMAIL_SENDER_VERIFICATION_REQUIRED_ENV] !== 'false';
+}
+
+/** EW-P4-3 — the refusal for a send from an address nobody has verified. */
+export class EmailSenderNotVerifiedException extends ForbiddenException {
+    constructor(address: string) {
+        super(
+            `The sending address ${address} is not verified. Send the confirmation email from ` +
+                'Settings → Integrations → Email addresses and click its link, then try again.',
+        );
+        this.name = 'EmailSenderNotVerifiedException';
+    }
+}
 
 export class EmailFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -101,6 +139,13 @@ export interface AuthenticatedInboundEmail extends EmailInboundMessage {
 export interface EmailFacadeSendOptions extends FacadeOptions {
     /** Specific tenant_email_addresses.id to send from. Else uses Agent default. */
     readonly addressId?: string;
+    /**
+     * EW-P4-3 — the `email_conversations` thread this send belongs to (a
+     * reply in a conversation). Recorded on the row, so the recipient's next
+     * reply threads back into the same conversation. Mutually exclusive with
+     * `taskId`, like on the row.
+     */
+    readonly conversationId?: string;
     /**
      * AW-05 — who asked for this send. SERVER-SET at the call site, never
      * copied from a request body: `agent` sends are held when the Agent's
@@ -172,6 +217,26 @@ export class EmailFacadeService extends BaseFacadeService {
         input: EmailFacadeSendInput,
         options: EmailFacadeSendOptions,
     ): Promise<EmailSendResult> {
+        // EW-P4-3 — never send from a tenant address its owner has not
+        // verified. Checked first, so a refused send reserves no capacity and
+        // touches no provider. (EmailService refuses earlier with the same
+        // error; this is the backstop every outbound path converges on.)
+        // `undefined` = not looked up here; the sender-name lookup below then
+        // loads it itself.
+        let sender: TenantEmailAddress | null | undefined;
+        if (options.addressId && this.emailAddresses && emailSenderVerificationRequired()) {
+            sender = await this.emailAddresses.findById(options.addressId);
+            if (sender && !sender.verified) {
+                throw new EmailSenderNotVerifiedException(sender.address);
+            }
+        }
+
+        // EW-P4-3 — RFC threading: every send carries a Message-ID (and the
+        // caller's In-Reply-To / References), recorded on its row so a reply
+        // can be matched back to it.
+        const headers = buildOutboundHeaders(input.from, input.headers);
+        const threading = threadingFieldsOf(headers);
+
         // AW-05 — the gate runs before plugin resolution, so a refused send
         // never touches a provider (or its credentials).
         let reservedMessageId: string | null = null;
@@ -191,7 +256,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 // so a concurrent burst cannot overshoot a hard stop.
                 const admission = await this.sendPolicy.admitSend(
                     attempt,
-                    await this.reservationFor(input, options),
+                    await this.reservationFor(input, options, threading),
                 );
                 reservedMessageId = admission?.reservedMessageId ?? null;
             } else {
@@ -209,10 +274,15 @@ export class EmailFacadeService extends BaseFacadeService {
             const settings = await this.resolveSettings(plugin.id, options);
 
             const { bodyText, bodyHtml } = await this.renderBody(input);
+            // EW-P4-3 — the sender name saved on the address (Settings →
+            // Email addresses) when the caller gave none. Here, so direct
+            // sends, auto-sent drafts and released drafts all carry it.
+            const fromName =
+                input.fromName ?? (await this.savedFromName(options.addressId, sender));
 
             wireInput = {
                 from: input.from,
-                fromName: input.fromName,
+                fromName,
                 to: input.to,
                 cc: input.cc,
                 bcc: input.bcc,
@@ -223,6 +293,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 attachments: input.attachments,
                 metadata: input.metadata,
                 messageRef: input.messageRef,
+                headers,
             };
 
             const emailOpts: EmailOptions = {
@@ -242,10 +313,36 @@ export class EmailFacadeService extends BaseFacadeService {
             throw error;
         }
 
-        await this.persistOutboundMessage(input, wireInput, result, options, reservedMessageId);
+        await this.persistOutboundMessage(
+            input,
+            wireInput,
+            result,
+            options,
+            reservedMessageId,
+            threading,
+        );
         await this.recordUsage(plugin.id, 'sendEmail', options);
 
         return result;
+    }
+
+    /**
+     * EW-P4-3 — `providerSettings.fromName` of the sending address, when one
+     * was saved. Best-effort: a lookup failure sends without a name, as before.
+     */
+    private async savedFromName(
+        addressId: string | undefined,
+        loaded?: TenantEmailAddress | null,
+    ): Promise<string | undefined> {
+        if (!addressId || !this.emailAddresses) return undefined;
+        try {
+            const address =
+                loaded !== undefined ? loaded : await this.emailAddresses.findById(addressId);
+            const name = address?.providerSettings?.fromName;
+            return typeof name === 'string' && name.trim() ? name.trim().slice(0, 200) : undefined;
+        } catch {
+            return undefined;
+        }
     }
 
     /**
@@ -256,6 +353,7 @@ export class EmailFacadeService extends BaseFacadeService {
     private async reservationFor(
         input: EmailFacadeSendInput,
         options: EmailFacadeSendOptions,
+        threading: EmailThreadingFields,
     ): Promise<EmailSendReservation | null> {
         if (!this.emailMessages || !options.userId || !options.addressId) return null;
         if (options.draftMessageId) return { kind: 'draft' };
@@ -267,6 +365,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 userId: options.userId,
                 agentId: options.agentId ?? null,
                 taskId: options.taskId ?? null,
+                conversationId: options.conversationId ?? null,
                 emailAddressId: options.addressId,
                 // Provisional — replaced by the provider that actually sends.
                 pluginId: EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID,
@@ -279,6 +378,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 bodyHtml: bodyHtml ?? null,
                 metadata: input.metadata ? { ...input.metadata } : null,
                 messageRef: input.messageRef ?? null,
+                ...threading,
             },
         };
     }
@@ -382,9 +482,11 @@ export class EmailFacadeService extends BaseFacadeService {
      * loaded instance ({@link getUsableInboundPlugin} — 503 when it cannot
      * load), never through the registry's lazy proxy, and the verification is
      * awaited ({@link verifyWebhookSignature} — 401 with a generic body when
-     * it fails). Note that a plugin with NO secret at the resolved scope
-     * accepts unsigned webhooks (an operator opt-in in the shipped postmark
-     * and mailgun plugins).
+     * it fails). A shipped plugin (postmark, mailgun) with NO secret at the
+     * resolved scope refuses the webhook too (EW-P4-3): there is nothing to
+     * authenticate it against. Only the operator opt-out
+     * `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (exact string) accepts it, for a
+     * local stack with no public webhook URL.
      */
     async parseInbound(
         pluginId: string,
@@ -768,6 +870,11 @@ export class EmailFacadeService extends BaseFacadeService {
         result: EmailSendResult,
         options: EmailFacadeSendOptions,
         reservedMessageId: string | null = null,
+        threading: EmailThreadingFields = {
+            messageIdHeader: null,
+            inReplyTo: null,
+            references: null,
+        },
     ): Promise<void> {
         if (!this.emailMessages || !options.userId || !options.addressId) return;
         const existingRowId = options.draftMessageId ?? reservedMessageId;
@@ -781,6 +888,9 @@ export class EmailFacadeService extends BaseFacadeService {
                 sentAt: new Date(),
                 deliveryStatus: 'accepted',
                 failureReason: null,
+                // EW-P4-3 — the ids THIS send carried (a released draft
+                // gets its Message-ID only now).
+                ...threading,
             });
             return;
         }
@@ -788,7 +898,7 @@ export class EmailFacadeService extends BaseFacadeService {
             userId: options.userId,
             agentId: options.agentId ?? null,
             taskId: options.taskId ?? null,
-            conversationId: null,
+            conversationId: options.conversationId ?? null,
             emailAddressId: options.addressId,
             direction: 'outbound',
             pluginId: result.provider,
@@ -802,6 +912,7 @@ export class EmailFacadeService extends BaseFacadeService {
             bodyHtml: wire.bodyHtml ?? null,
             metadata: input.metadata ? { ...input.metadata } : null,
             messageRef: input.messageRef ?? null,
+            ...threading,
             sentAt: new Date(),
             deliveryStatus: 'accepted',
             status: 'sent',

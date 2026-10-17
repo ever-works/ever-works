@@ -44,6 +44,11 @@ export interface AgentSendEmailInput {
     template?: AgentEmailTemplateRef;
     /** Optional explicit from-address id (tenant_email_addresses.id). */
     fromAddressId?: string;
+    /**
+     * EW-P4-3 — reply in thread: the `email_messages.id` this message
+     * answers (e.g. the inbound email a Task was spawned from).
+     */
+    inReplyToMessageId?: string;
 }
 
 export interface AgentSendEmailResult {

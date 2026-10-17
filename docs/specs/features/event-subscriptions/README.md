@@ -7,3 +7,6 @@ Per-user, per-event channel-selection matrix on top of notifications v1: extensi
 - [tasks.md](./tasks.md) — task breakdown
 
 Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/README.md), [`notification-channels`](../notification-channels/README.md), [`agent-inbox-ui`](../agent-inbox-ui/README.md).
+
+Upstream source: [`domain-events`](../domain-events/README.md) (EW-P1-1) — durable `domain.<type>` events that a
+notification listener maps onto this registry's keys (see that spec's §7).

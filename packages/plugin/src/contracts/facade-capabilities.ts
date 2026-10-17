@@ -140,7 +140,14 @@ export const PLUGIN_CAPABILITIES = {
 	// new category: the tier's plugin is a `deployment` plugin, so
 	// `PLUGIN_CATEGORIES` is untouched and every exhaustive map over it in
 	// `apps/web` stays total.
-	APPS_TIER: 'apps-tier'
+	APPS_TIER: 'apps-tier',
+	// Domain events (EW-P1-1) — plugins that follow the durable domain event
+	// outbox (`task.updated`, `team.member.added`, …) through the relay, at
+	// least once, with a per-plugin cursor. See
+	// `capabilities/domain-event-subscriber.interface.ts`. Appended last, so
+	// every existing constant keeps its value and its position; no category is
+	// added (a subscriber plugin keeps the category of what it otherwise is).
+	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

@@ -23,6 +23,16 @@ export class MailService {
     constructor(private readonly mailerService: MailerService) {}
 
     /**
+     * EW-P4-3 — whether platform mail is really delivered (not only logged by
+     * the development faker). See `MailerService.canDeliver`.
+     */
+    canDeliver(): boolean {
+        return typeof this.mailerService.canDeliver === 'function'
+            ? this.mailerService.canDeliver()
+            : true;
+    }
+
+    /**
      * EW-617 G2: anonymous users have no email and must never receive
      * transactional mail. All mail handlers early-return when the recipient
      * has no email; in practice they shouldn't fire for anon users at all
@@ -593,6 +603,9 @@ export class MailService {
             actionLabel?: string | null;
             settingsPath: string;
         },
+        // EW-P4-3 — `strict`: throw when the provider refuses the email (see
+        // `MailerService.sendMail`). Off for every existing caller.
+        options: { strict?: boolean } = {},
     ): Promise<boolean> {
         const recipient = this.requireEmail(toEmail, 'notification email');
         if (!recipient) {
@@ -601,7 +614,7 @@ export class MailService {
         const appName = config.branding.appName();
         const webAppUrl = config.webAppUrl().replace(/\/+$/, '');
         const actionUrl = toWebAppLink(webAppUrl, context.actionUrl);
-        await this.mailerService.sendMail({
+        const mail = {
             to: recipient,
             subject: `[${appName}] ${this.stripHtmlTags(context.title)}`,
             template: 'notification',
@@ -615,7 +628,12 @@ export class MailService {
                 actionLabel: context.actionLabel || 'Open',
                 settingsUrl: toWebAppLink(webAppUrl, context.settingsPath) ?? webAppUrl,
             },
-        });
+        };
+        if (options.strict) {
+            await this.mailerService.sendMail(mail, { strict: true });
+        } else {
+            await this.mailerService.sendMail(mail);
+        }
         return true;
     }
 

@@ -39,6 +39,30 @@ describe('ResendPlugin', () => {
 		expect(opts).toEqual({ idempotencyKey: 'ref-1' });
 	});
 
+	it('forwards EmailSendInput.headers (EW-P4-3 RFC threading)', async () => {
+		sendMock.mockResolvedValueOnce({ data: { id: 'rs-h' }, error: null });
+		await plugin.sendEmail(
+			{
+				from: 'a@example.com',
+				to: ['b@example.com'],
+				subject: 'Re: hi',
+				bodyText: 'hi',
+				messageRef: 'ref-thread',
+				headers: {
+					'Message-ID': '<out-1@acme.test>',
+					'In-Reply-To': '<in-1@client.test>',
+					References: '<root@client.test> <in-1@client.test>'
+				}
+			},
+			{ userId: 'u' }
+		);
+		expect(sendMock.mock.calls[0][0].headers).toEqual({
+			'Message-ID': '<out-1@acme.test>',
+			'In-Reply-To': '<in-1@client.test>',
+			References: '<root@client.test> <in-1@client.test>'
+		});
+	});
+
 	it('throws when the resend SDK returns an error', async () => {
 		sendMock.mockResolvedValueOnce({
 			data: null,

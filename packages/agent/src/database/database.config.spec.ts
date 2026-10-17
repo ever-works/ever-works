@@ -29,6 +29,11 @@ jest.mock('./_entities-inventory', () => {
         }),
     };
 });
+// Record visibility (EW-P1-3) — the DataSource subscriber imports TypeORM (its
+// `@EventSubscriber()` decorator); shell it like the entity barrels above.
+jest.mock('./record-visibility.subscriber', () => ({
+    RecordVisibilitySubscriber: class RecordVisibilitySubscriber {},
+}));
 jest.mock('../entities/cache.entity', () => ({
     CacheEntry: class CacheEntry {},
 }));

@@ -1,0 +1,12 @@
+{
+	"id": "0f4b2c6d-8e1a-4b3c-9d5e-6f7a8b9c0d12",
+	"tenantId": "7c1e9a52-3b0d-4c8e-9f21-5d6a7b8c9d01",
+	"slug": "acme",
+	"displayName": "Acme Inc.",
+	"legalName": null,
+	"countryCode": "US",
+	"version": 9,
+	"createdAt": "2026-08-01T10:00:00.000Z",
+	"updatedAt": "2026-10-15T18:10:00.000Z",
+	"webUrl": "https://app.ever.works/acme/dashboard"
+}

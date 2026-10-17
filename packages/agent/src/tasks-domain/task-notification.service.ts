@@ -73,13 +73,32 @@ export class TaskNotificationService {
         context: TaskNotificationContext,
         recipientUserIds: string[] = [],
     ): Promise<number> {
-        if (!this.notifications) return 0;
+        return (await this.emitCounted(event, context, recipientUserIds)).sent;
+    }
+
+    /** True when this service can deliver at all (a notification store is bound). */
+    canDeliver(): boolean {
+        return !!this.notifications;
+    }
+
+    /**
+     * {@link emit}, also answering how many recipients it tried, so a caller
+     * that must not lose a notice (the due-soon scan, EW-P2-3) can tell a
+     * partial delivery from a complete one and retry. A recipient whose notice
+     * already exists (same dedup key) counts as sent.
+     */
+    async emitCounted(
+        event: TaskNotificationEvent,
+        context: TaskNotificationContext,
+        recipientUserIds: string[] = [],
+    ): Promise<{ sent: number; recipients: number }> {
+        if (!this.notifications) return { sent: 0, recipients: 0 };
         const watchers = await this.watchers.findByTaskId(context.taskId).catch(() => []);
         const uniqueRecipients = new Set<string>([
             ...recipientUserIds,
             ...watchers.map((w) => w.userId),
         ]);
-        if (uniqueRecipients.size === 0) return 0;
+        if (uniqueRecipients.size === 0) return { sent: 0, recipients: 0 };
 
         const message = this.formatMessage(event, context);
         const title = this.formatTitle(event, context);
@@ -103,8 +122,15 @@ export class TaskNotificationService {
                 case 'task_assigned':
                 case 'task_mentioned':
                     return context.actorAgentSlug ?? context.actorUserId ?? '';
-                case 'task_due_soon':
-                    return new Date().toISOString().slice(0, 10); // dedup per-day at most
+                case 'task_due_soon': {
+                    // EW-P2-3 — one notice per DEADLINE: the same due date is
+                    // never noticed twice, a moved one is a new notice (even on
+                    // the same day). Without a date, fall back to per-day.
+                    const dueAt = context.extra?.dueAt;
+                    return typeof dueAt === 'string' && dueAt.length > 0
+                        ? `due:${dueAt}`
+                        : new Date().toISOString().slice(0, 10);
+                }
                 default:
                     return String(Date.now());
             }
@@ -141,7 +167,7 @@ export class TaskNotificationService {
                 this.logger.warn(`Failed to emit ${event} to user ${userId}: ${err}`);
             }
         }
-        return sent;
+        return { sent, recipients: uniqueRecipients.size };
     }
 
     private formatTitle(event: TaskNotificationEvent, ctx: TaskNotificationContext): string {

@@ -8,6 +8,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { RecordVisibility } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
 import type { TaskExtraRepo } from '@ever-works/contracts';
@@ -52,6 +53,27 @@ export enum TaskPriority {
 export type TaskActorType = 'user' | 'agent';
 
 /**
+ * EW-P1-2 — who CREATED a Task or WROTE a chat message. A superset of
+ * {@link TaskActorType}: an integration key (`ew_int_…`) that writes WITHOUT
+ * acting as a user is recorded as `'integration'` with its key id as the
+ * actor id. Kept apart from `TaskActorType` on purpose: an integration can
+ * never be an assignee, reviewer or approver.
+ */
+export type TaskAuthorType = TaskActorType | 'integration';
+
+/**
+ * EW-P1-2 — display-only attribution an integration may attach when it writes
+ * without acting as a user (e.g. the Gauzy employee who wrote a comment).
+ * Never an identity: nothing authorizes on it.
+ */
+export interface TaskExternalAuthor {
+    name: string;
+    avatarUrl?: string | null;
+    /** The integration it came from, e.g. `'gauzy'`. */
+    source: string;
+}
+
+/**
  * One non-primary repository a fleet run pushed for a Task (multi-repo Task
  * workspaces, self-build slice C). `state` follows the primary's
  * `branchState` vocabulary for the states that apply: the branch is
@@ -80,6 +102,7 @@ export interface TaskLinkedPullRequest {
 }
 
 @Entity({ name: 'tasks' })
+@Index('idx_tasks_org_visibility', ['organizationId', 'visibility'])
 // Review-fix C1: slug uniqueness is per-user (UserTaskCounter
 // increments per user, so two users both produce `T-1`). Global
 // unique would deadlock the platform after the second user creates a Task.
@@ -92,6 +115,8 @@ export interface TaskLinkedPullRequest {
 // "open tasks for X", so status is always the second predicate.
 @Index('idx_tasks_team', ['teamId', 'status'])
 @Index('idx_tasks_agent', ['agentId', 'status'])
+// Integration API v1 keyset lists (migration 1795080300000).
+@Index('idx_tasks_org_updated', ['organizationId', 'updatedAt', 'id'])
 @Index('idx_tasks_goal', ['goalId', 'status'])
 @Index('idx_tasks_parent', ['parentTaskId'])
 @Index('idx_tasks_branch_state', ['workId', 'branchState'])
@@ -105,6 +130,9 @@ export interface TaskLinkedPullRequest {
 // keeps the claim-filter cheap on both drivers (a partial index would
 // be Postgres-only, and this table is small enough not to need one).
 @Index('idx_tasks_scheduled_due', ['scheduledAt', 'scheduleClaimedAt'])
+// EW-P2-3 — the due-soon scan walks rows with a `dueAt` inside the window that
+// have not been noticed yet. Shipped by 1795110000000-AddTaskDatesAndEstimate.
+@Index('idx_tasks_due_soon', ['dueAt', 'dueSoonNotifiedAt'])
 export class Task {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -451,7 +479,7 @@ export class Task {
     latestRunStatus?: string | null;
 
     @Column({ type: 'varchar', length: 16 })
-    createdByType: TaskActorType;
+    createdByType: TaskAuthorType;
 
     @Column({ type: 'uuid' })
     createdById: string;
@@ -528,6 +556,31 @@ export class Task {
     @PortableDateColumn({ nullable: true })
     scheduleClaimedAt?: Date | null;
 
+    // ── Planning dates + estimate (EW-P2-3) ────────────────────────
+    /**
+     * When the Task is due. Planning only: nothing runs at this instant
+     * (that is `scheduledAt`). Drives the `task_due_soon` notice. NULL = no
+     * due date. Maps Ever Gauzy's `dueDate` one to one.
+     */
+    @PortableDateColumn({ nullable: true })
+    dueAt?: Date | null;
+
+    /** When work on the Task is planned to start (planning only). NULL = unset. */
+    @PortableDateColumn({ nullable: true })
+    startAt?: Date | null;
+
+    /** Estimated effort in whole minutes (0..525600, one year). NULL = no estimate. */
+    @Column({ type: 'int', nullable: true })
+    estimateMinutes?: number | null;
+
+    /**
+     * When the `task_due_soon` notice went out for the CURRENT `dueAt`.
+     * The due-soon scan CAS-claims it so two ticks never notify twice;
+     * changing `dueAt` clears it so the new date is noticed again.
+     */
+    @PortableDateColumn({ nullable: true })
+    dueSoonNotifiedAt?: Date | null;
+
     /**
      * Keep this Task off the Kanban board and the default Task lists.
      *
@@ -600,9 +653,39 @@ export class Task {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
+    /**
+     * Record visibility (EW-P1-3, `docs/specs/features/record-visibility/spec.md`).
+     * Ownership (`userId`) is unchanged; this only ADDS readers of an org-scope row:
+     * `private` = the owner and the participants, `team` = also the members of the
+     * row's Teams and Work, `organization` = also every member of the Organization.
+     * Existing org rows were backfilled by migration 1795070000000 (owner decision D11).
+     */
+    @Column({ type: 'varchar', length: 16, default: 'private' })
+    visibility: RecordVisibility;
+
+    /**
+     * `true` once somebody chose `visibility` by hand: the automatic Team ↔
+     * Organization changes then stop. `private` is only ever set by hand.
+     */
+    @Column({ type: 'boolean', default: false })
+    visibilityExplicit: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Aggregate version for optimistic concurrency and event ordering (EW-P1-1,
+     * `docs/specs/features/domain-events/spec.md` §4). Starts at 1 and is bumped by
+     * `bumpAggregateVersion` on every recorded change — edge and chat changes too (assignees, watchers, approvers, reviewers, blocks, relations, attachments,
+     * chat), never by runtime-only writes (PR/CI/run state, which record `task.runtime_updated`).
+     *
+     * A plain column on purpose, NOT `@VersionColumn`: TypeORM adds
+     * `version = version + 1` to every query-builder `.update()` of an entity
+     * with a version column, which would bump it on machine-only writes too.
+     */
+    @Column({ type: 'int', default: 1 })
+    version: number;
 }

@@ -1,0 +1,56 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/agent.schema.json",
+	"title": "Agent DTO (B.6, GET /agents, GET /agents/:id)",
+	"description": "Agents are owned by Ever Works (01 §4): read-only for integrations. Team scope for an agent = its team memberships (teamIds, D11). Also the `data` of agent.* events.",
+	"type": "object",
+	"allOf": [{ "$ref": "../common.schema.json#/$defs/ResourceBase" }],
+	"required": ["name", "slug", "status", "scope", "scopeTargetId", "avatar", "teamIds"],
+	"properties": {
+		"id": true,
+		"organizationId": true,
+		"version": true,
+		"createdAt": true,
+		"updatedAt": true,
+		"visibility": true,
+		"visibilityExplicit": true,
+		"owner": true,
+		"createdBy": true,
+		"externalLinks": true,
+		"teamIds": { "$ref": "../common.schema.json#/$defs/TeamIds" },
+		"name": { "type": "string", "maxLength": 120 },
+		"slug": { "type": "string", "maxLength": 80 },
+		"title": { "type": ["string", "null"], "maxLength": 200 },
+		"capabilities": { "type": ["string", "null"] },
+		"status": {
+			"type": "string",
+			"enum": ["draft", "active", "running", "paused", "error", "archived"]
+		},
+		"scope": { "type": "string", "enum": ["tenant", "mission", "idea", "work"] },
+		"scopeTargetId": {
+			"description": "Normalized target id of `scope` (the tenant id, mission id, idea id or work id).",
+			"type": "string",
+			"maxLength": 64
+		},
+		"reportsToAgentId": { "$ref": "../common.schema.json#/$defs/NullableUuid" },
+		"avatar": {
+			"type": "object",
+			"required": ["mode"],
+			"properties": {
+				"mode": { "type": "string", "enum": ["initials", "icon", "image"] },
+				"icon": { "type": ["string", "null"] },
+				"url": {
+					"description": "Set when mode = image.",
+					"type": ["string", "null"],
+					"maxLength": 2048
+				}
+			},
+			"additionalProperties": false
+		},
+		"modelId": { "type": ["string", "null"], "maxLength": 200 },
+		"lastRunAt": { "$ref": "../common.schema.json#/$defs/NullableDateTime" },
+		"webUrl": { "type": ["string", "null"], "format": "uri" },
+		"deleted": { "description": "Only on agent.deleted.", "const": true }
+	},
+	"additionalProperties": false
+}

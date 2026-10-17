@@ -2,6 +2,9 @@ import { WORK_KINDS, WORK_KIND_CAPABILITIES } from '@ever-works/contracts';
 
 import { Work } from '../../entities/work.entity';
 import {
+    findTaskForPullRequest,
+    kindHasTaskRepository,
+    requireTaskRepository,
     resolveTaskRepository,
     taskRepositoryFullName,
     taskRepositoryRole,
@@ -80,29 +83,29 @@ describe('taskRepositoryRole — read from the capability registry', () => {
 });
 
 describe('resolveTaskRepository — the data branch is today’s call, verbatim', () => {
-    it.each(WORK_KINDS.filter((kind) => kind !== 'app').map((kind) => [kind]))(
-        '%s: getRepoOwner() with NO argument, and getDataRepo()',
-        (kind) => {
-            const { work, calls } = double(kind);
+    it.each(
+        // `app` reads its Work Repository; `project` (EW-P2-4) has no repository.
+        WORK_KINDS.filter((kind) => kind !== 'app' && kind !== 'project').map((kind) => [kind]),
+    )('%s: getRepoOwner() with NO argument, and getDataRepo()', (kind) => {
+        const { work, calls } = double(kind);
 
-            expect(resolveTaskRepository(work)).toEqual({
-                role: 'data',
-                owner: 'data-owner',
-                repo: 'the-data-repo',
-            });
-            // Exactly the call every site made before this file existed. A
-            // structural double implementing `getRepoOwner: () => 'x'` sees
-            // the same thing it always saw.
-            expect(calls.owner).toEqual([[]]);
-            expect(calls.data).toBe(1);
-            expect(calls.website).toBe(0);
-        },
-    );
+        expect(resolveTaskRepository(work)).toEqual({
+            role: 'data',
+            owner: 'data-owner',
+            repo: 'the-data-repo',
+        });
+        // Exactly the call every site made before this file existed. A
+        // structural double implementing `getRepoOwner: () => 'x'` sees
+        // the same thing it always saw.
+        expect(calls.owner).toEqual([[]]);
+        expect(calls.data).toBe(1);
+        expect(calls.website).toBe(0);
+    });
 
     it('keeps a Work with no `kind` on the data role', () => {
         const { work } = double(undefined);
 
-        expect(resolveTaskRepository(work).role).toBe('data');
+        expect(resolveTaskRepository(work)?.role).toBe('data');
     });
 });
 
@@ -124,7 +127,7 @@ describe('resolveTaskRepository — an App Work’s Work Repository', () => {
         // One without `getWebsiteRepo` resolves as it did before this file.
         const { work } = double('app', { withWebsite: false });
 
-        expect(resolveTaskRepository(work).role).toBe('data');
+        expect(resolveTaskRepository(work)?.role).toBe('data');
     });
 
     it('names the repository for copy', () => {
@@ -180,5 +183,46 @@ describe('against the real Work entity — the phantom repository this replaces'
             owner: 'acme',
             repo: directory.getDataRepo(),
         });
+    });
+});
+
+/** EW-P2-4 — the repo-less Project kind: its Tasks run without a repository. */
+describe('a Project Work has no Task repository', () => {
+    it('only `project` has no Task repository', () => {
+        expect(WORK_KINDS.filter((kind) => !kindHasTaskRepository(kind))).toEqual(['project']);
+    });
+
+    it('resolves to none — never the derived `${slug}-data` name', () => {
+        const { work, calls } = double('project');
+        expect(resolveTaskRepository(work)).toBeNull();
+        expect(taskRepositoryFullName(work)).toBeNull();
+        expect(calls.data).toBe(0);
+        expect(calls.owner).toEqual([]);
+    });
+
+    it('requireTaskRepository refuses it with a 400 naming the kind and the action', () => {
+        const { work } = double(' Project ');
+        expect(() => requireTaskRepository(work, 'opening a pull request')).toThrow(
+            /has no repository \(a " Project " Work\) — opening a pull request is not available/,
+        );
+        expect(requireTaskRepository(double('directory').work, 'x')).toEqual({
+            role: 'data',
+            owner: 'data-owner',
+            repo: 'the-data-repo',
+        });
+    });
+
+    it('findTaskForPullRequest never matches a Project Work through its derived names', async () => {
+        const project = Object.assign(new Work(), {
+            id: 'w-project',
+            slug: 'relaunch',
+            kind: 'project',
+            owner: 'acme',
+        });
+        const lookup = jest.fn().mockResolvedValue({ id: 'task-1' });
+        await expect(
+            findTaskForPullRequest([project], 'acme', project.getDataRepo(), 7, lookup),
+        ).resolves.toBeNull();
+        expect(lookup).not.toHaveBeenCalled();
     });
 });

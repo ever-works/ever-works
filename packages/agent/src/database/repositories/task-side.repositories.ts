@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, LessThan, Repository } from 'typeorm';
+import { type EntityManager, In, IsNull, LessThan, Repository } from 'typeorm';
 import {
     approverDecisionCountsTowardDone,
     isCommitBoundApproverDecision,
@@ -43,13 +43,17 @@ export class TaskAssigneeRepository {
         if (taskIds.length === 0) return [];
         return this.repo.find({ where: { taskId: In(taskIds) } });
     }
+    // `manager` (domain events, EW-P1-1): pass the transaction's EntityManager to
+    // write inside it, so the change and its outbox row commit together.
     async add(
         taskId: string,
         assigneeType: 'user' | 'agent',
         assigneeId: string,
+        manager?: EntityManager,
     ): Promise<TaskAssignee> {
-        const entity = this.repo.create({ taskId, assigneeType, assigneeId });
-        return this.repo.save(entity);
+        const repo = manager ? manager.getRepository(TaskAssignee) : this.repo;
+        const entity = repo.create({ taskId, assigneeType, assigneeId });
+        return repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete to a single
     // task so a side-row PK from another tenant's task can never be
@@ -59,8 +63,9 @@ export class TaskAssigneeRepository {
     async remove(id: string, taskId?: string): Promise<void> {
         await this.repo.delete(taskId ? { id, taskId } : id);
     }
-    async removeForTask(taskId: string, id: string): Promise<boolean> {
-        const result = await this.repo.delete({ id, taskId });
+    async removeForTask(taskId: string, id: string, manager?: EntityManager): Promise<boolean> {
+        const repo = manager ? manager.getRepository(TaskAssignee) : this.repo;
+        const result = await repo.delete({ id, taskId });
         return (result.affected ?? 0) > 0;
     }
 }
@@ -76,9 +81,11 @@ export class TaskReviewerRepository {
         taskId: string,
         reviewerType: 'user' | 'agent',
         reviewerId: string,
+        manager?: EntityManager,
     ): Promise<TaskReviewer> {
-        const entity = this.repo.create({ taskId, reviewerType, reviewerId });
-        return this.repo.save(entity);
+        const repo = manager ? manager.getRepository(TaskReviewer) : this.repo;
+        const entity = repo.create({ taskId, reviewerType, reviewerId });
+        return repo.save(entity);
     }
     async setState(
         id: string,
@@ -120,9 +127,11 @@ export class TaskApproverRepository {
         taskId: string,
         approverType: 'user' | 'agent',
         approverId: string,
+        manager?: EntityManager,
     ): Promise<TaskApprover> {
-        const entity = this.repo.create({ taskId, approverType, approverId });
-        return this.repo.save(entity);
+        const repo = manager ? manager.getRepository(TaskApprover) : this.repo;
+        const entity = repo.create({ taskId, approverType, approverId });
+        return repo.save(entity);
     }
     /**
      * Write an approver row's decision.
@@ -344,17 +353,23 @@ export class TaskBlockRepository {
         const rows = await this.repo.find({ where: { blockedByTaskId: blockerTaskId } });
         return rows.map((r) => r.taskId);
     }
-    async add(taskId: string, blockedByTaskId: string): Promise<TaskBlock> {
-        const entity = this.repo.create({ taskId, blockedByTaskId });
-        return this.repo.save(entity);
+    async add(
+        taskId: string,
+        blockedByTaskId: string,
+        manager?: EntityManager,
+    ): Promise<TaskBlock> {
+        const repo = manager ? manager.getRepository(TaskBlock) : this.repo;
+        const entity = repo.create({ taskId, blockedByTaskId });
+        return repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
     async remove(id: string, taskId?: string): Promise<void> {
         await this.repo.delete(taskId ? { id, taskId } : id);
     }
-    async removeForTask(taskId: string, id: string): Promise<boolean> {
-        const result = await this.repo.delete({ id, taskId });
+    async removeForTask(taskId: string, id: string, manager?: EntityManager): Promise<boolean> {
+        const repo = manager ? manager.getRepository(TaskBlock) : this.repo;
+        const result = await repo.delete({ id, taskId });
         return (result.affected ?? 0) > 0;
     }
 }
@@ -370,17 +385,20 @@ export class TaskRelationRepository {
         taskId: string,
         relatedTaskId: string,
         kind: 'related' | 'duplicates' | 'follow-up',
+        manager?: EntityManager,
     ): Promise<TaskRelation> {
-        const entity = this.repo.create({ taskId, relatedTaskId, kind });
-        return this.repo.save(entity);
+        const repo = manager ? manager.getRepository(TaskRelation) : this.repo;
+        const entity = repo.create({ taskId, relatedTaskId, kind });
+        return repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
     async remove(id: string, taskId?: string): Promise<void> {
         await this.repo.delete(taskId ? { id, taskId } : id);
     }
-    async removeForTask(taskId: string, id: string): Promise<boolean> {
-        const result = await this.repo.delete({ id, taskId });
+    async removeForTask(taskId: string, id: string, manager?: EntityManager): Promise<boolean> {
+        const repo = manager ? manager.getRepository(TaskRelation) : this.repo;
+        const result = await repo.delete({ id, taskId });
         return (result.affected ?? 0) > 0;
     }
 }
@@ -402,9 +420,13 @@ export class TaskChatMessageRepository {
     async findById(id: string): Promise<TaskChatMessage | null> {
         return this.repo.findOne({ where: { id } });
     }
-    async create(data: Partial<TaskChatMessage>): Promise<TaskChatMessage> {
-        const entity = this.repo.create(data);
-        return this.repo.save(entity);
+    async create(
+        data: Partial<TaskChatMessage>,
+        manager?: EntityManager,
+    ): Promise<TaskChatMessage> {
+        const repo = manager ? manager.getRepository(TaskChatMessage) : this.repo;
+        const entity = repo.create(data);
+        return repo.save(entity);
     }
     async updateBody(id: string, body: string): Promise<void> {
         await this.repo.update(id, { body, editedAt: new Date() });
@@ -418,12 +440,19 @@ export class TaskChatMessageRepository {
         id: string,
         body: string,
         mentions: Array<{ type: 'user' | 'agent' | 'kb'; id?: string; slug?: string }> | null,
+        manager?: EntityManager,
     ): Promise<void> {
-        await this.repo.update(id, {
+        const repo = manager ? manager.getRepository(TaskChatMessage) : this.repo;
+        await repo.update(id, {
             body,
             mentions: mentions && mentions.length > 0 ? mentions : null,
             editedAt: new Date(),
         });
+    }
+    /** Integration API v1 (EW-P1-4): delete one message (`DELETE /tasks/:id/comments/:cid`). */
+    async delete(id: string, manager?: EntityManager): Promise<void> {
+        const repo = manager ? manager.getRepository(TaskChatMessage) : this.repo;
+        await repo.delete(id);
     }
 }
 
@@ -453,17 +482,20 @@ export class TaskAttachmentRepository {
         taskId: string,
         uploadId: string,
         role: 'initial' | 'result' = 'initial',
+        manager?: EntityManager,
     ): Promise<TaskAttachment> {
-        const entity = this.repo.create({ taskId, uploadId, role });
-        return this.repo.save(entity);
+        const repo = manager ? manager.getRepository(TaskAttachment) : this.repo;
+        const entity = repo.create({ taskId, uploadId, role });
+        return repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
     async remove(id: string, taskId?: string): Promise<void> {
         await this.repo.delete(taskId ? { id, taskId } : id);
     }
-    async removeForTask(taskId: string, id: string): Promise<boolean> {
-        const result = await this.repo.delete({ id, taskId });
+    async removeForTask(taskId: string, id: string, manager?: EntityManager): Promise<boolean> {
+        const repo = manager ? manager.getRepository(TaskAttachment) : this.repo;
+        const result = await repo.delete({ id, taskId });
         return (result.affected ?? 0) > 0;
     }
 }
@@ -478,14 +510,16 @@ export class TaskWatcherRepository {
     async findByUserId(userId: string): Promise<TaskWatcher[]> {
         return this.repo.find({ where: { userId } });
     }
-    async add(taskId: string, userId: string): Promise<TaskWatcher> {
-        const entity = this.repo.create({ taskId, userId });
-        return this.repo.save(entity);
+    async add(taskId: string, userId: string, manager?: EntityManager): Promise<TaskWatcher> {
+        const repo = manager ? manager.getRepository(TaskWatcher) : this.repo;
+        const entity = repo.create({ taskId, userId });
+        return repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
-    async remove(id: string, taskId?: string): Promise<void> {
-        await this.repo.delete(taskId ? { id, taskId } : id);
+    async remove(id: string, taskId?: string, manager?: EntityManager): Promise<void> {
+        const repo = manager ? manager.getRepository(TaskWatcher) : this.repo;
+        await repo.delete(taskId ? { id, taskId } : id);
     }
 }
 

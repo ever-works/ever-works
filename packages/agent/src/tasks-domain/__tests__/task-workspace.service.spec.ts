@@ -76,6 +76,17 @@ describe('TaskWorkspaceService', () => {
         expect(workspaceFacade.provision).not.toHaveBeenCalled();
     });
 
+    // EW-P2-4 — a repo-less Project Work runs without a workspace even when
+    // isolation is on: nothing to clone, no git call, no provisioning.
+    it('returns null without touching git for a Project Work (no repository), isolation on', async () => {
+        works.findById.mockResolvedValue(makeWork({ kind: 'project' }));
+        const result = await build().provisionForRun(input());
+        expect(result).toBeNull();
+        expect(gitFacade.getAccessToken).not.toHaveBeenCalled();
+        expect(gitFacade.getRepository).not.toHaveBeenCalled();
+        expect(workspaceFacade.provision).not.toHaveBeenCalled();
+    });
+
     it('returns null for a Task with no Work', async () => {
         const result = await build().provisionForRun({
             ...input(),

@@ -92,8 +92,16 @@ export interface EmailMessageDetail extends EmailMessageListItem {
 }
 
 export const emailAddressesAPI = {
-    list: async (direction?: EmailAddressDirection) => {
-        const query = direction ? `?direction=${direction}` : '';
+    list: async (
+        direction?: EmailAddressDirection,
+        options: { includeDisabled?: boolean } = {},
+    ) => {
+        const params = new URLSearchParams();
+        if (direction) params.set('direction', direction);
+        // EW-P4-3 — the settings page also lists disabled addresses, so they
+        // can be enabled again after a reload.
+        if (options.includeDisabled) params.set('includeDisabled', 'true');
+        const query = params.toString() ? `?${params.toString()}` : '';
         const data = await serverFetch<{ addresses: EmailAddress[] }>(`/email/addresses${query}`);
         return data.addresses;
     },
@@ -123,8 +131,17 @@ export const emailAddressesAPI = {
             wrapInData: false,
         });
     },
+    /**
+     * EW-P4-3 — sends the address a confirmation email (a one-time link to
+     * `/email-address/verify/<token>`). `alreadyVerified` = nothing was sent.
+     */
     triggerVerification: async (id: string) => {
-        const data = await serverMutation<{ messageRef: string }>({
+        const data = await serverMutation<{
+            messageRef: string;
+            sent?: boolean;
+            alreadyVerified?: boolean;
+            expiresAt?: string;
+        }>({
             method: 'POST',
             endpoint: `/email/addresses/${id}/verify`,
             data: {},
@@ -132,6 +149,14 @@ export const emailAddressesAPI = {
         });
         return data;
     },
+    /**
+     * EW-P4-3 — confirm an address from the link in its confirmation email.
+     * Public: the visitor may not be signed in (the token is the proof).
+     */
+    confirm: async (token: string) =>
+        serverFetch<{ verified: boolean }>(`/email/verify/${encodeURIComponent(token)}`, {
+            publicRouteScope: 'personal',
+        }),
     listMessagesForAgent: async (agentId: string, limit = 50, offset = 0) => {
         const data = await serverFetch<{ messages: EmailMessageListItem[] }>(
             `/email/messages?agentId=${agentId}&limit=${limit}&offset=${offset}`,

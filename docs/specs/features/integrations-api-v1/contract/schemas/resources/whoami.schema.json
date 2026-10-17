@@ -1,0 +1,122 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/whoami.schema.json",
+	"title": "GET /whoami response (B.2)",
+	"description": "Answers any valid integration key; needs no X-Scope-Slug. `feedHead` is the newest feed position overall (global, never below the retention floor): record it before an initial sync and replay the feed from it afterwards (C.6).",
+	"type": "object",
+	"required": ["keyId", "keyName", "tenant", "organizations", "scopes", "apiVersion", "feedHead", "limits"],
+	"properties": {
+		"keyId": {
+			"$ref": "../common.schema.json#/$defs/Uuid"
+		},
+		"keyName": {
+			"type": "string",
+			"maxLength": 100
+		},
+		"integrationKind": {
+			"type": "string",
+			"examples": ["ever-gauzy", "generic"]
+		},
+		"tenant": {
+			"type": "object",
+			"required": ["id", "slug"],
+			"properties": {
+				"id": {
+					"$ref": "../common.schema.json#/$defs/Uuid"
+				},
+				"slug": {
+					"type": "string",
+					"maxLength": 64
+				}
+			},
+			"additionalProperties": false
+		},
+		"organizations": {
+			"description": "The pinned organizations.",
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["id", "slug", "displayName"],
+				"properties": {
+					"id": {
+						"$ref": "../common.schema.json#/$defs/Uuid"
+					},
+					"slug": {
+						"type": "string",
+						"maxLength": 64
+					},
+					"displayName": {
+						"type": "string",
+						"maxLength": 200
+					}
+				},
+				"additionalProperties": false
+			}
+		},
+		"scopes": {
+			"type": "array",
+			"items": {
+				"$ref": "#/$defs/Scope"
+			},
+			"uniqueItems": true
+		},
+		"apiVersion": {
+			"const": "1"
+		},
+		"feedHead": {
+			"description": "The newest feed position overall (positions are global across organizations, so this is never below the retention floor). Record it before an initial sync and replay /events from it afterwards; it never answers 410 while it is inside retention.",
+			"$ref": "../common.schema.json#/$defs/Seq"
+		},
+		"limits": {
+			"type": "object",
+			"required": ["readsPerMin", "writesPerMin"],
+			"properties": {
+				"readsPerMin": {
+					"type": "integer",
+					"minimum": 1
+				},
+				"writesPerMin": {
+					"type": "integer",
+					"minimum": 1
+				}
+			},
+			"additionalProperties": false
+		}
+	},
+	"additionalProperties": false,
+	"$defs": {
+		"Scope": {
+			"description": "Scope vocabulary v1 (02 §3). Never grantable: goals:activate, missions:activate, ideas:build.",
+			"type": "string",
+			"enum": [
+				"org:read",
+				"org:write",
+				"members:read",
+				"members:write",
+				"agents:read",
+				"teams:read",
+				"teams:write",
+				"works:read",
+				"works:write",
+				"missions:read",
+				"missions:write",
+				"goals:read",
+				"goals:write",
+				"ideas:read",
+				"ideas:write",
+				"tasks:read",
+				"tasks:write",
+				"inbox:read",
+				"inbox:write",
+				"kb:read",
+				"kb:write",
+				"email:read",
+				"email:write",
+				"events:read",
+				"webhooks:manage",
+				"links:write"
+			]
+		}
+	}
+}

@@ -1342,10 +1342,10 @@ Email-provider plugins implement `email-outbound` and, where the vendor supports
 | `mailgun`                 | `apiKey`               | Yes      | Yes    | `MAILGUN_API_KEY`             | —                                                           |
 | `mailgun`                 | `domain`               | Yes      | No     | `MAILGUN_DOMAIN`              | Sending domain                                              |
 | `mailgun`                 | `region`               | No       | No     | `MAILGUN_REGION`              | `us` (default) or `eu`                                      |
-| `mailgun`                 | `webhookSigningKey`    | No       | Yes    | `MAILGUN_WEBHOOK_SIGNING_KEY` | Enables inbound HMAC-SHA256 verification; unset skips it    |
+| `mailgun`                 | `webhookSigningKey`    | Inbound  | Yes    | `MAILGUN_WEBHOOK_SIGNING_KEY` | Inbound HMAC-SHA256 verification; unset refuses inbound     |
 | `postmark`                | `apiKey`               | Yes      | Yes    | `POSTMARK_API_KEY`            | Postmark Server API token                                   |
 | `postmark`                | `defaultSenderDomain`  | No       | No     | —                             | Default `From` domain                                       |
-| `postmark`                | `inboundWebhookSecret` | No       | Yes    | `POSTMARK_INBOUND_SECRET`     | Basic-Auth secret for inbound webhook verification          |
+| `postmark`                | `inboundWebhookSecret` | Inbound  | Yes    | `POSTMARK_INBOUND_SECRET`     | Basic-Auth secret for inbound; unset refuses inbound        |
 | `postmark`                | `inboundStreamId`      | No       | No     | —                             | Specific inbound stream id                                  |
 
 **Inbound webhook URLs** (register these in the provider's dashboard):
@@ -1355,7 +1355,7 @@ Email-provider plugins implement `email-outbound` and, where the vendor supports
 | Postmark | Inbound email   | `https://<your-domain>/api/email/inbound/postmark` |
 | Postmark | Delivery events | `https://<your-domain>/api/email/events/postmark`  |
 
-Postmark surfaces `Delivery`, `Bounce`, `SpamComplaint`, `Open` and `Click` events. Mailgun verifies inbound with `HMAC(signingKey, timestamp + token)` compared in constant time and decodes both JSON and form-urlencoded webhook bodies. Resend inbound is not supported yet — Resend's inbound product is still in private beta.
+Inbound and delivery-event webhooks are **refused (`401`) when no secret is configured** — an unsigned webhook cannot be told apart from a forgery. Only `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (that exact string, for a local stack with no public webhook URL) accepts them unsigned. Postmark sends the secret as HTTP Basic auth (username `postmark`, password = the secret): embed it in the inbound URL (`https://postmark:<secret>@<your-domain>/api/email/inbound/postmark`) and enter it as the webhook's **Basic auth credentials** for the delivery-event URL. Delivery events are verified with the admin/env-scope secret, since an event names no recipient. Postmark surfaces `Delivery`, `Bounce`, `SpamComplaint`, `Open` and `Click` events. Mailgun verifies inbound with `HMAC(signingKey, timestamp + token)` compared in constant time and decodes both JSON and form-urlencoded webhook bodies. Resend inbound is not supported yet — Resend's inbound product is still in private beta.
 
 ## Notification Channels
 

@@ -299,6 +299,9 @@ export const ROUTES = {
     // `/admin/*` pages do.
     DASHBOARD_SETTINGS_ADMIN_EVER_ID: '/settings/admin/ever-id',
     DASHBOARD_SETTINGS_API_KEYS: '/settings/api-keys',
+    // EW-P1-7 — Settings → Integrations → Ever Gauzy (manual connection card).
+    DASHBOARD_SETTINGS_INTEGRATIONS_EVER_GAUZY: '/settings/integrations/ever-gauzy',
+    DASHBOARD_SETTINGS_INTEGRATIONS_WEBHOOKS: '/settings/integrations/webhooks',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
@@ -398,6 +401,11 @@ export const ROUTES = {
     ORG_INVITE: '/org-invite/:token',
     /** Concrete href for a given token. */
     orgInvite: (token: string) => `/org-invite/${token}`,
+    // EW-P4-3 — where a tenant email address's confirmation link lands,
+    // straight from that mailbox, often in another browser with no session.
+    // Public (the token is the proof); the page confirms only on a click, so
+    // a mail scanner that prefetches the link confirms nothing.
+    EMAIL_ADDRESS_VERIFY: '/email-address/verify/:token',
 
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
@@ -466,6 +474,8 @@ export const PUBLIC_ROUTES = [
     // segment. The page itself grants nothing: it renders a preview and
     // sends the visitor to register or sign in.
     ROUTES.ORG_INVITE,
+    // EW-P4-3 — tenant email address confirmation link (see ROUTES).
+    ROUTES.EMAIL_ADDRESS_VERIFY,
     // EW-617 zero-friction onboarding landing page — public so anonymous
     // visitors from the marketing site can mint a guest session client-side.
     ROUTES.ONBOARDING,
