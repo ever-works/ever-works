@@ -3613,7 +3613,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3700,6 +3701,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4525,12 +4540,14 @@
                     "generator": "צור Work, חד-פעמי או על פי לוח זמנים",
                     "deploy": "פרוס Work",
                     "tasks": "משימות עבור Work זה",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "אימג'ים של קונטיינרים שנבנו מהמאגר שלך"
                 },
                 "tasks": "משימות",
                 "posts": "פוסטים",
                 "pages": "עמודים",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "בניות"
             },
             "members": {
                 "title": "חברי צוות",
@@ -6875,6 +6892,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "מאגר המקור: {fullName}",
+                    "fork": "Fork: {fullName}",
+                    "private-copy": "עותק פרטי: {fullName}",
+                    "link": "מקושר: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "מכין את ה-Fork שלך",
+                    "forkBody": "GitHub יוצר את {fullName}. זה בדרך כלל לוקח פחות מדקה; מאגרים גדולים עשויים לקחת יותר זמן.",
+                    "copyTitle": "מכין את העותק הפרטי שלך",
+                    "copyBody": "מעתיק את {upstream} אל {fullName}. מאגרים גדולים יותר לוקחים יותר זמן.",
+                    "linkTitle": "מסיים את ההגדרה",
+                    "linkBody": "פותח pull request שמוסיף את .works/works.yml אל {fullName}.",
+                    "blueprintTitle": "מחיל את ה-Blueprint {name}",
+                    "blueprintBody": "Ever Works מכין את עבודת ה-App שלך ויכתוב את .works/works.yml עם קובצי ה-Blueprint."
+                },
+                "setupPrClosed": "ה-pull request של ההגדרה נסגר בלי מיזוג.",
+                "timedOut": "ה-Fork שלך לוקח יותר מ-15 דקות.",
+                "failedAccess": "Ever Works איבד את הגישה ל-GitHub בזמן הכנת עבודת App זו.",
+                "failedOther": "הכנת עבודת App זו נכשלה: {reason}",
+                "waitingForSetupPr": "מזג את ה-pull request של ההגדרה כדי לסיים.",
+                "tryAgain": "נסה שוב",
+                "openOnGitHub": "פתח ב-GitHub",
+                "reconnectGitHub": "חבר מחדש את GitHub",
+                "openPullRequest": "פתח pull request",
+                "retryLimit": "השתמשת בכל 3 הניסיונות החוזרים לשעה זו. נסה שוב מאוחר יותר.",
+                "retryFailed": "לא ניתן היה להתחיל ניסיון נוסף. נסה שוב.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml בענף ברירת המחדל אינו YAML תקין. תקן או הסר את הקובץ, ואז נסה שוב.",
+                    "works_yml_other_kind": ".works/works.yml כבר מצהיר על סוג אחר של עבודה. הגדר kind: app או הסר את הקובץ, ואז נסה שוב.",
+                    "push_rejected": "GitHub המשיך לדחות את ה-commit שמוסיף את .works/works.yml.",
+                    "provider_unsupported": "לא ניתן להגדיר אוטומטית את ספק ה-Git של מאגר זה.",
+                    "too_large_for_private_copy": "המאגר גדול מדי לעותק פרטי. צור Fork במקום זאת.",
+                    "uses_lfs": "המאגר משתמש ב-Git LFS, שעותק פרטי אינו יכול להעביר. צור Fork במקום זאת.",
+                    "other": "משהו השתבש בזמן הגדרת המאגר."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "מאגר העבודה",
+                    "upstream": "מאגר המקור",
+                    "relationLabel": "קשר",
+                    "readinessLabel": "מוכנות",
+                    "readiness": {
+                        "preparing": "בהכנה",
+                        "ready": "מוכן",
+                        "timed_out": "חרג מזמן ההמתנה",
+                        "failed": "נכשל",
+                        "waiting_for_setup_pr": "ממתין ל-pull request של ההגדרה"
+                    },
+                    "relations": {
+                        "link": "מקושר",
+                        "fork": "Fork",
+                        "private-copy": "עותק פרטי"
+                    },
+                    "appSpecLabel": "מפרט App",
+                    "appSpecStatus": {
+                        "valid": "תקין",
+                        "valid_with_warnings": "תקין, עם אזהרות",
+                        "invalid": "יש שגיאות",
+                        "missing": "עדיין לא נכתב",
+                        "unreadable": "לא ניתן היה לקרוא",
+                        "pending": "בבדיקה",
+                        "unknown": "עדיין לא נבדק"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {אין שגיאות} =1 {שגיאה אחת} other {# שגיאות}} · {warnings, plural, =0 {אין אזהרות} =1 {אזהרה אחת} other {# אזהרות}}",
+                    "openAppSpec": "פתח מפרט App",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "לא ניתן היה לטעון את פרטי ה-App כרגע.",
+                    "builds": "בניות",
+                    "deploy": "פריסה",
+                    "upstreamTab": "מאגר המקור",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "פתח אותה עם הסוכן שלה",
+                    "body": "בקש מהסוכן של העבודה לשנות את האפליקציה — להוסיף תכונה, לתקן באג, לשדרג תלות. הוא עובד במאגר העבודה ופותח pull requests.",
+                    "button": "שוחח על ה-App הזה"
+                }
+            },
+            "builds": {
+                "title": "בניות",
+                "subtitle": "נבנה על runners המתארחים ב-GitHub ב-{repository} · אימג' {imageRepository}",
+                "subtitleNoImage": "נבנה על runners המתארחים ב-GitHub ב-{repository}",
+                "subtitleGeneric": "אימג'ים של קונטיינרים שנבנו מהמאגר של עבודת App זו.",
+                "startBuild": "התחל בנייה",
+                "starting": "מתחיל…",
+                "refresh": "רענן",
+                "cancel": "ביטול",
+                "cancelling": "מבטל…",
+                "viewerDisabled": "דרושה לך הרשאת עריכה כדי לעשות זאת.",
+                "deployable": "ניתן לפריסה",
+                "notDeployableLine": "לא ניתן לפריסה — {reason}",
+                "pagination": "מוצגים {start}–{end} מתוך {total}",
+                "listLabel": "הבניות של עבודת App זו",
+                "openDetails": "פתח את בנייה #{number}",
+                "status": {
+                    "queued": "בתור",
+                    "running": "רץ",
+                    "succeeded": "הצליח",
+                    "failed": "נכשל",
+                    "cancelled": "בוטל",
+                    "blocked": "חסום"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "ידני",
+                    "verification": "אימות"
+                },
+                "notDeployable": {
+                    "notSucceeded": "הבנייה לא הצליחה",
+                    "pullRequest": "נבנה מ-pull request",
+                    "verification": "נבנה לצורך אימות",
+                    "specInvalid": "במפרט ה-App ב-commit זה יש שגיאות",
+                    "staleInputs": "נבנה עם ערכי בנייה ישנים יותר",
+                    "secretCheckFailed": "בדיקת הסודות לא עברה",
+                    "digestUnconfirmed": "לא ניתן היה לאשר את האימג' שנדחף",
+                    "criticalVulnerability": "קיים תיקון זמין לפגיעות קריטית",
+                    "unsigned": "האימג' אינו חתום"
+                },
+                "blocked": {
+                    "workflowPending": "ממתין למיזוג ה-workflow של הבנייה.",
+                    "workflowEditedByHand": "ה-workflow של הבנייה נערך ידנית.",
+                    "workflowWriteFailed": "Ever Works לא הצליח לכתוב את ה-workflow של הבנייה למאגר. כלל במאגר זה דוחה את השינוי.",
+                    "actionsDisabled": "GitHub Actions כבוי עבור מאגר זה.",
+                    "missingBuildValues": "ממתין ל{count, plural, =1 {ערך בנייה אחד} other {-# ערכי בנייה}}: {names}",
+                    "runnerTooSmall": "בנייה זו צריכה {needed}, אבל ה-runner למאגרים {visibility} מאפשר {max}.",
+                    "tooManyBuildValues": "בנייה זו משתמשת ב-{count} ערכי בנייה; מותרים 50 לכל היותר.",
+                    "buildValueTooLarge": "{name} גדול מדי להעברה לבנייה (מקסימום 48 KB).",
+                    "secretLimitReached": "אין במאגר מקום לסודות נוספים.",
+                    "strategyNotSupported": "runners המתארחים ב-GitHub אינם יכולים לבנות עם האסטרטגיה \"{strategy}\". הוסף Dockerfile והגדר את build.strategy ל-dockerfile.",
+                    "specInvalid": "במפרט ה-App ב-commit זה יש שגיאות.",
+                    "gitConnectionMissing": "Ever Works אינו יכול לגשת למאגר זה דרך חיבור ה-GitHub שלך.",
+                    "repositoryUnavailable": "{repository} נמצא בארכיון, נמחק או שאינו זמין עוד לחיבור ה-GitHub שלך.",
+                    "managedConcurrencyLimit": "ממתין לבניות אחרות: לכל היותר {perWork} לכל אפליקציה ו-{perAccount} לכל חשבון רצות בו-זמנית.",
+                    "buildValueNameReserved": "{name} שמור על ידי Ever Works ולא ניתן להעביר אותו לבנייה. שנה את שם רשומת הסביבה.",
+                    "buildServicePortRequired": "שירות הבנייה {service} צריך פורט: Ever Works אינו יודע על איזה פורט \"{image}\" מאזין.",
+                    "verificationDependencyUnsupported": "אימות עדיין לא יכול להפעיל {kind}. הבדיקה רצה על האשכול במקום זאת.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "סקור את ה-pull request",
+                    "turnOnActions": "הפעל",
+                    "setValue": "הגדר",
+                    "useLargerRunner": "השתמש ב-runner גדול יותר",
+                    "openRepositorySettings": "פתח את הגדרות המאגר",
+                    "reconnectGithub": "חבר מחדש את GitHub",
+                    "rebuild": "בנה מחדש",
+                    "openEnvironment": "פתח סביבה"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "נגמר הזיכרון",
+                        "suggestion": "הגדל את build.resources.memory (כעת {memory}) או הקטן את גודל ה-heap של הבנייה. ב-runner זה בנייה יכולה להשתמש לכל היותר ב-{max}."
+                    },
+                    "diskFull": {
+                        "title": "נגמר שטח הדיסק",
+                        "suggestion": "הפעל את \"Reclaim runner disk\" בהגדרות הבנייה, או צמצם את הקשר הבנייה באמצעות קובץ .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "ה-Dockerfile נכשל בשלב {step} מתוך {total}",
+                        "suggestion": "השלב שנכשל היה: {command}. תקן אותו ב-{dockerfile} ובצע push, או בקש מסוכן לתקן אותו."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "לא ניתן היה להוריד תלויות",
+                        "suggestion": "מאגר חבילות או מאגר אימג'ים בסיסיים לא הגיב. בנה מחדש בעוד כמה דקות; אם זה ממשיך להיכשל, נעל את הגרסאות שבהן אתה תלוי."
+                    },
+                    "registryPushDenied": {
+                        "title": "לא ניתן היה לדחוף את האימג'",
+                        "suggestion": "אפשר ל-workflows במאגר זה לכתוב חבילות (Settings ▸ Actions ▸ General ▸ Workflow permissions), ואז בנה מחדש."
+                    },
+                    "missingBuildValue": {
+                        "title": "חסר ערך בנייה: {names}",
+                        "suggestion": "הגדר אותו בהגדרות ▸ סביבה, ואז בנה מחדש."
+                    },
+                    "secretInImage": {
+                        "title": "סוד היה מתפרסם בתוך האימג': {name}",
+                        "suggestion": "השתמש בערך זה רק בשלב בנייה מוקדם יותר, או העבר אותו כ-build secret mount. שום דבר לא נדחף."
+                    },
+                    "timeout": {
+                        "title": "לקח יותר מ-{minutes} דקות",
+                        "suggestion": "הגדל את build.resources.timeoutMinutes (מקסימום 180) או האץ את הבנייה באמצעות מטמון."
+                    },
+                    "workflowInvalid": {
+                        "title": "קובץ ה-workflow אינו תקין",
+                        "suggestion": "GitHub אינו יכול להריץ את ה-workflow של הבנייה. סקור את ה-pull request הפתוח מ-Ever Works כדי לשחזר אותו."
+                    },
+                    "digestMismatch": {
+                        "title": "לא ניתן היה לאשר את האימג' שנדחף",
+                        "suggestion": "ה-registry דיווח על אימג' שונה מזה של הבנייה. בנה מחדש; שום דבר שלא אושר לא ייפרס."
+                    },
+                    "verificationFailed": {
+                        "title": "האפליקציה לא עברה את בדיקות ה-smoke שלה",
+                        "suggestion": "{failed} מתוך {total} בדיקות smoke נכשלו. ראה את התוצאות למטה."
+                    },
+                    "egressBlocked": {
+                        "title": "הגישה לרשת נחסמה",
+                        "suggestion": "הבנייה ניסתה לגשת אל {hosts}, שאינם ברשימת ההיתרים של ה-builder. השג את מה שאתה צריך ממאגר המקור שלך או מ-registry מורשה, ואז בנה מחדש."
+                    },
+                    "lost": {
+                        "title": "איבדנו את המעקב אחרי בנייה זו",
+                        "suggestion": "GitHub הפסיק להגיב לגבי בנייה זו. בדוק אותה ב-GitHub."
+                    },
+                    "unknown": {
+                        "title": "משהו אחר השתבש",
+                        "suggestion": "פתח את היומנים ב-GitHub, או בקש מסוכן לבדוק."
+                    },
+                    "askAgent": "בקש מסוכן לתקן את זה",
+                    "excerptLabel": "השורות האחרונות ביומן"
+                },
+                "cancelReason": {
+                    "user": "בוטל על ידי חבר",
+                    "superseded": "הוחלף בבנייה חדשה יותר"
+                },
+                "detail": {
+                    "title": "בנייה #{number} · {sha} · {status}",
+                    "loading": "טוען פרטי בנייה…",
+                    "close": "סגור",
+                    "trigger": "טריגר",
+                    "triggeredBy": "{trigger} — על ידי {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "משך",
+                    "durationValue": "{duration} (בתור {queued})",
+                    "image": "אימג'",
+                    "tags": "תגיות",
+                    "deployable": "ניתן לפריסה",
+                    "yes": "כן",
+                    "buildValues": "ערכי בנייה",
+                    "buildValuesValue": "{count, plural, =1 {אחד סונכרן} other {# סונכרנו}}: {names}",
+                    "noBuildValues": "אין",
+                    "receipt": "קבלה",
+                    "verification": "אימות",
+                    "copy": "העתק",
+                    "copied": "הפניית האימג' הועתקה.",
+                    "copyFailed": "לא ניתן היה להעתיק את הפניית האימג'.",
+                    "viewLogs": "הצג יומנים ב-GitHub",
+                    "rebuildThisCommit": "בנה מחדש את ה-commit הזה",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} דקות runner · שולם על ידי חשבון ה-GitHub שלך",
+                    "minutesPlatform": "{minutes} דקות runner · שולם על ידי Ever Works",
+                    "checksMinutes": "{checksMinutes} מהן הריצו בדיקות App",
+                    "costUnknown": "דקות ה-runner עדיין לא דווחו"
+                },
+                "verification": {
+                    "componentsReady": "הרכיבים הופעלו",
+                    "componentsNotReady": "הרכיבים לא הופעלו",
+                    "job": "ה-Job {name} הסתיים עם קוד {exitCode}",
+                    "jobNoExit": "ה-Job {name} לא הסתיים",
+                    "smokePassed": "עבר: {name}",
+                    "smokeFailed": "נכשל: {name} — צפוי {expected}, התקבל {observed}"
+                },
+                "empty": {
+                    "noBuilds": "עדיין אין בניות. הבנייה הראשונה מתחילה כשה-workflow של הבנייה נמצא במאגר.",
+                    "unavailable": "בניות עדיין אינן זמינות במופע זה."
+                },
+                "errors": {
+                    "loadFailed": "לא ניתן היה לטעון את הבניות. נסה לרענן את הדף.",
+                    "rebuildRateLimited": "הפעלת יותר מדי בניות בשעה זו. נסה שוב בעוד {minutes, plural, =1 {דקה אחת} other {# דקות}}.",
+                    "commitNotReachable": "ה-commit הזה אינו נמצא בענף שבמעקב.",
+                    "nothingToBuild": "עבודת App זו מריצה אימג' שפורסם, כך שאין מה לבנות.",
+                    "notCancellable": "בנייה זו כבר הסתיימה, ולכן לא ניתן לבטל אותה.",
+                    "providerUnavailable": "אין ספק בנייה זמין כרגע. נסה שוב מאוחר יותר.",
+                    "startFailed": "לא ניתן היה להתחיל בנייה. נסה שוב.",
+                    "cancelFailed": "לא ניתן היה לבטל בנייה זו. נסה שוב.",
+                    "detailFailed": "לא ניתן היה לטעון בנייה זו. נסה שוב."
+                },
+                "toasts": {
+                    "started": "הבנייה נכנסה לתור.",
+                    "deduped": "בנייה עבור commit זה כבר נמצאת בתור.",
+                    "cancelled": "הבנייה בוטלה."
+                },
+                "pullToken": {
+                    "title": "הוסף pull token",
+                    "body": "אימג' זה פרטי. האשכול שלך צריך טוקן שיכול רק לקרוא חבילות כדי להוריד אותו.",
+                    "stepCreate": "1. צור טוקן classic שבו מסומן רק \"read:packages\".",
+                    "stepPaste": "2. הדבק אותו כאן.",
+                    "label": "טוקן",
+                    "submit": "בדוק ושמור",
+                    "saving": "בודק…",
+                    "tooBroad": "טוקן זה יכול לעשות יותר מקריאת חבילות. צור טוקן עם read:packages בלבד.",
+                    "fineGrained": "זהו טוקן fine-grained. צור טוקן classic שבו מסומן רק read:packages.",
+                    "cannotRead": "טוקן זה אינו יכול לקרוא את {imageRepository}.",
+                    "publicImage": "אימג' זה כבר ציבורי — אין צורך בטוקן.",
+                    "noImageYet": "עדיין אין בנייה שהסתיימה. הוסף pull token אחרי הבנייה המוצלחת הראשונה.",
+                    "savedExpires": "ה-pull token נשמר. תוקפו יפוג ב-{date}.",
+                    "savedNoExpiry": "ה-pull token נשמר. תוקפו אינו פג.",
+                    "tokenSet": "pull token שמור. הדבק טוקן חדש כדי להחליף אותו.",
+                    "expiringSoon": "תוקף ה-pull token יפוג ב-{date}. הוסף טוקן חדש לפני כן.",
+                    "viewerDisabled": "דרושה לך הרשאת עריכה כדי לעשות זאת.",
+                    "failed": "לא ניתן היה לשמור את ה-pull token. נסה שוב."
+                },
+                "overview": {
+                    "title": "הבנייה האחרונה",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "בנייה ניתנת לפריסה: ה-commit הזה",
+                    "deployableOther": "בנייה ניתנת לפריסה: {sha}",
+                    "noDeployable": "עדיין אין בנייה ניתנת לפריסה",
+                    "open": "פתח בניות"
+                }
+            },
+            "appDeploy": {
+                "title": "פריסה",
+                "notRunning": "האפליקציה הזו עדיין לא רצה בשום מקום.",
+                "runningOn": "{state} · {target}",
+                "openApp": "פתח אפליקציה",
+                "source": "מקור",
+                "buildsLink": "ראה בניות",
+                "buildsHint": "בניות ממשיכות לרוץ בלי קשר ליעד.",
+                "stale": "נבדק לאחרונה לפני {minutes, plural, =1 {דקה אחת} other {# דקות}}",
+                "status": {
+                    "notDeployed": "לא נפרס",
+                    "live": "פעיל",
+                    "degraded": "פגוע",
+                    "down": "מושבת",
+                    "unreachable": "אין גישה לאשכול שלך",
+                    "paused": "מושהה",
+                    "deleting": "מוחק…"
+                },
+                "target": {
+                    "heading": "היכן זה צריך לרוץ?",
+                    "current": "(נוכחי)",
+                    "none": {
+                        "label": "ללא — אל תפרוס עדיין",
+                        "description": "בניות ממשיכות לרוץ."
+                    },
+                    "yourCluster": {
+                        "label": "האשכול שלך",
+                        "description": "רץ על אשכול Kubernetes שבשליטתך."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "אנחנו מריצים אותה בשבילך.",
+                        "unavailable": "בקרוב — אירוח מנוהל לאפליקציות עדיין לא נפתח.",
+                        "ineligible": "עדיין לא זמין עבור אפליקציה זו."
+                    },
+                    "connect": "חבר את האשכול שלך",
+                    "reconnect": "שנה את חיבור האשכול",
+                    "connected": "מחובר · {version}",
+                    "connectedNoVersion": "מחובר",
+                    "checkFailed": "בדיקת האשכול האחרונה נכשלה.",
+                    "notChecked": "עדיין לא חובר אשכול.",
+                    "save": "השתמש ביעד זה",
+                    "saving": "שומר…",
+                    "saved": "היעד נשמר.",
+                    "saveFailed": "לא ניתן היה לשמור את היעד: {reason}",
+                    "changeNote": "שינוי היעד אינו מסיר שום דבר שכבר רץ.",
+                    "routeUnavailable": "שינוי היעד עדיין אינו זמין במופע זה."
+                },
+                "connect": {
+                    "title": "חבר את האשכול שלך",
+                    "description": "הדבק kubeconfig עבור service account באשכול שעליו האפליקציה צריכה לרוץ.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "הדבק את ה-kubeconfig שלך…",
+                    "kubeconfigHelp": "השתמש בטוקן של service account. פקודות, קבצים מקומיים ו-proxies אינם נתמכים.",
+                    "kubeconfigStored": "ה-kubeconfig שלך נשלח פעם אחת ונשמר מוצפן. הדבק חדש כדי להחליף אותו, או בדוק שוב את השמור.",
+                    "contextLabel": "Context (אופציונלי)",
+                    "contextHelp": "השאר ריק כדי להשתמש ב-context הנוכחי של ה-kubeconfig.",
+                    "check": "בדוק חיבור",
+                    "checking": "בודק…",
+                    "checkAgain": "בדוק שוב",
+                    "checkTimedOut": "הבדיקה לא הסתיימה תוך 30 שניות. נסה שוב.",
+                    "checkFailed": "לא ניתן היה לבדוק את החיבור: {reason}",
+                    "unavailable": "חיבור אשכול עדיין אינו זמין במופע זה.",
+                    "kubeconfigTooLarge": "ה-kubeconfig הזה גדול מ-64 KiB.",
+                    "kubeconfigRequired": "הדבק קודם kubeconfig.",
+                    "ingressClass": "Ingress class",
+                    "ingressDefault": "{name} (ברירת מחדל)",
+                    "ingressNone": "לא נמצאה ingress class",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "תעודות מה-issuer",
+                        "external": "מטופל מחוץ לאשכול",
+                        "edge": "מסתיים ב-edge",
+                        "none": "ללא TLS (http בלבד)"
+                    },
+                    "issuer": "מנפיק",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "נבחר כשהאפליקציה נפרסת לראשונה",
+                    "isolation": "בידוד רשת",
+                    "isolationOn": "מופעל (מומלץ)",
+                    "isolationOff": "כבוי",
+                    "isolationOffWarning": "ללא בידוד רשת, עומסי עבודה אחרים באשכול יכולים לגשת לאפליקציה הזו ולמסדי הנתונים שלה.",
+                    "cancel": "ביטול",
+                    "save": "שמור",
+                    "saving": "שומר…",
+                    "saveBlocked": "השמירה תהיה זמינה לאחר שהבדיקה תעבור עם כל ההרשאות הנדרשות.",
+                    "saved": "האשכול חובר.",
+                    "saveFailed": "לא ניתן היה לשמור את חיבור האשכול: {reason}"
+                },
+                "check": {
+                    "ok": "מחובר",
+                    "version": "Kubernetes {version}",
+                    "failed": "בדיקת האשכול נכשלה.",
+                    "kubeconfigRefused": "ה-kubeconfig הזה {reason}. השתמש בטוקן של service account במקום זאת.",
+                    "notPublic": "Ever Works יכול לגשת רק לאשכולות בכתובת ציבורית.",
+                    "permissions": "הרשאות",
+                    "allPermissions": "כל ההרשאות הנדרשות קיימות.",
+                    "missing": "חסר: {verb} {resource}",
+                    "optionalMissing": "אופציונלי, חסר: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "פרוס עכשיו",
+                    "deploying": "שולח בקשה…",
+                    "started": "הפריסה התחילה.",
+                    "queued": "בתור — היא תתחיל כשהפריסה הנוכחית תסתיים.",
+                    "deduplicated": "הפריסה הזו כבר התבקשה.",
+                    "inProgress": "פריסה אחרת רצה ({id}). המתן לסיומה, ואז פרוס שוב.",
+                    "preconditionsHeader": "תקן את אלה לפני הפריסה:",
+                    "workerNotIsolated": "פריסות עדיין לא יכולות להתחיל: למופע זה אין worker מבודד לאשכול App.",
+                    "notAppWork": "עבודה זו אינה עבודת App, ולכן לא ניתן לפרוס אותה בדרך זו.",
+                    "failed": "לא ניתן היה לבקש את הפריסה: {reason}",
+                    "targetNone": "בחר קודם היכן האפליקציה צריכה לרוץ — \"ללא\" אינו פורס שום דבר.",
+                    "deploymentId": "פריסה {id}",
+                    "warningsHeader": "אזהרות"
+                },
+                "preconditions": {
+                    "specInvalid": "במפרט ה-App (.works/works.yml) יש שגיאות. תקן אותן בדף מפרט ה-App.",
+                    "licenseBlocksTarget": "רישיון האפליקציה אינו מאפשר לארח אותה ביעד זה.",
+                    "licenseAttestationMissing": "אשר את רישיון האפליקציה לפני שתפרוס אותה.",
+                    "envRequiredUnset": "חלק מערכי ה-env הנדרשים עדיין לא הוגדרו.",
+                    "dependencyNotReady": "תלות שהאפליקציה צריכה עדיין לא מוכנה.",
+                    "noGreenBuild": "עדיין אין בנייה מוצלחת לפריסה. התחל קודם בנייה.",
+                    "noGreenBuildForHead": "ה-commit האחרון בענף הפריסה עדיין לא נבנה בהצלחה.",
+                    "buildImageMissing": "לבנייה אין אימג' לפריסה.",
+                    "nothingToDeploy": "עדיין אין מה לפרוס: אין בנייה ואין אימג' שפורסם.",
+                    "imageNotPinned": "האימג' הזה מוזכר לפי תגית. נעל אותו לפי digest כדי שכל פריסה תריץ את אותו אימג'.",
+                    "imageNotFound": "לא ניתן למצוא את האימג' ב-registry שלו.",
+                    "imagePrivateUnsupported": "לא ניתן להוריד אימג' זה בלי פרטי גישה. Ever Works פורס אימג'ים שפורסמו רק כשהם ציבוריים.",
+                    "imageUnresolvable": "לא ניתן היה לפענח את הפניית האימג'.",
+                    "primaryDomainMissing": "הדומיין הראשי עדיין לא הוגדר.",
+                    "targetNone": "בחר קודם היכן האפליקציה צריכה לרוץ.",
+                    "targetNotChecked": "בדוק קודם את חיבור האשכול.",
+                    "clusterChangedUnconfirmed": "האשכול השתנה מאז הפריסה האחרונה. אשר את השינוי כדי לפרוס.",
+                    "managedDisabled": "בקרוב — אירוח מנוהל לאפליקציות עדיין לא נפתח.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps מריץ רק אפליקציות מ-Blueprint מאומת.",
+                    "quotaExceeded": "הגעת למספר האפליקציות שאתה יכול להריץ ב-Ever Works Apps.",
+                    "managedIneligible": "אפליקציה זו אינה יכולה לרוץ ב-Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps אינו יכול לקבל אפליקציות חדשות כרגע.",
+                    "appWorkDeleting": "עבודת App זו נמצאת בתהליך מחיקה.",
+                    "paused": "האפליקציה מושהית. חדש אותה כדי לפרוס.",
+                    "deployInProgress": "פריסה אחרת רצה.",
+                    "cronAuthEnvUnset": "קריאה מתוזמנת צריכה ערך אימות שלא הוגדר.",
+                    "jobAuthEnvUnset": "Job צריך ערך אימות שלא הוגדר.",
+                    "volumeReplicas": "רכיב עם volume יכול להריץ רק רפליקה אחת.",
+                    "volumeShrink": "לא ניתן להקטין volume.",
+                    "privilegedPort": "רכיב מאזין על פורט מתחת ל-1024.",
+                    "cronTooFrequent": "קריאה מתוזמנת רצה בתדירות גבוהה מהמותר.",
+                    "managedRootForbidden": "אימג' זה רץ כ-root.",
+                    "imageUserUnverifiable": "Ever Works לא הצליח לבדוק באיזה משתמש האימג' רץ.",
+                    "workerNotIsolated": "פריסות עדיין לא יכולות להתחיל: למופע זה אין worker מבודד לאשכול App.",
+                    "envSourceUnavailable": "לא ניתן לקרוא כרגע את ערכי ה-env של האפליקציה.",
+                    "pullCredentialUnavailable": "פרטי הגישה למשיכת האימג' אינם זמינים.",
+                    "namespaceForeign": "ה-namespace הזה כבר שייך למשהו אחר באשכול.",
+                    "verificationNamespaceForbidden": "ה-namespace הזה שמור להרצות אימות."
+                },
+                "license": {
+                    "loading": "קורא את הרישיון…",
+                    "unavailable": "פרטי הרישיון עדיין אינם זמינים במופע זה.",
+                    "error": "לא ניתן היה לקרוא את הרישיון. טען מחדש את הדף כדי לנסות שוב.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "לא נמצא רישיון שאנחנו מזהים.",
+                    "classes": {
+                        "green": "אירוח מותר",
+                        "amber": "האשכול שלך, לאחר שתאשר את תנאי הרישיון",
+                        "red": "האשכול שלך בלבד, לאחר שתאשר את תנאי הרישיון",
+                        "unknown": "רישיון לא ידוע — אשר את התנאים לפני הפריסה",
+                        "unclassified": "עדיין לא סווג"
+                    },
+                    "mixed": "חלקים ממאגר זה משתמשים ברישיון אחר.",
+                    "incomplete": "מאגר זה גדול מכדי לסרוק אותו במלואו.",
+                    "yourClusterAllowed": "האשכול שלך: מותר",
+                    "yourClusterAfterConfirm": "האשכול שלך: מותר לאחר שתאשר את תנאי הרישיון",
+                    "review": "סקור ואשר",
+                    "confirmed": "אושר ב-{date}.",
+                    "disclaimer": "זוהי קריאה אוטומטית של קובצי הרישיון של המאגר, ולא ייעוץ משפטי.",
+                    "unknownSpdx": "הרישיון של תוכנה זו",
+                    "dialogTitle": "אשר את תנאי הרישיון",
+                    "dialogBody": "{spdx} מגביל את האופן שבו מותר לארח תוכנה זו. Ever Works Apps אינו זמין עבורה. כדי להריץ אותה על האשכול שלך, אשר:",
+                    "noText": "במאגר הרישיונות אין הצהרה עבור רישיון זה.",
+                    "checkbox": "אני מאשר את ההצהרה שלמעלה.",
+                    "footer": "אנחנו מתעדים מי אישר, מתי, ועבור איזה רישיון ו-commit.",
+                    "cancel": "ביטול",
+                    "confirm": "אשר",
+                    "refusals": {
+                        "ownerOnly": "רק הבעלים של עבודת ה-App יכול לאשר.",
+                        "licenseChanged": "הרישיון השתנה בזמן שסקרת אותו. סקור את התנאים החדשים ואשר שוב.",
+                        "attestationNotRequired": "רישיון זה כבר אינו דורש אישור.",
+                        "licenseUnavailable": "אישור רישיון עדיין אינו זמין במופע זה.",
+                        "route_unavailable": "אישור רישיון עדיין אינו זמין במופע זה.",
+                        "failed": "לא ניתן היה לתעד את האישור. נסה שוב."
+                    }
+                },
+                "rollback": {
+                    "button": "חזרה לאחור",
+                    "title": "חזרה לפריסה קודמת",
+                    "description": "בחרו פריסה שכבר הייתה פעילה. האימג׳ ומפרט האפליקציה שלה ירוצו שוב; שום דבר לא נבנה מחדש.",
+                    "pickLabel": "הפריסה לחזור אליה",
+                    "liveAt": "פעילה מאז {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "הייתה פעילה בעבר",
+                    "none": "אין פריסה פעילה קודמת לחזור אליה.",
+                    "runJobs": "להריץ שוב את משימות טרום הפריסה",
+                    "confirm": "חזרה לאחור",
+                    "cancel": "ביטול",
+                    "started": "החזרה לאחור התחילה.",
+                    "failed": "לא ניתן היה להתחיל את החזרה לאחור: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "השהיה",
+                    "resume": "המשך",
+                    "remove": "הסרה מהאשכול",
+                    "removeTitle": "הסרת האפליקציה הזו מהאשכול שלה",
+                    "removeDescription": "האפליקציה הפועלת נעצרת ואובייקטי ה-Kubernetes שלה נמחקים. עבודת האפליקציה וה-Builds שלה נשארים.",
+                    "deleteData": "למחוק גם את הנתונים השמורים (אחסון ומסדי נתונים של התלויות)",
+                    "deleteDataWarning": "לא ניתן לבטל פעולה זו.",
+                    "confirmSlugLabel": "הקלידו {slug} לאישור",
+                    "confirmRemove": "הסרה",
+                    "cancel": "ביטול",
+                    "failed": "לא ניתן היה לבצע זאת: {reason}",
+                    "slugMismatch": "המזהה שהקלדתם אינו תואם לעבודת האפליקציה הזו.",
+                    "accepted": {
+                        "pause": "התבקשה השהיה.",
+                        "resume": "התבקש המשך.",
+                        "remove": "התבקשה הסרה.",
+                        "cancelDeploy": "התבקש ביטול."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "שמות מתחילים באות או בקו תחתון ומשתמשים רק ב-A–Z, 0–9 ו-_.",
+                    "reservedName": "שמות שמתחילים ב-EVER_WORKS_ שמורים לפלטפורמה.",
+                    "valueTooLarge": "ערך יכול להיות לכל היותר 65,536 בתים.",
+                    "controlCharacter": "ערכים אינם יכולים להכיל תו NUL.",
+                    "lengthMismatch": "חייב להיות בדיוק {expected} תווים — זה {actual}.",
+                    "tooShort": "חייב להיות לפחות {min} תווים.",
+                    "tooLong": "חייב להיות לכל היותר {max} תווים.",
+                    "patternMismatch": "זה אינו תואם לתבנית שהאפליקציה הזו מבקשת.",
+                    "generatedValueUseRotate": "ערך זה נוצר אוטומטית. בצע רוטציה כדי להחליף אותו.",
+                    "neverRotateNotAcknowledged": "האפליקציה הזו מציינת שערך זה לעולם אינו אמור להשתנות. אשר שאתה מבין זאת לפני ביצוע רוטציה.",
+                    "rotateConfirmationMismatch": "השם שהקלדת אינו תואם לשם של ערך זה.",
+                    "secureStorageUnavailable": "אחסון מאובטח אינו מוגדר בהתקנה זו, ולכן לא ניתן לשמור ערכים.",
+                    "tooManyValues": "אפליקציה יכולה להחזיק לכל היותר 300 ערכים.",
+                    "valuesTooLarge": "סך הערכים של אפליקציה יכול להיות לכל היותר 1 MiB.",
+                    "malformedLine": "אינה שורת NAME=value תקינה.",
+                    "rotateRateLimited": "יותר מדי רוטציות. נסה שוב מאוחר יותר."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "ממתין",
+                    "awaitingConfig": "דורש את ההגדרות שלך",
+                    "provisioning": "בהקצאה",
+                    "ready": "מוכן",
+                    "degraded": "פגוע",
+                    "failed": "נכשל",
+                    "kept": "נשמר — כבר אינו מנוהל",
+                    "deleting": "נמחק",
+                    "deleted": "נמחק",
+                    "notInSpec": "כבר אינו בשימוש במפרט ה-App — הנתונים נשמרו"
+                },
+                "backup": {
+                    "none": "אין גיבויים אוטומטיים. אם ה-volume הזה יאבד, הנתונים ייעלמו.",
+                    "notConfigured": "גיבויים: לא הוגדרו",
+                    "healthy": "גיבויים: האחרון הושלם {time}",
+                    "overdue": "גיבויים: באיחור — האחרון הושלם {time}",
+                    "failing": "גיבויים: הניסיון האחרון נכשל",
+                    "external": "גיבויים: מנוהלים על ידי ספק ה-{kind} שלך",
+                    "unknown": "גיבויים: לא ניתן היה לבדוק"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "לאשכול שלך אין storage class ברירת מחדל. בחר אחד בהגדרות התלויות.",
+                    "clusterUnreachable": "לא ניתן היה לגשת לאשכול שלך.",
+                    "smtpConnectFailed": "לא ניתן היה להתחבר לשרת הדואר.",
+                    "smtpTlsFailed": "לחיצת היד של TLS מול שרת הדואר נכשלה.",
+                    "smtpAuthRefused": "השרת דחה את ההתחברות.",
+                    "bucketUnreadable": "ה-bucket {bucket} אינו קיים או שלא ניתן לקרוא אותו.",
+                    "volumeNotReady": "ה-volume לא הפך למוכן תוך {minutes} דקות.",
+                    "extensionUnavailable": "הרחבות לא זמינות: {names}.",
+                    "platformServerRefused": "שרת זה מחזיק נתונים של פלטפורמת Ever Works. בחר שרת אחר.",
+                    "deadlineExceeded": "ההקצאה לא הסתיימה בזמן.",
+                    "namespaceNotOwned": "ה-namespace הזה שייך לאפליקציה אחרת. בחר אחד אחר.",
+                    "namespaceBaselineMissing": "ל-namespace חסרות מגבלות ומדיניות הבסיס שלו.",
+                    "clusterPermissionMissing": "ל-Ever Works אין הרשאה ליצור תלות זו באשכול שלך.",
+                    "operatorNamespaceUnknown": "ה-namespace של ה-operator אינו מוגדר בהגדרות התלויות.",
+                    "volumeExpansionUnsupported": "ה-storage class {storageClass} אינו יכול להגדיל את ה-volume הזה.",
+                    "sizeShrinkRefused": "לא ניתן להקטין את האחסון של תלות. מחק קודם את הנתונים שלה אם אתה צריך אחסון קטן יותר.",
+                    "relayIneligible": "אפליקציה זו אינה יכולה להשתמש בממסר הדואר של Ever Works.",
+                    "relaySuspended": "ממסר הדואר של Ever Works מושעה.",
+                    "providerNotSupported": "ספק זה אינו יכול לספק תלות זו.",
+                    "dependencyNotDeclared": "מפרט ה-App אינו מצהיר על תלות זו.",
+                    "confirmationMismatch": "השם שהקלדת אינו תואם.",
+                    "deleteInProgress": "הנתונים של תלות זו כבר נמצאים בתהליך מחיקה.",
+                    "notGenerated": "ערך זה אינו נוצר אוטומטית, ולכן אין מה לבצע לו רוטציה.",
+                    "notAppWork": "עבודה זו אינה אפליקציה.",
+                    "targetNone": "אפליקציה זו עדיין אינה מוגדרת לפריסה בשום מקום. בחר יעד פריסה כדי להקצות את התלויות שלה.",
+                    "targetNotChecked": "האשכול שלך עדיין לא עבר את הבדיקה שלו. בדוק את החיבור, ואז נסה שוב."
+                }
             }
         },
         "newPage": {
@@ -6894,7 +7514,8 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
                 "repo": "מאגר",
-                "company": "Company"
+                "company": "Company",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6907,7 +7528,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "מאגר קוד קיים כ-Work — משימות, יעדים והרצות צי מצטרפים אליו. שום דבר לא נוצר או נפרס.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "הרץ ופתח כל מאגר GitHub — קשר אותו או צור לו Fork, ואז בחר היכן הוא ירוץ."
             },
             "submit": "Create",
             "submitTitle": "צור",
@@ -6952,7 +7574,8 @@
                 "blog": "בלוג",
                 "directory": "מדריך",
                 "awesome-repo": "מאגר מצוין",
-                "repo": "מאגר"
+                "repo": "מאגר",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "אתר רב-עמוד לעסק, שירות או מותג — תוכן וקוד שנוצרו.",
@@ -6960,7 +7583,8 @@
                 "blog": "בלוג עם קטגוריות, RSS, הדגשת קוד, ותוכן מוכן ל-SEO.",
                 "directory": "אתר מדריך מוקטלג עם חיפוש, מסננים, ונתוני פריטים מסודרים.",
                 "awesome-repo": "מאגר רשימה מצוינת — אינדקס markdown, קישורים מקוטלגים, ומטא-נתונים ניתנים לרענון.",
-                "repo": "מאגר קוד קיים כ-Work — משימות, יעדים והרצות צי מצטרפים אליו. שום דבר לא נוצר או נפרס."
+                "repo": "מאגר קוד קיים כ-Work — משימות, יעדים והרצות צי מצטרפים אליו. שום דבר לא נוצר או נפרס.",
+                "app": "הרץ ופתח כל מאגר GitHub — קשר אותו או צור לו Fork, ואז בחר היכן הוא ירוץ."
             },
             "promptHints": {
                 "minLength": "הוסף תיאור (לפחות 10 תווים) כדי להתחיל.",
@@ -7365,6 +7989,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "לדוגמה \"https://github.com/owner/repo — אפליקציית קוד פתוח שאתה רוצה עותק משלך שלה\"",
+                "formTitle": "עבודת App חדשה",
+                "formSubtitle": "התחל מכל מאגר GitHub. Ever Works מקשר אותו או יוצר עותק משלך, ואז עוזר לך להריץ אותו ולהמשיך לשנות אותו.",
+                "urlLabel": "כתובת URL של המאגר",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "כל מאגר GitHub שהחשבון המחובר שלך יכול לקרוא.",
+                "checkButton": "בדוק מאגר",
+                "checking": "בודק…",
+                "tabPaste": "הדבק כתובת URL",
+                "tabCatalog": "עיין בקטלוג ה-Apps",
+                "catalogComingSoon": "קטלוג ה-Apps ייפתח כאן בקרוב. בינתיים, הדבק כתובת URL של מאגר.",
+                "stars": "{count, plural, =1 {כוכב אחד} other {# כוכבים}}",
+                "defaultBranch": "ענף ברירת מחדל: {branch}",
+                "largeRepository": "מאגר גדול ({size})",
+                "moved": "הועבר אל {fullName}",
+                "isFork": "מאגר זה הוא Fork של {parent}.",
+                "ownFork": "זה ה-Fork שלך של {parent}. Ever Works יעקוב אחרי {parent} כ-upstream.",
+                "publicForkNote": "Forks של מאגרים ציבוריים הם ציבוריים.",
+                "archivedNote": "מאגר זה בארכיון. הסנכרון מול ה-upstream נשאר כבוי.",
+                "licenseChip": "רישיון: {spdx}",
+                "licenseNotDetected": "רישיון: לא זוהה",
+                "licenseClass": {
+                    "green": "אירוח מותר",
+                    "amber": "האשכול שלך, לאחר שתאשר את הרישיון",
+                    "red": "האשכול שלך, לאחר שתאשר את הרישיון",
+                    "unknown": "רישיון לא ידוע — תאשר אותו לפני הפריסה"
+                },
+                "blueprintBadge": {
+                    "verified": "Blueprint מאומת",
+                    "available": "Blueprint זמין",
+                    "none": "אין Blueprint — סוכן יברר כיצד להריץ אותו",
+                    "unavailable": "בדיקת ה-Blueprint אינה זמינה"
+                },
+                "existingAppWork": "כבר יש לך עבודת App עבור מאגר זה: {name}.",
+                "openExistingAppWork": "פתח אותה",
+                "scanIncomplete": "לא כל החשבונות נבדקו לאיתור Fork קיים.",
+                "modesTitle": "כיצד Ever Works ישתמש במאגר זה?",
+                "modes": {
+                    "link": {
+                        "title": "קישור",
+                        "titleOwnFork": "קישור — ללא מעקב אחרי ה-upstream",
+                        "description": "השתמש במאגר זה כמו שהוא. יש לך הרשאת push אליו, כך שהשינויים נכנסים לכאן ישירות."
+                    },
+                    "fork": {
+                        "title": "Fork",
+                        "description": "צור Fork משלך. תוכל לסנכרן אותו מול ה-upstream ולהציע שינויים בחזרה."
+                    },
+                    "private-copy": {
+                        "title": "עותק פרטי",
+                        "description": "צור מאגר פרטי עם אותו קוד."
+                    }
+                },
+                "unavailable": "לא זמין: {reason}",
+                "forkInto": "צור Fork בתוך",
+                "copyInto": "העתק אל",
+                "ownerFilter": "חפש חשבונות",
+                "ownerOrganization": "ארגון",
+                "ownerNotChecked": "לא נבדק לאיתור Fork קיים",
+                "existingFork": "כבר יש לך Fork: {fullName}. Ever Works ישתמש בו.",
+                "privateCopyTradeOff": "עותק פרטי אינו מקושר למקור ב-GitHub, ולכן אינו יכול לפתוח pull requests לפרויקט המקורי. שינויים מה-upstream מגיעים כ-pull requests בעותק שלך.",
+                "linkSetupNote": "Ever Works פותח pull request שמוסיף קובץ אחד, .works/works.yml. מזג אותו כדי לסיים.",
+                "existingForkSetupNote": "Ever Works לא יצר את ה-Fork הזה, ולכן הוא פותח pull request שמוסיף את .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works פותח pull request שמוסיף את .works/works.yml ואת קובצי ה-Blueprint. מזג אותו כדי לסיים.",
+                "existingForkSetupNoteBlueprint": "Ever Works לא יצר את ה-Fork הזה, ולכן הוא פותח pull request שמוסיף את .works/works.yml ואת קובצי ה-Blueprint.",
+                "promptsTitle": "ערכים שהאפליקציה הזו צריכה",
+                "promptHint": "ה-Blueprint {name} מבקש את הערכים האלה. תוכל לשנות אותם מאוחר יותר בהגדרות.",
+                "promptRequired": "חובה",
+                "promptsIncomplete": "מלא קודם את הערכים שהאפליקציה צריכה.",
+                "autoProvision": "תן לסוכן לברר כיצד להריץ אותה",
+                "autoProvisionHelp": "מתחיל כשהמאגר מוכן. הוא צורך טוקנים של AI ודקות של build runner, בגבולות מכסות ההקצאה. תוכל לבטל אותו, או לבטל את הסימון ולהפעיל אותו מאוחר יותר מהסקירה הכללית באמצעות הקצאה.",
+                "deployTargetTitle": "היכן זה צריך לרוץ?",
+                "deployTargets": {
+                    "none": {
+                        "title": "ללא — אל תפרוס עדיין",
+                        "description": "תוכל לבחור יעד מאוחר יותר."
+                    },
+                    "your-cluster": {
+                        "title": "האשכול שלך",
+                        "description": "הרץ אותה על אשכול Kubernetes משלך. תוסיף את החיבור בלשונית הפריסה."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "בקרוב — אירוח מנוהל לאפליקציות עדיין לא נפתח."
+                    }
+                },
+                "submit": {
+                    "link": "קשר וצור עבודת App",
+                    "fork": "צור Fork ועבודת App",
+                    "private-copy": "העתק וצור עבודת App"
+                },
+                "submitPending": "יוצר…",
+                "nameLabel": "שם",
+                "slugLabel": "Slug",
+                "descriptionLabel": "תיאור",
+                "slugHelp": "מזהה ידידותי ל-URL. נגזר משם המאגר — ערוך כדי לעקוף.",
+                "invalidSlug": "השתמש באותיות קטנות, ספרות ומקפים בלבד, לדוגמה tasks-app",
+                "cancel": "ביטול",
+                "createFailed": "לא ניתן היה ליצור את עבודת ה-App. נסה שוב.",
+                "success": {
+                    "link": "עבודת ה-App נוצרה.",
+                    "fork": "ה-Fork התבקש — נודיע לך כשהוא יהיה מוכן.",
+                    "private-copy": "ההעתקה התחילה — נודיע לך כשהיא תהיה מוכנה."
+                },
+                "reasons": {
+                    "invalid_url": "הזן כתובת URL של מאגר GitHub, כמו https://github.com/owner/repo",
+                    "provider_not_connected": "חבר את GitHub כדי ליצור עבודת App.",
+                    "insufficient_scope": "חבר מחדש את GitHub כדי להעניק גישה למאגרים.",
+                    "not_found": "לא הצלחנו למצוא את המאגר הזה, או שחשבון ה-GitHub שלך אינו יכול לקרוא אותו.",
+                    "sso_authorization_required": "{owner} דורש שתאשר את Ever Works עבור הארגון שלו ב-GitHub.",
+                    "oauth_app_restricted": "{owner} מגביל גישה של צד שלישי. בקש מבעלים של {owner} לאשר את Ever Works, או בחר חשבון אחר.",
+                    "empty_repository": "אין עדיין commits במאגר זה.",
+                    "no_push_access": "אין לך הרשאת push למאגר זה.",
+                    "archived": "מאגרים בארכיון הם לקריאה בלבד.",
+                    "forking_disabled": "הבעלים של מאגר זה אינו מאפשר Forks או עותקים.",
+                    "own_repository": "המאגר הזה בבעלותך — קשר אותו במקום זאת.",
+                    "target_owner_unavailable": "חשבון זה אינו זמין בחיבור ה-GitHub שלך.",
+                    "target_owner_forbidden": "אינך יכול ליצור מאגרים ב-{owner}.",
+                    "too_large_for_private_copy": "גדול מדי לעותק פרטי ({size}). צור לו Fork במקום זאת.",
+                    "uses_lfs": "משתמש ב-Git LFS, שעותק פרטי אינו יכול להעביר. צור לו Fork במקום זאת.",
+                    "copy_name_unavailable": "ל-{owner} כבר יש מאגרים בשמות {name} עד {name}-copy-5.",
+                    "in_use_by_another_account": "חשבון אחר כבר משתמש במאגר זה ב-Ever Works. בקש מהבעלים שלו להוסיף אותך כחבר.",
+                    "app_work_exists": "כבר יש לך עבודת App עבור {fullName}: {workName}.",
+                    "create_in_progress": "עבודת App זו כבר נמצאת בתהליך יצירה.",
+                    "rate_limited": "GitHub מגביל את קצב הבקשות של החשבון שלך. נסה שוב ב-{time}.",
+                    "managed_hosting_unavailable": "בקרוב — אירוח מנוהל לאפליקציות עדיין לא נפתח.",
+                    "cluster_target_unavailable": "לא מותקנת אפשרות פריסה שיכולה להריץ אפליקציות.",
+                    "app_works_disabled": "עבודות App אינן זמינות במופע זה.",
+                    "blueprint_mismatch": "ה-Blueprint של מאגר זה השתנה. בדוק את המאגר שוב."
+                },
+                "catalog": {
+                    "searchLabel": "חפש בקטלוג ה-Apps",
+                    "searchPlaceholder": "חפש אפליקציות — לדוגמה umami או calendar",
+                    "listLabel": "Blueprints של אפליקציות",
+                    "loading": "טוען את קטלוג ה-Apps…",
+                    "unavailable": "קטלוג ה-Apps אינו זמין כרגע. הדבק כתובת URL של מאגר במקום זאת.",
+                    "disabled": "עבודות App אינן זמינות במופע זה.",
+                    "error": "לא ניתן היה לטעון את קטלוג ה-Apps. נסה שוב, או הדבק כתובת URL של מאגר.",
+                    "empty": "עדיין לא פורסמו Blueprints של אפליקציות. הדבק כתובת URL של מאגר במקום זאת.",
+                    "noMatches": "אין אפליקציות שתואמות לחיפוש שלך.",
+                    "pick": "התחל מ-{name}",
+                    "statusBeta": "בטא",
+                    "statusPlaceholder": "בקרוב",
+                    "verified": "מאומת",
+                    "upstreamLine": "מתוך {repo}",
+                    "runsOn": "רץ על: {targets}",
+                    "targetYourCluster": "האשכול שלך",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "עדיין לא זמין",
+                    "fallbackNote": "מוצגים Blueprints של אפליקציות שנמצאו ב-GitHub — הקטלוג המאוצר אינו זמין כרגע."
+                }
             }
         },
         "gitProvider": {
@@ -9266,6 +10042,13 @@
                 "started": "ייבוא התחיל בהצלחה",
                 "failed": "נכשל בייבוא עבודה",
                 "fetchReposFailed": "נכשל בקבלת מאגרים"
+            },
+            "app": {
+                "repositoryUrlRequired": "הזן כתובת URL של מאגר GitHub, כמו https://github.com/owner/repo",
+                "repositoryModeRequired": "בחר כיצד להשתמש במאגר זה: קישור, Fork או עותק פרטי.",
+                "targetOwnerRequired": "בחר את החשבון שבו ייווצר המאגר.",
+                "invalidUrl": "הזן כתובת URL של מאגר GitHub, כמו https://github.com/owner/repo",
+                "inspectFailed": "לא ניתן היה לבדוק את המאגר הזה. נסה שוב."
             }
         },
         "generator": {

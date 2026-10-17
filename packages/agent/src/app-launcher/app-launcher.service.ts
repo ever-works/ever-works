@@ -19,6 +19,7 @@ import {
     type AppLauncherWorkChip,
 } from '@ever-works/contracts';
 import { APPS_TIER_POLICY, type AppsTierPolicy } from '../app-runtime/ports';
+import { config } from '../config';
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
 import type { Work } from '../entities/work.entity';
 import { DeploymentEnvironment, type WorkDeployment } from '../entities/work-deployment.entity';
@@ -914,14 +915,15 @@ export class AppLauncherService {
      * FR-64's `meta.appWorksAvailable` — the App Works gate R-6 names, from
      * `process.env` until APW-01's accessor lands (plan §4.1).
      *
-     * Fail-closed (`false` unless the value is a truthy flag) and read with the
-     * same accepted spellings as the launcher's own install switch, so the empty
-     * state the panel offers and the API that serves it cannot disagree about
-     * whether App Works are available.
+     * Fail-closed, and read through the SAME accessor the App Works API uses
+     * (exactly `'true'`), so the empty state the panel offers and the API that
+     * would serve it cannot disagree about whether App Works are available.
      */
     private appWorksAvailable(): boolean {
-        const value = process.env.EVER_WORKS_APP_WORKS_ENABLED?.trim().toLowerCase();
-        return value === 'true' || value === '1' || value === 'yes';
+        // The ONE App Works switch (`config.everWorks.apps.worksEnabled()`, exactly
+        // `'true'`). Reading `'1'` / `'yes'` here as well made the launcher offer
+        // "create an App Work" on an instance whose API refuses to create one.
+        return config.everWorks.apps.worksEnabled();
     }
 
     /** Plan §4.6:522 — FR-32's localhost exception exists outside production only. */

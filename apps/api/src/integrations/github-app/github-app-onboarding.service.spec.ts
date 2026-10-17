@@ -5,12 +5,29 @@ import {
     UnauthorizedException,
 } from '@nestjs/common';
 import { AxiosError } from 'axios';
+import { createHash } from 'node:crypto';
 import { of, throwError } from 'rxjs';
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
 import { GitHubAppService } from './github-app.service';
 
 jest.mock('@ever-works/agent/database', () => ({}));
-jest.mock('@ever-works/agent/entities', () => ({}));
+jest.mock('@ever-works/agent/entities', () => ({
+    ActivityActionType: { PROVIDER_CONNECTED: 'provider_connected' },
+    ActivityStatus: { COMPLETED: 'completed' },
+}));
+jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));
+
+/** Item 13 — the browser-binding nonce the initiating browser's cookie holds. */
+const BINDING = 'browser-binding-nonce';
+const TX_MANAGER = { tx: true };
+
+/** A state signed the way `beginSetup` signs it: bound to {@link BINDING}. */
+function signBound(service: unknown, payload: Record<string, unknown>): string {
+    return (service as { signState(p: Record<string, unknown>): string }).signState({
+        binding: createHash('sha256').update(BINDING, 'utf8').digest('base64url'),
+        ...payload,
+    });
+}
 
 describe('GitHubAppOnboardingService', () => {
     beforeAll(() => {
@@ -37,6 +54,12 @@ describe('GitHubAppOnboardingService', () => {
             findByInstallationId: jest.fn(),
             claimOwnershipIfUnassigned: jest.fn(),
             upsertFromGithub: jest.fn(),
+            // Item 13: the claim runs in one transaction; the doubles hand
+            // themselves back as the transaction-bound copies.
+            transaction: jest.fn(async (work: (manager: unknown) => Promise<unknown>) =>
+                work(TX_MANAGER),
+            ),
+            withManager: jest.fn(),
         };
         const userLinkRepository = {
             findByGithubUserId: jest.fn(),
@@ -65,6 +88,19 @@ describe('GitHubAppOnboardingService', () => {
             suggest: jest.fn(),
         };
 
+        const activityLog = {
+            log: jest.fn().mockResolvedValue({}),
+        };
+
+        for (const repo of [
+            installationRepository,
+            userLinkRepository,
+            authAccountRepository,
+            userRepository,
+        ] as Array<{ withManager?: jest.Mock }>) {
+            repo.withManager = jest.fn(() => repo);
+        }
+
         const service = new GitHubAppOnboardingService(
             gitHubAppService as any,
             installationRepository as any,
@@ -72,6 +108,7 @@ describe('GitHubAppOnboardingService', () => {
             authAccountRepository as any,
             userRepository as any,
             usernameAllocator as any,
+            activityLog as any,
         );
 
         return {
@@ -82,8 +119,213 @@ describe('GitHubAppOnboardingService', () => {
             authAccountRepository,
             userRepository,
             usernameAllocator,
+            activityLog,
         };
     };
+
+    // Prod 2026-10-17 — App installs made straight from github.com never pass
+    // through the setup URL, so the row the verified `installation.created`
+    // webhook recorded stayed unclaimed (createdByUserId NULL) and invisible to
+    // its owner. The verified webhook path now claims it — for the RECORDED
+    // installer only, resolved through OAuth-proven links, never by email.
+    describe('claimForRecordedInstaller (verified installation webhook)', () => {
+        const INSTALLER = '7001';
+        const recordedRow = (overrides: Record<string, unknown> = {}) => ({
+            id: 'installation-row-1',
+            installationId: '12345',
+            accountLogin: 'ever-co',
+            targetType: 'Organization',
+            createdByUserId: null,
+            createdByGithubUserId: INSTALLER,
+            deletedAt: null,
+            ...overrides,
+        });
+        const owner = { id: 'user-owner', isActive: true };
+
+        const arrange = (
+            links: { link?: string | null; account?: string | null } = {},
+            user: unknown = owner,
+        ) => {
+            const ctx = createService();
+            ctx.userLinkRepository.findByGithubUserId.mockResolvedValue(
+                links.link ? { userId: links.link, githubUserId: INSTALLER } : null,
+            );
+            ctx.authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(
+                links.account
+                    ? { userId: links.account, providerId: 'github', accountId: INSTALLER }
+                    : null,
+            );
+            ctx.userRepository.findById.mockResolvedValue(user);
+            ctx.installationRepository.claimOwnershipIfUnassigned.mockImplementation(
+                async (_installationId: string, userId: string, githubUserId: string) =>
+                    recordedRow({ createdByUserId: userId, createdByGithubUserId: githubUserId }),
+            );
+            return ctx;
+        };
+
+        const expectUntouched = (ctx: ReturnType<typeof arrange>) => {
+            expect(ctx.installationRepository.claimOwnershipIfUnassigned).not.toHaveBeenCalled();
+            expect(ctx.activityLog.log).not.toHaveBeenCalled();
+        };
+
+        it('claims for the user behind the GitHub App user link and records the activity', async () => {
+            const ctx = arrange({ link: owner.id });
+
+            const claimed = await ctx.service.claimForRecordedInstaller(recordedRow() as any);
+
+            expect(ctx.userLinkRepository.findByGithubUserId).toHaveBeenCalledWith(INSTALLER);
+            expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                '12345',
+                owner.id,
+                INSTALLER,
+            );
+            expect(claimed).toEqual(expect.objectContaining({ createdByUserId: owner.id }));
+            expect(ctx.activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: owner.id,
+                    actionType: 'provider_connected',
+                    action: 'github_app_installation_claimed',
+                    status: 'completed',
+                    details: expect.objectContaining({
+                        installationId: '12345',
+                        accountLogin: 'ever-co',
+                        githubUserId: INSTALLER,
+                        source: 'installation-webhook',
+                        matchedBy: ['github-app-user-link'],
+                    }),
+                }),
+            );
+            // Identity never comes from an email.
+            expect(ctx.userRepository.findByEmail).not.toHaveBeenCalled();
+        });
+
+        it('claims for the user behind the linked `github` OAuth account (accountId = GitHub id)', async () => {
+            const ctx = arrange({ account: owner.id });
+
+            const claimed = await ctx.service.claimForRecordedInstaller(recordedRow() as any);
+
+            expect(ctx.authAccountRepository.findProviderAccountByAccountId).toHaveBeenCalledWith(
+                'github',
+                INSTALLER,
+            );
+            expect(ctx.installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
+                '12345',
+                owner.id,
+                INSTALLER,
+            );
+            expect(claimed).not.toBeNull();
+        });
+
+        it('claims when both links agree on the same user', async () => {
+            const ctx = arrange({ link: owner.id, account: owner.id });
+
+            await ctx.service.claimForRecordedInstaller(recordedRow() as any);
+
+            expect(ctx.activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    details: expect.objectContaining({
+                        matchedBy: ['github-app-user-link', 'github-auth-account'],
+                    }),
+                }),
+            );
+        });
+
+        it('leaves the row unclaimed (NULL) when the installer has no linked platform user', async () => {
+            const ctx = arrange({});
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(recordedRow() as any),
+            ).resolves.toBeNull();
+
+            expectUntouched(ctx);
+        });
+
+        it('never touches an already-claimed row', async () => {
+            const ctx = arrange({ link: owner.id });
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(
+                    recordedRow({ createdByUserId: 'user-someone-else' }) as any,
+                ),
+            ).resolves.toBeNull();
+
+            expect(ctx.userLinkRepository.findByGithubUserId).not.toHaveBeenCalled();
+            expectUntouched(ctx);
+        });
+
+        it('refuses when the installer id matches MORE than one platform user', async () => {
+            const ctx = arrange({ link: 'user-a', account: 'user-b' });
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(recordedRow() as any),
+            ).resolves.toBeNull();
+
+            expect(ctx.userRepository.findById).not.toHaveBeenCalled();
+            expectUntouched(ctx);
+        });
+
+        it.each([
+            [
+                'no recorded installer (row created by a non-`created` action)',
+                { createdByGithubUserId: null },
+            ],
+            ['a deleted installation', { deletedAt: new Date('2026-10-17T00:00:00Z') }],
+        ])('does nothing for %s', async (_label, overrides) => {
+            const ctx = arrange({ link: owner.id });
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(recordedRow(overrides) as any),
+            ).resolves.toBeNull();
+
+            expect(ctx.userLinkRepository.findByGithubUserId).not.toHaveBeenCalled();
+            expectUntouched(ctx);
+        });
+
+        it.each([
+            ['a linked user that no longer exists', null],
+            ['a deactivated user', { id: 'user-owner', isActive: false }],
+        ])('refuses %s', async (_label, user) => {
+            const ctx = arrange({ link: owner.id }, user);
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(recordedRow() as any),
+            ).resolves.toBeNull();
+
+            expectUntouched(ctx);
+        });
+
+        it('reports nothing claimed when a concurrent claim for someone else won the conditional update', async () => {
+            const ctx = arrange({ link: owner.id });
+            ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(
+                recordedRow({ createdByUserId: 'user-setup-flow' }),
+            );
+
+            await expect(
+                ctx.service.claimForRecordedInstaller(recordedRow() as any),
+            ).resolves.toBeNull();
+
+            expect(ctx.activityLog.log).not.toHaveBeenCalled();
+        });
+
+        it('keeps the claim when the activity log write fails', async () => {
+            const ctx = arrange({ link: owner.id });
+            ctx.activityLog.log.mockRejectedValue(new Error('activity store down'));
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
+
+            try {
+                await expect(
+                    ctx.service.claimForRecordedInstaller(recordedRow() as any),
+                ).resolves.toEqual(expect.objectContaining({ createdByUserId: owner.id }));
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Could not record the activity'),
+                );
+            } finally {
+                warnSpy.mockRestore();
+            }
+        });
+    });
 
     describe('completeUserAuth', () => {
         it('rejects linking an unverified GitHub email to an existing user', async () => {
@@ -94,7 +336,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
             });
@@ -119,10 +361,7 @@ describe('GitHubAppOnboardingService', () => {
             });
 
             await expect(
-                service.completeUserAuth({
-                    code: 'code',
-                    state,
-                }),
+                service.completeUserAuth({ binding: BINDING, code: 'code', state }),
             ).rejects.toBeInstanceOf(UnauthorizedException);
 
             expect(authAccountRepository.upsertProviderAccount).not.toHaveBeenCalled();
@@ -138,7 +377,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
                 redirectTo: '/settings/github-app',
@@ -193,6 +432,7 @@ describe('GitHubAppOnboardingService', () => {
             installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(installation);
 
             const result = await service.completeUserAuth({
+                binding: BINDING,
                 code: 'code',
                 state,
             });
@@ -229,7 +469,7 @@ describe('GitHubAppOnboardingService', () => {
                 authAccountRepository,
                 userRepository,
             } = createService();
-            const state = (service as any).signState({
+            const state = signBound(service, {
                 installationId: '12345',
                 issuedAt: Date.now(),
             });
@@ -279,10 +519,7 @@ describe('GitHubAppOnboardingService', () => {
                 createdByGithubUserId: 'gh-user-1',
             });
 
-            await service.completeUserAuth({
-                code: 'code',
-                state,
-            });
+            await service.completeUserAuth({ binding: BINDING, code: 'code', state });
 
             expect(installationRepository.claimOwnershipIfUnassigned).toHaveBeenCalledWith(
                 '12345',
@@ -302,7 +539,7 @@ describe('GitHubAppOnboardingService', () => {
                 options: { recordedInstaller?: string | null; githubUserId?: string } = {},
             ) => {
                 const ctx = createService();
-                const state = (ctx.service as any).signState({
+                const state = signBound(ctx.service, {
                     installationId: '12345',
                     issuedAt: Date.now(),
                 });
@@ -340,7 +577,8 @@ describe('GitHubAppOnboardingService', () => {
                 const row = { id: 'row-1', installationId: '12345' };
                 ctx.installationRepository.upsertFromGithub.mockResolvedValue(row);
                 ctx.installationRepository.claimOwnershipIfUnassigned.mockResolvedValue(row);
-                const run = () => ctx.service.completeUserAuth({ code: 'code', state });
+                const run = () =>
+                    ctx.service.completeUserAuth({ binding: BINDING, code: 'code', state });
                 return { ...ctx, state, run };
             };
             const orgInstallation = {
@@ -479,7 +717,7 @@ describe('GitHubAppOnboardingService', () => {
 
             const arrange = (overrides: { githubUserId?: string } = {}) => {
                 const ctx = createService();
-                const state = (ctx.service as any).signState({
+                const state = signBound(ctx.service, {
                     installationId: '12345',
                     issuedAt: Date.now(),
                 });
@@ -524,6 +762,7 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findById.mockResolvedValue(existingUser);
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -555,6 +794,7 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findById.mockResolvedValue(existingUser);
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -579,7 +819,11 @@ describe('GitHubAppOnboardingService', () => {
                 ctx.userRepository.findByEmail.mockResolvedValue(null);
 
                 await expect(
-                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                    ctx.service.completeUserAuth({
+                        binding: BINDING,
+                        code: 'code',
+                        state: ctx.state,
+                    }),
                 ).rejects.toBeInstanceOf(ConflictException);
 
                 expect(ctx.userRepository.create).not.toHaveBeenCalled();
@@ -600,7 +844,11 @@ describe('GitHubAppOnboardingService', () => {
                 });
 
                 await expect(
-                    ctx.service.completeUserAuth({ code: 'code', state: ctx.state }),
+                    ctx.service.completeUserAuth({
+                        binding: BINDING,
+                        code: 'code',
+                        state: ctx.state,
+                    }),
                 ).rejects.toBeInstanceOf(UnauthorizedException);
 
                 expect(ctx.userRepository.create).not.toHaveBeenCalled();
@@ -618,6 +866,7 @@ describe('GitHubAppOnboardingService', () => {
                 }));
 
                 const result = await ctx.service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
                     state: ctx.state,
                 });
@@ -694,8 +943,9 @@ describe('GitHubAppOnboardingService', () => {
 
             try {
                 const result = await service.completeUserAuth({
+                    binding: BINDING,
                     code: 'code',
-                    state: (service as any).signState({
+                    state: signBound(service, {
                         installationId: '169597044',
                         issuedAt: Date.now(),
                     }),
@@ -719,6 +969,95 @@ describe('GitHubAppOnboardingService', () => {
                 );
             } finally {
                 warnSpy.mockRestore();
+            }
+        });
+    });
+
+    // 10-09 handover item 13 — the setup state is bound to the browser that
+    // started it, and the claim's writes are one transaction.
+    describe('browser binding and one transaction (item 13)', () => {
+        it('beginSetup hands the web tier a binding nonce and signs only its hash', async () => {
+            const { service, gitHubAppService, installationRepository } = createService();
+            installationRepository.upsertFromGithub.mockResolvedValue({});
+            gitHubAppService.getUserAuthorizationUrl.mockImplementation(
+                (state: string) => `https://github.com/login/oauth/authorize?state=${state}`,
+            );
+            const result = await service.beginSetup({ installationId: '12345' });
+            expect(typeof result.binding).toBe('string');
+            expect(result.binding.length).toBeGreaterThanOrEqual(40);
+            expect(result.bindingTtlSeconds).toBe(600);
+            const state = decodeURIComponent(result.url.split('state=')[1]);
+            const payload = JSON.parse(
+                Buffer.from(state.split('.')[0], 'base64url').toString('utf8'),
+            );
+            expect(payload.binding).toBe(
+                createHash('sha256').update(result.binding, 'utf8').digest('base64url'),
+            );
+            expect(JSON.stringify(payload)).not.toContain(result.binding);
+        });
+
+        it.each([
+            ['no binding cookie', undefined],
+            ["another browser's binding", 'someone-elses-nonce'],
+        ])('refuses a callback with %s before exchanging the code', async (_label, binding) => {
+            const { service, gitHubAppService, userRepository } = createService();
+            const state = signBound(service, { installationId: '12345', issuedAt: Date.now() });
+            await expect(
+                service.completeUserAuth({ code: 'code', state, binding: binding ?? null }),
+            ).rejects.toThrow('Finish the GitHub App setup in the browser where you started it');
+            expect(gitHubAppService.exchangeUserCode).not.toHaveBeenCalled();
+            expect(userRepository.create).not.toHaveBeenCalled();
+        });
+
+        it('refuses a state signed with the raw secret (no domain separation) or without a binding', async () => {
+            const { service } = createService();
+            const unbound = (service as any).signState({
+                installationId: '12345',
+                issuedAt: Date.now(),
+            });
+            await expect(
+                service.completeUserAuth({ code: 'code', state: unbound, binding: BINDING }),
+            ).rejects.toThrow('Finish the GitHub App setup in the browser where you started it');
+        });
+
+        it('writes the claim through transaction-bound repositories', async () => {
+            const {
+                service,
+                gitHubAppService,
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            } = createService();
+            gitHubAppService.exchangeUserCode.mockResolvedValue({ access_token: 'token' });
+            gitHubAppService.getAuthenticatedGithubUser.mockResolvedValue({
+                githubUserId: 'gh-1',
+                login: 'octo',
+                email: null,
+                emailVerified: false,
+                avatarUrl: null,
+                nodeId: null,
+            });
+            userLinkRepository.findByGithubUserId.mockResolvedValue(null);
+            authAccountRepository.findProviderAccountByAccountId.mockResolvedValue(null);
+            userRepository.create.mockResolvedValue({ id: 'user-1' });
+            installationRepository.claimOwnershipIfUnassigned.mockResolvedValue({
+                installationId: '12345',
+            });
+            const state = signBound(service, { installationId: '12345', issuedAt: Date.now() });
+
+            await service.completeUserAuth({ code: 'code', state, binding: BINDING });
+
+            expect(installationRepository.transaction).toHaveBeenCalledTimes(1);
+            for (const repo of [
+                installationRepository,
+                userLinkRepository,
+                authAccountRepository,
+                userRepository,
+            ]) {
+                expect((repo as { withManager?: jest.Mock }).withManager).toHaveBeenCalledWith(
+                    TX_MANAGER,
+                );
             }
         });
     });

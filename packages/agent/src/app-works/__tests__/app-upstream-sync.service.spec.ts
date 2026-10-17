@@ -1169,6 +1169,75 @@ describe('AppUpstreamSyncService — the pull request (FR-36, FR-39, ACC-02-10)'
         expect(harness.calls.createPullRequest).toHaveLength(0);
     });
 
+    /** 150 open pull requests; the sync pull request is #150, i.e. on page 2 of 100. */
+    function openPullRequests(): Array<Record<string, unknown>> {
+        return Array.from({ length: 150 }, (_, index) => ({
+            number: index + 1,
+            title: index === 149 ? 'sync' : `feature ${index + 1}`,
+            state: 'open',
+            head: index === 149 ? APP_UPSTREAM_SYNC_BRANCH : `feature/${index + 1}`,
+            base: TRACKED_BRANCH,
+            url: `https://x/${index + 1}`,
+            createdAt: '',
+            updatedAt: '',
+        }));
+    }
+
+    it('finds the sync pull request among 150 open ones through the provider head filter — no duplicate', async () => {
+        const all = openPullRequests();
+        const harness = makeHarness({
+            row: makeRow({ syncPullRequestNumber: null }),
+            handlers: {
+                ...diverged,
+                // A provider that honours `head` (GitHub does): only the matching rows.
+                listPullRequests: ((_o: string, _r: string, list: { head?: string }) =>
+                    all.filter((pr) =>
+                        list?.head ? `${OWNER}:${String(pr.head)}` === list.head : true,
+                    )) as unknown as Handler,
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(firstArgs(harness, 'listPullRequests')[2]).toEqual(
+            expect.objectContaining({
+                state: 'open',
+                head: `${OWNER}:${APP_UPSTREAM_SYNC_BRANCH}`,
+            }),
+        );
+        expect(harness.calls.listPullRequests).toHaveLength(1);
+        expect(result.pullRequest).toEqual({ number: 150, url: 'https://x/150' });
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+        expect(result.result).toBe('pull_request_updated');
+    });
+
+    it('pages on when the provider ignores the head filter (150 open, the sync PR on page 2)', async () => {
+        const all = openPullRequests();
+        const harness = makeHarness({
+            row: makeRow({ syncPullRequestNumber: null }),
+            handlers: {
+                ...diverged,
+                // A provider WITHOUT the filter: plain pages of 100.
+                listPullRequests: ((
+                    _o: string,
+                    _r: string,
+                    list: { page?: number; perPage?: number },
+                ) => {
+                    const size = list?.perPage ?? 30;
+                    const page = list?.page ?? 1;
+                    return all.slice((page - 1) * size, page * size);
+                }) as unknown as Handler,
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(harness.calls.listPullRequests).toHaveLength(2);
+        expect(harness.calls.listPullRequests[1][2]).toEqual(expect.objectContaining({ page: 2 }));
+        expect(result.pullRequest).toEqual({ number: 150, url: 'https://x/150' });
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+    });
+
     it('does not reopen a closed pull request at the same head (S26)', async () => {
         const harness = makeHarness({
             row: makeRow({ syncPullRequestNumber: 9, syncPullRequestUrl: 'https://x/9' }),

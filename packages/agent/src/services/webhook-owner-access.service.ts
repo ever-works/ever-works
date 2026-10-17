@@ -87,7 +87,8 @@ const VISIBILITY_AGGREGATES: ReadonlySet<string> = new Set<VisibilityAggregate>(
  *  - a user owner receives only the organizations of its tenant it is a member
  *    of (roster row, or the Tenant owner), and only the events it could read in
  *    the app ({@link userMayRead}); a deleted user denies for good;
- *  - an integration-key owner must be active and unexpired, and is limited to
+ *  - an integration-key owner must be active, unexpired and hold `events:read`
+ *    (the scope of the change feed these events are the push form of), and is limited to
  *    the organizations it is pinned to (for an admin's key, the ones its creator
  *    still administers — EW-P2-6); a revoked, expired or deleted key denies for good.
  */
@@ -111,6 +112,11 @@ export class WebhookOwnerAccessService {
             ) {
                 return DENIED_FOR_GOOD;
             }
+            // Review 2026-10-17 F12: a webhook is the push form of the change feed, so its
+            // key needs `events:read` exactly as `GET /events` does. Scopes never change
+            // after a key is created, so a key without it is denied for good.
+            const scopes = Array.isArray(key.scopes) ? key.scopes : [];
+            if (!scopes.includes('events:read')) return DENIED_FOR_GOOD;
             // EW-P2-6 — an admin's key keeps only the pins its creator still administers
             // (a demoted or removed admin receives nothing; re-promotion restores it).
             const pinned = await effectiveIntegrationKeyPins(this.dataSource.manager, key);
@@ -119,7 +125,7 @@ export class WebhookOwnerAccessService {
                 ok: true,
                 disable: false,
                 organizationIds: new Set(pinned),
-                scopes: new Set(Array.isArray(key.scopes) ? key.scopes : []),
+                scopes: new Set(scopes),
             };
         }
         const user = await this.dataSource

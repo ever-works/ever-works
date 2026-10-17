@@ -5202,7 +5202,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -5292,6 +5293,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    }
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -6487,12 +6502,14 @@
                     "generator": "Generate Work, one time or on schedule",
                     "deploy": "Deploy Work",
                     "tasks": "Tasks for this Work",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Container images built from your repository"
                 },
                 "tasks": "Tasks",
                 "posts": "Posts",
                 "pages": "Pages",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Builds"
             },
             "members": {
                 "title": "Team Members",
@@ -8926,6 +8943,538 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Fork: {fullName}",
+                    "private-copy": "Private copy: {fullName}",
+                    "link": "Linked: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Preparing your fork",
+                    "forkBody": "GitHub is creating {fullName}. This usually takes under a minute; large repositories can take longer.",
+                    "copyTitle": "Preparing your private copy",
+                    "copyBody": "Copying {upstream} into {fullName}. Larger repositories take longer.",
+                    "linkTitle": "Finishing setup",
+                    "linkBody": "Opening a pull request that adds .works/works.yml to {fullName}.",
+                    "blueprintTitle": "Applying the {name} Blueprint",
+                    "blueprintBody": "Ever Works is preparing your App Work and will write .works/works.yml with the Blueprint's files."
+                },
+                "setupPrClosed": "The setup pull request was closed without merging.",
+                "timedOut": "Your fork is taking longer than 15 minutes.",
+                "failedAccess": "Ever Works lost access to GitHub while preparing this App Work.",
+                "failedOther": "Preparing this App Work failed: {reason}",
+                "waitingForSetupPr": "Merge the setup pull request to finish.",
+                "tryAgain": "Try again",
+                "openOnGitHub": "Open on GitHub",
+                "reconnectGitHub": "Reconnect GitHub",
+                "openPullRequest": "Open pull request",
+                "retryLimit": "You've used all 3 retries for this hour. Try again later.",
+                "retryFailed": "Couldn't start another attempt. Try again.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml on the default branch isn't valid YAML. Fix or remove the file, then try again.",
+                    "works_yml_other_kind": ".works/works.yml already declares a different kind of Work. Set kind: app or remove the file, then try again.",
+                    "push_rejected": "GitHub kept rejecting the commit that adds .works/works.yml.",
+                    "provider_unsupported": "This repository's Git provider can't be set up automatically.",
+                    "too_large_for_private_copy": "The repository is too large for a private copy. Create a fork instead.",
+                    "uses_lfs": "The repository uses Git LFS, which a private copy can't carry over. Create a fork instead.",
+                    "other": "Something went wrong while setting up the repository."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Work Repository",
+                    "upstream": "Upstream",
+                    "relationLabel": "Relation",
+                    "readinessLabel": "Readiness",
+                    "readiness": {
+                        "preparing": "Preparing",
+                        "ready": "Ready",
+                        "timed_out": "Timed out",
+                        "failed": "Failed",
+                        "waiting_for_setup_pr": "Waiting for the setup pull request"
+                    },
+                    "relations": {
+                        "link": "Linked",
+                        "fork": "Fork",
+                        "private-copy": "Private copy"
+                    },
+                    "appSpecLabel": "App spec",
+                    "appSpecStatus": {
+                        "valid": "Valid",
+                        "valid_with_warnings": "Valid, with warnings",
+                        "invalid": "Has errors",
+                        "missing": "Not written yet",
+                        "unreadable": "Couldn't be read",
+                        "pending": "Being checked",
+                        "unknown": "Not checked yet"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {No errors} =1 {1 error} other {# errors}} · {warnings, plural, =0 {no warnings} =1 {1 warning} other {# warnings}}",
+                    "openAppSpec": "Open App spec",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "The App details couldn't be loaded right now.",
+                    "builds": "Builds",
+                    "deploy": "Deploy",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Evolve it with its agent",
+                    "body": "Ask the Work's agent to change the app — add a feature, fix a bug, upgrade a dependency. It works in the Work Repository and opens pull requests.",
+                    "button": "Chat about this App"
+                }
+            },
+            "builds": {
+                "title": "Builds",
+                "subtitle": "Built on GitHub-hosted runners in {repository} · image {imageRepository}",
+                "subtitleNoImage": "Built on GitHub-hosted runners in {repository}",
+                "subtitleGeneric": "Container images built from this App Work's repository.",
+                "startBuild": "Start build",
+                "starting": "Starting…",
+                "refresh": "Refresh",
+                "cancel": "Cancel",
+                "cancelling": "Cancelling…",
+                "viewerDisabled": "You need edit access to do this.",
+                "deployable": "Deployable",
+                "notDeployableLine": "Not deployable — {reason}",
+                "pagination": "Showing {start}–{end} of {total}",
+                "listLabel": "Builds of this App Work",
+                "openDetails": "Open build #{number}",
+                "status": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "succeeded": "Succeeded",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled",
+                    "blocked": "Blocked"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Manual",
+                    "verification": "Verification"
+                },
+                "notDeployable": {
+                    "notSucceeded": "The build did not succeed",
+                    "pullRequest": "Built from a pull request",
+                    "verification": "Built for verification",
+                    "specInvalid": "The App spec at this commit has errors",
+                    "staleInputs": "Built with older build values",
+                    "secretCheckFailed": "The secret check did not pass",
+                    "digestUnconfirmed": "The pushed image could not be confirmed",
+                    "criticalVulnerability": "A critical vulnerability has a fix available",
+                    "unsigned": "The image is not signed"
+                },
+                "blocked": {
+                    "workflowPending": "Waiting for the build workflow to be merged.",
+                    "workflowEditedByHand": "The build workflow was edited by hand.",
+                    "workflowWriteFailed": "Ever Works couldn't write the build workflow to the repository. A rule on this repository refuses the change.",
+                    "actionsDisabled": "GitHub Actions is turned off for this repository.",
+                    "missingBuildValues": "Waiting for {count, plural, =1 {1 build value} other {# build values}}: {names}",
+                    "runnerTooSmall": "This build needs {needed} but the runner for {visibility} repositories allows {max}.",
+                    "tooManyBuildValues": "This build uses {count} build values; at most 50 are allowed.",
+                    "buildValueTooLarge": "{name} is too large to pass to a build (48 KB maximum).",
+                    "secretLimitReached": "The repository has no room for more secrets.",
+                    "strategyNotSupported": "GitHub-hosted runners can't build with the \"{strategy}\" strategy. Add a Dockerfile and set build.strategy to dockerfile.",
+                    "specInvalid": "The App spec at this commit has errors.",
+                    "gitConnectionMissing": "Ever Works can't reach this repository with your GitHub connection.",
+                    "repositoryUnavailable": "{repository} is archived, deleted or no longer available to your GitHub connection.",
+                    "managedConcurrencyLimit": "Waiting for other builds: at most {perWork} per app and {perAccount} per account run at once.",
+                    "buildValueNameReserved": "{name} is reserved by Ever Works and can't be passed to a build. Rename the environment entry.",
+                    "buildServicePortRequired": "The build service {service} needs a port: Ever Works doesn't know which port \"{image}\" listens on.",
+                    "verificationDependencyUnsupported": "A verification can't start {kind} yet. The check runs on the cluster instead.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Review pull request",
+                    "turnOnActions": "Turn it on",
+                    "setValue": "Set it",
+                    "useLargerRunner": "Use a larger runner",
+                    "openRepositorySettings": "Open repository settings",
+                    "reconnectGithub": "Reconnect GitHub",
+                    "rebuild": "Rebuild",
+                    "openEnvironment": "Open Environment"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Ran out of memory",
+                        "suggestion": "Raise build.resources.memory (now {memory}) or lower the build's heap size. On this runner a build can use at most {max}."
+                    },
+                    "diskFull": {
+                        "title": "Ran out of disk space",
+                        "suggestion": "Turn on \"Reclaim runner disk\" in build settings, or shrink the build context with a .dockerignore file."
+                    },
+                    "dockerfileError": {
+                        "title": "The Dockerfile failed at step {step} of {total}",
+                        "suggestion": "The failing step was: {command}. Fix it in {dockerfile} and push, or ask an agent to fix it."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Couldn't download dependencies",
+                        "suggestion": "A package or base image registry didn't answer. Rebuild in a few minutes; if it keeps failing, pin the versions you depend on."
+                    },
+                    "registryPushDenied": {
+                        "title": "Couldn't push the image",
+                        "suggestion": "Allow workflows in this repository to write packages (Settings ▸ Actions ▸ General ▸ Workflow permissions), then rebuild."
+                    },
+                    "missingBuildValue": {
+                        "title": "A build value is missing: {names}",
+                        "suggestion": "Set it in Settings ▸ Environment, then rebuild."
+                    },
+                    "secretInImage": {
+                        "title": "A secret would have been published inside the image: {name}",
+                        "suggestion": "Use this value only in an earlier build stage, or pass it as a build secret mount. Nothing was pushed."
+                    },
+                    "timeout": {
+                        "title": "Took longer than {minutes} minutes",
+                        "suggestion": "Raise build.resources.timeoutMinutes (maximum 180) or speed the build up with caching."
+                    },
+                    "workflowInvalid": {
+                        "title": "The workflow file is invalid",
+                        "suggestion": "GitHub can't run the build workflow. Review the open pull request from Ever Works to restore it."
+                    },
+                    "digestMismatch": {
+                        "title": "The pushed image could not be confirmed",
+                        "suggestion": "The registry reported a different image than the build did. Rebuild; nothing unconfirmed will be deployed."
+                    },
+                    "verificationFailed": {
+                        "title": "The app didn't pass its smoke tests",
+                        "suggestion": "{failed} of {total} smoke tests failed. See the results below."
+                    },
+                    "egressBlocked": {
+                        "title": "Network access was blocked",
+                        "suggestion": "The build tried to reach {hosts}, which aren't on the builder's allowed list. Get what you need from your source repository or an allowed registry, then rebuild."
+                    },
+                    "lost": {
+                        "title": "Lost track of this build",
+                        "suggestion": "GitHub stopped answering about this build. Check it on GitHub."
+                    },
+                    "unknown": {
+                        "title": "Something else went wrong",
+                        "suggestion": "Open the logs on GitHub, or ask an agent to look."
+                    },
+                    "askAgent": "Ask an agent to fix this",
+                    "excerptLabel": "Last lines of the log"
+                },
+                "cancelReason": {
+                    "user": "Cancelled by a member",
+                    "superseded": "Replaced by a newer build"
+                },
+                "detail": {
+                    "title": "Build #{number} · {sha} · {status}",
+                    "loading": "Loading build details…",
+                    "close": "Close",
+                    "trigger": "Trigger",
+                    "triggeredBy": "{trigger} — by {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Duration",
+                    "durationValue": "{duration} (queued {queued})",
+                    "image": "Image",
+                    "tags": "Tags",
+                    "deployable": "Deployable",
+                    "yes": "Yes",
+                    "buildValues": "Build values",
+                    "buildValuesValue": "{count, plural, =1 {1 synced} other {# synced}}: {names}",
+                    "noBuildValues": "None",
+                    "receipt": "Receipt",
+                    "verification": "Verification",
+                    "copy": "Copy",
+                    "copied": "Image reference copied.",
+                    "copyFailed": "Couldn't copy the image reference.",
+                    "viewLogs": "View logs on GitHub",
+                    "rebuildThisCommit": "Rebuild this commit",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} runner minutes · paid by your GitHub account",
+                    "minutesPlatform": "{minutes} runner minutes · paid by Ever Works",
+                    "checksMinutes": "{checksMinutes} of them ran App checks",
+                    "costUnknown": "Runner minutes not reported yet"
+                },
+                "verification": {
+                    "componentsReady": "Components started",
+                    "componentsNotReady": "Components did not start",
+                    "job": "Job {name} exited {exitCode}",
+                    "jobNoExit": "Job {name} did not finish",
+                    "smokePassed": "Passed: {name}",
+                    "smokeFailed": "Failed: {name} — expected {expected}, got {observed}"
+                },
+                "empty": {
+                    "noBuilds": "No builds yet. The first build starts when the build workflow is in the repository.",
+                    "unavailable": "Builds aren't available on this instance yet."
+                },
+                "errors": {
+                    "loadFailed": "Builds could not be loaded. Try refreshing the page.",
+                    "rebuildRateLimited": "You've started too many builds this hour. Try again in {minutes, plural, =1 {1 minute} other {# minutes}}.",
+                    "commitNotReachable": "That commit isn't on the tracked branch.",
+                    "nothingToBuild": "This App Work runs a published image, so there is nothing to build.",
+                    "notCancellable": "This build has already finished, so it can't be cancelled.",
+                    "providerUnavailable": "No build provider is available right now. Try again later.",
+                    "startFailed": "Couldn't start a build. Try again.",
+                    "cancelFailed": "Couldn't cancel this build. Try again.",
+                    "detailFailed": "Couldn't load this build. Try again."
+                },
+                "toasts": {
+                    "started": "Build queued.",
+                    "deduped": "A build for this commit is already queued.",
+                    "cancelled": "Build cancelled."
+                },
+                "pullToken": {
+                    "title": "Add a pull token",
+                    "body": "This image is private. Your cluster needs a token that can only read packages to download it.",
+                    "stepCreate": "1. Create a classic token with only \"read:packages\" checked.",
+                    "stepPaste": "2. Paste it here.",
+                    "label": "Token",
+                    "submit": "Check and save",
+                    "saving": "Checking…",
+                    "tooBroad": "This token can do more than read packages. Create one with only read:packages.",
+                    "fineGrained": "This is a fine-grained token. Create a classic token with only read:packages checked.",
+                    "cannotRead": "This token can't read {imageRepository}.",
+                    "publicImage": "This image is already public — no token is needed.",
+                    "noImageYet": "There is no finished build yet. Add a pull token after the first successful build.",
+                    "savedExpires": "Pull token saved. It expires on {date}.",
+                    "savedNoExpiry": "Pull token saved. It doesn't expire.",
+                    "tokenSet": "A pull token is saved. Paste a new one to replace it.",
+                    "expiringSoon": "The pull token expires on {date}. Add a new one before then.",
+                    "viewerDisabled": "You need edit access to do this.",
+                    "failed": "Couldn't save the pull token. Try again."
+                },
+                "overview": {
+                    "title": "Latest build",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Deployable build: this commit",
+                    "deployableOther": "Deployable build: {sha}",
+                    "noDeployable": "No deployable build yet",
+                    "open": "Open Builds"
+                }
+            },
+            "appDeploy": {
+                "title": "Deploy",
+                "notRunning": "This app isn't running anywhere yet.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Open app",
+                "source": "Source",
+                "buildsLink": "See Builds",
+                "buildsHint": "Builds still run whatever the target.",
+                "stale": "Last checked {minutes, plural, =1 {1 minute} other {# minutes}} ago",
+                "status": {
+                    "notDeployed": "Not deployed",
+                    "live": "Live",
+                    "degraded": "Degraded",
+                    "down": "Down",
+                    "unreachable": "Can't reach your cluster",
+                    "paused": "Paused",
+                    "deleting": "Deleting…"
+                },
+                "target": {
+                    "heading": "Where should it run?",
+                    "current": "(current)",
+                    "none": {
+                        "label": "None — don't deploy yet",
+                        "description": "Builds still run."
+                    },
+                    "yourCluster": {
+                        "label": "Your cluster",
+                        "description": "Runs on a Kubernetes cluster you control."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works (managed)",
+                        "description": "We run it for you on our cluster.",
+                        "unavailable": "Coming soon — managed hosting for apps isn't open yet.",
+                        "ineligible": "Not available yet for this app."
+                    },
+                    "connect": "Connect your cluster",
+                    "reconnect": "Change cluster connection",
+                    "connected": "Connected · {version}",
+                    "connectedNoVersion": "Connected",
+                    "checkFailed": "The last cluster check failed.",
+                    "notChecked": "No cluster connected yet.",
+                    "save": "Use this target",
+                    "saving": "Saving…",
+                    "saved": "Target saved.",
+                    "saveFailed": "Couldn't save the target: {reason}",
+                    "changeNote": "Changing the target doesn't remove anything already running.",
+                    "routeUnavailable": "Changing the target isn't available on this instance yet."
+                },
+                "connect": {
+                    "title": "Connect your cluster",
+                    "description": "Paste a kubeconfig for a service account in the cluster this app should run on.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Paste your kubeconfig…",
+                    "kubeconfigHelp": "Use a service account token. Commands, local files and proxies aren't supported.",
+                    "kubeconfigStored": "Your kubeconfig was sent once and is stored encrypted. Paste a new one to replace it, or check the stored one again.",
+                    "contextLabel": "Context (optional)",
+                    "contextHelp": "Leave empty to use the kubeconfig's current context.",
+                    "check": "Check connection",
+                    "checking": "Checking…",
+                    "checkAgain": "Check again",
+                    "checkTimedOut": "The check didn't finish within 30 seconds. Try again.",
+                    "checkFailed": "Couldn't check the connection: {reason}",
+                    "unavailable": "Connecting a cluster isn't available on this instance yet.",
+                    "kubeconfigTooLarge": "This kubeconfig is larger than 64 KiB.",
+                    "kubeconfigRequired": "Paste a kubeconfig first.",
+                    "ingressClass": "Ingress class",
+                    "ingressDefault": "{name} (default)",
+                    "ingressNone": "No ingress class found",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Certificates from issuer",
+                        "external": "Handled outside the cluster",
+                        "edge": "Terminated at the edge",
+                        "none": "No TLS (http only)"
+                    },
+                    "issuer": "Issuer",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Chosen when the app is first deployed",
+                    "isolation": "Network isolation",
+                    "isolationOn": "On (recommended)",
+                    "isolationOff": "Off",
+                    "isolationOffWarning": "Without network isolation, other workloads on the cluster can reach this app and its databases.",
+                    "cancel": "Cancel",
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "saveBlocked": "Save is available once the check passes with every required permission.",
+                    "saved": "Cluster connected.",
+                    "saveFailed": "Couldn't save the cluster connection: {reason}"
+                },
+                "check": {
+                    "ok": "Connected",
+                    "version": "Kubernetes {version}",
+                    "failed": "The cluster check failed.",
+                    "kubeconfigRefused": "This kubeconfig {reason}. Use a service account token instead.",
+                    "notPublic": "Ever Works can only reach clusters at a public address.",
+                    "permissions": "Permissions",
+                    "allPermissions": "Every required permission is present.",
+                    "missing": "Missing: {verb} {resource}",
+                    "optionalMissing": "Optional, missing: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Deploy now",
+                    "deploying": "Requesting…",
+                    "started": "Deployment started.",
+                    "queued": "Queued — it starts when the running Deployment finishes.",
+                    "deduplicated": "That Deployment was already requested.",
+                    "inProgress": "Another Deployment is running ({id}). Wait for it to finish, then deploy again.",
+                    "preconditionsHeader": "Fix these before deploying:",
+                    "workerNotIsolated": "Deployments can't start yet: this instance has no isolated App cluster worker.",
+                    "notAppWork": "This Work isn't an App Work, so it can't be deployed this way.",
+                    "failed": "Couldn't request the Deployment: {reason}",
+                    "targetNone": "Pick where the app should run first — None doesn't deploy anything.",
+                    "deploymentId": "Deployment {id}",
+                    "warningsHeader": "Warnings"
+                },
+                "preconditions": {
+                    "specInvalid": "The App spec (.works/works.yml) has errors. Fix them on the App spec page.",
+                    "licenseBlocksTarget": "The app's license doesn't allow hosting it on this target.",
+                    "licenseAttestationMissing": "Attest the app's license before deploying it.",
+                    "envRequiredUnset": "Some required env values aren't set yet.",
+                    "dependencyNotReady": "A dependency the app needs isn't ready yet.",
+                    "noGreenBuild": "There's no successful Build to deploy yet. Start a Build first.",
+                    "noGreenBuildForHead": "The latest commit on the deploy branch hasn't built successfully yet.",
+                    "buildImageMissing": "The Build has no image to deploy.",
+                    "nothingToDeploy": "There's nothing to deploy yet: no Build and no published image.",
+                    "imageNotPinned": "This image is referenced by tag. Pin it by digest so every Deployment runs the same image.",
+                    "imageNotFound": "The image can't be found in its registry.",
+                    "imagePrivateUnsupported": "This image can't be downloaded without credentials. Ever Works deploys published images only when they are public.",
+                    "imageUnresolvable": "The image reference couldn't be resolved.",
+                    "primaryDomainMissing": "The primary domain isn't set up yet.",
+                    "targetNone": "Pick where the app should run first.",
+                    "targetNotChecked": "Check the cluster connection first.",
+                    "clusterChangedUnconfirmed": "The cluster changed since the last Deployment. Confirm the change to deploy.",
+                    "managedDisabled": "Coming soon — managed hosting for apps isn't open yet.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps runs only apps from a verified Blueprint.",
+                    "quotaExceeded": "You've reached the number of apps you can run on Ever Works Apps.",
+                    "managedIneligible": "This app can't run on Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps can't take new apps right now.",
+                    "appWorkDeleting": "This App Work is being deleted.",
+                    "paused": "The app is paused. Resume it to deploy.",
+                    "deployInProgress": "Another Deployment is running.",
+                    "cronAuthEnvUnset": "A scheduled call needs an auth value that isn't set.",
+                    "jobAuthEnvUnset": "A job needs an auth value that isn't set.",
+                    "volumeReplicas": "A component with a volume can run only one replica.",
+                    "volumeShrink": "A volume can't be made smaller.",
+                    "privilegedPort": "A component listens on a port below 1024.",
+                    "cronTooFrequent": "A scheduled call runs more often than allowed.",
+                    "managedRootForbidden": "This image runs as root.",
+                    "imageUserUnverifiable": "Ever Works couldn't check which user the image runs as.",
+                    "workerNotIsolated": "Deployments can't start yet: this instance has no isolated App cluster worker.",
+                    "envSourceUnavailable": "The app's env values can't be read right now.",
+                    "pullCredentialUnavailable": "The credential to pull the image isn't available.",
+                    "namespaceForeign": "That namespace already belongs to something else on the cluster.",
+                    "verificationNamespaceForbidden": "That namespace is reserved for verification runs."
+                },
+                "license": {
+                    "loading": "Reading the license…",
+                    "unavailable": "License details aren't available on this instance yet.",
+                    "error": "Couldn't read the license. Reload the page to try again.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "No license we recognise was found.",
+                    "classes": {
+                        "green": "Hosting allowed",
+                        "amber": "Your cluster, after you confirm the license terms",
+                        "red": "Your cluster only, after you confirm the license terms",
+                        "unknown": "License unknown — confirm the terms before deploying",
+                        "unclassified": "Not classified yet"
+                    },
+                    "mixed": "Parts of this repository use a different license.",
+                    "incomplete": "This repository is too large to scan completely.",
+                    "yourClusterAllowed": "Your cluster: allowed",
+                    "yourClusterAfterConfirm": "Your cluster: allowed after you confirm the license terms",
+                    "review": "Review and confirm",
+                    "confirmed": "Confirmed on {date}.",
+                    "disclaimer": "This is an automated reading of the repository's license files, not legal advice.",
+                    "unknownSpdx": "This software's license",
+                    "dialogTitle": "Confirm the license terms",
+                    "dialogBody": "{spdx} restricts how this software may be hosted. Ever Works Apps is not available for it. To run it on your own cluster, confirm:",
+                    "noText": "The license registry has no statement for this license.",
+                    "checkbox": "I confirm the statement above.",
+                    "footer": "We record who confirmed, when, and for which license and commit.",
+                    "cancel": "Cancel",
+                    "confirm": "Confirm",
+                    "refusals": {
+                        "ownerOnly": "Only the App Work's owner can attest.",
+                        "licenseChanged": "The license changed while you were reviewing it. Review the new terms and confirm again.",
+                        "attestationNotRequired": "This license doesn't need a confirmation any more.",
+                        "licenseUnavailable": "License confirmation isn't available on this instance yet.",
+                        "route_unavailable": "License confirmation isn't available on this instance yet.",
+                        "failed": "Couldn't record the confirmation. Try again."
+                    }
+                },
+                "rollback": {
+                    "button": "Roll back",
+                    "title": "Roll back to an earlier Deployment",
+                    "description": "Pick a Deployment that went live before. Its image and App spec run again; nothing is rebuilt.",
+                    "pickLabel": "Deployment to return to",
+                    "liveAt": "Live since {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Went live earlier",
+                    "none": "There is no earlier live Deployment to roll back to.",
+                    "runJobs": "Run the pre-deploy jobs again",
+                    "confirm": "Roll back",
+                    "cancel": "Cancel",
+                    "started": "Rollback started.",
+                    "failed": "Couldn't start the rollback: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Pause",
+                    "resume": "Resume",
+                    "remove": "Remove from cluster",
+                    "removeTitle": "Remove this App from its cluster",
+                    "removeDescription": "The running app stops and its Kubernetes objects are deleted. The App Work and its Builds stay.",
+                    "deleteData": "Also delete stored data (volumes and dependency databases)",
+                    "deleteDataWarning": "This cannot be undone.",
+                    "confirmSlugLabel": "Type {slug} to confirm",
+                    "confirmRemove": "Remove",
+                    "cancel": "Cancel",
+                    "failed": "Couldn't do that: {reason}",
+                    "slugMismatch": "The slug you typed doesn't match this App Work.",
+                    "accepted": {
+                        "pause": "Pause requested.",
+                        "resume": "Resume requested.",
+                        "remove": "Removal requested.",
+                        "cancelDeploy": "Cancellation requested."
+                    }
+                }
             }
         },
         "newPage": {
@@ -8945,7 +9494,8 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
                 "repo": "Repository",
-                "company": "Company"
+                "company": "Company",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -8958,7 +9508,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "An existing code repository as a Work — Tasks, Goals and fleet runs attach to it. Nothing is generated or deployed.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Run and evolve any GitHub repository — link it or fork it, then choose where it runs."
             },
             "submit": "Create",
             "submitTitle": "Create",
@@ -9003,7 +9554,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Repository"
+                "repo": "Repository",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -9011,7 +9563,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "An existing code repository as a Work — Tasks, Goals and fleet runs attach to it. Nothing is generated or deployed."
+                "repo": "An existing code repository as a Work — Tasks, Goals and fleet runs attach to it. Nothing is generated or deployed.",
+                "app": "Run and evolve any GitHub repository — link it or fork it, then choose where it runs."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -9416,6 +9969,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "e.g. \"https://github.com/owner/repo — an open-source app you want your own copy of\"",
+                "formTitle": "New App Work",
+                "formSubtitle": "Start from any GitHub repository. Ever Works links it or makes your own copy, then helps you run it and keep changing it.",
+                "urlLabel": "Repository URL",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Any GitHub repository your connected account can read.",
+                "checkButton": "Check repository",
+                "checking": "Checking…",
+                "tabPaste": "Paste a URL",
+                "tabCatalog": "Browse the Apps catalog",
+                "catalogComingSoon": "The Apps catalog opens here soon. Paste a repository URL for now.",
+                "stars": "{count, plural, =1 {1 star} other {# stars}}",
+                "defaultBranch": "Default branch: {branch}",
+                "largeRepository": "Large repository ({size})",
+                "moved": "Moved to {fullName}",
+                "isFork": "This repository is a fork of {parent}.",
+                "ownFork": "This is your fork of {parent}. Ever Works will follow {parent} as upstream.",
+                "publicForkNote": "Forks of public repositories are public.",
+                "archivedNote": "This repository is archived. Upstream sync stays off.",
+                "licenseChip": "License: {spdx}",
+                "licenseNotDetected": "License: not detected",
+                "licenseClass": {
+                    "green": "Hosting allowed",
+                    "amber": "Your cluster, after you attest the license",
+                    "red": "Your cluster, after you attest the license",
+                    "unknown": "License unknown — you'll attest it before deploying"
+                },
+                "blueprintBadge": {
+                    "verified": "Verified Blueprint",
+                    "available": "Blueprint available",
+                    "none": "No Blueprint — an agent will work out how to run it",
+                    "unavailable": "Blueprint check unavailable"
+                },
+                "existingAppWork": "You already have an App Work for this repository: {name}.",
+                "openExistingAppWork": "Open it",
+                "scanIncomplete": "Not every account was checked for an existing fork.",
+                "modesTitle": "How should Ever Works use this repository?",
+                "modes": {
+                    "link": {
+                        "title": "Link",
+                        "titleOwnFork": "Link — don't follow upstream",
+                        "description": "Use this repository as it is. You can push to it, so changes land here directly."
+                    },
+                    "fork": {
+                        "title": "Fork",
+                        "description": "Make your own fork. You can sync it with upstream and propose changes back."
+                    },
+                    "private-copy": {
+                        "title": "Private copy",
+                        "description": "Make a private repository with the same code."
+                    }
+                },
+                "unavailable": "Unavailable: {reason}",
+                "forkInto": "Fork into",
+                "copyInto": "Copy into",
+                "ownerFilter": "Search accounts",
+                "ownerOrganization": "organization",
+                "ownerNotChecked": "not checked for an existing fork",
+                "existingFork": "You already have a fork: {fullName}. Ever Works will use it.",
+                "privateCopyTradeOff": "A private copy is not linked to the original on GitHub, so it can't open pull requests to the original project. Upstream changes arrive as pull requests in your copy.",
+                "linkSetupNote": "Ever Works opens a pull request that adds one file, .works/works.yml. Merge it to finish.",
+                "existingForkSetupNote": "Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works opens a pull request that adds .works/works.yml and the Blueprint's files. Merge it to finish.",
+                "existingForkSetupNoteBlueprint": "Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml and the Blueprint's files.",
+                "promptsTitle": "Values this app needs",
+                "promptHint": "The {name} Blueprint asks for these. You can change them later in Settings.",
+                "promptRequired": "Required",
+                "promptsIncomplete": "Fill in the values the app needs first.",
+                "autoProvision": "Let an agent work out how to run it",
+                "autoProvisionHelp": "Starts when the repository is ready. It spends AI tokens and build runner minutes, within the provisioning caps. You can cancel it, or untick this and start it later from the Overview with Provision.",
+                "deployTargetTitle": "Where should it run?",
+                "deployTargets": {
+                    "none": {
+                        "title": "None — don't deploy yet",
+                        "description": "You can pick a target later."
+                    },
+                    "your-cluster": {
+                        "title": "Your cluster",
+                        "description": "Run it on your own Kubernetes cluster. You'll add the connection on the Deploy tab."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Coming soon — managed hosting for apps isn't open yet."
+                    }
+                },
+                "submit": {
+                    "link": "Link and create App Work",
+                    "fork": "Fork and create App Work",
+                    "private-copy": "Copy and create App Work"
+                },
+                "submitPending": "Creating…",
+                "nameLabel": "Name",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Description",
+                "slugHelp": "URL-friendly identifier. Derived from the repository name — edit to override.",
+                "invalidSlug": "Use lowercase letters, digits and hyphens only, for example tasks-app",
+                "cancel": "Cancel",
+                "createFailed": "Couldn't create the App Work. Try again.",
+                "success": {
+                    "link": "App Work created.",
+                    "fork": "Fork requested — we'll tell you when it's ready.",
+                    "private-copy": "Copy started — we'll tell you when it's ready."
+                },
+                "reasons": {
+                    "invalid_url": "Enter a GitHub repository URL like https://github.com/owner/repo",
+                    "provider_not_connected": "Connect GitHub to create an App Work.",
+                    "insufficient_scope": "Reconnect GitHub to grant repository access.",
+                    "not_found": "We couldn't find this repository, or your GitHub account can't read it.",
+                    "sso_authorization_required": "{owner} requires you to authorize Ever Works for its organization on GitHub.",
+                    "oauth_app_restricted": "{owner} restricts third-party access. Ask an owner of {owner} to approve Ever Works, or pick another account.",
+                    "empty_repository": "This repository has no commits yet.",
+                    "no_push_access": "You can't push to this repository.",
+                    "archived": "Archived repositories are read-only.",
+                    "forking_disabled": "The owner of this repository doesn't allow forks or copies.",
+                    "own_repository": "You own this repository — link it instead.",
+                    "target_owner_unavailable": "This account isn't available on your GitHub connection.",
+                    "target_owner_forbidden": "You can't create repositories in {owner}.",
+                    "too_large_for_private_copy": "Too large for a private copy ({size}). Fork it instead.",
+                    "uses_lfs": "Uses Git LFS, which a private copy can't carry over. Fork it instead.",
+                    "copy_name_unavailable": "{owner} already has repositories named {name} through {name}-copy-5.",
+                    "in_use_by_another_account": "Another account already uses this repository in Ever Works. Ask its owner to add you as a member.",
+                    "app_work_exists": "You already have an App Work for {fullName}: {workName}.",
+                    "create_in_progress": "This App Work is already being created.",
+                    "rate_limited": "GitHub is rate-limiting your account. Try again at {time}.",
+                    "managed_hosting_unavailable": "Coming soon — managed hosting for apps isn't open yet.",
+                    "cluster_target_unavailable": "No deployment option that can run apps is installed.",
+                    "app_works_disabled": "App Works are not available on this instance.",
+                    "blueprint_mismatch": "The Blueprint for this repository changed. Check the repository again."
+                },
+                "catalog": {
+                    "searchLabel": "Search the Apps catalog",
+                    "searchPlaceholder": "Search apps — for example umami or calendar",
+                    "listLabel": "App Blueprints",
+                    "loading": "Loading the Apps catalog…",
+                    "unavailable": "The Apps catalog isn't available right now. Paste a repository URL instead.",
+                    "disabled": "App Works are not available on this instance.",
+                    "error": "Couldn't load the Apps catalog. Try again, or paste a repository URL.",
+                    "empty": "No App Blueprints are published yet. Paste a repository URL instead.",
+                    "noMatches": "No apps match your search.",
+                    "pick": "Start from {name}",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "Coming soon",
+                    "verified": "Verified",
+                    "upstreamLine": "From {repo}",
+                    "runsOn": "Runs on: {targets}",
+                    "targetYourCluster": "Your cluster",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Not available yet",
+                    "fallbackNote": "Showing the App Blueprints found on GitHub — the curated catalog isn't available right now."
+                }
             }
         },
         "gitProvider": {
@@ -11540,6 +12245,13 @@
                 "started": "Import started successfully",
                 "failed": "Failed to import Work",
                 "fetchReposFailed": "Failed to fetch repositories"
+            },
+            "app": {
+                "repositoryUrlRequired": "Enter a GitHub repository URL like https://github.com/owner/repo",
+                "repositoryModeRequired": "Choose how to use this repository: Link, Fork or Private copy.",
+                "targetOwnerRequired": "Choose the account to create the repository in.",
+                "invalidUrl": "Enter a GitHub repository URL like https://github.com/owner/repo",
+                "inspectFailed": "Couldn't check this repository. Try again."
             }
         },
         "generator": {

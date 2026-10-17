@@ -1329,3 +1329,54 @@ code comments and specs cite.
   `APP_HOSTS_DEPLOYMENT_STORE`, `APP_HOSTS_DEPLOY_REQUESTER`, `APP_HOSTS_WORK_STORE`. The DI reachability spec moved
   them from `OPEN_WORKER_GAPS` to `EXPECTED_WORKER_UNBOUND`, each citing this note; the list stays exact both ways, so
   the slice that binds one also deletes its entry. Unbound, each keeps its documented fail-closed answer.
+- **T71 / T73 / T44 / T72 / T28 / T29 / T35 (2026-10-17, lane aw-deploy, PR #2681) — decision B1 and the worker
+  composition.** **Decision B1** (owner-delegated, 2026-10-17): inside the isolated App runtime worker,
+  `AppDeployPreconditionsService.evaluate` skips §5.1 step 1's dispatcher gate when it runs in the worker context
+  (`isAppClusterWorkerContext()`) for the Deployment that **holds the deploy lock** (the run already passed §6.2's
+  attestation in `appClusterWorkerRefusal()`); a Deployment that lost the lock (cancelled, superseded, timed out) meets
+  the ordinary gate and answers `worker_not_isolated` with a lock message. The API never carries the worker-context flag,
+  so its request-time answer is unchanged. `APP_DEPLOY_DISPATCHER_AVAILABILITY` therefore stays **deliberately** unbound
+  in the worker; `APP_DEPLOY_DISPATCHER` is bound for §5.6 step 7's dequeue only, through the API's own gate
+  (`remoteMap.AppDeployDispatchRelay`). T71 status items (a)–(c) are closed: `WORK_APP_RUNTIME_STATES` →
+  `remoteMap.WorkAppRuntimeStateRepository`; `APP_RUNTIME_ENV_SOURCE` → `remoteMap.AppEnvRuntimeSource`;
+  `APP_IMAGE_PULL_CREDENTIAL_SOURCE` (public image ⇒ none, private GHCR ⇒ the owner's GitHub token),
+  `APP_RUNTIME_TARGET` (T20's facade + `prepareAppNamespace`) and `APPS_TIER_POLICY` (minimal APW-10: the managed target
+  opens only with `EVER_WORKS_APPS_MANAGED_ENABLED=true`, else the existing `managed_disabled` / `tier_closed`) are real
+  (`packages/agent/src/app-runtime/app-runtime-worker.adapters.ts`). Also bound: T72's
+  `RegistryAppImageReferenceResolver`, T28's `AppRuntimeEventRelayService` (catalogue + forbidden keys, re-emitted via
+  `EventEmitter2`; the Activity listener half of T28 is still open), T29's two producers, `APP_UPSTREAM_STATE_READER`,
+  `APP_COMMIT_ANCESTRY`, `APP_DEPLOY_DEPLOYMENT_STORE` (with the orchestrator's `update`) and T26's host stores. The
+  worker's `WorkRepository` now answers real `Work` instances (on SuperJSON plain objects `getRepoOwner` threw and every
+  Your-cluster access was refused). T35's Build-succeeded half: `AppBuildSucceededListener` (the spec-applied listener
+  is still open). Proof: `packages/tasks/src/trigger/worker/modules/__tests__/trigger-app-runtime.deploy.spec.ts` boots
+  the module against a stub API and drives a dequeued published-image Deployment to `READY`. `EXPECTED_WORKER_UNBOUND`
+  lost 13 `TriggerAppRuntimeModule` rows; `OPEN_WORKER_GAPS` stays empty.
+- **T33 / T31 / T26 / T47 / T48 / T28 / T35 + APW-07 T25 (2026-10-17, lane aw-deploy-2, PR #2688).** The Deploy tab's
+  routes exist: `GET`/`PUT :id/app-target`, `POST :id/app-target/check` and `GET :id/app-status`
+  (`apps/api/src/works/work-app-runtime.controller.ts` + `AppTargetService`), with the shapes `apps/web/src/lib/api/app-runtime.ts`
+  reads and access resolved first (one 404 for missing/invisible, `404 notAppWork` for other kinds). The kubeconfig is
+  stored write-only through `PluginSettingsService.writePlatformManagedWorkSettings` (encrypted, no validation, no
+  connection) and the check is an `app-cluster-op { op: 'cluster-check' }`: `TriggerService.dispatchAppClusterOp` +
+  the API's `APP_CLUSTER_OP_DISPATCHER` gate, which the worker reaches as `remoteMap.AppClusterOpDispatchRelay`.
+  **C43 closed:** `AppHostsService`/`AppDomainsService` are provided in the API (`AppDeployRequestModule`, the host
+  store swaps) and `DeployFacadeService` finds `AppDomainsService` through `ModuleRef`; the hosts deploy requester is
+  lazy, because `AppDeployRequestService` → preconditions → `AppHostsService` → requester is a constructor cycle.
+  **T47/T48:** `AppsDomainDnsServiceImpl` (apps apex + `EVER_WORKS_APPS_DNS_*` only) allocates the managed label when a
+  target is chosen and `AppManagedDnsListener` writes an unproxied `A`/`CNAME` to the public ingress address after
+  `app.deploy.succeeded`; deletion removes it through the worker's `APPS_DOMAIN_DNS_SERVICE` proxy. **APW-07 T25:**
+  `AppDependencySpecSourceAdapter` is bound, and `app-dependency-provision`'s worker module imports
+  `TriggerAppRuntimeModule` and proxies the row store, the id-scoped raw rows, the cipher, the spec and the re-dispatch
+  (`app-dependency-worker.relays.ts`). **T28:** `AppRuntimeActivityListener` writes `app_deploy` / `app_job` /
+  `app_smoke` rows. **T35:** `AppSpecAppliedListener` redeploys a published image on a spec change that runs.
+- **T33 / T30 / T71 / T73 (2026-10-17, lane aw-deploy-3).** `POST :id/app-rollback` (FR-34: an earlier Live
+  Deployment's Build, spec commit and image digest through `AppDeployRequestService`, pre-deploy jobs skipped unless
+  asked) and `POST :id/app-lifecycle` (`pause` / `resume` / `remove` / `cancel-deploy` as `app-cluster-op`s;
+  `deleteData` needs `confirmSlug === work.slug`, else `422 CONFIRM_SLUG_MISMATCH`) are live in
+  `WorkAppRuntimeController`. `GET app-status` reports `ops` (recent deploys/rollbacks from the Deployment rows plus
+  the runtime row's pause/remove/delete facts) and T30's `sourceOffer` (the licence gate's offer for the live
+  commit, when the obligation applies and a URL exists). `TriggerAppRuntimeModule` now composes APW-07's
+  `AppDependenciesService` over the API proxies and binds `APP_DEPENDENCIES_SERVICE`, so the worker's §5.1 re-check
+  enforces `dependency_not_ready` instead of warning, and `remove` orders the dependency deletion. The pull credential
+  prefers APW-05's stored read-only `pullToken` (`AppBuildPullTokenReader`, `remoteMap` read-only facade) and falls
+  back to the owner's GitHub token only when none is stored, recording the warning `pull_credential_owner_token` on
+  the Deployment.

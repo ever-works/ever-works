@@ -3613,7 +3613,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3700,6 +3701,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4525,12 +4540,14 @@
                     "generator": "Генериране на Work — еднократно или по график",
                     "deploy": "Разгръщане на Work",
                     "tasks": "Задачи за тази работа",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Контейнерни образи, изградени от вашето хранилище"
                 },
                 "tasks": "Задачи",
                 "posts": "Публикации",
                 "pages": "Страници",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Билдове"
             },
             "members": {
                 "title": "Членове на екипа",
@@ -6875,6 +6892,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Форк: {fullName}",
+                    "private-copy": "Частно копие: {fullName}",
+                    "link": "Свързано: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Подготвяне на вашия форк",
+                    "forkBody": "GitHub създава {fullName}. Обикновено това отнема под минута; големите хранилища може да отнемат повече време.",
+                    "copyTitle": "Подготвяне на вашето частно копие",
+                    "copyBody": "{upstream} се копира в {fullName}. По-големите хранилища отнемат повече време.",
+                    "linkTitle": "Завършване на настройката",
+                    "linkBody": "Отваря се pull request, който добавя .works/works.yml в {fullName}.",
+                    "blueprintTitle": "Прилагане на Blueprint {name}",
+                    "blueprintBody": "Ever Works подготвя вашата App Работа и ще запише .works/works.yml с файловете на Blueprint."
+                },
+                "setupPrClosed": "Pull request-ът за настройка беше затворен без сливане.",
+                "timedOut": "Вашият форк отнема повече от 15 минути.",
+                "failedAccess": "Ever Works загуби достъп до GitHub по време на подготовката на тази App Работа.",
+                "failedOther": "Подготовката на тази App Работа е неуспешна: {reason}",
+                "waitingForSetupPr": "Слейте pull request-а за настройка, за да завършите.",
+                "tryAgain": "Опитайте отново",
+                "openOnGitHub": "Отваряне в GitHub",
+                "reconnectGitHub": "Повторно свързване с GitHub",
+                "openPullRequest": "Отваряне на pull request",
+                "retryLimit": "Използвахте и трите повторни опита за този час. Опитайте отново по-късно.",
+                "retryFailed": "Не можа да започне нов опит. Опитайте отново.",
+                "failedReasons": {
+                    "works_yml_unparseable": ".works/works.yml в клона по подразбиране не е валиден YAML. Поправете или премахнете файла, след което опитайте отново.",
+                    "works_yml_other_kind": ".works/works.yml вече декларира друг вид Работа. Задайте kind: app или премахнете файла, след което опитайте отново.",
+                    "push_rejected": "GitHub продължи да отхвърля commit-а, който добавя .works/works.yml.",
+                    "provider_unsupported": "Git доставчикът на това хранилище не може да бъде настроен автоматично.",
+                    "too_large_for_private_copy": "Хранилището е твърде голямо за частно копие. Вместо това създайте форк.",
+                    "uses_lfs": "Хранилището използва Git LFS, което частното копие не може да пренесе. Вместо това създайте форк.",
+                    "other": "Нещо се обърка при настройването на хранилището."
+                },
+                "overview": {
+                    "title": "Приложение",
+                    "repository": "Хранилище на Работата",
+                    "upstream": "Upstream",
+                    "relationLabel": "Връзка",
+                    "readinessLabel": "Готовност",
+                    "readiness": {
+                        "preparing": "Подготвя се",
+                        "ready": "Готово",
+                        "timed_out": "Изтекло време",
+                        "failed": "Неуспешно",
+                        "waiting_for_setup_pr": "Изчаква се pull request-ът за настройка"
+                    },
+                    "relations": {
+                        "link": "Свързано",
+                        "fork": "Форк",
+                        "private-copy": "Частно копие"
+                    },
+                    "appSpecLabel": "Спецификация на приложението",
+                    "appSpecStatus": {
+                        "valid": "Валидна",
+                        "valid_with_warnings": "Валидна, с предупреждения",
+                        "invalid": "Има грешки",
+                        "missing": "Още не е написана",
+                        "unreadable": "Не можа да бъде прочетена",
+                        "pending": "Проверява се",
+                        "unknown": "Още не е проверена"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Няма грешки} =1 {1 грешка} other {# грешки}} · {warnings, plural, =0 {няма предупреждения} =1 {1 предупреждение} other {# предупреждения}}",
+                    "openAppSpec": "Отваряне на спецификацията на приложението",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "Данните за приложението не можаха да се заредят в момента.",
+                    "builds": "Билдове",
+                    "deploy": "Разполагане",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Развивайте го с неговия агент",
+                    "body": "Помолете агента на Работата да промени приложението — да добави функция, да поправи бъг, да обнови зависимост. Той работи в Хранилището на Работата и отваря pull request-и.",
+                    "button": "Чат за това приложение"
+                }
+            },
+            "builds": {
+                "title": "Билдове",
+                "subtitle": "Изградено на хоствани от GitHub runner-и в {repository} · образ {imageRepository}",
+                "subtitleNoImage": "Изградено на хоствани от GitHub runner-и в {repository}",
+                "subtitleGeneric": "Контейнерни образи, изградени от хранилището на тази App Работа.",
+                "startBuild": "Стартиране на билд",
+                "starting": "Стартира се…",
+                "refresh": "Обновяване",
+                "cancel": "Отказ",
+                "cancelling": "Отменя се…",
+                "viewerDisabled": "Нужен ви е достъп за редактиране, за да направите това.",
+                "deployable": "Готов за разгръщане",
+                "notDeployableLine": "Не е готов за разгръщане — {reason}",
+                "pagination": "Показани {start}–{end} от {total}",
+                "listLabel": "Билдове на тази App Работа",
+                "openDetails": "Отваряне на билд #{number}",
+                "status": {
+                    "queued": "В опашката",
+                    "running": "Изпълнява се",
+                    "succeeded": "Успешен",
+                    "failed": "Неуспешен",
+                    "cancelled": "Отменен",
+                    "blocked": "Блокиран"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Ръчно",
+                    "verification": "Проверка"
+                },
+                "notDeployable": {
+                    "notSucceeded": "Билдът не беше успешен",
+                    "pullRequest": "Изграден от pull request",
+                    "verification": "Изграден за проверка",
+                    "specInvalid": "Спецификацията на приложението в този commit има грешки",
+                    "staleInputs": "Изграден с по-стари стойности за билда",
+                    "secretCheckFailed": "Проверката за тайни не премина",
+                    "digestUnconfirmed": "Изпратеният образ не можа да бъде потвърден",
+                    "criticalVulnerability": "За критична уязвимост има налична поправка",
+                    "unsigned": "Образът не е подписан"
+                },
+                "blocked": {
+                    "workflowPending": "Изчаква се сливането на workflow-а за билд.",
+                    "workflowEditedByHand": "Workflow-ът за билд е редактиран ръчно.",
+                    "workflowWriteFailed": "Ever Works не можа да запише workflow-а за билд в хранилището. Правило в това хранилище отказва промяната.",
+                    "actionsDisabled": "GitHub Actions е изключен за това хранилище.",
+                    "missingBuildValues": "Изчаква се {count, plural, =1 {1 стойност за билда} other {# стойности за билда}}: {names}",
+                    "runnerTooSmall": "Този билд изисква {needed}, но runner-ът за {visibility} хранилища позволява {max}.",
+                    "tooManyBuildValues": "Този билд използва {count} стойности за билда; разрешени са най-много 50.",
+                    "buildValueTooLarge": "{name} е твърде голяма, за да бъде подадена на билд (максимум 48 KB).",
+                    "secretLimitReached": "В хранилището няма място за още тайни.",
+                    "strategyNotSupported": "Хостваните от GitHub runner-и не могат да изграждат със стратегия „{strategy}“. Добавете Dockerfile и задайте build.strategy на dockerfile.",
+                    "specInvalid": "Спецификацията на приложението в този commit има грешки.",
+                    "gitConnectionMissing": "Ever Works няма достъп до това хранилище през вашата връзка с GitHub.",
+                    "repositoryUnavailable": "{repository} е архивирано, изтрито или вече не е достъпно през вашата връзка с GitHub.",
+                    "managedConcurrencyLimit": "Изчакват се други билдове: едновременно се изпълняват най-много {perWork} на приложение и {perAccount} на акаунт.",
+                    "buildValueNameReserved": "{name} е запазено от Ever Works и не може да бъде подадено на билд. Преименувайте записа в средата.",
+                    "buildServicePortRequired": "Услугата за билд {service} се нуждае от порт: Ever Works не знае на кой порт слуша „{image}“.",
+                    "verificationDependencyUnsupported": "Проверката все още не може да стартира {kind}. Вместо това проверката се изпълнява в клъстера.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Преглед на pull request",
+                    "turnOnActions": "Включване",
+                    "setValue": "Задаване",
+                    "useLargerRunner": "Използване на по-голям runner",
+                    "openRepositorySettings": "Отваряне на настройките на хранилището",
+                    "reconnectGithub": "Повторно свързване с GitHub",
+                    "rebuild": "Нов билд",
+                    "openEnvironment": "Отваряне на Среда"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Паметта свърши",
+                        "suggestion": "Увеличете build.resources.memory (в момента {memory}) или намалете размера на heap-а на билда. На този runner билдът може да използва най-много {max}."
+                    },
+                    "diskFull": {
+                        "title": "Дисковото пространство свърши",
+                        "suggestion": "Включете „Освобождаване на диска на runner-а“ в настройките на билда или намалете контекста на билда с файл .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile се провали на стъпка {step} от {total}",
+                        "suggestion": "Неуспешната стъпка беше: {command}. Поправете я в {dockerfile} и направете push или помолете агент да я поправи."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Зависимостите не можаха да се изтеглят",
+                        "suggestion": "Регистър на пакети или базови образи не отговори. Пуснете нов билд след няколко минути; ако продължава да се проваля, фиксирайте версиите, от които зависите."
+                    },
+                    "registryPushDenied": {
+                        "title": "Образът не можа да бъде изпратен",
+                        "suggestion": "Разрешете на workflow-ите в това хранилище да записват пакети (Settings ▸ Actions ▸ General ▸ Workflow permissions), след което пуснете нов билд."
+                    },
+                    "missingBuildValue": {
+                        "title": "Липсва стойност за билда: {names}",
+                        "suggestion": "Задайте я в Настройки ▸ Среда, след което пуснете нов билд."
+                    },
+                    "secretInImage": {
+                        "title": "Тайна щеше да бъде публикувана в образа: {name}",
+                        "suggestion": "Използвайте тази стойност само в по-ранен етап на билда или я подайте като build secret mount. Нищо не беше изпратено."
+                    },
+                    "timeout": {
+                        "title": "Отне повече от {minutes} минути",
+                        "suggestion": "Увеличете build.resources.timeoutMinutes (максимум 180) или ускорете билда с кеширане."
+                    },
+                    "workflowInvalid": {
+                        "title": "Файлът на workflow-а е невалиден",
+                        "suggestion": "GitHub не може да изпълни workflow-а за билд. Прегледайте отворения pull request от Ever Works, за да го възстановите."
+                    },
+                    "digestMismatch": {
+                        "title": "Изпратеният образ не можа да бъде потвърден",
+                        "suggestion": "Регистърът отчете различен образ от този на билда. Пуснете нов билд; нищо непотвърдено няма да бъде разгърнато."
+                    },
+                    "verificationFailed": {
+                        "title": "Приложението не премина smoke тестовете си",
+                        "suggestion": "{failed} от {total} smoke теста са неуспешни. Вижте резултатите по-долу."
+                    },
+                    "egressBlocked": {
+                        "title": "Мрежовият достъп беше блокиран",
+                        "suggestion": "Билдът се опита да достигне {hosts}, които не са в списъка с разрешени на builder-а. Вземете нужното от изходното си хранилище или от разрешен регистър, след което пуснете нов билд."
+                    },
+                    "lost": {
+                        "title": "Връзката с този билд е изгубена",
+                        "suggestion": "GitHub спря да отговаря за този билд. Проверете го в GitHub."
+                    },
+                    "unknown": {
+                        "title": "Нещо друго се обърка",
+                        "suggestion": "Отворете логовете в GitHub или помолете агент да провери."
+                    },
+                    "askAgent": "Помолете агент да поправи това",
+                    "excerptLabel": "Последни редове от лога"
+                },
+                "cancelReason": {
+                    "user": "Отменен от член",
+                    "superseded": "Заменен от по-нов билд"
+                },
+                "detail": {
+                    "title": "Билд #{number} · {sha} · {status}",
+                    "loading": "Данните за билда се зареждат…",
+                    "close": "Затваряне",
+                    "trigger": "Задействане",
+                    "triggeredBy": "{trigger} — от {name}",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Продължителност",
+                    "durationValue": "{duration} (в опашката {queued})",
+                    "image": "Образ",
+                    "tags": "Тагове",
+                    "deployable": "Готов за разгръщане",
+                    "yes": "Да",
+                    "buildValues": "Стойности за билда",
+                    "buildValuesValue": "{count, plural, =1 {1 синхронизирана} other {# синхронизирани}}: {names}",
+                    "noBuildValues": "Няма",
+                    "receipt": "Разписка",
+                    "verification": "Проверка",
+                    "copy": "Копиране",
+                    "copied": "Препратката към образа е копирана.",
+                    "copyFailed": "Препратката към образа не можа да бъде копирана.",
+                    "viewLogs": "Преглед на логовете в GitHub",
+                    "rebuildThisCommit": "Нов билд на този commit",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} минути на runner · платени от вашия GitHub акаунт",
+                    "minutesPlatform": "{minutes} минути на runner · платени от Ever Works",
+                    "checksMinutes": "{checksMinutes} от тях са за проверки на приложението",
+                    "costUnknown": "Минутите на runner все още не са отчетени"
+                },
+                "verification": {
+                    "componentsReady": "Компонентите стартираха",
+                    "componentsNotReady": "Компонентите не стартираха",
+                    "job": "Задачата {name} завърши с код {exitCode}",
+                    "jobNoExit": "Задачата {name} не завърши",
+                    "smokePassed": "Успешен: {name}",
+                    "smokeFailed": "Неуспешен: {name} — очаквано {expected}, получено {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Все още няма билдове. Първият билд започва, когато workflow-ът за билд е в хранилището.",
+                    "unavailable": "Билдовете все още не са налични в тази инстанция."
+                },
+                "errors": {
+                    "loadFailed": "Билдовете не можаха да се заредят. Опитайте да обновите страницата.",
+                    "rebuildRateLimited": "Стартирахте твърде много билдове този час. Опитайте отново след {minutes, plural, =1 {1 минута} other {# минути}}.",
+                    "commitNotReachable": "Този commit не е в следения клон.",
+                    "nothingToBuild": "Тази App Работа изпълнява публикуван образ, така че няма какво да се изгражда.",
+                    "notCancellable": "Този билд вече е завършил, така че не може да бъде отменен.",
+                    "providerUnavailable": "В момента няма наличен доставчик на билдове. Опитайте отново по-късно.",
+                    "startFailed": "Билдът не можа да стартира. Опитайте отново.",
+                    "cancelFailed": "Този билд не можа да бъде отменен. Опитайте отново.",
+                    "detailFailed": "Този билд не можа да се зареди. Опитайте отново."
+                },
+                "toasts": {
+                    "started": "Билдът е добавен в опашката.",
+                    "deduped": "Билд за този commit вече е в опашката.",
+                    "cancelled": "Билдът е отменен."
+                },
+                "pullToken": {
+                    "title": "Добавяне на токен за изтегляне",
+                    "body": "Този образ е частен. Вашият клъстер се нуждае от токен, който може само да чете пакети, за да го изтегли.",
+                    "stepCreate": "1. Създайте класически токен, в който е отметнато само „read:packages“.",
+                    "stepPaste": "2. Поставете го тук.",
+                    "label": "Токен",
+                    "submit": "Проверка и запазване",
+                    "saving": "Проверява се…",
+                    "tooBroad": "Този токен може повече от четене на пакети. Създайте такъв само с read:packages.",
+                    "fineGrained": "Това е fine-grained токен. Създайте класически токен, в който е отметнато само read:packages.",
+                    "cannotRead": "Този токен не може да чете {imageRepository}.",
+                    "publicImage": "Този образ вече е публичен — не е нужен токен.",
+                    "noImageYet": "Все още няма завършен билд. Добавете токен за изтегляне след първия успешен билд.",
+                    "savedExpires": "Токенът за изтегляне е запазен. Изтича на {date}.",
+                    "savedNoExpiry": "Токенът за изтегляне е запазен. Не изтича.",
+                    "tokenSet": "Запазен е токен за изтегляне. Поставете нов, за да го замените.",
+                    "expiringSoon": "Токенът за изтегляне изтича на {date}. Добавете нов преди това.",
+                    "viewerDisabled": "Нужен ви е достъп за редактиране, за да направите това.",
+                    "failed": "Токенът за изтегляне не можа да бъде запазен. Опитайте отново."
+                },
+                "overview": {
+                    "title": "Последен билд",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Билд за разгръщане: този commit",
+                    "deployableOther": "Билд за разгръщане: {sha}",
+                    "noDeployable": "Все още няма билд, готов за разгръщане",
+                    "open": "Отваряне на Билдове"
+                }
+            },
+            "appDeploy": {
+                "title": "Разполагане",
+                "notRunning": "Това приложение все още не работи никъде.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Отваряне на приложението",
+                "source": "Източник",
+                "buildsLink": "Към Билдове",
+                "buildsHint": "Билдовете се изпълняват независимо от целта.",
+                "stale": "Последна проверка преди {minutes, plural, =1 {1 минута} other {# минути}}",
+                "status": {
+                    "notDeployed": "Не е разгърнато",
+                    "live": "Активно",
+                    "degraded": "С влошена работа",
+                    "down": "Не работи",
+                    "unreachable": "Няма връзка с вашия клъстер",
+                    "paused": "На пауза",
+                    "deleting": "Изтрива се…"
+                },
+                "target": {
+                    "heading": "Къде да работи?",
+                    "current": "(текуща)",
+                    "none": {
+                        "label": "Никъде — без разгръщане засега",
+                        "description": "Билдовете продължават да се изпълняват."
+                    },
+                    "yourCluster": {
+                        "label": "Вашият клъстер",
+                        "description": "Работи в Kubernetes клъстер, който вие управлявате."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Ние го изпълняваме вместо вас.",
+                        "unavailable": "Очаквайте скоро — управляваният хостинг за приложения все още не е отворен.",
+                        "ineligible": "Все още не е налично за това приложение."
+                    },
+                    "connect": "Свържете своя клъстер",
+                    "reconnect": "Промяна на връзката с клъстера",
+                    "connected": "Свързан · {version}",
+                    "connectedNoVersion": "Свързан",
+                    "checkFailed": "Последната проверка на клъстера е неуспешна.",
+                    "notChecked": "Все още няма свързан клъстер.",
+                    "save": "Използване на тази цел",
+                    "saving": "Запазва се…",
+                    "saved": "Целта е запазена.",
+                    "saveFailed": "Целта не можа да бъде запазена: {reason}",
+                    "changeNote": "Промяната на целта не премахва нищо, което вече работи.",
+                    "routeUnavailable": "Промяната на целта все още не е налична в тази инстанция."
+                },
+                "connect": {
+                    "title": "Свържете своя клъстер",
+                    "description": "Поставете kubeconfig за service account в клъстера, в който трябва да работи това приложение.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Поставете своя kubeconfig…",
+                    "kubeconfigHelp": "Използвайте токен на service account. Команди, локални файлове и проксита не се поддържат.",
+                    "kubeconfigStored": "Вашият kubeconfig беше изпратен веднъж и се съхранява криптиран. Поставете нов, за да го замените, или проверете отново съхранения.",
+                    "contextLabel": "Контекст (по избор)",
+                    "contextHelp": "Оставете празно, за да се използва текущият контекст на kubeconfig.",
+                    "check": "Проверка на връзката",
+                    "checking": "Проверява се…",
+                    "checkAgain": "Нова проверка",
+                    "checkTimedOut": "Проверката не завърши за 30 секунди. Опитайте отново.",
+                    "checkFailed": "Връзката не можа да бъде проверена: {reason}",
+                    "unavailable": "Свързването на клъстер все още не е налично в тази инстанция.",
+                    "kubeconfigTooLarge": "Този kubeconfig е по-голям от 64 KiB.",
+                    "kubeconfigRequired": "Първо поставете kubeconfig.",
+                    "ingressClass": "Ingress клас",
+                    "ingressDefault": "{name} (по подразбиране)",
+                    "ingressNone": "Не е намерен Ingress клас",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Сертификати от издател",
+                        "external": "Обработва се извън клъстера",
+                        "edge": "Терминира се на edge",
+                        "none": "Без TLS (само http)"
+                    },
+                    "issuer": "Издател",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Избира се при първото разгръщане на приложението",
+                    "isolation": "Мрежова изолация",
+                    "isolationOn": "Включена (препоръчително)",
+                    "isolationOff": "Изключена",
+                    "isolationOffWarning": "Без мрежова изолация други натоварвания в клъстера могат да достигнат това приложение и неговите бази данни.",
+                    "cancel": "Отказ",
+                    "save": "Запазване",
+                    "saving": "Запазва се…",
+                    "saveBlocked": "Запазването е възможно, след като проверката премине с всички необходими права.",
+                    "saved": "Клъстерът е свързан.",
+                    "saveFailed": "Връзката с клъстера не можа да бъде запазена: {reason}"
+                },
+                "check": {
+                    "ok": "Свързан",
+                    "version": "Kubernetes {version}",
+                    "failed": "Проверката на клъстера е неуспешна.",
+                    "kubeconfigRefused": "Този kubeconfig {reason}. Вместо това използвайте токен на service account.",
+                    "notPublic": "Ever Works може да достига само клъстери с публичен адрес.",
+                    "permissions": "Права",
+                    "allPermissions": "Всички необходими права са налице.",
+                    "missing": "Липсва: {verb} {resource}",
+                    "optionalMissing": "По избор, липсва: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Разгръщане сега",
+                    "deploying": "Заявява се…",
+                    "started": "Деплоят започна.",
+                    "queued": "В опашката — започва, когато текущият Деплой завърши.",
+                    "deduplicated": "Този Деплой вече е заявен.",
+                    "inProgress": "Изпълнява се друг Деплой ({id}). Изчакайте го да завърши, след което разгърнете отново.",
+                    "preconditionsHeader": "Поправете следното преди разгръщане:",
+                    "workerNotIsolated": "Деплоите все още не могат да започнат: тази инстанция няма изолиран worker за App клъстери.",
+                    "notAppWork": "Тази Работа не е App Работа, така че не може да бъде разгърната по този начин.",
+                    "failed": "Деплоят не можа да бъде заявен: {reason}",
+                    "targetNone": "Първо изберете къде да работи приложението — „Никъде“ не разгръща нищо.",
+                    "deploymentId": "Деплой {id}",
+                    "warningsHeader": "Предупреждения"
+                },
+                "preconditions": {
+                    "specInvalid": "Спецификацията на приложението (.works/works.yml) има грешки. Поправете ги на страницата на спецификацията.",
+                    "licenseBlocksTarget": "Лицензът на приложението не позволява хостването му на тази цел.",
+                    "licenseAttestationMissing": "Потвърдете лиценза на приложението, преди да го разгърнете.",
+                    "envRequiredUnset": "Някои задължителни стойности на средата все още не са зададени.",
+                    "dependencyNotReady": "Зависимост, от която приложението се нуждае, все още не е готова.",
+                    "noGreenBuild": "Все още няма успешен билд за разгръщане. Първо стартирайте билд.",
+                    "noGreenBuildForHead": "Последният commit в клона за разгръщане все още не е изграден успешно.",
+                    "buildImageMissing": "Билдът няма образ за разгръщане.",
+                    "nothingToDeploy": "Все още няма какво да се разгърне: няма билд и няма публикуван образ.",
+                    "imageNotPinned": "Този образ е посочен чрез таг. Фиксирайте го чрез digest, за да изпълнява всеки Деплой един и същ образ.",
+                    "imageNotFound": "Образът не може да бъде намерен в регистъра си.",
+                    "imagePrivateUnsupported": "Този образ не може да бъде изтеглен без идентификационни данни. Ever Works разгръща публикувани образи само когато са публични.",
+                    "imageUnresolvable": "Препратката към образа не можа да бъде разрешена.",
+                    "primaryDomainMissing": "Основният домейн все още не е настроен.",
+                    "targetNone": "Първо изберете къде да работи приложението.",
+                    "targetNotChecked": "Първо проверете връзката с клъстера.",
+                    "clusterChangedUnconfirmed": "Клъстерът се е променил след последния Деплой. Потвърдете промяната, за да разгърнете.",
+                    "managedDisabled": "Очаквайте скоро — управляваният хостинг за приложения все още не е отворен.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps изпълнява само приложения от проверен Blueprint.",
+                    "quotaExceeded": "Достигнахте броя приложения, които можете да изпълнявате в Ever Works Apps.",
+                    "managedIneligible": "Това приложение не може да работи в Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps не може да приема нови приложения в момента.",
+                    "appWorkDeleting": "Тази App Работа се изтрива.",
+                    "paused": "Приложението е на пауза. Възобновете го, за да го разгърнете.",
+                    "deployInProgress": "Изпълнява се друг Деплой.",
+                    "cronAuthEnvUnset": "Планирано извикване се нуждае от стойност за удостоверяване, която не е зададена.",
+                    "jobAuthEnvUnset": "Задача се нуждае от стойност за удостоверяване, която не е зададена.",
+                    "volumeReplicas": "Компонент с том може да работи само с една реплика.",
+                    "volumeShrink": "Том не може да бъде намален.",
+                    "privilegedPort": "Компонент слуша на порт под 1024.",
+                    "cronTooFrequent": "Планирано извикване се изпълнява по-често от разрешеното.",
+                    "managedRootForbidden": "Този образ се изпълнява като root.",
+                    "imageUserUnverifiable": "Ever Works не можа да провери като кой потребител се изпълнява образът.",
+                    "workerNotIsolated": "Деплоите все още не могат да започнат: тази инстанция няма изолиран worker за App клъстери.",
+                    "envSourceUnavailable": "Стойностите на средата на приложението не могат да бъдат прочетени в момента.",
+                    "pullCredentialUnavailable": "Идентификационните данни за изтегляне на образа не са налични.",
+                    "namespaceForeign": "Този namespace вече принадлежи на нещо друго в клъстера.",
+                    "verificationNamespaceForbidden": "Този namespace е запазен за проверки."
+                },
+                "license": {
+                    "loading": "Лицензът се прочита…",
+                    "unavailable": "Данните за лиценза все още не са налични в тази инстанция.",
+                    "error": "Лицензът не можа да бъде прочетен. Презаредете страницата, за да опитате отново.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Не беше открит лиценз, който разпознаваме.",
+                    "classes": {
+                        "green": "Хостването е разрешено",
+                        "amber": "Вашият клъстер, след като потвърдите условията на лиценза",
+                        "red": "Само вашият клъстер, след като потвърдите условията на лиценза",
+                        "unknown": "Неизвестен лиценз — потвърдете условията преди разгръщане",
+                        "unclassified": "Все още не е класифициран"
+                    },
+                    "mixed": "Части от това хранилище използват различен лиценз.",
+                    "incomplete": "Това хранилище е твърде голямо, за да бъде сканирано изцяло.",
+                    "yourClusterAllowed": "Вашият клъстер: разрешено",
+                    "yourClusterAfterConfirm": "Вашият клъстер: разрешено, след като потвърдите условията на лиценза",
+                    "review": "Преглед и потвърждение",
+                    "confirmed": "Потвърдено на {date}.",
+                    "disclaimer": "Това е автоматичен анализ на лицензионните файлове на хранилището, а не правен съвет.",
+                    "unknownSpdx": "Лицензът на този софтуер",
+                    "dialogTitle": "Потвърждаване на условията на лиценза",
+                    "dialogBody": "{spdx} ограничава начина, по който този софтуер може да бъде хостван. Ever Works Apps не е наличен за него. За да го стартирате в собствения си клъстер, потвърдете:",
+                    "noText": "Регистърът на лицензи няма декларация за този лиценз.",
+                    "checkbox": "Потвърждавам горната декларация.",
+                    "footer": "Записваме кой е потвърдил, кога и за кой лиценз и commit.",
+                    "cancel": "Отказ",
+                    "confirm": "Потвърждаване",
+                    "refusals": {
+                        "ownerOnly": "Само собственикът на App Работата може да потвърди.",
+                        "licenseChanged": "Лицензът се промени, докато го преглеждахте. Прегледайте новите условия и потвърдете отново.",
+                        "attestationNotRequired": "Този лиценз вече не изисква потвърждение.",
+                        "licenseUnavailable": "Потвърждаването на лиценз все още не е налично в тази инстанция.",
+                        "route_unavailable": "Потвърждаването на лиценз все още не е налично в тази инстанция.",
+                        "failed": "Потвърждението не можа да бъде записано. Опитайте отново."
+                    }
+                },
+                "rollback": {
+                    "button": "Връщане назад",
+                    "title": "Връщане към по-ранно внедряване",
+                    "description": "Изберете внедряване, което вече е било активно. Неговият образ и спецификация на приложението се стартират отново; нищо не се изгражда наново.",
+                    "pickLabel": "Внедряване, към което да се върнете",
+                    "liveAt": "Активно от {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Беше активно по-рано",
+                    "none": "Няма по-ранно активно внедряване, към което да се върнете.",
+                    "runJobs": "Изпълни отново задачите преди внедряване",
+                    "confirm": "Връщане назад",
+                    "cancel": "Отказ",
+                    "started": "Връщането започна.",
+                    "failed": "Връщането не можа да започне: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Пауза",
+                    "resume": "Продължаване",
+                    "remove": "Премахване от клъстера",
+                    "removeTitle": "Премахване на това приложение от неговия клъстер",
+                    "removeDescription": "Работещото приложение спира и неговите Kubernetes обекти се изтриват. Работата на приложението и нейните изграждания остават.",
+                    "deleteData": "Изтрий и съхранените данни (томове и бази данни на зависимостите)",
+                    "deleteDataWarning": "Това не може да бъде отменено.",
+                    "confirmSlugLabel": "Въведете {slug}, за да потвърдите",
+                    "confirmRemove": "Премахване",
+                    "cancel": "Отказ",
+                    "failed": "Това не можа да бъде изпълнено: {reason}",
+                    "slugMismatch": "Въведеният идентификатор не съвпада с тази работа на приложението.",
+                    "accepted": {
+                        "pause": "Поискана е пауза.",
+                        "resume": "Поискано е продължаване.",
+                        "remove": "Поискано е премахване.",
+                        "cancelDeploy": "Поискана е отмяна."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Имената започват с буква или долна черта и съдържат само A–Z, 0–9 и _.",
+                    "reservedName": "Имената, започващи с EVER_WORKS_, са запазени за платформата.",
+                    "valueTooLarge": "Стойността може да бъде най-много 65 536 байта.",
+                    "controlCharacter": "Стойностите не могат да съдържат символ NUL.",
+                    "lengthMismatch": "Трябва да е точно {expected} символа — тази е {actual}.",
+                    "tooShort": "Трябва да е поне {min} символа.",
+                    "tooLong": "Трябва да е най-много {max} символа.",
+                    "patternMismatch": "Това не отговаря на шаблона, който приложението изисква.",
+                    "generatedValueUseRotate": "Тази стойност е генерирана. Ротирайте я, за да я замените.",
+                    "neverRotateNotAcknowledged": "Според приложението тази стойност никога не трябва да се променя. Потвърдете, че разбирате, преди да я ротирате.",
+                    "rotateConfirmationMismatch": "Въведеното име не съвпада с името на тази стойност.",
+                    "secureStorageUnavailable": "Защитеното хранилище не е конфигурирано в тази инсталация, затова стойности не могат да се съхраняват.",
+                    "tooManyValues": "Едно приложение може да съдържа най-много 300 стойности.",
+                    "valuesTooLarge": "Стойностите на приложението могат да са общо най-много 1 MiB.",
+                    "malformedLine": "Не е валиден ред NAME=value.",
+                    "rotateRateLimited": "Твърде много ротации. Опитайте отново по-късно."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Изчакване",
+                    "awaitingConfig": "Нужни са ваши настройки",
+                    "provisioning": "Осигурява се",
+                    "ready": "Готово",
+                    "degraded": "С влошена работа",
+                    "failed": "Неуспешно",
+                    "kept": "Запазено — вече не се управлява",
+                    "deleting": "Изтрива се",
+                    "deleted": "Изтрито",
+                    "notInSpec": "Вече не се използва от спецификацията на приложението — данните са запазени"
+                },
+                "backup": {
+                    "none": "Няма автоматични резервни копия. Ако този том бъде загубен, данните изчезват.",
+                    "notConfigured": "Резервни копия: не са конфигурирани",
+                    "healthy": "Резервни копия: последно завършено {time}",
+                    "overdue": "Резервни копия: просрочени — последно завършено {time}",
+                    "failing": "Резервни копия: последният опит е неуспешен",
+                    "external": "Резервни копия: управлявани от вашия {kind} доставчик",
+                    "unknown": "Резервни копия: не можаха да бъдат проверени"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Вашият клъстер няма storage class по подразбиране. Изберете такъв в настройките на зависимостите.",
+                    "clusterUnreachable": "Няма връзка с вашия клъстер.",
+                    "smtpConnectFailed": "Не можа да се осъществи връзка с пощенския сървър.",
+                    "smtpTlsFailed": "TLS ръкостискането с пощенския сървър е неуспешно.",
+                    "smtpAuthRefused": "Сървърът отказа влизането.",
+                    "bucketUnreadable": "Bucket {bucket} не съществува или не може да бъде прочетен.",
+                    "volumeNotReady": "Томът не стана готов в рамките на {minutes} минути.",
+                    "extensionUnavailable": "Неналични разширения: {names}.",
+                    "platformServerRefused": "Този сървър съхранява данни на платформата Ever Works. Изберете друг.",
+                    "deadlineExceeded": "Осигуряването не завърши навреме.",
+                    "namespaceNotOwned": "Този namespace принадлежи на друго приложение. Изберете друг.",
+                    "namespaceBaselineMissing": "В namespace-а липсват базовите лимити и политики.",
+                    "clusterPermissionMissing": "Ever Works няма право да създаде тази зависимост във вашия клъстер.",
+                    "operatorNamespaceUnknown": "Namespace-ът на оператора не е зададен в настройките на зависимостите.",
+                    "volumeExpansionUnsupported": "Storage class {storageClass} не може да увеличи този том.",
+                    "sizeShrinkRefused": "Хранилището на зависимост не може да бъде намалено. Първо изтрийте данните ѝ, ако ви трябва по-малко.",
+                    "relayIneligible": "Това приложение не може да използва пощенския релей на Ever Works.",
+                    "relaySuspended": "Пощенският релей на Ever Works е спрян.",
+                    "providerNotSupported": "Този доставчик не може да обслужва тази зависимост.",
+                    "dependencyNotDeclared": "Спецификацията на приложението не декларира тази зависимост.",
+                    "confirmationMismatch": "Въведеното име не съвпада.",
+                    "deleteInProgress": "Данните на тази зависимост вече се изтриват.",
+                    "notGenerated": "Тази стойност не е генерирана, така че няма какво да се ротира.",
+                    "notAppWork": "Тази Работа не е приложение.",
+                    "targetNone": "Това приложение все още не е настроено да се разгръща никъде. Изберете цел за разгръщане, за да осигурите зависимостите му.",
+                    "targetNotChecked": "Вашият клъстер все още не е преминал проверката. Проверете връзката, след което опитайте отново."
+                }
             }
         },
         "newPage": {
@@ -6894,7 +7514,8 @@
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
                 "repo": "Хранилище",
-                "company": "Company"
+                "company": "Company",
+                "app": "Приложение"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6907,7 +7528,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Съществуващо кодово хранилище като Работа — задачи, цели и изпълнения на флота се прикачват към него. Нищо не се генерира или разгръща.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Стартирайте и развивайте всяко GitHub хранилище — свържете го или направете форк, след което изберете къде да работи."
             },
             "submit": "Create",
             "submitTitle": "Създай",
@@ -6952,7 +7574,8 @@
                 "blog": "Блог",
                 "directory": "Директория",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Хранилище"
+                "repo": "Хранилище",
+                "app": "Приложение"
             },
             "kindDescriptions": {
                 "website": "Многостраничен сайт за бизнес, услуга или марка — генерирано съдържание + код.",
@@ -6960,7 +7583,8 @@
                 "blog": "Блог с категории, RSS, подчертаване на код и съдържание, готово за SEO.",
                 "directory": "Подбран сайт директория с търсене, филтри и структурирани данни за елементите.",
                 "awesome-repo": "Хранилище от тип awesome-list — markdown индекс, категоризирани връзки и обновяеми метаданни.",
-                "repo": "Съществуващо кодово хранилище като Работа — задачи, цели и изпълнения на флота се прикачват към него. Нищо не се генерира или разгръща."
+                "repo": "Съществуващо кодово хранилище като Работа — задачи, цели и изпълнения на флота се прикачват към него. Нищо не се генерира или разгръща.",
+                "app": "Стартирайте и развивайте всяко GitHub хранилище — свържете го или направете форк, след което изберете къде да работи."
             },
             "promptHints": {
                 "minLength": "Добави описание (поне 10 символа), за да започнеш.",
@@ -7365,6 +7989,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "напр. „https://github.com/owner/repo — приложение с отворен код, от което искате собствено копие“",
+                "formTitle": "Нова App Работа",
+                "formSubtitle": "Започнете от всяко GitHub хранилище. Ever Works го свързва или прави ваше собствено копие, след което ви помага да го стартирате и да продължите да го променяте.",
+                "urlLabel": "URL на хранилището",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Всяко GitHub хранилище, което свързаният ви акаунт може да чете.",
+                "checkButton": "Проверка на хранилището",
+                "checking": "Проверява се…",
+                "tabPaste": "Поставяне на URL",
+                "tabCatalog": "Разглеждане на каталога с приложения",
+                "catalogComingSoon": "Каталогът с приложения скоро ще се отваря тук. Засега поставете URL на хранилище.",
+                "stars": "{count, plural, =1 {1 звезда} other {# звезди}}",
+                "defaultBranch": "Клон по подразбиране: {branch}",
+                "largeRepository": "Голямо хранилище ({size})",
+                "moved": "Преместено в {fullName}",
+                "isFork": "Това хранилище е форк на {parent}.",
+                "ownFork": "Това е вашият форк на {parent}. Ever Works ще следва {parent} като upstream.",
+                "publicForkNote": "Форковете на публични хранилища са публични.",
+                "archivedNote": "Това хранилище е архивирано. Синхронизацията с upstream остава изключена.",
+                "licenseChip": "Лиценз: {spdx}",
+                "licenseNotDetected": "Лиценз: не е открит",
+                "licenseClass": {
+                    "green": "Хостването е разрешено",
+                    "amber": "Вашият клъстер, след като потвърдите лиценза",
+                    "red": "Вашият клъстер, след като потвърдите лиценза",
+                    "unknown": "Неизвестен лиценз — ще го потвърдите преди разгръщане"
+                },
+                "blueprintBadge": {
+                    "verified": "Проверен Blueprint",
+                    "available": "Наличен Blueprint",
+                    "none": "Няма Blueprint — агент ще установи как да се стартира",
+                    "unavailable": "Проверката за Blueprint не е налична"
+                },
+                "existingAppWork": "Вече имате App Работа за това хранилище: {name}.",
+                "openExistingAppWork": "Отваряне",
+                "scanIncomplete": "Не всички акаунти бяха проверени за съществуващ форк.",
+                "modesTitle": "Как Ever Works да използва това хранилище?",
+                "modes": {
+                    "link": {
+                        "title": "Свързване",
+                        "titleOwnFork": "Свързване — без следване на upstream",
+                        "description": "Използвайте хранилището такова, каквото е. Можете да изпращате (push) в него, така че промените попадат директно тук."
+                    },
+                    "fork": {
+                        "title": "Форк",
+                        "description": "Направете собствен форк. Можете да го синхронизирате с upstream и да предлагате промени обратно."
+                    },
+                    "private-copy": {
+                        "title": "Частно копие",
+                        "description": "Създайте частно хранилище със същия код."
+                    }
+                },
+                "unavailable": "Не е налично: {reason}",
+                "forkInto": "Форк в",
+                "copyInto": "Копиране в",
+                "ownerFilter": "Търсене на акаунти",
+                "ownerOrganization": "организация",
+                "ownerNotChecked": "не е проверен за съществуващ форк",
+                "existingFork": "Вече имате форк: {fullName}. Ever Works ще го използва.",
+                "privateCopyTradeOff": "Частното копие не е свързано с оригинала в GitHub, затова не може да отваря pull request-и към оригиналния проект. Промените от upstream пристигат като pull request-и във вашето копие.",
+                "linkSetupNote": "Ever Works отваря pull request, който добавя един файл — .works/works.yml. Слейте го, за да завършите.",
+                "existingForkSetupNote": "Ever Works не е създал този форк, затова отваря pull request, който добавя .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works отваря pull request, който добавя .works/works.yml и файловете на Blueprint. Слейте го, за да завършите.",
+                "existingForkSetupNoteBlueprint": "Ever Works не е създал този форк, затова отваря pull request, който добавя .works/works.yml и файловете на Blueprint.",
+                "promptsTitle": "Стойности, нужни на това приложение",
+                "promptHint": "Blueprint {name} изисква тези стойности. Можете да ги промените по-късно в Настройки.",
+                "promptRequired": "Задължително",
+                "promptsIncomplete": "Първо попълнете стойностите, нужни на приложението.",
+                "autoProvision": "Агент да установи как да се стартира",
+                "autoProvisionHelp": "Започва, когато хранилището е готово. Изразходва AI токени и минути на build runner в рамките на лимитите за осигуряване. Можете да го отмените или да махнете отметката и да го стартирате по-късно от Преглед с Осигуряване.",
+                "deployTargetTitle": "Къде да работи?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Никъде — без разгръщане засега",
+                        "description": "Можете да изберете цел по-късно."
+                    },
+                    "your-cluster": {
+                        "title": "Вашият клъстер",
+                        "description": "Стартирайте го в собствения си Kubernetes клъстер. Ще добавите връзката в раздела Разполагане."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Очаквайте скоро — управляваният хостинг за приложения все още не е отворен."
+                    }
+                },
+                "submit": {
+                    "link": "Свързване и създаване на App Работа",
+                    "fork": "Форк и създаване на App Работа",
+                    "private-copy": "Копиране и създаване на App Работа"
+                },
+                "submitPending": "Създава се…",
+                "nameLabel": "Име",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Описание",
+                "slugHelp": "Идентификатор, подходящ за URL. Извлича се от името на хранилището — редактирайте, за да го промените.",
+                "invalidSlug": "Използвайте само малки латински букви, цифри и тирета, например tasks-app",
+                "cancel": "Отказ",
+                "createFailed": "App Работата не можа да бъде създадена. Опитайте отново.",
+                "success": {
+                    "link": "App Работата е създадена.",
+                    "fork": "Форкът е заявен — ще ви уведомим, когато е готов.",
+                    "private-copy": "Копирането започна — ще ви уведомим, когато е готово."
+                },
+                "reasons": {
+                    "invalid_url": "Въведете URL адрес на GitHub хранилище, например https://github.com/owner/repo",
+                    "provider_not_connected": "Свържете GitHub, за да създадете App Работа.",
+                    "insufficient_scope": "Свържете отново GitHub, за да предоставите достъп до хранилищата.",
+                    "not_found": "Не намерихме това хранилище или вашият GitHub акаунт няма право да го чете.",
+                    "sso_authorization_required": "{owner} изисква да оторизирате Ever Works за своята организация в GitHub.",
+                    "oauth_app_restricted": "{owner} ограничава достъпа на трети страни. Помолете собственик на {owner} да одобри Ever Works или изберете друг акаунт.",
+                    "empty_repository": "Това хранилище все още няма commit-и.",
+                    "no_push_access": "Нямате право да изпращате (push) в това хранилище.",
+                    "archived": "Архивираните хранилища са само за четене.",
+                    "forking_disabled": "Собственикът на това хранилище не разрешава форкове или копия.",
+                    "own_repository": "Вие притежавате това хранилище — вместо това го свържете.",
+                    "target_owner_unavailable": "Този акаунт не е достъпен през вашата връзка с GitHub.",
+                    "target_owner_forbidden": "Не можете да създавате хранилища в {owner}.",
+                    "too_large_for_private_copy": "Твърде голямо за частно копие ({size}). Вместо това направете форк.",
+                    "uses_lfs": "Използва Git LFS, което частното копие не може да пренесе. Вместо това направете форк.",
+                    "copy_name_unavailable": "{owner} вече има хранилища с имена от {name} до {name}-copy-5.",
+                    "in_use_by_another_account": "Друг акаунт вече използва това хранилище в Ever Works. Помолете собственика му да ви добави като член.",
+                    "app_work_exists": "Вече имате App Работа за {fullName}: {workName}.",
+                    "create_in_progress": "Тази App Работа вече се създава.",
+                    "rate_limited": "GitHub ограничава честотата на заявките от вашия акаунт. Опитайте отново в {time}.",
+                    "managed_hosting_unavailable": "Очаквайте скоро — управляваният хостинг за приложения все още не е отворен.",
+                    "cluster_target_unavailable": "Не е инсталирана опция за разгръщане, която може да стартира приложения.",
+                    "app_works_disabled": "App Работите не са налични в тази инстанция.",
+                    "blueprint_mismatch": "Blueprint за това хранилище се промени. Проверете хранилището отново."
+                },
+                "catalog": {
+                    "searchLabel": "Търсене в каталога с приложения",
+                    "searchPlaceholder": "Търсене на приложения — например umami или calendar",
+                    "listLabel": "Blueprint-и за приложения",
+                    "loading": "Каталогът с приложения се зарежда…",
+                    "unavailable": "Каталогът с приложения не е наличен в момента. Вместо това поставете URL на хранилище.",
+                    "disabled": "App Работите не са налични в тази инстанция.",
+                    "error": "Каталогът с приложения не можа да се зареди. Опитайте отново или поставете URL на хранилище.",
+                    "empty": "Все още няма публикувани Blueprint-и за приложения. Вместо това поставете URL на хранилище.",
+                    "noMatches": "Няма приложения, отговарящи на търсенето.",
+                    "pick": "Започване от {name}",
+                    "statusBeta": "Бета",
+                    "statusPlaceholder": "Очаквайте скоро",
+                    "verified": "Проверен",
+                    "upstreamLine": "От {repo}",
+                    "runsOn": "Работи на: {targets}",
+                    "targetYourCluster": "Вашият клъстер",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Все още не е налично",
+                    "fallbackNote": "Показват се Blueprint-ите за приложения, намерени в GitHub — подбраният каталог не е наличен в момента."
+                }
             }
         },
         "gitProvider": {
@@ -9266,6 +10042,13 @@
                 "started": "Импортирането започна успешно",
                 "failed": "Неуспешно импортиране на работа",
                 "fetchReposFailed": "Неуспешно зареждане на хранилища"
+            },
+            "app": {
+                "repositoryUrlRequired": "Въведете URL адрес на GitHub хранилище, например https://github.com/owner/repo",
+                "repositoryModeRequired": "Изберете как да се използва това хранилище: Свързване, Форк или Частно копие.",
+                "targetOwnerRequired": "Изберете акаунта, в който да се създаде хранилището.",
+                "invalidUrl": "Въведете URL адрес на GitHub хранилище, например https://github.com/owner/repo",
+                "inspectFailed": "Хранилището не можа да бъде проверено. Опитайте отново."
             }
         },
         "generator": {

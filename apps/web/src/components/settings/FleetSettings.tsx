@@ -46,6 +46,7 @@ import {
     rotateFleetNodeCredentialAction,
     updateFleetNodeAction,
     setFleetNodeLimitCeilingAction,
+    clearFleetNodeModelThrottleAction,
 } from '@/app/actions/settings/fleet';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { FleetCostCeiling } from './FleetCostCeiling';
@@ -55,6 +56,7 @@ import { FleetKillSwitchBanner } from './FleetKillSwitchBanner';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
 import { isEmptyLimitCeiling, keepIfStillOpen } from './fleet-node-limits.shared';
 import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
+import { describeFleetModelProvider } from '@ever-works/contracts';
 import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
 
@@ -382,6 +384,27 @@ export function FleetSettings({
         });
     };
 
+    /** Fleet usage limits: "clear limit now" for one CLI on the open node. */
+    const handleClearModelThrottle = (provider: string | null) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await clearFleetNodeModelThrottleAction(target.id, provider);
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data : entry)),
+                );
+                setDrawerNode((prev) => keepIfStillOpen(prev, result.data));
+                setDrawerDetail((prev) =>
+                    prev && prev.node.id === result.data.id ? { ...prev, node: result.data } : prev,
+                );
+                toast.success(t('modelThrottles.cleared'));
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
     const handleDrain = (drain: boolean) => {
         const target = drawerNode;
         if (!target) return;
@@ -528,6 +551,28 @@ export function FleetSettings({
                                             />
                                             {t(`statuses.${node.status}` as never)}
                                         </span>
+                                        {/* Fleet usage limits: "online" alone hid a
+                                            machine whose model CLI is out of quota. */}
+                                        {(node.modelThrottles ?? []).map((throttle) => (
+                                            <span
+                                                key={throttle.provider}
+                                                className="mt-1 flex w-fit items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-warning/10 text-warning whitespace-nowrap"
+                                                title={throttle.reason}
+                                                data-testid={`fleet-node-throttle-${node.id}-${throttle.provider}`}
+                                            >
+                                                {t('modelThrottles.entry', {
+                                                    cli: describeFleetModelProvider(
+                                                        throttle.provider,
+                                                    ),
+                                                    window: t(
+                                                        `modelThrottles.windows.${throttle.window}` as never,
+                                                    ),
+                                                    until: new Date(
+                                                        throttle.until,
+                                                    ).toLocaleString(),
+                                                })}
+                                            </span>
+                                        ))}
                                     </td>
                                     <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
                                         {node.platform ?? '-'}
@@ -874,6 +919,7 @@ export function FleetSettings({
                 onSaveCapabilities={handleSaveCapabilities}
                 onSaveCostCeiling={handleSaveCostCeiling}
                 onSaveLimitCeiling={handleSaveLimitCeiling}
+                onClearModelThrottle={handleClearModelThrottle}
                 onRotate={handleRotate}
                 onDrain={handleDrain}
             />

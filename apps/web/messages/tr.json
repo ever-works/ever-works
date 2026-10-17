@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Work'i tek seferlik veya zamanlanmış üret",
                     "deploy": "Work'i dağıt",
                     "tasks": "Bu Work için görevler",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Deponuzdan derlenen container imajları"
                 },
                 "tasks": "Görevler",
                 "posts": "Gönderiler",
                 "pages": "Sayfalar",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Derlemeler"
             },
             "members": {
                 "title": "Takım Üyeleri",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Kaynak depo: {fullName}",
+                    "fork": "Çatal: {fullName}",
+                    "private-copy": "Özel kopya: {fullName}",
+                    "link": "Bağlı: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Çatalınız hazırlanıyor",
+                    "forkBody": "GitHub {fullName} deposunu oluşturuyor. Bu genellikle bir dakikadan kısa sürer; büyük depolar daha uzun sürebilir.",
+                    "copyTitle": "Özel kopyanız hazırlanıyor",
+                    "copyBody": "{upstream}, {fullName} içine kopyalanıyor. Büyük depolar daha uzun sürer.",
+                    "linkTitle": "Kurulum tamamlanıyor",
+                    "linkBody": "{fullName} deposuna .works/works.yml ekleyen bir pull request açılıyor.",
+                    "blueprintTitle": "{name} Blueprint'i uygulanıyor",
+                    "blueprintBody": "Ever Works App Work'ünüzü hazırlıyor ve .works/works.yml dosyasını Blueprint'in dosyalarıyla birlikte yazacak."
+                },
+                "setupPrClosed": "Kurulum pull request'i birleştirilmeden kapatıldı.",
+                "timedOut": "Çatalınızın oluşturulması 15 dakikadan uzun sürüyor.",
+                "failedAccess": "Ever Works bu App Work'ü hazırlarken GitHub erişimini kaybetti.",
+                "failedOther": "Bu App Work hazırlanamadı: {reason}",
+                "waitingForSetupPr": "Tamamlamak için kurulum pull request'ini birleştirin.",
+                "tryAgain": "Tekrar dene",
+                "openOnGitHub": "GitHub'da aç",
+                "reconnectGitHub": "GitHub'ı yeniden bağla",
+                "openPullRequest": "Pull request'i aç",
+                "retryLimit": "Bu saat için 3 yeniden deneme hakkınızın tümünü kullandınız. Daha sonra tekrar deneyin.",
+                "retryFailed": "Yeni bir deneme başlatılamadı. Tekrar deneyin.",
+                "failedReasons": {
+                    "works_yml_unparseable": "Varsayılan daldaki .works/works.yml geçerli bir YAML değil. Dosyayı düzeltin veya kaldırın, ardından tekrar deneyin.",
+                    "works_yml_other_kind": ".works/works.yml zaten farklı türde bir Work bildiriyor. kind: app olarak ayarlayın veya dosyayı kaldırın, ardından tekrar deneyin.",
+                    "push_rejected": "GitHub, .works/works.yml ekleyen commit'i reddetmeye devam etti.",
+                    "provider_unsupported": "Bu deponun Git sağlayıcısı otomatik olarak kurulamıyor.",
+                    "too_large_for_private_copy": "Depo özel kopya için çok büyük. Bunun yerine bir çatal oluşturun.",
+                    "uses_lfs": "Depo, özel kopyanın aktaramadığı Git LFS'i kullanıyor. Bunun yerine bir çatal oluşturun.",
+                    "other": "Depo kurulurken bir sorun oluştu."
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "Work Deposu",
+                    "upstream": "Kaynak depo",
+                    "relationLabel": "İlişki",
+                    "readinessLabel": "Hazırlık durumu",
+                    "readiness": {
+                        "preparing": "Hazırlanıyor",
+                        "ready": "Hazır",
+                        "timed_out": "Zaman aşımı",
+                        "failed": "Başarısız",
+                        "waiting_for_setup_pr": "Kurulum pull request'i bekleniyor"
+                    },
+                    "relations": {
+                        "link": "Bağlı",
+                        "fork": "Çatal",
+                        "private-copy": "Özel kopya"
+                    },
+                    "appSpecLabel": "Uygulama belirtimi",
+                    "appSpecStatus": {
+                        "valid": "Geçerli",
+                        "valid_with_warnings": "Geçerli, uyarılarla",
+                        "invalid": "Hatalar var",
+                        "missing": "Henüz yazılmadı",
+                        "unreadable": "Okunamadı",
+                        "pending": "Kontrol ediliyor",
+                        "unknown": "Henüz kontrol edilmedi"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Hata yok} =1 {1 hata} other {# hata}} · {warnings, plural, =0 {uyarı yok} =1 {1 uyarı} other {# uyarı}}",
+                    "openAppSpec": "Uygulama belirtimini aç",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "App ayrıntıları şu anda yüklenemedi.",
+                    "builds": "Derlemeler",
+                    "deploy": "Dağıt",
+                    "upstreamTab": "Kaynak depo",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Ajanıyla geliştirin",
+                    "body": "Uygulamayı değiştirmesi için Work'ün ajanından isteyin — bir özellik ekleyin, bir hatayı düzeltin, bir bağımlılığı yükseltin. Ajan Work Deposunda çalışır ve pull request açar.",
+                    "button": "Bu App hakkında sohbet et"
+                }
+            },
+            "builds": {
+                "title": "Derlemeler",
+                "subtitle": "{repository} içinde GitHub tarafından barındırılan runner'larda derlenir · imaj {imageRepository}",
+                "subtitleNoImage": "{repository} içinde GitHub tarafından barındırılan runner'larda derlenir",
+                "subtitleGeneric": "Bu App Work'ün deposundan derlenen container imajları.",
+                "startBuild": "Derlemeyi başlat",
+                "starting": "Başlatılıyor…",
+                "refresh": "Yenile",
+                "cancel": "İptal",
+                "cancelling": "İptal ediliyor…",
+                "viewerDisabled": "Bunu yapmak için düzenleme erişiminiz olmalı.",
+                "deployable": "Dağıtılabilir",
+                "notDeployableLine": "Dağıtılamaz — {reason}",
+                "pagination": "{total} kayıttan {start}–{end} gösteriliyor",
+                "listLabel": "Bu App Work'ün derlemeleri",
+                "openDetails": "#{number} numaralı derlemeyi aç",
+                "status": {
+                    "queued": "Sırada",
+                    "running": "Çalışıyor",
+                    "succeeded": "Başarılı",
+                    "failed": "Başarısız",
+                    "cancelled": "İptal edildi",
+                    "blocked": "Engellendi"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Manuel",
+                    "verification": "Doğrulama"
+                },
+                "notDeployable": {
+                    "notSucceeded": "Derleme başarılı olmadı",
+                    "pullRequest": "Bir pull request'ten derlendi",
+                    "verification": "Doğrulama için derlendi",
+                    "specInvalid": "Bu commit'teki uygulama belirtiminde hatalar var",
+                    "staleInputs": "Eski derleme değerleriyle derlendi",
+                    "secretCheckFailed": "Gizli bilgi kontrolü geçilemedi",
+                    "digestUnconfirmed": "Gönderilen imaj doğrulanamadı",
+                    "criticalVulnerability": "Düzeltmesi mevcut olan kritik bir güvenlik açığı var",
+                    "unsigned": "İmaj imzalı değil"
+                },
+                "blocked": {
+                    "workflowPending": "Derleme iş akışının birleştirilmesi bekleniyor.",
+                    "workflowEditedByHand": "Derleme iş akışı elle düzenlendi.",
+                    "workflowWriteFailed": "Ever Works derleme iş akışını depoya yazamadı. Bu depodaki bir kural değişikliği reddediyor.",
+                    "actionsDisabled": "Bu depo için GitHub Actions kapalı.",
+                    "missingBuildValues": "{count, plural, =1 {1 derleme değeri} other {# derleme değeri}} bekleniyor: {names}",
+                    "runnerTooSmall": "Bu derleme {needed} gerektiriyor, ancak {visibility} depolar için runner en fazla {max} izin veriyor.",
+                    "tooManyBuildValues": "Bu derleme {count} derleme değeri kullanıyor; en fazla 50'ye izin verilir.",
+                    "buildValueTooLarge": "{name}, bir derlemeye aktarılamayacak kadar büyük (en fazla 48 KB).",
+                    "secretLimitReached": "Depoda daha fazla gizli bilgi için yer yok.",
+                    "strategyNotSupported": "GitHub tarafından barındırılan runner'lar “{strategy}” stratejisiyle derleme yapamaz. Bir Dockerfile ekleyin ve build.strategy değerini dockerfile olarak ayarlayın.",
+                    "specInvalid": "Bu commit'teki uygulama belirtiminde hatalar var.",
+                    "gitConnectionMissing": "Ever Works bu depoya GitHub bağlantınızla erişemiyor.",
+                    "repositoryUnavailable": "{repository} arşivlenmiş, silinmiş veya artık GitHub bağlantınız tarafından erişilemiyor.",
+                    "managedConcurrencyLimit": "Diğer derlemeler bekleniyor: aynı anda uygulama başına en fazla {perWork} ve hesap başına en fazla {perAccount} derleme çalışır.",
+                    "buildValueNameReserved": "{name}, Ever Works tarafından ayrılmıştır ve bir derlemeye aktarılamaz. Ortam girdisini yeniden adlandırın.",
+                    "buildServicePortRequired": "{service} derleme hizmeti bir port gerektiriyor: Ever Works “{image}” imajının hangi portu dinlediğini bilmiyor.",
+                    "verificationDependencyUnsupported": "Doğrulama henüz {kind} başlatamıyor. Kontrol bunun yerine kümede çalışır.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Pull request'i incele",
+                    "turnOnActions": "Aç",
+                    "setValue": "Ayarla",
+                    "useLargerRunner": "Daha büyük bir runner kullan",
+                    "openRepositorySettings": "Depo ayarlarını aç",
+                    "reconnectGithub": "GitHub'ı yeniden bağla",
+                    "rebuild": "Yeniden derle",
+                    "openEnvironment": "Ortamı aç"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Bellek tükendi",
+                        "suggestion": "build.resources.memory değerini artırın (şu an {memory}) veya derlemenin heap boyutunu düşürün. Bu runner'da bir derleme en fazla {max} kullanabilir."
+                    },
+                    "diskFull": {
+                        "title": "Disk alanı tükendi",
+                        "suggestion": "Derleme ayarlarında “Runner diskini geri kazan” seçeneğini açın veya bir .dockerignore dosyasıyla derleme bağlamını küçültün."
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile, {total} adımdan {step}. adımda başarısız oldu",
+                        "suggestion": "Başarısız adım şuydu: {command}. {dockerfile} içinde düzeltip push edin veya bir ajandan düzeltmesini isteyin."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Bağımlılıklar indirilemedi",
+                        "suggestion": "Bir paket veya temel imaj kayıt defteri yanıt vermedi. Birkaç dakika sonra yeniden derleyin; başarısız olmaya devam ederse bağımlı olduğunuz sürümleri sabitleyin."
+                    },
+                    "registryPushDenied": {
+                        "title": "İmaj gönderilemedi",
+                        "suggestion": "Bu depodaki iş akışlarının paket yazmasına izin verin (Settings ▸ Actions ▸ General ▸ Workflow permissions), ardından yeniden derleyin."
+                    },
+                    "missingBuildValue": {
+                        "title": "Bir derleme değeri eksik: {names}",
+                        "suggestion": "Ayarlar ▸ Ortam bölümünde ayarlayın, ardından yeniden derleyin."
+                    },
+                    "secretInImage": {
+                        "title": "Bir gizli bilgi imajın içinde yayımlanacaktı: {name}",
+                        "suggestion": "Bu değeri yalnızca daha önceki bir derleme aşamasında kullanın veya bir derleme gizli bilgisi bağlaması olarak aktarın. Hiçbir şey gönderilmedi."
+                    },
+                    "timeout": {
+                        "title": "{minutes} dakikadan uzun sürdü",
+                        "suggestion": "build.resources.timeoutMinutes değerini artırın (en fazla 180) veya önbellekleme ile derlemeyi hızlandırın."
+                    },
+                    "workflowInvalid": {
+                        "title": "İş akışı dosyası geçersiz",
+                        "suggestion": "GitHub derleme iş akışını çalıştıramıyor. Geri yüklemek için Ever Works'ün açtığı pull request'i inceleyin."
+                    },
+                    "digestMismatch": {
+                        "title": "Gönderilen imaj doğrulanamadı",
+                        "suggestion": "Kayıt defteri, derlemenin bildirdiğinden farklı bir imaj raporladı. Yeniden derleyin; doğrulanmamış hiçbir şey dağıtılmaz."
+                    },
+                    "verificationFailed": {
+                        "title": "Uygulama smoke testlerini geçemedi",
+                        "suggestion": "{total} smoke testinden {failed} tanesi başarısız oldu. Sonuçları aşağıda görebilirsiniz."
+                    },
+                    "egressBlocked": {
+                        "title": "Ağ erişimi engellendi",
+                        "suggestion": "Derleme, derleyicinin izin listesinde olmayan {hosts} adreslerine erişmeye çalıştı. İhtiyacınız olanı kaynak deponuzdan veya izin verilen bir kayıt defterinden alın, ardından yeniden derleyin."
+                    },
+                    "lost": {
+                        "title": "Bu derlemenin izi kaybedildi",
+                        "suggestion": "GitHub bu derleme hakkında yanıt vermeyi bıraktı. GitHub'da kontrol edin."
+                    },
+                    "unknown": {
+                        "title": "Başka bir sorun oluştu",
+                        "suggestion": "Günlükleri GitHub'da açın veya bir ajandan incelemesini isteyin."
+                    },
+                    "askAgent": "Bunu düzeltmesi için bir ajandan iste",
+                    "excerptLabel": "Günlüğün son satırları"
+                },
+                "cancelReason": {
+                    "user": "Bir üye tarafından iptal edildi",
+                    "superseded": "Daha yeni bir derlemeyle değiştirildi"
+                },
+                "detail": {
+                    "title": "Derleme #{number} · {sha} · {status}",
+                    "loading": "Derleme ayrıntıları yükleniyor…",
+                    "close": "Kapat",
+                    "trigger": "Tetikleyici",
+                    "triggeredBy": "{trigger} — {name} tarafından",
+                    "commit": "Commit",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Runner",
+                    "duration": "Süre",
+                    "durationValue": "{duration} (sırada {queued})",
+                    "image": "İmaj",
+                    "tags": "Etiketler",
+                    "deployable": "Dağıtılabilir",
+                    "yes": "Evet",
+                    "buildValues": "Derleme değerleri",
+                    "buildValuesValue": "{count, plural, =1 {1 senkronize edildi} other {# senkronize edildi}}: {names}",
+                    "noBuildValues": "Yok",
+                    "receipt": "Fiş",
+                    "verification": "Doğrulama",
+                    "copy": "Kopyala",
+                    "copied": "İmaj referansı kopyalandı.",
+                    "copyFailed": "İmaj referansı kopyalanamadı.",
+                    "viewLogs": "Günlükleri GitHub'da görüntüle",
+                    "rebuildThisCommit": "Bu commit'i yeniden derle",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} runner dakikası · GitHub hesabınız tarafından ödenir",
+                    "minutesPlatform": "{minutes} runner dakikası · Ever Works tarafından ödenir",
+                    "checksMinutes": "Bunların {checksMinutes} dakikası App kontrollerini çalıştırdı",
+                    "costUnknown": "Runner dakikaları henüz bildirilmedi"
+                },
+                "verification": {
+                    "componentsReady": "Bileşenler başlatıldı",
+                    "componentsNotReady": "Bileşenler başlamadı",
+                    "job": "{name} işi {exitCode} koduyla çıktı",
+                    "jobNoExit": "{name} işi tamamlanmadı",
+                    "smokePassed": "Geçti: {name}",
+                    "smokeFailed": "Başarısız: {name} — beklenen {expected}, alınan {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Henüz derleme yok. İlk derleme, derleme iş akışı depoya eklendiğinde başlar.",
+                    "unavailable": "Derlemeler bu örnekte henüz kullanılamıyor."
+                },
+                "errors": {
+                    "loadFailed": "Derlemeler yüklenemedi. Sayfayı yenilemeyi deneyin.",
+                    "rebuildRateLimited": "Bu saat içinde çok fazla derleme başlattınız. {minutes, plural, =1 {1 dakika} other {# dakika}} sonra tekrar deneyin.",
+                    "commitNotReachable": "Bu commit izlenen dalda değil.",
+                    "nothingToBuild": "Bu App Work yayımlanmış bir imajı çalıştırıyor, bu yüzden derlenecek bir şey yok.",
+                    "notCancellable": "Bu derleme zaten tamamlandı, bu yüzden iptal edilemez.",
+                    "providerUnavailable": "Şu anda kullanılabilir bir derleme sağlayıcısı yok. Daha sonra tekrar deneyin.",
+                    "startFailed": "Derleme başlatılamadı. Tekrar deneyin.",
+                    "cancelFailed": "Bu derleme iptal edilemedi. Tekrar deneyin.",
+                    "detailFailed": "Bu derleme yüklenemedi. Tekrar deneyin."
+                },
+                "toasts": {
+                    "started": "Derleme sıraya alındı.",
+                    "deduped": "Bu commit için zaten sırada bir derleme var.",
+                    "cancelled": "Derleme iptal edildi."
+                },
+                "pullToken": {
+                    "title": "Çekme token'ı ekleyin",
+                    "body": "Bu imaj özel. Kümenizin onu indirmek için yalnızca paketleri okuyabilen bir token'a ihtiyacı var.",
+                    "stepCreate": "1. Yalnızca “read:packages” işaretli bir klasik token oluşturun.",
+                    "stepPaste": "2. Buraya yapıştırın.",
+                    "label": "Token",
+                    "submit": "Kontrol et ve kaydet",
+                    "saving": "Kontrol ediliyor…",
+                    "tooBroad": "Bu token paket okumaktan fazlasını yapabiliyor. Yalnızca read:packages yetkisine sahip bir token oluşturun.",
+                    "fineGrained": "Bu ayrıntılı (fine-grained) bir token. Yalnızca read:packages işaretli bir klasik token oluşturun.",
+                    "cannotRead": "Bu token {imageRepository} deposunu okuyamıyor.",
+                    "publicImage": "Bu imaj zaten herkese açık — token gerekmez.",
+                    "noImageYet": "Henüz tamamlanmış bir derleme yok. İlk başarılı derlemeden sonra bir çekme token'ı ekleyin.",
+                    "savedExpires": "Çekme token'ı kaydedildi. {date} tarihinde sona eriyor.",
+                    "savedNoExpiry": "Çekme token'ı kaydedildi. Süresi dolmaz.",
+                    "tokenSet": "Bir çekme token'ı kayıtlı. Değiştirmek için yenisini yapıştırın.",
+                    "expiringSoon": "Çekme token'ı {date} tarihinde sona eriyor. O tarihten önce yenisini ekleyin.",
+                    "viewerDisabled": "Bunu yapmak için düzenleme erişiminiz olmalı.",
+                    "failed": "Çekme token'ı kaydedilemedi. Tekrar deneyin."
+                },
+                "overview": {
+                    "title": "Son derleme",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Dağıtılabilir derleme: bu commit",
+                    "deployableOther": "Dağıtılabilir derleme: {sha}",
+                    "noDeployable": "Henüz dağıtılabilir derleme yok",
+                    "open": "Derlemeleri aç"
+                }
+            },
+            "appDeploy": {
+                "title": "Dağıt",
+                "notRunning": "Bu uygulama henüz hiçbir yerde çalışmıyor.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Uygulamayı aç",
+                "source": "Kaynak",
+                "buildsLink": "Derlemeleri gör",
+                "buildsHint": "Derlemeler hedef ne olursa olsun çalışmaya devam eder.",
+                "stale": "Son kontrol {minutes, plural, =1 {1 dakika} other {# dakika}} önce",
+                "status": {
+                    "notDeployed": "Dağıtılmadı",
+                    "live": "Canlı",
+                    "degraded": "Performans düşük",
+                    "down": "Çalışmıyor",
+                    "unreachable": "Kümenize erişilemiyor",
+                    "paused": "Duraklatıldı",
+                    "deleting": "Siliniyor…"
+                },
+                "target": {
+                    "heading": "Nerede çalışmalı?",
+                    "current": "(mevcut)",
+                    "none": {
+                        "label": "Hiçbiri — henüz dağıtma",
+                        "description": "Derlemeler çalışmaya devam eder."
+                    },
+                    "yourCluster": {
+                        "label": "Kendi kümeniz",
+                        "description": "Kontrol ettiğiniz bir Kubernetes kümesinde çalışır."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Sizin için biz çalıştırırız.",
+                        "unavailable": "Çok yakında — uygulamalar için yönetilen barındırma henüz açık değil.",
+                        "ineligible": "Bu uygulama için henüz kullanılamıyor."
+                    },
+                    "connect": "Kümenizi bağlayın",
+                    "reconnect": "Küme bağlantısını değiştir",
+                    "connected": "Bağlı · {version}",
+                    "connectedNoVersion": "Bağlı",
+                    "checkFailed": "Son küme kontrolü başarısız oldu.",
+                    "notChecked": "Henüz bağlı küme yok.",
+                    "save": "Bu hedefi kullan",
+                    "saving": "Kaydediliyor…",
+                    "saved": "Hedef kaydedildi.",
+                    "saveFailed": "Hedef kaydedilemedi: {reason}",
+                    "changeNote": "Hedefi değiştirmek, zaten çalışan hiçbir şeyi kaldırmaz.",
+                    "routeUnavailable": "Hedef değiştirme bu örnekte henüz kullanılamıyor."
+                },
+                "connect": {
+                    "title": "Kümenizi bağlayın",
+                    "description": "Bu uygulamanın çalışacağı kümedeki bir hizmet hesabı için kubeconfig yapıştırın.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "kubeconfig dosyanızı yapıştırın…",
+                    "kubeconfigHelp": "Bir hizmet hesabı token'ı kullanın. Komutlar, yerel dosyalar ve proxy'ler desteklenmez.",
+                    "kubeconfigStored": "kubeconfig dosyanız bir kez gönderildi ve şifrelenmiş olarak saklanıyor. Değiştirmek için yenisini yapıştırın veya saklananı yeniden kontrol edin.",
+                    "contextLabel": "Bağlam (isteğe bağlı)",
+                    "contextHelp": "kubeconfig'in geçerli bağlamını kullanmak için boş bırakın.",
+                    "check": "Bağlantıyı kontrol et",
+                    "checking": "Kontrol ediliyor…",
+                    "checkAgain": "Yeniden kontrol et",
+                    "checkTimedOut": "Kontrol 30 saniye içinde tamamlanmadı. Tekrar deneyin.",
+                    "checkFailed": "Bağlantı kontrol edilemedi: {reason}",
+                    "unavailable": "Küme bağlama bu örnekte henüz kullanılamıyor.",
+                    "kubeconfigTooLarge": "Bu kubeconfig 64 KiB'tan büyük.",
+                    "kubeconfigRequired": "Önce bir kubeconfig yapıştırın.",
+                    "ingressClass": "Ingress sınıfı",
+                    "ingressDefault": "{name} (varsayılan)",
+                    "ingressNone": "Ingress sınıfı bulunamadı",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Sertifikalar sağlayıcıdan (issuer)",
+                        "external": "Küme dışında yönetilir",
+                        "edge": "Uçta sonlandırılır",
+                        "none": "TLS yok (yalnızca http)"
+                    },
+                    "issuer": "Sertifika sağlayıcı (issuer)",
+                    "namespace": "Namespace",
+                    "namespaceAuto": "Uygulama ilk kez dağıtıldığında seçilir",
+                    "isolation": "Ağ yalıtımı",
+                    "isolationOn": "Açık (önerilir)",
+                    "isolationOff": "Kapalı",
+                    "isolationOffWarning": "Ağ yalıtımı olmadan kümedeki diğer iş yükleri bu uygulamaya ve veritabanlarına erişebilir.",
+                    "cancel": "İptal",
+                    "save": "Kaydet",
+                    "saving": "Kaydediliyor…",
+                    "saveBlocked": "Kontrol gerekli tüm izinlerle geçtiğinde kaydedebilirsiniz.",
+                    "saved": "Küme bağlandı.",
+                    "saveFailed": "Küme bağlantısı kaydedilemedi: {reason}"
+                },
+                "check": {
+                    "ok": "Bağlı",
+                    "version": "Kubernetes {version}",
+                    "failed": "Küme kontrolü başarısız oldu.",
+                    "kubeconfigRefused": "Bu kubeconfig {reason}. Bunun yerine bir hizmet hesabı token'ı kullanın.",
+                    "notPublic": "Ever Works yalnızca herkese açık bir adresteki kümelere erişebilir.",
+                    "permissions": "İzinler",
+                    "allPermissions": "Gerekli tüm izinler mevcut.",
+                    "missing": "Eksik: {verb} {resource}",
+                    "optionalMissing": "İsteğe bağlı, eksik: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Şimdi dağıt",
+                    "deploying": "İsteniyor…",
+                    "started": "Dağıtım başladı.",
+                    "queued": "Sıraya alındı — çalışan Dağıtım bittiğinde başlar.",
+                    "deduplicated": "Bu Dağıtım zaten istendi.",
+                    "inProgress": "Başka bir Dağıtım çalışıyor ({id}). Bitmesini bekleyin, ardından yeniden dağıtın.",
+                    "preconditionsHeader": "Dağıtmadan önce bunları düzeltin:",
+                    "workerNotIsolated": "Dağıtımlar henüz başlatılamıyor: bu örnekte yalıtılmış bir App küme worker'ı yok.",
+                    "notAppWork": "Bu Work bir App Work değil, bu yüzden bu şekilde dağıtılamaz.",
+                    "failed": "Dağıtım istenemedi: {reason}",
+                    "targetNone": "Önce uygulamanın nerede çalışacağını seçin — Hiçbiri seçeneği hiçbir şey dağıtmaz.",
+                    "deploymentId": "Dağıtım {id}",
+                    "warningsHeader": "Uyarılar"
+                },
+                "preconditions": {
+                    "specInvalid": "Uygulama belirtiminde (.works/works.yml) hatalar var. Bunları Uygulama belirtimi sayfasında düzeltin.",
+                    "licenseBlocksTarget": "Uygulamanın lisansı onu bu hedefte barındırmaya izin vermiyor.",
+                    "licenseAttestationMissing": "Dağıtmadan önce uygulamanın lisansını beyan edin.",
+                    "envRequiredUnset": "Bazı zorunlu env değerleri henüz ayarlanmadı.",
+                    "dependencyNotReady": "Uygulamanın ihtiyaç duyduğu bir bağımlılık henüz hazır değil.",
+                    "noGreenBuild": "Henüz dağıtılacak başarılı bir Derleme yok. Önce bir Derleme başlatın.",
+                    "noGreenBuildForHead": "Dağıtım dalındaki son commit henüz başarıyla derlenmedi.",
+                    "buildImageMissing": "Derlemenin dağıtılacak bir imajı yok.",
+                    "nothingToDeploy": "Henüz dağıtılacak bir şey yok: Derleme de yayımlanmış imaj da yok.",
+                    "imageNotPinned": "Bu imaja etiketle başvuruluyor. Her Dağıtımın aynı imajı çalıştırması için onu digest ile sabitleyin.",
+                    "imageNotFound": "İmaj, kayıt defterinde bulunamıyor.",
+                    "imagePrivateUnsupported": "Bu imaj kimlik bilgileri olmadan indirilemiyor. Ever Works yayımlanmış imajları yalnızca herkese açık olduklarında dağıtır.",
+                    "imageUnresolvable": "İmaj referansı çözümlenemedi.",
+                    "primaryDomainMissing": "Birincil alan adı henüz ayarlanmadı.",
+                    "targetNone": "Önce uygulamanın nerede çalışacağını seçin.",
+                    "targetNotChecked": "Önce küme bağlantısını kontrol edin.",
+                    "clusterChangedUnconfirmed": "Küme, son Dağıtımdan bu yana değişti. Dağıtmak için değişikliği onaylayın.",
+                    "managedDisabled": "Çok yakında — uygulamalar için yönetilen barındırma henüz açık değil.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps yalnızca doğrulanmış bir Blueprint'ten gelen uygulamaları çalıştırır.",
+                    "quotaExceeded": "Ever Works Apps üzerinde çalıştırabileceğiniz uygulama sayısına ulaştınız.",
+                    "managedIneligible": "Bu uygulama Ever Works Apps üzerinde çalışamaz.",
+                    "managedSandboxUnavailable": "Ever Works Apps şu anda yeni uygulama kabul edemiyor.",
+                    "appWorkDeleting": "Bu App Work siliniyor.",
+                    "paused": "Uygulama duraklatıldı. Dağıtmak için devam ettirin.",
+                    "deployInProgress": "Başka bir Dağıtım çalışıyor.",
+                    "cronAuthEnvUnset": "Zamanlanmış bir çağrının ayarlanmamış bir kimlik doğrulama değerine ihtiyacı var.",
+                    "jobAuthEnvUnset": "Bir işin ayarlanmamış bir kimlik doğrulama değerine ihtiyacı var.",
+                    "volumeReplicas": "Birimi olan bir bileşen yalnızca tek bir replika çalıştırabilir.",
+                    "volumeShrink": "Bir birim küçültülemez.",
+                    "privilegedPort": "Bir bileşen 1024'ün altındaki bir portu dinliyor.",
+                    "cronTooFrequent": "Zamanlanmış bir çağrı izin verilenden daha sık çalışıyor.",
+                    "managedRootForbidden": "Bu imaj root olarak çalışıyor.",
+                    "imageUserUnverifiable": "Ever Works imajın hangi kullanıcıyla çalıştığını kontrol edemedi.",
+                    "workerNotIsolated": "Dağıtımlar henüz başlatılamıyor: bu örnekte yalıtılmış bir App küme worker'ı yok.",
+                    "envSourceUnavailable": "Uygulamanın env değerleri şu anda okunamıyor.",
+                    "pullCredentialUnavailable": "İmajı çekmek için gereken kimlik bilgisi mevcut değil.",
+                    "namespaceForeign": "Bu namespace kümede zaten başka bir şeye ait.",
+                    "verificationNamespaceForbidden": "Bu namespace doğrulama çalıştırmaları için ayrılmış."
+                },
+                "license": {
+                    "loading": "Lisans okunuyor…",
+                    "unavailable": "Lisans ayrıntıları bu örnekte henüz kullanılamıyor.",
+                    "error": "Lisans okunamadı. Tekrar denemek için sayfayı yeniden yükleyin.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Tanıdığımız bir lisans bulunamadı.",
+                    "classes": {
+                        "green": "Barındırmaya izin verilir",
+                        "amber": "Lisans koşullarını onayladıktan sonra kendi kümeniz",
+                        "red": "Lisans koşullarını onayladıktan sonra yalnızca kendi kümeniz",
+                        "unknown": "Lisans bilinmiyor — dağıtmadan önce koşulları onaylayın",
+                        "unclassified": "Henüz sınıflandırılmadı"
+                    },
+                    "mixed": "Bu deponun bazı bölümleri farklı bir lisans kullanıyor.",
+                    "incomplete": "Bu depo tamamen taranamayacak kadar büyük.",
+                    "yourClusterAllowed": "Kendi kümeniz: izin verilir",
+                    "yourClusterAfterConfirm": "Kendi kümeniz: lisans koşullarını onayladıktan sonra izin verilir",
+                    "review": "İncele ve onayla",
+                    "confirmed": "{date} tarihinde onaylandı.",
+                    "disclaimer": "Bu, deponun lisans dosyalarının otomatik bir yorumudur, hukuki tavsiye değildir.",
+                    "unknownSpdx": "Bu yazılımın lisansı",
+                    "dialogTitle": "Lisans koşullarını onaylayın",
+                    "dialogBody": "{spdx}, bu yazılımın nasıl barındırılabileceğini kısıtlar. Ever Works Apps bu yazılım için kullanılamaz. Kendi kümenizde çalıştırmak için onaylayın:",
+                    "noText": "Lisans kayıt defterinde bu lisans için bir beyan yok.",
+                    "checkbox": "Yukarıdaki beyanı onaylıyorum.",
+                    "footer": "Kimin, ne zaman, hangi lisans ve commit için onayladığını kaydederiz.",
+                    "cancel": "İptal",
+                    "confirm": "Onayla",
+                    "refusals": {
+                        "ownerOnly": "Yalnızca App Work'ün sahibi beyan edebilir.",
+                        "licenseChanged": "Siz incelerken lisans değişti. Yeni koşulları inceleyin ve tekrar onaylayın.",
+                        "attestationNotRequired": "Bu lisans artık onay gerektirmiyor.",
+                        "licenseUnavailable": "Lisans onayı bu örnekte henüz kullanılamıyor.",
+                        "route_unavailable": "Lisans onayı bu örnekte henüz kullanılamıyor.",
+                        "failed": "Onay kaydedilemedi. Tekrar deneyin."
+                    }
+                },
+                "rollback": {
+                    "button": "Geri al",
+                    "title": "Önceki bir dağıtıma geri dön",
+                    "description": "Daha önce yayında olmuş bir dağıtım seçin. Görüntüsü ve uygulama tanımı yeniden çalışır; hiçbir şey yeniden derlenmez.",
+                    "pickLabel": "Geri dönülecek dağıtım",
+                    "liveAt": "{when, date, medium} {when, time, short} tarihinden beri yayında",
+                    "liveAtUnknown": "Daha önce yayındaydı",
+                    "none": "Geri dönülebilecek önceki bir yayındaki dağıtım yok.",
+                    "runJobs": "Dağıtım öncesi işleri yeniden çalıştır",
+                    "confirm": "Geri al",
+                    "cancel": "İptal",
+                    "started": "Geri alma başlatıldı.",
+                    "failed": "Geri alma başlatılamadı: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Duraklat",
+                    "resume": "Sürdür",
+                    "remove": "Kümeden kaldır",
+                    "removeTitle": "Bu uygulamayı kümesinden kaldır",
+                    "removeDescription": "Çalışan uygulama durur ve Kubernetes nesneleri silinir. App Work ve derlemeleri kalır.",
+                    "deleteData": "Depolanan verileri de sil (birimler ve bağımlılık veritabanları)",
+                    "deleteDataWarning": "Bu işlem geri alınamaz.",
+                    "confirmSlugLabel": "Onaylamak için {slug} yazın",
+                    "confirmRemove": "Kaldır",
+                    "cancel": "İptal",
+                    "failed": "Bu yapılamadı: {reason}",
+                    "slugMismatch": "Yazdığınız kısa ad bu App Work ile eşleşmiyor.",
+                    "accepted": {
+                        "pause": "Duraklatma istendi.",
+                        "resume": "Sürdürme istendi.",
+                        "remove": "Kaldırma istendi.",
+                        "cancelDeploy": "İptal istendi."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Adlar bir harf veya alt çizgiyle başlar ve yalnızca A–Z, 0–9 ve _ kullanır.",
+                    "reservedName": "EVER_WORKS_ ile başlayan adlar platform için ayrılmıştır.",
+                    "valueTooLarge": "Bir değer en fazla 65.536 bayt olabilir.",
+                    "controlCharacter": "Değerler NUL karakteri içeremez.",
+                    "lengthMismatch": "Tam olarak {expected} karakter olmalı — bu {actual} karakter.",
+                    "tooShort": "En az {min} karakter olmalı.",
+                    "tooLong": "En fazla {max} karakter olmalı.",
+                    "patternMismatch": "Bu, uygulamanın istediği kalıpla eşleşmiyor.",
+                    "generatedValueUseRotate": "Bu değer otomatik üretilir. Değiştirmek için yenileyin (rotate).",
+                    "neverRotateNotAcknowledged": "Bu uygulama, bu değerin asla değişmemesi gerektiğini belirtiyor. Yenilemeden önce bunu anladığınızı onaylayın.",
+                    "rotateConfirmationMismatch": "Yazdığınız ad bu değerin adıyla eşleşmiyor.",
+                    "secureStorageUnavailable": "Bu kurulumda güvenli depolama yapılandırılmamış, bu yüzden değerler saklanamıyor.",
+                    "tooManyValues": "Bir uygulama en fazla 300 değer tutabilir.",
+                    "valuesTooLarge": "Bir uygulamanın değerlerinin toplamı en fazla 1 MiB olabilir.",
+                    "malformedLine": "Geçerli bir AD=değer satırı değil.",
+                    "rotateRateLimited": "Çok fazla yenileme. Daha sonra tekrar deneyin."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Beklemede",
+                    "awaitingConfig": "Ayarlarınız gerekiyor",
+                    "provisioning": "Hazırlanıyor",
+                    "ready": "Hazır",
+                    "degraded": "Performans düşük",
+                    "failed": "Başarısız",
+                    "kept": "Korundu — artık yönetilmiyor",
+                    "deleting": "Siliniyor",
+                    "deleted": "Silindi",
+                    "notInSpec": "Uygulama belirtimi artık kullanmıyor — veriler korundu"
+                },
+                "backup": {
+                    "none": "Otomatik yedekleme yok. Bu birim kaybolursa veriler de kaybolur.",
+                    "notConfigured": "Yedeklemeler: yapılandırılmadı",
+                    "healthy": "Yedeklemeler: son tamamlanan {time}",
+                    "overdue": "Yedeklemeler: gecikti — son tamamlanan {time}",
+                    "failing": "Yedeklemeler: son deneme başarısız oldu",
+                    "external": "Yedeklemeler: {kind} sağlayıcınız tarafından yönetiliyor",
+                    "unknown": "Yedeklemeler: kontrol edilemedi"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Kümenizde varsayılan bir depolama sınıfı yok. Bağımlılık ayarlarından bir tane seçin.",
+                    "clusterUnreachable": "Kümenize erişilemedi.",
+                    "smtpConnectFailed": "Posta sunucusuna bağlanılamadı.",
+                    "smtpTlsFailed": "Posta sunucusuyla TLS el sıkışması başarısız oldu.",
+                    "smtpAuthRefused": "Sunucu oturum açmayı reddetti.",
+                    "bucketUnreadable": "{bucket} bucket'ı mevcut değil veya okunamıyor.",
+                    "volumeNotReady": "Birim {minutes} dakika içinde hazır hale gelmedi.",
+                    "extensionUnavailable": "Kullanılamayan uzantılar: {names}.",
+                    "platformServerRefused": "Bu sunucu Ever Works platform verilerini barındırıyor. Başka bir sunucu seçin.",
+                    "deadlineExceeded": "Hazırlama zamanında tamamlanmadı.",
+                    "namespaceNotOwned": "Bu namespace başka bir uygulamaya ait. Başka bir tane seçin.",
+                    "namespaceBaselineMissing": "Namespace'in temel sınırları ve politikaları eksik.",
+                    "clusterPermissionMissing": "Ever Works'ün kümenizde bu bağımlılığı oluşturma izni yok.",
+                    "operatorNamespaceUnknown": "Operatörün namespace'i Bağımlılık ayarlarında belirtilmemiş.",
+                    "volumeExpansionUnsupported": "{storageClass} depolama sınıfı bu birimi büyütemez.",
+                    "sizeShrinkRefused": "Bir bağımlılığın depolama alanı küçültülemez. Daha küçük bir alan gerekiyorsa önce verilerini silin.",
+                    "relayIneligible": "Bu uygulama Ever Works posta aktarıcısını kullanamaz.",
+                    "relaySuspended": "Ever Works posta aktarıcısı askıya alındı.",
+                    "providerNotSupported": "Bu sağlayıcı bu bağımlılığı sunamaz.",
+                    "dependencyNotDeclared": "Uygulama belirtimi bu bağımlılığı bildirmiyor.",
+                    "confirmationMismatch": "Yazdığınız ad eşleşmiyor.",
+                    "deleteInProgress": "Bu bağımlılığın verileri zaten siliniyor.",
+                    "notGenerated": "Bu değer otomatik üretilmiyor, bu yüzden yenilenecek bir şey yok.",
+                    "notAppWork": "Bu Work bir uygulama değil.",
+                    "targetNone": "Bu uygulama henüz hiçbir yere dağıtılacak şekilde ayarlanmadı. Bağımlılıklarını hazırlamak için bir dağıtım hedefi seçin.",
+                    "targetNotChecked": "Kümeniz henüz kontrolden geçmedi. Bağlantıyı kontrol edin, ardından tekrar deneyin."
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "Depo",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Mevcut bir kod deposu Work olarak — görevler, hedefler ve filo çalıştırmaları ona bağlanır. Hiçbir şey üretilmez veya dağıtılmaz.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Herhangi bir GitHub deposunu çalıştırın ve geliştirin — bağlayın veya çatallayın, ardından nerede çalışacağını seçin."
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Depo"
+                "repo": "Depo",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "Mevcut bir kod deposu Work olarak — görevler, hedefler ve filo çalıştırmaları ona bağlanır. Hiçbir şey üretilmez veya dağıtılmaz."
+                "repo": "Mevcut bir kod deposu Work olarak — görevler, hedefler ve filo çalıştırmaları ona bağlanır. Hiçbir şey üretilmez veya dağıtılmaz.",
+                "app": "Herhangi bir GitHub deposunu çalıştırın ve geliştirin — bağlayın veya çatallayın, ardından nerede çalışacağını seçin."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "örn. “https://github.com/owner/repo — kendi kopyanızı istediğiniz açık kaynaklı bir uygulama”",
+                "formTitle": "Yeni App Work",
+                "formSubtitle": "Herhangi bir GitHub deposundan başlayın. Ever Works onu bağlar veya kendi kopyanızı oluşturur, ardından çalıştırmanıza ve değiştirmeye devam etmenize yardımcı olur.",
+                "urlLabel": "Depo URL'si",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Bağlı hesabınızın okuyabildiği herhangi bir GitHub deposu.",
+                "checkButton": "Depoyu kontrol et",
+                "checking": "Kontrol ediliyor…",
+                "tabPaste": "URL yapıştır",
+                "tabCatalog": "App kataloğuna göz at",
+                "catalogComingSoon": "App kataloğu yakında burada açılacak. Şimdilik bir depo URL'si yapıştırın.",
+                "stars": "{count, plural, =1 {1 yıldız} other {# yıldız}}",
+                "defaultBranch": "Varsayılan dal: {branch}",
+                "largeRepository": "Büyük depo ({size})",
+                "moved": "{fullName} konumuna taşındı",
+                "isFork": "Bu depo, {parent} deposunun bir çatalı.",
+                "ownFork": "Bu, {parent} deposunun sizin çatalınız. Ever Works, {parent} deposunu kaynak depo olarak izleyecek.",
+                "publicForkNote": "Herkese açık depoların çatalları herkese açıktır.",
+                "archivedNote": "Bu depo arşivlenmiş. Kaynak depo senkronizasyonu kapalı kalır.",
+                "licenseChip": "Lisans: {spdx}",
+                "licenseNotDetected": "Lisans: algılanmadı",
+                "licenseClass": {
+                    "green": "Barındırmaya izin verilir",
+                    "amber": "Lisansı beyan ettikten sonra kendi kümeniz",
+                    "red": "Lisansı beyan ettikten sonra kendi kümeniz",
+                    "unknown": "Lisans bilinmiyor — dağıtmadan önce beyan edeceksiniz"
+                },
+                "blueprintBadge": {
+                    "verified": "Doğrulanmış Blueprint",
+                    "available": "Blueprint mevcut",
+                    "none": "Blueprint yok — nasıl çalıştırılacağını bir ajan bulacak",
+                    "unavailable": "Blueprint kontrolü kullanılamıyor"
+                },
+                "existingAppWork": "Bu depo için zaten bir App Work'ünüz var: {name}.",
+                "openExistingAppWork": "Aç",
+                "scanIncomplete": "Mevcut bir çatal için tüm hesaplar kontrol edilmedi.",
+                "modesTitle": "Ever Works bu depoyu nasıl kullanmalı?",
+                "modes": {
+                    "link": {
+                        "title": "Bağla",
+                        "titleOwnFork": "Bağla — kaynak depoyu izleme",
+                        "description": "Bu depoyu olduğu gibi kullanın. Ona push yapabildiğiniz için değişiklikler doğrudan buraya gelir."
+                    },
+                    "fork": {
+                        "title": "Çatal",
+                        "description": "Kendi çatalınızı oluşturun. Onu kaynak depoyla senkronize edebilir ve değişiklikleri geri önerebilirsiniz."
+                    },
+                    "private-copy": {
+                        "title": "Özel kopya",
+                        "description": "Aynı koda sahip özel bir depo oluşturun."
+                    }
+                },
+                "unavailable": "Kullanılamıyor: {reason}",
+                "forkInto": "Çatalın oluşturulacağı hesap",
+                "copyInto": "Kopyanın oluşturulacağı hesap",
+                "ownerFilter": "Hesaplarda ara",
+                "ownerOrganization": "kuruluş",
+                "ownerNotChecked": "mevcut bir çatal için kontrol edilmedi",
+                "existingFork": "Zaten bir çatalınız var: {fullName}. Ever Works onu kullanacak.",
+                "privateCopyTradeOff": "Özel kopya GitHub'da orijinale bağlı değildir, bu yüzden orijinal projeye pull request açamaz. Kaynak depodaki değişiklikler kopyanıza pull request olarak gelir.",
+                "linkSetupNote": "Ever Works tek bir dosya, .works/works.yml ekleyen bir pull request açar. Tamamlamak için onu birleştirin.",
+                "existingForkSetupNote": "Bu çatalı Ever Works oluşturmadı, bu yüzden .works/works.yml ekleyen bir pull request açar.",
+                "linkSetupNoteBlueprint": "Ever Works, .works/works.yml dosyasını ve Blueprint'in dosyalarını ekleyen bir pull request açar. Tamamlamak için onu birleştirin.",
+                "existingForkSetupNoteBlueprint": "Bu çatalı Ever Works oluşturmadı, bu yüzden .works/works.yml dosyasını ve Blueprint'in dosyalarını ekleyen bir pull request açar.",
+                "promptsTitle": "Bu uygulamanın ihtiyaç duyduğu değerler",
+                "promptHint": "{name} Blueprint'i bunları istiyor. Daha sonra Ayarlar'dan değiştirebilirsiniz.",
+                "promptRequired": "Zorunlu",
+                "promptsIncomplete": "Önce uygulamanın ihtiyaç duyduğu değerleri doldurun.",
+                "autoProvision": "Nasıl çalıştırılacağını bir ajan bulsun",
+                "autoProvisionHelp": "Depo hazır olduğunda başlar. Hazırlama sınırları dahilinde YZ token'ları ve derleme runner dakikaları harcar. İptal edebilir ya da bu seçeneğin işaretini kaldırıp daha sonra Genel Bakış'tan “Hazırla” ile başlatabilirsiniz.",
+                "deployTargetTitle": "Nerede çalışmalı?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Hiçbiri — henüz dağıtma",
+                        "description": "Hedefi daha sonra seçebilirsiniz."
+                    },
+                    "your-cluster": {
+                        "title": "Kendi kümeniz",
+                        "description": "Kendi Kubernetes kümenizde çalıştırın. Bağlantıyı Dağıt sekmesinde ekleyeceksiniz."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Çok yakında — uygulamalar için yönetilen barındırma henüz açık değil."
+                    }
+                },
+                "submit": {
+                    "link": "Bağla ve App Work oluştur",
+                    "fork": "Çatalla ve App Work oluştur",
+                    "private-copy": "Kopyala ve App Work oluştur"
+                },
+                "submitPending": "Oluşturuluyor…",
+                "nameLabel": "Ad",
+                "slugLabel": "Slug",
+                "descriptionLabel": "Açıklama",
+                "slugHelp": "URL dostu tanımlayıcı. Depo adından türetilir — değiştirmek için düzenleyin.",
+                "invalidSlug": "Yalnızca küçük harf, rakam ve kısa çizgi kullanın, örneğin tasks-app",
+                "cancel": "İptal",
+                "createFailed": "App Work oluşturulamadı. Tekrar deneyin.",
+                "success": {
+                    "link": "App Work oluşturuldu.",
+                    "fork": "Çatal istendi — hazır olduğunda size haber vereceğiz.",
+                    "private-copy": "Kopyalama başladı — hazır olduğunda size haber vereceğiz."
+                },
+                "reasons": {
+                    "invalid_url": "https://github.com/owner/repo gibi bir GitHub depo URL'si girin",
+                    "provider_not_connected": "App Work oluşturmak için GitHub'ı bağlayın.",
+                    "insufficient_scope": "Depo erişimi vermek için GitHub'ı yeniden bağlayın.",
+                    "not_found": "Bu depoyu bulamadık veya GitHub hesabınız onu okuyamıyor.",
+                    "sso_authorization_required": "{owner}, GitHub'da kuruluşu için Ever Works'ü yetkilendirmenizi gerektiriyor.",
+                    "oauth_app_restricted": "{owner} üçüncü taraf erişimini kısıtlıyor. {owner} sahiplerinden birinden Ever Works'ü onaylamasını isteyin veya başka bir hesap seçin.",
+                    "empty_repository": "Bu depoda henüz commit yok.",
+                    "no_push_access": "Bu depoya push yapamazsınız.",
+                    "archived": "Arşivlenmiş depolar salt okunurdur.",
+                    "forking_disabled": "Bu deponun sahibi çatallara veya kopyalara izin vermiyor.",
+                    "own_repository": "Bu depo size ait — bunun yerine bağlayın.",
+                    "target_owner_unavailable": "Bu hesap GitHub bağlantınızda mevcut değil.",
+                    "target_owner_forbidden": "{owner} içinde depo oluşturamazsınız.",
+                    "too_large_for_private_copy": "Özel kopya için çok büyük ({size}). Bunun yerine çatallayın.",
+                    "uses_lfs": "Özel kopyanın aktaramadığı Git LFS'i kullanıyor. Bunun yerine çatallayın.",
+                    "copy_name_unavailable": "{owner} hesabında {name} ile {name}-copy-5 arasındaki tüm adlarla depolar zaten var.",
+                    "in_use_by_another_account": "Başka bir hesap bu depoyu Ever Works'te zaten kullanıyor. Sahibinden sizi üye olarak eklemesini isteyin.",
+                    "app_work_exists": "{fullName} için zaten bir App Work'ünüz var: {workName}.",
+                    "create_in_progress": "Bu App Work zaten oluşturuluyor.",
+                    "rate_limited": "GitHub hesabınıza hız sınırı uyguluyor. {time} itibarıyla tekrar deneyin.",
+                    "managed_hosting_unavailable": "Çok yakında — uygulamalar için yönetilen barındırma henüz açık değil.",
+                    "cluster_target_unavailable": "Uygulama çalıştırabilen bir dağıtım seçeneği kurulu değil.",
+                    "app_works_disabled": "App Work'ler bu örnekte kullanılamıyor.",
+                    "blueprint_mismatch": "Bu deponun Blueprint'i değişti. Depoyu tekrar kontrol edin."
+                },
+                "catalog": {
+                    "searchLabel": "App kataloğunda ara",
+                    "searchPlaceholder": "Uygulama arayın — örneğin umami veya calendar",
+                    "listLabel": "App Blueprint'leri",
+                    "loading": "App kataloğu yükleniyor…",
+                    "unavailable": "App kataloğu şu anda kullanılamıyor. Bunun yerine bir depo URL'si yapıştırın.",
+                    "disabled": "App Work'ler bu örnekte kullanılamıyor.",
+                    "error": "App kataloğu yüklenemedi. Tekrar deneyin veya bir depo URL'si yapıştırın.",
+                    "empty": "Henüz yayınlanmış bir App Blueprint'i yok. Bunun yerine bir depo URL'si yapıştırın.",
+                    "noMatches": "Aramanızla eşleşen uygulama yok.",
+                    "pick": "{name} ile başla",
+                    "statusBeta": "Beta",
+                    "statusPlaceholder": "Çok yakında",
+                    "verified": "Doğrulanmış",
+                    "upstreamLine": "Kaynak: {repo}",
+                    "runsOn": "Çalıştığı yer: {targets}",
+                    "targetYourCluster": "Kendi kümeniz",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Henüz kullanılamıyor",
+                    "fallbackNote": "GitHub'da bulunan App Blueprint'leri gösteriliyor — seçilmiş katalog şu anda kullanılamıyor."
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "İçe aktarma başarıyla başladı",
                 "failed": "İş içe aktarılamadı",
                 "fetchReposFailed": "Depolar getirilemedi"
+            },
+            "app": {
+                "repositoryUrlRequired": "https://github.com/owner/repo gibi bir GitHub depo URL'si girin",
+                "repositoryModeRequired": "Bu deponun nasıl kullanılacağını seçin: Bağla, Çatal veya Özel kopya.",
+                "targetOwnerRequired": "Deponun oluşturulacağı hesabı seçin.",
+                "invalidUrl": "https://github.com/owner/repo gibi bir GitHub depo URL'si girin",
+                "inspectFailed": "Bu depo kontrol edilemedi. Tekrar deneyin."
             }
         },
         "generator": {

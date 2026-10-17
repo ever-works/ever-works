@@ -49,6 +49,9 @@ const VALID_WORK_KINDS = [
     'directory',
     'awesome-repo',
     'repo',
+    // APW-01 T23 — `?kind=app` (from the `/new` App chip). A disabled App kind
+    // still degrades through `safeInitialKind` below, exactly like any other.
+    'app',
 ] as const;
 type InitialWorkKind = (typeof VALID_WORK_KINDS)[number];
 

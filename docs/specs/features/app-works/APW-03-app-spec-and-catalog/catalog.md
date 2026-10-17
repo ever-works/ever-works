@@ -305,7 +305,7 @@ ever-works/cal-template/
 └── .github/workflows/verify.yml
 ```
 
-**Required repository settings**: public; topic `ever-works-app-blueprint`; default branch `main`; tags
+**Required repository settings**: public (exception, 2026-10-17: a private `ever-works/*-template` is accepted for a source owned by `ever-works` or listed in `EVER_WORKS_APPS_PRIVATE_BLUEPRINT_OWNERS` — first-party fixtures; third-party sources only ever see public Blueprints); topic `ever-works-app-blueprint`; default branch `main`; tags
 `vMAJOR.MINOR.PATCH`; description ≤ 160 chars.
 
 **`overlay.yml`**

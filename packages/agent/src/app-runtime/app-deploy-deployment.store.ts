@@ -122,6 +122,74 @@ export class AppDeployDeploymentStoreAdapter implements AppDeployDeploymentStore
      * serialised by the deploy lock, so there is no concurrent writer to lose a
      * field to.
      */
+    /**
+     * APW-06 T71 (A0.7, 2026-10-17) — the orchestrator's wider view of this token
+     * (`AppDeployOrchestratorDeploymentStore.update`, §5.6 steps 4–7): one patch of the
+     * Deployment row per phase. Without it the worker's `patchDeployment` was a no-op, so a
+     * Deployment stayed `QUEUED` whatever the cluster did.
+     *
+     * `appRender` is MERGED onto the stored bag (each phase adds a key; the request's own
+     * `preconditions`/`specCommitSha` facts must survive), timestamps arrive as ISO strings over
+     * the internal channel and are stored as dates, and a `READY` row records its primary URL in
+     * `website` — the column the Deploy tab already shows.
+     */
+    async update(
+        workId: string,
+        deploymentId: string,
+        patch: {
+            state?: string | null;
+            startedAt?: Date | string | null;
+            completedAt?: Date | string | null;
+            lastError?: string | null;
+            componentStatuses?: unknown;
+            smokeResult?: unknown;
+            appRender?: Record<string, unknown>;
+        },
+    ): Promise<void> {
+        if (!this.deployments) {
+            throw new Error(
+                'App Deployment store unavailable: no WorkDeploymentRepository is bound, so the ' +
+                    'Deployment row cannot be updated.',
+            );
+        }
+
+        const fields: Partial<WorkDeployment> = {};
+        if (patch?.state) fields.state = String(patch.state);
+        const startedAt = toDate(patch?.startedAt);
+        if (startedAt) fields.startedAt = startedAt;
+        const completedAt = toDate(patch?.completedAt);
+        if (completedAt) fields.completedAt = completedAt;
+        if (patch && 'lastError' in patch) fields.lastError = patch.lastError ?? null;
+        if (patch && 'componentStatuses' in patch) {
+            fields.componentStatuses = Array.isArray(patch.componentStatuses)
+                ? (patch.componentStatuses as Record<string, unknown>[])
+                : null;
+        }
+        if (patch && 'smokeResult' in patch) {
+            fields.smokeResult =
+                patch.smokeResult && typeof patch.smokeResult === 'object'
+                    ? (patch.smokeResult as Record<string, unknown>)
+                    : null;
+        }
+
+        if (patch?.appRender && typeof patch.appRender === 'object') {
+            const row = await this.deployments.findById(deploymentId);
+            if (row && row.workId && workId && row.workId !== workId) {
+                throw new Error(
+                    `Deployment ${deploymentId} does not belong to Work ${workId}; not updated.`,
+                );
+            }
+            fields.appRender = { ...(row?.appRender ?? {}), ...patch.appRender };
+
+            const hosts = (patch.appRender as { hosts?: { primary?: unknown } }).hosts;
+            const primary = typeof hosts?.primary === 'string' ? hosts.primary.trim() : '';
+            if (fields.state === 'READY' && primary) fields.website = `https://${primary}`;
+        }
+
+        if (Object.keys(fields).length === 0) return;
+        await this.deployments.update(deploymentId, fields);
+    }
+
     async markSuperseded(deploymentId: string, supersededBy: string): Promise<void> {
         if (!this.deployments) return;
 
@@ -167,4 +235,10 @@ export class AppDeployDeploymentStoreAdapter implements AppDeployDeploymentStore
             );
         }
     }
+}
+
+function toDate(value: Date | string | null | undefined): Date | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(String(value));
+    return Number.isNaN(date.getTime()) ? null : date;
 }

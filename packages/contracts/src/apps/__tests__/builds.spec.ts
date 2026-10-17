@@ -350,7 +350,10 @@ describe('builds.ts — closed unions (APW-05 plan.md:417–462)', () => {
 			// plan.md:827 — the member §4.5 adds for a port-less unknown build service.
 			'buildServicePortRequired',
 			// plan.md:1056 — the member §4.10 adds for a verification that needs smtp.
-			'verificationDependencyUnsupported'
+			'verificationDependencyUnsupported',
+			// 2026-10-17 — the build credential cannot write `.github/workflows/`
+			// (no `workflow` OAuth scope / no `Workflows: write` App permission).
+			'workflowPermissionMissing'
 		]);
 	});
 

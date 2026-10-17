@@ -142,6 +142,35 @@ describe('DefaultInboundEmailDispatcher', () => {
         );
     });
 
+    // Review 2026-10-17 F15 (P1): an address can serve several agents; a push the
+    // caller authorized for ONE agent goes to that agent, never assignments[0].
+    it('routes to the agent the caller named, not the first assignment of the address', async () => {
+        const svc = await build(true);
+        addresses.findById.mockResolvedValue(inboundAddress);
+        assignments.findByEmailAddress.mockResolvedValue([
+            { agentId: 'personal-agent', dispatchMode: 'conversation' },
+            { agentId: 'org-agent', dispatchMode: 'task-spawn' },
+        ]);
+        const res = await svc.dispatch({ ...basePayload, agentId: 'org-agent' });
+        expect(res).toMatchObject({ handled: true, agentId: 'org-agent', mode: 'task-spawn' });
+        expect(taskSpawner.spawnTaskForInboundEmail).toHaveBeenCalledWith(
+            expect.objectContaining({ agentId: 'org-agent' }),
+        );
+    });
+
+    it('refuses when the named agent has no inbound assignment on the address', async () => {
+        const svc = await build(true);
+        addresses.findById.mockResolvedValue(inboundAddress);
+        assignments.findByEmailAddress.mockResolvedValue([
+            { agentId: 'personal-agent', dispatchMode: 'task-spawn' },
+        ]);
+        const res = await svc.dispatch({ ...basePayload, agentId: 'org-agent' });
+        expect(res.handled).toBe(false);
+        expect(res.reason).toMatch(/no inbound assignment/);
+        expect(messages.save).not.toHaveBeenCalled();
+        expect(taskSpawner.spawnTaskForInboundEmail).not.toHaveBeenCalled();
+    });
+
     it('task-spawn mode without a spawner persists but does not create a task', async () => {
         const svc = await build(false);
         addresses.findById.mockResolvedValue(inboundAddress);

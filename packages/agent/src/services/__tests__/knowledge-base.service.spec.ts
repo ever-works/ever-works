@@ -322,6 +322,29 @@ describe('KnowledgeBaseService', () => {
             ).rejects.toBeInstanceOf(NotFoundException);
         });
 
+        // Review 2026-10-17 F14 (P1): any class is now accepted at org scope, so the
+        // inherited read must be gated exactly like inheritance itself
+        // (`listInheritableForOrg`): an inheritable class, active, not proposed.
+        it.each([
+            ['a class outside the inheritable ones', { kbDocumentClass: 'research' }],
+            ['an archived document', { status: 'archived' }],
+            ['a document still awaiting review', { reviewState: 'proposed' }],
+        ])('answers 404 for %s', async (_label, overrides) => {
+            docRepo.findOrgByPath.mockResolvedValue(
+                buildDocument({
+                    id: 'org-doc-3',
+                    workId: null,
+                    organizationId: ORG_ID,
+                    path: 'research/roadmap.md',
+                    kbDocumentClass: 'legal' as KbDocumentClass,
+                    ...(overrides as Record<string, unknown>),
+                }),
+            );
+            await expect(
+                service.getInheritedDocument(WORK_ID, ORG_ID, 'research/roadmap.md', USER_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
         it('enforces canView on the Work (same gate as getDocument)', async () => {
             ownership.ensureCanView.mockRejectedValueOnce(new ForbiddenException('no access'));
 

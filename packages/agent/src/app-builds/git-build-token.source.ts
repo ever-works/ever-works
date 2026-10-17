@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { GitFacadeService } from '../facades/git.facade';
-import type { BuildTokenSource } from './build-facade.service';
+import type { BuildCredential, BuildTokenSource } from './build-facade.service';
 
 /**
  * APW-05 T16 — the credential half of `BuildFacadeService`.
@@ -63,6 +63,41 @@ export class GitBuildTokenSource implements BuildTokenSource {
                 return null;
             }
             return token;
+        } catch (error) {
+            this.logger.warn(
+                `Build credential for work ${input.workId}: the ${input.providerId} credential lookup failed (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * The Build credential AND what it is (2026-10-17) — see
+     * `GitFacadeService.getBuildCredential`: a workflow-capable connection is
+     * preferred, and the kind and scopes travel with the token so the build
+     * plugin can refuse a workflow write it cannot make with
+     * `workflowPermissionMissing` rather than GitHub's bare 403/404.
+     */
+    async getBuildCredential(input: {
+        readonly workId: string;
+        readonly userId: string;
+        readonly providerId: string;
+    }): Promise<BuildCredential | null> {
+        try {
+            const found = await this.gitFacade.getBuildCredential({
+                workId: input.workId,
+                userId: input.userId,
+                providerId: input.providerId,
+            });
+            if (!found || !found.token || found.token.trim().length === 0) {
+                this.logger.warn(
+                    `Build credential for work ${input.workId}: the git facade has no usable ${input.providerId} credential for member ${input.userId}.`,
+                );
+                return null;
+            }
+            return found;
         } catch (error) {
             this.logger.warn(
                 `Build credential for work ${input.workId}: the ${input.providerId} credential lookup failed (${

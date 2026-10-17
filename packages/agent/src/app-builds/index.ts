@@ -66,6 +66,13 @@ export * from './deployable-verdict';
 export * from './app-build-failure-copy';
 export * from './app-build-pull-token.service';
 export * from './app-build-sweep.service';
+export * from './app-build-run-discovery.service';
+export * from './app-builds.listener';
+export {
+    BUILD_SETTINGS_SOURCE,
+    type BuildFacadeBinding,
+    type BuildSettingsSource,
+} from './build-facade.service';
 
 // 🛑 An EXPLICIT list, not `export *`, for exactly one name.
 //
@@ -132,3 +139,8 @@ export {
     type AppBuildWatchRunResult,
     type AppBuildWatchSkipReason,
 } from './app-build-watch.runner';
+// Lane aw-deploy-3 — the stored pull token reader (the worker's pull credential).
+export {
+    AppBuildPullTokenReader,
+    type AppBuildStoredPullToken,
+} from './app-build-pull-token.reader';

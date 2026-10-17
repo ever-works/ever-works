@@ -10,6 +10,7 @@ import {
     APP_RUNTIME_HEALTH_FACADE,
     APP_RUNTIME_TARGET,
     APP_RUNTIME_VERIFICATION_FACADE,
+    APP_TARGET_UPDATED_PORT,
     APP_VERIFICATION_SINK,
     APP_VERIFICATION_SPEC_SOURCE,
     APPS_TIER_POLICY,
@@ -26,20 +27,58 @@ import {
     AppRuntimeDeletionService,
     AppSmokeService,
     AppVerificationTargetService,
-    DisabledAppsTierPolicy,
-    UnavailablePullCredentialSource,
-    UnavailableRuntimeEnvSource,
-    UnavailableRuntimeTarget,
     UnavailableVerificationSink,
     markAppClusterWorkerContext,
+    // A0.7 (2026-10-17) — the real port implementations and the seams they fill.
+    APP_COMMIT_ANCESTRY,
+    APP_CUSTOM_DOMAIN_STORE,
+    APP_DEPLOY_DEPLOYMENT_STORE,
+    APP_DEPLOY_DISPATCHER,
+    APP_CLUSTER_OP_DISPATCHER,
+    APPS_DOMAIN_DNS_SERVICE,
+    APP_HOSTS_APPS_DOMAIN,
+    APP_HOSTS_DEPLOY_REQUESTER,
+    APP_HOSTS_DEPLOYMENT_STORE,
+    APP_HOSTS_WORK_STORE,
+    APP_IMAGE_REFERENCE_RESOLVER,
+    APP_RUNTIME_EVENT_SINK,
+    APP_RUNTIME_NOTIFICATIONS,
+    APP_UPSTREAM_STATE_READER,
+    AppBuildPullCredentialSource,
+    AppDeployDeploymentStoreAdapter,
+    AppRuntimeNotificationProducersAdapter,
+    AppRuntimeTargetAdapter,
+    ConfigAppsTierPolicy,
+    PublicGitHubCommitAncestry,
+    RegistryAppImageReferenceResolver,
+    workerAppDeployDispatcher,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPLOY_HOST_SOURCE } from '@ever-works/agent/app-runtime';
-import { AppRuntimeFacadeService, DeployFacadeService } from '@ever-works/agent/facades';
+import { APP_DEPENDENCIES_SERVICE } from '@ever-works/agent/app-runtime';
+// Lane aw-deploy-3 (2026-10-17) — APW-07's service, composed HERE so the worker's preconditions
+// enforce dependency readiness and the orchestrator's `remove` can order the dependency deletion.
 import {
+    APP_DEPENDENCY_CLUSTER_ACCESS,
+    APP_DEPENDENCY_CONFIG_CIPHER,
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
+    APP_DEPENDENCY_SPEC_SOURCE,
+    AppDependenciesService,
+} from '@ever-works/agent/app-dependencies';
+import { WORK_APP_RUNTIME_STATES } from '@ever-works/agent/app-launcher';
+import {
+    AppDependencyFacadeService,
+    AppRuntimeFacadeService,
+    DeployFacadeService,
+    GitFacadeService,
+} from '@ever-works/agent/facades';
+import { APP_PROVISION_EVENTS_PORT } from '@ever-works/agent/app-works';
+import {
+    WorkAppDependencyRepository,
     WorkCustomDomainRepository,
     WorkDeploymentRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
+import { Work } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { TriggerPluginsModule } from './trigger-plugins.module';
@@ -52,6 +91,31 @@ import { createRemoteProxy } from '../remote-proxy';
 /**
  * APW-06 T71 (`tasks.md:1220-1238`, plan §6.4 `plan.md:966-991`) — **the isolated App runtime
  * worker's module**.
+ *
+ * ## ⭐ Status 2026-10-17 (A0.7, lane aw-deploy) — read this before the historical notes below
+ *
+ * A dequeued Deployment now runs end to end in this context. What changed, and what the older
+ * sections below (kept for history, no-removal rule) therefore no longer describe:
+ *
+ * - **Decision B1** — `AppDeployPreconditionsService.evaluate` skips §5.1 step 1's dispatcher gate
+ *   when it runs inside this worker (`isAppClusterWorkerContext()`) for the Deployment that holds
+ *   the deploy lock. `APP_DEPLOY_DISPATCHER_AVAILABILITY` therefore stays **deliberately** unbound
+ *   here; `APP_DEPLOY_DISPATCHER` is bound for §5.6 step 7's dequeue only (→ the API's gate).
+ * - `WORK_APP_RUNTIME_STATES` → `remoteMap.WorkAppRuntimeStateRepository` (T71 item (b)).
+ * - The four §6.4 ports are real: `APP_RUNTIME_ENV_SOURCE` → `remoteMap.AppEnvRuntimeSource`;
+ *   `APP_IMAGE_PULL_CREDENTIAL_SOURCE`, `APP_RUNTIME_TARGET`, `APPS_TIER_POLICY` → the classes in
+ *   `packages/agent/src/app-runtime/app-runtime-worker.adapters.ts`.
+ * - The unwritten seams are written and bound: `APP_IMAGE_REFERENCE_RESOLVER` (T72),
+ *   `APP_RUNTIME_EVENT_SINK` (T28 relay), `APP_RUNTIME_NOTIFICATIONS` (T29),
+ *   `APP_UPSTREAM_STATE_READER`, `APP_COMMIT_ANCESTRY`, `APP_DEPLOY_DEPLOYMENT_STORE` (with the
+ *   orchestrator's `update`), and T26's host stores (`APP_CUSTOM_DOMAIN_STORE`,
+ *   `APP_HOSTS_WORK_STORE`, `APP_HOSTS_DEPLOYMENT_STORE`, `APP_HOSTS_APPS_DOMAIN`,
+ *   `APP_HOSTS_DEPLOY_REQUESTER`).
+ * - `WorkRepository` answers real `Work` instances (`hydratingWorkRepositoryProxy`).
+ *
+ * Still unbound (each in `EXPECTED_WORKER_UNBOUND` with its reason): the verification sink,
+ * the dependency service, the cluster-op dispatcher, the managed DNS service, the rebuild
+ * requester, the licence service, the provisioner ports and the health egress source.
  *
  * ## Why it is not `TriggerInternalModule`
  *
@@ -211,7 +275,45 @@ export const APP_RUNTIME_REMOTE_PROXIES = [
     // §5.1's two reads, bound below to `APP_DEPLOY_SPEC_SOURCE` / `APP_DEPLOY_BUILD_SOURCE`.
     'AppSpecService',
     'AppDeployBuildSourceAdapter',
+    // A0.7 (2026-10-17) — T71 status item (b), §6.4's env source, T28's relay, the dequeue
+    // dispatcher, the hosts' deploy requester and APW-02's upstream-state read.
+    'WorkAppRuntimeStateRepository',
+    'AppEnvRuntimeSource',
+    'AppRuntimeEventRelayService',
+    'AppDeployDispatchRelay',
+    'AppClusterOpDispatchRelay',
+    'AppsDomainDnsServiceImpl',
+    'AppBuildPullTokenReader',
+    // Lane aw-deploy-3 — APW-07's rows, cipher, spec and re-dispatch (as `app-dependency-provision`).
+    'WorkAppDependencyRepository',
+    'AppDependencyRowsRelay',
+    'AppDependencyConfigCipherRelay',
+    'AppDependencySpecSourceAdapter',
+    'AppDependencyProvisionDispatchRelay',
+    'AppDeployRequestService',
+    'WorkUpstreamStateRepository',
 ] as const;
+
+/**
+ * The worker's `WorkRepository`: the API's, over the internal channel, with `findById` answering a
+ * real `Work` instance. SuperJSON carries the row's fields but not its prototype, and
+ * `AppRuntimeFacadeService.resolveYourCluster` calls `work.getRepoOwner('data')` for the
+ * cluster-source matrix — on a plain object that threw, so every Your-cluster access was refused
+ * before any kubeconfig was read (found 2026-10-17, A0.7).
+ */
+export function hydratingWorkRepositoryProxy(apiClient: TriggerInternalApiClient): WorkRepository {
+    const remote = createRemoteProxy(apiClient, 'WorkRepository');
+    return createRemoteProxy(apiClient, 'WorkRepository', {
+        async findById(id: string, ...rest: unknown[]) {
+            return hydrateWork(await remote.findById(id, ...rest));
+        },
+    });
+}
+
+function hydrateWork<T>(row: T): T {
+    if (!row || typeof row !== 'object' || row instanceof Work) return row;
+    return Object.assign(Object.create(Work.prototype), row) as T;
+}
 
 /**
  * The one queue every App cluster task declares (plan §6.2:942 "All App cluster I/O runs in
@@ -274,7 +376,7 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         {
             provide: WorkRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, 'WorkRepository'),
+                hydratingWorkRepositoryProxy(apiClient),
             inject: [TriggerInternalApiClient],
         },
         {
@@ -321,6 +423,128 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
                 createRemoteProxy(apiClient, 'AppDeployBuildSourceAdapter'),
             inject: [TriggerInternalApiClient],
         },
+        // ---- A0.7 (2026-10-17): the rows and relays a Deployment needs to reach READY ----------
+        // T71 status item (b): the runtime-state row — the deploy lock the orchestrator releases,
+        // the target and namespace the facade reads, the snapshot health and the ops write.
+        {
+            provide: WORK_APP_RUNTIME_STATES,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkAppRuntimeStateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // §6.4 "proxied by name" (T73): APW-07's env source reads the stored env and decrypts it in
+        // the API, where its key lives; the values cross the authenticated internal channel once.
+        {
+            provide: APP_RUNTIME_ENV_SOURCE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppEnvRuntimeSource'),
+            inject: [TriggerInternalApiClient],
+        },
+        // T28: the relay re-emits a catalogued `app.*` event in the API (names and ids only).
+        {
+            provide: APP_RUNTIME_EVENT_SINK,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppRuntimeEventRelayService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // §5.6 step 7: the adopted queued Deployment is dispatched through the API's own gate.
+        // Decision B1: this is the DEQUEUE dispatcher only — `APP_DEPLOY_DISPATCHER_AVAILABILITY`
+        // stays unbound here on purpose, because inside this worker §5.1 step 1 is answered by the
+        // run itself (the lock-holding `deploymentId`, `AppDeployPreconditionsService.evaluate`).
+        {
+            provide: APP_DEPLOY_DISPATCHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                workerAppDeployDispatcher(createRemoteProxy(apiClient, 'AppDeployDispatchRelay')),
+            inject: [TriggerInternalApiClient],
+        },
+        // T31 (lane aw-deploy-2): the worker's own re-dispatches — T58's deletion retries, T26's
+        // `ingress-reconcile`, `resume`'s wait — go through the API's `app-cluster-op` gate.
+        {
+            provide: APP_CLUSTER_OP_DISPATCHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppClusterOpDispatchRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        // T47/T48 (lane aw-deploy-2): the deletion path removes the managed subdomain's record
+        // through the API's apps-DNS service, where the apps-DNS token lives.
+        {
+            provide: APPS_DOMAIN_DNS_SERVICE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppsDomainDnsServiceImpl'),
+            inject: [TriggerInternalApiClient],
+        },
+        // ---- APW-07 in the isolated worker (lane aw-deploy-3, 2026-10-17) --------------------
+        // `APP_DEPENDENCIES_SERVICE` was unbound here, so the worker's §5.1 re-check only WARNED
+        // `dependencies_unavailable` and `remove` answered `dependencies_unavailable`. The service
+        // is composed locally (its provider calls dial the cluster) over the same proxies
+        // `app-dependency-provision` uses: rows, raw id-scoped row writes, cipher, spec, dispatch.
+        AppDependenciesService,
+        AppDependencyFacadeService,
+        { provide: APP_DEPENDENCIES_SERVICE, useExisting: AppDependenciesService },
+        { provide: APP_DEPENDENCY_CLUSTER_ACCESS, useExisting: AppRuntimeFacadeService },
+        {
+            provide: WorkAppDependencyRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkAppDependencyRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            // `@InjectRepository(WorkAppDependency)`'s token (`getRepositoryToken` → the string).
+            provide: 'WorkAppDependencyRepository',
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyRowsRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_CONFIG_CIPHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyConfigCipherRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_SPEC_SOURCE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencySpecSourceAdapter'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_PROVISION_DISPATCHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyProvisionDispatchRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        // T26: a primary-domain change asks for a Deployment; the request (and every §5.1 check
+        // it re-runs) happens in the API, so the worker may ask over the internal channel.
+        {
+            provide: APP_HOSTS_DEPLOY_REQUESTER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDeployRequestService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-02's row read for §5.6 step 9's upstream-sync verdict (`findByWorkId`).
+        {
+            provide: APP_UPSTREAM_STATE_READER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkUpstreamStateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-04 (lane aw-ai, 2026-10-17) — the provisioner's events port, dialled by name to
+        // the API's ONE `AppProvisionEventsService` (`AgentAppWorksModule`): the orchestrator's
+        // `smokeFailedAfterUpstreamSync` (§5.6:844-847, which files a re-provision Task) and
+        // `cluster-check`'s `targetUpdated` (§9.10:1593). Both land where the Task tables are;
+        // the worker owns no `DataSource`.
+        {
+            provide: APP_PROVISION_EVENTS_PORT,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppProvisionEventsService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_TARGET_UPDATED_PORT,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppProvisionEventsService'),
+            inject: [TriggerInternalApiClient],
+        },
 
         // ---- local: the work itself ------------------------------------------------------
         DeployFacadeService,
@@ -364,15 +588,88 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         // to the one class so no consumer can be handed a different plugin.
         { provide: APP_RUNTIME_HEALTH_FACADE, useExisting: AppRuntimeFacadeService },
 
-        // ---- the ports: fail-closed defaults until T73 publishes §9.8 -------------------
-        // See the header note. These are `default-ports.ts`'s own classes, not new behaviour.
-        { provide: APP_RUNTIME_ENV_SOURCE, useClass: UnavailableRuntimeEnvSource },
-        { provide: APP_IMAGE_PULL_CREDENTIAL_SOURCE, useClass: UnavailablePullCredentialSource },
-        { provide: APP_RUNTIME_TARGET, useClass: UnavailableRuntimeTarget },
-        { provide: APPS_TIER_POLICY, useClass: DisabledAppsTierPolicy },
+        // ---- the ports (A0.7, 2026-10-17): real implementations ---------------------------
+        // Until 2026-10-17 these were `default-ports.ts`'s fail-closed classes. Each is now the
+        // narrow real answer (`packages/agent/src/app-runtime/app-runtime-worker.adapters.ts`);
+        // the verification sink stays fail-closed (T60's sink is APW-04's, not in this slice).
+        // T44 / APW-10 minimal: the managed target opens only with EVER_WORKS_APPS_MANAGED_ENABLED.
+        { provide: APPS_TIER_POLICY, useFactory: () => new ConfigAppsTierPolicy() },
+        // T73: a Build's image — public => no credential; private GHCR => the owner's GitHub token.
+        {
+            provide: APP_IMAGE_PULL_CREDENTIAL_SOURCE,
+            useFactory: (
+                builds: ConstructorParameters<typeof AppBuildPullCredentialSource>[0],
+                works: WorkRepository,
+                apiClient: TriggerInternalApiClient,
+                git?: GitFacadeService,
+            ) =>
+                new AppBuildPullCredentialSource(
+                    builds,
+                    works as unknown as ConstructorParameters<
+                        typeof AppBuildPullCredentialSource
+                    >[1],
+                    git,
+                    undefined,
+                    // Lane aw-deploy-3 — APW-05's stored pull token first (read in the API).
+                    createRemoteProxy(apiClient, 'AppBuildPullTokenReader'),
+                ),
+            inject: [
+                APP_DEPLOY_BUILD_SOURCE,
+                WorkRepository,
+                TriggerInternalApiClient,
+                { token: GitFacadeService, optional: true },
+            ],
+        },
+        // T73 / §9.9: APW-07's dependency target, through T20's facade (the one credential path).
+        {
+            provide: APP_RUNTIME_TARGET,
+            useFactory: (
+                facade: AppRuntimeFacadeService,
+                states?: ConstructorParameters<typeof AppRuntimeTargetAdapter>[1],
+            ) =>
+                new AppRuntimeTargetAdapter(
+                    facade as unknown as ConstructorParameters<typeof AppRuntimeTargetAdapter>[0],
+                    states,
+                ),
+            inject: [AppRuntimeFacadeService, { token: WORK_APP_RUNTIME_STATES, optional: true }],
+        },
         { provide: APP_VERIFICATION_SINK, useClass: UnavailableVerificationSink },
+        // T72: §5.8's published-image identity (anonymous registry HEAD, tag -> digest once).
+        {
+            provide: APP_IMAGE_REFERENCE_RESOLVER,
+            useFactory: () => new RegistryAppImageReferenceResolver(),
+        },
+        // T29: the two producers, written through the proxied `NotificationService`.
+        {
+            provide: APP_RUNTIME_NOTIFICATIONS,
+            useFactory: (notifications: NotificationService) =>
+                new AppRuntimeNotificationProducersAdapter(notifications),
+            inject: [NotificationService],
+        },
+        // §5.6:841-843 — the upstream-sync verdict's range check (public GitHub compare).
+        { provide: APP_COMMIT_ANCESTRY, useFactory: () => new PublicGitHubCommitAncestry() },
+        // §5.6 steps 4-7: the Deployment row, with the `update` the orchestrator patches each phase
+        // through (the API adapter's class, over the proxied `WorkDeploymentRepository`).
+        { provide: APP_DEPLOY_DEPLOYMENT_STORE, useClass: AppDeployDeploymentStoreAdapter },
+        // T26's host stores — the swaps `app-hosts.service.ts` documents, now that the
+        // runtime-state row (the owner's primary-domain/TLS settings) is bound beside them.
+        { provide: APP_CUSTOM_DOMAIN_STORE, useExisting: WorkCustomDomainRepository },
+        { provide: APP_HOSTS_WORK_STORE, useExisting: WorkRepository },
+        { provide: APP_HOSTS_DEPLOYMENT_STORE, useExisting: WorkDeploymentRepository },
+        {
+            provide: APP_HOSTS_APPS_DOMAIN,
+            useValue: {
+                getDomain: (): string | null => config.everWorks.apps.getDomain(),
+                // APW-10 lite — managed-target hosts may live under their own apex.
+                getManagedDomain: (): string | null => config.everWorks.apps.managedTargetDomain(),
+            },
+        },
     ],
     exports: [
+        // A0.10 (lane aw-deploy-2) — what `app-dependency-provision`'s module reads from here.
+        APP_RUNTIME_TARGET,
+        APP_RUNTIME_EVENT_SINK,
+        WORK_APP_RUNTIME_STATES,
         AppClusterWorkerContextBootstrap,
         AppRuntimeFacadeService,
         DeployFacadeService,

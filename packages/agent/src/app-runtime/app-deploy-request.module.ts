@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { WorkBuild } from '../entities/work-build.entity';
@@ -13,12 +14,45 @@ import {
     APP_DEPLOY_SPEC_SOURCE,
     AppDeployPreconditionsService,
 } from './app-deploy-preconditions.service';
-import { buildAppDeployDispatcherProviders } from './app-deploy-dispatcher.provider';
+import {
+    buildAppClusterOpDispatcherProviders,
+    buildAppDeployDispatcherProviders,
+} from './app-deploy-dispatcher.provider';
+import { AppTargetService } from './app-target.service';
+import { config } from '../config';
+import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
+import { WorkDeploymentRepository } from '../database/repositories/work-deployment.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import {
+    APP_CUSTOM_DOMAIN_STORE,
+    APP_HOSTS_APPS_DOMAIN,
+    APP_HOSTS_DEPLOY_REQUESTER,
+    APP_HOSTS_DEPLOYMENT_STORE,
+    APP_HOSTS_WORK_STORE,
+    AppHostsService,
+} from './app-hosts.service';
+import { AppDomainsService } from './app-domains.service';
+import { APP_DEPLOY_HOST_SOURCE } from './app-deploy-preconditions.service';
+import { ConfigAppsTierPolicy } from '../apps-tier/config-apps-tier-policy';
+import { APPS_TIER_POLICY } from './ports';
 import { APP_DEPLOY_DEPLOYMENT_STORE, AppDeployRequestService } from './app-deploy-request.service';
 import { AppLicenseGate } from './app-license-gate';
+import { AppLicenseModule } from '../app-license/app-license.module';
 import { AppRuntimeStateModule } from './app-runtime-state.module';
 import { AppDependenciesModule } from '../app-dependencies/app-dependencies.module';
 import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
+import { AppBuildSucceededListener } from './app-build-succeeded.listener';
+import { AppEnvRedeployListener } from './app-env-redeploy.listener';
+import { AppSpecAppliedListener } from './app-spec-applied.listener';
+import { AppRuntimeActivityListener } from './app-runtime-activity.listener';
+import { AppManagedDnsListener } from './app-managed-dns.listener';
+import { AppsDomainDnsServiceImpl } from '../ever-works-providers/apps-domain-dns.service';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
+import {
+    AppClusterOpDispatchRelay,
+    AppDeployDispatchRelay,
+    AppRuntimeEventRelayService,
+} from './app-runtime-worker.adapters';
 
 /**
  * APW-06 §2.2 — the module that finally REGISTERS the deploy request path.
@@ -167,6 +201,12 @@ import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
         // visible HERE (see the docstring's "bound by IMPORT" section).
         AppRuntimeEnvModule,
         AppDependenciesModule,
+        // T28 (lane aw-deploy-2) — `ActivityLogService` for `AppRuntimeActivityListener`.
+        ActivityLogModule,
+        // APW-03 T42 — `APP_LICENSE_SERVICE` for the `AppLicenseGate` declared
+        // below (bound by IMPORT, same rule). Unbound, every your-cluster deploy ran
+        // with `license_eligibility_unavailable` and the managed target was refused.
+        AppLicenseModule,
     ],
     providers: [
         AppDeployPreconditionsService,
@@ -189,6 +229,61 @@ import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
         // it would read the repository twice.
         { provide: APP_DEPLOY_SPEC_SOURCE, useExisting: AppSpecService },
         ...buildAppDeployDispatcherProviders(),
+        // APW-06 T35 (A0.6) — a green deployable Build requests one Deployment when `autoDeploy`
+        // is on (or a domain rebuild is pending). API process only: the event fires here.
+        AppBuildSucceededListener,
+        // 2026-10-17 — a runtime-phase App env change redeploys the live Deployment once
+        // per 30 s window, through `AppDeployRequestService` (lane aw-env-redeploy).
+        AppEnvRedeployListener,
+        // T35's other half (spec-applied redeploys of a published image) and T28's Activity half
+        // (one row per relayed runtime event) — lane aw-deploy-2.
+        AppSpecAppliedListener,
+        AppRuntimeActivityListener,
+        // T47/T48 (lane aw-deploy-2) — the apps-domain DNS service (label allocation + the managed
+        // record) and the listener that points the record at the ingress after a live Deployment.
+        {
+            provide: AppsDomainDnsServiceImpl,
+            useFactory: (works?: WorkRepository) => new AppsDomainDnsServiceImpl(works),
+            inject: [{ token: WorkRepository, optional: true }],
+        },
+        AppManagedDnsListener,
+        // APW-06 T28 / T31 (A0.7) — the API ends of the isolated worker's `APP_RUNTIME_EVENT_SINK`
+        // and `APP_DEPLOY_DISPATCHER` proxies (`TriggerInternalController.remoteMap`).
+        AppRuntimeEventRelayService,
+        AppDeployDispatchRelay,
+        // APW-06 T31/T33 (lane aw-deploy-2) — the API's `app-cluster-op` gate, its worker-facing
+        // relay, the app-target/app-status service, and APW-10's minimal tier policy (the managed
+        // target opens only when the operator's ceiling switch is on — read by APW-10's
+        // `apps-tier/config-apps-tier-policy.ts`, never here (R-5); the worker binds the same class).
+        ...buildAppClusterOpDispatcherProviders(),
+        AppClusterOpDispatchRelay,
+        AppTargetService,
+        { provide: APPS_TIER_POLICY, useFactory: () => new ConfigAppsTierPolicy() },
+        // C43 / APW-06 T26 (lane aw-deploy-2) — the hosts and domains services in the API, so the
+        // App branch of `DeployFacadeService`'s four domain methods is live here (the facade finds
+        // `AppDomainsService` through `ModuleRef`). Neither dials a cluster: a non-primary change
+        // is an `ingress-reconcile` op the worker runs, a primary change a Deployment request.
+        // The stores are the swaps `app-hosts.service.ts` documents.
+        AppHostsService,
+        AppDomainsService,
+        { provide: APP_DEPLOY_HOST_SOURCE, useExisting: AppHostsService },
+        { provide: APP_CUSTOM_DOMAIN_STORE, useExisting: WorkCustomDomainRepository },
+        { provide: APP_HOSTS_WORK_STORE, useExisting: WorkRepository },
+        { provide: APP_HOSTS_DEPLOYMENT_STORE, useExisting: WorkDeploymentRepository },
+        // Lazy, not `useExisting`: the request service → preconditions → host source
+        // (`AppHostsService`) → this requester would be a constructor cycle Nest cannot resolve.
+        {
+            provide: APP_HOSTS_DEPLOY_REQUESTER,
+            useFactory: (moduleRef: ModuleRef) => ({
+                request: (request: Parameters<AppDeployRequestService['request']>[0]) =>
+                    moduleRef.get(AppDeployRequestService, { strict: false }).request(request),
+            }),
+            inject: [ModuleRef],
+        },
+        {
+            provide: APP_HOSTS_APPS_DOMAIN,
+            useValue: { getDomain: (): string | null => config.everWorks.apps.getDomain() },
+        },
     ],
     exports: [
         AppDeployPreconditionsService,
@@ -200,6 +295,13 @@ import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
         // it cannot read `work_builds` itself). Exporting the token instead would bind
         // `APP_DEPLOY_BUILD_SOURCE` in every importer's scope as a side effect.
         AppDeployBuildSourceAdapter,
+        AppRuntimeEventRelayService,
+        AppDeployDispatchRelay,
+        AppClusterOpDispatchRelay,
+        AppTargetService,
+        AppHostsService,
+        AppDomainsService,
+        AppsDomainDnsServiceImpl,
     ],
 })
 export class AppDeployRequestModule {}

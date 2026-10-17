@@ -1,11 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppRuntimeStateModule } from '../app-runtime/app-runtime-state.module';
 import { DatabaseModule } from '../database/database.module';
 import { AppLauncherPreferenceRepository } from '../database/repositories/app-launcher-preference.repository';
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
-import { AppLauncherService } from './app-launcher.service';
+import {
+    APP_SPEC_DISPLAY_NAMES,
+    AppLauncherService,
+    type AppSpecDisplayNameReader,
+} from './app-launcher.service';
+import { WorkAppSpecStateRepository } from '../database/repositories/work-app-spec-state.repository';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import {
     DefaultManagedHostRootResolver,
     MANAGED_HOST_ROOT_RESOLVER,
@@ -43,8 +50,9 @@ import {
  * 2026-09-18. A declared provider that injects a repository must declare where
  * that repository comes from.
  *
- * `APP_PUBLISHED_HOSTS`, `APPS_TIER_POLICY` and `APP_SPEC_DISPLAY_NAMES` are
- * intentionally **not** bound here. Each is `@Optional()` in the service and each
+ * `APP_PUBLISHED_HOSTS` and `APPS_TIER_POLICY` are
+ * intentionally **not** bound here (`APP_SPEC_DISPLAY_NAMES` is, below, over the
+ * real `WorkAppSpecState` rows — 2026-10-17). Each is `@Optional()` in the service and each
  * is owned by another epic (APW-06, APW-10, APW-03); binding a fake here would
  * make an unconfigured installation look configured, which is the one thing the
  * optional-injection posture exists to prevent.
@@ -70,6 +78,25 @@ import {
         {
             provide: MANAGED_HOST_ROOT_RESOLVER,
             useClass: DefaultManagedHostRootResolver,
+        },
+        // APW-11 FR-57 / APW-03 — the App spec's display name on an App Work's tile
+        // (e.g. "Cal (community build)"), read from the REAL `WorkAppSpecState`
+        // rows. The repository belongs to `AppSpecModule`, so it is resolved
+        // lazily and non-strictly: where that module is not in the graph the
+        // reader answers `null` and the launcher keeps the Work's name — exactly
+        // the unbound behaviour, never a stand-in value.
+        {
+            provide: APP_SPEC_DISPLAY_NAMES,
+            useFactory: (moduleRef: ModuleRef): AppSpecDisplayNameReader => ({
+                async findDisplayNamesForWorks(workIds: string[]) {
+                    const states = getOptionalProvider<WorkAppSpecStateRepository>(
+                        moduleRef,
+                        WorkAppSpecStateRepository,
+                    );
+                    return states ? states.findDisplayNamesByWorkIds(workIds) : null;
+                },
+            }),
+            inject: [ModuleRef],
         },
     ],
     exports: [AppLauncherService, AppLauncherPreferenceRepository, MANAGED_HOST_ROOT_RESOLVER],

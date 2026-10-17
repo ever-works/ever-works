@@ -314,20 +314,33 @@ export class IntegrationEmailController {
         return runIdempotent(this.idempotency, principal, req, res, async () => {
             const header = req.headers?.['idempotency-key'];
             const idempotencyKey = (Array.isArray(header) ? header[0] : header)?.trim() ?? '';
+            const dedupeKey = dto.message.messageId
+                ? `message-id:${dto.message.messageId}`
+                : `key:${idempotencyKey}`;
+            // Review 2026-10-17 F54: per agent too. The same Message-ID pushed to two
+            // agents is two deliveries; before, the second answered 200 with the
+            // first agent's message and was never delivered.
             const providerMessageId = integrationProviderMessageId(
                 principal.keyId,
                 organizationId,
-                dto.message.messageId
-                    ? `message-id:${dto.message.messageId}`
-                    : `key:${idempotencyKey}`,
+                `agent:${dto.agentId}:${dedupeKey}`,
             );
             // A push replayed without its Idempotency-Key (same Message-ID): the
-            // message it already delivered, never a second Task.
-            const pushed = await this.email.findPushed(
-                organizationId,
-                address.pluginId,
-                providerMessageId,
-            );
+            // message it already delivered, never a second Task. A message stored
+            // before the per-agent id still counts, for this same agent only.
+            const pushed =
+                (await this.email.findPushed(
+                    organizationId,
+                    address.pluginId,
+                    providerMessageId,
+                )) ??
+                (await this.email
+                    .findPushed(
+                        organizationId,
+                        address.pluginId,
+                        integrationProviderMessageId(principal.keyId, organizationId, dedupeKey),
+                    )
+                    .then((legacy) => (legacy?.agentId === dto.agentId ? legacy : null)));
             if (pushed) {
                 const existing = await this.email.get(organizationId, pushed.id);
                 return {
@@ -347,6 +360,9 @@ export class IntegrationEmailController {
             const outcome = await dispatcher.dispatch({
                 pluginId: address.pluginId,
                 recipient: { emailAddressId: address.id, userId: address.userId },
+                // Review 2026-10-17 F15: the agent this key was authorized for above,
+                // not whichever agent holds the address's first inbound assignment.
+                agentId: dto.agentId,
                 providerMessageId,
                 from: message.from,
                 to: [...message.to],

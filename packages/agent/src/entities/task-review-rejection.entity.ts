@@ -72,6 +72,14 @@ export const TASK_REVIEW_REJECTION_MAX_FEEDBACK_CHARS = 8000;
 // The resume lookup: newest unconsumed rejection for a Task.
 @Index('idx_task_review_rejection_task_consumed', ['taskId', 'consumedByRunId'])
 @Index('idx_task_review_rejection_work', ['workId'])
+// 10-09 handover item 11: one row per SOURCE comment / review, so a
+// redelivered GitHub `created` webhook cannot add the same finding twice.
+// Partial: rows without a source (a Task-review reject, the gate) never
+// collide. Migration `1795162000000-AddTaskReviewRejectionSourceKey`.
+@Index('uq_task_review_rejection_task_source', ['taskId', 'sourceKey'], {
+    unique: true,
+    where: '"sourceKey" IS NOT NULL',
+})
 export class TaskReviewRejection {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -134,6 +142,17 @@ export class TaskReviewRejection {
      */
     @Column({ type: 'varchar', length: 8, nullable: true })
     reviewerKind?: TaskReviewRejectionReviewerKind | null;
+
+    /**
+     * The provider object this row was recorded from, as
+     * `<event>:<id>` — `review:123`, `pull_request_review_comment:456`,
+     * `issue_comment:789` (GitHub's review and comment ids are separate id
+     * spaces, hence the prefix). Unique per Task, so a webhook redelivered
+     * by hand (or by GitHub's retry) records nothing the second time. NULL
+     * for rows with no provider source.
+     */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    sourceKey?: string | null;
 
     /**
      * The resumed run this rejection was seeded into. NULL = still

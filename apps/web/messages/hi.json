@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Work उत्पन्न करें, एक बार या निर्धारित समय पर",
                     "deploy": "Work परिनियोजित करें",
                     "tasks": "इस Work के कार्य",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "आपकी रिपॉज़िटरी से बनी कंटेनर इमेज"
                 },
                 "tasks": "कार्य",
                 "posts": "पोस्ट",
                 "pages": "पृष्ठ",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "बिल्ड"
             },
             "members": {
                 "title": "टीम सदस्य",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "अपस्ट्रीम: {fullName}",
+                    "fork": "फ़ॉर्क: {fullName}",
+                    "private-copy": "निजी कॉपी: {fullName}",
+                    "link": "लिंक किया गया: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "आपका फ़ॉर्क तैयार किया जा रहा है",
+                    "forkBody": "GitHub {fullName} बना रहा है। इसमें आमतौर पर एक मिनट से कम समय लगता है; बड़ी रिपॉज़िटरी में अधिक समय लग सकता है।",
+                    "copyTitle": "आपकी निजी कॉपी तैयार की जा रही है",
+                    "copyBody": "{upstream} को {fullName} में कॉपी किया जा रहा है। बड़ी रिपॉज़िटरी में अधिक समय लगता है।",
+                    "linkTitle": "सेटअप पूरा किया जा रहा है",
+                    "linkBody": "एक पुल रिक्वेस्ट खोली जा रही है जो {fullName} में .works/works.yml जोड़ती है।",
+                    "blueprintTitle": "{name} Blueprint लागू किया जा रहा है",
+                    "blueprintBody": "Ever Works आपका App कार्य तैयार कर रहा है और Blueprint की फ़ाइलों के साथ .works/works.yml लिखेगा।"
+                },
+                "setupPrClosed": "सेटअप पुल रिक्वेस्ट बिना मर्ज किए बंद कर दी गई।",
+                "timedOut": "आपके फ़ॉर्क में 15 मिनट से अधिक समय लग रहा है।",
+                "failedAccess": "इस App कार्य को तैयार करते समय Ever Works की GitHub तक पहुँच समाप्त हो गई।",
+                "failedOther": "इस App कार्य को तैयार करना विफल रहा: {reason}",
+                "waitingForSetupPr": "पूरा करने के लिए सेटअप पुल रिक्वेस्ट मर्ज करें।",
+                "tryAgain": "फिर से प्रयास करें",
+                "openOnGitHub": "GitHub पर खोलें",
+                "reconnectGitHub": "GitHub फिर से कनेक्ट करें",
+                "openPullRequest": "पुल रिक्वेस्ट खोलें",
+                "retryLimit": "आपने इस घंटे के सभी 3 पुनः प्रयास उपयोग कर लिए हैं। बाद में फिर से प्रयास करें।",
+                "retryFailed": "दूसरा प्रयास शुरू नहीं हो सका। फिर से प्रयास करें।",
+                "failedReasons": {
+                    "works_yml_unparseable": "डिफ़ॉल्ट ब्रांच पर .works/works.yml मान्य YAML नहीं है। फ़ाइल ठीक करें या हटाएँ, फिर से प्रयास करें।",
+                    "works_yml_other_kind": ".works/works.yml पहले से एक अलग प्रकार का कार्य घोषित करती है। kind: app सेट करें या फ़ाइल हटाएँ, फिर से प्रयास करें।",
+                    "push_rejected": "GitHub .works/works.yml जोड़ने वाले कमिट को बार-बार अस्वीकार करता रहा।",
+                    "provider_unsupported": "इस रिपॉज़िटरी के Git प्रदाता को अपने-आप सेट अप नहीं किया जा सकता।",
+                    "too_large_for_private_copy": "रिपॉज़िटरी निजी कॉपी के लिए बहुत बड़ी है। इसके बजाय फ़ॉर्क बनाएँ।",
+                    "uses_lfs": "रिपॉज़िटरी Git LFS का उपयोग करती है, जिसे निजी कॉपी साथ नहीं ले जा सकती। इसके बजाय फ़ॉर्क बनाएँ।",
+                    "other": "रिपॉज़िटरी सेट अप करते समय कुछ गलत हो गया।"
+                },
+                "overview": {
+                    "title": "App",
+                    "repository": "कार्य रिपॉज़िटरी",
+                    "upstream": "अपस्ट्रीम",
+                    "relationLabel": "संबंध",
+                    "readinessLabel": "तैयारी",
+                    "readiness": {
+                        "preparing": "तैयार किया जा रहा है",
+                        "ready": "तैयार",
+                        "timed_out": "समय समाप्त",
+                        "failed": "विफल",
+                        "waiting_for_setup_pr": "सेटअप पुल रिक्वेस्ट की प्रतीक्षा है"
+                    },
+                    "relations": {
+                        "link": "लिंक किया गया",
+                        "fork": "फ़ॉर्क",
+                        "private-copy": "निजी कॉपी"
+                    },
+                    "appSpecLabel": "App स्पेक",
+                    "appSpecStatus": {
+                        "valid": "मान्य",
+                        "valid_with_warnings": "मान्य, चेतावनियों के साथ",
+                        "invalid": "त्रुटियाँ हैं",
+                        "missing": "अभी लिखा नहीं गया",
+                        "unreadable": "पढ़ा नहीं जा सका",
+                        "pending": "जाँच हो रही है",
+                        "unknown": "अभी जाँचा नहीं गया"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {कोई त्रुटि नहीं} =1 {1 त्रुटि} other {# त्रुटियाँ}} · {warnings, plural, =0 {कोई चेतावनी नहीं} =1 {1 चेतावनी} other {# चेतावनियाँ}}",
+                    "openAppSpec": "App स्पेक खोलें",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "App विवरण अभी लोड नहीं हो सके।",
+                    "builds": "बिल्ड",
+                    "deploy": "तैनाती",
+                    "upstreamTab": "अपस्ट्रीम",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "इसके एजेंट के साथ इसे विकसित करें",
+                    "body": "कार्य के एजेंट से ऐप बदलने के लिए कहें — कोई फ़ीचर जोड़ें, बग ठीक करें, किसी डिपेंडेंसी को अपग्रेड करें। यह कार्य रिपॉज़िटरी में काम करता है और पुल रिक्वेस्ट खोलता है।",
+                    "button": "इस App के बारे में चैट करें"
+                }
+            },
+            "builds": {
+                "title": "बिल्ड",
+                "subtitle": "{repository} में GitHub-होस्टेड रनर पर बनाया गया · इमेज {imageRepository}",
+                "subtitleNoImage": "{repository} में GitHub-होस्टेड रनर पर बनाया गया",
+                "subtitleGeneric": "इस App कार्य की रिपॉज़िटरी से बनी कंटेनर इमेज।",
+                "startBuild": "बिल्ड शुरू करें",
+                "starting": "शुरू हो रहा है…",
+                "refresh": "रीफ़्रेश करें",
+                "cancel": "रद्द करें",
+                "cancelling": "रद्द किया जा रहा है…",
+                "viewerDisabled": "ऐसा करने के लिए आपको संपादन एक्सेस चाहिए।",
+                "deployable": "डिप्लॉय योग्य",
+                "notDeployableLine": "डिप्लॉय योग्य नहीं — {reason}",
+                "pagination": "{total} में से {start}–{end} दिखाए जा रहे हैं",
+                "listLabel": "इस App कार्य के बिल्ड",
+                "openDetails": "बिल्ड #{number} खोलें",
+                "status": {
+                    "queued": "कतार में",
+                    "running": "चल रहा है",
+                    "succeeded": "सफल",
+                    "failed": "विफल",
+                    "cancelled": "रद्द किया गया",
+                    "blocked": "अवरुद्ध"
+                },
+                "trigger": {
+                    "push": "पुश",
+                    "pullRequest": "PR #{number}",
+                    "manual": "मैन्युअल",
+                    "verification": "सत्यापन"
+                },
+                "notDeployable": {
+                    "notSucceeded": "बिल्ड सफल नहीं हुआ",
+                    "pullRequest": "पुल रिक्वेस्ट से बनाया गया",
+                    "verification": "सत्यापन के लिए बनाया गया",
+                    "specInvalid": "इस कमिट पर App स्पेक में त्रुटियाँ हैं",
+                    "staleInputs": "पुराने बिल्ड मानों के साथ बनाया गया",
+                    "secretCheckFailed": "सीक्रेट जाँच पास नहीं हुई",
+                    "digestUnconfirmed": "पुश की गई इमेज की पुष्टि नहीं हो सकी",
+                    "criticalVulnerability": "एक गंभीर कमज़ोरी के लिए सुधार उपलब्ध है",
+                    "unsigned": "इमेज साइन नहीं की गई है"
+                },
+                "blocked": {
+                    "workflowPending": "बिल्ड वर्कफ़्लो के मर्ज होने की प्रतीक्षा है।",
+                    "workflowEditedByHand": "बिल्ड वर्कफ़्लो को हाथ से संपादित किया गया था।",
+                    "workflowWriteFailed": "Ever Works रिपॉज़िटरी में बिल्ड वर्कफ़्लो नहीं लिख सका। इस रिपॉज़िटरी का एक नियम बदलाव को अस्वीकार करता है।",
+                    "actionsDisabled": "इस रिपॉज़िटरी के लिए GitHub Actions बंद है।",
+                    "missingBuildValues": "{count, plural, =1 {1 बिल्ड मान} other {# बिल्ड मानों}} की प्रतीक्षा है: {names}",
+                    "runnerTooSmall": "इस बिल्ड को {needed} चाहिए, लेकिन {visibility} रिपॉज़िटरी का रनर {max} की अनुमति देता है।",
+                    "tooManyBuildValues": "यह बिल्ड {count} बिल्ड मानों का उपयोग करता है; अधिकतम 50 की अनुमति है।",
+                    "buildValueTooLarge": "{name} बिल्ड में भेजने के लिए बहुत बड़ा है (अधिकतम 48 KB)।",
+                    "secretLimitReached": "रिपॉज़िटरी में और सीक्रेट के लिए जगह नहीं है।",
+                    "strategyNotSupported": "GitHub-होस्टेड रनर \"{strategy}\" रणनीति से बिल्ड नहीं कर सकते। एक Dockerfile जोड़ें और build.strategy को dockerfile पर सेट करें।",
+                    "specInvalid": "इस कमिट पर App स्पेक में त्रुटियाँ हैं।",
+                    "gitConnectionMissing": "Ever Works आपके GitHub कनेक्शन से इस रिपॉज़िटरी तक नहीं पहुँच सकता।",
+                    "repositoryUnavailable": "{repository} संग्रहीत है, हटा दी गई है या अब आपके GitHub कनेक्शन के लिए उपलब्ध नहीं है।",
+                    "managedConcurrencyLimit": "अन्य बिल्ड की प्रतीक्षा है: एक साथ प्रति ऐप अधिकतम {perWork} और प्रति खाता {perAccount} चलते हैं।",
+                    "buildValueNameReserved": "{name} Ever Works द्वारा आरक्षित है और बिल्ड में नहीं भेजा जा सकता। एनवायरनमेंट प्रविष्टि का नाम बदलें।",
+                    "buildServicePortRequired": "बिल्ड सेवा {service} को एक पोर्ट चाहिए: Ever Works नहीं जानता कि \"{image}\" किस पोर्ट पर सुनता है।",
+                    "verificationDependencyUnsupported": "सत्यापन अभी {kind} शुरू नहीं कर सकता। इसके बजाय जाँच क्लस्टर पर चलती है।",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "पुल रिक्वेस्ट की समीक्षा करें",
+                    "turnOnActions": "इसे चालू करें",
+                    "setValue": "इसे सेट करें",
+                    "useLargerRunner": "बड़े रनर का उपयोग करें",
+                    "openRepositorySettings": "रिपॉज़िटरी सेटिंग्स खोलें",
+                    "reconnectGithub": "GitHub फिर से कनेक्ट करें",
+                    "rebuild": "फिर से बिल्ड करें",
+                    "openEnvironment": "एनवायरनमेंट खोलें"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "मेमोरी समाप्त हो गई",
+                        "suggestion": "build.resources.memory (अभी {memory}) बढ़ाएँ या बिल्ड का हीप आकार घटाएँ। इस रनर पर एक बिल्ड अधिकतम {max} का उपयोग कर सकता है।"
+                    },
+                    "diskFull": {
+                        "title": "डिस्क स्थान समाप्त हो गया",
+                        "suggestion": "बिल्ड सेटिंग्स में \"Reclaim runner disk\" चालू करें, या .dockerignore फ़ाइल से बिल्ड संदर्भ छोटा करें।"
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile {total} में से चरण {step} पर विफल हुई",
+                        "suggestion": "विफल चरण था: {command}। इसे {dockerfile} में ठीक करके पुश करें, या किसी एजेंट से इसे ठीक करने के लिए कहें।"
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "डिपेंडेंसी डाउनलोड नहीं हो सकीं",
+                        "suggestion": "किसी पैकेज या बेस इमेज रजिस्ट्री ने जवाब नहीं दिया। कुछ मिनटों में फिर से बिल्ड करें; अगर यह विफल होता रहे, तो जिन संस्करणों पर आप निर्भर हैं उन्हें पिन करें।"
+                    },
+                    "registryPushDenied": {
+                        "title": "इमेज पुश नहीं हो सकी",
+                        "suggestion": "इस रिपॉज़िटरी में वर्कफ़्लो को पैकेज लिखने की अनुमति दें (Settings ▸ Actions ▸ General ▸ Workflow permissions), फिर से बिल्ड करें।"
+                    },
+                    "missingBuildValue": {
+                        "title": "एक बिल्ड मान गायब है: {names}",
+                        "suggestion": "इसे सेटिंग्स ▸ एनवायरनमेंट में सेट करें, फिर से बिल्ड करें।"
+                    },
+                    "secretInImage": {
+                        "title": "इमेज के अंदर एक सीक्रेट प्रकाशित हो जाता: {name}",
+                        "suggestion": "इस मान का उपयोग केवल किसी पिछले बिल्ड चरण में करें, या इसे बिल्ड सीक्रेट माउंट के रूप में भेजें। कुछ भी पुश नहीं किया गया।"
+                    },
+                    "timeout": {
+                        "title": "{minutes} मिनट से अधिक समय लगा",
+                        "suggestion": "build.resources.timeoutMinutes (अधिकतम 180) बढ़ाएँ या कैशिंग से बिल्ड को तेज़ करें।"
+                    },
+                    "workflowInvalid": {
+                        "title": "वर्कफ़्लो फ़ाइल अमान्य है",
+                        "suggestion": "GitHub बिल्ड वर्कफ़्लो नहीं चला सकता। इसे बहाल करने के लिए Ever Works की खुली पुल रिक्वेस्ट की समीक्षा करें।"
+                    },
+                    "digestMismatch": {
+                        "title": "पुश की गई इमेज की पुष्टि नहीं हो सकी",
+                        "suggestion": "रजिस्ट्री ने बिल्ड से अलग इमेज बताई। फिर से बिल्ड करें; कुछ भी अपुष्ट डिप्लॉय नहीं किया जाएगा।"
+                    },
+                    "verificationFailed": {
+                        "title": "ऐप अपने स्मोक टेस्ट पास नहीं कर सका",
+                        "suggestion": "{total} में से {failed} स्मोक टेस्ट विफल हुए। नीचे परिणाम देखें।"
+                    },
+                    "egressBlocked": {
+                        "title": "नेटवर्क एक्सेस अवरुद्ध किया गया",
+                        "suggestion": "बिल्ड ने {hosts} तक पहुँचने का प्रयास किया, जो बिल्डर की अनुमत सूची में नहीं हैं। जो चाहिए उसे अपनी स्रोत रिपॉज़िटरी या किसी अनुमत रजिस्ट्री से लें, फिर से बिल्ड करें।"
+                    },
+                    "lost": {
+                        "title": "इस बिल्ड का पता नहीं चल रहा",
+                        "suggestion": "GitHub ने इस बिल्ड के बारे में जवाब देना बंद कर दिया। इसे GitHub पर जाँचें।"
+                    },
+                    "unknown": {
+                        "title": "कुछ और गलत हो गया",
+                        "suggestion": "GitHub पर लॉग खोलें, या किसी एजेंट से देखने के लिए कहें।"
+                    },
+                    "askAgent": "किसी एजेंट से इसे ठीक करने के लिए कहें",
+                    "excerptLabel": "लॉग की अंतिम पंक्तियाँ"
+                },
+                "cancelReason": {
+                    "user": "किसी सदस्य द्वारा रद्द किया गया",
+                    "superseded": "नए बिल्ड द्वारा प्रतिस्थापित"
+                },
+                "detail": {
+                    "title": "बिल्ड #{number} · {sha} · {status}",
+                    "loading": "बिल्ड विवरण लोड हो रहे हैं…",
+                    "close": "बंद करें",
+                    "trigger": "ट्रिगर",
+                    "triggeredBy": "{trigger} — {name} द्वारा",
+                    "commit": "कमिट",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "रनर",
+                    "duration": "अवधि",
+                    "durationValue": "{duration} (कतार में {queued})",
+                    "image": "इमेज",
+                    "tags": "टैग",
+                    "deployable": "डिप्लॉय योग्य",
+                    "yes": "हाँ",
+                    "buildValues": "बिल्ड मान",
+                    "buildValuesValue": "{count, plural, =1 {1 सिंक किया गया} other {# सिंक किए गए}}: {names}",
+                    "noBuildValues": "कोई नहीं",
+                    "receipt": "रसीद",
+                    "verification": "सत्यापन",
+                    "copy": "कॉपी करें",
+                    "copied": "इमेज संदर्भ कॉपी किया गया।",
+                    "copyFailed": "इमेज संदर्भ कॉपी नहीं हो सका।",
+                    "viewLogs": "GitHub पर लॉग देखें",
+                    "rebuildThisCommit": "इस कमिट को फिर से बिल्ड करें",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} रनर मिनट · आपके GitHub खाते द्वारा भुगतान",
+                    "minutesPlatform": "{minutes} रनर मिनट · Ever Works द्वारा भुगतान",
+                    "checksMinutes": "इनमें से {checksMinutes} में App जाँचें चलीं",
+                    "costUnknown": "रनर मिनट अभी रिपोर्ट नहीं किए गए"
+                },
+                "verification": {
+                    "componentsReady": "कंपोनेंट शुरू हो गए",
+                    "componentsNotReady": "कंपोनेंट शुरू नहीं हुए",
+                    "job": "जॉब {name} {exitCode} के साथ समाप्त हुआ",
+                    "jobNoExit": "जॉब {name} पूरा नहीं हुआ",
+                    "smokePassed": "पास: {name}",
+                    "smokeFailed": "विफल: {name} — अपेक्षित {expected}, मिला {observed}"
+                },
+                "empty": {
+                    "noBuilds": "अभी कोई बिल्ड नहीं। बिल्ड वर्कफ़्लो के रिपॉज़िटरी में आने पर पहला बिल्ड शुरू होता है।",
+                    "unavailable": "इस इंस्टेंस पर बिल्ड अभी उपलब्ध नहीं हैं।"
+                },
+                "errors": {
+                    "loadFailed": "बिल्ड लोड नहीं हो सके। पेज रीफ़्रेश करके देखें।",
+                    "rebuildRateLimited": "आपने इस घंटे बहुत अधिक बिल्ड शुरू किए हैं। {minutes, plural, =1 {1 मिनट} other {# मिनट}} में फिर से प्रयास करें।",
+                    "commitNotReachable": "वह कमिट ट्रैक की गई ब्रांच पर नहीं है।",
+                    "nothingToBuild": "यह App कार्य एक प्रकाशित इमेज चलाता है, इसलिए बिल्ड करने के लिए कुछ नहीं है।",
+                    "notCancellable": "यह बिल्ड पहले ही पूरा हो चुका है, इसलिए इसे रद्द नहीं किया जा सकता।",
+                    "providerUnavailable": "अभी कोई बिल्ड प्रदाता उपलब्ध नहीं है। बाद में फिर से प्रयास करें।",
+                    "startFailed": "बिल्ड शुरू नहीं हो सका। फिर से प्रयास करें।",
+                    "cancelFailed": "यह बिल्ड रद्द नहीं हो सका। फिर से प्रयास करें।",
+                    "detailFailed": "यह बिल्ड लोड नहीं हो सका। फिर से प्रयास करें।"
+                },
+                "toasts": {
+                    "started": "बिल्ड कतार में जोड़ा गया।",
+                    "deduped": "इस कमिट का एक बिल्ड पहले से कतार में है।",
+                    "cancelled": "बिल्ड रद्द किया गया।"
+                },
+                "pullToken": {
+                    "title": "पुल टोकन जोड़ें",
+                    "body": "यह इमेज निजी है। इसे डाउनलोड करने के लिए आपके क्लस्टर को एक ऐसा टोकन चाहिए जो केवल पैकेज पढ़ सके।",
+                    "stepCreate": "1. केवल \"read:packages\" चुनकर एक क्लासिक टोकन बनाएँ।",
+                    "stepPaste": "2. इसे यहाँ पेस्ट करें।",
+                    "label": "टोकन",
+                    "submit": "जाँचें और सहेजें",
+                    "saving": "जाँच हो रही है…",
+                    "tooBroad": "यह टोकन पैकेज पढ़ने से अधिक कर सकता है। केवल read:packages वाला टोकन बनाएँ।",
+                    "fineGrained": "यह एक फ़ाइन-ग्रेन्ड टोकन है। केवल read:packages चुनकर एक क्लासिक टोकन बनाएँ।",
+                    "cannotRead": "यह टोकन {imageRepository} को नहीं पढ़ सकता।",
+                    "publicImage": "यह इमेज पहले से सार्वजनिक है — किसी टोकन की ज़रूरत नहीं है।",
+                    "noImageYet": "अभी कोई पूरा हुआ बिल्ड नहीं है। पहले सफल बिल्ड के बाद पुल टोकन जोड़ें।",
+                    "savedExpires": "पुल टोकन सहेजा गया। यह {date} को समाप्त होगा।",
+                    "savedNoExpiry": "पुल टोकन सहेजा गया। यह कभी समाप्त नहीं होता।",
+                    "tokenSet": "एक पुल टोकन सहेजा हुआ है। उसे बदलने के लिए नया पेस्ट करें।",
+                    "expiringSoon": "पुल टोकन {date} को समाप्त होगा। उससे पहले नया जोड़ें।",
+                    "viewerDisabled": "ऐसा करने के लिए आपको संपादन एक्सेस चाहिए।",
+                    "failed": "पुल टोकन सहेजा नहीं जा सका। फिर से प्रयास करें।"
+                },
+                "overview": {
+                    "title": "नवीनतम बिल्ड",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "डिप्लॉय योग्य बिल्ड: यह कमिट",
+                    "deployableOther": "डिप्लॉय योग्य बिल्ड: {sha}",
+                    "noDeployable": "अभी कोई डिप्लॉय योग्य बिल्ड नहीं",
+                    "open": "बिल्ड खोलें"
+                }
+            },
+            "appDeploy": {
+                "title": "तैनाती",
+                "notRunning": "यह ऐप अभी कहीं नहीं चल रहा है।",
+                "runningOn": "{state} · {target}",
+                "openApp": "ऐप खोलें",
+                "source": "स्रोत",
+                "buildsLink": "बिल्ड देखें",
+                "buildsHint": "टारगेट चाहे जो भी हो, बिल्ड चलते रहते हैं।",
+                "stale": "अंतिम जाँच {minutes, plural, =1 {1 मिनट} other {# मिनट}} पहले",
+                "status": {
+                    "notDeployed": "डिप्लॉय नहीं किया गया",
+                    "live": "लाइव",
+                    "degraded": "प्रभावित",
+                    "down": "बंद",
+                    "unreachable": "आपके क्लस्टर तक नहीं पहुँच सकते",
+                    "paused": "रोका गया",
+                    "deleting": "हटाया जा रहा है…"
+                },
+                "target": {
+                    "heading": "इसे कहाँ चलना चाहिए?",
+                    "current": "(वर्तमान)",
+                    "none": {
+                        "label": "कोई नहीं — अभी डिप्लॉय न करें",
+                        "description": "बिल्ड फिर भी चलते हैं।"
+                    },
+                    "yourCluster": {
+                        "label": "आपका क्लस्टर",
+                        "description": "आपके नियंत्रण वाले Kubernetes क्लस्टर पर चलता है।"
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "हम इसे आपके लिए चलाते हैं।",
+                        "unavailable": "जल्द आ रहा है — ऐप्स के लिए प्रबंधित होस्टिंग अभी खुली नहीं है।",
+                        "ineligible": "इस ऐप के लिए अभी उपलब्ध नहीं।"
+                    },
+                    "connect": "अपना क्लस्टर कनेक्ट करें",
+                    "reconnect": "क्लस्टर कनेक्शन बदलें",
+                    "connected": "कनेक्टेड · {version}",
+                    "connectedNoVersion": "कनेक्टेड",
+                    "checkFailed": "पिछली क्लस्टर जाँच विफल रही।",
+                    "notChecked": "अभी कोई क्लस्टर कनेक्ट नहीं है।",
+                    "save": "इस टारगेट का उपयोग करें",
+                    "saving": "सहेजा जा रहा है…",
+                    "saved": "टारगेट सहेजा गया।",
+                    "saveFailed": "टारगेट सहेजा नहीं जा सका: {reason}",
+                    "changeNote": "टारगेट बदलने से पहले से चल रही कोई चीज़ नहीं हटती।",
+                    "routeUnavailable": "इस इंस्टेंस पर टारगेट बदलना अभी उपलब्ध नहीं है।"
+                },
+                "connect": {
+                    "title": "अपना क्लस्टर कनेक्ट करें",
+                    "description": "उस क्लस्टर के सर्विस अकाउंट का kubeconfig पेस्ट करें जिस पर यह ऐप चलना चाहिए।",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "अपना kubeconfig पेस्ट करें…",
+                    "kubeconfigHelp": "सर्विस अकाउंट टोकन का उपयोग करें। कमांड, स्थानीय फ़ाइलें और प्रॉक्सी समर्थित नहीं हैं।",
+                    "kubeconfigStored": "आपका kubeconfig एक बार भेजा गया था और एन्क्रिप्टेड रूप में संग्रहीत है। उसे बदलने के लिए नया पेस्ट करें, या संग्रहीत वाले को फिर से जाँचें।",
+                    "contextLabel": "कॉन्टेक्स्ट (वैकल्पिक)",
+                    "contextHelp": "kubeconfig के वर्तमान कॉन्टेक्स्ट का उपयोग करने के लिए खाली छोड़ें।",
+                    "check": "कनेक्शन जाँचें",
+                    "checking": "जाँच हो रही है…",
+                    "checkAgain": "फिर से जाँचें",
+                    "checkTimedOut": "जाँच 30 सेकंड के भीतर पूरी नहीं हुई। फिर से प्रयास करें।",
+                    "checkFailed": "कनेक्शन की जाँच नहीं हो सकी: {reason}",
+                    "unavailable": "इस इंस्टेंस पर क्लस्टर कनेक्ट करना अभी उपलब्ध नहीं है।",
+                    "kubeconfigTooLarge": "यह kubeconfig 64 KiB से बड़ा है।",
+                    "kubeconfigRequired": "पहले एक kubeconfig पेस्ट करें।",
+                    "ingressClass": "Ingress क्लास",
+                    "ingressDefault": "{name} (डिफ़ॉल्ट)",
+                    "ingressNone": "कोई Ingress क्लास नहीं मिली",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "इश्यूअर से प्रमाणपत्र",
+                        "external": "क्लस्टर के बाहर संभाला जाता है",
+                        "edge": "एज पर समाप्त किया जाता है",
+                        "none": "TLS नहीं (केवल http)"
+                    },
+                    "issuer": "इश्यूअर",
+                    "namespace": "नेमस्पेस",
+                    "namespaceAuto": "ऐप के पहली बार डिप्लॉय होने पर चुना जाता है",
+                    "isolation": "नेटवर्क आइसोलेशन",
+                    "isolationOn": "चालू (अनुशंसित)",
+                    "isolationOff": "बंद",
+                    "isolationOffWarning": "नेटवर्क आइसोलेशन के बिना, क्लस्टर के अन्य वर्कलोड इस ऐप और इसके डेटाबेस तक पहुँच सकते हैं।",
+                    "cancel": "रद्द करें",
+                    "save": "सहेजें",
+                    "saving": "सहेजा जा रहा है…",
+                    "saveBlocked": "हर आवश्यक अनुमति के साथ जाँच पास होने पर सहेजना उपलब्ध होगा।",
+                    "saved": "क्लस्टर कनेक्ट हो गया।",
+                    "saveFailed": "क्लस्टर कनेक्शन सहेजा नहीं जा सका: {reason}"
+                },
+                "check": {
+                    "ok": "कनेक्टेड",
+                    "version": "Kubernetes {version}",
+                    "failed": "क्लस्टर जाँच विफल रही।",
+                    "kubeconfigRefused": "यह kubeconfig {reason}। इसके बजाय सर्विस अकाउंट टोकन का उपयोग करें।",
+                    "notPublic": "Ever Works केवल सार्वजनिक पते वाले क्लस्टर तक पहुँच सकता है।",
+                    "permissions": "अनुमतियाँ",
+                    "allPermissions": "हर आवश्यक अनुमति मौजूद है।",
+                    "missing": "गायब: {verb} {resource}",
+                    "optionalMissing": "वैकल्पिक, गायब: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "अभी डिप्लॉय करें",
+                    "deploying": "अनुरोध किया जा रहा है…",
+                    "started": "डिप्लॉयमेंट शुरू हो गया।",
+                    "queued": "कतार में — चल रहा डिप्लॉयमेंट पूरा होने पर यह शुरू होगा।",
+                    "deduplicated": "उस डिप्लॉयमेंट का अनुरोध पहले ही किया जा चुका है।",
+                    "inProgress": "एक अन्य डिप्लॉयमेंट चल रहा है ({id})। उसके पूरा होने की प्रतीक्षा करें, फिर से डिप्लॉय करें।",
+                    "preconditionsHeader": "डिप्लॉय करने से पहले इन्हें ठीक करें:",
+                    "workerNotIsolated": "डिप्लॉयमेंट अभी शुरू नहीं हो सकते: इस इंस्टेंस पर कोई आइसोलेटेड App क्लस्टर वर्कर नहीं है।",
+                    "notAppWork": "यह कार्य App कार्य नहीं है, इसलिए इसे इस तरह डिप्लॉय नहीं किया जा सकता।",
+                    "failed": "डिप्लॉयमेंट का अनुरोध नहीं हो सका: {reason}",
+                    "targetNone": "पहले चुनें कि ऐप कहाँ चलना चाहिए — \"कोई नहीं\" कुछ भी डिप्लॉय नहीं करता।",
+                    "deploymentId": "डिप्लॉयमेंट {id}",
+                    "warningsHeader": "चेतावनियाँ"
+                },
+                "preconditions": {
+                    "specInvalid": "App स्पेक (.works/works.yml) में त्रुटियाँ हैं। उन्हें App स्पेक पेज पर ठीक करें।",
+                    "licenseBlocksTarget": "ऐप का लाइसेंस इसे इस टारगेट पर होस्ट करने की अनुमति नहीं देता।",
+                    "licenseAttestationMissing": "ऐप को डिप्लॉय करने से पहले उसके लाइसेंस की पुष्टि करें।",
+                    "envRequiredUnset": "कुछ आवश्यक env मान अभी सेट नहीं हैं।",
+                    "dependencyNotReady": "ऐप को जिस डिपेंडेंसी की ज़रूरत है वह अभी तैयार नहीं है।",
+                    "noGreenBuild": "डिप्लॉय करने के लिए अभी कोई सफल बिल्ड नहीं है। पहले एक बिल्ड शुरू करें।",
+                    "noGreenBuildForHead": "डिप्लॉय ब्रांच का नवीनतम कमिट अभी सफलतापूर्वक बिल्ड नहीं हुआ है।",
+                    "buildImageMissing": "बिल्ड में डिप्लॉय करने के लिए कोई इमेज नहीं है।",
+                    "nothingToDeploy": "अभी डिप्लॉय करने के लिए कुछ नहीं है: न कोई बिल्ड है और न कोई प्रकाशित इमेज।",
+                    "imageNotPinned": "यह इमेज टैग द्वारा संदर्भित है। इसे डाइजेस्ट से पिन करें ताकि हर डिप्लॉयमेंट एक ही इमेज चलाए।",
+                    "imageNotFound": "इमेज अपनी रजिस्ट्री में नहीं मिल सकी।",
+                    "imagePrivateUnsupported": "यह इमेज क्रेडेंशियल के बिना डाउनलोड नहीं की जा सकती। Ever Works प्रकाशित इमेज केवल तभी डिप्लॉय करता है जब वे सार्वजनिक हों।",
+                    "imageUnresolvable": "इमेज संदर्भ हल नहीं हो सका।",
+                    "primaryDomainMissing": "प्राथमिक डोमेन अभी सेट अप नहीं है।",
+                    "targetNone": "पहले चुनें कि ऐप कहाँ चलना चाहिए।",
+                    "targetNotChecked": "पहले क्लस्टर कनेक्शन जाँचें।",
+                    "clusterChangedUnconfirmed": "पिछले डिप्लॉयमेंट के बाद क्लस्टर बदल गया है। डिप्लॉय करने के लिए बदलाव की पुष्टि करें।",
+                    "managedDisabled": "जल्द आ रहा है — ऐप्स के लिए प्रबंधित होस्टिंग अभी खुली नहीं है।",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps केवल सत्यापित Blueprint वाले ऐप्स चलाता है।",
+                    "quotaExceeded": "आप Ever Works Apps पर जितने ऐप्स चला सकते हैं, उस संख्या तक पहुँच गए हैं।",
+                    "managedIneligible": "यह ऐप Ever Works Apps पर नहीं चल सकता।",
+                    "managedSandboxUnavailable": "Ever Works Apps अभी नए ऐप्स नहीं ले सकता।",
+                    "appWorkDeleting": "यह App कार्य हटाया जा रहा है।",
+                    "paused": "ऐप रोका गया है। डिप्लॉय करने के लिए इसे फिर से शुरू करें।",
+                    "deployInProgress": "एक अन्य डिप्लॉयमेंट चल रहा है।",
+                    "cronAuthEnvUnset": "एक शेड्यूल्ड कॉल को एक ऑथ मान चाहिए जो सेट नहीं है।",
+                    "jobAuthEnvUnset": "एक जॉब को एक ऑथ मान चाहिए जो सेट नहीं है।",
+                    "volumeReplicas": "वॉल्यूम वाला कंपोनेंट केवल एक रेप्लिका चला सकता है।",
+                    "volumeShrink": "वॉल्यूम को छोटा नहीं किया जा सकता।",
+                    "privilegedPort": "एक कंपोनेंट 1024 से नीचे के पोर्ट पर सुनता है।",
+                    "cronTooFrequent": "एक शेड्यूल्ड कॉल अनुमति से अधिक बार चलता है।",
+                    "managedRootForbidden": "यह इमेज root के रूप में चलती है।",
+                    "imageUserUnverifiable": "Ever Works जाँच नहीं सका कि इमेज किस उपयोगकर्ता के रूप में चलती है।",
+                    "workerNotIsolated": "डिप्लॉयमेंट अभी शुरू नहीं हो सकते: इस इंस्टेंस पर कोई आइसोलेटेड App क्लस्टर वर्कर नहीं है।",
+                    "envSourceUnavailable": "ऐप के env मान अभी पढ़े नहीं जा सकते।",
+                    "pullCredentialUnavailable": "इमेज पुल करने का क्रेडेंशियल उपलब्ध नहीं है।",
+                    "namespaceForeign": "वह नेमस्पेस क्लस्टर पर पहले से किसी और चीज़ का है।",
+                    "verificationNamespaceForbidden": "वह नेमस्पेस सत्यापन रन के लिए आरक्षित है।"
+                },
+                "license": {
+                    "loading": "लाइसेंस पढ़ा जा रहा है…",
+                    "unavailable": "इस इंस्टेंस पर लाइसेंस विवरण अभी उपलब्ध नहीं हैं।",
+                    "error": "लाइसेंस पढ़ा नहीं जा सका। फिर से प्रयास करने के लिए पेज रीलोड करें।",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "ऐसा कोई लाइसेंस नहीं मिला जिसे हम पहचानते हों।",
+                    "classes": {
+                        "green": "होस्टिंग की अनुमति है",
+                        "amber": "आपका क्लस्टर, लाइसेंस शर्तों की पुष्टि करने के बाद",
+                        "red": "केवल आपका क्लस्टर, लाइसेंस शर्तों की पुष्टि करने के बाद",
+                        "unknown": "लाइसेंस अज्ञात — डिप्लॉय करने से पहले शर्तों की पुष्टि करें",
+                        "unclassified": "अभी वर्गीकृत नहीं"
+                    },
+                    "mixed": "इस रिपॉज़िटरी के कुछ हिस्से अलग लाइसेंस का उपयोग करते हैं।",
+                    "incomplete": "यह रिपॉज़िटरी पूरी तरह स्कैन करने के लिए बहुत बड़ी है।",
+                    "yourClusterAllowed": "आपका क्लस्टर: अनुमति है",
+                    "yourClusterAfterConfirm": "आपका क्लस्टर: लाइसेंस शर्तों की पुष्टि करने के बाद अनुमति है",
+                    "review": "समीक्षा करें और पुष्टि करें",
+                    "confirmed": "{date} को पुष्टि की गई।",
+                    "disclaimer": "यह रिपॉज़िटरी की लाइसेंस फ़ाइलों का एक स्वचालित अध्ययन है, कानूनी सलाह नहीं।",
+                    "unknownSpdx": "इस सॉफ़्टवेयर का लाइसेंस",
+                    "dialogTitle": "लाइसेंस शर्तों की पुष्टि करें",
+                    "dialogBody": "{spdx} यह सीमित करता है कि इस सॉफ़्टवेयर को कैसे होस्ट किया जा सकता है। Ever Works Apps इसके लिए उपलब्ध नहीं है। इसे अपने खुद के क्लस्टर पर चलाने के लिए, पुष्टि करें:",
+                    "noText": "लाइसेंस रजिस्ट्री में इस लाइसेंस के लिए कोई कथन नहीं है।",
+                    "checkbox": "मैं ऊपर दिए गए कथन की पुष्टि करता/करती हूँ।",
+                    "footer": "हम दर्ज करते हैं कि किसने, कब, और किस लाइसेंस और कमिट के लिए पुष्टि की।",
+                    "cancel": "रद्द करें",
+                    "confirm": "पुष्टि करें",
+                    "refusals": {
+                        "ownerOnly": "केवल App कार्य का मालिक ही पुष्टि कर सकता है।",
+                        "licenseChanged": "आपकी समीक्षा के दौरान लाइसेंस बदल गया। नई शर्तों की समीक्षा करें और फिर से पुष्टि करें।",
+                        "attestationNotRequired": "इस लाइसेंस को अब पुष्टि की ज़रूरत नहीं है।",
+                        "licenseUnavailable": "इस इंस्टेंस पर लाइसेंस पुष्टि अभी उपलब्ध नहीं है।",
+                        "route_unavailable": "इस इंस्टेंस पर लाइसेंस पुष्टि अभी उपलब्ध नहीं है।",
+                        "failed": "पुष्टि दर्ज नहीं हो सकी। फिर से प्रयास करें।"
+                    }
+                },
+                "rollback": {
+                    "button": "वापस लौटाएँ",
+                    "title": "पिछली डिप्लॉयमेंट पर वापस लौटें",
+                    "description": "ऐसी डिप्लॉयमेंट चुनें जो पहले लाइव हो चुकी हो। उसकी इमेज और ऐप स्पेक फिर से चलेंगे; कुछ भी दोबारा बिल्ड नहीं होगा।",
+                    "pickLabel": "जिस डिप्लॉयमेंट पर लौटना है",
+                    "liveAt": "लाइव {when, date, medium} {when, time, short} से",
+                    "liveAtUnknown": "पहले लाइव थी",
+                    "none": "वापस लौटने के लिए कोई पिछली लाइव डिप्लॉयमेंट नहीं है।",
+                    "runJobs": "प्री-डिप्लॉय जॉब फिर से चलाएँ",
+                    "confirm": "वापस लौटाएँ",
+                    "cancel": "रद्द करें",
+                    "started": "वापसी शुरू हो गई।",
+                    "failed": "वापसी शुरू नहीं हो सकी: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "रोकें",
+                    "resume": "फिर से शुरू करें",
+                    "remove": "क्लस्टर से हटाएँ",
+                    "removeTitle": "इस ऐप को उसके क्लस्टर से हटाएँ",
+                    "removeDescription": "चल रहा ऐप रुक जाता है और उसके Kubernetes ऑब्जेक्ट हटा दिए जाते हैं। ऐप वर्क और उसके बिल्ड बने रहते हैं।",
+                    "deleteData": "संग्रहीत डेटा भी हटाएँ (वॉल्यूम और डिपेंडेंसी डेटाबेस)",
+                    "deleteDataWarning": "इसे पूर्ववत नहीं किया जा सकता।",
+                    "confirmSlugLabel": "पुष्टि के लिए {slug} टाइप करें",
+                    "confirmRemove": "हटाएँ",
+                    "cancel": "रद्द करें",
+                    "failed": "यह नहीं हो सका: {reason}",
+                    "slugMismatch": "आपके द्वारा टाइप किया गया स्लग इस ऐप वर्क से मेल नहीं खाता।",
+                    "accepted": {
+                        "pause": "रोकने का अनुरोध किया गया।",
+                        "resume": "फिर से शुरू करने का अनुरोध किया गया।",
+                        "remove": "हटाने का अनुरोध किया गया।",
+                        "cancelDeploy": "रद्द करने का अनुरोध किया गया।"
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "नाम किसी अक्षर या अंडरस्कोर से शुरू होते हैं और केवल A–Z, 0–9 और _ का उपयोग करते हैं।",
+                    "reservedName": "EVER_WORKS_ से शुरू होने वाले नाम प्लेटफ़ॉर्म के लिए आरक्षित हैं।",
+                    "valueTooLarge": "एक मान अधिकतम 65,536 बाइट का हो सकता है।",
+                    "controlCharacter": "मानों में NUL वर्ण नहीं हो सकता।",
+                    "lengthMismatch": "ठीक {expected} वर्ण होने चाहिए — यह {actual} है।",
+                    "tooShort": "कम से कम {min} वर्ण होने चाहिए।",
+                    "tooLong": "अधिकतम {max} वर्ण होने चाहिए।",
+                    "patternMismatch": "यह उस पैटर्न से मेल नहीं खाता जो यह ऐप माँगता है।",
+                    "generatedValueUseRotate": "यह मान जनरेट किया गया है। इसे बदलने के लिए रोटेट करें।",
+                    "neverRotateNotAcknowledged": "यह ऐप कहता है कि यह मान कभी नहीं बदलना चाहिए। रोटेट करने से पहले पुष्टि करें कि आप समझते हैं।",
+                    "rotateConfirmationMismatch": "आपने जो नाम टाइप किया वह इस मान के नाम से मेल नहीं खाता।",
+                    "secureStorageUnavailable": "इस इंस्टॉलेशन पर सुरक्षित स्टोरेज कॉन्फ़िगर नहीं है, इसलिए मान संग्रहीत नहीं किए जा सकते।",
+                    "tooManyValues": "एक ऐप में अधिकतम 300 मान हो सकते हैं।",
+                    "valuesTooLarge": "एक ऐप के मान कुल मिलाकर अधिकतम 1 MiB हो सकते हैं।",
+                    "malformedLine": "यह मान्य NAME=value पंक्ति नहीं है।",
+                    "rotateRateLimited": "बहुत अधिक रोटेशन। बाद में फिर से प्रयास करें।"
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "लंबित",
+                    "awaitingConfig": "आपकी सेटिंग्स की ज़रूरत है",
+                    "provisioning": "प्रोविज़न किया जा रहा है",
+                    "ready": "तैयार",
+                    "degraded": "प्रभावित",
+                    "failed": "विफल",
+                    "kept": "रखा गया — अब प्रबंधित नहीं",
+                    "deleting": "हटाया जा रहा है",
+                    "deleted": "हटाया गया",
+                    "notInSpec": "App स्पेक अब इसका उपयोग नहीं करता — डेटा रखा गया"
+                },
+                "backup": {
+                    "none": "कोई स्वचालित बैकअप नहीं। अगर यह वॉल्यूम खो गया, तो डेटा चला जाएगा।",
+                    "notConfigured": "बैकअप: कॉन्फ़िगर नहीं",
+                    "healthy": "बैकअप: अंतिम बार {time} पूरा हुआ",
+                    "overdue": "बैकअप: समय से पीछे — अंतिम बार {time} पूरा हुआ",
+                    "failing": "बैकअप: अंतिम प्रयास विफल रहा",
+                    "external": "बैकअप: आपके {kind} प्रदाता द्वारा प्रबंधित",
+                    "unknown": "बैकअप: जाँच नहीं हो सकी"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "आपके क्लस्टर में कोई डिफ़ॉल्ट स्टोरेज क्लास नहीं है। डिपेंडेंसी सेटिंग्स में एक चुनें।",
+                    "clusterUnreachable": "आपके क्लस्टर तक नहीं पहुँच सके।",
+                    "smtpConnectFailed": "मेल सर्वर से कनेक्ट नहीं हो सका।",
+                    "smtpTlsFailed": "मेल सर्वर का TLS हैंडशेक विफल रहा।",
+                    "smtpAuthRefused": "सर्वर ने साइन-इन अस्वीकार कर दिया।",
+                    "bucketUnreadable": "बकेट {bucket} मौजूद नहीं है या पढ़ा नहीं जा सकता।",
+                    "volumeNotReady": "वॉल्यूम {minutes} मिनट के भीतर तैयार नहीं हुआ।",
+                    "extensionUnavailable": "एक्सटेंशन उपलब्ध नहीं: {names}।",
+                    "platformServerRefused": "उस सर्वर पर Ever Works प्लेटफ़ॉर्म डेटा है। कोई दूसरा चुनें।",
+                    "deadlineExceeded": "प्रोविज़निंग समय पर पूरी नहीं हुई।",
+                    "namespaceNotOwned": "वह नेमस्पेस किसी दूसरे ऐप का है। कोई दूसरा चुनें।",
+                    "namespaceBaselineMissing": "नेमस्पेस में उसकी बेसलाइन सीमाएँ और नीतियाँ नहीं हैं।",
+                    "clusterPermissionMissing": "Ever Works के पास आपके क्लस्टर में यह डिपेंडेंसी बनाने की अनुमति नहीं है।",
+                    "operatorNamespaceUnknown": "ऑपरेटर का नेमस्पेस डिपेंडेंसी सेटिंग्स में सेट नहीं है।",
+                    "volumeExpansionUnsupported": "स्टोरेज क्लास {storageClass} इस वॉल्यूम को बड़ा नहीं कर सकती।",
+                    "sizeShrinkRefused": "किसी डिपेंडेंसी का स्टोरेज छोटा नहीं किया जा सकता। अगर आपको छोटा चाहिए, तो पहले उसका डेटा हटाएँ।",
+                    "relayIneligible": "यह ऐप Ever Works मेल रिले का उपयोग नहीं कर सकता।",
+                    "relaySuspended": "Ever Works मेल रिले निलंबित है।",
+                    "providerNotSupported": "वह प्रदाता यह डिपेंडेंसी नहीं दे सकता।",
+                    "dependencyNotDeclared": "App स्पेक इस डिपेंडेंसी को घोषित नहीं करता।",
+                    "confirmationMismatch": "आपने जो नाम टाइप किया वह मेल नहीं खाता।",
+                    "deleteInProgress": "इस डिपेंडेंसी का डेटा पहले से हटाया जा रहा है।",
+                    "notGenerated": "वह मान जनरेट नहीं किया गया है, इसलिए रोटेट करने के लिए कुछ नहीं है।",
+                    "notAppWork": "यह कार्य कोई ऐप नहीं है।",
+                    "targetNone": "यह ऐप अभी कहीं भी डिप्लॉय होने के लिए सेट नहीं है। इसकी डिपेंडेंसी प्रोविज़न करने के लिए एक डिप्लॉय टारगेट चुनें।",
+                    "targetNotChecked": "आपके क्लस्टर ने अभी अपनी जाँच पास नहीं की है। कनेक्शन जाँचें, फिर से प्रयास करें।"
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "रिपॉज़िटरी",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "App"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "एक मौजूदा कोड रिपॉज़िटरी Work के रूप में — टास्क, गोल और फ़्लीट रन इससे जुड़ते हैं। कुछ भी जनरेट या डिप्लॉय नहीं होता।",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "किसी भी GitHub रिपॉज़िटरी को चलाएँ और विकसित करें — इसे लिंक या फ़ॉर्क करें, फिर चुनें कि यह कहाँ चलेगी।"
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "रिपॉज़िटरी"
+                "repo": "रिपॉज़िटरी",
+                "app": "App"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "एक मौजूदा कोड रिपॉज़िटरी Work के रूप में — टास्क, गोल और फ़्लीट रन इससे जुड़ते हैं। कुछ भी जनरेट या डिप्लॉय नहीं होता।"
+                "repo": "एक मौजूदा कोड रिपॉज़िटरी Work के रूप में — टास्क, गोल और फ़्लीट रन इससे जुड़ते हैं। कुछ भी जनरेट या डिप्लॉय नहीं होता।",
+                "app": "किसी भी GitHub रिपॉज़िटरी को चलाएँ और विकसित करें — इसे लिंक या फ़ॉर्क करें, फिर चुनें कि यह कहाँ चलेगी।"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "उदा. \"https://github.com/owner/repo — एक ओपन-सोर्स ऐप जिसकी आप अपनी कॉपी चाहते हैं\"",
+                "formTitle": "नया App कार्य",
+                "formSubtitle": "किसी भी GitHub रिपॉज़िटरी से शुरू करें। Ever Works उसे लिंक करता है या आपकी अपनी कॉपी बनाता है, फिर उसे चलाने और उसमें बदलाव करते रहने में आपकी मदद करता है।",
+                "urlLabel": "रिपॉज़िटरी URL",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "कोई भी GitHub रिपॉज़िटरी जिसे आपका कनेक्ट किया गया खाता पढ़ सकता है।",
+                "checkButton": "रिपॉज़िटरी जाँचें",
+                "checking": "जाँच हो रही है…",
+                "tabPaste": "URL पेस्ट करें",
+                "tabCatalog": "Apps कैटलॉग ब्राउज़ करें",
+                "catalogComingSoon": "Apps कैटलॉग जल्द ही यहाँ खुलेगा। अभी के लिए रिपॉज़िटरी URL पेस्ट करें।",
+                "stars": "{count, plural, =1 {1 स्टार} other {# स्टार}}",
+                "defaultBranch": "डिफ़ॉल्ट ब्रांच: {branch}",
+                "largeRepository": "बड़ी रिपॉज़िटरी ({size})",
+                "moved": "{fullName} पर स्थानांतरित",
+                "isFork": "यह रिपॉज़िटरी {parent} का फ़ॉर्क है।",
+                "ownFork": "यह {parent} का आपका फ़ॉर्क है। Ever Works {parent} को अपस्ट्रीम के रूप में फ़ॉलो करेगा।",
+                "publicForkNote": "सार्वजनिक रिपॉज़िटरी के फ़ॉर्क सार्वजनिक होते हैं।",
+                "archivedNote": "यह रिपॉज़िटरी संग्रहीत है। अपस्ट्रीम सिंक बंद रहेगा।",
+                "licenseChip": "लाइसेंस: {spdx}",
+                "licenseNotDetected": "लाइसेंस: पता नहीं चला",
+                "licenseClass": {
+                    "green": "होस्टिंग की अनुमति है",
+                    "amber": "आपका क्लस्टर, लाइसेंस की पुष्टि करने के बाद",
+                    "red": "आपका क्लस्टर, लाइसेंस की पुष्टि करने के बाद",
+                    "unknown": "लाइसेंस अज्ञात — डिप्लॉय करने से पहले आप इसकी पुष्टि करेंगे"
+                },
+                "blueprintBadge": {
+                    "verified": "सत्यापित Blueprint",
+                    "available": "Blueprint उपलब्ध",
+                    "none": "कोई Blueprint नहीं — एक एजेंट पता लगाएगा कि इसे कैसे चलाना है",
+                    "unavailable": "Blueprint जाँच उपलब्ध नहीं"
+                },
+                "existingAppWork": "इस रिपॉज़िटरी के लिए आपके पास पहले से एक App कार्य है: {name}।",
+                "openExistingAppWork": "इसे खोलें",
+                "scanIncomplete": "मौजूदा फ़ॉर्क के लिए हर खाते की जाँच नहीं की गई।",
+                "modesTitle": "Ever Works को इस रिपॉज़िटरी का उपयोग कैसे करना चाहिए?",
+                "modes": {
+                    "link": {
+                        "title": "लिंक",
+                        "titleOwnFork": "लिंक — अपस्ट्रीम फ़ॉलो न करें",
+                        "description": "इस रिपॉज़िटरी का जैसी है वैसी ही उपयोग करें। आप इसमें पुश कर सकते हैं, इसलिए बदलाव सीधे यहीं आते हैं।"
+                    },
+                    "fork": {
+                        "title": "फ़ॉर्क",
+                        "description": "अपना खुद का फ़ॉर्क बनाएँ। आप इसे अपस्ट्रीम के साथ सिंक कर सकते हैं और बदलाव वापस प्रस्तावित कर सकते हैं।"
+                    },
+                    "private-copy": {
+                        "title": "निजी कॉपी",
+                        "description": "उसी कोड के साथ एक निजी रिपॉज़िटरी बनाएँ।"
+                    }
+                },
+                "unavailable": "उपलब्ध नहीं: {reason}",
+                "forkInto": "इसमें फ़ॉर्क करें",
+                "copyInto": "इसमें कॉपी करें",
+                "ownerFilter": "खाते खोजें",
+                "ownerOrganization": "संगठन",
+                "ownerNotChecked": "मौजूदा फ़ॉर्क के लिए जाँच नहीं की गई",
+                "existingFork": "आपके पास पहले से एक फ़ॉर्क है: {fullName}। Ever Works इसका उपयोग करेगा।",
+                "privateCopyTradeOff": "निजी कॉपी GitHub पर मूल से लिंक नहीं होती, इसलिए यह मूल प्रोजेक्ट में पुल रिक्वेस्ट नहीं खोल सकती। अपस्ट्रीम बदलाव आपकी कॉपी में पुल रिक्वेस्ट के रूप में आते हैं।",
+                "linkSetupNote": "Ever Works एक पुल रिक्वेस्ट खोलता है जो एक फ़ाइल, .works/works.yml, जोड़ता है। पूरा करने के लिए इसे मर्ज करें।",
+                "existingForkSetupNote": "यह फ़ॉर्क Ever Works ने नहीं बनाया, इसलिए यह एक पुल रिक्वेस्ट खोलता है जो .works/works.yml जोड़ता है।",
+                "linkSetupNoteBlueprint": "Ever Works एक पुल रिक्वेस्ट खोलता है जो .works/works.yml और Blueprint की फ़ाइलें जोड़ता है। पूरा करने के लिए इसे मर्ज करें।",
+                "existingForkSetupNoteBlueprint": "यह फ़ॉर्क Ever Works ने नहीं बनाया, इसलिए यह एक पुल रिक्वेस्ट खोलता है जो .works/works.yml और Blueprint की फ़ाइलें जोड़ता है।",
+                "promptsTitle": "इस ऐप को जिन मानों की ज़रूरत है",
+                "promptHint": "{name} Blueprint इन्हें माँगता है। आप इन्हें बाद में सेटिंग्स में बदल सकते हैं।",
+                "promptRequired": "आवश्यक",
+                "promptsIncomplete": "पहले वे मान भरें जिनकी ऐप को ज़रूरत है।",
+                "autoProvision": "एक एजेंट को पता लगाने दें कि इसे कैसे चलाना है",
+                "autoProvisionHelp": "रिपॉज़िटरी तैयार होने पर शुरू होता है। यह प्रोविज़निंग सीमाओं के भीतर AI टोकन और बिल्ड रनर मिनट खर्च करता है। आप इसे रद्द कर सकते हैं, या इसका चयन हटाकर बाद में अवलोकन से प्रोविज़न के साथ शुरू कर सकते हैं।",
+                "deployTargetTitle": "इसे कहाँ चलना चाहिए?",
+                "deployTargets": {
+                    "none": {
+                        "title": "कोई नहीं — अभी डिप्लॉय न करें",
+                        "description": "आप बाद में कोई टारगेट चुन सकते हैं।"
+                    },
+                    "your-cluster": {
+                        "title": "आपका क्लस्टर",
+                        "description": "इसे अपने खुद के Kubernetes क्लस्टर पर चलाएँ। आप तैनाती टैब पर कनेक्शन जोड़ेंगे।"
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "जल्द आ रहा है — ऐप्स के लिए प्रबंधित होस्टिंग अभी खुली नहीं है।"
+                    }
+                },
+                "submit": {
+                    "link": "लिंक करें और App कार्य बनाएँ",
+                    "fork": "फ़ॉर्क करें और App कार्य बनाएँ",
+                    "private-copy": "कॉपी करें और App कार्य बनाएँ"
+                },
+                "submitPending": "बनाया जा रहा है…",
+                "nameLabel": "नाम",
+                "slugLabel": "स्लग",
+                "descriptionLabel": "विवरण",
+                "slugHelp": "URL-अनुकूल पहचानकर्ता। रिपॉज़िटरी के नाम से बनाया गया — बदलने के लिए संपादित करें।",
+                "invalidSlug": "केवल लोअरकेस अक्षर, अंक और हाइफ़न का उपयोग करें, उदाहरण के लिए tasks-app",
+                "cancel": "रद्द करें",
+                "createFailed": "App कार्य नहीं बनाया जा सका। फिर से प्रयास करें।",
+                "success": {
+                    "link": "App कार्य बनाया गया।",
+                    "fork": "फ़ॉर्क का अनुरोध किया गया — तैयार होने पर हम आपको बताएँगे।",
+                    "private-copy": "कॉपी शुरू हो गई — तैयार होने पर हम आपको बताएँगे।"
+                },
+                "reasons": {
+                    "invalid_url": "https://github.com/owner/repo जैसा GitHub रिपॉज़िटरी URL दर्ज करें",
+                    "provider_not_connected": "App कार्य बनाने के लिए GitHub कनेक्ट करें।",
+                    "insufficient_scope": "रिपॉज़िटरी एक्सेस देने के लिए GitHub को फिर से कनेक्ट करें।",
+                    "not_found": "हमें यह रिपॉज़िटरी नहीं मिली, या आपका GitHub खाता इसे पढ़ नहीं सकता।",
+                    "sso_authorization_required": "{owner} के लिए ज़रूरी है कि आप GitHub पर उसके संगठन के लिए Ever Works को अधिकृत करें।",
+                    "oauth_app_restricted": "{owner} तृतीय-पक्ष एक्सेस को प्रतिबंधित करता है। {owner} के किसी मालिक से Ever Works को स्वीकृत करने के लिए कहें, या कोई दूसरा खाता चुनें।",
+                    "empty_repository": "इस रिपॉज़िटरी में अभी कोई कमिट नहीं है।",
+                    "no_push_access": "आप इस रिपॉज़िटरी में पुश नहीं कर सकते।",
+                    "archived": "संग्रहीत रिपॉज़िटरी केवल-पढ़ने योग्य होती हैं।",
+                    "forking_disabled": "इस रिपॉज़िटरी का मालिक फ़ॉर्क या कॉपी की अनुमति नहीं देता।",
+                    "own_repository": "यह रिपॉज़िटरी आपकी है — इसके बजाय इसे लिंक करें।",
+                    "target_owner_unavailable": "यह खाता आपके GitHub कनेक्शन पर उपलब्ध नहीं है।",
+                    "target_owner_forbidden": "आप {owner} में रिपॉज़िटरी नहीं बना सकते।",
+                    "too_large_for_private_copy": "निजी कॉपी के लिए बहुत बड़ी ({size})। इसके बजाय इसे फ़ॉर्क करें।",
+                    "uses_lfs": "Git LFS का उपयोग करती है, जिसे निजी कॉपी साथ नहीं ले जा सकती। इसके बजाय इसे फ़ॉर्क करें।",
+                    "copy_name_unavailable": "{owner} के पास पहले से {name} से {name}-copy-5 तक नाम वाली रिपॉज़िटरी हैं।",
+                    "in_use_by_another_account": "Ever Works में कोई दूसरा खाता पहले से इस रिपॉज़िटरी का उपयोग कर रहा है। उसके मालिक से आपको सदस्य के रूप में जोड़ने के लिए कहें।",
+                    "app_work_exists": "{fullName} के लिए आपके पास पहले से एक App कार्य है: {workName}।",
+                    "create_in_progress": "यह App कार्य पहले से बनाया जा रहा है।",
+                    "rate_limited": "GitHub आपके खाते की दर सीमित कर रहा है। {time} पर फिर से प्रयास करें।",
+                    "managed_hosting_unavailable": "जल्द आ रहा है — ऐप्स के लिए प्रबंधित होस्टिंग अभी खुली नहीं है।",
+                    "cluster_target_unavailable": "ऐप्स चला सकने वाला कोई डिप्लॉयमेंट विकल्प इंस्टॉल नहीं है।",
+                    "app_works_disabled": "इस इंस्टेंस पर App कार्य उपलब्ध नहीं हैं।",
+                    "blueprint_mismatch": "इस रिपॉज़िटरी का Blueprint बदल गया है। रिपॉज़िटरी को फिर से जाँचें।"
+                },
+                "catalog": {
+                    "searchLabel": "Apps कैटलॉग में खोजें",
+                    "searchPlaceholder": "ऐप्स खोजें — उदाहरण के लिए umami या calendar",
+                    "listLabel": "App Blueprints",
+                    "loading": "Apps कैटलॉग लोड हो रहा है…",
+                    "unavailable": "Apps कैटलॉग अभी उपलब्ध नहीं है। इसके बजाय रिपॉज़िटरी URL पेस्ट करें।",
+                    "disabled": "इस इंस्टेंस पर App कार्य उपलब्ध नहीं हैं।",
+                    "error": "Apps कैटलॉग लोड नहीं हो सका। फिर से प्रयास करें, या रिपॉज़िटरी URL पेस्ट करें।",
+                    "empty": "अभी कोई App Blueprint प्रकाशित नहीं है। इसके बजाय रिपॉज़िटरी URL पेस्ट करें।",
+                    "noMatches": "आपकी खोज से कोई ऐप मेल नहीं खाता।",
+                    "pick": "{name} से शुरू करें",
+                    "statusBeta": "बीटा",
+                    "statusPlaceholder": "जल्द आ रहा है",
+                    "verified": "सत्यापित",
+                    "upstreamLine": "{repo} से",
+                    "runsOn": "यहाँ चलता है: {targets}",
+                    "targetYourCluster": "आपका क्लस्टर",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "अभी उपलब्ध नहीं",
+                    "fallbackNote": "GitHub पर मिले App Blueprints दिखाए जा रहे हैं — क्यूरेट किया गया कैटलॉग अभी उपलब्ध नहीं है।"
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "आयात सफलतापूर्वक शुरू हुआ",
                 "failed": "कार्य आयात करने में विफल",
                 "fetchReposFailed": "रिपॉजिटरीज़ लाने में विफल"
+            },
+            "app": {
+                "repositoryUrlRequired": "https://github.com/owner/repo जैसा GitHub रिपॉज़िटरी URL दर्ज करें",
+                "repositoryModeRequired": "चुनें कि इस रिपॉज़िटरी का उपयोग कैसे करना है: लिंक, फ़ॉर्क या निजी कॉपी।",
+                "targetOwnerRequired": "वह खाता चुनें जिसमें रिपॉज़िटरी बनानी है।",
+                "invalidUrl": "https://github.com/owner/repo जैसा GitHub रिपॉज़िटरी URL दर्ज करें",
+                "inspectFailed": "इस रिपॉज़िटरी की जाँच नहीं हो सकी। फिर से प्रयास करें।"
             }
         },
         "generator": {

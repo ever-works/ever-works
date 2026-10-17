@@ -1,4 +1,5 @@
 import {
+    AppWindow,
     BookOpen,
     Bot,
     Building2,
@@ -65,6 +66,8 @@ export const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     directory: FolderOpen,
     'awesome-repo': Star,
     repo: GitBranch,
+    // APW-01 T23 — the same icon the Work-kind catalog uses for `app`.
+    app: AppWindow,
     // EW-662 Phase 10 — same `Building2` icon the WorkspaceSwitcher
     // empty state uses for consistency.
     company: Building2,
@@ -141,6 +144,12 @@ export const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
         'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
     ],
+    // APW-01 §6.1 — the composer placeholder for the App chip.
+    app: [
+        'e.g. "https://github.com/owner/repo — an open-source app you want your own copy of"',
+        'e.g. "https://github.com/calcom/cal.com — scheduling I want to run on my own cluster"',
+        'e.g. "https://github.com/umami-software/umami — analytics I want to host and evolve"',
+    ],
     // EW-662 Phase 10 — Company placeholders telegraph that this chip
     // ends in a registered Organization (manual-completion path for v1).
     // The prompt input is ignored on submit — the chip opens the
@@ -166,6 +175,7 @@ export const CHIP_INTENT_LABEL: Record<ChipType, string> = {
     directory: 'directory',
     'awesome-repo': 'awesome list repo',
     repo: 'code repository',
+    app: 'app from a GitHub repository',
     company: 'Company',
 };
 
@@ -179,6 +189,7 @@ export const CHIP_TO_CANVAS_ROUTE: Partial<Record<ChipType, string>> = {
     directory: ROUTES.DASHBOARD_WORKS_NEW,
     'awesome-repo': ROUTES.DASHBOARD_WORKS_NEW,
     repo: ROUTES.DASHBOARD_WORKS_NEW,
+    app: ROUTES.DASHBOARD_WORKS_NEW,
 };
 
 /** Chips that create a Work of a named kind. */
@@ -189,6 +200,7 @@ export const CHIP_TO_WORK_KIND: Partial<Record<ChipType, string>> = {
     directory: 'directory',
     'awesome-repo': 'awesome-repo',
     repo: 'repo',
+    app: 'app',
 };
 
 /** Minimum trimmed prompt length the shared composer submits. */

@@ -183,6 +183,8 @@ import {
 } from '../database/repositories/work-app-env-value.repository';
 import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
 import { envEntryDeclaredSecret, envPhaseOf } from '../works-config/schema/app-spec.refs';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AppEnvChangedEvent, AppEnvRotatedEvent } from '../events/app-env.events';
 
 /* -------------------------------------------------------------------------- *
  * The caller, and the shapes another owner reads
@@ -716,6 +718,13 @@ export class AppEnvService {
         @Optional()
         @Inject(APP_ENV_ACTOR_NAMES)
         private readonly actorNames?: AppEnvActorNames,
+        // 2026-10-17 — `app.env.changed` / `app.env.rotated` on the bus (plan §7's
+        // "EventEmitter2 + Activity"); appended last and `@Optional()`, so every
+        // positional construction of this service keeps working. Unbound, the
+        // events are simply not emitted — the Activity row is unaffected.
+        @Optional()
+        @Inject(EventEmitter2)
+        private readonly emitter?: EventEmitter2,
     ) {}
 
     /** The clock, as a method, so a spec can pin an instant without touching a global. */
@@ -1441,6 +1450,11 @@ export class AppEnvService {
         }
 
         if (result.changed.length > 0) {
+            // The bus half (2026-10-17): names only, split by phase, for APW-05's
+            // re-prepare and any other consumer. Emitted whether or not the Activity
+            // writer is bound — the change happened either way.
+            this.emitEnvEvent(AppEnvChangedEvent, workId, result.changed, snapshot.spec);
+
             // FR-8: one row per call, names and action verbs only.
             result.activityRecorded = await this.emit({
                 actionType: 'app_env',
@@ -1570,6 +1584,8 @@ export class AppEnvService {
 
         // ACC-07-04: `app.env.rotated` carries the name only — never a value, a
         // length or a hash (FR-8).
+        this.emitEnvEvent(AppEnvRotatedEvent, workId, [name], snapshot.spec);
+
         await this.emit({
             actionType: 'app_env',
             action: 'app.env.rotated',
@@ -1862,6 +1878,43 @@ export class AppEnvService {
      * feed entry must not undo it — the answer is `activityRecorded: false` and
      * one warning line.
      */
+    /**
+     * `app.env.changed` / `app.env.rotated` on the EventEmitter bus — names only,
+     * split by the phase the App spec declares (an undeclared name is runtime).
+     * Never throws: a failing listener must not undo a change that already landed.
+     */
+    private emitEnvEvent(
+        EventClass: typeof AppEnvChangedEvent | typeof AppEnvRotatedEvent,
+        workId: string,
+        names: readonly string[],
+        spec: AppSpec,
+    ): void {
+        if (!this.emitter || names.length === 0) return;
+        try {
+            const index = indexAppSpec(spec);
+            const phaseOf = (name: string): AppEnvPhase =>
+                index.entries.get(name)?.phase ?? 'runtime';
+            const unique = [...new Set(names)];
+            this.emitter.emit(
+                EventClass.EVENT_NAME,
+                new EventClass({
+                    workId,
+                    names: unique,
+                    buildPhaseNames: unique.filter((name) =>
+                        participatesIn(phaseOf(name), 'build'),
+                    ),
+                    runtimePhaseNames: unique.filter((name) =>
+                        participatesIn(phaseOf(name), 'runtime'),
+                    ),
+                }),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `App env: emitting ${EventClass.EVENT_NAME} failed (${errorText(error)}).`,
+            );
+        }
+    }
+
     private async emit(event: AppEnvActivityEvent): Promise<boolean> {
         if (!this.activity) {
             this.logger.warn(

@@ -231,6 +231,13 @@ function rowsRepository(store: Map<string, WorkBuild>): Repository<WorkBuild> {
                             return { affected: 0 };
                         }
                         if (sql !== 'id = :id') {
+                            // `… AND notDeployableReason = :was` — the late digest confirmation's
+                            // exactly-once claim (2026-10-17): read from the SQL like the arms above.
+                            if (sql === 'notDeployableReason = :was') {
+                                if ((row.notDeployableReason ?? null) !== params.was)
+                                    return { affected: 0 };
+                                continue;
+                            }
                             throw new Error(`rowsRepository: unrecognised claim predicate: ${sql}`);
                         }
                     }
@@ -369,6 +376,20 @@ function makeHarness(options: HarnessOptions = {}): Harness {
             row.watchLeaseUntil = new Date(now + Math.max(0, leaseMs));
             return true;
         }),
+        // 2026-10-17 — the verification-secret guard asks whether ANOTHER open
+        // verification Build of the Work owns the shared secret; answered from the
+        // same store, filtered the way the repository's `findPage` filters.
+        findPage: jest.fn(
+            async (workId: string, filters: { trigger?: string[]; status?: string[] } = {}) => {
+                const rows = [...store.values()].filter(
+                    (row) =>
+                        row.workId === workId &&
+                        (!filters.trigger || filters.trigger.includes(row.trigger)) &&
+                        (!filters.status || filters.status.includes(row.status)),
+                );
+                return { rows, total: rows.length, page: 1, pageSize: rows.length, hasMore: false };
+            },
+        ),
     } as unknown as AppBuildRepository;
 
     const preparations = {

@@ -9,6 +9,7 @@ import { Work } from '@/lib/api';
 import { useWorkDetail, useWorkPermissions } from './WorkDetailContext';
 import {
     getWorkCapabilities,
+    isAppWorkKind,
     isRepositoryWorkKind,
     type AppRepositoryMode,
 } from '@ever-works/contracts';
@@ -183,7 +184,12 @@ export function WorkTabs({ work, appRelation }: WorkTabsProps) {
             // the kind, so the tab is not offered. A kind test rather than
             // `items.enabled` — a Landing Page has no Items tab but still
             // generates its pages.
-            visible: permissions.canGenerate && !isRepositoryWorkKind(work.kind),
+            // An App Work (APW-01 T24, spec S10) has nothing to generate either:
+            // its code is somebody else's repository, built and deployed as is.
+            visible:
+                permissions.canGenerate &&
+                !isRepositoryWorkKind(work.kind) &&
+                !isAppWorkKind(work.kind),
             icon: (
                 <svg
                     className="w-4 h-4 shrink-0"
@@ -230,6 +236,31 @@ export function WorkTabs({ work, appRelation }: WorkTabsProps) {
             isActive: pathname.includes('/upstream'),
         },
         {
+            // APW-05 T25–T28 — the Builds tab: every Build of the App Work's
+            // repository, the drawer, and **Start build**. Only an App Work has
+            // Builds; every other kind never shows the tab.
+            name: t('builds'),
+            tooltip: tTooltip('builds'),
+            href: ROUTES.DASHBOARD_WORK_BUILDS(work.id),
+            visible: getWorkCapabilities(work.kind).builds,
+            icon: (
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/builds'),
+        },
+        {
             name: t('plugins'),
             tooltip: undefined as string | undefined,
             href: ROUTES.DASHBOARD_WORK_PLUGINS(work.id),
@@ -255,7 +286,9 @@ export function WorkTabs({ work, appRelation }: WorkTabsProps) {
             name: t('deploy'),
             tooltip: tTooltip('deploy'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/deploy`,
-            visible: Boolean(config) && permissions.canDeploy,
+            // An App Work has no generated config — its Deploy tab is the App
+            // branch (APW-06 T37: target card, connect dialog, Deploy now).
+            visible: (Boolean(config) || isAppWorkKind(work.kind)) && permissions.canDeploy,
             icon: (
                 <svg
                     className="w-4 h-4 shrink-0"

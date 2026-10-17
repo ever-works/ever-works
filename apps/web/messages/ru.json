@@ -3545,7 +3545,8 @@
                     "elapsedValue": "Running for {duration}",
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
-                        "waitingForRunner": "no runner can take it yet"
+                        "waitingForRunner": "no runner can take it yet",
+                        "modelUsageLimit": "waiting for a model usage limit to reset"
                     },
                     "outcomes": {
                         "queued": "Queued",
@@ -3632,6 +3633,20 @@
                 },
                 "workerStateReason": "Reason: {reason}",
                 "workerStateSince": "Since {time}",
+                "modelThrottles": {
+                    "title": "Model usage limits",
+                    "entry": "{cli}: {window} until {until}",
+                    "hint": "Agent work for this CLI waits here until the reset (pinned Agents wait, unpinned work runs on another node); other work still runs.",
+                    "windows": {
+                        "weekly": "weekly limit",
+                        "session": "5-hour limit",
+                        "daily": "daily limit",
+                        "rate": "rate limit",
+                        "usage": "usage limit"
+                    },
+                    "clear": "Clear limit now",
+                    "cleared": "Usage limit cleared — the node takes that CLI’s work again from its next poll"
+                },
                 "housekeeping": {
                     "title": "Disk & workspaces",
                     "disk": {
@@ -4457,12 +4472,14 @@
                     "generator": "Сгенерировать Work — разово или по расписанию",
                     "deploy": "Развернуть Work",
                     "tasks": "Задачи этой работы",
-                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review",
+                    "builds": "Образы контейнеров, собранные из вашего репозитория"
                 },
                 "tasks": "Задачи",
                 "posts": "Публикации",
                 "pages": "Страницы",
-                "pullRequests": "Pull requests"
+                "pullRequests": "Pull requests",
+                "builds": "Сборки"
             },
             "members": {
                 "title": "Участники команды",
@@ -6807,6 +6824,609 @@
                 "filters": {
                     "all": "All sources"
                 }
+            },
+            "appSource": {
+                "relation": {
+                    "upstream": "Upstream: {fullName}",
+                    "fork": "Форк: {fullName}",
+                    "private-copy": "Приватная копия: {fullName}",
+                    "link": "Привязан: {fullName}"
+                },
+                "preparing": {
+                    "forkTitle": "Подготовка вашего форка",
+                    "forkBody": "GitHub создаёт {fullName}. Обычно это занимает меньше минуты; для больших репозиториев — дольше.",
+                    "copyTitle": "Подготовка вашей приватной копии",
+                    "copyBody": "Копирование {upstream} в {fullName}. Большие репозитории копируются дольше.",
+                    "linkTitle": "Завершение настройки",
+                    "linkBody": "Открывается pull request, который добавляет .works/works.yml в {fullName}.",
+                    "blueprintTitle": "Применение Blueprint {name}",
+                    "blueprintBody": "Ever Works готовит ваш App Work и запишет .works/works.yml вместе с файлами Blueprint."
+                },
+                "setupPrClosed": "Pull request настройки был закрыт без слияния.",
+                "timedOut": "Создание вашего форка занимает больше 15 минут.",
+                "failedAccess": "Ever Works потерял доступ к GitHub во время подготовки этого App Work.",
+                "failedOther": "Не удалось подготовить этот App Work: {reason}",
+                "waitingForSetupPr": "Выполните слияние pull request настройки, чтобы завершить.",
+                "tryAgain": "Попробовать ещё раз",
+                "openOnGitHub": "Открыть на GitHub",
+                "reconnectGitHub": "Переподключить GitHub",
+                "openPullRequest": "Открыть pull request",
+                "retryLimit": "Вы использовали все 3 повторные попытки за этот час. Попробуйте позже.",
+                "retryFailed": "Не удалось начать новую попытку. Попробуйте ещё раз.",
+                "failedReasons": {
+                    "works_yml_unparseable": "Файл .works/works.yml в ветке по умолчанию не является корректным YAML. Исправьте или удалите файл, затем попробуйте ещё раз.",
+                    "works_yml_other_kind": "Файл .works/works.yml уже объявляет другой тип Work. Укажите kind: app или удалите файл, затем попробуйте ещё раз.",
+                    "push_rejected": "GitHub раз за разом отклонял коммит, добавляющий .works/works.yml.",
+                    "provider_unsupported": "Git-провайдер этого репозитория нельзя настроить автоматически.",
+                    "too_large_for_private_copy": "Репозиторий слишком большой для приватной копии. Создайте форк вместо этого.",
+                    "uses_lfs": "Репозиторий использует Git LFS, который нельзя перенести в приватную копию. Создайте форк вместо этого.",
+                    "other": "Что-то пошло не так при настройке репозитория."
+                },
+                "overview": {
+                    "title": "Приложение",
+                    "repository": "Репозиторий Work",
+                    "upstream": "Upstream",
+                    "relationLabel": "Связь",
+                    "readinessLabel": "Готовность",
+                    "readiness": {
+                        "preparing": "Подготовка",
+                        "ready": "Готово",
+                        "timed_out": "Время ожидания истекло",
+                        "failed": "Ошибка",
+                        "waiting_for_setup_pr": "Ожидание pull request настройки"
+                    },
+                    "relations": {
+                        "link": "Привязан",
+                        "fork": "Форк",
+                        "private-copy": "Приватная копия"
+                    },
+                    "appSpecLabel": "Спецификация App",
+                    "appSpecStatus": {
+                        "valid": "Корректна",
+                        "valid_with_warnings": "Корректна, с предупреждениями",
+                        "invalid": "Содержит ошибки",
+                        "missing": "Ещё не записана",
+                        "unreadable": "Не удалось прочитать",
+                        "pending": "Проверяется",
+                        "unknown": "Ещё не проверена"
+                    },
+                    "appSpecIssues": "{errors, plural, =0 {Нет ошибок} =1 {1 ошибка} one {# ошибка} few {# ошибки} many {# ошибок} other {# ошибки}} · {warnings, plural, =0 {нет предупреждений} =1 {1 предупреждение} one {# предупреждение} few {# предупреждения} many {# предупреждений} other {# предупреждения}}",
+                    "openAppSpec": "Открыть спецификацию App",
+                    "blueprint": "Blueprint: {id}",
+                    "unavailable": "Сейчас не удалось загрузить сведения о приложении.",
+                    "builds": "Сборки",
+                    "deploy": "Развертывание",
+                    "upstreamTab": "Upstream",
+                    "blueprintLabel": "Blueprint"
+                },
+                "chat": {
+                    "title": "Развивайте его вместе с агентом",
+                    "body": "Попросите агента этого Work изменить приложение — добавить функцию, исправить ошибку, обновить зависимость. Он работает в репозитории Work и открывает pull request.",
+                    "button": "Обсудить это приложение"
+                }
+            },
+            "builds": {
+                "title": "Сборки",
+                "subtitle": "Собирается на раннерах GitHub в {repository} · образ {imageRepository}",
+                "subtitleNoImage": "Собирается на раннерах GitHub в {repository}",
+                "subtitleGeneric": "Образы контейнеров, собранные из репозитория этого App Work.",
+                "startBuild": "Запустить сборку",
+                "starting": "Запуск…",
+                "refresh": "Обновить",
+                "cancel": "Отменить",
+                "cancelling": "Отмена…",
+                "viewerDisabled": "Для этого нужны права на редактирование.",
+                "deployable": "Готова к развертыванию",
+                "notDeployableLine": "Нельзя развернуть — {reason}",
+                "pagination": "Показано {start}–{end} из {total}",
+                "listLabel": "Сборки этого App Work",
+                "openDetails": "Открыть сборку #{number}",
+                "status": {
+                    "queued": "В очереди",
+                    "running": "Выполняется",
+                    "succeeded": "Успешно",
+                    "failed": "Ошибка",
+                    "cancelled": "Отменена",
+                    "blocked": "Заблокирована"
+                },
+                "trigger": {
+                    "push": "Push",
+                    "pullRequest": "PR #{number}",
+                    "manual": "Вручную",
+                    "verification": "Проверка"
+                },
+                "notDeployable": {
+                    "notSucceeded": "Сборка завершилась неуспешно",
+                    "pullRequest": "Собрана из pull request",
+                    "verification": "Собрана для проверки",
+                    "specInvalid": "Спецификация App в этом коммите содержит ошибки",
+                    "staleInputs": "Собрана с устаревшими значениями сборки",
+                    "secretCheckFailed": "Проверка секретов не пройдена",
+                    "digestUnconfirmed": "Не удалось подтвердить отправленный образ",
+                    "criticalVulnerability": "Для критической уязвимости доступно исправление",
+                    "unsigned": "Образ не подписан"
+                },
+                "blocked": {
+                    "workflowPending": "Ожидается слияние workflow сборки.",
+                    "workflowEditedByHand": "Workflow сборки был изменён вручную.",
+                    "workflowWriteFailed": "Ever Works не удалось записать workflow сборки в репозиторий. Правило этого репозитория отклоняет изменение.",
+                    "actionsDisabled": "GitHub Actions отключены для этого репозитория.",
+                    "missingBuildValues": "Ожидается {count, plural, =1 {1 значение сборки} one {# значение сборки} few {# значения сборки} many {# значений сборки} other {# значения сборки}}: {names}",
+                    "runnerTooSmall": "Этой сборке нужно {needed}, но раннер для {visibility} репозиториев позволяет {max}.",
+                    "tooManyBuildValues": "Эта сборка использует {count} значений сборки; допускается не более 50.",
+                    "buildValueTooLarge": "{name} слишком велико для передачи в сборку (максимум 48 КБ).",
+                    "secretLimitReached": "В репозитории нет места для новых секретов.",
+                    "strategyNotSupported": "Раннеры GitHub не могут собирать со стратегией «{strategy}». Добавьте Dockerfile и задайте build.strategy значение dockerfile.",
+                    "specInvalid": "Спецификация App в этом коммите содержит ошибки.",
+                    "gitConnectionMissing": "Ever Works не может получить доступ к этому репозиторию через ваше подключение к GitHub.",
+                    "repositoryUnavailable": "{repository} заархивирован, удалён или больше не доступен вашему подключению к GitHub.",
+                    "managedConcurrencyLimit": "Ожидание других сборок: одновременно выполняется не более {perWork} на приложение и {perAccount} на аккаунт.",
+                    "buildValueNameReserved": "Имя {name} зарезервировано Ever Works и не может передаваться в сборку. Переименуйте запись окружения.",
+                    "buildServicePortRequired": "Сервису сборки {service} нужен порт: Ever Works не знает, какой порт слушает «{image}».",
+                    "verificationDependencyUnsupported": "Проверка пока не может запустить {kind}. Вместо этого проверка выполняется в кластере.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
+                },
+                "blockedAction": {
+                    "reviewPullRequest": "Просмотреть pull request",
+                    "turnOnActions": "Включить",
+                    "setValue": "Задать",
+                    "useLargerRunner": "Использовать раннер побольше",
+                    "openRepositorySettings": "Открыть настройки репозитория",
+                    "reconnectGithub": "Переподключить GitHub",
+                    "rebuild": "Пересобрать",
+                    "openEnvironment": "Открыть окружение"
+                },
+                "failure": {
+                    "outOfMemory": {
+                        "title": "Не хватило памяти",
+                        "suggestion": "Увеличьте build.resources.memory (сейчас {memory}) или уменьшите размер кучи сборки. На этом раннере сборка может использовать не более {max}."
+                    },
+                    "diskFull": {
+                        "title": "Не хватило места на диске",
+                        "suggestion": "Включите «Reclaim runner disk» в настройках сборки или уменьшите контекст сборки с помощью файла .dockerignore."
+                    },
+                    "dockerfileError": {
+                        "title": "Dockerfile завершился ошибкой на шаге {step} из {total}",
+                        "suggestion": "Шаг с ошибкой: {command}. Исправьте его в {dockerfile} и сделайте push или попросите агента исправить."
+                    },
+                    "dependencyDownloadFailed": {
+                        "title": "Не удалось загрузить зависимости",
+                        "suggestion": "Реестр пакетов или базовых образов не ответил. Пересоберите через несколько минут; если ошибка повторяется, закрепите версии, от которых вы зависите."
+                    },
+                    "registryPushDenied": {
+                        "title": "Не удалось отправить образ",
+                        "suggestion": "Разрешите workflow в этом репозитории записывать пакеты (Settings ▸ Actions ▸ General ▸ Workflow permissions), затем пересоберите."
+                    },
+                    "missingBuildValue": {
+                        "title": "Отсутствует значение сборки: {names}",
+                        "suggestion": "Задайте его в Настройки ▸ Окружение, затем пересоберите."
+                    },
+                    "secretInImage": {
+                        "title": "Секрет оказался бы опубликован внутри образа: {name}",
+                        "suggestion": "Используйте это значение только на более раннем этапе сборки или передайте его как монтируемый секрет сборки. Ничего не было отправлено."
+                    },
+                    "timeout": {
+                        "title": "Заняло больше {minutes} мин",
+                        "suggestion": "Увеличьте build.resources.timeoutMinutes (максимум 180) или ускорьте сборку с помощью кеширования."
+                    },
+                    "workflowInvalid": {
+                        "title": "Файл workflow некорректен",
+                        "suggestion": "GitHub не может запустить workflow сборки. Просмотрите открытый pull request от Ever Works, чтобы восстановить его."
+                    },
+                    "digestMismatch": {
+                        "title": "Не удалось подтвердить отправленный образ",
+                        "suggestion": "Реестр сообщил о другом образе, чем сборка. Пересоберите; ничего неподтверждённого развернуто не будет."
+                    },
+                    "verificationFailed": {
+                        "title": "Приложение не прошло smoke-тесты",
+                        "suggestion": "Не пройдено smoke-тестов: {failed} из {total}. Смотрите результаты ниже."
+                    },
+                    "egressBlocked": {
+                        "title": "Доступ к сети был заблокирован",
+                        "suggestion": "Сборка пыталась обратиться к {hosts}, которых нет в списке разрешённых для сборщика. Получите нужное из исходного репозитория или разрешённого реестра, затем пересоберите."
+                    },
+                    "lost": {
+                        "title": "Связь с этой сборкой потеряна",
+                        "suggestion": "GitHub перестал отвечать по этой сборке. Проверьте её на GitHub."
+                    },
+                    "unknown": {
+                        "title": "Что-то ещё пошло не так",
+                        "suggestion": "Откройте логи на GitHub или попросите агента разобраться."
+                    },
+                    "askAgent": "Попросить агента исправить",
+                    "excerptLabel": "Последние строки лога"
+                },
+                "cancelReason": {
+                    "user": "Отменена участником",
+                    "superseded": "Заменена более новой сборкой"
+                },
+                "detail": {
+                    "title": "Сборка #{number} · {sha} · {status}",
+                    "loading": "Загрузка сведений о сборке…",
+                    "close": "Закрыть",
+                    "trigger": "Триггер",
+                    "triggeredBy": "{trigger} — {name}",
+                    "commit": "Коммит",
+                    "commitValue": "{sha} ({branch})",
+                    "runner": "Раннер",
+                    "duration": "Длительность",
+                    "durationValue": "{duration} (в очереди {queued})",
+                    "image": "Образ",
+                    "tags": "Теги",
+                    "deployable": "Готова к развертыванию",
+                    "yes": "Да",
+                    "buildValues": "Значения сборки",
+                    "buildValuesValue": "Синхронизировано {count, plural, =1 {1 значение} one {# значение} few {# значения} many {# значений} other {# значения}}: {names}",
+                    "noBuildValues": "Нет",
+                    "receipt": "Квитанция",
+                    "verification": "Проверка",
+                    "copy": "Копировать",
+                    "copied": "Ссылка на образ скопирована.",
+                    "copyFailed": "Не удалось скопировать ссылку на образ.",
+                    "viewLogs": "Смотреть логи на GitHub",
+                    "rebuildThisCommit": "Пересобрать этот коммит",
+                    "notAvailable": "—"
+                },
+                "receipt": {
+                    "minutes": "{minutes} мин раннера · оплачивает ваш аккаунт GitHub",
+                    "minutesPlatform": "{minutes} мин раннера · оплачивает Ever Works",
+                    "checksMinutes": "Из них {checksMinutes} ушло на проверки App",
+                    "costUnknown": "Минуты раннера ещё не получены"
+                },
+                "verification": {
+                    "componentsReady": "Компоненты запущены",
+                    "componentsNotReady": "Компоненты не запустились",
+                    "job": "Задание {name} завершилось с кодом {exitCode}",
+                    "jobNoExit": "Задание {name} не завершилось",
+                    "smokePassed": "Пройден: {name}",
+                    "smokeFailed": "Не пройден: {name} — ожидалось {expected}, получено {observed}"
+                },
+                "empty": {
+                    "noBuilds": "Сборок пока нет. Первая сборка начнётся, когда workflow сборки появится в репозитории.",
+                    "unavailable": "Сборки пока недоступны в этом экземпляре."
+                },
+                "errors": {
+                    "loadFailed": "Не удалось загрузить сборки. Попробуйте обновить страницу.",
+                    "rebuildRateLimited": "Вы запустили слишком много сборок за этот час. Попробуйте снова через {minutes, plural, =1 {1 минуту} one {# минуту} few {# минуты} many {# минут} other {# минуты}}.",
+                    "commitNotReachable": "Этого коммита нет в отслеживаемой ветке.",
+                    "nothingToBuild": "Этот App Work запускает опубликованный образ, поэтому собирать нечего.",
+                    "notCancellable": "Эта сборка уже завершилась, поэтому её нельзя отменить.",
+                    "providerUnavailable": "Сейчас нет доступного провайдера сборки. Попробуйте позже.",
+                    "startFailed": "Не удалось запустить сборку. Попробуйте ещё раз.",
+                    "cancelFailed": "Не удалось отменить эту сборку. Попробуйте ещё раз.",
+                    "detailFailed": "Не удалось загрузить эту сборку. Попробуйте ещё раз."
+                },
+                "toasts": {
+                    "started": "Сборка поставлена в очередь.",
+                    "deduped": "Сборка для этого коммита уже в очереди.",
+                    "cancelled": "Сборка отменена."
+                },
+                "pullToken": {
+                    "title": "Добавьте токен для pull",
+                    "body": "Этот образ приватный. Чтобы скачать его, вашему кластеру нужен токен, который может только читать пакеты.",
+                    "stepCreate": "1. Создайте классический токен, отметив только «read:packages».",
+                    "stepPaste": "2. Вставьте его сюда.",
+                    "label": "Токен",
+                    "submit": "Проверить и сохранить",
+                    "saving": "Проверка…",
+                    "tooBroad": "Этот токен может больше, чем читать пакеты. Создайте токен только с read:packages.",
+                    "fineGrained": "Это fine-grained токен. Создайте классический токен, отметив только read:packages.",
+                    "cannotRead": "Этот токен не может прочитать {imageRepository}.",
+                    "publicImage": "Этот образ уже публичный — токен не нужен.",
+                    "noImageYet": "Завершённых сборок пока нет. Добавьте токен для pull после первой успешной сборки.",
+                    "savedExpires": "Токен для pull сохранён. Он истекает {date}.",
+                    "savedNoExpiry": "Токен для pull сохранён. Он бессрочный.",
+                    "tokenSet": "Токен для pull сохранён. Вставьте новый, чтобы заменить его.",
+                    "expiringSoon": "Токен для pull истекает {date}. Добавьте новый до этой даты.",
+                    "viewerDisabled": "Для этого нужны права на редактирование.",
+                    "failed": "Не удалось сохранить токен для pull. Попробуйте ещё раз."
+                },
+                "overview": {
+                    "title": "Последняя сборка",
+                    "line": "{status} · {branch} · {sha} · {duration}",
+                    "deployableSame": "Сборка для развертывания: этот коммит",
+                    "deployableOther": "Сборка для развертывания: {sha}",
+                    "noDeployable": "Пока нет сборки для развертывания",
+                    "open": "Открыть сборки"
+                }
+            },
+            "appDeploy": {
+                "title": "Развертывание",
+                "notRunning": "Это приложение пока нигде не запущено.",
+                "runningOn": "{state} · {target}",
+                "openApp": "Открыть приложение",
+                "source": "Источник",
+                "buildsLink": "Смотреть сборки",
+                "buildsHint": "Сборки выполняются при любой цели.",
+                "stale": "Последняя проверка {minutes, plural, =1 {1 минуту} one {# минуту} few {# минуты} many {# минут} other {# минуты}} назад",
+                "status": {
+                    "notDeployed": "Не развернуто",
+                    "live": "Работает",
+                    "degraded": "Работает с перебоями",
+                    "down": "Не работает",
+                    "unreachable": "Нет связи с вашим кластером",
+                    "paused": "Приостановлено",
+                    "deleting": "Удаление…"
+                },
+                "target": {
+                    "heading": "Где оно должно работать?",
+                    "current": "(текущая)",
+                    "none": {
+                        "label": "Нигде — пока не развертывать",
+                        "description": "Сборки продолжают выполняться."
+                    },
+                    "yourCluster": {
+                        "label": "Ваш кластер",
+                        "description": "Работает в кластере Kubernetes, которым управляете вы."
+                    },
+                    "everWorksApps": {
+                        "label": "Ever Works Apps",
+                        "description": "Мы запускаем его за вас.",
+                        "unavailable": "Скоро — управляемый хостинг приложений пока недоступен.",
+                        "ineligible": "Пока недоступно для этого приложения."
+                    },
+                    "connect": "Подключить кластер",
+                    "reconnect": "Изменить подключение к кластеру",
+                    "connected": "Подключено · {version}",
+                    "connectedNoVersion": "Подключено",
+                    "checkFailed": "Последняя проверка кластера не удалась.",
+                    "notChecked": "Кластер ещё не подключён.",
+                    "save": "Использовать эту цель",
+                    "saving": "Сохранение…",
+                    "saved": "Цель сохранена.",
+                    "saveFailed": "Не удалось сохранить цель: {reason}",
+                    "changeNote": "Смена цели не удаляет ничего из уже запущенного.",
+                    "routeUnavailable": "Смена цели пока недоступна в этом экземпляре."
+                },
+                "connect": {
+                    "title": "Подключите свой кластер",
+                    "description": "Вставьте kubeconfig сервисного аккаунта в кластере, где должно работать это приложение.",
+                    "kubeconfigLabel": "kubeconfig",
+                    "kubeconfigPlaceholder": "Вставьте свой kubeconfig…",
+                    "kubeconfigHelp": "Используйте токен сервисного аккаунта. Команды, локальные файлы и прокси не поддерживаются.",
+                    "kubeconfigStored": "Ваш kubeconfig был отправлен один раз и хранится в зашифрованном виде. Вставьте новый, чтобы заменить его, или проверьте сохранённый ещё раз.",
+                    "contextLabel": "Контекст (необязательно)",
+                    "contextHelp": "Оставьте пустым, чтобы использовать текущий контекст из kubeconfig.",
+                    "check": "Проверить подключение",
+                    "checking": "Проверка…",
+                    "checkAgain": "Проверить ещё раз",
+                    "checkTimedOut": "Проверка не завершилась за 30 секунд. Попробуйте ещё раз.",
+                    "checkFailed": "Не удалось проверить подключение: {reason}",
+                    "unavailable": "Подключение кластера пока недоступно в этом экземпляре.",
+                    "kubeconfigTooLarge": "Этот kubeconfig больше 64 КиБ.",
+                    "kubeconfigRequired": "Сначала вставьте kubeconfig.",
+                    "ingressClass": "Класс ingress",
+                    "ingressDefault": "{name} (по умолчанию)",
+                    "ingressNone": "Класс ingress не найден",
+                    "tls": "TLS",
+                    "tlsModes": {
+                        "certManager": "Сертификаты от издателя",
+                        "external": "Обрабатывается вне кластера",
+                        "edge": "Терминируется на границе сети",
+                        "none": "Без TLS (только http)"
+                    },
+                    "issuer": "Издатель",
+                    "namespace": "Пространство имён",
+                    "namespaceAuto": "Выбирается при первом развертывании приложения",
+                    "isolation": "Сетевая изоляция",
+                    "isolationOn": "Включена (рекомендуется)",
+                    "isolationOff": "Выключена",
+                    "isolationOffWarning": "Без сетевой изоляции другие рабочие нагрузки в кластере смогут обращаться к этому приложению и его базам данных.",
+                    "cancel": "Отмена",
+                    "save": "Сохранить",
+                    "saving": "Сохранение…",
+                    "saveBlocked": "Сохранение станет доступно, когда проверка пройдёт со всеми необходимыми правами.",
+                    "saved": "Кластер подключён.",
+                    "saveFailed": "Не удалось сохранить подключение к кластеру: {reason}"
+                },
+                "check": {
+                    "ok": "Подключено",
+                    "version": "Kubernetes {version}",
+                    "failed": "Проверка кластера не удалась.",
+                    "kubeconfigRefused": "Этот kubeconfig {reason}. Используйте вместо него токен сервисного аккаунта.",
+                    "notPublic": "Ever Works может подключаться только к кластерам с публичным адресом.",
+                    "permissions": "Права",
+                    "allPermissions": "Все необходимые права есть.",
+                    "missing": "Нет прав: {verb} {resource}",
+                    "optionalMissing": "Необязательно, нет прав: {verb} {resource}"
+                },
+                "deployNow": {
+                    "button": "Развернуть сейчас",
+                    "deploying": "Отправка запроса…",
+                    "started": "Развертывание запущено.",
+                    "queued": "В очереди — начнётся, когда завершится текущее развертывание.",
+                    "deduplicated": "Это развертывание уже запрошено.",
+                    "inProgress": "Выполняется другое развертывание ({id}). Дождитесь его завершения, затем разверните снова.",
+                    "preconditionsHeader": "Исправьте это перед развертыванием:",
+                    "workerNotIsolated": "Развертывания пока не могут запускаться: в этом экземпляре нет изолированного воркера кластера App.",
+                    "notAppWork": "Этот Work не является App Work, поэтому его нельзя развернуть таким способом.",
+                    "failed": "Не удалось запросить развертывание: {reason}",
+                    "targetNone": "Сначала выберите, где должно работать приложение, — вариант «Нигде» ничего не развертывает.",
+                    "deploymentId": "Развертывание {id}",
+                    "warningsHeader": "Предупреждения"
+                },
+                "preconditions": {
+                    "specInvalid": "Спецификация App (.works/works.yml) содержит ошибки. Исправьте их на странице спецификации App.",
+                    "licenseBlocksTarget": "Лицензия приложения не разрешает размещать его на этой цели.",
+                    "licenseAttestationMissing": "Подтвердите лицензию приложения перед его развертыванием.",
+                    "envRequiredUnset": "Некоторые обязательные значения env ещё не заданы.",
+                    "dependencyNotReady": "Зависимость, нужная приложению, ещё не готова.",
+                    "noGreenBuild": "Пока нет успешной сборки для развертывания. Сначала запустите сборку.",
+                    "noGreenBuildForHead": "Последний коммит в ветке развертывания ещё не был успешно собран.",
+                    "buildImageMissing": "У сборки нет образа для развертывания.",
+                    "nothingToDeploy": "Пока нечего развертывать: нет ни сборки, ни опубликованного образа.",
+                    "imageNotPinned": "Этот образ указан по тегу. Закрепите его по digest, чтобы каждое развертывание запускало один и тот же образ.",
+                    "imageNotFound": "Образ не найден в его реестре.",
+                    "imagePrivateUnsupported": "Этот образ нельзя скачать без учётных данных. Ever Works развертывает опубликованные образы, только если они публичные.",
+                    "imageUnresolvable": "Не удалось разрешить ссылку на образ.",
+                    "primaryDomainMissing": "Основной домен ещё не настроен.",
+                    "targetNone": "Сначала выберите, где должно работать приложение.",
+                    "targetNotChecked": "Сначала проверьте подключение к кластеру.",
+                    "clusterChangedUnconfirmed": "Кластер изменился после последнего развертывания. Подтвердите изменение, чтобы развернуть.",
+                    "managedDisabled": "Скоро — управляемый хостинг приложений пока недоступен.",
+                    "managedScopeUnverifiedBlueprint": "Ever Works Apps запускает только приложения из проверенного Blueprint.",
+                    "quotaExceeded": "Вы достигли лимита приложений, которые можно запускать в Ever Works Apps.",
+                    "managedIneligible": "Это приложение не может работать в Ever Works Apps.",
+                    "managedSandboxUnavailable": "Ever Works Apps сейчас не может принять новые приложения.",
+                    "appWorkDeleting": "Этот App Work удаляется.",
+                    "paused": "Приложение приостановлено. Возобновите его, чтобы развернуть.",
+                    "deployInProgress": "Выполняется другое развертывание.",
+                    "cronAuthEnvUnset": "Запланированному вызову нужно значение для аутентификации, которое не задано.",
+                    "jobAuthEnvUnset": "Заданию нужно значение для аутентификации, которое не задано.",
+                    "volumeReplicas": "Компонент с томом может работать только в одной реплике.",
+                    "volumeShrink": "Том нельзя уменьшить.",
+                    "privilegedPort": "Компонент слушает порт ниже 1024.",
+                    "cronTooFrequent": "Запланированный вызов выполняется чаще, чем разрешено.",
+                    "managedRootForbidden": "Этот образ запускается от имени root.",
+                    "imageUserUnverifiable": "Ever Works не удалось проверить, от имени какого пользователя запускается образ.",
+                    "workerNotIsolated": "Развертывания пока не могут запускаться: в этом экземпляре нет изолированного воркера кластера App.",
+                    "envSourceUnavailable": "Значения env приложения сейчас нельзя прочитать.",
+                    "pullCredentialUnavailable": "Учётные данные для pull образа недоступны.",
+                    "namespaceForeign": "Это пространство имён уже принадлежит чему-то другому в кластере.",
+                    "verificationNamespaceForbidden": "Это пространство имён зарезервировано для проверочных запусков."
+                },
+                "license": {
+                    "loading": "Чтение лицензии…",
+                    "unavailable": "Сведения о лицензии пока недоступны в этом экземпляре.",
+                    "error": "Не удалось прочитать лицензию. Перезагрузите страницу, чтобы попробовать снова.",
+                    "headline": "{spdx} — {classLabel}",
+                    "headlineUnknown": "Не найдено ни одной известной нам лицензии.",
+                    "classes": {
+                        "green": "Хостинг разрешён",
+                        "amber": "Ваш кластер, после подтверждения условий лицензии",
+                        "red": "Только ваш кластер, после подтверждения условий лицензии",
+                        "unknown": "Лицензия неизвестна — подтвердите условия перед развертыванием",
+                        "unclassified": "Ещё не классифицирована"
+                    },
+                    "mixed": "Части этого репозитория используют другую лицензию.",
+                    "incomplete": "Этот репозиторий слишком большой для полного сканирования.",
+                    "yourClusterAllowed": "Ваш кластер: разрешено",
+                    "yourClusterAfterConfirm": "Ваш кластер: разрешено после подтверждения условий лицензии",
+                    "review": "Просмотреть и подтвердить",
+                    "confirmed": "Подтверждено {date}.",
+                    "disclaimer": "Это автоматический анализ файлов лицензии репозитория, а не юридическая консультация.",
+                    "unknownSpdx": "Лицензия этого ПО",
+                    "dialogTitle": "Подтвердите условия лицензии",
+                    "dialogBody": "{spdx} ограничивает способы размещения этого ПО. Ever Works Apps для него недоступен. Чтобы запустить его в собственном кластере, подтвердите:",
+                    "noText": "В реестре лицензий нет заявления для этой лицензии.",
+                    "checkbox": "Я подтверждаю заявление выше.",
+                    "footer": "Мы записываем, кто подтвердил, когда, а также для какой лицензии и коммита.",
+                    "cancel": "Отмена",
+                    "confirm": "Подтвердить",
+                    "refusals": {
+                        "ownerOnly": "Подтвердить может только владелец App Work.",
+                        "licenseChanged": "Лицензия изменилась, пока вы её просматривали. Просмотрите новые условия и подтвердите снова.",
+                        "attestationNotRequired": "Эта лицензия больше не требует подтверждения.",
+                        "licenseUnavailable": "Подтверждение лицензии пока недоступно в этом экземпляре.",
+                        "route_unavailable": "Подтверждение лицензии пока недоступно в этом экземпляре.",
+                        "failed": "Не удалось записать подтверждение. Попробуйте ещё раз."
+                    }
+                },
+                "rollback": {
+                    "button": "Откатить",
+                    "title": "Откатить к более раннему развёртыванию",
+                    "description": "Выберите развёртывание, которое уже было в работе. Его образ и спецификация приложения запустятся снова; ничего не пересобирается.",
+                    "pickLabel": "Развёртывание для возврата",
+                    "liveAt": "В работе с {when, date, medium} {when, time, short}",
+                    "liveAtUnknown": "Было в работе ранее",
+                    "none": "Нет более раннего работающего развёртывания для отката.",
+                    "runJobs": "Снова выполнить задачи перед развёртыванием",
+                    "confirm": "Откатить",
+                    "cancel": "Отмена",
+                    "started": "Откат запущен.",
+                    "failed": "Не удалось запустить откат: {reason}"
+                },
+                "lifecycle": {
+                    "pause": "Приостановить",
+                    "resume": "Возобновить",
+                    "remove": "Удалить из кластера",
+                    "removeTitle": "Удалить это приложение из его кластера",
+                    "removeDescription": "Работающее приложение останавливается, а его объекты Kubernetes удаляются. App Work и его сборки сохраняются.",
+                    "deleteData": "Также удалить сохранённые данные (тома и базы данных зависимостей)",
+                    "deleteDataWarning": "Это действие нельзя отменить.",
+                    "confirmSlugLabel": "Введите {slug} для подтверждения",
+                    "confirmRemove": "Удалить",
+                    "cancel": "Отмена",
+                    "failed": "Не удалось выполнить: {reason}",
+                    "slugMismatch": "Введённый слаг не совпадает с этим App Work.",
+                    "accepted": {
+                        "pause": "Запрошена приостановка.",
+                        "resume": "Запрошено возобновление.",
+                        "remove": "Запрошено удаление.",
+                        "cancelDeploy": "Запрошена отмена."
+                    }
+                }
+            },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Имена начинаются с буквы или подчёркивания и содержат только A–Z, 0–9 и _.",
+                    "reservedName": "Имена, начинающиеся с EVER_WORKS_, зарезервированы для платформы.",
+                    "valueTooLarge": "Значение может занимать не более 65 536 байт.",
+                    "controlCharacter": "Значения не могут содержать символ NUL.",
+                    "lengthMismatch": "Длина должна быть ровно {expected} символов — сейчас {actual}.",
+                    "tooShort": "Должно быть не менее {min} символов.",
+                    "tooLong": "Должно быть не более {max} символов.",
+                    "patternMismatch": "Не соответствует шаблону, который требует это приложение.",
+                    "generatedValueUseRotate": "Это значение генерируется. Выполните ротацию, чтобы заменить его.",
+                    "neverRotateNotAcknowledged": "По словам приложения, это значение никогда не должно меняться. Подтвердите, что понимаете это, прежде чем выполнять ротацию.",
+                    "rotateConfirmationMismatch": "Введённое имя не совпадает с именем этого значения.",
+                    "secureStorageUnavailable": "Защищённое хранилище не настроено в этой установке, поэтому значения нельзя сохранить.",
+                    "tooManyValues": "У приложения может быть не более 300 значений.",
+                    "valuesTooLarge": "Суммарный размер значений приложения — не более 1 МиБ.",
+                    "malformedLine": "Это не корректная строка NAME=value.",
+                    "rotateRateLimited": "Слишком много ротаций. Попробуйте позже."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Ожидание",
+                    "awaitingConfig": "Нужны ваши настройки",
+                    "provisioning": "Подготовка ресурсов",
+                    "ready": "Готово",
+                    "degraded": "Работает с перебоями",
+                    "failed": "Ошибка",
+                    "kept": "Сохранено — больше не управляется",
+                    "deleting": "Удаление",
+                    "deleted": "Удалено",
+                    "notInSpec": "Больше не используется спецификацией App — данные сохранены"
+                },
+                "backup": {
+                    "none": "Нет автоматических резервных копий. Если этот том будет потерян, данные пропадут.",
+                    "notConfigured": "Резервные копии: не настроены",
+                    "healthy": "Резервные копии: последняя создана {time}",
+                    "overdue": "Резервные копии: просрочены — последняя создана {time}",
+                    "failing": "Резервные копии: последняя попытка не удалась",
+                    "external": "Резервные копии: управляются вашим провайдером {kind}",
+                    "unknown": "Резервные копии: не удалось проверить"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "В вашем кластере нет класса хранилища по умолчанию. Выберите его в настройках зависимостей.",
+                    "clusterUnreachable": "Не удалось подключиться к вашему кластеру.",
+                    "smtpConnectFailed": "Не удалось подключиться к почтовому серверу.",
+                    "smtpTlsFailed": "Не удалось выполнить TLS-рукопожатие с почтовым сервером.",
+                    "smtpAuthRefused": "Сервер отклонил вход.",
+                    "bucketUnreadable": "Бакет {bucket} не существует или недоступен для чтения.",
+                    "volumeNotReady": "Том не стал готов в течение {minutes} мин.",
+                    "extensionUnavailable": "Недоступные расширения: {names}.",
+                    "platformServerRefused": "На этом сервере хранятся данные платформы Ever Works. Выберите другой.",
+                    "deadlineExceeded": "Подготовка ресурсов не завершилась вовремя.",
+                    "namespaceNotOwned": "Это пространство имён принадлежит другому приложению. Выберите другое.",
+                    "namespaceBaselineMissing": "В пространстве имён отсутствуют базовые лимиты и политики.",
+                    "clusterPermissionMissing": "У Ever Works нет прав на создание этой зависимости в вашем кластере.",
+                    "operatorNamespaceUnknown": "Пространство имён оператора не задано в настройках зависимостей.",
+                    "volumeExpansionUnsupported": "Класс хранилища {storageClass} не может увеличить этот том.",
+                    "sizeShrinkRefused": "Хранилище зависимости нельзя уменьшить. Если нужно меньшее, сначала удалите её данные.",
+                    "relayIneligible": "Это приложение не может использовать почтовый релей Ever Works.",
+                    "relaySuspended": "Почтовый релей Ever Works приостановлен.",
+                    "providerNotSupported": "Этот провайдер не может обслуживать эту зависимость.",
+                    "dependencyNotDeclared": "Спецификация App не объявляет эту зависимость.",
+                    "confirmationMismatch": "Введённое имя не совпадает.",
+                    "deleteInProgress": "Данные этой зависимости уже удаляются.",
+                    "notGenerated": "Это значение не генерируется, поэтому ротировать нечего.",
+                    "notAppWork": "Этот Work не является приложением.",
+                    "targetNone": "Для этого приложения ещё не задана цель развертывания. Выберите цель развертывания, чтобы подготовить его зависимости.",
+                    "targetNotChecked": "Ваш кластер ещё не прошёл проверку. Проверьте подключение, затем попробуйте ещё раз."
+                }
             }
         },
         "newPage": {
@@ -6826,7 +7446,8 @@
                 "repo": "Репозиторий",
                 "company": "Company",
                 "agent": "Agent",
-                "task": "Task"
+                "task": "Task",
+                "app": "Приложение"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -6839,7 +7460,8 @@
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "repo": "Существующий репозиторий кода как Work — к нему привязываются задачи, цели и запуски флота. Ничего не генерируется и не разворачивается.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+                "company": "Register a new entity. Becomes an Organization in your account.",
+                "app": "Запускайте и развивайте любой репозиторий GitHub — привяжите его или сделайте форк, а затем выберите, где он будет работать."
             },
             "submit": "Create",
             "or": "or",
@@ -7253,7 +7875,8 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "repo": "Репозиторий"
+                "repo": "Репозиторий",
+                "app": "Приложение"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
@@ -7261,7 +7884,8 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "repo": "Существующий репозиторий кода как Work — к нему привязываются задачи, цели и запуски флота. Ничего не генерируется и не разворачивается."
+                "repo": "Существующий репозиторий кода как Work — к нему привязываются задачи, цели и запуски флота. Ничего не генерируется и не разворачивается.",
+                "app": "Запускайте и развивайте любой репозиторий GitHub — привяжите его или сделайте форк, а затем выберите, где он будет работать."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7298,6 +7922,158 @@
                     "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
                 },
                 "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
+            },
+            "app": {
+                "composerPlaceholder": "например, «https://github.com/owner/repo — open-source приложение, собственную копию которого вы хотите получить»",
+                "formTitle": "Новый App Work",
+                "formSubtitle": "Начните с любого репозитория GitHub. Ever Works привяжет его или создаст вашу собственную копию, а затем поможет запускать и дальше развивать приложение.",
+                "urlLabel": "URL репозитория",
+                "urlPlaceholder": "https://github.com/owner/repo",
+                "urlHelp": "Любой репозиторий GitHub, доступный для чтения вашему подключённому аккаунту.",
+                "checkButton": "Проверить репозиторий",
+                "checking": "Проверка…",
+                "tabPaste": "Вставить URL",
+                "tabCatalog": "Открыть каталог приложений",
+                "catalogComingSoon": "Скоро здесь откроется каталог приложений. Пока вставьте URL репозитория.",
+                "stars": "{count, plural, =1 {1 звезда} one {# звезда} few {# звезды} many {# звёзд} other {# звезды}}",
+                "defaultBranch": "Ветка по умолчанию: {branch}",
+                "largeRepository": "Большой репозиторий ({size})",
+                "moved": "Перемещён в {fullName}",
+                "isFork": "Этот репозиторий — форк {parent}.",
+                "ownFork": "Это ваш форк {parent}. Ever Works будет отслеживать {parent} как upstream.",
+                "publicForkNote": "Форки публичных репозиториев публичны.",
+                "archivedNote": "Этот репозиторий заархивирован. Синхронизация с upstream остаётся выключенной.",
+                "licenseChip": "Лицензия: {spdx}",
+                "licenseNotDetected": "Лицензия: не определена",
+                "licenseClass": {
+                    "green": "Хостинг разрешён",
+                    "amber": "Ваш кластер, после подтверждения лицензии",
+                    "red": "Ваш кластер, после подтверждения лицензии",
+                    "unknown": "Лицензия неизвестна — вы подтвердите её перед развертыванием"
+                },
+                "blueprintBadge": {
+                    "verified": "Проверенный Blueprint",
+                    "available": "Blueprint доступен",
+                    "none": "Нет Blueprint — агент сам разберётся, как это запустить",
+                    "unavailable": "Проверка Blueprint недоступна"
+                },
+                "existingAppWork": "У вас уже есть App Work для этого репозитория: {name}.",
+                "openExistingAppWork": "Открыть его",
+                "scanIncomplete": "Не все аккаунты были проверены на наличие существующего форка.",
+                "modesTitle": "Как Ever Works должен использовать этот репозиторий?",
+                "modes": {
+                    "link": {
+                        "title": "Привязка",
+                        "titleOwnFork": "Привязка — без отслеживания upstream",
+                        "description": "Используйте этот репозиторий как есть. У вас есть право push, поэтому изменения попадают прямо сюда."
+                    },
+                    "fork": {
+                        "title": "Форк",
+                        "description": "Создайте собственный форк. Его можно синхронизировать с upstream и предлагать изменения обратно."
+                    },
+                    "private-copy": {
+                        "title": "Приватная копия",
+                        "description": "Создайте приватный репозиторий с тем же кодом."
+                    }
+                },
+                "unavailable": "Недоступно: {reason}",
+                "forkInto": "Форк в",
+                "copyInto": "Копировать в",
+                "ownerFilter": "Поиск аккаунтов",
+                "ownerOrganization": "организация",
+                "ownerNotChecked": "не проверено на наличие существующего форка",
+                "existingFork": "У вас уже есть форк: {fullName}. Ever Works будет использовать его.",
+                "privateCopyTradeOff": "Приватная копия не связана с оригиналом на GitHub, поэтому не может открывать pull request в исходный проект. Изменения из upstream приходят как pull request в вашу копию.",
+                "linkSetupNote": "Ever Works откроет pull request, который добавляет один файл — .works/works.yml. Выполните его слияние, чтобы завершить.",
+                "existingForkSetupNote": "Этот форк создан не Ever Works, поэтому Ever Works откроет pull request, который добавляет .works/works.yml.",
+                "linkSetupNoteBlueprint": "Ever Works откроет pull request, который добавляет .works/works.yml и файлы Blueprint. Выполните его слияние, чтобы завершить.",
+                "existingForkSetupNoteBlueprint": "Этот форк создан не Ever Works, поэтому Ever Works откроет pull request, который добавляет .works/works.yml и файлы Blueprint.",
+                "promptsTitle": "Значения, необходимые этому приложению",
+                "promptHint": "Blueprint {name} запрашивает эти значения. Их можно изменить позже в настройках.",
+                "promptRequired": "Обязательно",
+                "promptsIncomplete": "Сначала заполните значения, необходимые приложению.",
+                "autoProvision": "Пусть агент разберётся, как это запустить",
+                "autoProvisionHelp": "Запускается, когда репозиторий готов. Расходует токены ИИ и минуты раннеров сборки в пределах лимитов подготовки ресурсов. Это можно отменить или снять отметку и запустить позже из обзора кнопкой Provision.",
+                "deployTargetTitle": "Где оно должно работать?",
+                "deployTargets": {
+                    "none": {
+                        "title": "Нигде — пока не развертывать",
+                        "description": "Цель можно выбрать позже."
+                    },
+                    "your-cluster": {
+                        "title": "Ваш кластер",
+                        "description": "Запустите его в собственном кластере Kubernetes. Подключение добавляется на вкладке «Развертывание»."
+                    },
+                    "ever-works-apps": {
+                        "title": "Ever Works Apps",
+                        "description": "Скоро — управляемый хостинг приложений пока недоступен."
+                    }
+                },
+                "submit": {
+                    "link": "Привязать и создать App Work",
+                    "fork": "Сделать форк и создать App Work",
+                    "private-copy": "Скопировать и создать App Work"
+                },
+                "submitPending": "Создание…",
+                "nameLabel": "Название",
+                "slugLabel": "Слаг",
+                "descriptionLabel": "Описание",
+                "slugHelp": "Идентификатор для URL. Формируется из имени репозитория — отредактируйте, чтобы изменить.",
+                "invalidSlug": "Используйте только строчные буквы, цифры и дефисы, например tasks-app",
+                "cancel": "Отмена",
+                "createFailed": "Не удалось создать App Work. Попробуйте ещё раз.",
+                "success": {
+                    "link": "App Work создан.",
+                    "fork": "Форк запрошен — мы сообщим, когда он будет готов.",
+                    "private-copy": "Копирование начато — мы сообщим, когда копия будет готова."
+                },
+                "reasons": {
+                    "invalid_url": "Введите URL репозитория GitHub, например https://github.com/owner/repo",
+                    "provider_not_connected": "Подключите GitHub, чтобы создать App Work.",
+                    "insufficient_scope": "Переподключите GitHub, чтобы предоставить доступ к репозиториям.",
+                    "not_found": "Мы не нашли этот репозиторий, или ваш аккаунт GitHub не может его прочитать.",
+                    "sso_authorization_required": "{owner} требует авторизовать Ever Works для своей организации на GitHub.",
+                    "oauth_app_restricted": "{owner} ограничивает доступ сторонних приложений. Попросите владельца {owner} одобрить Ever Works или выберите другой аккаунт.",
+                    "empty_repository": "В этом репозитории ещё нет коммитов.",
+                    "no_push_access": "У вас нет права push в этот репозиторий.",
+                    "archived": "Архивные репозитории доступны только для чтения.",
+                    "forking_disabled": "Владелец этого репозитория не разрешает форки и копии.",
+                    "own_repository": "Это ваш репозиторий — привяжите его вместо этого.",
+                    "target_owner_unavailable": "Этот аккаунт недоступен в вашем подключении к GitHub.",
+                    "target_owner_forbidden": "Вы не можете создавать репозитории в {owner}.",
+                    "too_large_for_private_copy": "Слишком большой для приватной копии ({size}). Сделайте форк вместо этого.",
+                    "uses_lfs": "Использует Git LFS, который нельзя перенести в приватную копию. Сделайте форк вместо этого.",
+                    "copy_name_unavailable": "У {owner} уже есть репозитории с именами от {name} до {name}-copy-5.",
+                    "in_use_by_another_account": "Другой аккаунт уже использует этот репозиторий в Ever Works. Попросите его владельца добавить вас в участники.",
+                    "app_work_exists": "У вас уже есть App Work для {fullName}: {workName}.",
+                    "create_in_progress": "Этот App Work уже создаётся.",
+                    "rate_limited": "GitHub ограничивает частоту запросов вашего аккаунта. Попробуйте ещё раз в {time}.",
+                    "managed_hosting_unavailable": "Скоро — управляемый хостинг приложений пока недоступен.",
+                    "cluster_target_unavailable": "Не установлен ни один вариант развертывания, способный запускать приложения.",
+                    "app_works_disabled": "App Works недоступны в этом экземпляре.",
+                    "blueprint_mismatch": "Blueprint этого репозитория изменился. Проверьте репозиторий ещё раз."
+                },
+                "catalog": {
+                    "searchLabel": "Поиск по каталогу приложений",
+                    "searchPlaceholder": "Поиск приложений — например, umami или calendar",
+                    "listLabel": "Blueprint приложений",
+                    "loading": "Загрузка каталога приложений…",
+                    "unavailable": "Каталог приложений сейчас недоступен. Вставьте URL репозитория вместо этого.",
+                    "disabled": "App Works недоступны в этом экземпляре.",
+                    "error": "Не удалось загрузить каталог приложений. Попробуйте ещё раз или вставьте URL репозитория.",
+                    "empty": "Blueprint приложений пока не опубликованы. Вставьте URL репозитория вместо этого.",
+                    "noMatches": "Нет приложений, соответствующих запросу.",
+                    "pick": "Начать с {name}",
+                    "statusBeta": "Бета",
+                    "statusPlaceholder": "Скоро",
+                    "verified": "Проверено",
+                    "upstreamLine": "Из {repo}",
+                    "runsOn": "Работает на: {targets}",
+                    "targetYourCluster": "Ваш кластер",
+                    "targetManaged": "Ever Works Apps",
+                    "notSelectable": "Пока недоступно",
+                    "fallbackNote": "Показаны Blueprint приложений, найденные на GitHub, — курируемый каталог сейчас недоступен."
+                }
             }
         },
         "gitProvider": {
@@ -9267,6 +10043,13 @@
                 "started": "Импорт успешно запущен",
                 "failed": "Не удалось импортировать работа",
                 "fetchReposFailed": "Не удалось загрузить репозитории"
+            },
+            "app": {
+                "repositoryUrlRequired": "Введите URL репозитория GitHub, например https://github.com/owner/repo",
+                "repositoryModeRequired": "Выберите, как использовать этот репозиторий: Привязка, Форк или Приватная копия.",
+                "targetOwnerRequired": "Выберите аккаунт, в котором будет создан репозиторий.",
+                "invalidUrl": "Введите URL репозитория GitHub, например https://github.com/owner/repo",
+                "inspectFailed": "Не удалось проверить этот репозиторий. Попробуйте ещё раз."
             }
         },
         "generator": {

@@ -185,7 +185,9 @@ export class IntegrationWebhooksController {
     }
 
     @Post()
-    @RequireScopes('webhooks:manage')
+    // Review 2026-10-17 F12: a subscription delivers the change feed, so it needs the
+    // feed's own scope too (`GET /events` answers 403 scope_missing without it).
+    @RequireScopes('webhooks:manage', 'events:read')
     @IntegrationOrgOptional()
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({ summary: 'Subscribe to domain events (the secret is returned once)' })
@@ -210,7 +212,7 @@ export class IntegrationWebhooksController {
     }
 
     @Patch(':id')
-    @RequireScopes('webhooks:manage')
+    @RequireScopes('webhooks:manage', 'events:read')
     @IntegrationOrgOptional()
     @ApiOperation({
         summary: 'Change, pause (status: paused) or resume (status: active) a subscription',

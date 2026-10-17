@@ -1,4 +1,8 @@
-import { FLEET_MAX_WORKER_STATE_REASON_LENGTH, type FleetNodeWorkerState } from '@ever-works/contracts';
+import {
+	describeFleetModelUsageLimitWindow,
+	FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+	type FleetNodeWorkerState
+} from '@ever-works/contracts';
 import type { WorkerLoopState } from './worker-loop';
 
 /**
@@ -45,7 +49,41 @@ export interface WorkerHealth {
  */
 export function describeWorkerHealth(state: WorkerLoopState | null | undefined): WorkerHealth | null {
 	if (!state) return null;
+	const projected = projectWorkerState(state);
+	// Fleet usage limits: a model CLI out of quota is the answer to "why is
+	// this machine not taking my agent work", so it is said on the beat. An
+	// otherwise-idle worker reads `throttled` (running, not leasing that
+	// work); a busy one stays `working` and carries the reason alongside; a
+	// quarantine or a drain keeps its own, more important, sentence.
+	const usage = describeModelThrottles(state);
+	if (!usage) return projected;
+	switch (projected.workerState) {
+		case 'idle':
+			return health('throttled', usage);
+		case 'throttled':
+		case 'working':
+			return health(
+				projected.workerState,
+				projected.workerStateReason ? `${projected.workerStateReason}; ${usage}` : usage
+			);
+		default:
+			return projected;
+	}
+}
 
+/** `claude-code: weekly limit until 2026-10-19T01:01:00.000Z`, one clause per CLI. */
+function describeModelThrottles(state: WorkerLoopState): string | null {
+	const throttles = state.modelThrottles ?? [];
+	if (throttles.length === 0) return null;
+	return throttles
+		.map(
+			(throttle) =>
+				`${throttle.provider}: ${describeFleetModelUsageLimitWindow(throttle.window)} until ${throttle.until}`
+		)
+		.join('; ');
+}
+
+function projectWorkerState(state: WorkerLoopState): WorkerHealth {
 	switch (state.state) {
 		// The fail-closed stop. `lastError` carries the quarantine's own
 		// message (`markUnsafe` writes it there), which is the single most

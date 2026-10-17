@@ -91,6 +91,24 @@ export async function removeOAuthStateCookie() {
 }
 
 // =================
+// GitHub App setup — browser binding (10-09 handover item 13)
+// =================
+
+/** HttpOnly cookie holding the setup's browser-binding nonce, scoped to the App routes. */
+export const GITHUB_APP_SETUP_COOKIE_NAME = 'ew_github_app_setup';
+
+/** The cookie's options: Lax so GitHub's top-level redirect back carries it. */
+export function githubAppSetupCookieOptions(maxAgeSeconds: number): Partial<ResponseCookie> {
+    return {
+        httpOnly: true,
+        secure: isPublicUrlHttps(),
+        sameSite: 'lax',
+        path: '/api/github-app',
+        maxAge: Math.max(60, Math.min(maxAgeSeconds, 60 * 15)),
+    };
+}
+
+// =================
 // Redirects
 // =================
 

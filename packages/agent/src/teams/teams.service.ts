@@ -10,6 +10,7 @@ import type { VisibilityAggregate } from '@ever-works/contracts';
 import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { type EntityManager, In, Repository } from 'typeorm';
+import { withoutAggregateVersion } from '../domain-events/domain-event-context';
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { Agent } from '../entities/agent.entity';
 import { Organization } from '../entities/organization.entity';
@@ -193,7 +194,15 @@ export class TeamsService {
         if (input.avatarIcon !== undefined) team.avatarIcon = input.avatarIcon;
 
         return this.withTeamEvent(
-            (manager) => (manager ? manager.getRepository(Team) : this.teams).save(team),
+            // Review 2026-10-17 F7 / F29: never write back the `version` loaded above.
+            // `version` is a plain column the publisher bumps in SQL; a concurrent
+            // change (a member added) may have moved it since, and saving the stale
+            // copy reset it, so the If-Match check inside the transaction passed and
+            // two events got the same version.
+            (manager) =>
+                (manager ? manager.getRepository(Team) : this.teams).save(
+                    withoutAggregateVersion(team),
+                ),
             async (publisher, manager, saved) => {
                 const version = await publisher.changed(manager, 'team', saved.id, 'team.updated', {
                     changedFields: Object.keys(previous),

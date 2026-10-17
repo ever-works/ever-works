@@ -1,4 +1,4 @@
-import type { FleetJobView } from '@ever-works/contracts';
+import type { FleetJobView, FleetModelUsageLimit } from '@ever-works/contracts';
 import { BaseEvent } from './base';
 
 /**
@@ -73,6 +73,38 @@ export class FleetJobCompletedEvent extends BaseEvent {
 
     get succeeded(): boolean {
         return this.job.status === 'done';
+    }
+}
+
+/**
+ * Fleet usage limits — a node handed a job back because its model CLI is out
+ * of quota, and the platform PARKED it: the job is `queued` again (attempt
+ * refunded, `queuedReason: 'model-usage-limit'`), the node is throttled for
+ * that CLI until `limit.retryAfter`, and nothing reached a verdict.
+ *
+ * Deliberately NOT a {@link FleetJobCompletedEvent}: every consumer of that
+ * event treats it as the end of the run (failure counts, Inbox "run failed",
+ * Task state). A park is the opposite — the run continues after the reset —
+ * so it travels as its own fact and the reconciler re-queues the AgentRun
+ * and files at most one notice per node per throttle window (`newWindow`).
+ */
+export class FleetJobParkedEvent extends BaseEvent {
+    static EVENT_NAME = 'fleet.job.parked';
+
+    constructor(
+        /** The job as it now stands (`queued`). */
+        public readonly job: FleetJobView,
+        public readonly userId: string,
+        /** Node that reported the limit. */
+        public readonly nodeId: string,
+        /** Its display name, for the notice. */
+        public readonly nodeName: string | null,
+        /** Which CLI, which window, until when — `retryAfter` already clamped. */
+        public readonly limit: FleetModelUsageLimit,
+        /** True when this opened a NEW throttle window for that node + CLI (notify once). */
+        public readonly newWindow: boolean,
+    ) {
+        super();
     }
 }
 

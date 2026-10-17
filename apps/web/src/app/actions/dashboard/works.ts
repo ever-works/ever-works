@@ -22,8 +22,14 @@ import type {
     WorkChecksPolicy,
     WorkExternalRefs,
     AppDeployTargetChoice,
+    AppSourceCreatedView,
+    AppSourceInspectResponse,
+    AppSourceReasonCode,
 } from '@ever-works/contracts';
 import {
+    APP_REPOSITORY_MODES,
+    appRepositoryUrlLengthExceeded,
+    isAppSourceReasonCode,
     INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
     WORK_EXTERNAL_REFS_MAX_PER_KIND,
     WORK_EXTERNAL_REF_KINDS,
@@ -67,13 +73,20 @@ const workKindSchema = z.enum([
     'directory',
     'awesome-repo',
     'repo',
+    // APW-01 T21 — an App Work: any GitHub repository, linked or forked, then
+    // built, deployed and evolved. Manual-only, exactly like `repo`.
+    'app',
 ]);
 
 // `repo` is manual-only: registering one means naming an existing repository,
 // and the AI creation path neither collects nor constructs `repositoryUrl`, so
 // a Work created there with `kind: 'repo'` could never satisfy the API's
 // registration contract. Excluded at the schema so it cannot arrive at all.
-const aiWorkKindSchema = workKindSchema.exclude(['repo']);
+//
+// `app` (APW-01 T21, ACC-01-14) is manual-only for the same reason and one
+// more: creating one forks or links somebody's repository, which the AI path
+// must never do without the member's explicit choice of mode and owner.
+const aiWorkKindSchema = workKindSchema.exclude(['repo', 'app']);
 type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
 
 const getCreateWorkSchema = async () => {
@@ -120,10 +133,59 @@ const getCreateWorkSchema = async () => {
             .optional()
             .transform((val) => val?.trim() || undefined)
             .pipe(z.string().max(400).optional()),
+        // App Work (`kind: 'app'`, APW-01 T21) — declared so zod keeps them on
+        // their way to the API's CreateWorkDto; the API validates again.
+        repositoryMode: z.enum(APP_REPOSITORY_MODES).optional(),
+        targetOwner: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim() || undefined)
+            .pipe(z.string().max(100).optional()),
+        blueprintId: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim() || undefined)
+            .pipe(z.string().max(200).optional()),
+        // Sent ONLY as `false` (the member's decline, spec §6.2); `true` is
+        // stripped so an absent property keeps meaning "on".
+        autoProvision: z
+            .boolean()
+            .optional()
+            .transform((val) => (val === false ? false : undefined)),
+        // Write-only Blueprint prompt answers (FR-55). Never logged.
+        appEnv: z.record(z.string().max(200), z.string().max(10_000)).optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
-    return createWorkSchema;
+    // An App Work needs the repository, the mode and — for a fork or a private
+    // copy — the target owner. Checked here so the form gets the message before
+    // the round-trip; the API's validation pipe says the same thing.
+    return createWorkSchema.superRefine((data, ctx) => {
+        if (data.kind !== 'app') return;
+        if (!data.repositoryUrl) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['repositoryUrl'],
+                message: t('app.repositoryUrlRequired'),
+            });
+        }
+        if (!data.repositoryMode) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['repositoryMode'],
+                message: t('app.repositoryModeRequired'),
+            });
+        } else if (
+            (data.repositoryMode === 'fork' || data.repositoryMode === 'private-copy') &&
+            !data.targetOwner
+        ) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['targetOwner'],
+                message: t('app.targetOwnerRequired'),
+            });
+        }
+    });
 };
 
 async function markProposalAcceptedWithRetry(proposalId: string, workId: string): Promise<void> {
@@ -241,7 +303,28 @@ function storageProviderForCreate(managedStorage: ManagedStorageStatus): string 
     return managedStorage.managedGitActive ? EVER_WORKS_GIT_STORAGE : undefined;
 }
 
-export async function createWork(data: CreateWorkDto) {
+/**
+ * What {@link createWork} answers. Declared rather than inferred: the App Work
+ * fields (APW-01) are spread in conditionally, which defeats TypeScript's
+ * object-literal union normalisation, and every caller reads `work` / `message`
+ * off the union.
+ */
+export interface CreateWorkResult {
+    success: boolean;
+    work?: Work;
+    message?: string;
+    error?: string;
+    requiresGitProvider?: boolean;
+    /** App Work only — the platform's own decision (relation, readiness, Blueprint). */
+    appSource?: AppSourceCreatedView;
+    /** App Work only — an equivalent App Work already existed (FR-23). */
+    alreadyExisted?: boolean;
+    /** App Work only — the §6.3 refusal code, when the API gave one. */
+    code?: AppSourceReasonCode;
+    details?: AppSourceErrorDetails;
+}
+
+export async function createWork(data: CreateWorkDto): Promise<CreateWorkResult> {
     // Security: verify authentication at the server-action boundary.
     const user = await getAuthFromCookie();
     if (!user) {
@@ -278,7 +361,9 @@ export async function createWork(data: CreateWorkDto) {
         // front instead of relaying the API's 400 after the round-trip.
         const gate = await resolveCreateWorkGitGate(
             providerId,
-            validation.data.kind === 'repo'
+            // An App Work (APW-01 T21) reads, forks or links the member's
+            // repositories with THEIR connection too — same rule as `repo`.
+            validation.data.kind === 'repo' || validation.data.kind === 'app'
                 ? { ...managedStorage, managedGitActive: false }
                 : managedStorage,
         );
@@ -308,11 +393,15 @@ export async function createWork(data: CreateWorkDto) {
         // provider id, owner/org, slug, name, description) to server stdout.
 
         // Create the work with validated data
-        const { work } = await workAPI.create(validation.data);
+        const { work, appSource, alreadyExisted } = await workAPI.create(validation.data);
 
         return {
             success: true,
             work,
+            // APW-01 — the platform's own decision for an App Work (relation,
+            // readiness, Blueprint). Absent for every other kind.
+            ...(appSource ? { appSource } : {}),
+            ...(alreadyExisted ? { alreadyExisted: true } : {}),
             message: t('createSuccess'),
         };
     } catch (error) {
@@ -320,6 +409,96 @@ export async function createWork(data: CreateWorkDto) {
         return {
             success: false,
             error: error instanceof Error ? error.message : t('createFailed'),
+            // APW-01 §6.3 — the App-source refusal code and the caller's own
+            // identifiers, so the form renders the exact reason copy instead of
+            // the API's English message. Only a known reason code is passed on.
+            ...appSourceErrorFields(error),
+        };
+    }
+}
+
+/**
+ * The `code` / `details` of an App-source refusal (`AppSourceErrorBody`), when
+ * the error carries a code from the closed §6.3 set. Anything else — a code we
+ * do not know, a non-API error — contributes nothing, so a caller can never
+ * render an unknown code as if it were a reason.
+ */
+function appSourceErrorFields(error: unknown): {
+    code?: AppSourceReasonCode;
+    details?: AppSourceErrorDetails;
+} {
+    if (!(error instanceof ApiResponseError) || !isAppSourceReasonCode(error.code)) {
+        return {};
+    }
+    const raw = (error.details?.details ?? null) as Record<string, unknown> | null;
+    const details: AppSourceErrorDetails = {};
+    if (raw && typeof raw === 'object') {
+        for (const key of ['owner', 'fullName', 'workId', 'workName', 'retryAfter'] as const) {
+            const value = raw[key];
+            if (typeof value === 'string' && value.length > 0) details[key] = value;
+        }
+    }
+    return { code: error.code, ...(Object.keys(details).length > 0 ? { details } : {}) };
+}
+
+/** The identifiers an App-source refusal may carry (the caller's own only, FR-51). */
+export interface AppSourceErrorDetails {
+    owner?: string;
+    fullName?: string;
+    workId?: string;
+    workName?: string;
+    retryAfter?: string;
+}
+
+/** What {@link inspectAppSourceAction} answers the create form. */
+export type InspectAppSourceResult =
+    | { success: true; data: AppSourceInspectResponse }
+    | {
+          success: false;
+          error: string;
+          code?: AppSourceReasonCode;
+          details?: AppSourceErrorDetails;
+      };
+
+/**
+ * APW-01 T21 — inspect a pasted repository before an App Work is created from
+ * it (`POST /api/works/app-source/inspect`). Writes nothing (FR-5).
+ *
+ * The URL is length-checked here with the same predicate the API uses
+ * (`appRepositoryUrlLengthExceeded`), so an oversized paste never leaves the
+ * server action. Every API refusal with a §6.3 code is passed through as that
+ * code, which the form maps to its exact copy.
+ */
+export async function inspectAppSourceAction(input: {
+    repositoryUrl: string;
+    gitProvider?: string;
+    blueprintId?: string;
+}): Promise<InspectAppSourceResult> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('actions.works');
+    const repositoryUrl =
+        typeof input?.repositoryUrl === 'string' ? input.repositoryUrl.trim() : '';
+    if (!repositoryUrl || appRepositoryUrlLengthExceeded(repositoryUrl)) {
+        return { success: false, error: t('app.invalidUrl'), code: 'invalid_url' };
+    }
+
+    try {
+        const data = await workAPI.inspectAppSource({
+            repositoryUrl,
+            ...(input.gitProvider ? { gitProvider: input.gitProvider } : {}),
+            ...(input.blueprintId ? { blueprintId: input.blueprintId } : {}),
+        });
+        return { success: true, data };
+    } catch (error) {
+        console.error('Failed to inspect App source:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('app.inspectFailed'),
+            ...appSourceErrorFields(error),
         };
     }
 }

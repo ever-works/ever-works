@@ -809,7 +809,15 @@ export class GoalOrchestratorService {
             results: [],
         };
 
-        for (const goal of due) {
+        for (const queued of due) {
+            // Review 2026-10-17 F13: the batch was read at tick start, and each Goal
+            // waits its turn while the ones before it create Tasks and dispatch runs.
+            // An integration may re-open a Definition-of-Done item, push a sample or
+            // pause the loop meanwhile, so the decision is made on the row as it is
+            // NOW: the copy would let the loop complete a Goal on a DoD that was just
+            // re-opened. (Every write already saves only the columns it decides.)
+            const goal = await this.goals.findOne({ where: { id: queued.id } });
+            if (!goal || goal.loopStatus !== 'running' || goal.archivedAt) continue;
             try {
                 const result = await this.advanceOne(goal);
                 summary.results.push(result);

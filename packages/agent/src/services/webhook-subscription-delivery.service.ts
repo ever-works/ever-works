@@ -13,6 +13,15 @@ import { type WebhookEventRef, WebhookOwnerAccessService } from './webhook-owner
  */
 const DEFAULT_MAX_CONSECUTIVE_FAILURES = 10;
 
+/**
+ * Webhooks v2 (review 2026-10-17 F11): a v2 subscription is dead-lettered only after
+ * it has failed for this long without one success: the spec promises the 30 s → 24 h
+ * retry ladder. The one shared failure counter alone dead-lettered a busy subscription
+ * during a two-minute receiver outage (ten events failing once each), after which
+ * every queued retry was skipped and every later event dropped.
+ */
+export const WEBHOOK_V2_DEAD_LETTER_AFTER_MS = 24 * 60 * 60 * 1000;
+
 export interface DispatchWebhookInput {
     readonly subscriptionId: string;
     readonly event: string;
@@ -283,7 +292,14 @@ export class WebhookSubscriptionDeliveryService {
     }
 
     private async applyResult(
-        sub: { id: string; status: WebhookSubscriptionStatus; consecutiveFailures: number },
+        sub: {
+            id: string;
+            status: WebhookSubscriptionStatus;
+            consecutiveFailures: number;
+            version?: number | null;
+            lastDeliveryAt?: Date | string | null;
+            createdAt?: Date | string | null;
+        },
         result: DeliveryResult,
         input: DispatchWebhookInput,
     ): Promise<DispatchedWebhookResult> {
@@ -329,7 +345,12 @@ export class WebhookSubscriptionDeliveryService {
             this.logger.error(`webhook.increment_failure_failed sub=${sub.id}`, err as Error);
         }
 
-        const shouldDeadLetter = failures >= this.maxConsecutiveFailures;
+        // v2: the counter alone is not enough, the subscription must also have gone
+        // WEBHOOK_V2_DEAD_LETTER_AFTER_MS without one success (F11). `lastDeliveryAt`
+        // is the last success while the subscription is active (markSuccess).
+        const shouldDeadLetter =
+            failures >= this.maxConsecutiveFailures &&
+            (Number(sub.version) !== 2 || failingLongEnough(sub));
         const terminalThisAttempt = !retryable || shouldDeadLetter;
 
         if (shouldDeadLetter) {
@@ -397,4 +418,15 @@ export class WebhookSubscriptionDeliveryService {
                 ),
             );
     }
+}
+
+/** Whether a v2 subscription has gone {@link WEBHOOK_V2_DEAD_LETTER_AFTER_MS} without a success. */
+function failingLongEnough(sub: {
+    lastDeliveryAt?: Date | string | null;
+    createdAt?: Date | string | null;
+}): boolean {
+    const since = sub.lastDeliveryAt ?? sub.createdAt ?? null;
+    if (!since) return true;
+    const at = (since instanceof Date ? since : new Date(since)).getTime();
+    return !Number.isFinite(at) || Date.now() - at >= WEBHOOK_V2_DEAD_LETTER_AFTER_MS;
 }

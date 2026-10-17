@@ -1,19 +1,26 @@
 // `AppDependenciesModule` imports `FacadesModule` for `AppDependencyFacadeService`,
 // and that module pulls in the whole plugin-registry tree, which is registered
-// GLOBALLY by `PluginsModule.forRoot()` at application bootstrap and therefore
-// cannot resolve inside a standalone compile. It is shelled here exactly as
-// `app-works.module.spec.ts` and `community-pr.module.spec.ts` shell it, so this
-// stays a test of THIS wiring. `AppDependenciesService` takes the facade
-// `@Optional()`, so a shelled module is a supported graph and not a broken one --
-// and the real graph is proved separately by the API boot spec.
-jest.mock('../../facades/facades.module', () => ({
-    FacadesModule: class FacadesModule {},
-}));
-
+// GLOBALLY by `PluginsModule.forRoot()` at application bootstrap. This file used
+// to shell `FacadesModule` (`jest.mock`) so it stayed a test of THIS wiring,
+// leaning on `AppDependenciesService` taking the facade `@Optional()`.
+//
+// #2688 (A0.10, APW-07 T25) made `AppDependenciesModule` import `AppSpecModule`
+// for the dependency spec source, and `AppSpecService` injects `GitFacadeService`
+// from `FacadesModule` NON-optionally (plus the global event emitter and the
+// cache the distributed lock reads). A shelled `FacadesModule` can no longer
+// compile that graph, so the shell is gone: the compile below stands in only what
+// the API ROOT registers — the in-memory DataSource, the global event emitter,
+// the global cache and the global `PluginsModule.forRoot()` (registered, never
+// bootstrapped: no plugin is loaded) — exactly as
+// `app-runtime/__tests__/app-deploy-request.graph.spec.ts` composes it. Every
+// assertion below is unchanged; the graph under test is now the real one.
+import { CacheModule } from '@nestjs/cache-manager';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ENTITIES } from '../../database/_entities-inventory';
+import { PluginsModule } from '../../plugins/plugins.module';
 import { AppDependenciesService } from '../../app-dependencies/app-dependencies.service';
 import { APP_DEPENDENCY_CONFIG_CIPHER } from '../../app-dependencies/app-dependencies.service';
 import { APP_DEPENDENCIES_SERVICE } from '../../app-runtime/app-runtime-deletion.service';
@@ -57,6 +64,9 @@ describe('AppRuntimeEnvModule (APW-07 wiring)', () => {
                     synchronize: true,
                     logging: false,
                 }),
+                EventEmitterModule.forRoot(),
+                CacheModule.register({ isGlobal: true }),
+                PluginsModule.forRoot(),
                 AppRuntimeEnvModule,
             ],
         }).compile();

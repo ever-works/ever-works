@@ -252,6 +252,9 @@ describe('TriggerInternalController', () => {
     // The worker git facade's installation reads (`trigger-facades.module.ts`); unbound
     // unless a case sets it.
     let gitHubAppInstallationRepository: any;
+    // APW-03 T42 — the licence service behind the worker's `AppLicenseService` facade;
+    // unbound unless a case sets it.
+    let appLicenseService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -375,6 +378,16 @@ describe('TriggerInternalController', () => {
             pluginAllowlistRepository,
             // The worker git facade's installation reads, appended LAST, same rule.
             gitHubAppInstallationRepository,
+            // APW-06 T71 (A0.7) — the App runtime worker's five names, appended after it.
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            // APW-04 (lane aw-ai) — the provisioner's events port, appended after them.
+            undefined,
+            // APW-03 T42 / APW-02 T33 — the licence service the sync worker proxies, LAST.
+            appLicenseService,
         );
         c.onModuleInit();
         return c;
@@ -531,6 +544,7 @@ describe('TriggerInternalController', () => {
             delete: jest.fn(),
         };
         gitHubAppInstallationRepository = undefined;
+        appLicenseService = undefined;
 
         controller = buildController();
     });
@@ -1594,17 +1608,122 @@ describe('TriggerInternalController', () => {
             ).rejects.toThrow('Unknown remote target: GitHubAppInstallationRepository');
         });
 
-        it('appends the repository LAST and @Optional()', () => {
+        it('appends the repository in the @Optional() tail', () => {
             const paramTypes: unknown[] =
                 Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
             const optionalIndices: number[] =
                 Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
-            const last = paramTypes.length - 1;
+            // Was "the LAST parameter" — true until APW-03 T42's `AppLicenseService` was
+            // appended after it (2026-10-17). The rule is the tail: it and every later
+            // parameter are `@Optional()`.
+            const at = paramTypes.indexOf(GitHubAppInstallationRepository);
 
             // The class itself, not `Object`: an `Object` here is a parameter Nest resolves
             // to nothing, and `@Optional()` would hide that.
-            expect(paramTypes[last]).toBe(GitHubAppInstallationRepository);
-            expect(optionalIndices).toContain(last);
+            expect(at).toBeGreaterThan(0);
+            for (let index = at; index < paramTypes.length; index += 1) {
+                expect(optionalIndices).toContain(index);
+            }
+        });
+    });
+
+    /**
+     * APW-03 T42 / APW-02 T33 — the `AppLicenseService` remote target. The
+     * `app-upstream-sync` worker binds `APP_UPSTREAM_LICENSE_SERVICE` to a proxy of this
+     * name; the entry is a three-read facade, so the owner-only `attest` and the
+     * evaluation internals are not reachable over the hop.
+     */
+    describe('the AppLicenseService remote target (the sync worker’s licence reads)', () => {
+        let licenses: any;
+
+        beforeEach(() => {
+            licenses = {
+                previewUpstream: jest.fn(async () => ({
+                    worse: false,
+                    spdx: 'MIT',
+                    licenseClass: 'green',
+                })),
+                request: jest.fn(async () => undefined),
+                getHostingEligibility: jest.fn(async () => null),
+                attest: jest.fn(),
+                evaluate: jest.fn(),
+            };
+        });
+
+        const build = () => {
+            appLicenseService = licenses;
+            return buildController();
+        };
+
+        it('reaches previewUpstream and request over the RPC hop', async () => {
+            const controllerWithLicenses = build();
+            const preview = await controllerWithLicenses.callRemote(VALID_SECRET, {
+                name: 'AppLicenseService',
+                method: 'previewUpstream',
+                args: superjson.serialize(['w1', 'up', 'repo', 'a'.repeat(40)]) as any,
+            });
+            expect(licenses.previewUpstream).toHaveBeenCalledWith(
+                'w1',
+                'up',
+                'repo',
+                'a'.repeat(40),
+            );
+            expect(superjson.deserialize(preview.result as any)).toMatchObject({ worse: false });
+
+            await controllerWithLicenses.callRemote(VALID_SECRET, {
+                name: 'AppLicenseService',
+                method: 'request',
+                args: superjson.serialize(['w1', 'upstream_synced']) as any,
+            });
+            expect(licenses.request).toHaveBeenCalledWith('w1', 'upstream_synced');
+        });
+
+        it.each(['attest', 'evaluate'])(
+            'refuses %s — the facade exposes the reads only',
+            async (method) => {
+                await expect(
+                    build().callRemote(VALID_SECRET, {
+                        name: 'AppLicenseService',
+                        method,
+                        args: superjson.serialize([]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for AppLicenseService: ${method}`);
+                expect(licenses[method]).not.toHaveBeenCalled();
+            },
+        );
+
+        it('answers the loud "Unknown remote target" when no licence service is bound', async () => {
+            appLicenseService = undefined;
+            await expect(
+                buildController().callRemote(VALID_SECRET, {
+                    name: 'AppLicenseService',
+                    method: 'request',
+                    args: superjson.serialize(['w1']) as any,
+                }),
+            ).rejects.toThrow('Unknown remote target: AppLicenseService');
+        });
+
+        it('appends the service in the @Optional() tail, after the installation repository', () => {
+            const paramTypes: unknown[] =
+                Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
+            const optionalIndices: number[] =
+                Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
+            // The tail from the installation repository on (A0.7's five App runtime names,
+            // APW-04's provisioner events service, this licence service) is all `@Optional()`
+            // per the arity rule.
+            const at = paramTypes.indexOf(GitHubAppInstallationRepository);
+            expect(at).toBeGreaterThan(0);
+
+            // The class itself, not `Object`: an `Object` here is a parameter Nest resolves
+            // to nothing, and `@Optional()` would hide that.
+            expect(paramTypes[at]).toBe(GitHubAppInstallationRepository);
+            for (let index = at; index < paramTypes.length; index += 1) {
+                expect(optionalIndices).toContain(index);
+            }
+            const license = paramTypes.findIndex(
+                (type) => (type as { name?: string })?.name === 'AppLicenseService',
+            );
+            expect(license).toBeGreaterThan(at);
         });
     });
 });

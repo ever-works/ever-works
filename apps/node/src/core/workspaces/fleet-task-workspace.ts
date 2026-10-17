@@ -6,6 +6,7 @@ import {
 	FLEET_AGENT_TASK_META_DIR,
 	normalizeFleetRunEnvFileRefs,
 	normalizeFleetTaskWorkspaceMounts,
+	retypeFleetCommitMessage,
 	type FleetRunEnvFileRef,
 	type FleetTaskWorkspaceDescriptor,
 	type FleetTaskWorkspaceMountDescriptor,
@@ -1267,6 +1268,11 @@ export class FleetTaskWorkspaceProvisioner {
 					// pool config. The credentialed push already does this; the flag
 					// extends it to the commit.
 					hardenRepoHooks: true,
+					// Fleet commit messages: once the change is staged, a
+					// docs-only change commits as `docs`, a tests-only one as
+					// `test`, whatever the Task title implied. Only the type token
+					// of the subject changes; the body and trailers are untouched.
+					commitMessageFor: (changedPaths, message) => retypeFleetCommitMessage(message, changedPaths),
 					...(signal ? { signal } : {}),
 					...(opts.publishFence ? { publishFence: opts.publishFence } : {}),
 					...(authorization.identity ? { identity: authorization.identity } : {}),

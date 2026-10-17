@@ -36,6 +36,8 @@ describe('FleetController', () => {
         setDailyCostCeilingForUser: jest.Mock;
         // Remote node limits (slice AS).
         setLimitCeilingForUser: jest.Mock;
+        // Fleet usage limits — "clear limit now".
+        clearModelThrottlesForUser: jest.Mock;
         deleteForUser: jest.Mock;
         enroll: jest.Mock;
         heartbeat: jest.Mock;
@@ -98,6 +100,7 @@ describe('FleetController', () => {
                 ...nodeView,
                 limitCeiling: { maxConcurrentJobs: 2, maxCpuPercent: null, maxMemoryMb: null },
             })),
+            clearModelThrottlesForUser: jest.fn(async () => ({ ...nodeView, modelThrottles: [] })),
             deleteForUser: jest.fn(async () => undefined),
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
@@ -128,6 +131,26 @@ describe('FleetController', () => {
             // EW-799 — the audit reader behind GET /nodes/:id/audit.
             auditStub as never,
         );
+    });
+
+    describe('POST /api/fleet/nodes/:id/clear-model-throttle (fleet usage limits)', () => {
+        it('clears one CLI owner-scoped, or every CLI when none is named', async () => {
+            const view = await controller.clearModelThrottle(auth, nodeView.id, {
+                provider: 'claude-code',
+            });
+            expect(service.clearModelThrottlesForUser).toHaveBeenCalledWith(
+                'user-1',
+                nodeView.id,
+                'claude-code',
+            );
+            expect(view.modelThrottles).toEqual([]);
+            await controller.clearModelThrottle(auth, nodeView.id, {});
+            expect(service.clearModelThrottlesForUser).toHaveBeenLastCalledWith(
+                'user-1',
+                nodeView.id,
+                null,
+            );
+        });
     });
 
     describe('PUT /api/fleet/nodes/:id/limits (remote node limits, slice AS)', () => {

@@ -123,3 +123,23 @@ export * from './app-deploy-request.module';
 // controller publishes it as the remote target the isolated App runtime worker's
 // `APP_DEPLOY_BUILD_SOURCE` proxies. Its helpers stay file-private to this folder.
 export { AppDeployBuildSourceAdapter } from './app-deploy-build.source';
+export { AppDeployDeploymentStoreAdapter } from './app-deploy-deployment.store';
+// APW-06 T71/T72/T35 (A0.6/A0.7, 2026-10-17) — the worker's real port implementations, the API-side
+// relays they dial, and the Build-succeeded auto-deploy listener.
+export * from './app-image-reference.resolver';
+export * from './app-runtime-worker.adapters';
+// APW-10's minimal `AppsTierPolicy` — moved out of this folder for Resolution R-5 (it reads the
+// managed-tier ceiling; nothing under `app-runtime/` may), re-exported so importers are unchanged.
+export * from '../apps-tier/config-apps-tier-policy';
+export * from './app-build-succeeded.listener';
+// APW-06 T33 / T31 (lane aw-deploy-2) — the app-target/app-status service and the cluster-op gate.
+export * from './app-target.service';
+export * from './app-spec-applied.listener';
+export * from './app-runtime-activity.listener';
+export * from './app-managed-dns.listener';
+export {
+    appClusterOpDispatcherGate,
+    buildAppClusterOpDispatcherProviders,
+    type AppClusterOpDispatchGate,
+    type AppClusterOpDispatchPayload,
+} from './app-deploy-dispatcher.provider';

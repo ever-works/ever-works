@@ -34,6 +34,10 @@ import type {
     WorkChecksPolicy,
     WorkExternalRefs,
     AppDeployTargetChoice,
+    AppRepositoryMode,
+    AppSourceInspectRequest,
+    AppSourceInspectResponse,
+    AppSourceCreatedView,
 } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -107,6 +111,23 @@ export interface CreateWorkDto {
      *  to register as the Work's data repository. Required for that kind;
      *  ignored for every other kind. */
     repositoryUrl?: string;
+    /**
+     * APW-01 T21 — App Work (`kind: 'app'`) only: how the upstream repository
+     * in `repositoryUrl` becomes the Work Repository. Required for that kind
+     * (the API answers `400 repositoryMode must be defined` otherwise).
+     */
+    repositoryMode?: AppRepositoryMode;
+    /** App Work only — the account the fork / private copy is created in. */
+    targetOwner?: string;
+    /** App Work only — the Apps catalog Blueprint the member previewed or picked. */
+    blueprintId?: string;
+    /**
+     * App Work only — `false` is the member's decline of the automatic
+     * provisioning start (spec §6.2). Sent ONLY when unticked; absent means on.
+     */
+    autoProvision?: boolean;
+    /** App Work only — write-only answers to the Blueprint's prompts (FR-55). */
+    appEnv?: Record<string, string>;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -807,9 +828,27 @@ export const workAPI = {
 
     // Create a new work
     create: async (data: CreateWorkDto) => {
-        return serverMutation<APIResponse<{ work: Work }>>({
+        return serverMutation<
+            APIResponse<{ work: Work; appSource?: AppSourceCreatedView; alreadyExisted?: boolean }>
+        >({
             endpoint: '/works',
             data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * APW-01 T21 — `POST /api/works/app-source/inspect`: the create form's
+     * preview of a pasted repository. Writes nothing (FR-5). Provider-side
+     * refusals answer `200` with reason codes on the modes; only our own
+     * validation (`invalid_url`, `app_works_disabled`) answers `4xx`, which
+     * surfaces here as an `ApiResponseError` carrying that `code`.
+     */
+    inspectAppSource: async (body: AppSourceInspectRequest): Promise<AppSourceInspectResponse> => {
+        return serverMutation<AppSourceInspectResponse>({
+            endpoint: '/works/app-source/inspect',
+            data: body,
             method: 'POST',
             wrapInData: false,
         });

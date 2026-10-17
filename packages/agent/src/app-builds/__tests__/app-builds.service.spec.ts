@@ -350,6 +350,13 @@ function makeHarness(options: HarnessOptions = {}): Harness {
                             if (!inTerminal || clockArm) continue;
                             return { affected: 0 };
                         }
+                        // `… AND notDeployableReason = :was` — the late digest confirmation's
+                        // exactly-once claim (2026-10-17): read from the SQL like the arms above.
+                        if (sql === 'notDeployableReason = :was') {
+                            if ((row.notDeployableReason ?? null) !== params.was)
+                                return { affected: 0 };
+                            continue;
+                        }
                         throw new Error(`rowsRepository: unrecognised claim predicate: ${sql}`);
                     }
 
@@ -1589,7 +1596,7 @@ describe('AppBuildsService (APW-05 T17)', () => {
          * this a Build that settled as `digestUnconfirmed` stays that way forever.
          */
         describe('reconfirmDigest — the recheck of a digestUnconfirmed Build', () => {
-            it('re-settles a Build the registry now confirms, and publishes nothing', async () => {
+            it('re-settles a Build the registry now confirms, and publishes app.build.succeeded once (no second Activity row)', async () => {
                 let answer: ImageAccessAnswer = { visibility: 'private', readable: false };
                 const { harness, row } = await settle({ checkImageAccess: async () => answer });
                 expect(row.notDeployableReason).toBe('digestUnconfirmed');
@@ -1609,11 +1616,24 @@ describe('AppBuildsService (APW-05 T17)', () => {
                 expect(after.digestConfirmed).toBe(true);
                 expect(after.deployable).toBe(true);
                 expect(after.notDeployableReason ?? null).toBeNull();
-                // Not a status transition, so §7.8's map names no event for it; and
-                // not a second receipt either.
-                expect(harness.events()).toHaveLength(eventsBefore);
+                // 2026-10-17 (lane aw-builds-3) — this case used to pin "publishes
+                // nothing": a late confirmation is not a status transition, so §7.8's
+                // map names no event for it. But APW-06's auto-deploy listens for
+                // `app.build.succeeded` with `deployable: true`, and the first
+                // succeeded event carried `deployable: false` (`digestUnconfirmed`),
+                // so a Build confirmed after the fact was never auto-deployed. It now
+                // publishes `app.build.succeeded` once more — exactly once, behind the
+                // conditional claim — and still writes no second Activity row and no
+                // second receipt.
+                expect(harness.events()).toHaveLength(eventsBefore + 1);
+                expect(harness.events().slice(eventsBefore)).toEqual(['app.build.succeeded']);
                 expect(harness.activity).toHaveLength(activityBefore);
                 expect(harness.usage).toHaveLength(1);
+
+                // A second re-check finds nothing left to confirm and publishes nothing.
+                const again = await harness.service.reconfirmDigest(row.id);
+                expect(again.reconfirmed).toBe(false);
+                expect(harness.events()).toHaveLength(eventsBefore + 1);
             });
 
             it('confirms from a Push-step digest when the registry still cannot be read', async () => {

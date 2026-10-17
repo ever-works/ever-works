@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type {
     IDeploymentPlugin,
     IDeployFacade,
@@ -143,6 +144,12 @@ export class DeployFacadeService implements IDeployFacade {
         // by `OPEN_API_GAPS` in `apps/api/src/app-works-di-reachability.spec.ts`.
         @Optional()
         private readonly appDomains?: AppDomainsService,
+        // C43 (lane aw-deploy-2, 2026-10-17) — the API's `FacadesModule` cannot import the module
+        // that provides `AppDomainsService` without a cycle, so in the API the App branch reaches
+        // it through a non-strict `ModuleRef` lookup (`AppDeployRequestModule` provides it). The
+        // worker still gets it by constructor. Optional and last, like the line above.
+        @Optional()
+        private readonly moduleRef?: ModuleRef,
     ) {}
 
     resolveProviderId(providerId: string): string {
@@ -511,7 +518,8 @@ export class DeployFacadeService implements IDeployFacade {
      * domain operation is a member's explicit click, not a hot path.
      */
     private async appDomainsFor(options: DeployFacadeOptions): Promise<AppDomainsService | null> {
-        if (!this.appDomains) return null;
+        const appDomains = this.appDomains ?? this.lookupAppDomains();
+        if (!appDomains) return null;
 
         try {
             const work = await this.workRepository.findById(options?.workId);
@@ -521,13 +529,23 @@ export class DeployFacadeService implements IDeployFacade {
             return String(work?.kind ?? '')
                 .trim()
                 .toLowerCase() === APP_WORK_KIND
-                ? this.appDomains
+                ? appDomains
                 : null;
         } catch (error) {
             // A Work that cannot be read is not an App Work here: the method's own resolution below
             // reports the missing Work with the error its callers already handle.
             this.logger.warn(`Reading work ${options?.workId} for its kind failed: ${error}`);
 
+            return null;
+        }
+    }
+
+    /** C43 — `AppDomainsService` from anywhere in the container, or `null` (never throws). */
+    private lookupAppDomains(): AppDomainsService | null {
+        if (!this.moduleRef) return null;
+        try {
+            return this.moduleRef.get(AppDomainsService, { strict: false }) ?? null;
+        } catch {
             return null;
         }
     }

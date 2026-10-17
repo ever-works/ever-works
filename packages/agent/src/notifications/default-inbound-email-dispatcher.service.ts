@@ -218,11 +218,19 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
             return { handled: false, reason: 'no matching inbound address' };
         }
 
-        // 2. Resolve the inbound assignment (lowest priority first).
+        // 2. Resolve the inbound assignment (lowest priority first), or the one of the
+        // agent the caller authorized (review 2026-10-17 F15).
         const assignments = await this.assignments.findByEmailAddress(address.id, 'inbound');
-        const assignment = assignments[0];
+        const assignment = payload.agentId
+            ? assignments.find((candidate) => candidate.agentId === payload.agentId)
+            : assignments[0];
         if (!assignment) {
-            return { handled: false, reason: 'address has no inbound agent assignment' };
+            return {
+                handled: false,
+                reason: payload.agentId
+                    ? 'the agent has no inbound assignment on this address'
+                    : 'address has no inbound agent assignment',
+            };
         }
         const agentId = assignment.agentId;
         const mode = assignment.dispatchMode === 'conversation' ? 'conversation' : 'task-spawn';

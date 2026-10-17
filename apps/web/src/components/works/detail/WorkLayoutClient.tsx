@@ -6,6 +6,7 @@ import { GitProviderConnectionInfo, Work, WorkConfig } from '@/lib/api/types-onl
 import type { Agent } from '@/lib/api/agents';
 import { getWorkCapabilities, type AppRepositoryMode } from '@ever-works/contracts';
 import { WorkHeader } from './WorkHeader';
+import type { AppSourceRelationSummary } from '@/lib/works/app-source-relation';
 import { WorkTabs } from './WorkTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { WorkDetailProvider } from './WorkDetailContext';
@@ -37,6 +38,8 @@ interface WorkLayoutClientProps {
      * an upstream at all.
      */
     appRelation?: AppRepositoryMode | null;
+    /** APW-01 T24 — the App Work header's relation line; `null` for every other kind. */
+    appSource?: AppSourceRelationSummary | null;
 }
 
 export function WorkLayoutClient({
@@ -47,6 +50,7 @@ export function WorkLayoutClient({
     agentsTotal,
     assignedAgentIds = [],
     appRelation = null,
+    appSource = null,
     children,
 }: WorkLayoutClientProps) {
     const router = useRouter();
@@ -194,6 +198,7 @@ export function WorkLayoutClient({
                     agents={agents}
                     agentsTotal={agentsTotal}
                     assignedAgentIds={assignedAgentIds}
+                    appSource={appSource}
                 />
                 <WorkTabs work={syncedWork} appRelation={appRelation} />
 

@@ -170,7 +170,12 @@ export interface WorkflowWriteResult {
 	 * bytes. Only a matching read-back sets it (FR-8, plan §4.6 step 4).
 	 */
 	readonly storedWorkflowSha256: string | null;
-	readonly blocked?: { readonly reason: 'workflowWriteFailed'; readonly detail: { readonly cause: string } };
+	readonly blocked?:
+		| { readonly reason: 'workflowWriteFailed'; readonly detail: { readonly cause: string } }
+		| {
+				readonly reason: 'workflowPermissionMissing';
+				readonly detail: { readonly cause: string; readonly credential: string; readonly missing: string };
+		  };
 }
 
 /** A file as the writer reads it back — `encoding` decides whether the content needs decoding. */
@@ -207,7 +212,13 @@ async function readBranchHead(writer: RepositoryWriter, branch: string): Promise
 export function repositoryWriteErrorCode(error: unknown): RepositoryWriteErrorCode | null {
 	const candidate = error as { code?: unknown; reason?: unknown } | null | undefined;
 	for (const value of [candidate?.code, candidate?.reason]) {
-		if (value === 'nonFastForward' || value === 'refRejectedByRule' || value === 'pullRequestExists') return value;
+		if (
+			value === 'nonFastForward' ||
+			value === 'refRejectedByRule' ||
+			value === 'pullRequestExists' ||
+			value === 'workflowPermissionMissing'
+		)
+			return value;
 	}
 	return null;
 }
@@ -311,7 +322,9 @@ export async function writeWorkflow(
 	const removal = input.content === '';
 	if (removal) {
 		if (!existsOnTrackedBranch) return { state: 'unchanged', storedWorkflowSha256: null };
-		return pullRequestDelivery(input, writer, path, contentSha256, handEdited, REMOVAL_COPY);
+		return withWorkflowPermission(() =>
+			pullRequestDelivery(input, writer, path, contentSha256, handEdited, REMOVAL_COPY)
+		);
 	}
 
 	// Step 7 then step 1 — a Link relation always takes the pull request path, and a
@@ -323,9 +336,38 @@ export async function writeWorkflow(
 	const pullRequestPath = !createdByAppWork || handEdited || verdict.protected;
 
 	if (pullRequestPath) {
-		return pullRequestDelivery(input, writer, path, contentSha256, handEdited);
+		return withWorkflowPermission(() => pullRequestDelivery(input, writer, path, contentSha256, handEdited));
 	}
-	return directDelivery(input, writer, path, contentSha256, existsOnTrackedBranch);
+	return withWorkflowPermission(() => directDelivery(input, writer, path, contentSha256, existsOnTrackedBranch));
+}
+
+/**
+ * The credential cannot write under `.github/workflows/` (2026-10-17).
+ *
+ * Terminal on BOTH delivery paths — a pull-request branch needs the same
+ * permission as the tracked branch — so it is mapped once, here, onto the named
+ * blocked reason the member can act on ("reconnect GitHub with the `workflow`
+ * scope"), instead of surfacing as a generic 403/404 `workflowWriteFailed`.
+ */
+async function withWorkflowPermission(deliver: () => Promise<WorkflowWriteResult>): Promise<WorkflowWriteResult> {
+	try {
+		return await deliver();
+	} catch (error) {
+		if (repositoryWriteErrorCode(error) !== 'workflowPermissionMissing') throw error;
+		const facts = error as { credential?: unknown; missing?: unknown };
+		return {
+			state: 'blocked',
+			storedWorkflowSha256: null,
+			blocked: {
+				reason: 'workflowPermissionMissing',
+				detail: {
+					cause: 'workflowPermissionMissing',
+					credential: typeof facts.credential === 'string' ? facts.credential : 'unknown',
+					missing: typeof facts.missing === 'string' ? facts.missing : 'workflow'
+				}
+			}
+		};
+	}
 }
 
 /** Steps 2 + 4 — the direct commit, with the `nonFastForward` retry and the `refRejectedByRule` switch. */

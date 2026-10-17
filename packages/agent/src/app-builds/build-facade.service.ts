@@ -1,6 +1,21 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { APP_BUILD_IMAGE_NAME, type AppBuildKind } from '@ever-works/contracts';
-import type { BuildAuth, BuildRef, IBuildPlugin, StartBuildInput } from '@ever-works/plugin';
+import {
+    APP_BUILD_IMAGE_NAME,
+    APP_BUILD_WORKFLOW_PATH,
+    type AppBuildKind,
+} from '@ever-works/contracts';
+import type {
+    BuildAuth,
+    BuildRef,
+    BuildRepositoryRef,
+    BuildRunRef,
+    BuildSnapshot,
+    IBuildPlugin,
+    PrepareRepositoryInput,
+    PrepareRepositoryResult,
+    RepositoryWriter,
+    StartBuildInput,
+} from '@ever-works/plugin';
 
 import { WorkRepository } from '../database/repositories/work.repository';
 import {
@@ -20,6 +35,44 @@ export const BUILD_TOKEN_SOURCE = Symbol('BUILD_TOKEN_SOURCE');
 
 /** DI token for {@link BuildRepositoryFactsSource}. Declared here for the same reason. */
 export const BUILD_REPOSITORY_FACTS_SOURCE = Symbol('BUILD_REPOSITORY_FACTS_SOURCE');
+
+/** DI token for {@link BuildSettingsSource}. Declared here for the same reason. */
+export const BUILD_SETTINGS_SOURCE = Symbol('BUILD_SETTINGS_SOURCE');
+
+/**
+ * The full binding {@link BuildFacadeService.resolve} answers (2026-10-17,
+ * outstanding-work A0.4, ledger D19).
+ *
+ * `AppBuildPluginBinding` is what `AppBuildsService` calls; the prepare runner,
+ * the watch runner and run discovery each declared the further members they
+ * need (`repository`, `settings`, `auth`, `writer`, `prepareRepository`,
+ * `getBuild`, `listRecentRuns`) as a provisional widening "until T16 lands". Until
+ * this date the facade supplied none of them, so a real prepare and a real watch
+ * both answered `pluginUnavailable` — no Build could run or be observed. This is
+ * that widening, supplied.
+ */
+export interface BuildFacadeBinding extends AppBuildPluginBinding {
+    readonly repository?: BuildRepositoryRef;
+    readonly settings?: Record<string, unknown>;
+    /** The resolved git credential. Never logged, never stored, never returned over HTTP. */
+    readonly auth?: BuildAuth;
+    readonly writer?: RepositoryWriter;
+    prepareRepository?(
+        input: PrepareRepositoryInput,
+        auth?: { readonly token: string },
+        writer?: RepositoryWriter,
+    ): Promise<PrepareRepositoryResult>;
+    getBuild?(
+        ref: BuildRef,
+        auth: BuildAuth,
+        redact: (text: string) => string,
+    ): Promise<BuildSnapshot | null>;
+    listRecentRuns?(input: {
+        readonly perPage: number;
+        readonly etag?: string;
+    }): Promise<{ notModified: boolean; etag?: string; runs: BuildRunRef[] }>;
+    deleteVerifyPromptedSecret?(): Promise<unknown>;
+}
 
 /**
  * APW-05 T16 — `BuildFacadeService.resolve(workId, userId)`, the binding behind
@@ -124,6 +177,15 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         @Optional()
         @Inject(BUILD_REPOSITORY_FACTS_SOURCE)
         private readonly facts?: BuildRepositoryFactsSource,
+        /**
+         * Plan §4.4's resolved Work-scoped settings of the build plugin (the
+         * larger-runner keys, the generator's switches, the pull token).
+         * `@Optional()` and last; absent, the binding carries `{}` — the schema's
+         * defaults, which build on the public runner.
+         */
+        @Optional()
+        @Inject(BUILD_SETTINGS_SOURCE)
+        private readonly settingsSource?: BuildSettingsSource,
     ) {}
 
     /**
@@ -133,7 +195,7 @@ export class BuildFacadeService implements AppBuildPluginResolver {
      * The callers treat a `null` as `pluginUnavailable`, which is a Build that
      * does not start rather than one that half-starts.
      */
-    async resolve(workId: string, userId: string): Promise<AppBuildPluginBinding | null> {
+    async resolve(workId: string, userId: string): Promise<BuildFacadeBinding | null> {
         const work = await this.workRepository.findById(workId);
         if (!work) {
             this.logger.warn(
@@ -169,26 +231,41 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         }
 
         const plugin = candidates[0];
-        const token = await this.tokenFor(workId, userId);
-        if (!token) {
+        const auth = await this.authFor(workId, userId);
+        if (!auth) {
             this.logger.warn(
                 `Build plugin resolution for work ${workId}: no provider credential is available for member ${userId}.`,
             );
             return null;
         }
-
-        const auth: BuildAuth = { token };
         const repository = this.repositoryOf(work);
         const facts = await this.factsFor(workId);
-        const repositoryRef = repository
+        const repositoryRef: BuildRepositoryRef | null = repository
             ? {
                   owner: repository.owner,
                   repo: repository.repo,
                   visibility: facts.visibility,
-                  trackedBranch: repository.branch,
+                  // APW-03's `WorkAppSpecState.trackedBranch` when the facts source
+                  // knows it; `repositoryOf`'s `main` only as the last resort.
+                  trackedBranch: facts.trackedBranch ?? repository.branch,
                   createdByAppWork: facts.createdByAppWork,
               }
             : null;
+        const settings = await this.settingsFor(plugin.id, workId, userId);
+        // The plugin's own clone-free writer when it has one (see
+        // `IBuildPlugin.repositoryWriter?`); without it there is no writer, and the
+        // prepare runner answers `pluginUnavailable` rather than half-preparing.
+        const writer =
+            repositoryRef && typeof plugin.repositoryWriter === 'function'
+                ? plugin.repositoryWriter(
+                      {
+                          owner: repositoryRef.owner,
+                          repo: repositoryRef.repo,
+                          trackedBranch: repositoryRef.trackedBranch,
+                      },
+                      auth,
+                  )
+                : null;
 
         const imageRepository = repository
             ? `ghcr.io/${repository.owner}/${repository.repo}/${APP_BUILD_IMAGE_NAME}`.toLowerCase()
@@ -196,8 +273,100 @@ export class BuildFacadeService implements AppBuildPluginResolver {
 
         return {
             pluginId: plugin.id,
+            ...(typeof plugin.name === 'string' ? { name: plugin.name } : {}),
             buildKind: plugin.buildKind,
             imageRepository,
+            settings,
+            auth,
+            ...(repositoryRef ? { repository: repositoryRef } : {}),
+            ...(writer ? { writer } : {}),
+
+            // §4.6 — deliver the workflow and the build values. Work-bound: the
+            // facade's credential and writer, whatever the caller passes.
+            ...(repositoryRef && writer
+                ? {
+                      prepareRepository: async (
+                          input: PrepareRepositoryInput,
+                          _auth?: { readonly token: string },
+                          writerOverride?: RepositoryWriter,
+                      ) =>
+                          plugin.prepareRepository(
+                              {
+                                  ...input,
+                                  // Work-bound: always the resolved repository, never
+                                  // one a caller names (the runner passes the same).
+                                  repository: repositoryRef,
+                                  settings: { ...settings, ...(input.settings ?? {}) },
+                              },
+                              auth,
+                              writerOverride ?? writer,
+                          ),
+                  }
+                : {}),
+
+            // §7.3 — one observation. The ref's repository is replaced with the
+            // resolved one, so a caller cannot observe somebody else's runs.
+            ...(repositoryRef && typeof plugin.getBuild === 'function'
+                ? {
+                      getBuild: async (
+                          ref: BuildRef,
+                          _auth: BuildAuth,
+                          redact: (text: string) => string,
+                      ) => plugin.getBuild({ ...ref, repository: repositoryRef }, auth, redact),
+                  }
+                : {}),
+
+            // §7.4a — run discovery, when the plugin can list its runs.
+            ...(repositoryRef && typeof plugin.listRecentRuns === 'function'
+                ? {
+                      listRecentRuns: async (input: {
+                          readonly perPage: number;
+                          readonly etag?: string;
+                      }) =>
+                          plugin.listRecentRuns!(
+                              {
+                                  repository: {
+                                      owner: repositoryRef.owner,
+                                      name: repositoryRef.repo,
+                                  },
+                                  workflowPath: APP_BUILD_WORKFLOW_PATH,
+                                  perPage: input.perPage,
+                                  ...(input.etag ? { etag: input.etag } : {}),
+                              },
+                              auth,
+                          ),
+                  }
+                : {}),
+
+            // Plan §5 — a Rebuild's `commitSha` must be in the tracked branch's history.
+            ...(repositoryRef && typeof plugin.isCommitReachable === 'function'
+                ? {
+                      isCommitReachable: async (sha: string) =>
+                          plugin.isCommitReachable!(
+                              {
+                                  repository: {
+                                      owner: repositoryRef.owner,
+                                      repo: repositoryRef.repo,
+                                  },
+                                  sha,
+                                  branch: repositoryRef.trackedBranch,
+                              },
+                              auth,
+                          ),
+                  }
+                : {}),
+
+            // §4.10 — the per-run prompted-value secret's removal (the watch runner's
+            // terminal transition, and the sweep's orphan pass).
+            ...(repositoryRef && typeof plugin.deleteVerifyPromptedSecret === 'function'
+                ? {
+                      deleteVerifyPromptedSecret: async () =>
+                          plugin.deleteVerifyPromptedSecret!(
+                              { owner: repositoryRef.owner, repo: repositoryRef.repo },
+                              auth,
+                          ),
+                  }
+                : {}),
 
             startBuild: async (input) => {
                 if (!repositoryRef) return null;
@@ -213,7 +382,7 @@ export class BuildFacadeService implements AppBuildPluginResolver {
                             ? { reuseImageDigest: input.reuseImageDigest }
                             : {}),
                         ...(input.verification ? { verification: input.verification } : {}),
-                        settings: {},
+                        settings,
                     } as StartBuildInput,
                     auth,
                 );
@@ -324,15 +493,20 @@ export class BuildFacadeService implements AppBuildPluginResolver {
      *    to write into, so the workflow change takes the pull-request path.
      *    Guessing `true` would push a commit to somebody else's repository.
      */
-    private async factsFor(
-        workId: string,
-    ): Promise<{ visibility: 'public' | 'private'; createdByAppWork: boolean }> {
+    private async factsFor(workId: string): Promise<{
+        visibility: 'public' | 'private';
+        createdByAppWork: boolean;
+        trackedBranch?: string;
+    }> {
         if (!this.facts) return { visibility: 'private', createdByAppWork: false };
         try {
             const reported = await this.facts.getBuildRepositoryFacts({ workId });
+            const trackedBranch =
+                typeof reported?.trackedBranch === 'string' ? reported.trackedBranch.trim() : '';
             return {
                 visibility: reported?.visibility ?? 'private',
                 createdByAppWork: reported?.createdByAppWork ?? false,
+                ...(trackedBranch ? { trackedBranch } : {}),
             };
         } catch (error) {
             this.logger.warn(
@@ -342,6 +516,59 @@ export class BuildFacadeService implements AppBuildPluginResolver {
             );
             return { visibility: 'private', createdByAppWork: false };
         }
+    }
+
+    /** The build plugin's resolved Work settings, `{}` when they cannot be read. Never logged. */
+    private async settingsFor(
+        pluginId: string,
+        workId: string,
+        userId: string,
+    ): Promise<Record<string, unknown>> {
+        if (!this.settingsSource) return {};
+        try {
+            return (await this.settingsSource.getBuildSettings({ pluginId, workId, userId })) ?? {};
+        } catch (error) {
+            this.logger.warn(
+                `Build plugin resolution for work ${workId}: the settings read failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the schema defaults apply.`,
+            );
+            return {};
+        }
+    }
+
+    /**
+     * The Build's `BuildAuth`: the token, plus its kind and scopes when the
+     * source can say (2026-10-17) — what lets the plugin name a missing
+     * `workflow` scope instead of passing GitHub's 403/404 through.
+     */
+    private async authFor(workId: string, userId: string): Promise<BuildAuth | null> {
+        if (this.tokens?.getBuildCredential) {
+            try {
+                const found = await this.tokens.getBuildCredential({
+                    workId,
+                    userId,
+                    providerId: 'github',
+                });
+                if (found && found.token.trim().length > 0) {
+                    return {
+                        token: found.token,
+                        credential: found.credential,
+                        scopes: found.scopes,
+                    };
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Build plugin resolution for work ${workId}: the credential lookup failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+            }
+            // Fall through to the plain token read: an older source answering
+            // only `getBuildToken` must keep working.
+        }
+        const token = await this.tokenFor(workId, userId);
+        return token ? { token } : null;
     }
 
     /** The member's provider token, or `null` when none can be obtained. */
@@ -377,6 +604,23 @@ export interface BuildTokenSource {
         readonly userId: string;
         readonly providerId: string;
     }): Promise<string | null>;
+    /**
+     * The credential and what it is (2026-10-17). Optional: a source without it
+     * is read through `getBuildToken` and the plugin learns nothing about the
+     * credential's kind, which is how every source behaved before.
+     */
+    getBuildCredential?(input: {
+        readonly workId: string;
+        readonly userId: string;
+        readonly providerId: string;
+    }): Promise<BuildCredential | null>;
+}
+
+/** A Build credential with its kind and (when recorded) its OAuth scopes. Never logged. */
+export interface BuildCredential {
+    readonly token: string;
+    readonly credential: 'oauth' | 'githubApp' | 'pat';
+    readonly scopes: readonly string[] | null;
 }
 
 /**
@@ -391,5 +635,23 @@ export interface BuildRepositoryFactsSource {
     getBuildRepositoryFacts(input: { readonly workId: string }): Promise<{
         readonly visibility: 'public' | 'private';
         readonly createdByAppWork: boolean;
+        /** APW-03's `WorkAppSpecState.trackedBranch`, when known (2026-10-17). */
+        readonly trackedBranch?: string | null;
     } | null>;
+}
+
+/**
+ * Where the build plugin's resolved Work settings come from (plan §4.4).
+ *
+ * A port for the same reason as the two above: the real answer is
+ * `PluginSettingsService.getResolvedSettings`, which lives in the `@Global()`
+ * plugins module this module cannot import standalone. Secrets are included —
+ * the plugin needs the pull token — and the value never leaves the process.
+ */
+export interface BuildSettingsSource {
+    getBuildSettings(input: {
+        readonly pluginId: string;
+        readonly workId: string;
+        readonly userId: string;
+    }): Promise<Record<string, unknown> | null>;
 }

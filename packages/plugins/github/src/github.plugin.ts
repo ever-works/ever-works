@@ -14,6 +14,10 @@ import type {
 	GitUser,
 	GitOrganization,
 	GitBranch,
+	GitCommitFilesInput,
+	GitCommitFilesResult,
+	GitRepositoryTree,
+	GitRepositoryTreeOptions,
 	GitCommit,
 	GitPullRequest,
 	CreateRepoOptions,
@@ -347,6 +351,29 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	): Promise<GitBranch> {
 		const settings = await this.getSettings();
 		return this.apiService.updateBranchRef(owner, repo, name, sha, options, token, settings.apiBaseUrl);
+	}
+
+	/** APW-03 T22 — one clone-free commit (Git Data API); fast-forward only. */
+	async commitFiles(
+		owner: string,
+		repo: string,
+		input: GitCommitFilesInput,
+		token: string
+	): Promise<GitCommitFilesResult> {
+		const settings = await this.getSettings();
+		return this.apiService.commitFiles(owner, repo, input, token, settings.apiBaseUrl);
+	}
+
+	/** APW-03 T38 — the repository tree at a ref (`git.getTree`), capped. */
+	async getRepositoryTree(
+		owner: string,
+		repo: string,
+		ref: string,
+		token: string,
+		opts: GitRepositoryTreeOptions
+	): Promise<GitRepositoryTree | null> {
+		const settings = await this.getSettings();
+		return this.apiService.getRepositoryTree(owner, repo, ref, token, opts, settings.apiBaseUrl);
 	}
 
 	// App Works fork lifecycle (APW-02 T19/T20/T21) — the private copy, the

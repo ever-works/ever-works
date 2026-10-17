@@ -207,6 +207,10 @@ import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
 import { SafetyGateService, SafetyModule } from '@ever-works/agent/safety';
+import {
+    AppChangeRequestService,
+    AppWorksModule as AgentAppWorksModule,
+} from '@ever-works/agent/app-works';
 
 type FactoryProvider = {
     provide?: unknown;
@@ -231,6 +235,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(imports).toContain(PrReviewModule);
         expect(imports).toContain(PolicyModule);
         expect(imports).toContain(AgentInboxModule);
+        // APW-08 T26 (#2685) — backs the `appChanges` domain (chat-to-modify).
+        expect(imports).toContain(AgentAppWorksModule);
     });
 
     it('binds AGENT_DOMAIN_TOOL_SOURCES — without it every domain tool is dead code', () => {
@@ -270,6 +276,11 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             // assertion is what stops a future slice inserting in the
             // middle and silently rebinding every service after it.
             TaskAgentReviewService,
+            // APW-08 T26 (#2685) — backs `request_app_change` /
+            // `get_app_change`. Appended after the reviewer for the same
+            // positional reason, and OPTIONAL: unbound, the two tools are
+            // simply not offered (the bundle carries no `appChanges`).
+            { token: AppChangeRequestService, optional: true },
         ]);
     });
 
@@ -410,11 +421,16 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             ...(factory.inject ?? []).map((_, index) => ({ stub: index })),
         ) as { tasks?: Record<string, unknown> };
         expect(bundle?.tasks?.agentReviews).toBeDefined();
-        // Positional proof: the LAST injected service is the one that
-        // lands here, so an insertion anywhere earlier is caught.
+        // Positional proof: the LAST REQUIRED injected service is the one
+        // that lands here, so an insertion anywhere earlier is caught. Since
+        // #2685 the optional `AppChangeRequestService` is appended after it,
+        // so the reviewer is second-to-last and the app-change service last.
         expect(bundle?.tasks?.agentReviews).toEqual({
-            stub: (factory?.inject ?? []).length - 1,
+            stub: (factory?.inject ?? []).length - 2,
         });
+        expect(
+            (bundle as { appChanges?: { service?: unknown } } | undefined)?.appChanges?.service,
+        ).toEqual({ stub: (factory?.inject ?? []).length - 1 });
     });
 
     it('carries every domain in the assembled bundle', () => {
@@ -440,6 +456,9 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'workflow',
             // Inbox (operator message center) — the `ask_human` tool.
             'inbox',
+            // APW-08 T26 (#2685) — chat-to-modify (`request_app_change` /
+            // `get_app_change`), present because the optional service is bound.
+            'appChanges',
         ]);
     });
 });

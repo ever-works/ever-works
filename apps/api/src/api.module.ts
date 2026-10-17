@@ -100,6 +100,7 @@ import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { SafetyApiModule } from './safety/safety.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { AppWorksTelemetryBindingModule } from './telemetry/app-works-telemetry-binding.module';
+import { AppsTierPolicyBindingModule } from './app-works/apps-tier-policy-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
@@ -374,6 +375,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         AppWorksTelemetryBindingModule,
+        // APW-10 lite — APPS_TIER_POLICY for the API process (`EVER_WORKS_APPS_MANAGED_ENABLED`).
+        AppsTierPolicyBindingModule,
         UploadsModule,
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).

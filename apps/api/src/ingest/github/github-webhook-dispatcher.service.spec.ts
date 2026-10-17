@@ -158,8 +158,11 @@ describe('GitHubWebhookDispatcherService', () => {
                 'pull_request',
                 PR_BODY,
             );
-            // ...and the one that used to need a SECOND receiver.
-            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY);
+            // ...and the one that used to need a SECOND receiver — told the
+            // delivery did NOT verify with the platform App secret.
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY, {
+                appSecretVerified: false,
+            });
         });
 
         it('verifies a platform-App delivery and fans out to BOTH consumers', async () => {
@@ -172,7 +175,9 @@ describe('GitHubWebhookDispatcherService', () => {
 
             expect(result.credential).toBe('app-secret');
             expect(result.handled).toEqual({ sync: true, review: true });
-            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY);
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY, {
+                appSecretVerified: true,
+            });
             // Installing the GitHub App now turns the review loop on with
             // NO second webhook to configure — the whole point of 08(g).
             expect(bridge.handleEvent).toHaveBeenCalledWith(
@@ -555,7 +560,9 @@ describe('GitHubWebhookDispatcherService', () => {
                 signed(INSTALL_EVENT_BODY, APP_SECRET, 'installation'),
             );
 
-            expect(appSync.handleWebhook).toHaveBeenCalledWith('installation', INSTALL_EVENT_BODY);
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('installation', INSTALL_EVENT_BODY, {
+                appSecretVerified: true,
+            });
             expect(result.handled.sync).toBe(true);
         });
 
@@ -564,7 +571,31 @@ describe('GitHubWebhookDispatcherService', () => {
 
             await dispatcher.dispatch(signed(PR_BODY, INSTALL_SECRET, 'pull_request'));
 
-            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY);
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY, {
+                appSecretVerified: false,
+            });
+        });
+
+        // Prod 2026-10-17 — the sync leg auto-claims an `installation.created`
+        // row for its recorded installer ONLY when told GitHub's own App
+        // signature vouched for the delivery (and so for its `sender`). A
+        // per-install-signed `installation.created` never even reaches it.
+        it('hands an App-signed installation.created to the sync leg as appSecretVerified, never a per-install one', async () => {
+            const created = {
+                action: 'created',
+                installation: { id: 4242, account: { login: 'ever-co' } },
+                sender: { id: 7001 },
+            };
+
+            const app = createDispatcher({ appSecret: APP_SECRET });
+            await app.dispatcher.dispatch(signed(created, APP_SECRET, 'installation'));
+            expect(app.appSync.handleWebhook).toHaveBeenCalledWith('installation', created, {
+                appSecretVerified: true,
+            });
+
+            const tenant = createDispatcher({ appSecret: APP_SECRET });
+            await tenant.dispatcher.dispatch(signed(created, INSTALL_SECRET, 'installation'));
+            expect(tenant.appSync.handleWebhook).not.toHaveBeenCalled();
         });
 
         // A string id was the way to make the ownership check blind to the

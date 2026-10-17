@@ -4,6 +4,7 @@ import {
     QUEUED_REASON_KILL_SWITCH,
     RunDispatchGateService,
 } from '../run-dispatch-gate.service';
+import { FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON } from '@ever-works/contracts';
 import { KILL_SWITCH_ACTIVE_ERROR_NAME } from '../run-kill-switch';
 import { AgentRunSweeperService } from '../agent-run-sweeper.service';
 
@@ -374,10 +375,17 @@ describe('AgentRunSweeperService — kill-switch-parked runs are never reaped (E
         // held by a paused agent is waiting for a person too. Still an
         // exact match, and `kill-switch` still leads it: this assertion
         // is what stops a future exemption from quietly displacing it.
+        // #2682 then APPENDED `model-usage-limit`: a fleet run parked until
+        // its node's model CLI resets (possibly a weekly limit) is waiting,
+        // not stuck. Appended, so `kill-switch` still leads.
         expect(runs.findStuckNonTerminal).toHaveBeenCalledWith(
             expect.any(Date),
             expect.any(Number),
-            [QUEUED_REASON_KILL_SWITCH, QUEUED_REASON_AGENT_PAUSED],
+            [
+                QUEUED_REASON_KILL_SWITCH,
+                QUEUED_REASON_AGENT_PAUSED,
+                FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+            ],
         );
     });
 

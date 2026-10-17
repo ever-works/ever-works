@@ -222,6 +222,18 @@ export class FleetJob {
     @PortableDateColumn({ nullable: true })
     bodiesPurgedAt?: Date | null;
 
+    /**
+     * Fleet usage limits — how many times this job was handed back to the
+     * queue because the model CLI on its node ran out of quota (each such
+     * park refunds the attempt it spent). Bounded by
+     * `FLEET_JOB_MAX_USAGE_LIMIT_PARKS`: past it the result settles the
+     * ordinary way, so a mis-recognised failure can never requeue forever.
+     *
+     * Migration: `1795161700000-AddFleetModelUsageLimits`.
+     */
+    @Column({ type: 'int', default: 0 })
+    usageLimitParks: number;
+
     @CreateDateColumn()
     createdAt: Date;
 

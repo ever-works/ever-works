@@ -127,3 +127,11 @@ export * from './app-build-sweep.task';
 // queues it (`APP_FORK_READINESS_DISPATCHER`) is bound in the agent-side
 // `AppWorksModule` — see the file's header for both registrations.
 export * from './app-fork-readiness.task';
+// APW-02 T33 — one upstream sync run of one Fork / private-copy App Work (plan §6.3).
+// `AppUpstreamSyncService` runs in the worker over remote proxies (claim, row, owner,
+// App spec); `APP_UPSTREAM_SYNC_DISPATCHER` (agent `AppWorksModule`) queues it.
+export * from './app-upstream-sync.task';
+// APW-02 T34 — the `app-upstream-sync-dispatcher` cron (plan §6.6):
+// `AppUpstreamSyncDispatcherService.dispatchDue()` over the internal RPC channel,
+// every `APP_UPSTREAM_SYNC_DISPATCHER_CRON` (default `*/10 * * * *`).
+export * from './app-upstream-sync-dispatcher.task';

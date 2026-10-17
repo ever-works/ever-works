@@ -225,6 +225,77 @@ describe('webhooks v2 delivery', () => {
             expect(unchecked.deliver).not.toHaveBeenCalled();
         });
 
+        // Review 2026-10-17 F11 (P1): one shared counter must not dead-letter a busy v2
+        // subscription during a short outage; the 24 h ladder is the promise.
+        describe('dead-letter (F11)', () => {
+            const failing = (sub: Record<string, unknown>, failures: number) => {
+                const markFailed = jest.fn().mockResolvedValue(undefined);
+                const service = new WebhookSubscriptionDeliveryService(
+                    {
+                        deliver: jest.fn().mockResolvedValue({
+                            ok: false,
+                            outcome: 'server_error',
+                            status: 503,
+                            deliveryId: 'd',
+                        }),
+                    } as unknown as WebhookDeliveryService,
+                    {
+                        findById: jest.fn().mockResolvedValue({
+                            id: 'sub-1',
+                            accountId: 'acct-1',
+                            url: 'https://hooks.example.com/ever',
+                            secretEncrypted: 'enc-current',
+                            status: 'active',
+                            consecutiveFailures: failures - 1,
+                            ...sub,
+                        }),
+                        incrementFailure: jest.fn().mockResolvedValue(failures),
+                        markFailed,
+                    } as never,
+                    { recordAttempt: jest.fn().mockResolvedValue(undefined) } as never,
+                    {
+                        canReceive: jest.fn().mockResolvedValue({ allowed: true, disable: false }),
+                    } as never,
+                );
+                service.setSecretDecryptor(() => 'current');
+                return { service, markFailed };
+            };
+            const input = { subscriptionId: 'sub-1', event: 'task.updated', payload: ENVELOPE };
+            const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+            it('keeps retrying a v2 subscription that succeeded minutes ago, whatever the counter', async () => {
+                const { service, markFailed } = failing(
+                    { version: 2, lastDeliveryAt: minutesAgo(2) },
+                    25,
+                );
+                const out = await service.dispatch(input);
+                expect(out.shouldRetry).toBe(true);
+                expect(out.subscription.status).toBe('active');
+                expect(markFailed).not.toHaveBeenCalled();
+            });
+
+            it('dead-letters a v2 subscription failing for over 24 h with no success', async () => {
+                const { service, markFailed } = failing(
+                    { version: 2, lastDeliveryAt: minutesAgo(25 * 60) },
+                    10,
+                );
+                const out = await service.dispatch(input);
+                expect(out.shouldRetry).toBe(false);
+                expect(out.subscription.status).toBe('failed');
+                expect(markFailed).toHaveBeenCalledWith('sub-1');
+            });
+
+            it('keeps the counter rule for v1 subscriptions', async () => {
+                const { service, markFailed } = failing(
+                    { version: 1, lastDeliveryAt: minutesAgo(2) },
+                    10,
+                );
+                const out = await service.dispatch(input);
+                expect(out.subscription.status).toBe('failed');
+                expect(markFailed).toHaveBeenCalled();
+            });
+        });
+
         it('does not deliver to a disabled subscription', async () => {
             const { service, deliver } = setup({ version: 2, status: 'disabled' });
             const result = await service.dispatch({

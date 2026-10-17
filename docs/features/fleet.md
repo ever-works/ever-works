@@ -122,6 +122,7 @@ Every heartbeat now carries what the node's **worker** is doing, alongside the r
 | `paused`      | drained on purpose — an operator pause, or draining the last in-flight jobs before a stop |
 | `quarantined` | the fail-closed stop the node imposed on ITSELF; only clearable at that machine           |
 | `throttled`   | over a resource ceiling (CPU / memory, disk floor): keeps its jobs, leases no more        |
+|               | — or idle while a model CLI is out of quota (see "Model usage limits" below)              |
 
 `workerStateReason` carries the sentence that explains it — the quarantine's own message, the ceiling that was crossed — and `workerStateChangedAt` moves only on a TRANSITION, so "quarantined since 03:14" survives the hundreds of beats that follow. A node that has never reported one shows **unknown**, never `idle`: a fabricated readiness for a machine nobody has heard from is the thing these signals exist to end.
 
@@ -134,15 +135,35 @@ The drawer judges a job FAILED on the reconciled run outcome — the badge, the 
 
 Availability counts a node as **free** only when its worker state is not `quarantined`, `throttled` or `paused`. It stays counted as ONLINE — the operator must keep seeing it — but the run router no longer places work on a machine that will refuse it.
 
+### Model usage limits
+
+A model CLI on a node can run out of quota: Claude Code's weekly or 5-hour limit (`You've hit your weekly limit · resets Oct 19, 3am (Europe/Paris)`), an API `429` / `rate_limit_error`, Codex's `You've hit your usage limit … try again in 2 days`. That is a property of the SEAT the CLI is logged in as and it ends at a known instant, so it is not treated as a failure of the work, the Agent or the machine. (Before this, prod 2026-10-17: the node stayed `online`, kept leasing agent-task jobs that each failed in ~30 s, the Agent's error count climbed until `pauseAfterFailures` halted it, and the owner was told nothing actionable.)
+
+**On the node** (`ever-works-node`):
+
+- The agent-task executor recognises the CLI's sentence (the CLI's final message first, the raw output tail only for unambiguous phrases), parses the reset in the zone it names — else the machine's own zone — and reports the result with `failureKind: 'model_usage_limit'` + `modelUsageLimit { provider, window, resetsAt, retryAfter, message }`. Steps, acceptance checks and the publish are skipped: the model never finished the change. No reset named → retry after 1 h; always clamped to [1 min, 8 days].
+- The worker loop throttles THAT CLI until `retryAfter`: when every CLI the node has is out of quota it leases with `excludeKinds: ['agent-task']`; an agent-task for a throttled CLI that still arrives is handed back with the same outcome without starting anything. Other job kinds — and the other CLI's work — keep leasing. The throttle lifts by itself at the reset (and on a restart).
+- The heartbeat says so: an otherwise idle worker reports `workerState: 'throttled'` with `claude-code: weekly limit until 2026-10-19T01:01:00.000Z`; a busy one stays `working` and carries the same reason.
+
+**On the platform:**
+
+- A usage-limit result is **parked**, never settled: the job goes back to `queued` with its attempt refunded, `queuedReason: 'model-usage-limit'` and `queuedAt` = the reset (so the queue SLA measures from when the work can run again). No `fleet.job.completed` fires — so no AgentRun fails, no Agent error is counted, no Task fails — a `fleet.job.parked` event does instead. One job can be parked at most `FLEET_JOB_MAX_USAGE_LIMIT_PARKS` (20) times; past that its result settles the ordinary way, so a mis-recognised failure cannot requeue forever.
+- The node is throttled for that CLI on its row (`fleet_nodes.modelThrottles`) until the reset, and the LEASE skips that CLI's work for it — a job requiring the CLI's capability tag, or an agent-task whose execution names it. A job **pinned** to the node (Agent ↔ node affinity) therefore waits for it; an **unpinned** one is leased by another node with quota. This is enforced server-side, so it also holds an older daemon off — and the platform recognises an older daemon's plain failure (`model.summary` carrying the CLI's sentence) the same way, so the fix works before any machine upgrades.
+- The AgentRun goes back to `queued` with the same reason (exempt from the stuck-run and queued-too-long sweeps, not counted as in-flight by the dispatch gate) and its activity line reads `Waiting for everdesk4: Claude Code weekly limit until 2026-10-19 01:01 UTC`. The next lease flips it to `running` and clears the reason.
+- The Fleet node list shows a `Claude Code: weekly limit until …` badge under the status; the drawer lists every CLI out of quota with its reset.
+
+To resume sooner, sign that CLI on that machine in to a seat with quota left, then press **Clear limit now** next to the limit in the node drawer (`POST /api/fleet/nodes/:id/clear-model-throttle` with an optional `{ "provider": "claude-code" }`; owner-scoped, audited as `node.model-throttle-clear`). The lease offers that CLI's work to the node again on its next poll, and the node lifts its own copy from its next heartbeat — every heartbeat response carries `node.modelThrottles`, which the node reconciles with (adopting the platform's after a restart; dropping one the owner cleared once it is older than two minutes, so a beat answered just before the platform recorded a fresh limit cannot undo it). If the seat is in fact still out, the next run simply parks again.
+
 ### Inbox notices
 
 Three notices, each filed **exactly once per event** and re-armed when the node recovers:
 
-| Notice                     | Fired by                                                             | Re-armed by                            |
-| -------------------------- | -------------------------------------------------------------------- | -------------------------------------- |
-| `Fleet node offline`       | the heartbeat-expiry sweep, on the flip to offline                   | the next accepted heartbeat            |
-| `Fleet node still offline` | the sweep, once the node has been gone longer than the notice window | the next accepted heartbeat            |
-| `Fleet node quarantined`   | the first heartbeat reporting `quarantined`                          | the first beat reporting anything else |
+| Notice                               | Fired by                                                                    | Re-armed by                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `Fleet node offline`                 | the heartbeat-expiry sweep, on the flip to offline                          | the next accepted heartbeat                                      |
+| `Fleet node still offline`           | the sweep, once the node has been gone longer than the notice window        | the next accepted heartbeat                                      |
+| `Fleet node quarantined`             | the first heartbeat reporting `quarantined`                                 | the first beat reporting anything else                           |
+| `<node>: <CLI> <window> until <UTC>` | the first park that opens a NEW model usage-limit window on that node + CLI | the window ending (the next limit after the reset is news again) |
 
 Each names the node, its kind, the reason where there is one, and when it was last seen. The dedup markers live on the `fleet_nodes` row (`offlineNoticedAt`, `offlineLongNoticedAt`, `quarantineNoticedAt`) and are claimed by a conditional UPDATE, so two API replicas sweeping the same owner produce one notice rather than two.
 
@@ -937,6 +958,24 @@ a commit message that already contains one — a Task title can reach the messag
 rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
 is worse than no trailer at all. If you see that failure, rename the Task.
 
+### What a fleet commit says
+
+Every fleet commit used to read `feat(task): T-2 agent run output`, whatever it changed. The planner
+now writes a **conventional commit from the Task title**, with the Task slug in the body:
+
+```
+fix: login redirect losing the return URL
+
+Task: T-13
+```
+
+The type is read from the title (`Fix …` / `… crashes` → `fix`, `Refactor …` → `refactor`, `Docs …` →
+`docs`, `Add tests …` → `test`, `Bump …` → `chore`, otherwise `feat`); a title that already IS a
+conventional commit (`docs(api): …`) is kept as written. Once the change is staged, the node
+**re-types** the subject from the paths it actually touches — a docs-only change commits as `docs`, a
+tests-only change as `test` — changing only the type token; scope, subject, body and the trailer
+block are kept byte-for-byte. Long subjects are cut at a word boundary at 72 characters.
+
 ### What a fleet run leaves behind
 
 A fleet run used to leave the owner one 8 KB output tail and a job row; the CLI's own record of every turn and tool call was deleted with the run's scratch directory. Now the node reads the model CLI's event stream — Claude Code runs with `--output-format stream-json --verbose`, Codex's `exec --json` already is one — **while the CLI writes it**, and reports two bounded, redacted artefacts on the job result:
@@ -958,6 +997,33 @@ A fleet job carries the whole assembled prompt (`payload`, up to 256 KB) and the
 | `FLEET_JOB_PURGE_ENABLED`  | `true`  | `false` switches the purge off entirely (an audit hold)                                         |
 
 The pass works in batches of 200 and stops after 50 batches, leaving any remainder to the next night. Purged rows carry `bodiesPurgedAt`, so no row is purged twice.
+
+### How long agent runs keep their timeline (slice AT)
+
+Every run's step timeline — the fleet step records above, the cloud tool loop, chat turns — lives in `agent_run_logs`, and nothing used to purge it. A second nightly pass (03:45 UTC, same lock, same batching) **deletes the timeline of terminal runs that finished more than `AGENT_RUN_LOG_RETENTION_DAYS` ago** and stamps the run `logsPurgedAt`. The run row — status, summary, cost, timings, check results — is kept. Deleting run ROWS is opt-in: the cost dashboards, the Task history and the audit tables (Inbox items, escalations, usage events) name runs by id, so an operator who wants rows gone sets `AGENT_RUN_RETENTION_DAYS`; a row is only deleted after its timeline was purged, and its transcript chunks cascade with it.
+
+A run waiting on a human (`awaitingInput`) or parked for a resume (`terminalEndedReason = 'parked'`) is never touched, whatever its age — its history is what the resume continues from.
+
+| Env                            | Default | Meaning                                                                                                                   |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `AGENT_RUN_LOG_RETENTION_DAYS` | `90`    | days a terminal run keeps its `agent_run_logs` timeline; clamped to 7–3650 (the export already trims run logs to 90 days) |
+| `AGENT_RUN_RETENTION_DAYS`     | _(off)_ | days a terminal run ROW is kept; unset or `0` keeps rows forever; when set, clamped to 30–3650                            |
+| `AGENT_RUN_RETENTION_ENABLED`  | `true`  | `false` switches the whole pass off (an audit hold)                                                                       |
+
+### Backups and restore (slice AT)
+
+Retention is the half of data durability the application owns; the other half — that a purge, a bad migration or a lost volume can be undone — is the database's. The rules this repository assumes of a production deployment:
+
+- **Postgres runs under CloudNativePG** with a **nightly base backup** (`ScheduledBackup`) and **continuous WAL archiving** to object storage, so the `ever_works` database can be restored to any point in time inside the retention window (PITR), not only to last night. The Helm/GitOps values that declare the `Cluster` and the `ScheduledBackup` are the source of truth; change them there, never by hand-editing the live spec.
+- **"Configured" is not "working."** Before ANY change to the database, its engine, its storage or a node hosting it — a CNPG switchover or upgrade, a production migration, a resize, draining the node — prove a recent restorable backup exists:
+    1. the `ScheduledBackup` is not suspended and its `lastScheduleTime` is recent;
+    2. the newest `Backup` objects are `phase: completed`, with no `.status.error` and a real `backupId`;
+    3. on the primary, `SELECT last_archived_time, last_failed_time FROM pg_stat_archiver;` shows `last_archived_time` newer than `last_failed_time` (WAL is flowing);
+    4. the base backup and recent WAL are actually present at the destination bucket.
+       With the barman-cloud **plugin**, `Cluster.status.lastSuccessfulBackup` / `firstRecoverabilityPoint` can read stale while nightlies are fine — never judge backup health from them. Record the restore point you rely on in the change log; if you cannot prove one, take an on-demand `Backup` first.
+- **Restore = a NEW cluster**, never an in-place overwrite: create a CNPG `Cluster` that bootstraps with `recovery` from the backup object store (with `recoveryTarget.targetTime` for PITR), let it replay WAL to the target, verify it (row counts on `agent_runs`, `tasks`, `fleet_jobs`; the newest `createdAt`), then point the API at it (or promote it) and keep the old cluster until the new one is proven. Migrations are forward-only with per-step guards, so a restored database at an older schema converges on the next boot.
+- **What a restore does NOT bring back:** files outside Postgres (object-storage uploads have their own versioning), anything a retention pass purged before the restore point, and in-flight fleet work — leased jobs on a restored database lapse and are re-offered by the reclaim sweep; nodes keep their credentials (the hashes are in the restored rows).
+- **Self-hosting without CNPG:** a scheduled `pg_dump` is the minimum (see `docs/guides/self-host-docker-kubernetes.md` → Backups); test the restore, not just the dump. Disaster-recovery procedures for the managed-cloud deployment are in `docs/devops/disaster-recovery.md`.
 
 ### Fleet run telemetry
 

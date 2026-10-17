@@ -9,6 +9,13 @@ import { WorkConfig } from '@/components/works/detail/overview/WorkConfig';
 import { WorkMissions } from '@/components/works/detail/overview/WorkMissions';
 import { AppLauncherExposureCard } from '@/components/works/detail/overview/AppLauncherExposureCard';
 import { AppUpstreamCard } from '@/components/works/app/AppUpstreamCard';
+import { AppSourceStatusCard } from '@/components/works/app/AppSourceStatusCard';
+import { AppWorkOverviewCard } from '@/components/works/app/AppWorkOverviewCard';
+import { AppBuildsOverviewCard } from '@/components/works/app/builds/AppBuildsOverviewCard';
+import { workAppSpecAPI } from '@/lib/api/work-app-spec';
+import { listLatestAppBuilds } from '@/lib/api/app-builds';
+import { canEdit } from '@/lib/permissions';
+import { isAppWorkKind } from '@ever-works/contracts';
 // The predicate is CALLED in this page's render body, so it must come from a
 // module a server component may import: `AppUpstreamCard` is a client module
 // (`'use client'`), and importing the function through it handed this page a
@@ -81,20 +88,64 @@ export default async function WorkOverviewPage({ params }: Params) {
     // not_found` for every other kind (ACC-02-21), which is a correct answer and
     // a wasted round trip. A failed read hides the card — the Overview must
     // never turn an unreadable upstream into a 404 page.
-    const upstreamState =
-        work.kind === 'app' ? await workAPI.getUpstream(id).catch(() => null) : null;
+    const isApp = isAppWorkKind(work.kind);
+    const upstreamState = isApp ? await workAPI.getUpstream(id).catch(() => null) : null;
 
+    // APW-01 T24 / APW-05 T28 — the rest of the App Work's Overview: the App
+    // spec state and the latest Builds. Both reads fail soft (a missing route or
+    // a fresh Work answers `null`), and neither is asked for any other kind.
+    const [appSpec, appBuilds] = isApp
+        ? await Promise.all([
+              workAppSpecAPI.get(id).catch(() => null),
+              listLatestAppBuilds(id).catch(() => null),
+          ])
+        : [null, null];
+
+    // An App Work has nothing to generate, so the generation status card —
+    // which would read "not generated yet" forever — is replaced by the App
+    // source status card below.
     const showStatusCard =
-        !work.generateStatus?.status ||
-        work.generateStatus?.status === GenerateStatusType.ERROR ||
-        work.generateStatus?.status === GenerateStatusType.GENERATING ||
-        work.generateStatus?.status === GenerateStatusType.CANCELLED ||
-        (work.generateStatus?.status === GenerateStatusType.GENERATED &&
-            !!work.generateStatus?.warnings?.length);
+        !isApp &&
+        (!work.generateStatus?.status ||
+            work.generateStatus?.status === GenerateStatusType.ERROR ||
+            work.generateStatus?.status === GenerateStatusType.GENERATING ||
+            work.generateStatus?.status === GenerateStatusType.CANCELLED ||
+            (work.generateStatus?.status === GenerateStatusType.GENERATED &&
+                !!work.generateStatus?.warnings?.length));
 
     return (
         <div className="space-y-6">
             {showStatusCard && <WorkStatusCard work={work} />}
+
+            {/* APW-01 T24 (spec §6.4) — above the Overview tiles while the App
+                Work is not ready; it removes itself once it is. */}
+            {isApp && upstreamState && upstreamState.readiness.state !== 'ready' && (
+                <AppSourceStatusCard
+                    workId={id}
+                    initialState={upstreamState}
+                    blueprintName={
+                        appSpec?.blueprintApplyStatus === 'applying'
+                            ? (appSpec.displayName ?? appSpec.blueprintId ?? null)
+                            : null
+                    }
+                />
+            )}
+
+            {isApp && (
+                <div className="grid @3xl/main:grid-cols-2 gap-6">
+                    <AppWorkOverviewCard
+                        workId={id}
+                        workName={work.name}
+                        upstreamState={upstreamState}
+                        appSpec={appSpec}
+                    />
+                    <AppBuildsOverviewCard
+                        workId={id}
+                        initialBuilds={appBuilds}
+                        canEdit={canEdit(work.userRole)}
+                    />
+                </div>
+            )}
 
             <WorkStats
                 itemsCount={work.itemsCount ?? 0}

@@ -86,6 +86,37 @@ export const APP_BLUEPRINT_OWNER = 'ever-works';
 /** The only file the resolver ever reads (CONTRACTS §8, `catalog.md` §5). */
 export const APP_BLUEPRINT_SPEC_PATH = '.works/works.yml';
 
+/**
+ * Who may be offered a **private** Blueprint (decision 2026-10-17, lane aw-catalog).
+ *
+ * Third-party sources only ever see PUBLIC Blueprints (`catalog.md` §5's rule, unchanged).
+ * A private `ever-works/*-template` is first-party material — a fixture, a not-yet-public
+ * Blueprint — and is offered only when the SOURCE repository being matched is owned by
+ * `ever-works` itself, or by an owner the operator lists in
+ * `EVER_WORKS_APPS_PRIVATE_BLUEPRINT_OWNERS` (comma-separated, case-insensitive; `*` =
+ * anyone, for a test installation only). That is what lets the APW-13 lanes resolve
+ * `ever-works/app-fixture-hello-template` for `ever-works/app-fixture-hello` and for a
+ * per-run generated upstream in the e2e org, while a stranger's repository can never pull
+ * a private Blueprint's content into their fork.
+ */
+export function allowsPrivateBlueprint(sourceOwner: string | null | undefined): boolean {
+    const owner = typeof sourceOwner === 'string' ? sourceOwner.trim().toLowerCase() : '';
+    if (owner === '') {
+        return false;
+    }
+    if (owner === APP_BLUEPRINT_OWNER) {
+        return true;
+    }
+    const listed = (process.env.EVER_WORKS_APPS_PRIVATE_BLUEPRINT_OWNERS ?? '')
+        .split(',')
+        .map((entry) => entry.trim().toLowerCase())
+        .filter((entry) => entry !== '');
+    // `*` is a test-installation convenience and is ignored in production, so a stray
+    // wildcard can never offer first-party private Blueprints to every source.
+    const wildcard = listed.includes('*') && process.env.NODE_ENV !== 'production';
+    return wildcard || listed.includes(owner);
+}
+
 /** How many resolutions the in-process cache holds before evicting the oldest. */
 export const APP_BLUEPRINT_RESOLVE_CACHE_MAX_ENTRIES = 500;
 
@@ -126,6 +157,19 @@ export interface AppBlueprintResolveHit {
     /** The licence the Blueprint DECLARES; classifying it is the adapter's job. */
     spdx?: string;
     prompts: AppBlueprintPrompt[];
+}
+
+/**
+ * APW-03 T28 — a Blueprint together with its `.works/works.yml` text, for the apply
+ * service only. Kept OUT of {@link AppBlueprintResolveHit} (and its cache) on purpose:
+ * the document carries prompt examples, and FR-55 says no value or example ever
+ * travels with a match.
+ */
+export interface AppBlueprintDocument {
+    readonly hit: AppBlueprintResolveHit;
+    readonly text: string;
+    /** The Blueprint repository's default branch the text was read from. */
+    readonly defaultBranch: string | null;
 }
 
 export interface AppBlueprintResolveMiss {
@@ -235,7 +279,13 @@ export class AppBlueprintResolverService {
         try {
             result =
                 blueprintId !== undefined
-                    ? await this.resolveExplicit(facade, token, blueprintId, budget)
+                    ? await this.resolveExplicit(
+                          facade,
+                          token,
+                          blueprintId,
+                          budget,
+                          allowsPrivateBlueprint(owner),
+                      )
                     : await this.resolveProbe(facade, token, owner, repo, budget);
         } catch (error) {
             if (error instanceof ReadBudgetExhausted) {
@@ -255,27 +305,79 @@ export class AppBlueprintResolverService {
         return result;
     }
 
+    /**
+     * APW-03 T28 — the explicit path (FR-81) plus the document text, uncached, for the
+     * apply service. The same acceptance rules and the same read budget as `resolve`;
+     * `null` for any miss. Throws {@link AppsCatalogCredentialUnavailableError} when no
+     * platform credential exists.
+     */
+    async readBlueprintDocument(
+        blueprintId: string,
+        opts: { sourceOwner?: string | null } = {},
+    ): Promise<AppBlueprintDocument | null> {
+        if (typeof blueprintId !== 'string' || !BLUEPRINT_ID_PATTERN.test(blueprintId)) {
+            return null;
+        }
+        const facade = this.gitFacade;
+        const token = facade ? await this.resolveToken(facade) : null;
+        if (!facade || !token) {
+            throw new AppsCatalogCredentialUnavailableError();
+        }
+        const budget = new ReadBudget(BLUEPRINT_PROBE_MAX_READS);
+        try {
+            const repository = await this.readRepository(
+                facade,
+                token,
+                `${blueprintId}-template`,
+                budget,
+                allowsPrivateBlueprint(opts.sourceOwner),
+            );
+            if (!repository) {
+                return null;
+            }
+            const read = await this.readBlueprintSpec(facade, token, repository, budget);
+            if (!read || read.spec.blueprint?.id !== blueprintId) {
+                return null;
+            }
+            return {
+                hit: this.toHit('explicit', repository, read.spec),
+                text: read.text,
+                defaultBranch: repository.defaultBranch || null,
+            };
+        } catch (error) {
+            if (error instanceof ReadBudgetExhausted) {
+                return null;
+            }
+            this.logger.warn(
+                `Reading Blueprint "${blueprintId}" failed (${error instanceof Error ? error.message : String(error)}).`,
+            );
+            return null;
+        }
+    }
+
     /** FR-81: `ever-works/<blueprintId>-template`, and the file must name that id. */
     private async resolveExplicit(
         facade: GitFacadeService,
         token: string,
         blueprintId: string,
         budget: ReadBudget,
+        allowPrivate: boolean,
     ): Promise<AppBlueprintResolution> {
         const repository = await this.readRepository(
             facade,
             token,
             `${blueprintId}-template`,
             budget,
+            allowPrivate,
         );
         if (!repository) {
             return { status: 'none', reason: 'blueprintNotFound' };
         }
-        const spec = await this.readBlueprintSpec(facade, token, repository, budget);
-        if (!spec || spec.blueprint?.id !== blueprintId) {
+        const read = await this.readBlueprintSpec(facade, token, repository, budget);
+        if (!read || read.spec.blueprint?.id !== blueprintId) {
             return { status: 'none', reason: 'blueprintNotFound' };
         }
-        return this.toHit('explicit', repository, spec);
+        return this.toHit('explicit', repository, read.spec);
     }
 
     /** FR-43: two names at most, the first acceptable repository, then ONE file read. */
@@ -288,7 +390,13 @@ export class AppBlueprintResolverService {
     ): Promise<AppBlueprintResolution> {
         let repository: GitRepositoryWithPermissions | null = null;
         for (const name of probeCandidateNames(owner, repo)) {
-            repository = await this.readRepository(facade, token, name, budget);
+            repository = await this.readRepository(
+                facade,
+                token,
+                name,
+                budget,
+                allowsPrivateBlueprint(owner),
+            );
             if (repository) {
                 break;
             }
@@ -296,9 +404,9 @@ export class AppBlueprintResolverService {
         if (!repository) {
             return { status: 'none', reason: 'notListed' };
         }
-        const spec = await this.readBlueprintSpec(facade, token, repository, budget);
-        return spec
-            ? this.toHit('probe', repository, spec)
+        const read = await this.readBlueprintSpec(facade, token, repository, budget);
+        return read
+            ? this.toHit('probe', repository, read.spec)
             : { status: 'none', reason: 'notListed' };
     }
 
@@ -311,6 +419,7 @@ export class AppBlueprintResolverService {
         token: string,
         name: string,
         budget: ReadBudget,
+        allowPrivate = false,
     ): Promise<GitRepositoryWithPermissions | null> {
         if (!CANDIDATE_NAME_PATTERN.test(name)) {
             return null;
@@ -329,7 +438,8 @@ export class AppBlueprintResolverService {
         const isPublic =
             repository.isPrivate !== true &&
             (repository.visibility === undefined || repository.visibility === 'public');
-        if (!isPublic) {
+        // Public, or private and first-party for this source (see `allowsPrivateBlueprint`).
+        if (!isPublic && !allowPrivate) {
             return null;
         }
         if (!Array.isArray(repository.topics) || !repository.topics.includes(APP_BLUEPRINT_TOPIC)) {
@@ -347,15 +457,18 @@ export class AppBlueprintResolverService {
         token: string,
         repository: GitRepositoryWithPermissions,
         budget: ReadBudget,
-    ): Promise<AppSpec | null> {
+    ): Promise<{ spec: AppSpec; text: string } | null> {
         budget.take();
+        const ref = repository.defaultBranch || undefined;
         const file = await facade.getFileContent(
             APP_BLUEPRINT_OWNER,
             repository.name,
             APP_BLUEPRINT_SPEC_PATH,
             { token, providerId: 'github' },
-            repository.defaultBranch || undefined,
+            ref,
         );
+        // Only `.works/works.yml` (owner decision 2026-09-25: fix the repositories, not
+        // the contract — a Blueprint whose spec lives elsewhere is moved, never followed).
         const text = file?.content;
         if (typeof text !== 'string' || text.trim() === '') {
             return null;
@@ -386,7 +499,7 @@ export class AppBlueprintResolverService {
         if (classifyLicenseExpression(spec.license?.spdx) === 'red') {
             return null;
         }
-        return spec;
+        return { spec, text };
     }
 
     private toHit(

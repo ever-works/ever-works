@@ -2,6 +2,7 @@ import type {
 	AppBuildBlock,
 	BuildAuth,
 	BuildRef,
+	BuildRunRef,
 	BuildSnapshot,
 	BuildStrategy,
 	IBuildPlugin,
@@ -16,8 +17,10 @@ import type {
 } from '@ever-works/plugin';
 import {
 	APP_BUILD_DEPLOYABLE_TRIGGERS,
+	APP_BUILD_RUN_DISCOVERY_PER_PAGE,
 	APP_BUILD_WORKFLOW_PATH,
 	computeBuildInputsHash,
+	githubRunToBuildRunRef,
 	type AppBuildKind
 } from '@ever-works/contracts';
 import { Octokit } from 'octokit';
@@ -40,6 +43,7 @@ import { selectRunner } from './runner/runner-selector.js';
 import { generateWorkflow } from './workflow/generator.js';
 import { writeWorkflow } from './repo/workflow-writer.js';
 import { createBuildValueSecretSync, type RepositorySecretPort } from './repo/secret-sync.js';
+import { octokitRepositoryWriter, type OctokitRequester } from './repo/octokit-repository-writer.js';
 
 import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } from './settings.schema.js';
 
@@ -102,10 +106,11 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  * always, and `AppBuildsService.finalize` does the comparison, because it is the
  * only party holding both the Build row and the `pullToken` setting.
  *
- * `listRecentRuns?` (T12's run discovery, §7.4a) is still deliberately **not
- * declared**: it is optional on the contract and a caller materialises the member
- * before calling it, so declaring a throwing placeholder would buy nothing and
- * would tell a future reader the capability is wired when it is not.
+ * `listRecentRuns?` (T21a's run discovery, §7.4a) is declared now that it does
+ * something (2026-10-17): it reads the build workflow's newest runs with
+ * `If-None-Match` and maps them through contracts' `githubRunToBuildRunRef`, the
+ * same mapping the `workflow_run` consumer uses. `repositoryWriter?` (the
+ * clone-free writer `prepareRepository` delivers through) landed with it.
  */
 export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	readonly id = 'github-actions-build';
@@ -306,7 +311,9 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 				buildInputsHash: computeBuildInputsHash(input.values ?? []),
 				blocked: {
 					reason: written.blocked?.reason ?? 'workflowWriteFailed',
-					detail: { cause: written.blocked?.detail.cause ?? 'unknown' }
+					// The whole detail: `workflowPermissionMissing` carries which credential
+					// and which permission, which is what the member's fix depends on.
+					detail: { ...(written.blocked?.detail ?? { cause: 'unknown' }) }
 				}
 			};
 		}
@@ -459,7 +466,11 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 
 		// The result artifact is read only for a finished run: an unfinished one has
 		// not uploaded it, and asking would spend a request per poll to learn that.
-		const artifact = finished ? await readResultArtifact(port, { repository, runId }) : null;
+		// `expectBuildId` (ledger C35): a result naming a DIFFERENT Build is not
+		// this Build's result, whatever else it says.
+		const artifact = finished
+			? await readResultArtifact(port, { repository, runId, expectBuildId: ref.buildId })
+			: null;
 		const result = artifact?.ok ? artifact.result : null;
 
 		// T13 — a failed Build says WHY. Only a FAILED one: a successful Build has
@@ -481,7 +492,10 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 
 		return {
 			...snapshot,
-			...(result
+			// A versioned result with no digest (a failed build, a pull request, a
+			// verify job) still reports its secret check — it just claims no image.
+			...(result?.secretCheck && !result.digest ? { secretCheck: result.secretCheck } : {}),
+			...(result?.digest
 				? {
 						// `confirmed: false` without exception. This plugin reads the digest
 						// the member's own CI claimed; confirming it against the registry is
@@ -670,6 +684,105 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	 */
 	protected registryFetch(): GhcrFetch {
 		return (url, init) => fetch(url, init as RequestInit);
+	}
+
+	/**
+	 * APW-05 T21a / T12 remainder — run discovery (plan §7.4a, `APW05-G01`).
+	 *
+	 * The newest runs of the build workflow, so a push or pull-request Build is
+	 * recorded even when no `workflow_run` delivery reaches the platform (a
+	 * personal fork connected through OAuth has no App installation to deliver
+	 * from). `If-None-Match` with the stored `etag` makes an idle repository cost
+	 * a 304 — which GitHub does not count against the rate limit.
+	 *
+	 * The mapping is `githubRunToBuildRunRef` from contracts, the SAME function
+	 * the webhook consumer uses, so a polled run and a delivered run are the same
+	 * `BuildRunRef` and converge on one Build row.
+	 */
+	async listRecentRuns(
+		input: { repository: { owner: string; name: string }; workflowPath: string; perPage: number; etag?: string },
+		auth: BuildAuth
+	): Promise<{ notModified: boolean; etag?: string; runs: BuildRunRef[] }> {
+		const port = this.actionsPort(auth);
+		const repository: ActionsRepositoryRef = { owner: input.repository.owner, repo: input.repository.name };
+		const workflowFile = input.workflowPath.split('/').pop() || WORKFLOW_FILE_NAME;
+		const perPage = Math.max(1, Math.min(APP_BUILD_RUN_DISCOVERY_PER_PAGE, Math.floor(input.perPage) || 1));
+
+		const page = port.listWorkflowRunsConditional
+			? await port.listWorkflowRunsConditional({
+					repository,
+					workflowFile,
+					perPage,
+					...(input.etag ? { etag: input.etag } : {})
+				})
+			: { notModified: false, runs: await port.listWorkflowRuns({ repository, workflowFile, perPage }) };
+
+		if (page.notModified) {
+			return { notModified: true, ...(page.etag ? { etag: page.etag } : {}), runs: [] };
+		}
+		const runs = page.runs
+			.map((run) => githubRunToBuildRunRef(run))
+			.filter((run): run is BuildRunRef => run !== null);
+		return { notModified: false, ...(page.etag ? { etag: page.etag } : {}), runs };
+	}
+
+	/**
+	 * APW-05 T16 remainder — the clone-free writer `prepareRepository` delivers the
+	 * workflow through, over this plugin's own Octokit (see
+	 * `repo/octokit-repository-writer.ts` on why the plugin supplies it).
+	 */
+	repositoryWriter(
+		repository: { readonly owner: string; readonly repo: string; readonly trackedBranch?: string },
+		auth: BuildAuth
+	): RepositoryWriter {
+		return octokitRepositoryWriter(this.octokitFor(auth), repository, {
+			credential: auth.credential,
+			scopes: auth.scopes
+		});
+	}
+
+	/**
+	 * Plan §5 — a Rebuild's `commitSha` must be reachable from the tracked branch
+	 * (2026-10-17). `GET …/compare/{sha}...{branch}`: `ahead` or `identical` means
+	 * the commit is in the branch's history; `behind` / `diverged` means it is not
+	 * (a commit only a fork's network carries is `diverged`), and 404/422 means
+	 * GitHub does not know it here. Any other failure is a throw.
+	 */
+	async isCommitReachable(
+		input: {
+			readonly repository: { readonly owner: string; readonly repo: string };
+			readonly sha: string;
+			readonly branch: string;
+		},
+		auth: BuildAuth
+	): Promise<boolean> {
+		try {
+			const { data } = await this.octokitFor(auth).request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+				owner: input.repository.owner,
+				repo: input.repository.repo,
+				basehead: `${input.sha}...${input.branch}`,
+				per_page: 1
+			});
+			const status = (data as { status?: unknown } | null)?.status;
+			return status === 'ahead' || status === 'identical';
+		} catch (error) {
+			const status = (error as { status?: unknown } | null)?.status;
+			if (status === 404 || status === 422) return false;
+			throw error;
+		}
+	}
+
+	/** §4.10 — the per-run prompted-value secret's removal (T12's `secret-sync.ts`, now on the contract). */
+	async deleteVerifyPromptedSecret(
+		repository: { readonly owner: string; readonly repo: string },
+		auth: BuildAuth
+	): Promise<{ readonly deleted: boolean }> {
+		return createBuildValueSecretSync({ port: this.secretPort(auth, repository) }).deleteVerifyPromptedSecret();
+	}
+
+	/** The Octokit client for one call — a seam a spec overrides, like {@link actionsPort}. */
+	protected octokitFor(auth: BuildAuth): OctokitRequester {
+		return new Octokit({ auth: auth.token }) as unknown as OctokitRequester;
 	}
 
 	/** APW-05 T12 — the run's own page, which is where a member reads its logs. */

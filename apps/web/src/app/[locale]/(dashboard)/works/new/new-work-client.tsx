@@ -6,12 +6,15 @@ import { cn } from '@/lib/utils/cn';
 import { WorkAICreator } from '@/components/works/WorkAICreator';
 import { WorkImportForm } from '@/components/works/WorkImportForm';
 import { RepositoryWorkForm } from '@/components/works/RepositoryWorkForm';
+import { AppWorkForm } from '@/components/works/app/AppWorkForm';
+import { isHiddenWhenDisabled } from '@/lib/work-kinds/flag-gated-kinds';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import {
+    AppWindow,
     BookOpen,
     Building2,
     Files,
@@ -69,6 +72,7 @@ const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     directory: FolderOpen,
     'awesome-repo': Star,
     repo: GitBranch,
+    app: AppWindow,
 };
 
 const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
@@ -107,6 +111,12 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
         'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
+    ],
+    // APW-01 §6.1 — the composer placeholder for the App chip.
+    app: [
+        'e.g. "https://github.com/owner/repo — an open-source app you want your own copy of"',
+        'e.g. "https://github.com/calcom/cal.com — scheduling I want to run on my own cluster"',
+        'e.g. "https://github.com/umami-software/umami — analytics I want to host and evolve"',
     ],
 };
 
@@ -180,7 +190,7 @@ export default function NewWorkClient({
     // handed to the Repository form instead of the chat AI. Seeded from
     // `?prompt=` when `/new` routed here with `kind=repo`.
     const [repositoryUrlSeed, setRepositoryUrlSeed] = useState(
-        initialKind === 'repo' ? (initialPrompt ?? '') : '',
+        initialKind === 'repo' || initialKind === 'app' ? (initialPrompt ?? '') : '',
     );
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [, startSubmit] = useTransition();
@@ -198,6 +208,7 @@ export default function NewWorkClient({
         directory: 'directory',
         'awesome-repo': 'awesome list repo',
         repo: 'code repository',
+        app: 'app from a GitHub repository',
     };
 
     const gitConnected = useMemo(() => {
@@ -240,12 +251,16 @@ export default function NewWorkClient({
     // picker behavior.
     const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
         () => [
-            ...WORK_KIND_ORDER.map((k) => ({
-                value: k,
-                label: t(`kinds.${k}`),
-                Icon: WORK_KIND_ICONS[k],
-                comingSoon: disabledSet.has(k),
-            })),
+            // APW-01 T23 (FR-47, ACC-01-13) — a fail-closed kind that is
+            // disabled is left OUT of the row, not rendered as "Soon".
+            ...WORK_KIND_ORDER.filter((k) => !(isHiddenWhenDisabled(k) && disabledSet.has(k))).map(
+                (k) => ({
+                    value: k,
+                    label: t(`kinds.${k}`),
+                    Icon: WORK_KIND_ICONS[k],
+                    comingSoon: disabledSet.has(k),
+                }),
+            ),
             // store is flag-controlled via works-store like every other kind.
             // The `works-store` PostHog flag exists as `active: false`, so
             // the chip continues to render as the inert "Soon" baseline
@@ -278,7 +293,9 @@ export default function NewWorkClient({
         startSubmit(() => {
             // A Repository Work has nothing to generate, so there is no
             // chat turn to open — the text goes straight to the form.
-            if (effectiveKind === 'repo') {
+            // The same goes for an App Work (APW-01 T23): its form starts from
+            // the repository URL the member typed.
+            if (effectiveKind === 'repo' || effectiveKind === 'app') {
                 setRepositoryUrlSeed(description);
                 setPrompt('');
                 setCreationMode('manual');
@@ -478,7 +495,17 @@ export default function NewWorkClient({
                         initialRepositoryUrl={repositoryUrlSeed || initialPrompt}
                     />
                 )}
+                {/* APW-01 T22/T23 — an App Work: paste a GitHub URL, inspect, choose
+                    Link / Fork / Private copy and where it runs. Replaces the AI
+                    creator in both the `ai` and `manual` modes, like `repo`. */}
+                {effectiveKind === 'app' && creationMode !== 'import' && (
+                    <AppWorkForm
+                        gitProvider={selectedProviderId || undefined}
+                        initialRepositoryUrl={repositoryUrlSeed || initialPrompt}
+                    />
+                )}
                 {effectiveKind !== 'repo' &&
+                    effectiveKind !== 'app' &&
                     (creationMode === 'ai' || creationMode === 'manual') && (
                         /* The previously separate "Create with AI" and
                        "Create Manually" flows are merged here. The AI

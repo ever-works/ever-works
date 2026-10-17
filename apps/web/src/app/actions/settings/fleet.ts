@@ -129,6 +129,25 @@ export async function setFleetNodeLimitCeilingAction(
     }
 }
 
+/** Fleet usage limits — clear a node's model usage-limit throttle before its reset. */
+export async function clearFleetNodeModelThrottleAction(
+    nodeId: string,
+    provider: string | null,
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.clearNodeModelThrottle(nodeId, provider);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the usage limit'),
+        };
+    }
+}
+
 export async function deleteFleetNodeAction(
     nodeId: string,
 ): Promise<FleetActionResult<{ deleted: true }>> {

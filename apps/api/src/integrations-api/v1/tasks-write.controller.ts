@@ -527,31 +527,57 @@ export class IntegrationTasksWriteController {
                 }
                 throw error;
             }
-            for (const extra of extraTeams) {
-                await this.teamResources.attach(
-                    user.userId,
-                    organizationId,
-                    extra,
-                    { resourceType: 'task', resourceId: task.id },
-                    { viewer: { kind: 'integration' } },
-                );
-            }
-            for (const assignee of dto.assignees ?? []) {
-                await this.tasks.addAssignee(
-                    user.userId,
-                    task.id,
-                    assignee.type,
-                    assignee.id,
-                    this.scope.getScope() as never,
-                );
-            }
-            if (dto.visibility !== undefined) {
-                await this.visibility?.setVisibility('task', task.id, dto.visibility as never);
+            // Review 2026-10-17 F8: the extra Teams, assignees and visibility are part of
+            // the create. When one of them is refused (a foreign Team, an unreachable
+            // agent), the task and its externalRef link are undone before the error
+            // answers, as the comments route does: otherwise the 4xx left a task behind,
+            // a retry with the same externalRef answered 200 with a task missing what it
+            // asked for, and a retry without one created a duplicate.
+            try {
+                for (const extra of extraTeams) {
+                    await this.teamResources.attach(
+                        user.userId,
+                        organizationId,
+                        extra,
+                        { resourceType: 'task', resourceId: task.id },
+                        { viewer: { kind: 'integration' } },
+                    );
+                }
+                for (const assignee of dto.assignees ?? []) {
+                    await this.tasks.addAssignee(
+                        user.userId,
+                        task.id,
+                        assignee.type,
+                        assignee.id,
+                        this.scope.getScope() as never,
+                    );
+                }
+                if (dto.visibility !== undefined) {
+                    await this.visibility?.setVisibility('task', task.id, dto.visibility as never);
+                }
+            } catch (error) {
+                await this.undoCreate(user.userId, organizationId, task.id);
+                throw error;
             }
             const created = await this.resources.get('task', organizationId, task.id, source);
             if (created.etag) res.setHeader('ETag', created.etag);
             return { status: 201, body: created.dto };
         });
+    }
+
+    /**
+     * Review 2026-10-17 F8: remove a task whose create failed part-way, then its links.
+     * When the task cannot be removed its link is KEPT, so a retry with the same
+     * externalRef finds this task instead of creating a duplicate. Either way the
+     * caller answers the original error, which is what the client has to fix.
+     */
+    private async undoCreate(userId: string, organizationId: string, taskId: string) {
+        try {
+            await this.tasks.remove(userId, taskId, this.scope.getScope() as never);
+        } catch {
+            return;
+        }
+        await this.links.removeAllFor(organizationId, 'task', taskId).catch(() => undefined);
     }
 
     @Patch('tasks/:id')

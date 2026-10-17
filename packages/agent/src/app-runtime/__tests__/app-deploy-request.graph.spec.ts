@@ -1,4 +1,6 @@
 import { CacheModule } from '@nestjs/cache-manager';
+import { AppSpecAppliedListener } from '../app-spec-applied.listener';
+import { AppDependencySpecSourceAdapter } from '../../app-dependencies/app-dependency-spec.source';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
@@ -114,7 +116,15 @@ describe('AppDeployRequestModule — the §5.1 collaborators as the API composes
         expect(env.readiness).toBe(preconditions().dependencies);
     });
 
-    it('answers the dependency preflight fail-closed, writing and dispatching nothing, while its spec source is unbound', async () => {
+    it('answers the dependency preflight fail-closed, writing and dispatching nothing, for a Work with no readable spec', async () => {
+        // A0.10 (lane aw-deploy-2, 2026-10-17): APW-07 T25's spec source is now BOUND
+        // (`AppDependencySpecSourceAdapter`, `AppDependenciesModule`). For a Work whose App spec
+        // cannot be read it answers `null`, so the preflight below is unchanged — still fail-closed
+        // with `specUnavailable`, no row, no dispatch. A Work whose spec declares a dependency now
+        // gets its row and its provision dispatch from `reconcile`.
+        expect((preconditions().dependencies as unknown as { spec?: unknown }).spec).toBeInstanceOf(
+            AppDependencySpecSourceAdapter,
+        );
         // What wiring the service turns on TODAY. `APP_DEPENDENCY_SPEC_SOURCE` is
         // APW-07 T25's to bind and is unwritten, so `reconcile` fails closed before
         // it creates a row or dispatches a provision. §5.1 step 9 refuses on that
@@ -150,6 +160,13 @@ describe('AppDeployRequestModule — the §5.1 collaborators as the API composes
 
         expect(moduleRef.get(AppEnvListener, { strict: false })).toBeInstanceOf(AppEnvListener);
         expect(producer.events).toBeInstanceOf(EventEmitter2);
-        expect(producer.events?.listeners(AppSpecAppliedEvent.EVENT_NAME)).toHaveLength(1);
+        // Two subscribers since lane aw-deploy-2: APW-07's `AppEnvListener` and APW-06 T35's
+        // `AppSpecAppliedListener` (spec-applied redeploys of a published image) — each once.
+        expect(moduleRef.get(AppSpecAppliedListener, { strict: false })).toBeInstanceOf(
+            AppSpecAppliedListener,
+        );
+        // Three since APW-03 T42's `AppLicenseService` (imported here through `AppLicenseModule`) also
+        // listens, to re-evaluate the licence on a spec change.
+        expect(producer.events?.listeners(AppSpecAppliedEvent.EVENT_NAME)).toHaveLength(3);
     });
 });

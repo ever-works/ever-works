@@ -7,6 +7,7 @@ import {
     Repository,
     type SelectQueryBuilder,
 } from 'typeorm';
+import { ExternalRecordLink } from '../../entities/external-record-link.entity';
 import { Task, TaskStatus } from '../../entities/task.entity';
 import {
     buildCaseInsensitiveLikeClause,
@@ -823,6 +824,13 @@ export class TaskRepository {
      *    is spawned `todo` and dispatched by `dispatchDue`, which also
      *    never transitions it. Its occurrence is the recurrence scan's to
      *    decide, not this driver's.
+     *  - not an integration's Task (review 2026-10-17 F10, plan decision D9:
+     *    "integration writes never start Ever Works autonomous spend"): a Task
+     *    an integration key created (`createdByType = 'integration'`), or one
+     *    linked to an external record (`external_record_links`, which covers an
+     *    integration create made as a person through X-Act-As-User and a Task
+     *    an integration mirrors into `todo` with a sync walk). An external
+     *    system drives such a Task's status; a person still starts it by hand.
      *  - `startedAt IS NULL` AND `latestRunId IS NULL` — the row has never
      *    been run. Three shipped paths dispatch a run and deliberately
      *    LEAVE the Task in `todo` (board "Run" / `TasksService.runTask`,
@@ -851,6 +859,31 @@ export class TaskRepository {
             .andWhere('task.hiddenFromBoard = :hidden', { hidden: false })
             .andWhere('task.goalId IS NULL')
             .andWhere('task.parentRecurringTaskId IS NULL')
+            .andWhere('task.createdByType <> :fanoutIntegrationAuthor', {
+                fanoutIntegrationAuthor: 'integration',
+            })
+            .andWhere(
+                (qb: SelectQueryBuilder<Task>) => {
+                    // `entityId` is a varchar, `tasks.id` a uuid on Postgres: compare as text.
+                    const type = String(qb.connection.options.type);
+                    const taskId = `${qb.escape('task')}.${qb.escape('id')}`;
+                    const taskIdText =
+                        type === 'postgres'
+                            ? `CAST(${taskId} AS text)`
+                            : type === 'mysql'
+                              ? `CAST(${taskId} AS CHAR)`
+                              : taskId;
+                    const linked = qb
+                        .subQuery()
+                        .select('1')
+                        .from(ExternalRecordLink, 'fanout_link')
+                        .where('fanout_link.entityType = :fanoutLinkType')
+                        .andWhere(`fanout_link.entityId = ${taskIdText}`)
+                        .getQuery();
+                    return `NOT EXISTS ${linked}`;
+                },
+                { fanoutLinkType: 'task' },
+            )
             .andWhere('task.startedAt IS NULL')
             .andWhere('task.latestRunId IS NULL')
             .orderBy('task.priority', 'ASC')

@@ -319,6 +319,7 @@ describe('WebhookDomainEventFanoutService', () => {
                 isActive: true,
                 kind,
                 organizationIds,
+                scopes: ['events:read', 'webhooks:manage'],
             } as unknown as ApiKey);
             return id;
         };
@@ -335,6 +336,36 @@ describe('WebhookDomainEventFanoutService', () => {
         expect(await fanout.catchUp()).toBe(1);
         expect((await deliveries()).map((row) => row.subscriptionId)).toEqual([pinned.id]);
         expect((await subscriptions.findById(personal.id))?.status).toBe('disabled');
+    });
+
+    // Review 2026-10-17 F12 (P1): GET /events answers 403 without events:read, so the
+    // push form of the same feed must not deliver it either.
+    it('never delivers to a key without events:read, and disables its subscription', async () => {
+        await fanout.catchUp();
+        const keyId = randomUUID();
+        await dataSource.getRepository(ApiKey).insert({
+            id: keyId,
+            userId: OWNER,
+            name: 'generic',
+            hashedKey: `h-${keyId}`,
+            prefix: 'ew_int_x',
+            isActive: true,
+            kind: 'integration',
+            organizationIds: [ORG_A],
+            scopes: ['webhooks:manage', 'inbox:read'],
+        } as unknown as ApiKey);
+        const sub = await subscribe({
+            events: ['*'],
+            ownerType: 'integration_key',
+            ownerId: keyId,
+        });
+        await record();
+        await dispatch();
+        expect(await fanout.catchUp()).toBe(0);
+        expect((await subscriptions.findById(sub.id))?.status).toBe('disabled');
+        expect(
+            await new WebhookOwnerAccessService(dataSource).canReceive(sub, ORG_A, 'task.updated'),
+        ).toEqual({ allowed: false, disable: true });
     });
 
     it("an admin's key receives only in the organizations its creator still administers (EW-P2-6)", async () => {
@@ -363,6 +394,7 @@ describe('WebhookDomainEventFanoutService', () => {
             isActive: true,
             kind: 'integration',
             organizationIds: [ORG_A],
+            scopes: ['events:read', 'webhooks:manage'],
         } as unknown as ApiKey);
         const sub = await subscribe({ ownerType: 'integration_key', ownerId: keyId });
         const access = new WebhookOwnerAccessService(dataSource);

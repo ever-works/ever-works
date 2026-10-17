@@ -29,6 +29,8 @@ import { isAgentReviewRunScope } from '../../tasks-domain/task-agent-review';
  * alone — see {@link AgentRunRepository.casTerminal}.
  */
 const NON_TERMINAL: AgentRunStatus[] = ['queued', 'running'];
+/** Self-build slice AT — the statuses the retention pass may touch. */
+const RETENTION_TERMINAL: AgentRunStatus[] = ['completed', 'failed', 'cancelled'];
 
 /**
  * Dispatch rollback may only touch a run that has NOT been picked up yet.
@@ -609,30 +611,35 @@ export class AgentRunRepository {
     async findQueuedTooLong(
         cutoff: Date,
         limit: number,
+        /** Rows parked for one of these reasons are not surfaced (they say why themselves). */
+        exemptQueuedReasons: readonly string[] = [],
     ): Promise<
         Pick<
             AgentRun,
             'id' | 'agentId' | 'userId' | 'taskId' | 'workId' | 'queuedReason' | 'createdAt'
         >[]
     > {
-        return addInsertionOrderTieBreak(
-            this.repository
-                .createQueryBuilder('run')
-                .select([
-                    'run.id',
-                    'run.agentId',
-                    'run.userId',
-                    'run.taskId',
-                    'run.workId',
-                    'run.queuedReason',
-                    'run.createdAt',
-                ])
-                .where('run.status = :queued', { queued: 'queued' })
-                .andWhere('run.attentionReason IS NULL')
-                .andWhere('run.createdAt <= :cutoff', { cutoff })
-                .orderBy('run.createdAt', 'ASC'),
-            'ASC',
-        )
+        const query = this.repository
+            .createQueryBuilder('run')
+            .select([
+                'run.id',
+                'run.agentId',
+                'run.userId',
+                'run.taskId',
+                'run.workId',
+                'run.queuedReason',
+                'run.createdAt',
+            ])
+            .where('run.status = :queued', { queued: 'queued' })
+            .andWhere('run.attentionReason IS NULL')
+            .andWhere('run.createdAt <= :cutoff', { cutoff });
+        if (exemptQueuedReasons.length > 0) {
+            query.andWhere(
+                '(run.queuedReason IS NULL OR run.queuedReason NOT IN (:...exemptQueuedReasons))',
+                { exemptQueuedReasons: [...exemptQueuedReasons] },
+            );
+        }
+        return addInsertionOrderTieBreak(query.orderBy('run.createdAt', 'ASC'), 'ASC')
             .limit(limit)
             .getMany();
     }
@@ -1597,6 +1604,113 @@ export class AgentRunRepository {
             .where('id = :id', { id: runId })
             .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
             .andWhere('queuedReason = :from', { from })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Self-build slice AT — up to `limit` TERMINAL runs that finished before
+     * `cutoff` and whose timeline has not been purged yet, oldest first.
+     *
+     * Never a run that is waiting on a human (`awaitingInput`) or parked for a
+     * resume (`terminalEndedReason = 'parked'`): their history is what the
+     * resume continues from, however old.
+     */
+    async findLogRetentionCandidates(cutoff: Date, limit: number): Promise<string[]> {
+        const rows = await this.retentionQuery(cutoff)
+            .andWhere('run.logsPurgedAt IS NULL')
+            .orderBy('run.finishedAt', 'ASC')
+            .limit(Math.max(1, Math.trunc(limit)))
+            .getMany();
+        return rows.map((row) => row.id);
+    }
+
+    /** Stamp `logsPurgedAt` on runs whose timeline the retention pass just deleted. */
+    async markLogsPurged(runIds: string[], at: Date): Promise<number> {
+        if (runIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ logsPurgedAt: at })
+            .where('id IN (:...runIds)', { runIds })
+            .andWhere('logsPurgedAt IS NULL')
+            .execute();
+        return result.affected ?? 0;
+    }
+
+    /**
+     * Self-build slice AT (OPT-IN, `AGENT_RUN_RETENTION_DAYS`) — delete up to
+     * `limit` TERMINAL run rows that finished before `cutoff` AND whose logs
+     * were already purged. Same exclusions as
+     * {@link findLogRetentionCandidates}; the DELETE re-checks the terminal
+     * status so a row revived between the read and the write survives.
+     * `agent_run_logs` / `terminal_transcript_chunks` cascade; the audit
+     * tables that name runs (inbox, escalations, usage events) are kept.
+     */
+    async deleteRetainedRuns(cutoff: Date, limit: number): Promise<number> {
+        const rows = await this.retentionQuery(cutoff)
+            .andWhere('run.logsPurgedAt IS NOT NULL')
+            .orderBy('run.finishedAt', 'ASC')
+            .limit(Math.max(1, Math.trunc(limit)))
+            .getMany();
+        if (rows.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .delete()
+            .from(AgentRun)
+            .where('id IN (:...ids)', { ids: rows.map((row) => row.id) })
+            .andWhere('status IN (:...terminal)', { terminal: RETENTION_TERMINAL })
+            .execute();
+        return result.affected ?? 0;
+    }
+
+    private retentionQuery(cutoff: Date) {
+        return this.repository
+            .createQueryBuilder('run')
+            .select(['run.id'])
+            .where('run.status IN (:...terminal)', { terminal: RETENTION_TERMINAL })
+            .andWhere('run.finishedAt IS NOT NULL')
+            .andWhere('run.finishedAt < :cutoff', { cutoff })
+            .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
+                notAwaiting: false,
+            })
+            .andWhere('(run.terminalEndedReason IS NULL OR run.terminalEndedReason <> :parked)', {
+                parked: 'parked',
+            });
+    }
+
+    /**
+     * Fleet usage limits — put a fleet run whose job was PARKED (the model
+     * CLI on its node ran out of quota) back to `queued` with `queuedReason`,
+     * where it waits for the reset. Not terminal and not a failure: the
+     * sweepers exempt the reason (it is waiting, not stuck), the dispatch gate
+     * does not count it as in-flight, and the run's next lease flips it back
+     * to `running` (then {@link clearQueuedReason}). CAS on the non-terminal
+     * statuses, so a run cancelled meanwhile stays cancelled.
+     */
+    async parkQueued(runId: string, queuedReason: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ status: 'queued', queuedReason })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Clear `queuedReason` when it is still `queuedReason` — the parked fleet
+     * run was leased again and {@link markStarted} flipped it to `running`.
+     * No-clobber: any other reason (written by another path since) is kept.
+     */
+    async clearQueuedReason(runId: string, queuedReason: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason: null })
+            .where('id = :id', { id: runId })
+            .andWhere('queuedReason = :queuedReason', { queuedReason })
             .execute();
         return (result.affected ?? 0) > 0;
     }

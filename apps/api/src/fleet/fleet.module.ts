@@ -15,6 +15,7 @@ import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetMcpCredentialListener } from './fleet-mcp-credential.listener';
 import { FleetJobRetentionService } from './fleet-job-retention.service';
+import { AgentRunRetentionService } from './agent-run-retention.service';
 import { FleetRunTelemetryListener } from './fleet-run-telemetry.listener';
 import { FleetPushCredentialService } from './fleet-push-credential.service';
 import { FleetRunRouterService } from './fleet-run-router.service';
@@ -153,6 +154,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // retention passes use (`SafetyApiModule` provides it the same way:
         // it only needs the `CacheEntry` repository `DatabaseModule` supplies).
         FleetJobRetentionService,
+        // Self-build slice AT — the nightly retention pass over agent run
+        // timelines (and, opt-in, run rows); same lock, same idiom.
+        AgentRunRetentionService,
         DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,

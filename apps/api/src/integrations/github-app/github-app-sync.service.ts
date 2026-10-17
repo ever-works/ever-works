@@ -3,13 +3,28 @@ import {
     GitHubAppInstallationRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
-import { User } from '@ever-works/agent/entities';
+import { GitHubAppInstallation, User } from '@ever-works/agent/entities';
 import { SourceRepoAnalyzerService } from '@ever-works/agent/import';
 import { WorkImportService } from '@ever-works/agent/services';
 import { Injectable, Logger } from '@nestjs/common';
 import { config } from '@src/config/constants';
 import { config as agentConfig } from '@ever-works/agent/config';
+import { GitHubAppOnboardingService } from './github-app-onboarding.service';
 import { GitHubAppService } from './github-app.service';
+
+/**
+ * How the delivery handed to {@link GitHubAppSyncService.handleWebhook} was
+ * authenticated — set by the consolidated GitHub receiver.
+ */
+export type GitHubAppWebhookContext = {
+    /**
+     * `true` ONLY when the delivery's HMAC verified against the platform App
+     * webhook secret (`GITHUB_APP_WEBHOOK_SECRET`), i.e. GitHub itself vouched
+     * for the body — its `sender` included. Gates the installer auto-claim;
+     * omitted or `false` never claims anything.
+     */
+    appSecretVerified?: boolean;
+};
 
 type InstallationWebhookPayload = {
     action?: string;
@@ -48,6 +63,10 @@ export class GitHubAppSyncService {
         // full-name and stamps `pendingSyncRequestedAt` so the dispatcher
         // picks the row up on the next tick.
         private readonly workRepository: WorkRepository,
+        // Claims an installation recorded from a VERIFIED webhook for the
+        // platform user behind its recorded installer (prod 2026-10-17: App
+        // installs made from github.com never reached the setup-URL claim).
+        private readonly gitHubAppOnboardingService: GitHubAppOnboardingService,
     ) {}
 
     async listInstallationsForUser(userId: string) {
@@ -184,6 +203,7 @@ export class GitHubAppSyncService {
     async handleWebhook(
         eventName: string,
         payload: InstallationWebhookPayload | InstallationRepositoriesWebhookPayload,
+        context: GitHubAppWebhookContext = {},
     ) {
         if (eventName === 'installation') {
             const installationPayloadWrapper = payload as InstallationWebhookPayload;
@@ -223,15 +243,17 @@ export class GitHubAppSyncService {
                 rawPayload: installationPayload,
             });
 
+            const owned = await this.claimRecordedInstaller(installation, context);
+
             if (
                 action === 'created' ||
                 action === 'new_permissions_accepted' ||
                 action === 'unsuspend'
             ) {
-                await this.syncInstallation(installation.installationId);
+                await this.syncInstallation(owned.installationId);
             }
 
-            return installation;
+            return owned;
         }
 
         if (eventName === 'installation_repositories') {
@@ -239,6 +261,17 @@ export class GitHubAppSyncService {
                 ?.id;
             if (!installationId) {
                 return;
+            }
+
+            // A later verified delivery retries the claim, e.g. for an
+            // installer who linked their GitHub account after installing.
+            if (context.appSecretVerified) {
+                await this.claimRecordedInstaller(
+                    await this.gitHubAppInstallationRepository
+                        .findByInstallationId(String(installationId))
+                        .catch(() => null),
+                    context,
+                );
             }
 
             return this.syncInstallation(String(installationId));
@@ -262,6 +295,36 @@ export class GitHubAppSyncService {
         // arrives in the Phase 5 follow-up alongside the flag wiring.
         if (eventName === 'push') {
             return this.handlePushEvent(payload as PushWebhookPayload);
+        }
+    }
+
+    /**
+     * Claim an unclaimed installation for the platform user behind its
+     * RECORDED installer — ONLY for an App-secret-verified delivery (see
+     * {@link GitHubAppOnboardingService.claimForRecordedInstaller} for the
+     * authority rules). Best-effort: a failure is logged and never fails
+     * installation sync; the next verified delivery (or the setup-URL flow)
+     * claims it instead. Returns the claimed row, or the row unchanged.
+     */
+    private async claimRecordedInstaller<T extends GitHubAppInstallation | null>(
+        installation: T,
+        context: GitHubAppWebhookContext,
+    ): Promise<T> {
+        if (!context.appSecretVerified || !installation || installation.createdByUserId) {
+            return installation;
+        }
+
+        try {
+            const claimed =
+                await this.gitHubAppOnboardingService.claimForRecordedInstaller(installation);
+            return (claimed ?? installation) as T;
+        } catch (error) {
+            this.logger.warn(
+                `GitHub App installation ${installation.installationId} auto-claim failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return installation;
         }
     }
 

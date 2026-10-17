@@ -3,6 +3,7 @@ import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.t
 import { normalizeFleetRunEnvGrants } from './fleet-run-secrets.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
 import type { FleetAgentTaskMcpBridge, FleetAgentTaskMcpResult } from './fleet-run-credential.types.js';
+import type { FleetJobFailureKind, FleetModelUsageLimit } from './fleet-model-usage-limit.types.js';
 
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
@@ -864,7 +865,13 @@ export interface FleetAgentTaskGitPolicy {
 	commit?: boolean;
 	/** Push the task branch to the remote. Default true. */
 	push?: boolean;
-	/** Commit subject; the node supplies a default naming the Task. */
+	/**
+	 * Commit message; the node supplies a default naming the Task. The
+	 * planner writes a conventional commit derived from the Task title
+	 * (`composeFleetTaskCommitMessage`), and the node re-types it from what
+	 * was actually staged (`retypeFleetCommitMessage`: docs-only → `docs`,
+	 * tests-only → `test`).
+	 */
 	commitMessage?: string;
 }
 
@@ -1814,6 +1821,20 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	containment?: FleetAgentTaskContainment | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
+	/**
+	 * Fleet usage limits — the machine-readable KIND of failure, when it is
+	 * one the platform treats differently from "the work failed". Today only
+	 * `model_usage_limit`: the model CLI on this node is out of quota
+	 * (Claude Code's weekly / 5-hour limit, a 429, Codex's usage limit).
+	 *
+	 * Such a result never settles the job: the platform puts it back in the
+	 * queue until {@link FleetModelUsageLimit.retryAfter}, counts no Agent
+	 * failure and fails no Task. Absent on every other result, so a normal
+	 * failure reports exactly what it always did.
+	 */
+	failureKind?: FleetJobFailureKind | null;
+	/** Present with `failureKind: 'model_usage_limit'`: which CLI, which window, and until when. */
+	modelUsageLimit?: FleetModelUsageLimit | null;
 }
 
 /**

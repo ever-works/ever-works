@@ -91,6 +91,11 @@ import type { appBuildPrepareTask } from '../tasks/trigger/app-build-prepare.tas
 // two-hour `maxDuration`, and triggering the object keeps both with the task
 // instead of restating them at every call site.
 import { appDeployTask, type AppDeployTaskPayload } from '../tasks/trigger/app-deploy.task';
+import {
+    APP_CLUSTER_OP_VERIFICATION_MAX_DURATION,
+    appClusterOpTask,
+    type AppClusterOpTaskPayload,
+} from '../tasks/trigger/app-cluster-op.task';
 // C10 — the `app-fork-readiness` job (APW-02 plan §6.1/§6.2). Both the id and the type
 // come from the task module itself here: T31's planned agent-side
 // `app-fork-readiness.types.ts` has not landed, and unlike the Build pair there is no
@@ -100,13 +105,22 @@ import {
     APP_FORK_READINESS_TASK_ID,
     type appForkReadinessTask,
 } from '../tasks/trigger/app-fork-readiness.task';
+// APW-02 T31 — the `app-upstream-sync` one-shot (plan §6.1:656, §6.3). The id is
+// imported from the task module for the same reason the readiness id is.
+import {
+    APP_UPSTREAM_SYNC_TASK_ID,
+    type appUpstreamSyncTask,
+} from '../tasks/trigger/app-upstream-sync.task';
 import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
 import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 // C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
 // `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
 // payload is API-side, and this file only needs the shape the SDK call is checked against.
-import type { AppForkReadinessJobPayload } from '@ever-works/agent/app-works';
+import type {
+    AppForkReadinessJobPayload,
+    AppUpstreamSyncJobPayload,
+} from '@ever-works/agent/app-works';
 
 /**
  * EW-742 P3.2 T22 (stamping) — minimal stamp payload set on the
@@ -1246,6 +1260,63 @@ export class TriggerService
     }
 
     /**
+     * APW-06 T31/T32 (lane aw-deploy-2, 2026-10-17) — the `app-cluster-op` job (plan §9.2:1247): one
+     * op (`cluster-check`, `prepare-namespace`, `status-refresh`, `ingress-reconcile`, `pause`, …)
+     * for one App Work, run on the isolated `app-cluster-io` queue.
+     *
+     * The same two refusals as {@link dispatchAppDeploy}, for the same reasons: no job runtime ⇒
+     * no in-process fallback (FR-5), and production without
+     * `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true` ⇒ nothing is enqueued. `verification-deploy`
+     * gets its 3 600 s budget at trigger time (§9.2). The payload carries ids only, never a
+     * credential — the worker resolves the kubeconfig itself.
+     */
+    async dispatchAppClusterOp(
+        payload: AppClusterOpTaskPayload,
+        opts: { delayMs?: number } = {},
+    ): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            this.logger.warn(
+                `Refusing to dispatch app-cluster-op ${payload?.op} for Work ${payload?.workId}: the ` +
+                    'job runtime is disabled, and App cluster work has no in-process fallback (FR-5).',
+            );
+            return null;
+        }
+
+        if (
+            process.env.NODE_ENV === 'production' &&
+            config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+        ) {
+            this.logger.warn(
+                `Refusing to dispatch app-cluster-op ${payload?.op} for Work ${payload?.workId}: ` +
+                    'production requires EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true.',
+            );
+            return null;
+        }
+
+        try {
+            const delayMs = typeof opts.delayMs === 'number' && opts.delayMs > 0 ? opts.delayMs : 0;
+            const handle = await appClusterOpTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['app-cluster-op', `work:${payload.workId}`, `op:${payload.op}`],
+                    machine: this.machine() as any,
+                    ...(payload.op === 'verification-deploy'
+                        ? { maxDuration: APP_CLUSTER_OP_VERIFICATION_MAX_DURATION }
+                        : {}),
+                    ...(delayMs > 0 ? { delay: new Date(Date.now() + delayMs) } : {}),
+                }),
+            );
+            return handle?.id ?? null;
+        } catch (error) {
+            this.logger.error(
+                `Failed to dispatch app-cluster-op ${payload?.op} for Work ${payload?.workId}`,
+                error as Error,
+            );
+            return null;
+        }
+    }
+
+    /**
      * APW-03 T13's `app-spec-evaluate` job, dispatched through the **propagate**
      * shape — the same one {@link dispatchAppDependencyProvision} uses above and
      * for the same reason.
@@ -1491,6 +1562,60 @@ export class TriggerService
             return null;
         }
     }
+
+    /**
+     * APW-02 T31 — the `app-upstream-sync` job (plan §6.1:656, §6.3).
+     *
+     * The agent `AppWorksModule` binds `APP_UPSTREAM_SYNC_DISPATCHER` to this method
+     * (`UPSTREAM_SYNC_DISPATCH_METHOD` there), for the two call sites it declares:
+     * `AppUpstreamStateService` (**Sync now**, the divergence compare, the merged
+     * follow-up) and `AppUpstreamSyncDispatcherService.dispatchDue` (the cron).
+     *
+     * Same `null` contract as {@link dispatchAppForkReadiness}: unconfigured or a
+     * failed enqueue resolves `null` (the callers record "not queued"), never a throw.
+     *
+     * `idempotencyKey` is plan §6.1:662's `app-upstream-sync:<workId>:<trigger>:<minute
+     * bucket>`, so a double-clicked **Sync now** or two dispatcher ticks racing inside
+     * one minute collapse to one run. `concurrencyKey` is per Work, as readiness's is —
+     * the run's own claim (`beginSync`) is the real mutual exclusion.
+     */
+    async dispatchAppUpstreamSync(payload: AppUpstreamSyncJobPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        const trigger = payload.trigger ?? 'schedule';
+        try {
+            const handle = await tasks.trigger<typeof appUpstreamSyncTask>(
+                APP_UPSTREAM_SYNC_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: ['app-upstream-sync', `work:${payload.workId}`, `trigger:${trigger}`],
+                    idempotencyKey: appUpstreamSyncIdempotencyKey(payload.workId, trigger),
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-upstream-sync:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-upstream-sync task', error as Error);
+            return null;
+        }
+    }
+}
+
+/**
+ * Plan §6.1:662 — `app-upstream-sync:<workId>:<trigger>:<minute bucket>`. The bucket is
+ * the UTC minute (`YYYYMMDDHHmm`), so the key is stable for one minute and never longer.
+ */
+export function appUpstreamSyncIdempotencyKey(
+    workId: string,
+    trigger: string,
+    now: Date = new Date(),
+): string {
+    const bucket = now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    return `app-upstream-sync:${workId}:${trigger}:${bucket}`;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Module, type FactoryProvider } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
@@ -7,20 +8,36 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { TasksDomainModule } from '../tasks-domain/tasks.module';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
+import { AgentRepository } from '../database/repositories/agent.repository';
+import { Agent } from '../entities/agent.entity';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import {
     APP_FORK_READINESS_DISPATCHER,
+    APP_UPSTREAM_SYNC_DISPATCHER,
     AppUpstreamStateService,
     type AppForkReadinessDispatcher,
     type AppForkReadinessJobPayload,
+    type AppUpstreamSyncDispatcher,
+    type AppUpstreamSyncJobPayload,
 } from './app-upstream-state.service';
 import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher.service';
 import { AppSourceInspectorService } from './app-source-inspector.service';
 import { AppWorkCreateService } from './app-work-create.service';
 import { AppActionsHygieneService } from './app-actions-hygiene.service';
-import { AppSourceInitializerService } from './app-source-initializer.service';
+import {
+    APP_BLUEPRINT_APPLY_SERVICE,
+    AppSourceInitializerService,
+} from './app-source-initializer.service';
+import { AppBlueprintApplyService } from '../apps-catalog/app-blueprint-apply.service';
+import { AppLicenseModule } from '../app-license/app-license.module';
 import { AppWorksTelemetryService } from './app-works-telemetry.service';
 import { APP_SOURCE_CATALOG_PORT } from './app-source-catalog.port';
+import { APP_WORK_AGENT_RESOLVER, AppWorkAgentResolverService } from './app-work-agent-resolver';
+import { AppChangeRequestService } from './app-change-request.service';
+import { AppProvisionEventsService, AppProvisioningService } from './app-provisioning.service';
+import { AppProvisioningFeedbackService } from './app-provisioning-feedback.service';
+import { APP_PROVISIONING_SERVICE } from './app-source-initializer.service';
+import { APP_PROVISION_EVENTS_PORT } from './app-fork-readiness.service';
 import { AppBlueprintResolverService } from '../apps-catalog/app-blueprint-resolver.service';
 import { AppSourceCatalogAdapter } from '../apps-catalog/app-source-catalog.adapter';
 import {
@@ -119,10 +136,10 @@ import {
  * module), and a binding anywhere else would be structurally invisible to both
  * call sites — which is exactly the failure C10 measured.
  *
- * The note T28 left above still stands for its own token: T31's planned
- * `APP_UPSTREAM_SYNC_DISPATCHER` binding is *not* this file's to add, and this
- * section binds the readiness token only because C10 is the gap that keeps an App
- * Work from ever becoming `ready`.
+ * **APW-02 T31 (2026-10-17):** `APP_UPSTREAM_SYNC_DISPATCHER` is now bound here
+ * too (`buildAppUpstreamSyncDispatcherProvider`), for the same visibility reason:
+ * its two call sites (`AppUpstreamStateService`, `AppUpstreamSyncDispatcherService`)
+ * are declared in this module. The note T28 left above is superseded.
  *
  * What the binding resolves: the **active job runtime's** dispatchers view
  * (`JOB_RUNTIME_PROVIDER_REGISTRY`, EW-685), whose `dispatchAppForkReadiness`
@@ -281,6 +298,43 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
     };
 }
 
+/**
+ * The method the active job runtime exposes for the `app-upstream-sync` job
+ * (`TriggerService.dispatchAppUpstreamSync`, APW-02 T31).
+ */
+const UPSTREAM_SYNC_DISPATCH_METHOD = 'dispatchAppUpstreamSync' as const;
+
+/**
+ * APW-02 T31 — `APP_UPSTREAM_SYNC_DISPATCHER`, bound exactly as C10's readiness
+ * dispatcher is (same module, same visibility rule, same `null` answer):
+ * `AppUpstreamStateService.syncNow` and `AppUpstreamSyncDispatcherService.dispatchDue`
+ * are declared HERE, so a binding anywhere else would be invisible to both.
+ *
+ * `null` whenever no job runtime is registered or the runtime has no such method —
+ * the call sites' documented "not queued" answer, never an invented run id.
+ */
+export function buildAppUpstreamSyncDispatcherProvider(): FactoryProvider {
+    return {
+        provide: APP_UPSTREAM_SYNC_DISPATCHER,
+        useFactory: (registry?: JobRuntimeProviderRegistry | null): AppUpstreamSyncDispatcher => ({
+            dispatch: async (payload: AppUpstreamSyncJobPayload): Promise<string | null> => {
+                const dispatchers = registry?.getActive()?.dispatchers as
+                    | Record<string, unknown>
+                    | undefined;
+                const dispatch = dispatchers?.[UPSTREAM_SYNC_DISPATCH_METHOD];
+                if (typeof dispatch !== 'function') {
+                    return null;
+                }
+                const runId = await (
+                    dispatch as (p: AppUpstreamSyncJobPayload) => Promise<string | null>
+                ).call(dispatchers, payload);
+                return runId ?? null;
+            },
+        }),
+        inject: [{ token: JOB_RUNTIME_PROVIDER_REGISTRY, optional: true }],
+    };
+}
+
 @Module({
     imports: [
         // The epic's own table. `forFeature` is what registers the entity with
@@ -308,6 +362,12 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         ActivityLogModule,
         NotificationsModule,
         TasksDomainModule,
+        // APW-03 T42 — `AppLicenseService` and the two tokens it binds
+        // (`APP_LICENSE_SERVICE`, `APP_UPSTREAM_LICENSE_SERVICE`). Imported here so
+        // the ready handler declared in this module sees them, and re-exported so the
+        // API (deploy gate, attest endpoint, RPC channel) reaches the same instance.
+        // It imports only leaf modules; see its docstring.
+        AppLicenseModule,
     ],
     providers: [
         WorkUpstreamStateRepository,
@@ -333,13 +393,54 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // C10 — the binding that makes a readiness dispatch leave the process. See
         // the docstring above for why it lives here and what `null` means.
         buildAppForkReadinessDispatcherProvider(),
+        // APW-02 T31 — the sync dispatcher, same shape and same reason as C10's.
+        buildAppUpstreamSyncDispatcherProvider(),
         // APW-03 T26 — the Apps-catalog port, bound where its two consumers are
         // declared. Deliberately not exported. See the docstring above.
         AppBlueprintResolverService,
         { provide: APP_SOURCE_CATALOG_PORT, useClass: AppSourceCatalogAdapter },
+        // APW-03 T28 — the Blueprint apply service. Bound HERE because the catalog
+        // adapter's apply gate and this module's ready handler both inject the token
+        // (the C10 visibility rule), and exported so the API-side ready handler copy
+        // resolves the same instance. Opening the gate is the point: a matched
+        // Blueprint is now offered and applied (see `app-blueprint-apply.service.ts`).
+        AppBlueprintApplyService,
+        { provide: APP_BLUEPRINT_APPLY_SERVICE, useExisting: AppBlueprintApplyService },
         // APW-01 T36 — FR-53's five events. Its sink is the API's to bind (a global
         // alias); unbound, events are counted and dropped. See the docstring above.
         AppWorksTelemetryService,
+        // APW-08 T25 (lane aw-ai, 2026-10-17) — the agent-resolution rule, bound where
+        // APW-02's `AppUpstreamStateService` (declared here) can see it (APW08-G18). Its
+        // own dependencies are repository providers only (`DatabaseModule`).
+        // `AgentRepository` is provided locally (the `ActivityLogModule` / `SkillsModule`
+        // shape): `DatabaseModule` does not carry it and `TasksDomainModule` does not
+        // re-export `AgentsModule`'s copy — the DI reachability spec measured both. A
+        // factory over an OPTIONAL entity repository, so the module specs that compile
+        // this module against a shelled `DatabaseModule` still compile (both consumers
+        // inject it `@Optional()` and answer "no Agent" without it).
+        {
+            provide: AgentRepository,
+            useFactory: (repository?: Repository<Agent> | null) =>
+                repository ? new AgentRepository(repository) : null,
+            inject: [{ token: getRepositoryToken(Agent), optional: true }],
+        },
+        AppWorkAgentResolverService,
+        { provide: APP_WORK_AGENT_RESOLVER, useExisting: AppWorkAgentResolverService },
+        // APW-08 T25 — `POST /api/works/:id/evolve`'s service: a Task on the Work, started
+        // through `TasksService.runTask` (THE dispatch path — the Self-Build Fleet's).
+        AppChangeRequestService,
+        // APW-04 — the provisioner (inspect → draft → validate → an `app-provision` Task
+        // for the resolved Agent) and its events port. `APP_PROVISIONING_SERVICE` is read
+        // by both copies of `AppSourceInitializerService` (this module's and the API's),
+        // which is why it is bound and exported here. `APP_TARGET_UPDATED_PORT` has no
+        // consumer in the API graph; the worker binds it to the same class by name.
+        AppProvisioningService,
+        { provide: APP_PROVISIONING_SERVICE, useExisting: AppProvisioningService },
+        AppProvisionEventsService,
+        { provide: APP_PROVISION_EVENTS_PORT, useExisting: AppProvisionEventsService },
+        // APW-04 — the feedback loop: build / deploy / smoke outcomes back to the
+        // provisioning Task as bounded follow-up iterations (`@OnEvent` listeners).
+        AppProvisioningFeedbackService,
     ],
     exports: [
         WorkUpstreamStateRepository,
@@ -353,13 +454,29 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // dispatcher instance the two call sites use.
         AppActionsHygieneService,
         APP_FORK_READINESS_DISPATCHER,
+        APP_UPSTREAM_SYNC_DISPATCHER,
         // APW-01 T15 — exported for the same reason: the API-side module binds
         // `APP_FORK_READY_HANDLER` to this class, and a class that is not exported
         // cannot be reached across the module edge.
         AppSourceInitializerService,
+        // APW-03 T28 / T42 — see the providers above.
+        AppBlueprintApplyService,
+        APP_BLUEPRINT_APPLY_SERVICE,
+        AppLicenseModule,
         // APW-01 T36 — exported so the API-side ready handler and `WorkModule`'s
         // `WorkLifecycleService` receive the same instance the services here do.
         AppWorksTelemetryService,
+        // APW-08 T25 / APW-04 — exported so the API's controllers, its copy of the ready
+        // handler (`APP_PROVISIONING_SERVICE`), its readiness service
+        // (`APP_PROVISION_EVENTS_PORT`) and the `remoteMap` (`AppProvisionEventsService`)
+        // all resolve the SAME instances.
+        AppWorkAgentResolverService,
+        APP_WORK_AGENT_RESOLVER,
+        AppChangeRequestService,
+        AppProvisioningService,
+        APP_PROVISIONING_SERVICE,
+        AppProvisionEventsService,
+        APP_PROVISION_EVENTS_PORT,
     ],
 })
 export class AppWorksModule {}

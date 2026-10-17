@@ -11,6 +11,7 @@ import { ROUTES } from '@/lib/constants';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
+import { isHiddenWhenDisabled } from '@/lib/work-kinds/flag-gated-kinds';
 import {
     CHIP_ICONS,
     CHIP_INTENT_LABEL,
@@ -188,7 +189,10 @@ export function useNewPrompt({
             // nothing for the chat AI to iterate on: hand the text (a repo
             // URL, typically) straight to the Repository form on the Work
             // canvas instead of opening a chat turn.
-            if (effectiveChip === 'repo') {
+            // APW-01 T23 — an App Work starts from a repository URL too, and
+            // its create form (inspect → mode → owner → target) is on the
+            // Work canvas, not in a chat turn. Same canonical-only rule.
+            if (effectiveChip === 'repo' || effectiveChip === 'app') {
                 // Only canonical coordinates may ride in the query string:
                 // pasted remotes routinely carry a token in the user-info
                 // section, and a query parameter reaches browser history,
@@ -198,7 +202,7 @@ export function useNewPrompt({
                 const canonical = canonicalRepositoryUrl(description);
                 const params = new URLSearchParams({
                     mode: 'manual',
-                    kind: 'repo',
+                    kind: effectiveChip,
                     ...(canonical ? { prompt: canonical } : {}),
                 });
                 router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
@@ -270,12 +274,16 @@ export function useNewPrompt({
     // Missing/undefined flags stay enabled (fail-open).
     const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store'>>>(
         () => [
-            ...CHIP_ORDER.map((c) => ({
-                value: c,
-                label: t(`chips.${c}`),
-                Icon: CHIP_ICONS[c],
-                comingSoon: disabledSet.has(c),
-            })),
+            // APW-01 T23 (FR-47, ACC-01-13) — a fail-closed kind that is
+            // disabled is left OUT of the row, not rendered as "Soon".
+            ...CHIP_ORDER.filter((c) => !(isHiddenWhenDisabled(c) && disabledSet.has(c))).map(
+                (c) => ({
+                    value: c,
+                    label: t(`chips.${c}`),
+                    Icon: CHIP_ICONS[c],
+                    comingSoon: disabledSet.has(c),
+                }),
+            ),
             // store is flag-controlled via works-store like every other kind.
             // The `works-store` PostHog flag exists as `active: false`, so
             // the chip continues to render as the inert "Soon" baseline

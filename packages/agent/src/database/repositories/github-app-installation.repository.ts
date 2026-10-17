@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Repository, EntityManager } from 'typeorm';
 import { GitHubAppInstallation } from '../../entities/github-app-installation.entity';
 export type UpsertGitHubAppInstallationData = {
     installationId: string;
@@ -21,6 +21,21 @@ export class GitHubAppInstallationRepository {
         @InjectRepository(GitHubAppInstallation)
         private readonly repository: Repository<GitHubAppInstallation>,
     ) {}
+
+    /**
+     * A copy of this repository bound to `manager`, so every method runs
+     * inside the caller's transaction (GitHub App onboarding writes the user,
+     * its provider account, the App user link and the installation claim as
+     * one unit — 10-09 handover item 13).
+     */
+    withManager(manager: EntityManager): GitHubAppInstallationRepository {
+        return new GitHubAppInstallationRepository(manager.getRepository(GitHubAppInstallation));
+    }
+
+    /** Run `work` in one database transaction (see {@link withManager}). */
+    transaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(work);
+    }
 
     async findById(id: string): Promise<GitHubAppInstallation | null> {
         return this.repository.findOne({ where: { id } });

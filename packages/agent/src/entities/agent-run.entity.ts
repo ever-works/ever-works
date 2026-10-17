@@ -78,6 +78,10 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 // `listSessionsForUser` filters on the same leading column.
 // Migration: `AddCostsDashboardIndexes1786910000000`.
 @Index('idx_agent_runs_user_created', ['userId', 'createdAt'])
+// Self-build slice AT — the retention pass selects
+// `logsPurgedAt IS NULL AND finishedAt < cutoff`, oldest first. Migration:
+// `1795162100000-AddAgentRunLogsPurgedAt`.
+@Index('idx_agent_runs_logs_purge', ['logsPurgedAt', 'finishedAt'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -103,6 +107,15 @@ export class AgentRun {
 
     @PortableDateColumn({ nullable: true })
     finishedAt?: Date | null;
+
+    /**
+     * Self-build slice AT — when the retention pass deleted this TERMINAL
+     * run's `agent_run_logs` timeline (`AGENT_RUN_LOG_RETENTION_DAYS`,
+     * default 90). NULL = never purged; what keeps the nightly pass
+     * idempotent and off rows it has already done. The row itself is kept.
+     */
+    @PortableDateColumn({ nullable: true })
+    logsPurgedAt?: Date | null;
 
     @Column({ type: 'int', nullable: true })
     durationMs?: number | null;

@@ -6,6 +6,9 @@ import { Repository } from 'typeorm';
 import {
     APP_BUILD_DEPLOYABLE_TRIGGERS,
     APP_BUILD_LIST_MAX_PAGE_SIZE,
+    APP_BUILD_LIST_PAGE_SIZE,
+    APP_BUILD_STATUSES,
+    APP_BUILD_TRIGGERS,
     APP_BUILD_REBUILD_DEDUPE_MS,
     APP_BUILD_REBUILDS_PER_HOUR,
     APP_BUILD_VERIFY_MEMORY_GIB,
@@ -23,6 +26,8 @@ import {
     type AppBuildEventName,
     type AppBuildEventPayload,
     type AppBuildKind,
+    type AppBuildListQuery,
+    type AppBuildListResponse,
     type AppBuildNotDeployableReason,
     type AppBuildRunSource,
     type AppBuildSummary,
@@ -47,6 +52,7 @@ import {
 // imported rather than restated, so a field the plugin adds is visible here.
 import type { BuildSnapshot } from '@ever-works/plugin';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import {
     APP_ENV_RESOLVER_FINGERPRINTS,
     AppEnvResolvedFingerprints,
@@ -197,7 +203,15 @@ export const APP_BUILD_WATCH_RUNNER = Symbol('APP_BUILD_WATCH_RUNNER');
  */
 export interface AppBuildPluginBinding {
     readonly pluginId: string;
+    /** The plugin's display name, for the Builds list's `provider` (plan §5:1194). */
+    readonly name?: string;
     readonly buildKind: AppBuildKind;
+    /**
+     * Plan §4.4's resolved Work-scoped settings, secrets included (the facade
+     * resolves them; nothing here logs or returns a value). The Builds list reads
+     * only whether `pullToken` is set and `pullTokenExpiresAt`.
+     */
+    readonly settings?: Record<string, unknown>;
     /** The App Work's image repository, or `null` when the plugin produces none. */
     readonly imageRepository: string | null;
     startBuild?(input: {
@@ -215,6 +229,10 @@ export interface AppBuildPluginBinding {
         readonly buildId: string;
         readonly providerRunId: string | null;
     }): Promise<void>;
+    /** Plan §5 — is this commit in the tracked branch's history? A throw is "could not tell". */
+    isCommitReachable?(sha: string): Promise<boolean>;
+    /** §4.10 — remove the per-run prompted-value secret of a verification Build. */
+    deleteVerifyPromptedSecret?(): Promise<unknown>;
     checkImageAccess?(input: {
         readonly imageRepository: string;
         readonly tag: string;
@@ -313,9 +331,15 @@ export interface AppBuildRunnerRecipeSource {
 /** DI token for {@link AppBuildRunnerRecipeSource} — APW-07's `APP_RUNTIME_ENV_SOURCE`. */
 export const APP_BUILD_RUNNER_RECIPE_SOURCE = Symbol('APP_BUILD_RUNNER_RECIPE_SOURCE');
 
-/** _Provisional — the App Works controller's ownership service._ */
+/**
+ * The App Works ownership check, as this epic reads it.
+ *
+ * Bound (2026-10-17) over `WorkOwnershipService.ensureCanEdit` in
+ * `AppBuildsModule`. `userId` is the CALLER: without one there is nobody to
+ * grant edit rights to, so the answer is `false` (fail-closed).
+ */
 export interface AppBuildEditAccess {
-    isEditor(workId: string): Promise<boolean>;
+    isEditor(workId: string, userId?: string): Promise<boolean>;
 }
 
 /** DI token for {@link AppBuildEditAccess}. Unbound ⇒ every viewer is a viewer. */
@@ -758,8 +782,19 @@ export function assertVerificationBudget(plan: AppVerificationPlan): void {
  * Result shapes
  * -------------------------------------------------------------------------- */
 
-/** The `requestRebuild` refusal codes of plan §5:1202-1205. */
-export type AppBuildRebuildRefusal = 'rebuildRateLimited' | 'commitNotReachable' | 'nothingToBuild';
+/**
+ * The `requestRebuild` refusal codes of plan §5:1202-1205.
+ *
+ * `buildProviderUnavailable` (503) is the App Work whose build context cannot be
+ * read at all — no resolvable build plugin, no credential, no tracked branch —
+ * which is a different answer from `nothingToBuild` (a strategy that builds
+ * nothing) and must not be shown to the member as one.
+ */
+export type AppBuildRebuildRefusal =
+    | 'rebuildRateLimited'
+    | 'commitNotReachable'
+    | 'nothingToBuild'
+    | 'buildProviderUnavailable';
 
 /** What `requestRebuild` answers. */
 export type AppBuildRebuildResult =
@@ -923,6 +958,31 @@ export type AppBuildRecordRunResult =
     | { readonly accepted: true; readonly build: WorkBuild; readonly created: boolean }
     | { readonly accepted: false; readonly reason: AppBuildRunRefusal };
 
+/**
+ * The per-Work lock shared by everything that writes or deletes the ONE
+ * repository secret `EW_VERIFY__PROMPTED` (2026-10-17, lane aw-builds-3):
+ * `startVerification` (insert + dispatch, which writes it), the watch runner's
+ * terminal deletion and the sweep's orphan pass. Serialising the three closes the
+ * race CodeRabbit flagged on #2686 — an orphan pass that checked "no other open
+ * verification" and then deleted a secret a verification started in between had
+ * just written.
+ */
+export const APP_BUILD_VERIFY_SECRET_LOCK_PREFIX = 'app-builds:verify-secret:';
+
+/** The lock's lease — far above the critical sections it guards (one insert + one dispatch, or one delete). */
+export const APP_BUILD_VERIFY_SECRET_LOCK_TTL_MS = 2 * 60_000;
+
+/** How long `startVerification` waits for a deletion holding the lock before going ahead. */
+export const APP_BUILD_VERIFY_SECRET_LOCK_WAIT_MS = 15_000;
+
+/** The pause between two attempts while waiting for the lock. */
+const VERIFY_SECRET_LOCK_RETRY_MS = 250;
+
+/** The lock key of one Work's verification secret. */
+export function appBuildVerifySecretLockKey(workId: string): string {
+    return `${APP_BUILD_VERIFY_SECRET_LOCK_PREFIX}${workId}`;
+}
+
 /** The terminal statuses — a Build that reached one of these is done (§7.3). */
 const TERMINAL_STATUSES = ['succeeded', 'failed', 'cancelled'] as const;
 
@@ -975,6 +1035,18 @@ function buildEventPayload(
         failureClass: (build.failureClass as AppBuildEventPayload['failureClass']) ?? null,
         cancelReason: build.cancelReason ?? null,
     };
+}
+
+/** A list filter (`a`, `a,b` or `['a','b']`) narrowed to the closed set it filters on. */
+function listFilter<T extends string>(
+    value: T | readonly T[] | string | undefined,
+    allowed: readonly T[],
+): T[] {
+    if (value === undefined || value === null) return [];
+    const raw: readonly string[] = Array.isArray(value) ? value : String(value).split(',');
+    return raw
+        .map((entry) => String(entry).trim())
+        .filter((entry): entry is T => (allowed as readonly string[]).includes(entry));
 }
 
 /** The Builds-list row of plan §3.2 (`contracts/…/builds.ts:907`). */
@@ -1136,6 +1208,14 @@ export class AppBuildsService {
         @Optional()
         @Inject(APP_BUILD_EDIT_ACCESS)
         private readonly editAccess?: AppBuildEditAccess,
+        // 2026-10-17 — the per-Work verification-secret lock (see
+        // {@link APP_BUILD_VERIFY_SECRET_LOCK_PREFIX}). Appended last and
+        // `@Optional()`: unbound, the guarded sections run unlocked, exactly as
+        // before. `@Inject` by class because SWC erases an optional parameter's
+        // type to `Object` (the `BuildFacadeService` registry lesson).
+        @Optional()
+        @Inject(DistributedTaskLockService)
+        private readonly locks?: DistributedTaskLockService,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -1571,7 +1651,7 @@ export class AppBuildsService {
     ): Promise<AppBuildRebuildResult> {
         const context = await this.readWork(workId);
         if (!context) {
-            return { ok: false, code: 'nothingToBuild' };
+            return { ok: false, code: 'buildProviderUnavailable' };
         }
 
         const spec = await this.readSpec(workId, options.commitSha ?? null);
@@ -1583,6 +1663,38 @@ export class AppBuildsService {
         const commitSha = options.commitSha ?? spec?.commitSha ?? null;
         if (!commitSha) {
             return { ok: false, code: 'commitNotReachable' };
+        }
+
+        // Plan §5 — a caller-named commit must be in the tracked branch's history
+        // (2026-10-17). Without this an editor could build any 40-hex sha the
+        // repository's network knows, a fork's unreviewed commit included, with
+        // the repository's build values. A provider that cannot answer refuses
+        // with 503 rather than building a commit nobody checked; a plugin without
+        // the member keeps today's behaviour.
+        if (options.commitSha) {
+            const binding = await this.resolvePlugin(workId);
+            // No binding means nothing can check the commit now — and a later prepare
+            // that does resolve one dispatches the Build without re-checking it — so a
+            // named commit is refused rather than queued unchecked (CodeRabbit #2686).
+            if (!binding) {
+                return { ok: false, code: 'buildProviderUnavailable' };
+            }
+            if (binding.isCommitReachable) {
+                let reachable: boolean;
+                try {
+                    reachable = await binding.isCommitReachable(options.commitSha);
+                } catch (error) {
+                    this.logger.warn(
+                        `App builds: checking that ${options.commitSha} is on the tracked branch of ${workId} failed (${
+                            error instanceof Error ? error.message : String(error)
+                        }); the Rebuild is refused.`,
+                    );
+                    return { ok: false, code: 'buildProviderUnavailable' };
+                }
+                if (!reachable) {
+                    return { ok: false, code: 'commitNotReachable' };
+                }
+            }
         }
 
         const now = Date.now();
@@ -1804,46 +1916,61 @@ export class AppBuildsService {
             });
         }
 
-        const build = await this.insertManualBuild(workId, context, {
-            trigger: 'verification',
-            branch: request.ref,
-            commitSha: request.sha,
-            userId: ownerUserId,
-        });
+        // The insert and the dispatch (which writes `EW_VERIFY__PROMPTED`) run under
+        // the Work's verification-secret lock, so an orphan pass can never delete
+        // the secret this run is about to read (2026-10-17).
+        const locked = await this.withVerifySecretLock(
+            workId,
+            async () => {
+                const build = await this.insertManualBuild(workId, context, {
+                    trigger: 'verification',
+                    branch: request.ref,
+                    commitSha: request.sha,
+                    userId: ownerUserId,
+                });
 
-        const promptedNames = plan.env
-            .filter((entry) => entry.source === 'prompted')
-            .map((entry) => entry.name);
+                const promptedNames = plan.env
+                    .filter((entry) => entry.source === 'prompted')
+                    .map((entry) => entry.name);
 
-        const binding = await this.resolvePlugin(workId);
-        let dispatched: { providerRunId: string | null; dispatchedAt: string } | null = null;
-        try {
-            dispatched =
-                (await binding?.startBuild?.({
-                    buildId: build.id,
-                    ref: request.ref,
-                    sha: request.sha,
-                    mode: 'verify',
-                    ...(request.reuseImageDigest
-                        ? { reuseImageDigest: request.reuseImageDigest }
+                const binding = await this.resolvePlugin(workId);
+                let dispatched: { providerRunId: string | null; dispatchedAt: string } | null =
+                    null;
+                try {
+                    dispatched =
+                        (await binding?.startBuild?.({
+                            buildId: build.id,
+                            ref: request.ref,
+                            sha: request.sha,
+                            mode: 'verify',
+                            ...(request.reuseImageDigest
+                                ? { reuseImageDigest: request.reuseImageDigest }
+                                : {}),
+                            verification: { json: encoded, promptedNames },
+                        })) ?? null;
+                } catch (error) {
+                    this.logger.warn(
+                        `App builds: dispatching verification build ${build.id} failed (${
+                            error instanceof Error ? error.message : String(error)
+                        }).`,
+                    );
+                }
+
+                return this.persist(build, {
+                    ...(dispatched?.providerRunId
+                        ? { providerRunId: dispatched.providerRunId }
                         : {}),
-                    verification: { json: encoded, promptedNames },
-                })) ?? null;
-        } catch (error) {
-            this.logger.warn(
-                `App builds: dispatching verification build ${build.id} failed (${
-                    error instanceof Error ? error.message : String(error)
-                }).`,
-            );
-        }
-
-        const started = await this.persist(build, {
-            ...(dispatched?.providerRunId ? { providerRunId: dispatched.providerRunId } : {}),
-            dispatchedAt: dispatched?.dispatchedAt ? new Date(dispatched.dispatchedAt) : new Date(),
-            ...(promptedNames.length > 0
-                ? { verifySecretNames: [APP_BUILD_VERIFY_PROMPTED_SECRET] }
-                : {}),
-        });
+                    dispatchedAt: dispatched?.dispatchedAt
+                        ? new Date(dispatched.dispatchedAt)
+                        : new Date(),
+                    ...(promptedNames.length > 0
+                        ? { verifySecretNames: [APP_BUILD_VERIFY_PROMPTED_SECRET] }
+                        : {}),
+                });
+            },
+            { waitMs: APP_BUILD_VERIFY_SECRET_LOCK_WAIT_MS },
+        );
+        const started = locked.result as WorkBuild;
 
         await this.publish(started, 'app.build.queued');
         void this.dispatchWatch({ buildId: started.id, reason: 'dispatched' });
@@ -2167,11 +2294,37 @@ export class AppBuildsService {
         }
 
         const { verdict } = await this.verdictFor(row, binding, true);
+
+        // Exactly once (2026-10-17): the move OUT of `digestUnconfirmed` is a
+        // conditional UPDATE, so of two re-checks racing (a pull-token save and a
+        // sweep, two API replicas) only one settles the verdict — and only that one
+        // publishes. The loser answers what the winner wrote.
+        const claimed = await this.claimReconfirmation(row.id, verdict);
+        if (!claimed) {
+            const current = (await this.rowById(row.id)) ?? row;
+            return {
+                reconfirmed: false,
+                reason: 'notDigestUnconfirmed',
+                build: current,
+                deployable: current.deployable,
+                notDeployableReason:
+                    (current.notDeployableReason as AppBuildNotDeployableReason | null) ?? null,
+            };
+        }
         const settled = await this.persist(row, {
             ...digest.patch,
             deployable: verdict.deployable,
             notDeployableReason: verdict.notDeployableReason,
         });
+
+        // A Build confirmed after the fact is deployable NOW, and APW-06's
+        // auto-deploy listens for `app.build.succeeded` with `deployable: true`. The
+        // first succeeded event carried `deployable: false` (`digestUnconfirmed`), so
+        // the late confirmation publishes it again, once (the claim above), with the
+        // settled verdict. No second Activity row: the Build's success was recorded.
+        if (verdict.deployable) {
+            await this.publish(settled, 'app.build.succeeded', true, null, { activity: false });
+        }
         return {
             reconfirmed: true,
             reason: 'reconfirmed',
@@ -2179,6 +2332,33 @@ export class AppBuildsService {
             deployable: verdict.deployable,
             notDeployableReason: verdict.notDeployableReason,
         };
+    }
+
+    /**
+     * `UPDATE work_builds SET deployable, notDeployableReason WHERE id AND
+     * notDeployableReason = 'digestUnconfirmed'` — true only for the call that
+     * moved the row. Without the entity repository there is nothing to race with
+     * (a unit graph), so the claim is granted.
+     */
+    private async claimReconfirmation(
+        buildId: string,
+        verdict: {
+            readonly deployable: boolean;
+            readonly notDeployableReason: AppBuildNotDeployableReason | null;
+        },
+    ): Promise<boolean> {
+        if (!this.rows || typeof this.rows.createQueryBuilder !== 'function') return true;
+        const result = await this.rows
+            .createQueryBuilder()
+            .update(WorkBuild)
+            .set({
+                deployable: verdict.deployable,
+                notDeployableReason: verdict.notDeployableReason,
+            })
+            .where('id = :id', { id: buildId })
+            .andWhere('notDeployableReason = :was', { was: 'digestUnconfirmed' })
+            .execute();
+        return (result.affected ?? 0) === 1;
     }
 
     /**
@@ -2282,12 +2462,20 @@ export class AppBuildsService {
             return unconfirmed;
         }
 
+        // The Work's saved registry pull token, when there is one (§4.12): a private
+        // image can only be read — and so confirmed — with it. Never logged.
+        const pullToken =
+            typeof binding.settings?.pullToken === 'string' && binding.settings.pullToken.trim()
+                ? binding.settings.pullToken
+                : undefined;
+
         let answer: Awaited<ReturnType<NonNullable<AppBuildPluginBinding['checkImageAccess']>>>;
         try {
             answer = await withinDigestReadTimeout(
                 binding.checkImageAccess({
                     imageRepository: repository,
                     tag: `sha-${row.commitSha}`,
+                    ...(pullToken ? { pullToken } : {}),
                 }),
             );
         } catch (error) {
@@ -2391,6 +2579,9 @@ export class AppBuildsService {
         event: AppBuildEventName,
         deployable = false,
         notDeployableReason: AppBuildNotDeployableReason | null = null,
+        // `activity: false` — a re-publication whose transition is already in the
+        // feed (the late digest confirmation): emit and notify, write no second row.
+        options: { readonly activity?: boolean } = {},
     ): Promise<void> {
         const EventClass: AppBuildEventClass | null = APP_BUILD_EVENT_CLASSES[build.status];
         if (!EventClass || EventClass.EVENT_NAME !== event) {
@@ -2406,7 +2597,7 @@ export class AppBuildsService {
 
         const payload = buildEventPayload(build, userId, deployable, notDeployableReason);
 
-        if (this.activityLog && userId) {
+        if (this.activityLog && userId && options.activity !== false) {
             try {
                 await this.activityLog.log({
                     userId,
@@ -2461,6 +2652,251 @@ export class AppBuildsService {
     }
 
     /* ---------------------------------------------------------------------- *
+     * After a pull-token save (§4.12) and the orphaned verification secret (§7.4)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Re-check every recent `digestUnconfirmed` Build of a Work — what a saved
+     * pull token is for (§4.12, §7.4's recheck; 2026-10-17). A private image could
+     * not be read before the token existed, so its Builds were left
+     * `digestUnconfirmed`; `reconfirmDigest` now reads the image WITH the token.
+     *
+     * Bounded to the newest page of succeeded Builds (the ones a member could still
+     * deploy) and sequential, because each is a registry round trip. A failure is
+     * counted, never thrown.
+     */
+    async reconfirmUnconfirmedDigests(workId: string): Promise<{
+        readonly checked: number;
+        readonly reconfirmed: number;
+        readonly failed: number;
+    }> {
+        const page = await this.builds.findPage(
+            workId,
+            { status: ['succeeded'] },
+            1,
+            APP_BUILD_LIST_PAGE_SIZE,
+        );
+        let checked = 0;
+        let reconfirmed = 0;
+        let failed = 0;
+        for (const row of page.rows) {
+            if (row.notDeployableReason !== 'digestUnconfirmed') continue;
+            checked += 1;
+            try {
+                const result = await this.reconfirmDigest(row.id);
+                if (result.reconfirmed) reconfirmed += 1;
+            } catch (error) {
+                failed += 1;
+                this.logger.warn(
+                    `App builds: re-checking the digest of build ${row.id} failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+            }
+        }
+        return { checked, reconfirmed, failed };
+    }
+
+    /**
+     * Remove a verification Build's per-run prompted-value secret and forget it
+     * (§4.10:1019, §7.4's orphan pass; 2026-10-17). `true` only when the secret
+     * was handled (deleted or already absent) AND the record cleared.
+     */
+    async removeOrphanedVerifySecret(buildId: string): Promise<boolean> {
+        const first = await this.rowById(buildId);
+        if (
+            !first ||
+            first.trigger !== 'verification' ||
+            (first.verifySecretNames ?? []).length === 0
+        ) {
+            return false;
+        }
+
+        // Under the Work's verification-secret lock (2026-10-17): the check below and
+        // the delete cannot interleave with a `startVerification` insert + dispatch.
+        // Held elsewhere ⇒ nothing is done now; the next sweep tick retries.
+        const locked = await this.withVerifySecretLock(first.workId, async () => {
+            // Re-read under the lock: the watch runner may have cleared it meanwhile.
+            const row = await this.rowById(buildId);
+            if (!row || (row.verifySecretNames ?? []).length === 0) return false;
+            // A Build still running may still read its secret: never delete under it.
+            if (!isTerminalBuildStatus(row.status)) return false;
+
+            // `EW_VERIFY__PROMPTED` is ONE repository secret, so a newer verification
+            // Build of the same Work owns it while it is open: only this row's record
+            // is cleared, and the newer run's own terminal transition removes it.
+            if (await this.hasOtherOpenVerification(row)) {
+                await this.persist(row, { verifySecretNames: [] });
+                return false;
+            }
+
+            const binding = await this.resolvePlugin(row.workId);
+            if (!binding?.deleteVerifyPromptedSecret) return false;
+            await binding.deleteVerifyPromptedSecret();
+            await this.persist(row, { verifySecretNames: [] });
+            return true;
+        });
+        return locked.acquired ? locked.result === true : false;
+    }
+
+    /**
+     * Run `fn` under one Work's verification-secret lock (see
+     * {@link APP_BUILD_VERIFY_SECRET_LOCK_PREFIX}).
+     *
+     * `waitMs` (startVerification) retries while another holder finishes — a
+     * deletion holds it for one request — and then runs `fn` unlocked rather than
+     * refuse the verification; that fallback is logged. Without `waitMs` a held
+     * lock answers `{ acquired: false }` and `fn` does not run (the deletions retry
+     * on their next trigger). With no lock service bound, `fn` runs directly.
+     */
+    async withVerifySecretLock<T>(
+        workId: string,
+        fn: () => Promise<T>,
+        options: { readonly waitMs?: number } = {},
+    ): Promise<{ readonly acquired: boolean; readonly result?: T }> {
+        if (!this.locks) return { acquired: true, result: await fn() };
+        const key = appBuildVerifySecretLockKey(workId);
+        const deadline = Date.now() + Math.max(0, options.waitMs ?? 0);
+        for (;;) {
+            const attempt = await this.locks.runExclusive(key, fn, {
+                ttlMs: APP_BUILD_VERIFY_SECRET_LOCK_TTL_MS,
+                maxLifetimeMs: APP_BUILD_VERIFY_SECRET_LOCK_TTL_MS * 2,
+            });
+            if (attempt.acquired) return attempt;
+            if (options.waitMs === undefined) return { acquired: false };
+            if (Date.now() >= deadline) {
+                this.logger.warn(
+                    `App builds: the verification-secret lock of work ${workId} stayed held for ${options.waitMs} ms; going ahead without it.`,
+                );
+                return { acquired: true, result: await fn() };
+            }
+            await new Promise((resolve) => setTimeout(resolve, VERIFY_SECRET_LOCK_RETRY_MS));
+        }
+    }
+
+    /** Another queued or running verification Build of the same Work. */
+    async hasOtherOpenVerification(row: WorkBuild): Promise<boolean> {
+        const open = await this.builds.findPage(
+            row.workId,
+            { trigger: ['verification'], status: ['queued', 'running'] },
+            1,
+            APP_BUILD_LIST_PAGE_SIZE,
+        );
+        return open.rows.some((other) => other.id !== row.id);
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * listForWork (§5:1194, APW-05 T23)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * The Builds list of one App Work — plan §5's `GET /api/works/:id/builds`.
+     *
+     * Everything a page of Builds needs in one answer, so the web makes one call:
+     * the rows, the resolved provider (the web never embeds a plugin id), the
+     * repository, the image repository, the preparation row's workflow state
+     * (`{ state: 'none', pullRequestUrl: null }` with no row — `APW05-G03`) and the
+     * pull-token facts. **Never the token**: `pullAccess.tokenSet` is a boolean.
+     *
+     * A provider that cannot be resolved is not an error here: the list still
+     * answers its rows, with `provider: null`, so a member can see the Builds that
+     * already exist while the integration is broken.
+     */
+    async listForWork(
+        workId: string,
+        query: AppBuildListQuery = {},
+        userId?: string,
+    ): Promise<AppBuildListResponse> {
+        const page = Math.max(1, Math.floor(Number(query.page ?? 1)) || 1);
+        const pageSize = Math.min(
+            APP_BUILD_LIST_MAX_PAGE_SIZE,
+            Math.max(1, Math.floor(Number(query.pageSize ?? APP_BUILD_LIST_PAGE_SIZE)) || 1),
+        );
+        const status = listFilter(query.status, APP_BUILD_STATUSES);
+        const trigger = listFilter(query.trigger, APP_BUILD_TRIGGERS);
+        const pullRequestNumber =
+            query.pullRequest !== undefined && Number.isInteger(Number(query.pullRequest))
+                ? Number(query.pullRequest)
+                : undefined;
+
+        const result = await this.builds.findPage(
+            workId,
+            {
+                ...(status.length > 0 ? { status } : {}),
+                ...(trigger.length > 0 ? { trigger } : {}),
+                ...(query.branch ? { branch: String(query.branch) } : {}),
+                ...(pullRequestNumber !== undefined ? { pullRequestNumber } : {}),
+            },
+            page,
+            pageSize,
+        );
+
+        const context = await this.readWork(workId);
+        const binding = context ? await this.resolvePlugin(workId) : null;
+
+        let preparation: WorkBuildPreparation | null = null;
+        try {
+            preparation = await this.preparations.findByWork(workId);
+        } catch (error) {
+            this.logger.warn(
+                `App builds: reading the preparation row of ${workId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the list answers workflow state 'none'.`,
+            );
+        }
+
+        const settings = binding?.settings ?? {};
+        const tokenSet =
+            typeof settings.pullToken === 'string' && settings.pullToken.trim().length > 0;
+        const tokenExpiresAt =
+            typeof settings.pullTokenExpiresAt === 'string' ? settings.pullTokenExpiresAt : null;
+
+        return {
+            items: result.rows.map(toAppBuildSummary),
+            total: result.total,
+            page: result.page,
+            pageSize: result.pageSize,
+            provider: binding
+                ? {
+                      pluginId: binding.pluginId,
+                      name: binding.name ?? binding.pluginId,
+                      buildKind: binding.buildKind,
+                  }
+                : null,
+            repository: context
+                ? {
+                      fullName: context.repositoryFullName,
+                      visibility: context.repositoryVisibility,
+                  }
+                : null,
+            imageRepository: binding?.imageRepository ?? null,
+            workflow: {
+                state: preparation?.workflowState ?? 'none',
+                pullRequestUrl: preparation?.workflowPullRequestUrl ?? null,
+            },
+            pullAccess: {
+                // The image's visibility is the registry's answer (§4.12) and is
+                // only known after a pull-token check; the repository's is not
+                // the image's, so the list does not guess.
+                visibility: 'unknown',
+                tokenSet,
+                tokenExpiresAt,
+            },
+            canEdit: await this.canEdit(workId, userId),
+        };
+    }
+
+    /** `APP_BUILD_EDIT_ACCESS`, fail-closed: unbound, no caller, or a throwing check ⇒ `false`. */
+    private async canEdit(workId: string, userId?: string): Promise<boolean> {
+        if (!this.editAccess || !userId) return false;
+        try {
+            return (await this.editAccess.isEditor(workId, userId)) === true;
+        } catch {
+            return false;
+        }
+    }
+
+    /* ---------------------------------------------------------------------- *
      * getDetail (§5:1197, APW-04's poll fallback)
      * ---------------------------------------------------------------------- */
 
@@ -2473,11 +2909,15 @@ export class AppBuildsService {
      * claim edit rights. `buildValueNames` is `buildSecretNames`: the NAMES only,
      * never a value (`plan.md:1204-1205`).
      */
-    async getDetail(workId: string, buildId: string): Promise<AppBuildDetail | null> {
+    async getDetail(
+        workId: string,
+        buildId: string,
+        userId?: string,
+    ): Promise<AppBuildDetail | null> {
         const row = await this.builds.findByIdForWork(workId, buildId);
         if (!row) return null;
 
-        const canEdit = (await this.editAccess?.isEditor(workId)) ?? false;
+        const canEdit = await this.canEdit(workId, userId);
 
         return {
             ...toAppBuildSummary(row),

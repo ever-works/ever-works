@@ -220,7 +220,9 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
 
             await controller.receiveEvents(req as never, signature, 'pull_request');
 
-            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', body);
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', body, {
+                appSecretVerified: false,
+            });
         });
 
         it('never 500s this route for an App-sync failure (new consumer, logged not thrown)', async () => {

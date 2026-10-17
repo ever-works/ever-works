@@ -298,7 +298,13 @@ export class GitHubWebhookDispatcherService {
             );
         } else {
             try {
-                await this.appSync.handleWebhook(eventName, body as never);
+                // `appSecretVerified` is what lets the sync leg auto-claim an
+                // installation for its recorded installer (the `installation`
+                // webhook `sender`): only GitHub's own signature vouches for
+                // that sender, never a tenant's per-install secret.
+                await this.appSync.handleWebhook(eventName, body as never, {
+                    appSecretVerified: credential === 'app-secret',
+                });
                 syncHandled = true;
             } catch (error) {
                 errors.sync = error;

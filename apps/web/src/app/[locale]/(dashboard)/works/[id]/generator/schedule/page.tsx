@@ -5,7 +5,7 @@ import {
 } from '@/components/works/detail/schedule/WorkScheduleCard';
 import { WorkScheduleHeader } from '@/components/works/detail/schedule/WorkScheduleHeader';
 import { canManageSchedule } from '@/lib/permissions';
-import { isRepositoryWorkKind } from '@ever-works/contracts';
+import { isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import type { GeneratorFormSchema, ProviderOption } from '@/lib/api/types-only';
@@ -90,6 +90,11 @@ export default async function WorkSchedulePage({ params }: Params) {
     // the API refuses generation for the kind. Not served (the Generator tab
     // that links here is hidden too; this covers a typed URL).
     if (isRepositoryWorkKind(work.kind)) {
+        notFound();
+    }
+    // APW-01 T24 (spec S10, ACC-01-11) — an App Work has no generator either:
+    // its code is somebody's repository, built and deployed as is. Same refusal.
+    if (isAppWorkKind(work.kind)) {
         notFound();
     }
 

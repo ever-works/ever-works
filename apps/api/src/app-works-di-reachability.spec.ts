@@ -184,29 +184,14 @@ interface OpenGap extends Expected {
  */
 const EXPECTED_UNBOUND: readonly Expected[] = [
     {
-        key: 'AppBuildsModule[agent] | AppBuildPullTokenService | APP_BUILD_PLATFORM_SETTINGS_WRITER',
-        reason: '`PluginSettingsService.writePlatformManagedWorkSettings` does not exist yet; the port waits for it.',
-        source: 'packages/agent/src/app-builds/app-build-pull-token.service.ts:43-52 (APW-05 T17; plan §4.12:1116-1119)',
-    },
-    {
-        key: 'AppBuildsModule[agent] | AppBuildsService | APP_BUILD_EDIT_ACCESS',
-        reason: 'Provisional port for the Builds controller ownership read; unbound ⇒ `canEdit: false`.',
-        source: 'packages/agent/src/app-builds/app-builds.service.ts:316-321; APW-05 T23 (tasks.md:548-556)',
-    },
-    {
         key: 'AppBuildsModule[agent] | AppBuildsService | APP_PROVISION_EVENTS_PORT',
-        reason: "APW-04's provisioner events port; the provisioner is not in this tree.",
-        source: 'docs/specs/features/app-works/CONTRACTS.md:366 (added by APW-04); APW-04 T19 (tasks.md:307,326)',
+        reason: "APW-04's events port is bound by `AppWorksModule` (2026-10-17, lane aw-ai), which `AppBuildsModule` deliberately does not import (it compiles standalone); `buildUpdated` is record-only in APW-04 P1, so unbound answers the same.",
+        source: 'packages/agent/src/app-works/app-provisioning.service.ts (AppProvisionEventsService.buildUpdated); packages/agent/src/app-builds/app-builds.module.ts:245-256 (the ModuleRef-only rule); APW-04 T19 (tasks.md:307,326)',
     },
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_DEPENDENCY_CLUSTER_ACCESS',
         reason: 'Worker-only by design: its swap, `AppRuntimeFacadeService`, refuses outside the isolated worker and no dependency provider is dialled from the API (FR-5); unbound, a cluster call reports `mayRemain`.',
         source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:308-329; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
-    },
-    {
-        key: 'AppDependenciesModule | AppDependenciesService | APP_DEPENDENCY_SPEC_SOURCE',
-        reason: "APW-07's module owner binds the dependency spec source (T25); unwritten, so `reconcile` fails closed `specUnavailable` and nothing is created or dispatched.",
-        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:230-265 (APW-07 T25, tasks.md:380)',
     },
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_RUNTIME_EVENT_SINK',
@@ -219,19 +204,9 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:107-125 (APW-06 T73, APW-06/tasks.md:1271-1276)',
     },
     {
-        key: 'AppDeployRequestModule | AppDeployPreconditionsService | APPS_TIER_POLICY',
-        reason: "APW-10's tier policy is unwritten in this tree.",
-        source: 'packages/agent/src/app-runtime/app-deploy-request.module.ts:73; APW-10 T27 (tasks.md:466,475)',
-    },
-    {
-        key: 'AppDeployRequestModule | AppDeployPreconditionsService | APP_DEPLOY_HOST_SOURCE',
-        reason: '`AppHostsService` exists but its eight stores are unbound, so binding it would answer null; the check is advisory.',
-        source: 'packages/agent/src/app-runtime/app-deploy-request.module.ts:69-72; app-deploy-preconditions.service.ts:249 (APW-06 T26)',
-    },
-    {
-        key: 'AppDeployRequestModule | AppLicenseGate | APP_LICENSE_SERVICE',
-        reason: "APW-03's licence service is unwritten; the gate answers its documented unreadable verdict (managed target refused, your cluster warned).",
-        source: 'packages/agent/src/app-runtime/app-license-gate.ts:78-109 (APW-03 T42, tasks.md:728)',
+        key: 'AppDeployRequestModule | AppHostsService | APP_HOSTS_REBUILD_REQUESTER',
+        reason: "APW-05's rebuild requester is unwritten (the hosts service is provided in the API since C43, lane aw-deploy-2).",
+        source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
     },
     {
         key: 'AppEnvModule | AppEnvService | APP_ENV_ACTIVITY',
@@ -254,20 +229,12 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         source: 'packages/agent/src/app-env/app-env.service.ts:299-311 (APW-06); app-works-port-dormancy.spec.ts:59-60',
     },
     {
-        key: 'AppLauncherModule[agent] | AppLauncherService | APPS_TIER_POLICY',
-        reason: "APW-10's tier policy is unwritten in this tree.",
-        source: 'docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md:466,475 (APW-10 T27)',
-    },
-    {
         key: 'AppLauncherModule[agent] | AppLauncherService | APP_PUBLISHED_HOSTS',
         reason: "APW-06's `AppHostsService` binds it and its stores are unbound; unbound, the FR-16 order applies.",
         source: 'packages/agent/src/app-launcher/managed-host-root.resolver.ts:117-130 (APW-06 T26)',
     },
-    {
-        key: 'AppLauncherModule[agent] | AppLauncherService | APP_SPEC_DISPLAY_NAMES',
-        reason: "APW-03's display-name reader; unbound, the launcher shows the Work's own name.",
-        source: 'packages/agent/src/app-launcher/app-launcher.service.ts:238 (bound by APW-03)',
-    },
+    // `AppLauncherModule[agent] | AppLauncherService | APP_SPEC_DISPLAY_NAMES` left this list
+    // on 2026-10-17: the agent AppLauncherModule now binds it over the real WorkAppSpecState rows.
     {
         key: 'AppLauncherModule[api] | LauncherDelegatedCorsMiddleware (middleware) | Object',
         reason: 'A test seam (`origins?: readonly string[]`), never a DI token; `@Optional()` is what lets the API boot.',
@@ -277,26 +244,6 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         key: 'AppLauncherModule[api] | PlatformCatalogService | PLATFORM_CATALOG_FETCH',
         reason: 'Unbound in production on purpose: the service uses `globalThis.fetch`; specs bind it.',
         source: 'apps/api/src/app-launcher/platform-catalog.service.ts:127-132',
-    },
-    {
-        key: 'AppWorksModule[agent] | APP_SOURCE_CATALOG_PORT (useClass AppSourceCatalogAdapter) | APP_BLUEPRINT_APPLY_SERVICE',
-        reason: 'A Blueprint match stays behind the apply gate until T28 binds the apply service.',
-        source: 'docs/specs/features/app-works/APW-03-app-spec-and-catalog/tasks.md:496 (APW-03 T28)',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppSourceInitializerService | APP_BLUEPRINT_APPLY_SERVICE',
-        reason: "The ready handler's apply step; owned by APW-03 T28.",
-        source: 'packages/agent/src/app-works/app-source-initializer.service.ts:235; apps/api/src/app-works/app-works.module.ts:69-79',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppSourceInitializerService | APP_LICENSE_SERVICE',
-        reason: "APW-03's licence service is unwritten in this tree.",
-        source: 'packages/agent/src/app-runtime/app-license-gate.ts:108 (APW-03 T42, tasks.md:728)',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppSourceInitializerService | APP_PROVISIONING_SERVICE',
-        reason: "APW-04's provisioner is not in this tree.",
-        source: 'packages/agent/src/app-works/app-source-initializer.service.ts:267; apps/api/src/app-works/app-works.module.ts:69-79 (APW-04)',
     },
     {
         key: 'AppWorksModule[agent] | AppSourceInitializerService | AppSpecService',
@@ -309,64 +256,19 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         source: 'apps/api/src/app-works/app-works.module.ts:133-144 (APW-01 T15)',
     },
     {
-        key: 'AppWorksModule[agent] | AppSourceInspectorService | APPS_TIER_POLICY',
-        reason: "APW-10's tier policy is unwritten in this tree.",
-        source: 'docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md:466,475 (APW-10 T27)',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppUpstreamStateService | APP_UPSTREAM_SYNC_DISPATCHER',
-        reason: "The sync dispatcher's runtime binding belongs to APW-02 T31.",
-        source: 'packages/agent/src/app-works/app-upstream-state.service.ts:434; apps/api/src/app-works/app-works.module.ts:69-79',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppUpstreamStateService | APP_WORK_AGENT_RESOLVER',
-        reason: "APW-08's agent-resolution rule is unwritten in this tree.",
-        source: 'packages/agent/src/app-works/app-upstream-state.service.ts:392; APW-08 T25 (tasks.md:580-588)',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppUpstreamSyncDispatcherService | APP_UPSTREAM_SYNC_DISPATCHER',
-        reason: "The sync dispatcher's runtime binding belongs to APW-02 T31.",
-        source: 'packages/agent/src/app-works/app-upstream-state.service.ts:434 (APW-02 T31, tasks.md:469)',
-    },
-    {
-        key: 'AppWorksModule[agent] | AppWorkCreateService | APPS_TIER_POLICY',
-        reason: "APW-10's tier policy is unwritten in this tree.",
-        source: 'docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md:466,475 (APW-10 T27)',
-    },
-    {
         key: 'AppWorksModule[agent] | AppWorkCreateService | APP_PROMPTED_VALUES_PORT',
         reason: 'Unbound on purpose: binding it means inventing the actor and ordering APW-07 T24/T25 own.',
         source: 'packages/agent/src/app-runtime/__tests__/app-works-port-dormancy.spec.ts:373-379; app-works/app-prompted-values.port.ts:46-53',
     },
     {
-        key: 'AppWorksModule[api] | AppForkReadinessService | APP_PROVISION_EVENTS_PORT',
-        reason: "APW-04's provisioner events port; the provisioner is not in this tree.",
-        source: 'docs/specs/features/app-works/APW-02-fork-lifecycle/tasks.md:354; APW-04 T19 (tasks.md:307,326)',
-    },
-    {
-        key: 'AppWorksModule[api] | AppSourceInitializerService | APP_BLUEPRINT_APPLY_SERVICE',
-        reason: "The ready handler's apply step; owned by APW-03 T28.",
-        source: 'apps/api/src/app-works/app-works.module.ts:69-79; APW-03 T28 (tasks.md:530)',
-    },
-    {
-        key: 'AppWorksModule[api] | AppSourceInitializerService | APP_LICENSE_SERVICE',
-        reason: "APW-03's licence service is unwritten in this tree.",
-        source: 'packages/agent/src/app-runtime/app-license-gate.ts:108 (APW-03 T42, tasks.md:728)',
-    },
-    {
-        key: 'AppWorksModule[api] | AppSourceInitializerService | APP_PROVISIONING_SERVICE',
-        reason: "APW-04's provisioner is not in this tree.",
-        source: 'apps/api/src/app-works/app-works.module.ts:69-79 (APW-04)',
-    },
-    {
-        key: 'FacadesModule | AppRuntimeFacadeService | APPS_TIER_POLICY',
-        reason: "APW-10's tier policy is unwritten; absent, the facade answers `tier_closed`, the fail-closed default. In the API every method refuses (`APP_CLUSTER_IO_IN_API`) before this is read anyway.",
-        source: 'packages/agent/src/facades/app-runtime.facade.ts:50-56,85; docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md:466 (APW-10 T27)',
-    },
-    {
         key: 'FacadesModule | AppRuntimeFacadeService | WORK_APP_RUNTIME_STATES',
         reason: 'Worker-only facade: in the API every method throws `APP_CLUSTER_IO_IN_API` before any read, so the row is never read here. Its worker binding is T71 status item (b) (see EXPECTED_WORKER_UNBOUND).',
         source: 'packages/agent/src/facades/app-runtime.facade.ts:50-56,86; docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1220-1234 (APW-06 T71)',
+    },
+    {
+        key: 'FacadesModule | DeployFacadeService | AppDomainsService',
+        reason: 'C43, closed 2026-10-17 (lane aw-deploy-2): FacadesModule cannot import the module that provides `AppDomainsService` without a cycle, so in the API the facade reaches it through a non-strict `ModuleRef` lookup (`AppDeployRequestModule` provides it); the constructor parameter stays for the worker, which binds it directly.',
+        source: 'packages/agent/src/facades/deploy.facade.ts:137-152,543-551; packages/agent/src/app-runtime/app-deploy-request.module.ts',
     },
     {
         key: 'WorkModule | WorkLifecycleService | APP_WORK_DELETION_PORT',
@@ -379,15 +281,7 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
  * API-graph gaps this spec found that are NOT deliberate, routed to the lane that owns the
  * file (see {@link OpenGap}). Shrinking it is owed, not optional.
  */
-const OPEN_API_GAPS: readonly OpenGap[] = [
-    {
-        key: 'FacadesModule | DeployFacadeService | AppDomainsService',
-        reason: "APW-06 T26's App branch of `getDomains`/`addDomain`/`removeDomain`/`verifyDomain` is dead in the API: no API module provides `AppDomainsService` (only the worker's `TriggerAppRuntimeModule` does), so an App Work's custom-domain click takes the website path (recorded gap C43; the facade's docstring now says so).",
-        source: 'packages/agent/src/facades/deploy.facade.ts:137-145,509-511 (found 2026-09-26)',
-        routedTo:
-            "Owner ruling (2026-09-30): a recorded gap (C43). The docstring is corrected and this entry stays until a slice binds `AppDomainsService` where FacadesModule's `DeployFacadeService` can see it (FacadesModule cannot import AppRuntimeStateModule without a cycle, so likely a lazy ModuleRef lookup).",
-    },
-];
+const OPEN_API_GAPS: readonly OpenGap[] = [];
 
 /** App Works module classes the API graph deliberately does not import. None today. */
 const EXPECTED_UNREACHABLE_MODULES: readonly Expected[] = [];
@@ -414,89 +308,44 @@ const EXPECTED_REMOTE_MISSES: readonly Expected[] = [];
  */
 const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
     {
-        key: "AppDependencyProvisionWorkerModule :: 'WorkAppDependencyRepository'",
-        reason: "The entity's TypeORM repository (row creation): a remote proxy cannot carry it, so the dependency worker composition needs repository methods first.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+        key: 'AppDependencyProvisionWorkerModule :: APP_DEPLOY_DISPATCHER_AVAILABILITY',
+        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_DEPLOY_DISPATCHER_AVAILABILITY` row for the reason.",
+        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CLUSTER_ACCESS',
-        reason: "Its swap is `AppRuntimeFacadeService`, which lives in T71's module; this task's lean module is not that one.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+        key: 'AppDependencyProvisionWorkerModule :: APP_HEALTH_EGRESS_SOURCE',
+        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_HEALTH_EGRESS_SOURCE` row for the reason.",
+        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CONFIG_CIPHER',
-        reason: '`AppEnvCrypto` and its key inside the isolated worker are part of the open dependency worker composition.',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+        key: 'AppDependencyProvisionWorkerModule :: APP_HOSTS_REBUILD_REQUESTER',
+        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER` row for the reason.",
+        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_PROVISION_DISPATCHER',
-        reason: "The runner's re-dispatch; this context imports no job-runtime binding (reported `dispatcherUnavailable`).",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+        key: 'AppDependencyProvisionWorkerModule :: APP_LICENSE_SERVICE',
+        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_LICENSE_SERVICE` row for the reason.",
+        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_SPEC_SOURCE',
-        reason: "APW-07's module owner binds the dependency spec source (T25); unwritten.",
-        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:264 (APW-07 T25, tasks.md:380)',
+        key: 'AppDependencyProvisionWorkerModule :: APP_WORK_DELETION_COMPLETION',
+        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION` row for the reason.",
+        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_RUNTIME_EVENT_SINK',
-        reason: 'The relay (`AppRuntimeEventRelayService`) is APW-06 T28 and is not in this tree.',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:132-133 (APW-06 T28)',
+        key: 'AppUpstreamSyncWorkerModule :: APP_UPSTREAM_PRIVATE_COPY_PORT',
+        reason: "FR-63's private-copy compare/move capability is a plugin capability that is not written; unbound, a private copy's sync is `failed/provider_unsupported` (a fork's sync is unaffected).",
+        source: 'packages/agent/src/app-works/app-upstream-sync.service.ts:200-250 (APW-02 P1 plugin capability, FR-63)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_RUNTIME_TARGET',
-        reason: 'Only a fail-closed default exists until T73 publishes the port; unbound answers the same refusal.',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:107-125 (APW-06 T73)',
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: AppDependencyFacadeService',
-        reason: 'The provider selection lives in the facades graph this lean context does not import.',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: WorkAppDependencyRepository',
-        reason: 'Needs a `remoteMap` name and the row-write redesign above; unbound, every run answers `storeUnavailable` and dials nothing.',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APPS_DOMAIN_DNS_SERVICE',
-        reason: "APW-06's managed-subdomain task is unwritten.",
-        source: 'packages/agent/src/app-runtime/app-runtime-deletion.service.ts:525',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_CLUSTER_OP_DISPATCHER',
-        reason: 'No cluster-op dispatcher exists in any process yet (unbound in the API too).',
-        source: 'packages/agent/src/app-runtime/app-runtime-deletion.service.ts:507 (APW-06 T31/T32); app-works-port-dormancy.spec.ts:349',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_COMMIT_ANCESTRY',
-        reason: "APW-02's commit-ancestry reader is unwritten.",
-        source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:170 (owned by APW-02)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_CUSTOM_DOMAIN_STORE',
-        reason: "The swap is the proxied `WorkCustomDomainRepository`; bound without the runtime-state row, hosts would ignore the owner's settings.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_DEPENDENCIES_SERVICE',
-        reason: "APW-07's service must run in the worker, and its `@InjectRepository(WorkAppDependency)` writes cannot cross the internal channel.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:170-172',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DEPLOYMENT_STORE',
-        reason: "The API's adapter has no `update`, which the orchestrator's view of the token needs; which class carries it is undecided.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:162-164',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DISPATCHER',
-        reason: "The orchestrator's dequeue dispatch: T24 declares the token and T31 binds it; inside the worker it is also the open §5.1/§5.6 dispatcher-gate decision (T71 status item (a)).",
-        source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:98-100 (APW-06 T31); APW-06/tasks.md:1228-1232',
+        key: 'AppUpstreamSyncWorkerModule :: ActivityLogService',
+        reason: 'The worker has no `ActivityLogService` and no database module; the sync outcome is settled on the row through the state-service proxy, but its `app.upstream.*` / `app.actions.*` Activity rows are not written from the worker.',
+        source: 'packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts:161-163 (no ActivityLogService in worker scope)',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DISPATCHER_AVAILABILITY',
-        reason: 'What "an isolated dispatcher is available" means inside the worker is an open §5.1/§5.6 decision (T71 status item (a)); every dequeued Deployment answers `worker_not_isolated` meanwhile.',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1228-1232 (APW-06 T71 status (a))',
+        reason: 'Deliberately unbound — decision B1 (2026-10-17): inside the isolated worker §5.1 step 1 is answered by the run itself (the lock-holding `deploymentId`, `AppDeployPreconditionsService.evaluate`), so the gate is not consulted for a dequeued Deployment and a lock-less one still meets `worker_not_isolated`.',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1228-1232 (APW-06 T71 status (a), decision B1); packages/agent/src/app-runtime/app-deploy-preconditions.service.ts:428-461',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_HEALTH_EGRESS_SOURCE',
@@ -504,34 +353,9 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/agent/src/app-runtime/app-health.service.ts:722-736',
     },
     {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_APPS_DOMAIN',
-        reason: 'The swap is `config.everWorks.apps`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOYMENT_STORE',
-        reason: 'The swap is the proxied `WorkDeploymentRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOY_REQUESTER',
-        reason: "Bound to the API's `AppDeployRequestService`; §6.4 lists no proxy, so whether the worker may request a Deployment is undecided.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:165-166; docs/specs/features/app-works/APW-06-app-runtime/plan.md:982-989',
-    },
-    {
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "APW-05's rebuild requester is unwritten.",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_WORK_STORE',
-        reason: 'The swap is the proxied `WorkRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_IMAGE_REFERENCE_RESOLVER',
-        reason: '`AppImageReferenceResolver` does not exist yet.',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:131 (APW-06 T72)',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_LICENSE_SERVICE',
@@ -539,39 +363,9 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:134-135 (APW-03 T42)',
     },
     {
-        key: 'TriggerAppRuntimeModule :: APP_PROVISION_EVENTS_PORT',
-        reason: "APW-04's provisioner events port; the provisioner is not in this tree.",
-        source: 'docs/specs/features/app-works/CONTRACTS.md:366; APW-04 T19 (tasks.md:307,326)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_RUNTIME_EVENT_SINK',
-        reason: 'The relay (`AppRuntimeEventRelayService`) is APW-06 T28 and is not in this tree.',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:132-133 (APW-06 T28)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_RUNTIME_NOTIFICATIONS',
-        reason: "APW-06 T29's notification producers are unwritten.",
-        source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:173 (APW-06 T29)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_TARGET_UPDATED_PORT',
-        reason: "APW-04's port; the provisioner is not in this tree.",
-        source: 'packages/agent/src/app-runtime/app-lifecycle-ops.service.ts:359 (owned by APW-04)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_UPSTREAM_STATE_READER',
-        reason: "APW-02's upstream-state reader adapter is unwritten.",
-        source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:167 (owned by APW-02)',
-    },
-    {
         key: 'TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION',
         reason: 'Deletes the Work row; its binding is owed by T33/T58 and, unbound, a finished removal keeps the row (the fail-closed answer).',
         source: 'packages/agent/src/app-runtime/app-runtime-deletion.service.ts:320-331 (APW-06 T33/T58)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: WORK_APP_RUNTIME_STATES',
-        reason: "§6.4's `WorkAppRuntimeStateRepository` proxy is T71 status item (b); it needs a `remoteMap` name and turns on the health, op, smoke and deletion paths at once.",
-        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1232 (APW-06 T71 status (b))',
     },
 ];
 
@@ -2308,6 +2102,7 @@ if (process.env[CHILD_FLAG] === undefined) {
                     'AppBuildWatchWorkerModule',
                     'AppDependencyProvisionWorkerModule',
                     'AppForkReadinessWorkerModule',
+                    'AppUpstreamSyncWorkerModule',
                     'TriggerAppRuntimeModule',
                 ]),
             );
@@ -2357,6 +2152,8 @@ if (process.env[CHILD_FLAG] === undefined) {
                     "AppBuildSweepWorkerModule :: remote 'AppBuildSweepService'",
                     "AppBuildWatchWorkerModule :: remote 'AppBuildWatchRunner'",
                     "AppForkReadinessWorkerModule :: remote 'AppForkReadinessRunner'",
+                    "AppUpstreamSyncWorkerModule :: remote 'AppLicenseService'",
+                    "AppUpstreamSyncWorkerModule :: remote 'AppSpecService'",
                     "TriggerAppRuntimeModule :: remote 'AppDeployBuildSourceAdapter'",
                     "TriggerAppRuntimeModule :: remote 'AppSpecService'",
                 ]),

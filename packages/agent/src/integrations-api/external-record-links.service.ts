@@ -1,6 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, type EntityManager, In } from 'typeorm';
+import { DataSource, type EntityManager, type EntityTarget, In, type ObjectLiteral } from 'typeorm';
+import { Agent } from '../entities/agent.entity';
+import { Goal } from '../entities/goal.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
+import { MemoryFolder } from '../entities/memory-folder.entity';
+import { Mission } from '../entities/mission.entity';
+import { Task } from '../entities/task.entity';
+import { TaskChatMessage } from '../entities/task-chat-message.entity';
+import { Team } from '../entities/team.entity';
+import { Work } from '../entities/work.entity';
+import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
 import {
     ExternalRecordLink,
     type ExternalLinkEntityType,
@@ -92,6 +103,24 @@ export function toExternalRecordLinkDto(row: ExternalRecordLink): ExternalRecord
  * database's (`uq_external_record_links_external` / `_entity`); a collision
  * surfaces as {@link DuplicateExternalRefError}.
  */
+/**
+ * The table of each link target type (review 2026-10-17 F9: a link to a deleted row
+ * is stale). `member` is a user id scoped by the roster, so it is never judged here.
+ */
+const LINK_TARGET_ENTITIES: Partial<Record<ExternalLinkEntityType, EntityTarget<ObjectLiteral>>> = {
+    agent: Agent,
+    team: Team,
+    work: Work,
+    mission: Mission,
+    goal: Goal,
+    idea: WorkProposal,
+    task: Task,
+    task_comment: TaskChatMessage,
+    inbox_item: InboxItem,
+    kb_document: WorkKnowledgeDocument,
+    kb_folder: MemoryFolder,
+};
+
 @Injectable()
 export class ExternalRecordLinksService {
     constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
@@ -100,14 +129,24 @@ export class ExternalRecordLinksService {
         return (manager ?? this.dataSource.manager).getRepository(ExternalRecordLink);
     }
 
-    /** The Ever Works record an external record is linked to, if any (the `externalRef` replay check). */
-    findByExternal(
+    /**
+     * The Ever Works record an external record is linked to, if any (the `externalRef`
+     * replay check, a create's race winner, PUT's "already taken" check).
+     *
+     * Review 2026-10-17 F9: a link whose Ever Works record no longer exists (deleted in
+     * the app, or with its Work, so no integration DELETE ever dropped the link) is
+     * removed and answers `null`. Otherwise every later create with that externalRef
+     * answered 404 for good, and `PUT /links` of a new record answered 409 against the
+     * deleted id. Only a missing ROW counts: a private record still exists and keeps
+     * its link.
+     */
+    async findByExternal(
         scope: LinkScope,
         entityType: ExternalLinkEntityType,
         externalId: string,
         manager?: EntityManager,
     ): Promise<ExternalRecordLink | null> {
-        return this.repo(manager).findOne({
+        const link = await this.repo(manager).findOne({
             where: {
                 organizationId: scope.organizationId,
                 source: scope.source,
@@ -116,6 +155,22 @@ export class ExternalRecordLinksService {
                 externalId,
             },
         });
+        if (!link || (await this.targetExists(link, manager))) return link;
+        await this.repo(manager).delete({ id: link.id });
+        return null;
+    }
+
+    /** Whether the record a link points at still exists (types without a table here count as existing). */
+    private async targetExists(
+        link: ExternalRecordLink,
+        manager?: EntityManager,
+    ): Promise<boolean> {
+        const entity = LINK_TARGET_ENTITIES[link.entityType];
+        if (!entity) return true;
+        const found = await (manager ?? this.dataSource.manager)
+            .getRepository(entity)
+            .count({ where: { id: link.entityId } });
+        return found > 0;
     }
 
     /** `GET /links?entityType=&externalId=` — this source's links in the organization. */
@@ -310,11 +365,16 @@ export class ExternalRecordLinksService {
             },
         });
         if (byExternal) {
-            return new DuplicateExternalRefError(
-                'external',
-                byExternal.entityId,
-                byExternal.externalId,
-            );
+            // F9: a link to a deleted record does not block a new one; drop it.
+            if (!(await this.targetExists(byExternal, manager))) {
+                await repo.delete({ id: byExternal.id });
+            } else {
+                return new DuplicateExternalRefError(
+                    'external',
+                    byExternal.entityId,
+                    byExternal.externalId,
+                );
+            }
         }
         const byEntity = await repo.findOne({
             where: {

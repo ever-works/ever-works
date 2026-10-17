@@ -68,4 +68,5 @@
 export * from './upstream-credential.service';
 export * from './upstream-credential.store';
 export * from './upstream-contribution-budget.service';
+export * from './upstream-pull-request-open.service';
 export * from './upstream-pull-requests.module';

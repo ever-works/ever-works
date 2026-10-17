@@ -63,6 +63,7 @@ import {
     APP_SOURCE_SPEC_FILE,
 } from '@ever-works/contracts';
 import { AppSpecService } from '@ever-works/agent/app-spec';
+import { AppLicenseService } from '@ever-works/agent/app-license';
 import {
     CacheEntry,
     Work,
@@ -1038,6 +1039,104 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             // §4.2's 413 could never be the answer: the parser would refuse the
             // body first, with its own body and its own code.
             expect(BODY_LIMIT_BYTES).toBeGreaterThan(APP_SPEC_FILE_MAX_BYTES);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // APW-03 T44 — POST app-license/attest (ACC-03-34, ACC-03-41)
+    // -----------------------------------------------------------------------
+
+    describe('POST app-license/attest (APW-03 T44)', () => {
+        function controllerWithLicences(): WorkAppSpecController {
+            const works = new WorkRepository(dataSource.getRepository(Work));
+            const ownership = new WorkOwnershipService(
+                works,
+                new WorkMemberRepository(dataSource.getRepository(WorkMember)),
+            );
+            const moduleRef = {
+                get: (token: unknown) => {
+                    if (token === WorkAppSpecStateRepository) return states;
+                    throw new Error('not here');
+                },
+            };
+            const licenses = new AppLicenseService(works, undefined, undefined, moduleRef as never);
+            return new WorkAppSpecController(
+                ownership,
+                h.appSpec,
+                h.git as unknown as GitFacadeService,
+                licenses,
+            );
+        }
+
+        async function classify(spdx: string | null, licenseClass: string | null): Promise<void> {
+            await dataSource
+                .getRepository(WorkAppSpecState)
+                .update(
+                    { workId: WORK },
+                    { licenseSpdx: spdx, licenseClass: licenseClass as never },
+                );
+        }
+
+        it('declares the route', () => {
+            const attest = WorkAppSpecController.prototype.attestLicense;
+            expect(Reflect.getMetadata(PATH_METADATA, attest)).toBe(':id/app-license/attest');
+            expect(Reflect.getMetadata(METHOD_METADATA, attest)).toBe(RequestMethod.POST);
+        });
+
+        it('records the owner’s attestation for an amber licence, with the text hash', async () => {
+            await classify('BUSL-1.1', 'amber');
+            const controller = controllerWithLicences();
+
+            const answer = await controller.attestLicense({ userId: OWNER_ID } as never, WORK, {});
+
+            expect(answer.attestation).toMatchObject({
+                userId: OWNER_ID,
+                spdx: 'BUSL-1.1',
+                class: 'amber',
+                textId: 'busl-1.1-v1',
+            });
+            expect(answer.attestation.textSha256).toMatch(/^[0-9a-f]{64}$/);
+            expect((await storedState())?.attestation).toMatchObject({ userId: OWNER_ID });
+        });
+
+        it('refuses a member who is not the owner with 403 ownerOnly', async () => {
+            await classify('BUSL-1.1', 'amber');
+            await seedMember(WORK, EDITOR_ID, WorkMemberRole.EDITOR);
+            const controller = controllerWithLicences();
+
+            await expect(
+                controller.attestLicense({ userId: EDITOR_ID } as never, WORK, {}),
+            ).rejects.toMatchObject({ response: { code: 'ownerOnly' } });
+        });
+
+        it('answers 422 attestationNotRequired for a green licence', async () => {
+            await classify('MIT', 'green');
+            const controller = controllerWithLicences();
+
+            await expect(
+                controller.attestLicense({ userId: OWNER_ID } as never, WORK, {}),
+            ).rejects.toMatchObject({ response: { code: 'attestationNotRequired' } });
+        });
+
+        it('answers 409 licenseChanged when the reviewed classification is stale', async () => {
+            await classify('BUSL-1.1', 'amber');
+            const controller = controllerWithLicences();
+
+            await expect(
+                controller.attestLicense({ userId: OWNER_ID } as never, WORK, {
+                    spdx: 'MIT',
+                    class: 'green',
+                }),
+            ).rejects.toMatchObject({ response: { code: 'licenseChanged' } });
+        });
+
+        it('answers 404 for another account’s Work (ACC-03-41)', async () => {
+            await classify('BUSL-1.1', 'amber');
+            const controller = controllerWithLicences();
+
+            await expect(
+                controller.attestLicense({ userId: STRANGER_ID } as never, WORK, {}),
+            ).rejects.toMatchObject({ status: 404 });
         });
     });
 });

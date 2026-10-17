@@ -14,9 +14,13 @@ import type {
     FleetNodeJobHistoryEntry,
     FleetNodeLoadView,
 } from '@ever-works/contracts';
+import type { FleetModelUsageLimit } from '@ever-works/contracts';
 import {
+    activeFleetNodeModelThrottles,
     clampLeaseTtlSec,
     clampMaxAttempts,
+    FLEET_JOB_MAX_USAGE_LIMIT_PARKS,
+    FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
     FLEET_JOB_KINDS,
     FLEET_JOB_MAX_ERROR_LENGTH,
     FLEET_JOB_MAX_LEASE_BATCH,
@@ -28,10 +32,16 @@ import {
     isFleetJobKind,
     isFleetNodeVersionBelowFloor,
     nodeSatisfiesCapabilities,
+    readFleetJobModelUsageLimit,
 } from '@ever-works/contracts';
 import { config } from '../config';
 import { FleetJob } from '../entities/fleet-job.entity';
-import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '../events/fleet-job.events';
+import {
+    FleetJobCompletedEvent,
+    FleetJobLeasedEvent,
+    FleetJobParkedEvent,
+} from '../events/fleet-job.events';
+import type { FleetNode } from '../entities/fleet-node.entity';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { matchNodeCredential, verifyNodeSecret } from './fleet-node-credential';
@@ -425,6 +435,12 @@ export class FleetJobService {
         const capabilities = Array.isArray(input.capabilities)
             ? normalizeCapabilities(input.capabilities, FLEET_JOB_MAX_REQUIRED_CAPABILITIES * 4)
             : (node.capabilities ?? []);
+        // Fleet usage limits: the model CLIs this node's seat is out of quota
+        // on. Their work is not offered to it until the reset — a pinned job
+        // waits for this node, an unpinned one goes to another — whatever the
+        // node itself advertises, so an OLDER daemon that cannot throttle
+        // itself is held off too.
+        const throttledClis = throttledProviders(node);
         const max = clampBatch(input.max);
         const ttlSec = clampLeaseTtlSec(input.leaseTtlSec);
 
@@ -465,6 +481,9 @@ export class FleetJobService {
                 continue;
             }
             if (!nodeSatisfiesCapabilities(capabilities, candidate.requiredCapabilities)) {
+                continue;
+            }
+            if (blockedByModelThrottle(candidate, throttledClis)) {
                 continue;
             }
             const leaseExpiresAt = new Date(Date.now() + ttlSec * 1000);
@@ -597,7 +616,10 @@ export class FleetJobService {
     }
 
     /** Best-effort event emission — a listener failure must never fail the lease protocol. */
-    private emit(name: string, event: FleetJobLeasedEvent | FleetJobCompletedEvent): void {
+    private emit(
+        name: string,
+        event: FleetJobLeasedEvent | FleetJobCompletedEvent | FleetJobParkedEvent,
+    ): void {
         if (!this.events) return;
         try {
             this.events.emit(name, event);
@@ -704,6 +726,19 @@ export class FleetJobService {
         }
 
         const completedAt = new Date();
+        // Fleet usage limits: the model CLI ran out of quota. Not a verdict —
+        // the job goes back in the queue until the reset instead of settling,
+        // so no AgentRun fails, no Agent error is counted and no Task fails.
+        // Bounded per job (`FLEET_JOB_MAX_USAGE_LIMIT_PARKS`): past it the
+        // result settles the ordinary way, so a mis-recognised failure cannot
+        // requeue forever.
+        const usageLimit =
+            input.success && job.kind === 'agent-task'
+                ? readFleetJobModelUsageLimit(input.result, { now: completedAt })
+                : null;
+        if (usageLimit && (job.usageLimitParks ?? 0) < FLEET_JOB_MAX_USAGE_LIMIT_PARKS) {
+            return this.parkForUsageLimit(job, node, usageLimit, completedAt);
+        }
         const status: Extract<FleetJobStatus, 'done' | 'failed'> = input.success
             ? 'done'
             : 'failed';
@@ -738,6 +773,92 @@ export class FleetJobService {
             new FleetJobCompletedEvent(view, job.userId, 'node-report', node.id, result, error),
         );
         return view;
+    }
+
+    /**
+     * Fleet usage limits — put a job whose model CLI ran out of quota back in
+     * the queue, throttle that CLI on this node until the reset, and announce
+     * the park (never a completion). Returns the job as it now stands
+     * (`queued`), or null when the claim moved on in between.
+     */
+    private async parkForUsageLimit(
+        job: FleetJob,
+        node: AuthenticatedFleetNode,
+        limit: FleetModelUsageLimit,
+        now: Date,
+    ): Promise<FleetJobView | null> {
+        const retryAt = new Date(limit.retryAfter);
+        const attempts = Math.max(0, (job.attempts ?? 1) - 1);
+        const usageLimitParks = (job.usageLimitParks ?? 0) + 1;
+        const parked = await this.jobs.parkForUsageLimit(job.id, node.id, job.leaseGeneration, {
+            attempts,
+            // The queue SLA measures from the moment the work can run again.
+            queuedAt: retryAt,
+            usageLimitParks,
+            queuedReason: FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+        });
+        if (!parked) return null;
+
+        let newWindow = false;
+        try {
+            newWindow = await this.recordModelThrottle(node, limit, now);
+        } catch (error) {
+            // The job is parked either way; without the throttle the node may
+            // be offered the work once more and park it again (bounded).
+            this.logger.warn(
+                `fleet node ${node.id}: recording the ${limit.provider} usage limit failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+
+        const view = toJobView({
+            ...job,
+            status: 'queued',
+            nodeId: null,
+            leaseExpiresAt: null,
+            startedAt: null,
+            attempts,
+            queuedAt: retryAt,
+            queuedReason: FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
+            usageLimitParks,
+        } as FleetJob);
+        this.logger.log(
+            `Fleet job ${job.id} parked: ${limit.provider} on node ${node.id} hit its ${limit.window} limit — ` +
+                `retry after ${limit.retryAfter}${job.targetNodeId ? ' (pinned: waits for this node)' : ''}`,
+        );
+        this.emit(
+            FleetJobParkedEvent.EVENT_NAME,
+            new FleetJobParkedEvent(view, job.userId, node.id, node.name ?? null, limit, newWindow),
+        );
+        return view;
+    }
+
+    /**
+     * Store (or extend) the node's throttle for `limit.provider`. True when it
+     * opens a NEW window — no throttle for that CLI was in force — which is
+     * the one moment the owner is notified. A later reset extends the window;
+     * an earlier one never shortens it.
+     */
+    private async recordModelThrottle(
+        node: AuthenticatedFleetNode,
+        limit: FleetModelUsageLimit,
+        now: Date,
+    ): Promise<boolean> {
+        const active = activeFleetNodeModelThrottles(node.modelThrottles, now);
+        const previous = active.find((entry) => entry.provider === limit.provider) ?? null;
+        const extends_ = !previous || Date.parse(limit.retryAfter) > Date.parse(previous.until);
+        const entry = {
+            provider: limit.provider,
+            window: extends_ ? limit.window : previous!.window,
+            until: extends_ ? limit.retryAfter : previous!.until,
+            reason: extends_ ? limit.message : previous!.reason,
+            since: previous?.since ?? now.toISOString(),
+        };
+        await this.nodes.update(node.id, {
+            modelThrottles: [...active.filter((other) => other.provider !== limit.provider), entry],
+        });
+        return previous === null;
     }
 
     /**
@@ -1025,10 +1146,13 @@ export class FleetJobService {
                 FLEET_JOB_RECLAIM_BATCH,
             );
             const capabilities = node.capabilities ?? [];
+            const throttledClis = throttledProviders(node);
             let promoted = 0;
             for (const job of waiting) {
                 if (job.cancelRequestedAt) continue;
                 if (!nodeSatisfiesCapabilities(capabilities, job.requiredCapabilities)) continue;
+                // Out of quota on this CLI: this node cannot take it yet.
+                if (blockedByModelThrottle(job, throttledClis)) continue;
                 if (await this.jobs.promoteWaiting(job.id)) promoted += 1;
             }
             if (promoted > 0) {
@@ -1169,13 +1293,7 @@ export class FleetJobService {
         nodeId: unknown,
         secret: unknown,
         intent: 'lease' | 'report' = 'lease',
-    ): Promise<{
-        id: string;
-        userId: string;
-        capabilities: string[];
-        /** The daemon version the node last reported (slice AR's floor reads it). */
-        version: string | null;
-    } | null> {
+    ): Promise<AuthenticatedFleetNode | null> {
         const verified = verifyNodeSecret(nodeId, secret);
         if (!verified) return null;
 
@@ -1197,8 +1315,23 @@ export class FleetJobService {
             userId: node.userId,
             capabilities: node.capabilities ?? [],
             version: node.version ?? null,
+            name: node.name ?? null,
+            modelThrottles: node.modelThrottles ?? null,
         };
     }
+}
+
+/** The slice of a node row the lease protocol works with once it is authenticated. */
+interface AuthenticatedFleetNode {
+    id: string;
+    userId: string;
+    capabilities: string[];
+    /** The daemon version the node last reported (slice AR's floor reads it). */
+    version: string | null;
+    /** Display name, for the usage-limit notice. */
+    name: string | null;
+    /** Fleet usage limits — the stored throttles (filtered on read). */
+    modelThrottles: FleetNode['modelThrottles'] | null;
 }
 
 /** Entity → wire view. Credentials never enter this shape. */
@@ -1356,4 +1489,29 @@ function truncate(value: unknown, max: number): string | null {
 
 function toIso(value: Date | string): string {
     return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+/** The model CLIs this node's seat is out of quota on right now. */
+function throttledProviders(node: Pick<FleetNode, 'modelThrottles'>): ReadonlySet<string> {
+    return new Set(
+        activeFleetNodeModelThrottles(node.modelThrottles).map((entry) => entry.provider),
+    );
+}
+
+/**
+ * Fleet usage limits — may NOT go to a node out of quota on its CLI: it
+ * requires that CLI's capability tag, or it is an `agent-task` whose
+ * execution names that CLI (a job enqueued without the tag must not slip
+ * through and be parked again on the very next poll).
+ */
+export function blockedByModelThrottle(
+    job: Pick<FleetJob, 'kind' | 'requiredCapabilities' | 'payload'>,
+    throttled: ReadonlySet<string>,
+): boolean {
+    if (throttled.size === 0) return false;
+    if ((job.requiredCapabilities ?? []).some((tag) => throttled.has(tag))) return true;
+    if (job.kind !== 'agent-task') return false;
+    const execution = (job.payload as { execution?: { provider?: unknown } } | null | undefined)
+        ?.execution;
+    return typeof execution?.provider === 'string' && throttled.has(execution.provider);
 }

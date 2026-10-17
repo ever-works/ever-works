@@ -32,6 +32,7 @@
 import type { FleetJobView } from './fleet-jobs.types';
 
 import type { FleetNodeLoadView } from './fleet-jobs.types.js';
+import type { FleetNodeModelThrottleView } from './fleet-model-usage-limit.types.js';
 
 import type { ComputerControlPolicy } from '../computer/computer-session.types.js';
 
@@ -412,6 +413,15 @@ export interface FleetNodeView {
 	 * hundreds of beats that follow rather than resetting every 30s.
 	 */
 	workerStateChangedAt?: string | null;
+	/**
+	 * Fleet usage limits — the model CLIs this node is OUT OF QUOTA on right
+	 * now, one entry per CLI, each with the instant the platform will offer
+	 * the node that CLI's work again. Recorded by the platform when a run
+	 * reports `failureKind: 'model_usage_limit'` (or an older node's result
+	 * carries the CLI's limit sentence); expired entries are never returned.
+	 * Empty / absent = no limit in force.
+	 */
+	modelThrottles?: FleetNodeModelThrottleView[] | null;
 	/**
 	 * ISO instant at which the owner QUEUED a credential rotation for this
 	 * node (`POST /api/fleet/rotate-all`), or null when none is pending.

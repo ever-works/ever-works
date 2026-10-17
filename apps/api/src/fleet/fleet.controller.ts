@@ -60,6 +60,7 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import type { FleetNodeDetailView, FleetNodeDrainResult } from './fleet-admin.types';
 import {
     ClearFleetExecutionPreferenceDto,
+    ClearFleetNodeModelThrottleDto,
     CreateFleetEnrollmentTokenDto,
     DrainFleetNodeDto,
     EnrollFleetNodeDto,
@@ -445,6 +446,21 @@ export class FleetController {
         // load-bearing) lives in FleetPanicService so that drain-all
         // (EW-778) performs exactly this, once per node.
         return this.panic.drainNodeForUser(auth.userId, id, body.drain);
+    }
+
+    @Post('nodes/:id/clear-model-throttle')
+    @ApiOperation({
+        summary:
+            'Clear a model usage-limit throttle on one node before its reset ("clear limit now"): the lease offers that CLI’s agent work to the node again on its next poll, and the node lifts its own copy from its next heartbeat. `provider` names one CLI; omitted clears all. Audited as node.model-throttle-clear. Owner-scoped: another account’s node id answers 404.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async clearModelThrottle(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: ClearFleetNodeModelThrottleDto,
+    ): Promise<FleetNodeView> {
+        return this.service.clearModelThrottlesForUser(auth.userId, id, body?.provider ?? null);
     }
 
     @Put('nodes/:id/limits')

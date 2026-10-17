@@ -64,6 +64,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     check_tool_grant: 'read.internal',
     resolve_merge_policy: 'read.internal',
     validate_workflow_graph: 'read.internal',
+    // APW-08 T26 — where a requested App change got to (Task, PR, CI).
+    get_app_change: 'read.internal',
 
     // ── read.external — browse the web ──
     searchWeb: 'read.external',
@@ -83,6 +85,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     resolve_escalation: 'write.internal',
     review_pull_request: 'write.internal',
     run_workflow_graph: 'write.internal',
+    // APW-08 T26 — files and starts an App Work change Task (the PR is reviewed before merge).
+    request_app_change: 'write.internal',
     'facade:memory-write': 'write.internal',
     'facade:knowledge-write': 'write.internal',
 

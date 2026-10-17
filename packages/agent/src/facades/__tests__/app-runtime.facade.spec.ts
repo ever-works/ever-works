@@ -1657,3 +1657,17 @@ function walk(dir: string): string[] {
         return entry.isFile() && full.endsWith('.ts') ? [full] : [];
     });
 }
+
+describe('managedAppNamespaceName (APW-10 lite)', () => {
+    it('is ewapp-<first 8 hex of the work id>, independent of the slug', () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const {
+            managedAppNamespaceName,
+            APP_MANAGED_NAMESPACE_PREFIX,
+        } = require('../app-runtime.facade');
+        expect(managedAppNamespaceName('0123ABCD-ef45-6789-0000-000000000000')).toBe(
+            'ewapp-0123abcd',
+        );
+        expect(APP_MANAGED_NAMESPACE_PREFIX).toBe('ewapp-');
+    });
+});

@@ -572,6 +572,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Remote node limits (slice AS): where an owner's ceiling lands — the
 	// work lane, once it exists below. Unset on a visibility-only node.
 	let limitTarget: ((ceiling: NodeLimitCeiling) => void) | null = null;
+	// Fleet usage limits: where the platform's view of this node's model
+	// throttles lands (the work lane, once it exists below).
+	let throttleTarget: ((throttles: unknown) => void) | null = null;
 	const lifecycle = new NodeLifecycleTracker({
 		daemonVersion: io.version,
 		logger: io.logger,
@@ -597,9 +600,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			minNodeVersion?: string;
 			upgradeRequired?: boolean;
 			limitCeiling?: NodeLimitCeiling;
+			node?: { modelThrottles?: unknown };
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
+			throttleTarget?.(response.node?.modelThrottles);
 		}
 	};
 
@@ -653,7 +658,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			// attended lane alone — never parked in (or holding a slot of) the
 			// work lane. Sent only under `--attend`, so a work-only node's lease
 			// body is exactly what it always was.
-			...(options.attendEnabled ? { excludeKinds: ['computer-session' as const] } : {})
+			...(options.attendEnabled ? { excludeKinds: ['computer-session' as const] } : {}),
+			// Fleet usage limits: the CLIs an agent-task can run with here, so a
+			// node whose only CLI is out of quota stops leasing agent-task work
+			// until the reset (other kinds keep leasing).
+			modelProviders: () =>
+				Object.entries(options.modelCli ?? io.environment.modelCli ?? {})
+					.filter(([, path]) => typeof path === 'string' && path.length > 0)
+					.map(([provider]) => provider)
 		});
 		// Node lifecycle (slice AR): the version floor holds this lane, and a
 		// LEASE refusal (the other channel that can say it) is folded into
@@ -673,6 +685,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			}
 		};
 		telemetry.limits = () => worker.resourceLimits;
+		// Fleet usage limits: the platform's throttles for this node, from every
+		// accepted beat — adopted after a restart, lifted after "clear limit now".
+		throttleTarget = (throttles) => {
+			if (Array.isArray(throttles)) worker.syncModelThrottles(throttles);
+		};
 		// Fleet health signals (EW-776). Wired onto the SAME telemetry
 		// object `describe` already closed over above, so the heartbeat
 		// starts reporting worker state without the loop having to be

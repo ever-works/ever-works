@@ -114,6 +114,25 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
         "why can't the agent",
         'why cannot the agent',
     ],
+    // APW-08 T26 / APW08-G20 — the App Works chat tools (`request_app_change`, …). The slot
+    // ships WITH the rows (program DoD rule). Phrases, not `app` alone: a bare `app` would
+    // match "happened" and "approve".
+    appworks: [
+        'app work',
+        'this app',
+        'the app',
+        'my app',
+        'evolve',
+        'provision',
+        'change request',
+        'add a feature',
+        'new feature',
+        'fix the bug',
+        'fix a bug',
+        'modify the',
+        'change the code',
+        'app spec',
+    ],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
     budgets: ['budget', 'usage', 'spend', 'spending', 'cost', 'billing'],
@@ -173,6 +192,7 @@ function deriveDomain(path: string): string {
     if (p.includes('/api/digest')) return 'digest';
     if (p.includes('/api/pr-review')) return 'prreview';
     if (p.includes('/api/tool-grants')) return 'toolgrants';
+    if (p.includes('/evolve') || p.includes('/provision')) return 'appworks';
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';

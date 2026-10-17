@@ -249,6 +249,19 @@ export class TasksController {
     ) {}
 
     /**
+     * Review 2026-10-17 F6 — on the core routes open to integration keys (create's
+     * parent, transition, chat), a private Task answers 404 to an integration, as on
+     * `/api/integrations/v1`: the key's own read rule (`visibleTo` for an integration
+     * principal) admits only `team` / `organization` rows. The acting user's reach
+     * (the key owner's or the act-as person's own private Tasks) does not widen it.
+     */
+    private async refuseIntegrationPrivateTask(auth: AuthenticatedUser, id: string): Promise<void> {
+        if (!isIntegrationPrincipal(auth)) return;
+        const task = await this.service.getReadable(auth.userId, id, this.scopeContext.getScope());
+        if (task.visibility === 'private') throw new NotFoundException(`Task ${id} not found.`);
+    }
+
+    /**
      * Review-fix I5: build the `ownedAgentSlugs` map used by
      * `TaskChatService.parseMentions`. We pull a generous page of the
      * user's owned Agents (the platform's Agent count per user is
@@ -397,6 +410,7 @@ export class TasksController {
         if (!body?.title) throw new BadRequestException('title is required.');
         refuseRunTokenApproverPolicy(body, req);
         refuseIntegrationCreateFields(body, auth);
+        if (body.parentTaskId) await this.refuseIntegrationPrivateTask(auth, body.parentTaskId);
         const createdBy = writeAttribution(auth);
         return this.service.create(
             auth.userId,
@@ -755,6 +769,7 @@ export class TasksController {
                     { field: 'mode' },
                 );
             }
+            await this.refuseIntegrationPrivateTask(auth, id);
         }
         if (body.mode === 'sync') {
             const result = await this.service.syncTransition(
@@ -1314,6 +1329,7 @@ export class TasksController {
         if (typeof body?.body !== 'string') {
             throw new BadRequestException('body is required.');
         }
+        await this.refuseIntegrationPrivateTask(auth, id);
         // Review-fix I5: populate the mention-lookup map with the
         // user's owned Agent slugs so @<slug> mentions resolve →
         // chat-dispatch fan-out fires `agent-chat-reply` for each

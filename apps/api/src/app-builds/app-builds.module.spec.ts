@@ -1,3 +1,30 @@
+// The module now carries the Builds controller (T23), whose `../auth` import
+// pulls `better-auth` (ESM, which jest cannot parse) and whose services barrel is
+// large. The guard is never exercised here — no request is routed — so both are
+// replaced by the one class each this graph needs, as `catalog.module.spec.ts` does.
+//
+// #2680 (02c5c1228) made the module import `AuthModule` from `@src/auth` — the
+// same barrel this mock replaces — because the guard injects the non-global
+// `AUTH_PROVIDER` in the real API. Without an `AuthModule` in the stand-in, the
+// module's `imports[2]` is `undefined` and nothing compiles; an EMPTY module is
+// the stand-in, exactly as `catalog.module.spec.ts` / `changelog.module.spec.ts`
+// stand it in. The real graph's auth wiring is pinned by
+// `app-works-di-reachability.spec.ts`, not here.
+jest.mock('../auth', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Module } = require('@nestjs/common');
+    class AuthModule {}
+    Module({})(AuthModule);
+    return {
+        AuthModule,
+        AuthSessionGuard: class AuthSessionGuard {},
+        CurrentUser: () => () => undefined,
+    };
+});
+jest.mock('@ever-works/agent/services', () => ({
+    ...jest.requireActual('../../../../packages/agent/src/services/work-ownership.service'),
+}));
+
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -5,10 +32,14 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ENTITIES } from '@ever-works/agent/database';
 import { AppEnvResolver, AppEnvService } from '@ever-works/agent/app-env';
 import {
+    APP_BUILD_EDIT_ACCESS,
+    APP_BUILD_PLATFORM_SETTINGS_WRITER,
     AppBuildPrepareRunner,
     AppBuildsService,
     AppBuildWatchRunner,
 } from '@ever-works/agent/app-builds';
+import { AppBuildsController } from './app-builds.controller';
+import { AppBuildWorkflowRunConsumer } from './app-build-workflow-run.consumer';
 import { AppBuildSweepCronService } from './app-build-sweep-cron.service';
 import { AppBuildsModule } from './app-builds.module';
 
@@ -121,6 +152,23 @@ describe('AppBuildsModule (apps/api) — the Builds graph as the API composes it
         expect(prepare.env).toBeInstanceOf(AppEnvResolver);
         // One resolver for the whole graph, not a second instance per consumer.
         expect(prepare.env).toBe(service.fingerprints);
+    });
+
+    it('serves the Builds routes and consumes workflow_run deliveries (T23, T24)', () => {
+        expect(moduleRef.get(AppBuildsController)).toBeInstanceOf(AppBuildsController);
+        expect(moduleRef.get(AppBuildWorkflowRunConsumer)).toBeInstanceOf(
+            AppBuildWorkflowRunConsumer,
+        );
+    });
+
+    it('binds the edit check and the pull token writer (2026-10-17, A0.4)', async () => {
+        const editAccess = moduleRef.get(APP_BUILD_EDIT_ACCESS, { strict: false }) as {
+            isEditor(workId: string, userId?: string): Promise<boolean>;
+        };
+        // Fail-closed: no caller, or a Work nobody owns, is never an editor.
+        await expect(editAccess.isEditor(WORK_ID)).resolves.toBe(false);
+        await expect(editAccess.isEditor(WORK_ID, 'nobody')).resolves.toBe(false);
+        expect(moduleRef.get(APP_BUILD_PLATFORM_SETTINGS_WRITER, { strict: false })).toBeDefined();
     });
 
     it('hands the watch runner the env service, so it has a redactor', () => {

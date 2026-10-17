@@ -33,8 +33,11 @@ import {
 	FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
 	FLEET_RUN_SECRETS_UNAVAILABLE_REASON,
 	FLEET_RUN_SECRETS_UNRESOLVED_REASON,
+	detectFleetModelUsageLimit,
+	FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT,
 	FleetAgentExecutionError,
 	fleetAgentExecutionProviderSupportsSessionResume,
+	type FleetModelUsageLimit,
 	normalizeFleetAgentModelExecution,
 	REPO_DECLARED_COMMAND_ID_PREFIX
 } from '@ever-works/contracts';
@@ -234,6 +237,12 @@ export interface AgentTaskSessionConfigFs {
 export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Directory used when the job carries no `workspacePath`. */
 	defaultWorkspacePath?: string;
+	/**
+	 * Fleet usage limits — the clock and the zone a model CLI's "resets 3am"
+	 * is read against. The CLI prints THIS machine's local time, so the zone
+	 * defaults to the process's own; injected so a spec can pin both.
+	 */
+	usageLimitClock?: { now: () => number; timeZone?: string };
 	/**
 	 * The node's disk floor, applied to a workspace the PROVISIONER never
 	 * sees: a payload carrying `workspacePath`, or carrying neither field
@@ -928,6 +937,38 @@ async function runResolvedAgentTask(
 		containment = modelStep.containment;
 		throwIfAgentTaskAborted(signal);
 		if (model.status !== 'succeeded') {
+			// Fleet usage limits: the CLI is out of quota. Not a verdict on the
+			// work — nothing after this would describe the change (the model
+			// never finished it), and publishing a half-done tree would open a
+			// pull request for it. Stop here and say so in a form the platform
+			// can act on: it parks the job until the reset instead of failing
+			// the run, and this node stops leasing this CLI's work meanwhile.
+			const usageLimit = recognizeModelUsageLimit(model, io);
+			if (usageLimit) {
+				if (workspaceResolution.descriptor && io.removeRunEnvFiles) {
+					await io.removeRunEnvFiles(taskId, workspaceResolution.descriptor).catch(() => undefined);
+				}
+				io.logger?.warn(
+					`[fleet-node] job ${job.id}: ${model.provider} hit a usage limit (${usageLimit.window}) — ` +
+						`retry after ${usageLimit.retryAfter}; steps, checks and publish skipped`
+				);
+				return fitNodeOutcomeToResultBudget({
+					status: 'failed',
+					taskId,
+					runId,
+					workspace: workspaceResolution.descriptor,
+					steps: [],
+					...(setupResults.length > 0 ? { setup: setupResults } : {}),
+					...(setup.length > 0 ? { setupStatus } : {}),
+					model,
+					gateStatus: 'none',
+					...(mcp ? { mcp } : {}),
+					...(containment ? { containment } : {}),
+					failureReason: `${describeModelFailure(model)} — usage limit, retry after ${usageLimit.retryAfter}`,
+					failureKind: FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT,
+					modelUsageLimit: usageLimit
+				});
+			}
 			failures.push(describeModelFailure(model));
 		}
 	}
@@ -2287,6 +2328,36 @@ function resumeNeverOpened(model: FleetAgentTaskModelResult): boolean {
 	if (model.sessionId || (typeof model.turns === 'number' && model.turns > 0)) return false;
 	const said = typeof model.outputTail === 'string' ? model.outputTail : '';
 	return RESUME_NEVER_OPENED_SIGNATURES.some((signature) => signature.test(said));
+}
+
+/**
+ * Fleet usage limits — the model step failed because the CLI is out of quota?
+ *
+ * The CLI's final message (`summary`) is read first and in full; the raw
+ * output tail only for the unambiguous phrases (`strict`), because it also
+ * carries the MODEL's own words and a Task about rate limiting must never
+ * read as the CLI being rate limited. A timeout is never a usage limit.
+ */
+export function recognizeModelUsageLimit(
+	model: FleetAgentTaskModelResult,
+	io: Pick<AgentTaskIo, 'usageLimitClock'> = {}
+): FleetModelUsageLimit | null {
+	if (model.status === 'succeeded' || model.status === 'timeout') return null;
+	const now = io.usageLimitClock?.now() ?? Date.now();
+	const timeZone = io.usageLimitClock?.timeZone ?? localTimeZone();
+	const options = { provider: model.provider, now, ...(timeZone ? { timeZone } : {}) };
+	return (
+		detectFleetModelUsageLimit(model.summary, options) ??
+		detectFleetModelUsageLimit(model.outputTail, { ...options, strict: true })
+	);
+}
+
+function localTimeZone(): string | undefined {
+	try {
+		return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function describeModelFailure(model: FleetAgentTaskModelResult): string {

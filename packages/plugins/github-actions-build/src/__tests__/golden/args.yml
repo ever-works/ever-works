@@ -131,7 +131,7 @@ jobs:
           jq -n --arg buildId "${{ inputs.ew_build_id }}" --arg sha "$EW_SHA" \
             --arg imageRepository "$EW_IMAGE" --arg digest "$digest" --arg secretCheck "$secret_check" \
             --arg tag "$EW_IMAGE:sha-$EW_SHA" \
-            '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,'
+            '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,
               digest:$digest,tags:[$tag],secretCheck:$secretCheck,verification:{jobs:[],smoke:[]}}' > ever-works-build-result.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -202,7 +202,7 @@ jobs:
           jq -n --arg buildId "${{ inputs.ew_build_id }}" --arg sha "$EW_SHA" \
             --arg imageRepository "$EW_IMAGE" --arg reusedDigest "$reused_digest" \
             --argjson localBuild "$local_build" \
-            '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,'
+            '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,
               reusedDigest:$reusedDigest,localBuild:$localBuild,verification:{jobs:[],smoke:[]}}' > ever-works-build-result.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

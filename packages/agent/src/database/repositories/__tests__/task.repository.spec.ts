@@ -1,3 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import type { DataSource } from 'typeorm';
+import {
+    createDomainEventsDataSource,
+    ORG_A,
+    TENANT,
+} from '../../../domain-events/__tests__/domain-events.test-helpers';
+import { ExternalRecordLink } from '../../../entities/external-record-link.entity';
+import { Task, TaskStatus } from '../../../entities/task.entity';
 import { TaskRepository } from '../task.repository';
 
 describe('TaskRepository ownership scope', () => {
@@ -91,6 +100,57 @@ describe('TaskRepository.findFanoutCandidates', () => {
         expect(qb.addOrderBy).toHaveBeenCalledWith('task.createdAt', 'ASC');
         expect(qb.addOrderBy).toHaveBeenCalledWith('task.id', 'ASC');
         expect(qb.take).toHaveBeenCalledWith(7);
+    });
+});
+
+// Review 2026-10-17 F10 (P1, plan D9): the real SQL on better-sqlite3 — an
+// integration's Task (created by a key, or linked to an external record) is never
+// auto-started by the fan-out, whoever the acting person was.
+describe('TaskRepository.findFanoutCandidates — integration Tasks (SQLite)', () => {
+    let dataSource: DataSource;
+    let tasks: TaskRepository;
+    const OWNER = randomUUID();
+
+    const makeTask = (overrides: Partial<Task>) =>
+        dataSource.getRepository(Task).save(
+            dataSource.getRepository(Task).create({
+                userId: OWNER,
+                slug: `T-${randomUUID().slice(0, 6)}`,
+                title: 'Ship it',
+                status: TaskStatus.TODO,
+                createdByType: 'user',
+                createdById: OWNER,
+                tenantId: TENANT,
+                organizationId: ORG_A,
+                ...overrides,
+            } as Partial<Task>),
+        );
+
+    beforeAll(async () => {
+        dataSource = await createDomainEventsDataSource();
+        tasks = new TaskRepository(dataSource.getRepository(Task));
+    });
+
+    afterAll(async () => {
+        if (dataSource?.isInitialized) await dataSource.destroy();
+    });
+
+    it('skips a Task an integration created or links to an external record', async () => {
+        const human = await makeTask({});
+        await makeTask({ createdByType: 'integration', createdById: randomUUID() });
+        const linked = await makeTask({});
+        await dataSource.getRepository(ExternalRecordLink).insert({
+            organizationId: ORG_A,
+            tenantId: TENANT,
+            entityType: 'task',
+            entityId: linked.id,
+            source: 'gauzy',
+            installationKey: '',
+            externalId: 'g-1',
+        } as unknown as ExternalRecordLink);
+
+        const ids = (await tasks.findFanoutCandidates(50)).map((task) => task.id);
+        expect(ids).toEqual([human.id]);
     });
 });
 

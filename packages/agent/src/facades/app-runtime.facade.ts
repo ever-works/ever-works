@@ -379,6 +379,21 @@ export function appNamespaceName(workSlug: string, workId: string): string {
     return `${head || APP_NAMESPACE_FALLBACK_SLUG}${suffix}`;
 }
 
+/** The prefix of every managed-target namespace — what the operator's RBAC is scoped to. */
+export const APP_MANAGED_NAMESPACE_PREFIX = 'ewapp-';
+
+/**
+ * APW-10 lite — `ewapp-<first 8 hex of workId>`: one namespace per App Work on the managed target.
+ *
+ * Deliberately NOT slug-based: the operator's admission policy scopes the managed credential to
+ * the `ewapp-` prefix, and a slug in the name would let a Work's own name shape a cluster object
+ * name. The work id alone is stable for the Work's lifetime, so the name is never re-derived into
+ * a different one.
+ */
+export function managedAppNamespaceName(workId: string): string {
+    return `${APP_MANAGED_NAMESPACE_PREFIX}${hexSuffix(workId, 8)}`;
+}
+
 /**
  * The first `length` hex characters of an identifier, falling back to the first `length` hex of its
  * SHA-256 digest when the id carries fewer (`app-names.ts:125-135`) — still pure, so a namespace is
@@ -1021,7 +1036,16 @@ export class AppRuntimeFacadeService
             }
         }
 
-        const namespace = firstNonEmpty(row?.namespace) ?? appNamespaceName(work.slug, work.id);
+        // APW-10 lite — the managed target always lands in its own `ewapp-` namespace: a row frozen
+        // by an earlier your-cluster Deployment (`ew-…`) is never reused on the platform's cluster,
+        // where the credential cannot reach it anyway.
+        const stored = firstNonEmpty(row?.namespace);
+        const namespace =
+            target === 'ever-works-apps'
+                ? stored && stored.startsWith(APP_MANAGED_NAMESPACE_PREFIX)
+                    ? stored
+                    : managedAppNamespaceName(work.id)
+                : (stored ?? appNamespaceName(work.slug, work.id));
         const fingerprint = firstNonEmpty(row?.clusterFingerprint);
 
         return {

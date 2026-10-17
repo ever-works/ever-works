@@ -5,6 +5,7 @@ jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/import', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
+jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));
 // Stub the auth barrel so importing AuthService doesn't pull in the full
 // auth module (which transitively requires the agent runtime tree we
 // can't satisfy in unit tests).
@@ -112,6 +113,7 @@ describe('GitHubAppController', () => {
             expect(onboardingService.completeUserAuth).toHaveBeenCalledWith({
                 code: 'c',
                 state: 's',
+                binding: null,
             });
             expect(authProvider.issueSession).toHaveBeenCalledWith('u1', {
                 ipAddress: '203.0.113.4',

@@ -804,6 +804,8 @@ export class GitHubPrReviewBridgeService {
                 prUrl: body.pull_request?.html_url ?? review.html_url ?? null,
                 reviewerKind: who === 'trusted-bot' ? 'bot' : 'human',
                 severity: who === 'trusted-bot' ? parseReviewBotSeverity(raw) : null,
+                // Item 11: a redelivered `submitted` webhook records nothing twice.
+                sourceKey: typeof review.id === 'number' ? `review:${review.id}` : null,
             });
         } catch (error) {
             this.logger.warn(
@@ -1024,6 +1026,8 @@ export class GitHubPrReviewBridgeService {
                     comment.html_url ?? body.pull_request?.html_url ?? body.issue?.html_url ?? null,
                 reviewerKind: 'bot',
                 severity: parseReviewBotSeverity(raw),
+                // Item 11: a redelivered `created` webhook records nothing twice.
+                sourceKey: `${eventName}:${comment.id}`,
             });
         } catch (error) {
             this.logger.warn(

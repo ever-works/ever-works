@@ -39,6 +39,11 @@ export interface CreateAgentFromTemplateInput {
      * existing call site compiles and creates a laneless Agent unchanged.
      */
     lane?: string | null;
+    /**
+     * Move the new Agent DRAFT → ACTIVE before returning (APW-08 GAP-14's one-click
+     * path, which dispatches a run straight away). Absent = DRAFT, as before.
+     */
+    activate?: boolean;
 }
 
 /**
@@ -113,7 +118,21 @@ export class AgentTemplatesService {
         input: CreateAgentFromTemplateInput = {},
         ownershipScope?: OwnershipScope,
     ): Promise<AgentDto> {
-        const template = this.get(slug);
+        return this.createFromDefinition(userId, this.get(slug), input, ownershipScope);
+    }
+
+    /**
+     * {@link createFromTemplate} for a template that is not in the go-to-market catalog
+     * (APW-08's `evolve-app`, `app-works/evolve-app-agent-template.ts`). Same path — Agent
+     * row, SOUL.md, guardrails — so a definition cannot skip a step the catalog takes.
+     */
+    async createFromDefinition(
+        userId: string,
+        template: AgentTemplate,
+        input: CreateAgentFromTemplateInput = {},
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const slug = template.slug;
         const scope = input.scope ?? AgentScope.TENANT;
 
         const createInput = {
@@ -148,14 +167,20 @@ export class AgentTemplatesService {
         }
 
         // Seed the review-before-act guardrails and return the fresh DTO.
-        return ownershipScope
-            ? this.agents.setGuardrails(
+        const guarded = ownershipScope
+            ? await this.agents.setGuardrails(
                   userId,
                   created.id,
                   template.defaultGuardrails,
                   ownershipScope,
               )
-            : this.agents.setGuardrails(userId, created.id, template.defaultGuardrails);
+            : await this.agents.setGuardrails(userId, created.id, template.defaultGuardrails);
+        if (input.activate !== true) {
+            return guarded;
+        }
+        return ownershipScope
+            ? this.agents.resume(userId, created.id, ownershipScope)
+            : this.agents.resume(userId, created.id);
     }
 
     /**

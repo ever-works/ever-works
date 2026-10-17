@@ -564,6 +564,28 @@ describe('isReviewFeedbackDelivery', () => {
             ).toBe(true);
         });
 
+        // 10-09 handover item 11: the bridge already ignores a bot's in-thread
+        // reply with no severity marker of its own (#2632); the doorbell
+        // classified it without `inReplyTo` and still rang for "Thanks for
+        // the fix…".
+        it('does not ring for a bot thank-you reply inside a review thread', () => {
+            expect(
+                isReviewFeedbackDelivery(
+                    'pull_request_review_comment',
+                    {
+                        action: 'created',
+                        pull_request: { number: 42 },
+                        comment: {
+                            body: '`@evereq` Thanks for the fix! The guard now covers the retry path.',
+                            user: coderabbit,
+                            in_reply_to_id: 500,
+                        },
+                    } as never,
+                    POLICY,
+                ),
+            ).toBe(false);
+        });
+
         it('a placeholder on the INLINE event does not ring either', () => {
             expect(
                 isReviewFeedbackDelivery(

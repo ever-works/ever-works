@@ -26,3 +26,10 @@ export {
     EverWorksDbProvisionService,
     summarizeDbProvisionError,
 } from './ever-works-db-provision.service';
+// APW-06 T47/T48 (lane aw-deploy-2) — the apps-domain DNS service.
+export {
+    APPS_DOMAIN_MIN_LABEL_LENGTH,
+    AppsDomainDnsServiceImpl,
+    isPublicIPv4,
+    type AppsDomainRecordOutcome,
+} from './apps-domain-dns.service';

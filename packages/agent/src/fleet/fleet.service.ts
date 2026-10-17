@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
 import {
+    activeFleetNodeModelThrottles,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -917,6 +918,38 @@ export class FleetService {
     }
 
     /**
+     * Fleet usage limits — the owner's "clear limit now": drop the model
+     * usage-limit throttle on one node before its reset, for one CLI
+     * (`provider`) or for every CLI (`null`). Owner-scoped like every node
+     * write (another account's node answers 404) and audited as
+     * `node.model-throttle-clear` with the throttles before / after.
+     *
+     * What it changes: the LEASE offers that CLI's work to the node again on
+     * its next poll, and the node — which reads its throttles back off every
+     * heartbeat response (`node.modelThrottles`) — lifts its own copy. The
+     * owner uses it after signing the CLI in to a seat with quota left; if the
+     * seat is in fact still out, the next run simply parks again.
+     */
+    async clearModelThrottlesForUser(
+        userId: string,
+        nodeId: string,
+        provider: string | null = null,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        const before = activeFleetNodeModelThrottles(node.modelThrottles);
+        const wanted = typeof provider === 'string' && provider.trim() ? provider.trim() : null;
+        const after = wanted ? before.filter((entry) => entry.provider !== wanted) : [];
+        const patch: Partial<FleetNode> = { modelThrottles: after.length > 0 ? after : null };
+        await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.model-throttle-clear', userId, node, ctx, {
+            before: { modelThrottles: before },
+            after: { modelThrottles: after },
+        });
+        return this.toView({ ...node, ...patch } as FleetNode);
+    }
+
+    /**
      * Owner-scoped node list: sweeps stale `online` rows to `offline`
      * (5-minute heartbeat window — piggybacked here, no cron), then
      * merges live nodes from the user's own configured clusters
@@ -1700,6 +1733,8 @@ export class FleetService {
             workerStateChangedAt: node.workerStateChangedAt
                 ? toIso(node.workerStateChangedAt)
                 : null,
+            // Fleet usage limits — only the throttles still in force.
+            modelThrottles: activeFleetNodeModelThrottles(node.modelThrottles),
             // Credential lifecycle (EW-799). The two hash columns and the
             // window expiry stay OUT of the view: a wire shape that can
             // carry a credential artefact eventually does.

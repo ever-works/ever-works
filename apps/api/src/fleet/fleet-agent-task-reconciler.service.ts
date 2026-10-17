@@ -8,7 +8,11 @@ import {
 } from '@ever-works/agent/database';
 import type { AgentRun, FleetNode, Task } from '@ever-works/agent/entities';
 import { PluginUsageCapability } from '@ever-works/agent/entities';
-import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
+import {
+    FleetJobCompletedEvent,
+    FleetJobLeasedEvent,
+    FleetJobParkedEvent,
+} from '@ever-works/agent/events';
 import {
     FleetCostCeilingService,
     FleetJobRepository,
@@ -26,10 +30,14 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
 import {
+    describeFleetModelProvider,
+    describeFleetModelUsageLimitWindow,
     FLEET_AGENT_TASK_MODEL_RESUME_OUTCOMES,
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
+    FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON,
     FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
+    INBOX_MAX_TITLE_CHARS,
     fleetModelCostUsdToCents,
     fleetModelPluginId,
     isFleetAgentExecutionProvider,
@@ -180,6 +188,11 @@ export class FleetAgentTaskReconcilerService {
                 );
                 return;
             }
+            // Fleet usage limits: a run parked for its node's model quota is
+            // running again — drop the reason that exempted it from the sweeps.
+            await this.bestEffort('clear usage-limit park', () =>
+                this.runs.clearQueuedReason(ctx.runId, FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON),
+            );
             await this.bestEffort('board denorm', () =>
                 this.runDenorm.recordStarted(ctx.taskId, ctx.runId),
             );
@@ -194,6 +207,72 @@ export class FleetAgentTaskReconcilerService {
                 `Fleet lease reconcile failed for run ${ctx.runId}: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
+    }
+
+    /**
+     * Fleet usage limits — the node's model CLI ran out of quota and the job
+     * was PARKED back in the queue (see `FleetJobService.completeJob`).
+     *
+     * Nothing here is a verdict: the AgentRun goes back to `queued` with the
+     * `model-usage-limit` reason (exempt from the sweeps, not counted as
+     * in-flight), its activity line says what it is waiting for, and — only
+     * when this opened a NEW throttle window on that node — the owner gets ONE
+     * Inbox notice naming the machine, the CLI and the reset. No failure is
+     * recorded, so the Agent's error count and its `pauseAfterFailures` halt
+     * are untouched, and the Task stays where it was.
+     */
+    @OnEvent(FleetJobParkedEvent.EVENT_NAME, { async: true })
+    async onParked(event: FleetJobParkedEvent): Promise<void> {
+        const ctx = FleetAgentTaskReconcilerService.correlate(event.job);
+        const nodeLabel = event.nodeName?.trim() || event.nodeId.slice(0, 8);
+        const cli = describeFleetModelProvider(event.limit.provider);
+        const window = describeFleetModelUsageLimitWindow(event.limit.window);
+        const until = formatUsageLimitInstant(event.limit.retryAfter);
+        const pinned = Boolean(event.job.targetNodeId);
+        let task: Task | null = null;
+        if (ctx) {
+            task = await this.tasks.findById(ctx.taskId).catch(() => null);
+            await this.bestEffort('park run for usage limit', () =>
+                this.runs.parkQueued(ctx.runId, FLEET_JOB_MODEL_USAGE_LIMIT_QUEUED_REASON),
+            );
+            await this.bestEffort('run activity', () =>
+                this.runs.updateTelemetry(ctx.runId, {
+                    currentActivity: truncate(
+                        pinned
+                            ? `Waiting for ${nodeLabel}: ${cli} ${window} until ${until}`
+                            : `Waiting for a fleet node with ${cli} quota (${nodeLabel}: ${window} until ${until})`,
+                        MAX_QUOTED_CHARS * 2,
+                    ),
+                }),
+            );
+        }
+        if (!event.newWindow || !this.inbox) return;
+        await this.bestEffort('usage-limit notice', async () => {
+            await this.inbox!.notice(event.userId, {
+                title: truncate(
+                    `${nodeLabel}: ${cli} ${window} until ${until}`,
+                    INBOX_MAX_TITLE_CHARS,
+                ),
+                body: truncate(
+                    [
+                        `The ${cli} seat on fleet node ${nodeLabel} is out of quota (${window}) until ${until}.`,
+                        `${cli} said: "${truncate(redactSecrets(event.limit.message).cleaned, MAX_VERDICT_CHARS)}"`,
+                        '',
+                        'Nothing failed. The run was put back in the queue and the Agent was not charged a failure.',
+                        pinned
+                            ? `This Agent is pinned to ${nodeLabel}, so its work waits for the reset and resumes on its own.`
+                            : `Unpinned work runs on another node with ${cli} quota; ${nodeLabel} takes ${cli} work again after the reset.`,
+                        `To resume sooner, sign ${cli} on ${nodeLabel} in to a seat with quota left.`,
+                    ].join('\n'),
+                    INBOX_MAX_BODY_CHARS,
+                ),
+                agentId: ctx?.agentId ?? null,
+                agentRunId: ctx?.runId ?? null,
+                taskId: ctx?.taskId ?? null,
+                workId: task?.workId ?? null,
+                organizationId: task?.organizationId ?? null,
+            });
+        });
     }
 
     @OnEvent(FleetJobCompletedEvent.EVENT_NAME, { async: true })
@@ -1538,6 +1617,13 @@ function toGateStatus(value: unknown): GateStatus {
     return value === 'green' || value === 'red' || value === 'skipped' || value === 'none'
         ? value
         : 'none';
+}
+
+/** `2026-10-19 01:01 UTC` — the reset, readable in a notice title. */
+export function formatUsageLimitInstant(iso: string): string {
+    const parsed = Date.parse(iso);
+    if (!Number.isFinite(parsed)) return iso;
+    return `${new Date(parsed).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
 function truncate(value: string, max: number): string {

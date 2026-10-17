@@ -18,6 +18,10 @@ export * from './app-spec-applied.event';
 // deliberately NOT a sixth event: it is a stored status and publishes nothing
 // (plan.md:1560).
 export * from './app-build.events';
+// APW-07 — `app.env.changed` / `app.env.rotated` on the bus, names only and split
+// by phase (2026-10-17). Emitted by `AppEnvService` beside the Activity row;
+// APW-05's `AppBuildsListener` re-prepares on the build-phase names.
+export * from './app-env.events';
 // APW-12 (Ever ID) — `ever_id.identity_linked` / `ever_id.identity_unlinked`, ids only,
 // additive and without a listener in this repository.
 export * from './ever-id.events';

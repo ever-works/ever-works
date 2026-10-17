@@ -8,6 +8,7 @@ import {
 } from '../../domain-events/__tests__/domain-events.test-helpers';
 import { ExternalRecordLink } from '../../entities/external-record-link.entity';
 import { IntegrationIdempotencyKey } from '../../entities/integration-idempotency-key.entity';
+import { Task } from '../../entities/task.entity';
 import { Team } from '../../entities/team.entity';
 import {
     ExternalRecordLinksService,
@@ -50,7 +51,12 @@ describe('integration API v1 foundation', () => {
     });
 
     beforeEach(async () => {
-        for (const table of ['external_record_links', 'integration_idempotency_keys', 'teams']) {
+        for (const table of [
+            'external_record_links',
+            'integration_idempotency_keys',
+            'teams',
+            'tasks',
+        ]) {
             await dataSource.query(`DELETE FROM "${table}"`);
         }
     });
@@ -66,9 +72,26 @@ describe('integration API v1 foundation', () => {
             source: 'gauzy',
             installationId: 'conn-1',
         };
+        /** A real task row: a link to a row that does not exist is stale (F9). */
+        const realTask = async (overrides: Partial<Task> = {}): Promise<string> => {
+            const owner = randomUUID();
+            const row = await dataSource.getRepository(Task).save(
+                dataSource.getRepository(Task).create({
+                    userId: owner,
+                    slug: `T-${randomUUID().slice(0, 6)}`,
+                    title: 'Linked',
+                    createdByType: 'user',
+                    createdById: owner,
+                    tenantId: TENANT,
+                    organizationId: ORG_A,
+                    ...overrides,
+                } as Partial<Task>),
+            );
+            return row.id;
+        };
 
         it('links a record and finds it back from the external side', async () => {
-            const taskId = randomUUID();
+            const taskId = await realTask();
             await links.create(scope, {
                 entityType: 'task',
                 entityId: taskId,
@@ -96,7 +119,7 @@ describe('integration API v1 foundation', () => {
         });
 
         it('is unique on both sides, per organization, source and installation', async () => {
-            const [a, b] = [randomUUID(), randomUUID()];
+            const [a, b] = [await realTask(), await realTask()];
             await links.create(scope, { entityType: 'task', entityId: a, externalId: 'g-1' });
             await expect(
                 links.create(scope, { entityType: 'task', entityId: b, externalId: 'g-1' }),
@@ -114,7 +137,7 @@ describe('integration API v1 foundation', () => {
             await expect(
                 links.create(none, {
                     entityType: 'task',
-                    entityId: randomUUID(),
+                    entityId: await realTask(),
                     externalId: 'g-1',
                 }),
             ).rejects.toBeInstanceOf(DuplicateExternalRefError);
@@ -126,7 +149,7 @@ describe('integration API v1 foundation', () => {
         });
 
         it('PUT sets or moves a record link; DELETE removes it', async () => {
-            const taskId = randomUUID();
+            const taskId = await realTask();
             await links.put(scope, { entityType: 'task', entityId: taskId, externalId: 'g-1' });
             await links.put(scope, {
                 entityType: 'task',
@@ -181,7 +204,7 @@ describe('integration API v1 foundation', () => {
         });
 
         it('reports which side collides before inserting (safe inside a Postgres transaction)', async () => {
-            const [a, b] = [randomUUID(), randomUUID()];
+            const [a, b] = [await realTask(), await realTask()];
             await links.create(scope, { entityType: 'task', entityId: a, externalId: 'g-1' });
             await expect(
                 dataSource.transaction((manager) =>
@@ -199,6 +222,31 @@ describe('integration API v1 foundation', () => {
             await expect(
                 links.put(scope, { entityType: 'task', entityId: b, externalId: 'g-1' }),
             ).rejects.toMatchObject({ side: 'external', existingEntityId: a });
+        });
+
+        // Review 2026-10-17 F9 (P1): the record was deleted in the app (or with its
+        // Work), so no integration DELETE dropped its link.
+        it('drops a link whose record is gone, so the externalRef can be created again', async () => {
+            const gone = await realTask();
+            await links.create(scope, { entityType: 'task', entityId: gone, externalId: 'g-1' });
+            await dataSource.getRepository(Task).delete({ id: gone });
+
+            expect(await links.findByExternal(scope, 'task', 'g-1')).toBeNull();
+            expect(await dataSource.getRepository(ExternalRecordLink).count()).toBe(0);
+
+            // PUT of a new record with that external id is no longer a 409.
+            await links.create(scope, { entityType: 'task', entityId: gone, externalId: 'g-2' });
+            await dataSource.getRepository(Task).delete({ id: gone });
+            const fresh = await realTask();
+            await expect(
+                links.put(scope, { entityType: 'task', entityId: fresh, externalId: 'g-2' }),
+            ).resolves.toMatchObject({ entityId: fresh, externalId: 'g-2' });
+        });
+
+        it('keeps the link of a private record: it still exists', async () => {
+            const hidden = await realTask({ visibility: 'private', visibilityExplicit: true });
+            await links.create(scope, { entityType: 'task', entityId: hidden, externalId: 'g-1' });
+            expect((await links.findByExternal(scope, 'task', 'g-1'))?.entityId).toBe(hidden);
         });
 
         it('takes the installation from X-Sync-Origin when externalRef has none', () => {

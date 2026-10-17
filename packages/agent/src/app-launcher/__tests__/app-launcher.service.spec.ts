@@ -980,6 +980,11 @@ describe('AppLauncherService.listForUser (APW-11 T6)', () => {
 
             process.env.EVER_WORKS_APP_WORKS_ENABLED = 'false';
             expect((await list()).meta.appWorksAvailable).toBe(false);
+
+            // The App Works switch is exactly `'true'`; the launcher must not offer
+            // App Works on an instance whose API refuses them.
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = '1';
+            expect((await list()).meta.appWorksAvailable).toBe(false);
         });
 
         it('marks the running platform as current and never hides it (FR-13)', async () => {

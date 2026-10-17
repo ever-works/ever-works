@@ -197,3 +197,40 @@ describe('WorksCreateComposer Repository chip routing', () => {
         expect(href).not.toContain('prompt=');
     });
 });
+
+describe('WorksCreateComposer App chip (APW-01 T23, FR-47, ACC-01-13)', () => {
+    it('is ABSENT by default — a caller that evaluates no flags never surfaces it', () => {
+        const { container } = render(<WorksCreateComposer />);
+        expect(container.querySelector('[data-testid="works-quick-add-app"]')).toBeNull();
+        // The Repository chip is unaffected.
+        expect(
+            container.querySelector('button[data-testid="works-quick-add-repo"]'),
+        ).not.toBeNull();
+    });
+
+    it('is absent while `app` is in disabledKinds', () => {
+        const { container } = render(<WorksCreateComposer disabledKinds={['app']} />);
+        expect(container.querySelector('[data-testid="works-quick-add-app"]')).toBeNull();
+    });
+
+    it('once enabled, routes the URL to the App form (mode=manual&kind=app) with no chat turn', async () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<WorksCreateComposer disabledKinds={[]} />);
+        const chip = container.querySelector('button[data-testid="works-quick-add-app"]');
+        expect(chip).not.toBeNull();
+        fireEvent.click(chip as Element);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://github.com/calcom/cal.com' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledTimes(1));
+        expect(startFromPromptMock).not.toHaveBeenCalled();
+        const href = routerPushMock.mock.calls[0][0] as string;
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('mode')).toBe('manual');
+        expect(params.get('kind')).toBe('app');
+        expect(params.get('prompt')).toBe('https://github.com/calcom/cal.com');
+    });
+});

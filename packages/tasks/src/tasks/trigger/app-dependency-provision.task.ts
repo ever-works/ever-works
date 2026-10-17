@@ -2,9 +2,25 @@ import { Module } from '@nestjs/common';
 import { logger, task } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
 import {
+    APP_DEPENDENCY_CLUSTER_ACCESS,
+    APP_DEPENDENCY_CONFIG_CIPHER,
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
+    APP_DEPENDENCY_SPEC_SOURCE,
     AppDependenciesService,
     AppDependencyProvisionRunner,
 } from '@ever-works/agent/app-dependencies';
+import { AppRuntimeFacadeService, AppDependencyFacadeService } from '@ever-works/agent/facades';
+import { WorkAppDependencyRepository } from '@ever-works/agent/database';
+import { TriggerAppRuntimeModule } from '../../trigger/worker/modules/trigger-app-runtime.module';
+import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
+import { createRemoteProxy } from '../../trigger/worker/remote-proxy';
+
+/**
+ * `@InjectRepository(WorkAppDependency)`'s token — TypeORM's `getRepositoryToken(Entity)` is the
+ * string `'<Entity>Repository'`. Spelled here rather than importing `@nestjs/typeorm` into a
+ * package that must never touch a `DataSource`.
+ */
+export const WORK_APP_DEPENDENCY_ROWS_TOKEN = 'WorkAppDependencyRepository' as const;
 import type { AppDependencyProvisionPayload } from '@ever-works/agent/tasks';
 import { TriggerWorkerModule } from '../../trigger/worker/modules/trigger-worker.module';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
@@ -88,8 +104,52 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * dialled.
  */
 @Module({
-    imports: [TriggerWorkerModule],
-    providers: [AppDependenciesService, AppDependencyProvisionRunner],
+    imports: [
+        TriggerWorkerModule,
+        // A0.10 (lane aw-deploy-2, 2026-10-17) — the isolated App runtime module: T20's facade (the
+        // cluster access), the worker-context flag it requires, `APP_RUNTIME_TARGET` (namespace
+        // preparation, GAP-06), `APP_RUNTIME_EVENT_SINK` and the runtime-state row.
+        TriggerAppRuntimeModule,
+    ],
+    providers: [
+        AppDependenciesService,
+        AppDependencyProvisionRunner,
+        // The provider selection (one place a provider is called) — local, it dials the cluster.
+        AppDependencyFacadeService,
+        { provide: APP_DEPENDENCY_CLUSTER_ACCESS, useExisting: AppRuntimeFacadeService },
+        // The rows, the cipher, the spec and the re-dispatch live in the API (no DataSource, no key
+        // here) — each reached by name over the internal channel (`remoteMap`).
+        {
+            provide: WorkAppDependencyRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkAppDependencyRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: WORK_APP_DEPENDENCY_ROWS_TOKEN,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyRowsRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_CONFIG_CIPHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyConfigCipherRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_SPEC_SOURCE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencySpecSourceAdapter'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPENDENCY_PROVISION_DISPATCHER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDependencyProvisionDispatchRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+    ],
 })
 class AppDependencyProvisionWorkerModule {}
 

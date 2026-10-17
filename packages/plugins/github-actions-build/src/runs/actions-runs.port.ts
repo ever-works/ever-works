@@ -42,6 +42,8 @@ export interface ActionsRun {
 	readonly run_started_at?: string | null;
 	readonly updated_at?: string | null;
 	readonly pull_requests?: ReadonlyArray<{ readonly number?: number | null }> | null;
+	/** The repository the run's head commit lives in — a fork's for a fork pull request (§7.5, ACC-05-06). */
+	readonly head_repository?: { readonly full_name?: string | null } | null;
 }
 
 /** One job of a run (`GET /repos/{o}/{r}/actions/runs/{id}/jobs`). */
@@ -105,6 +107,21 @@ export interface ActionsRunsPort {
 		readonly headSha?: string;
 		readonly event?: string;
 	}): Promise<readonly ActionsRun[]>;
+
+	/**
+	 * Run discovery's conditional read (§7.4a): the same list as
+	 * {@link ActionsRunsPort.listWorkflowRuns}, sent with `If-None-Match` when an
+	 * `etag` is given. A 304 answers `{ notModified: true, runs: [] }`.
+	 *
+	 * Optional — an adapter without it is read unconditionally through
+	 * `listWorkflowRuns`, which costs a request but is never wrong.
+	 */
+	listWorkflowRunsConditional?(input: {
+		readonly repository: ActionsRepositoryRef;
+		readonly workflowFile: string;
+		readonly perPage: number;
+		readonly etag?: string;
+	}): Promise<{ readonly notModified: boolean; readonly etag?: string; readonly runs: readonly ActionsRun[] }>;
 
 	/** `GET /repos/{o}/{r}/actions/runs/{id}`. `null` when GitHub answers 404. */
 	getWorkflowRun(input: {
@@ -208,6 +225,33 @@ export function octokitActionsRunsPort(octokit: OctokitLike): ActionsRunsPort {
 				params
 			);
 			return asArray<ActionsRun>(data, 'workflow_runs');
+		},
+
+		async listWorkflowRunsConditional({ repository, workflowFile, perPage, etag }) {
+			try {
+				const response = (await octokit.request(
+					'GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs',
+					{
+						owner: repository.owner,
+						repo: repository.repo,
+						workflow_id: workflowFile,
+						per_page: perPage,
+						...(etag ? { headers: { 'if-none-match': etag } } : {})
+					}
+				)) as { data: unknown; headers?: Record<string, unknown> };
+				const next = response.headers?.etag;
+				return {
+					notModified: false,
+					...(typeof next === 'string' ? { etag: next } : {}),
+					runs: asArray<ActionsRun>(response.data, 'workflow_runs')
+				};
+			} catch (error) {
+				// Octokit throws on 304; it is the cheap "nothing new" answer, not a failure.
+				if ((error as { status?: number }).status === 304) {
+					return { notModified: true, ...(etag ? { etag } : {}), runs: [] };
+				}
+				throw error;
+			}
 		},
 
 		async getWorkflowRun({ repository, runId }) {

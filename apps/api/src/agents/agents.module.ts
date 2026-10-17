@@ -1,3 +1,7 @@
+import {
+    AppChangeRequestService,
+    AppWorksModule as AgentAppWorksModule,
+} from '@ever-works/agent/app-works';
 import { Global, Module } from '@nestjs/common';
 import {
     AgentsModule as AgentAgentsModule,
@@ -439,6 +443,10 @@ async function assertRealWriteTarget(
 @Module({
     imports: [
         AgentAgentsModule,
+        // APW-08 T26 — `AppChangeRequestService` for the AGENT_DOMAIN_TOOL_SOURCES
+        // binding's `appChanges` member. The agent package's module (no api-side imports),
+        // so no cycle.
+        AgentAppWorksModule,
         AgentSkillsModule,
         DatabaseModule,
         TasksDomainModule,
@@ -1908,6 +1916,10 @@ async function assertRealWriteTarget(
                 // inserting anywhere else silently rebinds every service
                 // after the insertion point.
                 TaskAgentReviewService,
+                // APW-08 T26 — backs `request_app_change` / `get_app_change`. APPENDED
+                // LAST for the same positional reason, and optional: unbound, the two
+                // tools are simply not offered.
+                { token: AppChangeRequestService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -1929,6 +1941,7 @@ async function assertRealWriteTarget(
                 workflowExecutor: WorkflowGraphExecutorService,
                 inboxService: InboxService,
                 agentReviews: TaskAgentReviewService,
+                appChangeService?: AppChangeRequestService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2030,6 +2043,32 @@ async function assertRealWriteTarget(
                 // `askHuman` is carried, so the reply router and list
                 // surface are unreachable from the model.
                 inbox: { service: inboxService },
+                // APW-08 T26 — the chat half of the evolve loop. The Work id comes from
+                // the MODEL, so it is owner-checked (edit for the write, view for the
+                // read) and kind-checked before the service sees it; a foreign or
+                // non-App id answers null with no existence leak.
+                ...(appChangeService
+                    ? {
+                          appChanges: {
+                              service: appChangeService,
+                              async authorize(
+                                  userId: string,
+                                  workId: string,
+                                  level: 'edit' | 'view',
+                              ) {
+                                  try {
+                                      const access =
+                                          level === 'edit'
+                                              ? await workOwnership.ensureCanEdit(workId, userId)
+                                              : await workOwnership.ensureCanView(workId, userId);
+                                      return isAppWorkKind(access.work.kind) ? access.work : null;
+                                  } catch {
+                                      return null;
+                                  }
+                              },
+                          },
+                      }
+                    : {}),
             }),
         },
         // Agent Plugins MCP slice (T26) — AGENT_MCP_TOOL_SOURCE binding.
