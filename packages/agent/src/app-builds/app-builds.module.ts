@@ -264,6 +264,13 @@ import { GitFacadeService } from '../facades/git.facade';
                     if (!gitFacade) return null;
                     return new GitBuildTokenSource(gitFacade).getBuildToken(input);
                 },
+                // 2026-10-17 — the workflow-capable credential with its kind and
+                // scopes (`GitFacadeService.getBuildCredential`).
+                getBuildCredential: async (input) => {
+                    const gitFacade = getOptionalProvider<GitFacadeService>(ref, GitFacadeService);
+                    if (!gitFacade) return null;
+                    return new GitBuildTokenSource(gitFacade).getBuildCredential(input);
+                },
             }),
             inject: [ModuleRef],
         },

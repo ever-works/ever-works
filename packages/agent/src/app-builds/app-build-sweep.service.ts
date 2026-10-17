@@ -190,6 +190,10 @@ export interface AppBuildSweepSummary {
     readonly silentDispatched?: number;
     /** Silent pass: offers that threw. */
     readonly silentFailed?: number;
+    /** Orphan pass (§7.4): verification secrets removed this tick. */
+    readonly orphanSecretsRemoved?: number;
+    /** Orphan pass: removals that threw. */
+    readonly orphanSecretsFailed?: number;
 }
 
 /** A summary with every counter at zero. */
@@ -347,6 +351,16 @@ export class AppBuildSweepService {
             this.logger.warn(`App builds: the sweep's silent read failed (${errorText(error)}).`);
         }
 
+        // §7.4:1404-1405 — the backstop for a verification secret the watch's
+        // terminal transition could not remove (2026-10-17).
+        let orphans = { orphanSecretsRemoved: 0, orphanSecretsFailed: 0 };
+        try {
+            orphans = await this.orphanSecretPass(nowMs);
+        } catch (error) {
+            passesFailed += 1;
+            this.logger.warn(`App builds: the sweep's orphaned-secret read failed (${errorText(error)}).`);
+        }
+
         return {
             ...emptySummary(null),
             passesFailed,
@@ -355,7 +369,28 @@ export class AppBuildSweepService {
             discoveryRunsRecorded,
             discoveryBuildsCreated,
             ...silent,
+            ...orphans,
         };
+    }
+
+    /** Verification secrets still recorded 40 minutes after their run started — remove them. */
+    private async orphanSecretPass(
+        nowMs: number,
+    ): Promise<{ orphanSecretsRemoved: number; orphanSecretsFailed: number }> {
+        const orphans = await this.builds.findWithOrphanedVerifySecrets(nowMs, APP_BUILD_SWEEP_BATCH);
+        let orphanSecretsRemoved = 0;
+        let orphanSecretsFailed = 0;
+        for (const build of orphans) {
+            try {
+                if (await this.service.removeOrphanedVerifySecret(build.id)) orphanSecretsRemoved += 1;
+            } catch (error) {
+                orphanSecretsFailed += 1;
+                this.logger.warn(
+                    `App builds: removing the orphaned verification secret of build ${build.id} failed (${errorText(error)}).`,
+                );
+            }
+        }
+        return { orphanSecretsRemoved, orphanSecretsFailed };
     }
 
     /* ---------------------------------------------------------------------- *

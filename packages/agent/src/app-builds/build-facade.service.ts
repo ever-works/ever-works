@@ -67,6 +67,7 @@ export interface BuildFacadeBinding extends AppBuildPluginBinding {
         readonly perPage: number;
         readonly etag?: string;
     }): Promise<{ notModified: boolean; etag?: string; runs: BuildRunRef[] }>;
+    deleteVerifyPromptedSecret?(): Promise<unknown>;
 }
 
 /**
@@ -226,15 +227,13 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         }
 
         const plugin = candidates[0];
-        const token = await this.tokenFor(workId, userId);
-        if (!token) {
+        const auth = await this.authFor(workId, userId);
+        if (!auth) {
             this.logger.warn(
                 `Build plugin resolution for work ${workId}: no provider credential is available for member ${userId}.`,
             );
             return null;
         }
-
-        const auth: BuildAuth = { token };
         const repository = this.repositoryOf(work);
         const facts = await this.factsFor(workId);
         const repositoryRef: BuildRepositoryRef | null = repository
@@ -327,6 +326,33 @@ export class BuildFacadeService implements AppBuildPluginResolver {
                                   perPage: input.perPage,
                                   ...(input.etag ? { etag: input.etag } : {}),
                               },
+                              auth,
+                          ),
+                  }
+                : {}),
+
+            // Plan §5 — a Rebuild's `commitSha` must be in the tracked branch's history.
+            ...(repositoryRef && typeof plugin.isCommitReachable === 'function'
+                ? {
+                      isCommitReachable: async (sha: string) =>
+                          plugin.isCommitReachable!(
+                              {
+                                  repository: { owner: repositoryRef.owner, repo: repositoryRef.repo },
+                                  sha,
+                                  branch: repositoryRef.trackedBranch,
+                              },
+                              auth,
+                          ),
+                  }
+                : {}),
+
+            // §4.10 — the per-run prompted-value secret's removal (the watch runner's
+            // terminal transition, and the sweep's orphan pass).
+            ...(repositoryRef && typeof plugin.deleteVerifyPromptedSecret === 'function'
+                ? {
+                      deleteVerifyPromptedSecret: async () =>
+                          plugin.deleteVerifyPromptedSecret!(
+                              { owner: repositoryRef.owner, repo: repositoryRef.repo },
                               auth,
                           ),
                   }
@@ -501,6 +527,40 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         }
     }
 
+    /**
+     * The Build's `BuildAuth`: the token, plus its kind and scopes when the
+     * source can say (2026-10-17) — what lets the plugin name a missing
+     * `workflow` scope instead of passing GitHub's 403/404 through.
+     */
+    private async authFor(workId: string, userId: string): Promise<BuildAuth | null> {
+        if (this.tokens?.getBuildCredential) {
+            try {
+                const found = await this.tokens.getBuildCredential({
+                    workId,
+                    userId,
+                    providerId: 'github',
+                });
+                if (found && found.token.trim().length > 0) {
+                    return {
+                        token: found.token,
+                        credential: found.credential,
+                        scopes: found.scopes,
+                    };
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `Build plugin resolution for work ${workId}: the credential lookup failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+            }
+            // Fall through to the plain token read: an older source answering
+            // only `getBuildToken` must keep working.
+        }
+        const token = await this.tokenFor(workId, userId);
+        return token ? { token } : null;
+    }
+
     /** The member's provider token, or `null` when none can be obtained. */
     private async tokenFor(workId: string, userId: string): Promise<string | null> {
         if (!this.tokens) return null;
@@ -534,6 +594,23 @@ export interface BuildTokenSource {
         readonly userId: string;
         readonly providerId: string;
     }): Promise<string | null>;
+    /**
+     * The credential and what it is (2026-10-17). Optional: a source without it
+     * is read through `getBuildToken` and the plugin learns nothing about the
+     * credential's kind, which is how every source behaved before.
+     */
+    getBuildCredential?(input: {
+        readonly workId: string;
+        readonly userId: string;
+        readonly providerId: string;
+    }): Promise<BuildCredential | null>;
+}
+
+/** A Build credential with its kind and (when recorded) its OAuth scopes. Never logged. */
+export interface BuildCredential {
+    readonly token: string;
+    readonly credential: 'oauth' | 'githubApp' | 'pat';
+    readonly scopes: readonly string[] | null;
 }
 
 /**

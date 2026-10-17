@@ -111,7 +111,13 @@ export const APP_BUILD_BLOCKED_REASONS = [
 	'managedConcurrencyLimit',
 	'buildValueNameReserved',
 	'buildServicePortRequired',
-	'verificationDependencyUnsupported'
+	'verificationDependencyUnsupported',
+	// 2026-10-17 (aw-builds-2): the credential the build runs with cannot write
+	// under `.github/workflows/` — an OAuth token without the `workflow` scope, or
+	// a GitHub App installation without `Workflows: write` (APW-02 plan §4's
+	// permission matrix, "Push a workflow file"). Before this every such refusal
+	// surfaced as a generic 403/404 `workflowWriteFailed`.
+	'workflowPermissionMissing'
 ] as const;
 
 /** `work_builds.blockedReason` — plan §3.2:435–451 + §4.5:827 + §4.10:1056. */
@@ -1296,7 +1302,9 @@ export const APP_BUILD_BLOCKED_REASON_ACTIONS = {
 	managedConcurrencyLimit: null,
 	buildValueNameReserved: 'openEnvironment',
 	secretLimitReached: 'openRepositorySettings',
-	gitConnectionMissing: 'reconnectGithub'
+	gitConnectionMissing: 'reconnectGithub',
+	// Reconnecting GitHub with the `workflow` scope is the member's fix.
+	workflowPermissionMissing: 'reconnectGithub'
 } as const satisfies Record<AppBuildBlockedReason, AppBuildBlockedAction | null>;
 
 /**

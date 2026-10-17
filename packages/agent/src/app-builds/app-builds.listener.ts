@@ -125,6 +125,21 @@ export class AppBuildsListener implements OnModuleDestroy {
             ? 'pullTokenSaved'
             : 'settingsChanged';
         await this.prepare(event.workId, reason);
+
+        // §4.12 / §7.4 — a saved pull token is what lets a private image's digest be
+        // confirmed, so the Work's `digestUnconfirmed` Builds are re-checked now
+        // rather than left undeployable (2026-10-17).
+        if (reason === 'pullTokenSaved') {
+            try {
+                await this.builds.reconfirmUnconfirmedDigests(event.workId);
+            } catch (error) {
+                this.logger.warn(
+                    `App builds: re-checking unconfirmed digests of work ${event.workId} failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+            }
+        }
     }
 
     /**

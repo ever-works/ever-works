@@ -24,7 +24,7 @@ import type {
  * lands a git-provider `commitFiles`, the facade may bind that instead; nothing
  * in `workflow-writer.ts` changes either way.
  *
- * ## The four refusal codes the contract names
+ * ## The refusal codes the contract names
  *
  * A refusal is THROWN with `code` set, which is what `repositoryWriteErrorCode`
  * reads:
@@ -34,26 +34,65 @@ import type {
  *    fresh head (never a force-push);
  *  - `refRejectedByRule` — 409/422 mentioning a protection rule or a
  *    required status/review: the caller switches to the pull-request path;
- *  - `pullRequestExists` — 422 "A pull request already exists".
+ *  - `pullRequestExists` — 422 "A pull request already exists";
+ *  - `workflowPermissionMissing` (2026-10-17) — the credential cannot write
+ *    under `.github/workflows/`: an OAuth token or classic PAT without the
+ *    `workflow` scope, or a GitHub App installation without `Workflows: write`
+ *    (APW-02 plan §4's permission matrix). Checked BEFORE the commit when the
+ *    scopes are known or readable (`x-oauth-scopes`), and translated from
+ *    GitHub's own refusal otherwise, so the member is told to reconnect GitHub
+ *    with the `workflow` scope instead of seeing a bare 403/404.
  *
  * Every other failure is rethrown untouched.
  */
 
 /** The subset of Octokit's surface this writer uses. */
 export interface OctokitRequester {
-	request(route: string, params?: Record<string, unknown>): Promise<{ data: unknown; status?: number }>;
+	request(
+		route: string,
+		params?: Record<string, unknown>
+	): Promise<{ data: unknown; status?: number; headers?: Record<string, unknown> }>;
 }
+
+/** What the facade knows about the credential (see `BuildAuth`). */
+export interface RepositoryWriterCredential {
+	readonly credential?: 'oauth' | 'githubApp' | 'pat' | 'unknown';
+	readonly scopes?: readonly string[] | null;
+}
+
+/** The directory GitHub guards with the `workflow` scope / `Workflows: write` permission. */
+export const WORKFLOWS_DIRECTORY = '.github/workflows/';
 
 /** An error carrying one of the contract's refusal codes. */
 export class RepositoryWriteError extends Error {
 	constructor(
 		readonly code: RepositoryWriteErrorCode,
 		message: string,
-		readonly cause?: unknown
+		readonly cause?: unknown,
+		/** `workflowPermissionMissing` only: which credential, and what it lacks. */
+		readonly credential?: string,
+		readonly missing?: string
 	) {
 		super(message);
 		this.name = 'RepositoryWriteError';
 	}
+}
+
+/**
+ * The refusal for a credential that cannot write `.github/workflows/`. Names what
+ * to grant: the `workflow` OAuth scope, or the App's `Workflows: write`.
+ */
+export function workflowPermissionMissingError(credential: string, cause?: unknown): RepositoryWriteError {
+	const app = credential === 'githubApp';
+	return new RepositoryWriteError(
+		'workflowPermissionMissing',
+		app
+			? 'The GitHub App installation cannot write workflow files: grant it "Workflows: Read and write".'
+			: 'The GitHub connection cannot write workflow files: reconnect GitHub and grant the "workflow" scope.',
+		cause,
+		credential,
+		app ? 'workflows:write' : 'workflow'
+	);
 }
 
 const FULL_SHA = /^[0-9a-f]{40}$/i;
@@ -82,6 +121,26 @@ function messageOf(error: unknown): string {
 const RULE_REFUSAL = /protected branch|ruleset|rule violation|required status|required review|push declined|cannot be updated/i;
 
 /**
+ * GitHub's wordings for "this credential may not touch a workflow file":
+ * "refusing to allow an OAuth App to create or update workflow … without
+ * `workflow` scope" and "… a GitHub App … without `workflows` permission".
+ */
+const WORKFLOW_REFUSAL = /workflow[^|]*\b(scope|permission)|\b(scope|permission)[^|]*workflow/i;
+
+/** The App API's answer to a write the installation's permissions do not cover. */
+const INTEGRATION_REFUSAL = /resource not accessible by integration/i;
+
+/** `x-oauth-scopes` as a list, or `null` when the header is absent (App / fine-grained tokens). */
+function scopesFromHeader(headers: Record<string, unknown> | undefined): string[] | null {
+	const header = headers?.['x-oauth-scopes'];
+	if (typeof header !== 'string') return null;
+	return header
+		.split(',')
+		.map((scope) => scope.trim())
+		.filter(Boolean);
+}
+
+/**
  * The writer for one repository, bound to one token.
  *
  * `trackedBranch` is the default `ref` for {@link RepositoryWriter.getFileContent}
@@ -89,9 +148,11 @@ const RULE_REFUSAL = /protected branch|ruleset|rule violation|required status|re
  */
 export function octokitRepositoryWriter(
 	octokit: OctokitRequester,
-	repository: { readonly owner: string; readonly repo: string; readonly trackedBranch?: string }
+	repository: { readonly owner: string; readonly repo: string; readonly trackedBranch?: string },
+	credential: RepositoryWriterCredential = {}
 ): RepositoryWriter {
 	const base = { owner: repository.owner, repo: repository.repo };
+	const kind = credential.credential ?? 'unknown';
 
 	async function headOf(ref: string): Promise<string> {
 		if (FULL_SHA.test(ref)) return ref;
@@ -102,6 +163,98 @@ export function octokitRepositoryWriter(
 		const sha = (data as { object?: { sha?: unknown } })?.object?.sha;
 		if (typeof sha !== 'string') throw new Error(`github-actions-build: no head commit for ${ref}`);
 		return sha;
+	}
+
+	/**
+	 * Before a commit that touches `.github/workflows/`: a credential whose scopes
+	 * are known (or readable from `GET /user`'s `x-oauth-scopes`) and lack
+	 * `workflow` is refused up front, with nothing written. A GitHub App token
+	 * answers no scopes header; its permissions are left to the write's own answer.
+	 */
+	async function assertCanWriteWorkflows(): Promise<void> {
+		if (kind === 'githubApp') return;
+		let scopes: readonly string[] | null = credential.scopes ?? null;
+		if (!scopes) {
+			try {
+				scopes = scopesFromHeader((await octokit.request('GET /user')).headers);
+			} catch {
+				scopes = null;
+			}
+		}
+		if (scopes && !scopes.includes('workflow')) {
+			throw workflowPermissionMissingError(kind === 'pat' ? 'pat' : 'oauth');
+		}
+	}
+
+	/** A write refusal on a workflow commit, translated when it is GitHub's workflow guard. */
+	function translateWorkflowRefusal(error: unknown, touchesWorkflows: boolean): unknown {
+		if (!touchesWorkflows || error instanceof RepositoryWriteError) return error;
+		const message = messageOf(error);
+		if (WORKFLOW_REFUSAL.test(message)) {
+			return workflowPermissionMissingError(/github app|integration/i.test(message) ? 'githubApp' : kind, error);
+		}
+		if (statusOf(error) === 403 && INTEGRATION_REFUSAL.test(message)) {
+			return workflowPermissionMissingError('githubApp', error);
+		}
+		return error;
+	}
+
+	/** The four-call commit of {@link RepositoryWriter.commitFiles}. */
+	async function commit(input: RepositoryCommitInput): Promise<{ commitSha: string }> {
+		const { data: baseCommit } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
+			...base,
+			commit_sha: input.baseSha
+		});
+		const baseTree = (baseCommit as { tree?: { sha?: unknown } })?.tree?.sha;
+		if (typeof baseTree !== 'string') {
+			throw new Error(`github-actions-build: commit ${input.baseSha} has no tree`);
+		}
+
+		const tree: Array<{ path: string; mode: '100644'; type: 'blob'; sha: string }> = [];
+		for (const file of input.files) {
+			const { data: blob } = await octokit.request('POST /repos/{owner}/{repo}/git/blobs', {
+				...base,
+				content: file.content,
+				encoding: file.encoding === 'base64' ? 'base64' : 'utf-8'
+			});
+			const sha = (blob as { sha?: unknown })?.sha;
+			if (typeof sha !== 'string') throw new Error(`github-actions-build: no blob sha for ${file.path}`);
+			tree.push({ path: file.path, mode: '100644', type: 'blob', sha });
+		}
+
+		const { data: newTree } = await octokit.request('POST /repos/{owner}/{repo}/git/trees', {
+			...base,
+			base_tree: baseTree,
+			tree
+		});
+		const { data: created } = await octokit.request('POST /repos/{owner}/{repo}/git/commits', {
+			...base,
+			message: input.message,
+			tree: (newTree as { sha: string }).sha,
+			parents: [input.baseSha]
+		});
+		const commitSha = (created as { sha: string }).sha;
+
+		try {
+			await octokit.request('PATCH /repos/{owner}/{repo}/git/refs/{ref}', {
+				...base,
+				ref: `heads/${input.branch}`,
+				sha: commitSha,
+				// Never a force-push: a moved branch is `nonFastForward`.
+				force: false
+			});
+		} catch (error) {
+			const status = statusOf(error);
+			const message = messageOf(error);
+			if (status === 422 && /fast[ -]?forward/i.test(message)) {
+				throw new RepositoryWriteError('nonFastForward', `${input.branch} moved; retry from its new head`, error);
+			}
+			if ((status === 409 || status === 422 || status === 403) && RULE_REFUSAL.test(message)) {
+				throw new RepositoryWriteError('refRejectedByRule', `${input.branch} refused the update`, error);
+			}
+			throw error;
+		}
+		return { commitSha };
 	}
 
 	return {
@@ -126,60 +279,13 @@ export function octokitRepositoryWriter(
 		},
 
 		async commitFiles(input: RepositoryCommitInput) {
-			const { data: baseCommit } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
-				...base,
-				commit_sha: input.baseSha
-			});
-			const baseTree = (baseCommit as { tree?: { sha?: unknown } })?.tree?.sha;
-			if (typeof baseTree !== 'string') {
-				throw new Error(`github-actions-build: commit ${input.baseSha} has no tree`);
-			}
-
-			const tree: Array<{ path: string; mode: '100644'; type: 'blob'; sha: string }> = [];
-			for (const file of input.files) {
-				const { data: blob } = await octokit.request('POST /repos/{owner}/{repo}/git/blobs', {
-					...base,
-					content: file.content,
-					encoding: file.encoding === 'base64' ? 'base64' : 'utf-8'
-				});
-				const sha = (blob as { sha?: unknown })?.sha;
-				if (typeof sha !== 'string') throw new Error(`github-actions-build: no blob sha for ${file.path}`);
-				tree.push({ path: file.path, mode: '100644', type: 'blob', sha });
-			}
-
-			const { data: newTree } = await octokit.request('POST /repos/{owner}/{repo}/git/trees', {
-				...base,
-				base_tree: baseTree,
-				tree
-			});
-			const { data: commit } = await octokit.request('POST /repos/{owner}/{repo}/git/commits', {
-				...base,
-				message: input.message,
-				tree: (newTree as { sha: string }).sha,
-				parents: [input.baseSha]
-			});
-			const commitSha = (commit as { sha: string }).sha;
-
+			const touchesWorkflows = input.files.some((file) => file.path.startsWith(WORKFLOWS_DIRECTORY));
+			if (touchesWorkflows) await assertCanWriteWorkflows();
 			try {
-				await octokit.request('PATCH /repos/{owner}/{repo}/git/refs/{ref}', {
-					...base,
-					ref: `heads/${input.branch}`,
-					sha: commitSha,
-					// Never a force-push: a moved branch is `nonFastForward`.
-					force: false
-				});
+				return await commit(input);
 			} catch (error) {
-				const status = statusOf(error);
-				const message = messageOf(error);
-				if (status === 422 && /fast[ -]?forward/i.test(message)) {
-					throw new RepositoryWriteError('nonFastForward', `${input.branch} moved; retry from its new head`, error);
-				}
-				if ((status === 409 || status === 422 || status === 403) && RULE_REFUSAL.test(message)) {
-					throw new RepositoryWriteError('refRejectedByRule', `${input.branch} refused the update`, error);
-				}
-				throw error;
+				throw translateWorkflowRefusal(error, touchesWorkflows);
 			}
-			return { commitSha };
 		},
 
 		async createBranch(name: string, fromRef: string): Promise<GitBranch> {

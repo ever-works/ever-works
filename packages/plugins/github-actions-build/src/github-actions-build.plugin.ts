@@ -311,7 +311,9 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 				buildInputsHash: computeBuildInputsHash(input.values ?? []),
 				blocked: {
 					reason: written.blocked?.reason ?? 'workflowWriteFailed',
-					detail: { cause: written.blocked?.detail.cause ?? 'unknown' }
+					// The whole detail: `workflowPermissionMissing` carries which credential
+					// and which permission, which is what the member's fix depends on.
+					detail: { ...(written.blocked?.detail ?? { cause: 'unknown' }) }
 				}
 			};
 		}
@@ -733,7 +735,45 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 		repository: { readonly owner: string; readonly repo: string; readonly trackedBranch?: string },
 		auth: BuildAuth
 	): RepositoryWriter {
-		return octokitRepositoryWriter(this.octokitFor(auth), repository);
+		return octokitRepositoryWriter(this.octokitFor(auth), repository, {
+			credential: auth.credential,
+			scopes: auth.scopes
+		});
+	}
+
+	/**
+	 * Plan §5 — a Rebuild's `commitSha` must be reachable from the tracked branch
+	 * (2026-10-17). `GET …/compare/{sha}...{branch}`: `ahead` or `identical` means
+	 * the commit is in the branch's history; `behind` / `diverged` means it is not
+	 * (a commit only a fork's network carries is `diverged`), and 404/422 means
+	 * GitHub does not know it here. Any other failure is a throw.
+	 */
+	async isCommitReachable(
+		input: { readonly repository: { readonly owner: string; readonly repo: string }; readonly sha: string; readonly branch: string },
+		auth: BuildAuth
+	): Promise<boolean> {
+		try {
+			const { data } = await this.octokitFor(auth).request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+				owner: input.repository.owner,
+				repo: input.repository.repo,
+				basehead: `${input.sha}...${input.branch}`,
+				per_page: 1
+			});
+			const status = (data as { status?: unknown } | null)?.status;
+			return status === 'ahead' || status === 'identical';
+		} catch (error) {
+			const status = (error as { status?: unknown } | null)?.status;
+			if (status === 404 || status === 422) return false;
+			throw error;
+		}
+	}
+
+	/** §4.10 — the per-run prompted-value secret's removal (T12's `secret-sync.ts`, now on the contract). */
+	async deleteVerifyPromptedSecret(
+		repository: { readonly owner: string; readonly repo: string },
+		auth: BuildAuth
+	): Promise<{ readonly deleted: boolean }> {
+		return createBuildValueSecretSync({ port: this.secretPort(auth, repository) }).deleteVerifyPromptedSecret();
 	}
 
 	/** The Octokit client for one call — a seam a spec overrides, like {@link actionsPort}. */

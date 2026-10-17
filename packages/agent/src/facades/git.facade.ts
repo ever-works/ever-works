@@ -570,6 +570,87 @@ export class GitFacadeService implements IGitFacade {
      * `connectionScope` rather than falling back to a credential the member
      * does not own.
      */
+    /**
+     * APW-05 — the credential an App Work's Build runs with, and what it is
+     * (2026-10-17, lane aw-builds-2).
+     *
+     * A Build commits `.github/workflows/ever-works-build.yml` into the member's
+     * repository, and GitHub guards that directory separately from `repo`: an
+     * OAuth token needs the **`workflow`** scope, a GitHub App installation needs
+     * **`Workflows: write`** (APW-02 plan §4's permission matrix). The platform
+     * App deliberately has no Workflows permission, and an OAuth connection made
+     * before the scope was requested lacks it — so the plain `getAccessToken`
+     * ladder can hand a Build a token that will be refused on its first write.
+     *
+     * The ladder here prefers a credential that CAN write workflows, and says
+     * which kind it returned so the build plugin can refuse with a named reason
+     * (`workflowPermissionMissing`) instead of a bare 403/404:
+     *
+     *   1. the member's connected account WITH `repo` + `workflow`;
+     *   2. the Work's GitHub App installation token (dispatch and observe work;
+     *      a workflow write needs the App's `Workflows: write`);
+     *   3. the member's connected account with `repo` only (the plugin refuses
+     *      the workflow write up front from the recorded scopes);
+     *   4. a PAT from plugin settings (scopes unknown; read from GitHub).
+     *
+     * `null` when none exists. Never throws; the token is never logged.
+     */
+    async getBuildCredential(options: GitFacadeOptions): Promise<{
+        readonly token: string;
+        readonly credential: 'oauth' | 'githubApp' | 'pat';
+        readonly scopes: string[] | null;
+    } | null> {
+        if (!options.userId || !options.providerId) return null;
+        const parseScopes = (scope: string | null | undefined): string[] | null => {
+            const list = (scope ?? '')
+                .split(/[,\s]+/)
+                .map((entry) => entry.trim())
+                .filter(Boolean);
+            return list.length > 0 ? list : null;
+        };
+        try {
+            const plugin = await this.resolvePlugin(
+                options.providerId,
+                options.userId,
+                options.workId,
+            );
+            const workflowAccount = await this.authAccountRepository.findConnectedProviderAccount(
+                options.userId,
+                plugin.id,
+                {
+                    usePluginProviderId: true,
+                    requiredScopes: [...this.getRequiredOAuthScopes(plugin.id), 'workflow'],
+                },
+            );
+            if (workflowAccount?.accessToken) {
+                return {
+                    token: workflowAccount.accessToken,
+                    credential: 'oauth',
+                    scopes: parseScopes(workflowAccount.scope),
+                };
+            }
+
+            const installationToken = await this.getInstallationTokenForWork(options);
+            if (installationToken) {
+                return { token: installationToken, credential: 'githubApp', scopes: null };
+            }
+
+            const account = await this.findUsableGitProviderAccount(options.userId, plugin.id);
+            if (account?.accessToken) {
+                return {
+                    token: account.accessToken,
+                    credential: 'oauth',
+                    scopes: parseScopes(account.scope),
+                };
+            }
+
+            const pat = await this.getPatFromSettings(plugin.id, options.userId, options.workId);
+            return pat ? { token: pat, credential: 'pat', scopes: null } : null;
+        } catch {
+            return null;
+        }
+    }
+
     async getMemberAccountToken(options: MemberAccountTokenOptions): Promise<string | null> {
         const account = await this.findUsableGitProviderAccount(options.userId, options.providerId);
         if (account?.accessToken) {

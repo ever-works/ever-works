@@ -7029,7 +7029,8 @@
                     "managedConcurrencyLimit": "Waiting for other builds: at most {perWork} per app and {perAccount} per account run at once.",
                     "buildValueNameReserved": "{name} is reserved by Ever Works and can't be passed to a build. Rename the environment entry.",
                     "buildServicePortRequired": "The build service {service} needs a port: Ever Works doesn't know which port \"{image}\" listens on.",
-                    "verificationDependencyUnsupported": "A verification can't start {kind} yet. The check runs on the cluster instead."
+                    "verificationDependencyUnsupported": "A verification can't start {kind} yet. The check runs on the cluster instead.",
+                    "workflowPermissionMissing": "Your GitHub connection can't write workflow files, so Ever Works can't add its build workflow. Reconnect GitHub and allow the \"workflow\" permission."
                 },
                 "blockedAction": {
                     "reviewPullRequest": "Review pull request",

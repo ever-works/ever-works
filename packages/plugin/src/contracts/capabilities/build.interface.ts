@@ -115,6 +115,18 @@ export interface BuildRepositoryRef {
 /** The credential a plugin call runs with (plan §4.1:599–601). Resolved by the facade; **never logged**. */
 export interface BuildAuth {
 	readonly token: string;
+	/**
+	 * What kind of credential `token` is, when the facade knows (2026-10-17).
+	 * Optional and additive: a plugin uses it to refuse a write the credential
+	 * cannot make with a NAMED reason (`workflowPermissionMissing`) instead of
+	 * letting the provider answer a bare 403/404.
+	 */
+	readonly credential?: 'oauth' | 'githubApp' | 'pat' | 'unknown';
+	/**
+	 * The OAuth scopes the token was granted, when recorded (`auth_accounts.scope`).
+	 * `undefined` / `null` means "not known" — never "none".
+	 */
+	readonly scopes?: readonly string[] | null;
 }
 
 /**
@@ -175,7 +187,17 @@ export interface BuildValue {
  * (T9's `workflow-writer.ts`) agree on the same two strings; when APW-03 lands a
  * typed vocabulary, re-point this alias at it rather than adding a third name.
  */
-export type RepositoryWriteErrorCode = 'nonFastForward' | 'refRejectedByRule' | 'pullRequestExists';
+export type RepositoryWriteErrorCode =
+	| 'nonFastForward'
+	| 'refRejectedByRule'
+	| 'pullRequestExists'
+	/**
+	 * The credential cannot write under `.github/workflows/` — an OAuth token
+	 * without the `workflow` scope, or a GitHub App installation without
+	 * `Workflows: write` (2026-10-17). Terminal: no retry and no pull-request
+	 * fallback can help, because a pull-request branch needs the same permission.
+	 */
+	| 'workflowPermissionMissing';
 
 /** One file in a {@link RepositoryWriter.commitFiles} call (APW-03 plan §7:717–719). */
 export interface RepositoryCommitFile {
@@ -439,6 +461,24 @@ export interface IBuildPlugin extends IPlugin {
 		repository: { readonly owner: string; readonly repo: string; readonly trackedBranch?: string },
 		auth: BuildAuth
 	): RepositoryWriter;
+	/**
+	 * Is `sha` in the history of `branch`? (plan §5: a Rebuild's `commitSha` must be
+	 * reachable; 2026-10-17). `false` for a commit that is not an ancestor of the
+	 * branch, including one that exists only in a fork of the repository's network.
+	 * A failure to tell is a throw, never `true`.
+	 */
+	isCommitReachable?(
+		input: { readonly repository: { readonly owner: string; readonly repo: string }; readonly sha: string; readonly branch: string },
+		auth: BuildAuth
+	): Promise<boolean>;
+	/**
+	 * §4.10 — delete the one per-run prompted-value secret of a verification Build
+	 * (`EW_VERIFY__PROMPTED`). Already absent is `deleted: false`, not an error.
+	 */
+	deleteVerifyPromptedSecret?(
+		repository: { readonly owner: string; readonly repo: string },
+		auth: BuildAuth
+	): Promise<{ readonly deleted: boolean }>;
 }
 
 /**

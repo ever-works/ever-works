@@ -228,6 +228,10 @@ export interface AppBuildPluginBinding {
         readonly buildId: string;
         readonly providerRunId: string | null;
     }): Promise<void>;
+    /** Plan §5 — is this commit in the tracked branch's history? A throw is "could not tell". */
+    isCommitReachable?(sha: string): Promise<boolean>;
+    /** §4.10 — remove the per-run prompted-value secret of a verification Build. */
+    deleteVerifyPromptedSecret?(): Promise<unknown>;
     checkImageAccess?(input: {
         readonly imageRepository: string;
         readonly tag: string;
@@ -1627,6 +1631,32 @@ export class AppBuildsService {
             return { ok: false, code: 'commitNotReachable' };
         }
 
+        // Plan §5 — a caller-named commit must be in the tracked branch's history
+        // (2026-10-17). Without this an editor could build any 40-hex sha the
+        // repository's network knows, a fork's unreviewed commit included, with
+        // the repository's build values. A provider that cannot answer refuses
+        // with 503 rather than building a commit nobody checked; a plugin without
+        // the member keeps today's behaviour.
+        if (options.commitSha) {
+            const binding = await this.resolvePlugin(workId);
+            if (binding?.isCommitReachable) {
+                let reachable: boolean;
+                try {
+                    reachable = await binding.isCommitReachable(options.commitSha);
+                } catch (error) {
+                    this.logger.warn(
+                        `App builds: checking that ${options.commitSha} is on the tracked branch of ${workId} failed (${
+                            error instanceof Error ? error.message : String(error)
+                        }); the Rebuild is refused.`,
+                    );
+                    return { ok: false, code: 'buildProviderUnavailable' };
+                }
+                if (!reachable) {
+                    return { ok: false, code: 'commitNotReachable' };
+                }
+            }
+        }
+
         const now = Date.now();
 
         const recent = await this.builds.findRecentForCommit(
@@ -2324,12 +2354,20 @@ export class AppBuildsService {
             return unconfirmed;
         }
 
+        // The Work's saved registry pull token, when there is one (§4.12): a private
+        // image can only be read — and so confirmed — with it. Never logged.
+        const pullToken =
+            typeof binding.settings?.pullToken === 'string' && binding.settings.pullToken.trim()
+                ? binding.settings.pullToken
+                : undefined;
+
         let answer: Awaited<ReturnType<NonNullable<AppBuildPluginBinding['checkImageAccess']>>>;
         try {
             answer = await withinDigestReadTimeout(
                 binding.checkImageAccess({
                     imageRepository: repository,
                     tag: `sha-${row.commitSha}`,
+                    ...(pullToken ? { pullToken } : {}),
                 }),
             );
         } catch (error) {
@@ -2500,6 +2538,62 @@ export class AppBuildsService {
                 }); the Build is unaffected.`,
             );
         }
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * After a pull-token save (§4.12) and the orphaned verification secret (§7.4)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Re-check every recent `digestUnconfirmed` Build of a Work — what a saved
+     * pull token is for (§4.12, §7.4's recheck; 2026-10-17). A private image could
+     * not be read before the token existed, so its Builds were left
+     * `digestUnconfirmed`; `reconfirmDigest` now reads the image WITH the token.
+     *
+     * Bounded to the newest page of succeeded Builds (the ones a member could still
+     * deploy) and sequential, because each is a registry round trip. A failure is
+     * counted, never thrown.
+     */
+    async reconfirmUnconfirmedDigests(
+        workId: string,
+    ): Promise<{ readonly checked: number; readonly reconfirmed: number; readonly failed: number }> {
+        const page = await this.builds.findPage(workId, { status: ['succeeded'] }, 1, APP_BUILD_LIST_PAGE_SIZE);
+        let checked = 0;
+        let reconfirmed = 0;
+        let failed = 0;
+        for (const row of page.rows) {
+            if (row.notDeployableReason !== 'digestUnconfirmed') continue;
+            checked += 1;
+            try {
+                const result = await this.reconfirmDigest(row.id);
+                if (result.reconfirmed) reconfirmed += 1;
+            } catch (error) {
+                failed += 1;
+                this.logger.warn(
+                    `App builds: re-checking the digest of build ${row.id} failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+            }
+        }
+        return { checked, reconfirmed, failed };
+    }
+
+    /**
+     * Remove a verification Build's per-run prompted-value secret and forget it
+     * (§4.10:1019, §7.4's orphan pass; 2026-10-17). `true` only when the secret
+     * was handled (deleted or already absent) AND the record cleared.
+     */
+    async removeOrphanedVerifySecret(buildId: string): Promise<boolean> {
+        const row = await this.rowById(buildId);
+        if (!row || row.trigger !== 'verification' || (row.verifySecretNames ?? []).length === 0) {
+            return false;
+        }
+        const binding = await this.resolvePlugin(row.workId);
+        if (!binding?.deleteVerifyPromptedSecret) return false;
+        await binding.deleteVerifyPromptedSecret();
+        await this.persist(row, { verifySecretNames: [] });
+        return true;
     }
 
     /* ---------------------------------------------------------------------- *

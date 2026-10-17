@@ -18,11 +18,13 @@ function harness(options: { silent?: Array<{ id: string }>; discoveryFails?: boo
         findUndispatchedRequested: jest.fn(async () => []),
         findNeverAdoptedOpen: jest.fn(async () => []),
         findSilentNonTerminal: jest.fn(async () => options.silent ?? [{ id: 'b1' }, { id: 'b2' }]),
+        findWithOrphanedVerifySecrets: jest.fn(async () => [{ id: 'v1' }]),
     };
     const service = {
         requestPrepare: jest.fn(),
         finalize: jest.fn(),
         dispatchWatch: jest.fn(async () => true),
+        removeOrphanedVerifySecret: jest.fn(async () => true),
     };
     const discovery = {
         discover: jest.fn(async () => {
@@ -65,6 +67,14 @@ describe('AppBuildSweepService — discovery and the silent pass', () => {
         expect(h.discovery.discover.mock.invocationCallOrder[0]).toBeLessThan(
             h.builds.findSilentNonTerminal.mock.invocationCallOrder[0],
         );
+    });
+
+    it('removes orphaned verification secrets (§7.4, 2026-10-17)', async () => {
+        const h = harness();
+        const summary = await h.sweeps.sweep(NOW);
+        expect(h.builds.findWithOrphanedVerifySecrets).toHaveBeenCalledWith(NOW, APP_BUILD_SWEEP_BATCH);
+        expect(h.service.removeOrphanedVerifySecret).toHaveBeenCalledWith('v1');
+        expect(summary).toMatchObject({ orphanSecretsRemoved: 1, orphanSecretsFailed: 0 });
     });
 
     it('a discovery failure never stops the silent pass', async () => {
