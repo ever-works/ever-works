@@ -34,6 +34,10 @@ import {
 } from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
 import { hashNormalizedBody } from './kb-content-hash';
+import {
+    KB_LAST_CONTENT_WRITE_KEY,
+    type KbContentWrite,
+} from '../integrations-api/kb-content-provenance';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import type { KbConsolidationMarker } from './memory-consolidation';
 import type { EntityManager } from 'typeorm';
@@ -201,6 +205,15 @@ interface UpdateDocumentInput {
      * Never read from a request body.
      */
     reviewState?: KbReviewState;
+    /**
+     * Works-security lane (integration API gates, finding 2) — who wrote this
+     * content, set ONLY by the integration API (`kb-content-provenance.ts`).
+     * Stored under `metadata.lastContentWrite` when the edit changes content
+     * (title, description, body, class); a content edit WITHOUT it clears the
+     * marker, so a person's edit in the app supersedes a key's. Never read
+     * from a request body.
+     */
+    contentWrite?: KbContentWrite;
 }
 
 interface ListOptions {
@@ -2421,7 +2434,9 @@ export class KnowledgeBaseService {
             revision: 1,
             revisionAt: new Date(),
             normalizedContentHash: hashNormalizedBody(body),
-            metadata: { body } as Record<string, unknown>,
+            // Caller metadata (the integration API's content-write marker) rides
+            // alongside the body, as on a Work document (`createDocument`).
+            metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
             // M7 — same review-gate derivation as `createDocument`: the
             // consolidation synthesis path passes `source: agent` so
             // LLM-merged docs land as `proposed` (review queue), while
@@ -4274,6 +4289,22 @@ export class KnowledgeBaseService {
                 ...(row.metadata ?? {}),
                 body: input.body,
             } as Record<string, unknown>;
+        }
+
+        // Works-security lane (integration API gates, finding 2) — the content
+        // write marker follows every CONTENT edit: the integration API's own
+        // (stamped), anyone else's (cleared — their content supersedes it).
+        const changesContent =
+            input.title !== undefined ||
+            input.description !== undefined ||
+            input.body !== undefined ||
+            input.class !== undefined;
+        const existingMetadata = (patch.metadata ?? row.metadata ?? {}) as Record<string, unknown>;
+        if (changesContent && (input.contentWrite || KB_LAST_CONTENT_WRITE_KEY in existingMetadata)) {
+            const metadata = { ...existingMetadata };
+            if (input.contentWrite) metadata[KB_LAST_CONTENT_WRITE_KEY] = input.contentWrite;
+            else delete metadata[KB_LAST_CONTENT_WRITE_KEY];
+            patch.metadata = metadata;
         }
 
         const revision = this.revisionPatch(row, {
