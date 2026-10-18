@@ -24,7 +24,7 @@ its `ever-mock-platform` bin.
 
 | Pinned version | Where it is set                                               |
 | -------------- | ------------------------------------------------------------- |
-| `1.0.0-rc.2`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
+| `1.0.0-rc.7`   | `@ever-co/connect-tools` in `tools/egress-audit/package.json` |
 
 The module itself uses `@ever-co/connect-sdk` and `@ever-co/connect-contracts` at the same
 version (`apps/api`, `packages/agent`, `packages/contracts`); `drift.spec.ts` in the statistics
@@ -55,6 +55,17 @@ This directory holds only Works' inputs:
 
 In every mode the send interval is a few seconds, so a module that should be silent but is not
 would try to send inside the watched window (two minutes after the scenario).
+
+## The browser leg: not run yet
+
+From `1.0.0-rc.5` the harness also has a browser leg: a real browser signs in through the product
+UI, walks every route and fails on any request or link to an Ever host. It needs the UI's compose
+service in the config. Works' web app (`apps/web`, a separate Next.js service) is not yet built
+inside the sealed audit network, so the config sets `"web_service": null` with a `no_web_reason`
+that says so. **This audit covers the API process only; it proves nothing about the web app.**
+Wiring the browser leg (the web image built from the commit, a signed-in walk of the web app's
+routes with fixtures or skip reasons for the parameterised ones, and a baseline of the links that
+predate the modules) is a planned follow-up.
 
 ## When it runs
 
