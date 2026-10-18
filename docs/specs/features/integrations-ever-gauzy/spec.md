@@ -39,7 +39,7 @@
 1. **Settings → API keys → New key → type "Integration"**, or the preset link
    `https://app.ever.works/settings/api-keys?new=integration&preset=ever-gauzy`.
 2. Name the key (for example "Ever Gauzy — Acme"), pick **one or more organizations** to pin it to, keep the preset
-   scopes ([`integration-keys`](../integration-keys/spec.md) §3: everything except `org:write` and `email:write`).
+   scopes ([`integration-keys`](../integration-keys/spec.md) §3: everything except `org:write`, `email:write` and `merges:decide`; without `merges:decide` a merge approval answered in the Gauzy Inbox is refused and stays pending for a decision in Ever Works).
 3. Copy the key — shown once, starts with `ew_int_` — and paste it into Gauzy (Integrations → Ever Works → Connect).
 4. Gauzy then validates with `GET /api/integrations/v1/whoami`, maps orgs, registers its webhook subscription
    (`POST /api/integrations/v1/webhooks` with `excludeOriginTags=['gauzy:<connectionId>']`), records the feed head and

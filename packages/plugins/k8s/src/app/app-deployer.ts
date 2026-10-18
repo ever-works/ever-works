@@ -340,12 +340,46 @@ function messageOf(err: unknown): string {
 }
 
 /**
- * The only code §3.1 offers for "we could not write to the cluster": a prepare, rollout or CronJob
- * apply failure is none of a rollout, a job or a publish, so the codes that name those are wrong and
- * `cluster_unreachable` is the honest one. The scrubbed reason travels in `message`.
+ * The code for an apply that failed — a prepare, rollout or CronJob apply is none of a rollout, a
+ * job or a publish, so the codes that name those are wrong. The scrubbed reason travels in
+ * `message`.
+ *
+ * - **400 / 422** — the API server REJECTED the object (`Invalid`, `BadRequest`): `manifest_invalid`.
+ *   It reached the cluster; retrying the same render can never succeed.
+ * - **401 / 403** — the credential, RBAC or an admission policy (Pod Security, a
+ *   ValidatingAdmissionPolicy, a webhook) refused it: `apply_forbidden`.
+ * - anything else (no HTTP status, 5xx, a socket error): `cluster_unreachable`, as before.
+ *
+ * It used to answer `cluster_unreachable` for all of them, so prod Deployment e4b65cbd's 422
+ * (`volumeMounts[0].name: Not found: "tmp"`, 2026-10-18) read as a network problem.
  */
-function applyFailureCode(): AppFailureCode {
+function applyFailureCode(err: unknown): AppFailureCode {
+	const status = httpStatusOf(err);
+	if (status === 400 || status === 422) return 'manifest_invalid';
+	if (status === 401 || status === 403) return 'apply_forbidden';
 	return 'cluster_unreachable';
+}
+
+/**
+ * The HTTP status an apply failure carries: `@kubernetes/client-node`'s `ApiException.code` (on
+ * the error or, once `KubernetesApiService` wrapped it in a `K8sPluginError`, on its `cause`), or
+ * the `HTTP-Code: <n>` / `HTTP <n>` its message is formatted with. `null` when there is none — a
+ * socket or TLS error never reached the API server.
+ */
+export function httpStatusOf(err: unknown): number | null {
+	const seen = new Set<unknown>();
+	let current: unknown = err;
+	for (let depth = 0; depth < 4 && current && typeof current === 'object' && !seen.has(current); depth++) {
+		seen.add(current);
+		const carried = current as { code?: unknown; statusCode?: unknown; cause?: unknown };
+		for (const value of [carried.statusCode, carried.code]) {
+			if (typeof value === 'number' && value >= 100 && value <= 599) return value;
+		}
+		current = carried.cause;
+	}
+	const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+	const match = /\bHTTP(?:-Code)?:?\s*(\d{3})\b/i.exec(message);
+	return match ? Number(match[1]) : null;
 }
 
 /**
@@ -987,7 +1021,7 @@ export class AppDeployer {
 				}
 				return {
 					phase: state.phase,
-					code: applyFailureCode(),
+					code: applyFailureCode(err),
 					message: `Applying ${object.kind} '${object.metadata.name}' failed: ${messageOf(err)}`
 				};
 			}
@@ -1178,7 +1212,7 @@ export class AppDeployer {
 			} catch (err) {
 				return {
 					phase: 'rollout',
-					code: applyFailureCode(),
+					code: applyFailureCode(err),
 					message: `Applying Deployment '${deployment.metadata.name}' failed: ${messageOf(err)}`
 				};
 			}

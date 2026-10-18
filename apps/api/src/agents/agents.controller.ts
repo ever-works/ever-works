@@ -19,6 +19,7 @@ import {
     Post,
     Put,
     Query,
+    Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -76,6 +77,10 @@ import {
 } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import {
+    refuseMachinePrincipalAction,
+    type MachinePrincipalRequest,
+} from '../auth/machine-principal';
 import { ScopeContextService } from '../scope';
 import {
     AddAgentAttachmentDto,
@@ -1018,7 +1023,18 @@ export class AgentsController {
     async resume(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<AgentDto & { releasedCount?: number }> {
+        // Works-security lane 3a — resuming releases every run held while the
+        // Agent was paused: a fleet run never starts autonomous work.
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'resume an Agent',
+            'resuming releases held runs; a person resumes it in the app.',
+            ['fleet-run'],
+        );
         const dto = await this.service.resume(auth.userId, id, this.scopeContext?.getScope());
         // FR-17 — the reason is cleared on resume, and at no other time
         // except activation from draft and unarchive.
@@ -1372,7 +1388,17 @@ export class AgentsController {
     async runNow(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<{ outcome: string; runId?: string; reason?: string }> {
+        // Works-security lane 3a — a fleet run never starts autonomous work.
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'start an Agent run',
+            'a fleet run never starts autonomous work; a person runs the Agent in the app.',
+            ['fleet-run'],
+        );
         // Cross-user 404 via service-level access check.
         const agent = await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         // AW-23 — a synchronous, user-initiated dispatch is REFUSED

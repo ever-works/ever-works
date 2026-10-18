@@ -4,6 +4,7 @@ import type { IntegrationInboxItemDto } from '@ever-works/contracts';
 import { DataSource } from 'typeorm';
 import { toIntegrationInboxItemDto } from '../domain-events/domain-event-snapshots';
 import { InboxItem } from '../entities/inbox-item.entity';
+import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import { etagFor } from './if-match';
 import { ResourceNotFoundError } from './integration-api.errors';
 import { type KeysetPage, type KeysetQuery, readKeysetPage } from './keyset-cursor';
@@ -88,5 +89,71 @@ export class IntegrationInboxService {
         }
         const dto = toIntegrationInboxItemDto(row);
         return { dto, etag: etagFor(dto.version), recipientUserId: row.userId };
+    }
+
+    /**
+     * Works-security lane 3a — whether answering this item would DECIDE A MERGE:
+     * an approval backed by a `merge_pull_request` proposal (an agent's pull
+     * request landing on a real branch, a release promotion, a release revert
+     * — all of them go through that one proposal type). An integration relays
+     * such an answer only with the `merges:decide` scope.
+     *
+     * Fails CLOSED: a proposal that cannot be read, or no longer exists, counts
+     * as a merge, so a lookup hiccup never relays a merge decision without the
+     * scope. An approval with no proposal behind it, a question, an escalation
+     * and a notice are never merges.
+     */
+    async isMergeApproval(
+        dto: Pick<IntegrationInboxItemDto, 'kind' | 'proposalId'>,
+    ): Promise<boolean> {
+        if (dto.kind !== 'approval' || !dto.proposalId) return false;
+        try {
+            const row = await this.dataSource
+                .getRepository(AgentActionProposal)
+                .findOne({ where: { id: dto.proposalId }, select: ['id', 'actionType'] });
+            return !row || row.actionType === 'merge_pull_request';
+        } catch {
+            return true;
+        }
+    }
+
+    /**
+     * Works-security lane 3a — record ON THE DECISION that an integration
+     * relayed it: `payload.decisionRelay` on the decided proposal (the payload
+     * is the proposal's free-form, display-and-audit column; no verifier binds
+     * to it). Written only after the decision landed, and only when the decided
+     * row really carries this recipient's decision, so an idempotent replay or
+     * a lost race never rewrites somebody else's. Best-effort: the decision
+     * stands whether or not the stamp could be written.
+     */
+    async recordRelayedDecision(
+        proposalId: string,
+        relay: { recipientUserId: string; integrationKeyId: string; integrationKind: string },
+        now: Date = new Date(),
+    ): Promise<boolean> {
+        try {
+            const repository = this.dataSource.getRepository(AgentActionProposal);
+            const row = await repository.findOne({ where: { id: proposalId } });
+            if (!row || row.status === 'pending' || row.decidedById !== relay.recipientUserId) {
+                return false;
+            }
+            await repository.update(
+                { id: proposalId },
+                {
+                    payload: {
+                        ...(row.payload ?? {}),
+                        decisionRelay: {
+                            via: 'integration',
+                            integrationKeyId: relay.integrationKeyId,
+                            integrationKind: relay.integrationKind,
+                            recordedAt: now.toISOString(),
+                        },
+                    },
+                },
+            );
+            return true;
+        } catch {
+            return false;
+        }
     }
 }

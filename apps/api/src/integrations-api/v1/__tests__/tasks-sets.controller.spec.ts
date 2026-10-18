@@ -14,6 +14,7 @@ describe('IntegrationTaskSetsController', () => {
 
     const setup = () => {
         const tasks = {
+            getOne: jest.fn().mockResolvedValue({ id: 'task-1', isRecurring: false }),
             addAssignee: jest.fn(),
             removeAssignee: jest.fn(),
             listWatchers: jest.fn().mockResolvedValue([{ userId: 'u-1' }, { userId: 'u-2' }]),
@@ -109,6 +110,69 @@ describe('IntegrationTaskSetsController', () => {
         );
         expect(dto).toEqual({ id: 'task-1', version: 4 });
         expect(response.setHeader).toHaveBeenCalledWith('ETag', '"4"');
+    });
+
+    // Works-security lane 3a — the agent assignees of a recurring template are
+    // who runs at every future fire: an integration may not change them.
+    it('refuses changing the agent assignees of a recurring template (422), user assignees stay open', async () => {
+        const { controller, tasks } = setup();
+        tasks.getOne.mockResolvedValue({ id: 'task-1', isRecurring: true });
+        await expect(
+            controller.assignees(
+                user,
+                'task-1',
+                {
+                    assignees: [
+                        { type: 'agent', id: 'ag-2' },
+                        { type: 'user', id: 'u-1' },
+                    ],
+                },
+                res(),
+            ),
+        ).rejects.toMatchObject({
+            code: 'domain_rule',
+            response: { error: { details: { reason: 'recurring_template' } } },
+        });
+        expect(tasks.addAssignee).not.toHaveBeenCalled();
+        expect(tasks.removeAssignee).not.toHaveBeenCalled();
+        // Same agents, a different user: allowed, and the template is not even read.
+        tasks.getOne.mockClear();
+        await controller.assignees(
+            user,
+            'task-1',
+            {
+                assignees: [
+                    { type: 'agent', id: 'ag-1' },
+                    { type: 'user', id: 'u-3' },
+                ],
+            },
+            res(),
+        );
+        expect(tasks.getOne).not.toHaveBeenCalled();
+        expect(tasks.addAssignee).toHaveBeenCalledWith(
+            'owner-1',
+            'task-1',
+            'user',
+            'u-3',
+            expect.anything(),
+        );
+    });
+
+    it('lets an integration change the agent assignees of an ordinary Task', async () => {
+        const { controller, tasks } = setup();
+        await controller.assignees(
+            user,
+            'task-1',
+            { assignees: [{ type: 'agent', id: 'ag-2' }] },
+            res(),
+        );
+        expect(tasks.addAssignee).toHaveBeenCalledWith(
+            'owner-1',
+            'task-1',
+            'agent',
+            'ag-2',
+            expect.anything(),
+        );
     });
 
     it('watchers, blocks and relations apply only the difference', async () => {

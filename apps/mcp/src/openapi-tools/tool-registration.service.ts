@@ -85,7 +85,8 @@ export class ToolRegistrationService {
 				`${entry.method} ${entry.path}`;
 			const parameters = this.withoutOmittedArgs(
 				this.converter.buildToolParameters(operation.pathParams, operation.queryParams, operation.requestBody),
-				entry
+				entry,
+				operation
 			);
 
 			this.registry.registerTool({
@@ -111,9 +112,23 @@ export class ToolRegistrationService {
 	 */
 	private withoutOmittedArgs(
 		parameters: z.ZodObject<Record<string, z.ZodTypeAny>>,
-		entry: WhitelistEntry
+		entry: WhitelistEntry,
+		operation?: Pick<OpenApiOperation, 'pathParams' | 'queryParams'>
 	): z.ZodObject<Record<string, z.ZodTypeAny>> {
-		const present = (entry.omitArgs ?? []).filter((name) => name in parameters.shape);
+		const omitted = new Set(entry.omitArgs ?? []);
+		// `bodyArgs` (works-security lane 3a): every body argument not listed is
+		// cut, while path and query parameters are always kept.
+		if (entry.bodyArgs) {
+			const kept = new Set<string>([
+				...(operation?.pathParams ?? []).map((param) => param.name),
+				...(operation?.queryParams ?? []).map((param) => param.name),
+				...entry.bodyArgs
+			]);
+			for (const name of Object.keys(parameters.shape)) {
+				if (!kept.has(name)) omitted.add(name);
+			}
+		}
+		const present = [...omitted].filter((name) => name in parameters.shape);
 		if (present.length === 0) {
 			return parameters;
 		}
@@ -131,6 +146,8 @@ export class ToolRegistrationService {
 		// Belt and braces for the schema-level omit above: if a transport ever
 		// hands us unvalidated arguments, the flag still must not go upstream.
 		const omittedArgNames = new Set(entry.omitArgs ?? []);
+		// Belt and braces for `bodyArgs`, like `omitArgs` above.
+		const allowedBodyArgNames = entry.bodyArgs ? new Set(entry.bodyArgs) : null;
 		const apiClient = this.apiClient;
 
 		return async (args: Record<string, unknown>) => {
@@ -150,6 +167,7 @@ export class ToolRegistrationService {
 							queryParams.append(key, `${value as string | number | boolean}`);
 						}
 					} else if (entry.method !== 'GET' && entry.method !== 'DELETE') {
+						if (allowedBodyArgNames && !allowedBodyArgNames.has(key)) continue;
 						bodyParams[key] = value;
 					}
 				}

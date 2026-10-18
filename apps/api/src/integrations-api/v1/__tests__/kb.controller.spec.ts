@@ -171,7 +171,13 @@ describe('IntegrationKbController', () => {
         expect(knowledgeBase.createOrgDocument).toHaveBeenCalledWith(
             ORG,
             'owner-1',
-            expect.objectContaining({ class: 'freeform', source: 'imported' }),
+            // Works-security lane 3a — the key writing as itself (no person
+            // behind it) lands the document `proposed` (M7 review gate).
+            expect.objectContaining({
+                class: 'freeform',
+                source: 'imported',
+                reviewState: 'proposed',
+            }),
             { withinCreate: expect.any(Function) },
         );
         expect(library.fileDocuments).toHaveBeenCalledWith(
@@ -199,7 +205,11 @@ describe('IntegrationKbController', () => {
         );
         expect(kb.assertWorkOfOrganization).toHaveBeenCalledWith(ORG, WORK);
         expect(knowledgeBase.createDocument).toHaveBeenCalledWith(
-            expect.objectContaining({ workId: WORK, userId: 'user-7', source: 'user' }),
+            expect.objectContaining({
+                workId: WORK,
+                userId: 'user-7',
+                source: 'user',
+            }),
             { withinCreate: undefined },
         );
     });
@@ -342,14 +352,44 @@ describe('IntegrationKbController', () => {
     it('edits a Work document through updateDocument and an organization one through updateOrgDocument; a stale If-Match is 412', async () => {
         const work = setup({ workId: WORK });
         await work.controller.updateDocument(user(), 'doc-1', { body: 'New' }, undefined, res());
+        // Works-security lane 3a — a content edit with no person behind it (the
+        // key writing as itself) re-proposes the document.
         expect(work.knowledgeBase.updateDocument).toHaveBeenCalledWith(WORK, 'doc-1', 'owner-1', {
             body: 'New',
+            reviewState: 'proposed',
         });
         const org = setup();
         await org.controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"1"', res());
         expect(org.knowledgeBase.updateOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1', {
             title: 'T',
+            reviewState: 'proposed',
         });
+        // A metadata-only edit leaves the review state alone…
+        await org.controller.updateDocument(user(), 'doc-1', { tags: ['a'] }, undefined, res());
+        expect(org.knowledgeBase.updateOrgDocument).toHaveBeenLastCalledWith(
+            ORG,
+            'doc-1',
+            'owner-1',
+            {
+                tags: ['a'],
+            },
+        );
+        // …and so does a person's edit relayed with X-Act-As-User.
+        await org.controller.updateDocument(
+            user('user-7'),
+            'doc-1',
+            { body: 'Mine' },
+            undefined,
+            res(),
+        );
+        expect(org.knowledgeBase.updateOrgDocument).toHaveBeenLastCalledWith(
+            ORG,
+            'doc-1',
+            'user-7',
+            {
+                body: 'Mine',
+            },
+        );
         await expect(
             org.controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"9"', res()),
         ).rejects.toBeInstanceOf(VersionMismatchError);
@@ -371,6 +411,8 @@ describe('IntegrationKbController', () => {
     });
 
     it('accepts, archives, restores and files through the Knowledge Base and the library', async () => {
+        // `/accept` stays open to an integration (works-security lane 3a): it
+        // relays a person's review decision made in the integration's own queue.
         const { controller, knowledgeBase, library } = setup();
         await controller.acceptDocument(user(), 'doc-1', res());
         expect(knowledgeBase.acceptOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1');

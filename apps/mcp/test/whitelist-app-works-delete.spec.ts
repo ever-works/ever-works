@@ -100,6 +100,16 @@ describe('delete_work — the stored-data flag is not an MCP argument', () => {
 
 		expect(entry.omitArgs ?? []).toContain('delete_stored_data');
 		expect(entry.omitArgs ?? []).toContain('confirm_slug');
+		// Works-security lane 3a — the repository-deleting flags and the force
+		// path are not tool arguments either.
+		for (const flag of [
+			'delete_data_repository',
+			'delete_website_repository',
+			'delete_markdown_repository',
+			'force_delete'
+		]) {
+			expect(entry.omitArgs ?? []).toContain(flag);
+		}
 		// The entry keeps its (method, path) tuple: only the arguments changed.
 		expect(entry.method).toBe(DELETE_WORK_ENTRY.method);
 		expect(entry.path).toBe(DELETE_WORK_ENTRY.path);
@@ -111,19 +121,24 @@ describe('delete_work — the stored-data flag is not an MCP argument', () => {
 
 		expect(shape).not.toContain('delete_stored_data');
 		expect(shape).not.toContain('confirm_slug');
-		expect(shape).toContain('delete_data_repository');
+		expect(shape).not.toContain('delete_data_repository');
+		expect(shape).not.toContain('delete_website_repository');
+		expect(shape).not.toContain('delete_markdown_repository');
+		expect(shape).not.toContain('force_delete');
+		expect(shape).toContain('reason');
 		expect(shape).toContain('id');
 
 		// The transport validates with `safeParse`, and a Zod object strips unknown
 		// keys — so an agent that sends the flag anyway never reaches the handler.
 		const parsed = parameters.safeParse({
 			id: 'work-1',
+			reason: 'obsolete',
 			delete_data_repository: true,
 			delete_stored_data: true,
 			confirm_slug: 'cal-diy'
 		});
 		expect(parsed.success).toBe(true);
-		expect(parsed.data).toEqual({ id: 'work-1', delete_data_repository: true });
+		expect(parsed.data).toEqual({ id: 'work-1', reason: 'obsolete' });
 	});
 
 	it('never forwards either field upstream, even when handed raw arguments', async () => {
@@ -132,13 +147,17 @@ describe('delete_work — the stored-data flag is not an MCP argument', () => {
 
 		await handler({
 			id: 'work-1',
+			reason: 'obsolete',
 			delete_data_repository: true,
+			delete_website_repository: true,
+			delete_markdown_repository: true,
+			force_delete: true,
 			delete_stored_data: true,
 			confirm_slug: 'cal-diy'
 		});
 
 		expect(requestSpy).toHaveBeenCalledWith('POST', '/works/work-1/delete', {
-			delete_data_repository: true
+			reason: 'obsolete'
 		});
 	});
 });

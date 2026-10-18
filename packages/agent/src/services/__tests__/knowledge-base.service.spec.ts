@@ -29,6 +29,7 @@ import {
     KbDocumentStatus,
     KbLockMode,
     KbUploadExtractionStatus,
+    KbReviewState,
 } from '../../entities/kb-types';
 
 const WORK_ID = '00000000-0000-0000-0000-000000000001';
@@ -1200,6 +1201,28 @@ describe('KnowledgeBaseService', () => {
             // row — that path writes to `.content/kb/<path>` (work-owned)
             // and would collide with overlay precedence semantics.
             expect(mirrorDispatcher.dispatchKbMirrorDocument).not.toHaveBeenCalled();
+        });
+
+        // Works-security lane 3a — a PROPOSED (review-gated, machine-written)
+        // document is not copied into every Work repository; accepting it
+        // runs the fanout (`acceptOrgDocument`).
+        it('does not fan a proposed inheritable org doc out until it is accepted', async () => {
+            const { service: svc, fanoutDispatcher } = await buildWithFanout({
+                workIds: ['work-a', 'work-b'],
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'org-doc-2', workId: null, organizationId: ORG_ID }),
+            );
+
+            await svc.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/terms.md',
+                title: 'Terms',
+                class: 'legal' as KbDocumentClass,
+                body: 'proposed words',
+                reviewState: 'proposed' as KbReviewState,
+            });
+
+            expect(fanoutDispatcher.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
         });
 
         it('skips fanout dispatch when the org has zero Works', async () => {

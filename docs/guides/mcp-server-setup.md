@@ -224,7 +224,7 @@ Four families of tools, from three different sources.
 | Family                    | Count | Source                                    | Examples                                                              |
 | ------------------------- | ----- | ----------------------------------------- | --------------------------------------------------------------------- |
 | OpenAPI-whitelisted verbs | 66    | `apps/mcp/src/openapi-tools/whitelist.ts` | `list_works`, `generate_items`, `deploy_work`, `create_mission`       |
-| Knowledge Base            | 6     | `apps/mcp/src/tools/kb/`                  | `kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`, `kb.unlock` |
+| Knowledge Base            | 5     | `apps/mcp/src/tools/kb/`                  | `kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`              |
 | Zero-friction onboarding  | 1     | `apps/mcp/src/register-work.tool.ts`      | `register_work`                                                       |
 | Health                    | 1     | `apps/mcp/src/ping.tool.ts`               | `ping`                                                                |
 
@@ -269,9 +269,8 @@ The Knowledge Base namespace is hand-written rather than derived from the spec, 
 | `kb.create` | No        | Create a document: `path`, `title`, `body`, `class`, optional description/tags/categories/language/status.              |
 | `kb.update` | No        | Partial update through a `patch` envelope; at least one field required.                                                 |
 | `kb.lock`   | No        | Lock a document — `full` rejects all agent edits, `additions-only` permits appends.                                     |
-| `kb.unlock` | No        | Release the lock so Agents may edit again.                                                                              |
 
-Every one of them takes `workId` (a UUID). Field-by-field tables, output shapes and the matching `ever works kb` CLI commands live in [Knowledge Base — MCP & CLI Reference](../kb/mcp-cli-reference.md).
+There is no `kb.unlock` tool: unlocking is a person's decision (works-security lane 3a, 2026-10-18), so a person unlocks in the app, the API or the CLI. A document written through these tools by a fleet run lands `proposed` and waits for a person's review before it feeds agent context. Every one of them takes `workId` (a UUID). Field-by-field tables, output shapes and the matching `ever works kb` CLI commands live in [Knowledge Base — MCP & CLI Reference](../kb/mcp-cli-reference.md).
 
 Locking is the reason this surface matters from a client: write your brand voice once, `kb.lock` it `full`, and no Agent run can quietly rewrite it. See [Knowledge Base](../features/knowledge-base.md).
 

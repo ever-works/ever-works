@@ -16,6 +16,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
+import { RefuseFleetRunGuard } from '../auth/guards/refuse-fleet-run.guard';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import { PluginOperationsService, PluginInstallerService } from '@ever-works/agent/plugins';
@@ -281,6 +282,8 @@ export class PluginsController {
     // ============================================
 
     @Post('plugins/:pluginId/enable')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Enable plugin for user',
@@ -314,6 +317,8 @@ export class PluginsController {
     }
 
     @Post('plugins/:pluginId/disable')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Disable plugin for user',
@@ -340,6 +345,8 @@ export class PluginsController {
     }
 
     @Patch('plugins/:pluginId/settings')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Update plugin settings',
@@ -455,6 +462,8 @@ export class PluginsController {
     }
 
     @Post('works/:workId/plugins/:pluginId/enable')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Enable plugin for work',
@@ -502,6 +511,8 @@ export class PluginsController {
     }
 
     @Post('works/:workId/plugins/:pluginId/disable')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Disable plugin for work',
@@ -541,6 +552,8 @@ export class PluginsController {
     }
 
     @Patch('works/:workId/plugins/:pluginId/settings')
+    // Works-security lane 3a — never from a fleet run (see the guard).
+    @UseGuards(RefuseFleetRunGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Update work plugin settings',

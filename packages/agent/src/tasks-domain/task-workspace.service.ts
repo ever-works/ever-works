@@ -2251,10 +2251,17 @@ export class TaskWorkspaceService {
             providerId: work.gitProvider,
             workId: work.id,
         };
-        const baseRef =
+        // The PLANNED base: the caller's (a promotion / revert) or the Work's
+        // isolation base. `null` when neither names one — then the facade
+        // judges the pull request's LIVE base alone (works-security lane 3a);
+        // guessing 'main' here made every merge of a Work whose repository
+        // defaults to another branch fail `target-branch-mismatch`.
+        const plannedTargetBranch =
             (input.baseRef && input.baseRef.trim()) ||
             (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
-            'main';
+            null;
+        // Display text only (Task chat, activity), never a policy input.
+        const baseRef = plannedTargetBranch ?? 'main';
 
         return this.attemptAgentMerge({
             task,
@@ -2266,6 +2273,7 @@ export class TaskWorkspaceService {
             gitOptions,
             prNumber: task.prNumber,
             baseRef,
+            plannedTargetBranch,
             gateStatus: input.gateStatus ?? null,
             headSha: input.headSha ?? task.prHeadSha ?? null,
             requireHumanApproval: input.requireHumanApproval === true,
@@ -2317,7 +2325,14 @@ export class TaskWorkspaceService {
         repo: string;
         gitOptions: { userId: string; providerId: string; workId: string };
         prNumber: number;
+        /** Display text for messages and activity (falls back to 'main'). */
         baseRef: string;
+        /**
+         * The branch the platform PLANNED to merge into, or `null` when nothing
+         * names one. The policy input: the facade refuses a live base that
+         * disagrees with it, and judges the live base alone when it is null.
+         */
+        plannedTargetBranch?: string | null;
         gateStatus: GateStatus | null;
         /** Head commit the refusal record is keyed by. Never an input to the decision. */
         headSha?: string | null;
@@ -2386,7 +2401,7 @@ export class TaskWorkspaceService {
                     // head commit. An asker that could assert its own
                     // approval would not be a gate.
                     taskId: task.id,
-                    targetBranch: baseRef,
+                    targetBranch: args.plannedTargetBranch ?? null,
                     // Release promotion lane (slice AI): a caller-side
                     // RAISE only. The facade ORs it with the resolved
                     // policy, so this can never clear an approval

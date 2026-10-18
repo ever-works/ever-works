@@ -185,8 +185,11 @@ const UNIONS: Array<[name: string, actual: readonly string[], expected: readonly
 			'deadline_exceeded',
 			'image_not_found',
 			'image_private_unsupported',
-			'image_unresolvable'
-		] // plan §3.1:370-374 — "pins exactly this list"
+			'image_unresolvable',
+			// 2026-10-18 (lane aw-managed-debug): an apply the API server rejected.
+			'manifest_invalid',
+			'apply_forbidden'
+		] // plan §3.1:370-374 — "pins exactly this list" (+ the two apply rejections)
 	],
 	[
 		'APP_FAILURE_CODES_WITHOUT_MESSAGE_LEAF',
@@ -196,7 +199,9 @@ const UNIONS: Array<[name: string, actual: readonly string[], expected: readonly
 			'cluster_unreachable',
 			'worker_failed',
 			'isolation_not_enforced',
-			'deadline_exceeded'
+			'deadline_exceeded',
+			'manifest_invalid',
+			'apply_forbidden'
 		]
 	],
 	['APP_FAILURE_LEAVES_WITHOUT_FAILURE_CODE', APP_FAILURE_LEAVES_WITHOUT_FAILURE_CODE, ['imageNotPinned']]

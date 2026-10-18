@@ -12,7 +12,8 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
  * the `api/` prefix, the owner-only call shapes (no caller-supplied user),
  * and 404-never-403 on get and resolve.
  */
-const auth = { userId: 'u1' } as AuthenticatedUser;
+// A person in an interactive session: resolving is a human gate (works-security lane 3a).
+const auth = { userId: 'u1', authMethod: 'session' } as AuthenticatedUser;
 
 function makeService() {
     return {
@@ -91,5 +92,15 @@ describe('EscalationsController', () => {
                 NotFoundException,
             );
         });
+    });
+
+    // Works-security lane 3a — resolving an escalation is a human gate.
+    it('refuses a resolve from a personal API key or an unstamped credential', async () => {
+        for (const who of [{ userId: 'u1', authMethod: 'api-key' }, { userId: 'u1' }]) {
+            await expect(
+                controller.resolve(who as AuthenticatedUser, 'e1', { note: 'x' }),
+            ).rejects.toMatchObject({ status: 403 });
+        }
+        expect(service.resolve).not.toHaveBeenCalled();
     });
 });

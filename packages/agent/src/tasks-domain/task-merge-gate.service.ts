@@ -3,6 +3,7 @@ import type { GitPullRequestStatus } from '@ever-works/plugin';
 import {
     isPromotionTask,
     isReleaseRevertTask,
+    mergeTargetNeedsFloorApproval,
     normalizeCommitSha,
     releaseRevertRungFromLabels,
     resolvePromotionBranches,
@@ -261,8 +262,26 @@ export class TaskMergeGateService {
         // `revertBase !== null` carries the slice-AJ half of the same
         // property: a revert is never merged without a recorded human
         // approval either.
+        //
+        // The protected-branch FLOOR (works-security lane 3a) is the third
+        // raise: a pull request whose base is `main` / `master` / `develop` /
+        // `stage` (or cannot be named) is never merged on green CI alone,
+        // whatever `requireHumanApproval` and `protectedBranches` resolved to.
+        // The facade enforces the same rule at merge time; raising it HERE is
+        // what files the Inbox approval a person can answer, instead of a
+        // merge that is refused on every sweep.
+        const floorTarget = mergeTargetNeedsFloorApproval(
+            promotion?.baseBranch ??
+                revertBase ??
+                status.baseRef ??
+                ((work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null),
+            { humanScopeWaivesApproval: resolved.humanScopeWaivesApproval === true },
+        );
         const needsApproval =
-            resolved.policy.requireHumanApproval || promotion !== null || revertBase !== null;
+            resolved.policy.requireHumanApproval ||
+            promotion !== null ||
+            revertBase !== null ||
+            floorTarget;
 
         if (!needsApproval) {
             // The operator opted out of approvals for this scope. Green
@@ -296,7 +315,7 @@ export class TaskMergeGateService {
                 // the promotion landed on. Never the Work's default; see
                 // `attemptMergeForOpenPullRequest`.
                 baseRef: promotion?.baseBranch ?? revertBase,
-                requireHumanApproval: promotion !== null || revertBase !== null,
+                requireHumanApproval: promotion !== null || revertBase !== null || floorTarget,
             });
             return { action: 'merge-attempted', merge };
         }
@@ -316,9 +335,12 @@ export class TaskMergeGateService {
             // read it in the Inbox ("Merge PR #7 into <branch> in <repo>").
             // A promotion carries its own base; only an ordinary Task pull
             // request targets the Work's isolation base.
+            // The LIVE base first (works-security lane 3a): a pull request
+            // retargeted after it was opened must be shown as what it is.
             targetBranch:
                 promotion?.baseBranch ??
                 revertBase ??
+                ((status.baseRef && status.baseRef.trim()) || null) ??
                 ((work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null),
             repository: taskRepositoryFullName(work),
             ciState: status.ciState,

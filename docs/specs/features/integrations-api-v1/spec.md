@@ -207,7 +207,10 @@ visibility is derived (`team` when it sits on a team).
 Request bodies for the P1 writes: [`contract/schemas/requests.schema.json`](./contract/schemas/requests.schema.json).
 PUT-set routes take an object (`{members:[…]}`, `{resources:[…]}`, `{assignees:[…]}`, `{userIds:[…]}`,
 `{blockedBy:[…]}`, `{relations:[…]}`) and answer the parent DTO. Task status is never set by PATCH; on create it may
-be `backlog` (default) or `todo`.
+be `backlog` (default) or `todo`. A `PATCH /tasks/:id` that changes `title`, `description` or `workId` on a **recurring
+template** answers `422 domain_rule` (`details.reason: recurring_template`, works-security lane 3a): every fire dispatches
+that text to an agent with no person in between, so a person edits it in Ever Works. Acceptance checks (shell commands a fleet node runs) are never
+writable by an integration key: `POST /tasks` here, and the app route `POST /api/tasks` an integration key with `tasks:write` can also reach, both answer `422 domain_rule` for `acceptanceChecks`.
 
 ### 6.1 Creating with an external reference
 
@@ -408,7 +411,12 @@ Works `id` (`PUT /links/inbox_item/...` stays `400 validation_failed`).
   another member, never answers somebody's message.
 - `POST /inbox/items/:id/reply` [`InboxReply`](./contract/schemas/requests.schema.json) goes through the app's own Inbox
   reply, so it does exactly what the recipient answering in Ever Works does: a question steers the live run or resumes
-  the parked one, an approval decides its proposal, an escalation resolves. It answers
+  the parked one. An approval decides its proposal and an escalation resolves, exactly as the recipient answering in Ever Works — the
+  reply is the recipient's own decision relayed by the integration (works-security lane 3a keeps it open for that reason;
+  `X-Act-As-User` must still name the recipient). **A merge approval** (a `merge_pull_request` proposal) is relayed only
+  by a key holding the opt-in `merges:decide` scope; without it the reply answers `403 scope_missing`
+  (`details.missing: ['merges:decide']`) and the approval stays pending. A relayed decision is recorded on the proposal
+  (`payload.decisionRelay: {via: 'integration', integrationKeyId, integrationKind, recordedAt}`). It answers
   [`{item, routed, restart, runId?}`](./contract/schemas/resources/inbox-reply-result.schema.json). An item already
   answered or archived answers `409 conflict`; a lost race answers `200` with `routed: "already-decided"` and the
   winning answer. `Idempotency-Key` is optional (a reply creates nothing); with one, a retry replays the first answer.
@@ -470,6 +478,12 @@ organization overlay into Works, locks, revisions and the activity trail therefo
   letter (`400`). A Work document's path follows the Work rule, which also requires a class folder first.
 - **An archived document** changes `status` only through `/unarchive`: a `PATCH` with `status` answers `422`. Other
   edits are allowed.
+- **Review gate** (works-security lane 3a, 2026-10-18): a document the key writes **as itself** (no `X-Act-As-User`)
+  lands `reviewState: proposed`, and a key-only `PATCH` of its `title`, `body`, `description` or `class` puts it back to
+  `proposed`; it is kept out of agent context until it is accepted — by a person in Ever Works, or by the integration
+  relaying its own review queue's decision through `POST /kb/documents/:id/accept`. A person's write relayed with
+  `X-Act-As-User` stays `accepted` (create) and leaves the review state alone (edit), as their own edit in Ever Works
+  would.
 
 Document routes:
 
@@ -478,7 +492,7 @@ Document routes:
 | `POST /kb/documents`               | [`CreateKbDocument`](./contract/schemas/requests.schema.json): `scope {type, id}`, `folderId?`, `path`, `title`, `class`, `body`, `tags?`, … | `scope.type` is `organization` (the pinned organization) or `work` (one of its Works). `Idempotency-Key` is required. A repeated `externalRef` answers `200` with the existing document. |
 | `PATCH /kb/documents/:id`          | `UpdateKbDocument`                                                                                                                           | `If-Match` is optional. A fully locked document answers `422`.                                                                                                                           |
 | `DELETE /kb/documents/:id`         | —                                                                                                                                            | Deletes a Work document. An organization document answers `422 domain_rule`: organization documents are archived, never deleted.                                                         |
-| `POST /kb/documents/:id/accept`    | —                                                                                                                                            | The review.                                                                                                                                                                              |
+| `POST /kb/documents/:id/accept`    | —                                                                                                                                            | The review: how an integration relays a person's review decision (works-security lane 3a).                                                                                               |
 | `POST /kb/documents/:id/archive`   | —                                                                                                                                            |                                                                                                                                                                                          |
 | `POST /kb/documents/:id/unarchive` | —                                                                                                                                            |                                                                                                                                                                                          |
 | `POST /kb/documents/:id/move`      | `{folderId}`                                                                                                                                 | `null` means Unfiled.                                                                                                                                                                    |

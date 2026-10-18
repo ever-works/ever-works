@@ -12,6 +12,7 @@ import {
     Patch,
     Post,
     Query,
+    Req,
     Res,
     UploadedFile,
     UseGuards,
@@ -40,6 +41,12 @@ import {
     UpdateKbTagDto,
 } from '@ever-works/agent/dto';
 import { AuthSessionGuard, CurrentUser } from '../auth';
+import {
+    fleetRunBindingOf,
+    machinePrincipalKind,
+    refuseMachinePrincipalAction,
+    type MachinePrincipalRequest,
+} from '../auth/machine-principal';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import type {
     KbDecisionStatus,
@@ -50,6 +57,48 @@ import type {
     KbReviewState,
     KbUploadExtractionStatus,
 } from '@ever-works/agent/entities';
+
+/**
+ * Works-security lane 3a — what a document written by a MACHINE principal
+ * carries. Without it a `kb.create` from a fleet run (or any non-person
+ * credential) landed `source: 'user'` and `accepted`, straight into the
+ * always-injected `<kb>` block of every later run. A fleet run's document is
+ * the agent's work (`source: 'agent'`, its run id); either way it lands
+ * `proposed`, so the M7 review gate applies and a person accepts it first.
+ */
+function machineAuthoredKbFields(
+    auth: AuthenticatedUser,
+    req: MachinePrincipalRequest | undefined,
+): { source?: KbDocumentSource; reviewState?: KbReviewState; metadata?: Record<string, unknown> } {
+    const kind = machinePrincipalKind(auth, req);
+    if (!kind) return {};
+    if (kind === 'fleet-run') {
+        // The run id is an `agent_runs` id: `generatedByAgentRunId` is a
+        // relation to `work_agent_runs`, so it travels in metadata instead.
+        const runId = fleetRunBindingOf(req)?.runId ?? null;
+        return {
+            source: 'agent' as KbDocumentSource,
+            reviewState: 'proposed' as KbReviewState,
+            ...(runId ? { metadata: { authoredByAgentRunId: runId } } : {}),
+        };
+    }
+    return { reviewState: 'proposed' as KbReviewState };
+}
+
+/** Whether an update touches what a model reads (title, body, description, class). */
+function changesKbContent(body: {
+    title?: unknown;
+    body?: unknown;
+    description?: unknown;
+    class?: unknown;
+}): boolean {
+    return (
+        body.title !== undefined ||
+        body.body !== undefined ||
+        body.description !== undefined ||
+        body.class !== undefined
+    );
+}
 
 /** Per-upload byte cap — spec §9.1 default is 200 MB, tunable per tenant. */
 const KB_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
@@ -164,6 +213,8 @@ export class KbController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Body() body: CreateKbDocumentDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ) {
         return this.kb.createDocument({
             workId,
@@ -177,6 +228,7 @@ export class KbController {
             categories: body.categories,
             language: body.language,
             status: body.status as KbDocumentStatus | undefined,
+            ...machineAuthoredKbFields(auth, req),
         });
     }
 
@@ -201,11 +253,18 @@ export class KbController {
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('docId', new ParseUUIDPipe()) docId: string,
         @Body() body: UpdateKbDocumentDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ) {
         return this.kb.updateDocument(workId, docId, auth.userId, {
             ...body,
             status: body.status as KbDocumentStatus | undefined,
             class: body.class as KbDocumentClass | undefined,
+            // Works-security lane 3a — a machine principal's content edit
+            // re-enters the review gate (see `machineAuthoredKbFields`).
+            ...(machinePrincipalKind(auth, req) && changesKbContent(body)
+                ? { reviewState: 'proposed' as KbReviewState }
+                : {}),
         });
     }
 
@@ -242,7 +301,17 @@ export class KbController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('docId', new ParseUUIDPipe()) docId: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ) {
+        // Works-security lane 3a — a lock is how the owner keeps agents off a
+        // document; a machine principal lifting it would undo exactly that.
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'unlock a Knowledge Base document',
+            'a lock keeps agents off the document; a person unlocks it in the app.',
+        );
         return this.kb.unlockDocument(workId, docId, auth.userId);
     }
 
@@ -334,7 +403,20 @@ export class KbController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('docId', new ParseUUIDPipe()) docId: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ) {
+        // Works-security lane 3a — accepting IS the review gate: never a
+        // fleet run's (it would accept its own document). An integration key
+        // is not refused here — it relays a person's review decision through
+        // its own API (`POST /api/integrations/v1/kb/documents/:id/accept`).
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'accept a proposed Knowledge Base document',
+            'accepting is the review; a person accepts it in the app.',
+            ['fleet-run'],
+        );
         return this.kb.acceptDocument(workId, docId, auth.userId);
     }
 

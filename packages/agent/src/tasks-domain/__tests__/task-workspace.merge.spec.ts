@@ -624,6 +624,23 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
         expect(actor).toEqual(expect.objectContaining({ targetBranch: 'release' }));
     });
 
+    // Works-security lane 3a (review): a Work with no isolation base used to
+    // hand the facade 'main' as the planned base, while its pull requests
+    // open against the repository's real default (develop / master) — every
+    // agent merge then failed `target-branch-mismatch`, approved or not.
+    it('attemptMergeForOpenPullRequest plans no base when the Work names none (the live base decides)', async () => {
+        works.findById.mockResolvedValue(makeWork({ taskIsolationBaseBranch: null }));
+        const task = { ...makeTask(), prNumber: 7, prUrl: 'https://x/pull/7' };
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+        });
+
+        const [, , , , , actor] = gitFacade.mergePullRequest.mock.calls[0];
+        expect(actor).toEqual(expect.objectContaining({ targetBranch: null }));
+    });
+
     it('attemptMergeForOpenPullRequest does nothing for a Task with no pull request', async () => {
         const outcome = await build().attemptMergeForOpenPullRequest({
             task: makeTask(),

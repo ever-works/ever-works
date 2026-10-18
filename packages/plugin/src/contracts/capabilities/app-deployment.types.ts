@@ -89,7 +89,11 @@ export type AppFailureCode =
 	| 'deadline_exceeded'
 	| 'image_not_found'
 	| 'image_private_unsupported'
-	| 'image_unresolvable';
+	| 'image_unresolvable'
+	// The API server rejected an apply: an invalid object (400/422), or a refusal by the
+	// credential's RBAC / an admission policy (401/403). Not an unreachable cluster.
+	| 'manifest_invalid'
+	| 'apply_forbidden';
 
 /**
  * The App state FR-46 reports, mapped from `health` + `paused` + `removedAt` +
