@@ -191,6 +191,17 @@ export interface TransitionOptions {
      * restore never counts as the owner starting the Task.
      */
     automaticRestore?: boolean;
+    /**
+     * Works-security (2026-10-18) — set ONLY by the platform callers that move
+     * the Task an agent run was dispatched for, as that run's lifecycle: the
+     * run finisher (`AGENT_RUN_TASK_FINISHER`), the workspace finalize step and
+     * the merge completion. With it, an agent-driven move to a NON-dispatching
+     * status keeps its ordinary side effects (a run finishing its Task to
+     * `done` still releases dependents and their agents). Never set by the
+     * agent `transitionTask` tool: the model picks that Task id. See
+     * {@link withAgentFanOutSuppressed}.
+     */
+    ownRunTask?: boolean;
 }
 
 /** Result of a sync walk: the Task after the last hop and the hops taken. */
@@ -220,6 +231,49 @@ export function withoutAgentForce(
         `Task ${taskId ?? '?'}: an agent-driven transition asked for force=true; ignored (agents run every gate).`,
     );
     return { ...opts, force: false };
+}
+
+/**
+ * Works-security (2026-10-18) — `AGENT_TRANSITIONS_NO_FANOUT` (default on).
+ * `false` restores the previous behaviour: an agent's move starts runs like a
+ * person's. Read per call so an operator can flip it without a rebuild.
+ */
+export function agentTransitionsNoFanOut(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.AGENT_TRANSITIONS_NO_FANOUT?.trim().toLowerCase() !== 'false';
+}
+
+/**
+ * Prompt-injection hardening — an AGENT's move never starts another agent's
+ * work. Applied centrally in {@link TaskTransitionService.transition}, so
+ * every agent path gets it (the `transitionTask` tool, the run finisher, the
+ * workspace finalize step, the merge completion, and any path added later):
+ * an agent-driven move carries `suppressAgentFanOut`, i.e. no `→ in_progress`
+ * fan-out to the Task's assigned agents and no fan-out down the auto-unblock
+ * cascade. Before this, an agent holding `canAssignTasks` could move any of
+ * the owner's Tasks (even `done → in_progress`) and start every agent
+ * assigned to it — on text an injected run may have written. Fleet-run tokens
+ * already got this at the controller; now it is the rule for every agent.
+ *
+ * The one exception keeps a run's own lifecycle intact: a platform caller
+ * moving the run's OWN Task (`ownRunTask`) to a status that dispatches
+ * nothing by itself — the finisher's `→ in_review` / `→ done` / `→ blocked` —
+ * keeps every side effect it had (reviewer stage, dependents released on
+ * done). `→ in_progress` is suppressed even then. Reviewer runs on
+ * `→ in_review` are untouched for all callers (a review must still happen
+ * before a merge), as are gates and notifications.
+ *
+ * The `awaiting-owner` hold (#2769) is unaffected: an agent still cannot move
+ * a held Task at all, and an agent move never counts as the owner starting it.
+ */
+export function withAgentFanOutSuppressed(
+    opts: TransitionOptions,
+    to: TaskStatus,
+    env: NodeJS.ProcessEnv = process.env,
+): TransitionOptions {
+    if (opts.actorType !== 'agent' || opts.suppressAgentFanOut === true) return opts;
+    if (!agentTransitionsNoFanOut(env)) return opts;
+    if (opts.ownRunTask === true && to !== TaskStatus.IN_PROGRESS) return opts;
+    return { ...opts, suppressAgentFanOut: true };
 }
 
 @Injectable()
@@ -290,7 +344,7 @@ export class TaskTransitionService {
      * side-effect columns).
      */
     async transition(task: Task, to: TaskStatus, opts: TransitionOptions = {}): Promise<Task> {
-        opts = withoutAgentForce(opts, this.logger, task.id);
+        opts = withAgentFanOutSuppressed(withoutAgentForce(opts, this.logger, task.id), to);
         // Prompt-injection hardening — a Task filed from an untrusted email
         // waits for its owner: no agent moves it (see `awaiting-owner.ts`).
         const awaitingOwner = isAwaitingOwner(task);

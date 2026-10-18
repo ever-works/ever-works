@@ -2870,9 +2870,17 @@ export class TaskWorkspaceService {
                     // own gates and WITHOUT a second agent dispatch. Only from the two
                     // not-started columns: a Task a person already closed is not
                     // re-opened by a late finalize.
-                    await this.transitions.transitionSync(fresh, to, { actorType: 'agent' });
+                    await this.transitions.transitionSync(fresh, to, {
+                        actorType: 'agent',
+                        ownRunTask: true,
+                    });
                 } else {
-                    await this.transitions.transition(fresh, to, { actorType: 'agent' });
+                    // Works-security: the run's OWN Task, moved as its lifecycle
+                    // (`ownRunTask`) — see `withAgentFanOutSuppressed`.
+                    await this.transitions.transition(fresh, to, {
+                        actorType: 'agent',
+                        ownRunTask: true,
+                    });
                 }
             }
         } catch (error) {

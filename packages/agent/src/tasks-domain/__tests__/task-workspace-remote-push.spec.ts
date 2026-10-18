@@ -223,6 +223,7 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
 
             expect(sync).toHaveBeenCalledWith(backlog, TaskStatus.IN_REVIEW, {
                 actorType: 'agent',
+                ownRunTask: true,
             });
             expect(transitions.transition).not.toHaveBeenCalled();
         });
@@ -237,6 +238,7 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
 
             expect(transitions.transition).toHaveBeenCalledWith(running, TaskStatus.IN_REVIEW, {
                 actorType: 'agent',
+                ownRunTask: true,
             });
             expect(sync).not.toHaveBeenCalled();
         });
