@@ -82,6 +82,25 @@ describe('normalizeGitHubIssue', () => {
         });
     });
 
+    /**
+     * F6 (2026-10-18): the triage filer (and the inbound-trigger matcher)
+     * must be able to tell a collaborator's issue from a stranger's, and the
+     * intake used to drop the association on the floor.
+     */
+    it('carries the issue author’s association as `authorAssociation` (raw GitHub value)', () => {
+        expect(
+            normalizeGitHubIssue(issueBody({}, { author_association: 'NONE' }))?.payload,
+        ).toMatchObject({ authorAssociation: 'NONE' });
+        expect(
+            normalizeGitHubIssue(issueBody({}, { author_association: 'member' }))?.payload
+                .authorAssociation,
+        ).toBe('MEMBER');
+        // The author's account type rides along for the filer's bot allow-list.
+        expect(normalizeGitHubIssue(issueBody())?.payload).toMatchObject({ authorType: 'User' });
+        // Absent stays absent — every consumer reads that as an outsider.
+        expect(normalizeGitHubIssue(issueBody())?.payload).not.toHaveProperty('authorAssociation');
+    });
+
     it.each(['reopened', 'closed', 'labeled', 'unlabeled', 'assigned', 'unassigned'])(
         'ingests the %s action as a new revision of the SAME issue',
         (action) => {

@@ -538,7 +538,10 @@ describe('createNodeRuntime', () => {
 			kind: 'node',
 			capabilities: ['os:linux'],
 			heartbeatIntervalMs: 30_000,
-			enrolledAt: '2026-07-25T10:00:00.000Z'
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			// This job carries a command step; control 18 refuses those unless the
+			// machine owner allowed node-run shell commands locally.
+			executionPolicy: { allowSkipPermissions: false, allowShellCommands: true, restrictedMode: true }
 		};
 
 		const runtime = createNodeRuntime(
@@ -1039,7 +1042,30 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 		expect(beat?.body.capabilities).toContain('attended');
 		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
 		expect(leases).toContainEqual(expect.objectContaining({ kinds: ['computer-session'] }));
-		expect(leases).toContainEqual(expect.objectContaining({ excludeKinds: ['computer-session'] }));
+		// Control 18: with the default local policy (no node-run shell commands)
+		// the work lane also never leases `acceptance-checks` jobs.
+		expect(leases).toContainEqual(
+			expect.objectContaining({ excludeKinds: ['computer-session', 'acceptance-checks'] })
+		);
+	});
+
+	it('control 18: a node whose owner allowed shell commands leases acceptance-checks again', async () => {
+		const { calls, fetchFn } = recording();
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(
+			{
+				...config(),
+				executionPolicy: { allowSkipPermissions: false, allowShellCommands: true, restrictedMode: true }
+			},
+			deps,
+			{ workerEnabled: true, terminalHost: null }
+		);
+		await runtime.worker?.start();
+		await runtime.worker?.stop();
+		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
+		expect(leases.length).toBeGreaterThan(0);
+		for (const lease of leases)
+			expect((lease.excludeKinds as string[] | undefined) ?? []).not.toContain('acceptance-checks');
 	});
 
 	it('serves live views on a machine started with --attend but without --work', () => {

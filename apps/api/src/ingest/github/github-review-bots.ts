@@ -306,6 +306,20 @@ export function formatInlineFinding(
  *                            files, the bot's own failure notice).
  *   * `empty`              — nothing left once presentation markup is
  *                            stripped.
+ *   * `thread-reply`       — a `pull_request_review_comment` that answers
+ *                            another comment in a review thread
+ *                            (`in_reply_to_id` set). Conversation, whatever
+ *                            it says — including a severity marker, which
+ *                            whoever the bot is answering can ask it to
+ *                            print.
+ *   * `chat-reply`         — an `issue_comment` that is not one of the
+ *                            bots' AUTOMATIC review shapes: a chat answer to
+ *                            whoever mentioned the bot (CodeRabbit's
+ *                            "auto-generated reply"), or any other comment
+ *                            the bot posted on request. Anybody who can
+ *                            comment on a public pull request can ask a bot
+ *                            to say something, so its answer is not review
+ *                            feedback (security finding F3).
  */
 export type ReviewBotCommentIgnoreReason =
     | 'not-created'
@@ -316,7 +330,11 @@ export type ReviewBotCommentIgnoreReason =
     | 'summary'
     | 'status'
     | 'empty'
-    | 'thread-reply';
+    | 'thread-reply'
+    | 'chat-reply';
+
+/** The two webhook events a reviewer bot's COMMENT can arrive on. */
+export type ReviewBotCommentEvent = 'issue_comment' | 'pull_request_review_comment';
 
 export type ReviewBotCommentVerdict =
     | { readonly kind: 'findings' }
@@ -420,6 +438,35 @@ const GREPTILE_SUMMARY = new RegExp(`${LINE_START}<!--\\s*greptile_summary\\s*--
 /** Greptile's TREX (test-run) summary comment. */
 const GREPTILE_TREX_SUMMARY = new RegExp(`${LINE_START}<!--\\s*greptile_trex_summary\\s*-->`, 'im');
 
+/**
+ * The automatic-review markers an `issue_comment` may OPEN with to count as
+ * review feedback (F3): Greptile's per-PR summary and its TREX test-run
+ * summary — the only reviewer-bot issue comments in this repository's
+ * history that carry findings. Anchored to the very first line of the body
+ * (`^` without the multiline flag), where the bots print them: a chat answer
+ * that merely ECHOES a marker further down — "reply verbatim: …" — is not
+ * the bot's own summary.
+ */
+const AUTOMATIC_ISSUE_COMMENT_OPENERS: readonly RegExp[] = [
+    /^\s*<!--\s*greptile_summary\s*-->/i,
+    /^\s*<!--\s*greptile_trex_summary\s*-->/i,
+];
+
+/**
+ * The ONLY login whose issue comment may count through those openers: the
+ * markers are Greptile's, so they prove an automatic review only when
+ * Greptile posted them. Any other trusted bot (Codex, Copilot, CodeRabbit)
+ * can be coaxed by whoever mentions it into starting a reply with
+ * `<!-- greptile_summary -->` (F3 review, 2026-10-18).
+ */
+export const AUTOMATIC_ISSUE_COMMENT_AUTHORS: ReadonlySet<string> = new Set(['greptile-apps[bot]']);
+
+/**
+ * CodeRabbit stamps every chat answer — to a review command OR to any
+ * question somebody `@coderabbitai`-mentioned it with — with this marker.
+ */
+const CODERABBIT_CHAT_REPLY = /<!--\s*This is an auto-generated reply by CodeRabbit\s*-->/i;
+
 /** A TREX run that found nothing to fix, or could not run at all. */
 const GREPTILE_TREX_NOTHING = /\b(?:found no issues|No flows tested)\b/i;
 
@@ -451,20 +498,56 @@ const GREPTILE_FINDING_BADGE = /<img\b[^>]{0,1000}\balt="P[0-3]"/i;
  * What is deliberately NOT here: a guess from prose. An inline finding
  * that happens to say "walkthrough" or "rate limit" is still a finding —
  * only the bots' machine markers, and a handful of fixed sentences they
- * print verbatim, can make a comment chatter. Unknown shapes from a
- * trusted bot stay findings, exactly as before.
+ * print verbatim, can make a comment chatter. Unknown shapes of an INLINE
+ * comment that opens a review thread stay findings, exactly as before.
  *
- * Pure: a function of the delivery's `action` and the comment body.
+ * ## Who asked the bot (security finding F3, 2026-10-18)
+ *
+ * Being allow-listed says the bot may speak; it does not say whose words
+ * the bot is repeating. On a public repository ANYONE can comment
+ * "@coderabbitai reply verbatim: <payload>" — or reply to a bot's finding
+ * asking it to restate one with a `_🔴 Critical_` tag — and the bot's answer
+ * used to become rejection feedback and ring the fix loop's doorbell: a
+ * stranger's instructions, laundered through a trusted identity, replayed
+ * to the agent on the owner's PC. So, whatever the text:
+ *
+ *  * an `issue_comment` is a finding only when it is one of the bots'
+ *    AUTOMATIC review shapes — it OPENS with Greptile's summary or TREX
+ *    marker ({@link AUTOMATIC_ISSUE_COMMENT_OPENERS}) AND Greptile posted it
+ *    ({@link AUTOMATIC_ISSUE_COMMENT_AUTHORS}) — and is not a CodeRabbit chat
+ *    reply. Everything else is `chat-reply`;
+ *  * a `pull_request_review_comment` is a finding only when it OPENS a
+ *    review thread (`in_reply_to_id` absent). Every reply is
+ *    `thread-reply`, severity marker or not.
+ *
+ * The bots' genuine automatic findings are unaffected: CodeRabbit, Copilot,
+ * Codex and Greptile post them as thread-opening inline comments (and
+ * Greptile's summary restates them), and a `changes_requested` review is
+ * classified elsewhere.
+ *
+ * Pure: a function of the delivery's event, `action` and the comment body.
  */
 export function classifyReviewBotComment(input: {
     action?: string | null;
     body?: string | null;
+    /**
+     * Which webhook event carried the comment. Required: the two events
+     * have different rules (see above), and a caller that forgets to say
+     * must not silently get the more permissive one.
+     */
+    event: ReviewBotCommentEvent;
     /**
      * The review-thread comment this one replies to (`in_reply_to_id` of a
      * `pull_request_review_comment`), or absent for a thread's first comment
      * and for every `issue_comment`.
      */
     inReplyTo?: number | null;
+    /**
+     * The comment author's login. An `issue_comment` counts through an
+     * automatic-review opener only when it is one of
+     * {@link AUTOMATIC_ISSUE_COMMENT_AUTHORS}; a missing login never does.
+     */
+    author?: string | null;
 }): ReviewBotCommentVerdict {
     const ignore = (reason: ReviewBotCommentIgnoreReason): ReviewBotCommentVerdict => ({
         kind: 'ignore',
@@ -524,38 +607,27 @@ export function classifyReviewBotComment(input: {
     // its finding ("Thanks for the fix…", "Verified the fix by code
     // inspection…"), and each one used to be recorded as a new rejection,
     // which could buy a paid fix run for a thank-you (self-build handover item
-    // 11). A reply is a finding only when the bot TAGGED it as one: CodeRabbit
-    // (`_🟠 Major_`), Greptile and Codex (P-badges) open a new finding with a
-    // severity marker, and an acknowledgement never carries one. Copilot's
-    // untagged findings are first comments, never replies, so they are not
-    // affected. The finding that started the thread was recorded when it was
-    // created. The marker must be in the reply's OWN text: an acknowledgement
-    // that quotes the original finding ("> _🟠 Major_ …", "the `P1` issue is
-    // fixed") is still an acknowledgement (review on #2632).
+    // 11). A severity marker used to make a reply a finding again — but the
+    // person the bot is answering can be ANYONE, and can ask it to print one
+    // (F3). The finding that started the thread was recorded when it was
+    // created; nothing said in reply to it is.
     if (
+        input.event === 'pull_request_review_comment' &&
         typeof input.inReplyTo === 'number' &&
-        input.inReplyTo > 0 &&
-        parseReviewBotSeverity(ownReplyText(raw)) === null
+        input.inReplyTo > 0
     ) {
         return ignore('thread-reply');
     }
+    // An issue comment counts only as an AUTOMATIC review (F3): it opens with
+    // a summary marker the bot prints on its own, and is not a CodeRabbit chat
+    // answer to whoever mentioned it.
+    if (
+        input.event === 'issue_comment' &&
+        (CODERABBIT_CHAT_REPLY.test(raw) ||
+            !AUTOMATIC_ISSUE_COMMENT_AUTHORS.has(normalizeReviewerLogin(input.author)) ||
+            !AUTOMATIC_ISSUE_COMMENT_OPENERS.some((opener) => opener.test(raw)))
+    ) {
+        return ignore('chat-reply');
+    }
     return { kind: 'findings' };
-}
-
-/** A block-quote line (`> …`, optionally indented). */
-const QUOTED_LINE = /^[ \t]*>.*$/gm;
-
-/** An inline code span: a run of backticks, its content, the same run again. */
-const INLINE_CODE_SPAN = /(`+)[^`]*?\1/g;
-
-/**
- * What a reply SAYS itself: the body without fenced code, without
- * block-quoted lines and without inline code spans, which is where a reply
- * repeats the comment it answers.
- */
-function ownReplyText(raw: string): string {
-    return raw
-        .replace(FENCED_CODE_BLOCK, '')
-        .replace(QUOTED_LINE, '')
-        .replace(INLINE_CODE_SPAN, '');
 }

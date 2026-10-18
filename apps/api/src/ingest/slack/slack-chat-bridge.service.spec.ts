@@ -11,7 +11,12 @@ jest.mock('../../ai-conversation/openai-compat.service', () => ({
     OpenAiCompatService: class {},
 }));
 
-import { SlackChatBridgeService, extractSlackWorkspaceRef } from './slack-chat-bridge.service';
+import {
+    SLACK_BRIDGE_KB_ALLOWLIST_ENV,
+    SlackChatBridgeService,
+    extractSlackWorkspaceRef,
+    isSlackKbAllowed,
+} from './slack-chat-bridge.service';
 
 /** Flush the fire-and-forget bridge promise chain. */
 function flush(): Promise<void> {
@@ -370,6 +375,8 @@ describe('SlackChatBridgeService', () => {
                     messages: [{ role: 'user', content: 'what shipped today?' }],
                 }),
                 { userId: 'user-1' },
+                // Security: no @kb: resolution for a non-allow-listed sender.
+                { allowKbMentions: false },
             );
             // Reply lands in the mention's thread via the connector plugin.
             expect(slackPlugin.reply).toHaveBeenCalledWith(
@@ -552,6 +559,7 @@ describe('SlackChatBridgeService', () => {
                         messages: [{ role: 'user', content: 'what shipped today?' }],
                     }),
                     { userId: 'user-1' },
+                    { allowKbMentions: false },
                 );
                 // A command has no thread, so the reply lands at the channel root.
                 expect(slackPlugin.reply).toHaveBeenCalledWith(
@@ -636,6 +644,95 @@ describe('SlackChatBridgeService', () => {
                     ),
                 ).toEqual({ teamId: 'T9', enterpriseId: 'E1' });
             });
+        });
+    });
+
+    // Security: a Slack workspace member (or Slack Connect guest) must not be
+    // able to pull the owner's KB documents with @kb: tokens.
+    describe('@kb: allow-list for bridged prompts', () => {
+        const ORIGINAL = process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV];
+        afterEach(() => {
+            if (ORIGINAL === undefined) delete process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV];
+            else process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV] = ORIGINAL;
+        });
+
+        it('is disabled by default (empty allow-list)', () => {
+            expect(isSlackKbAllowed({ settings: {} }, { userId: 'U7', teamId: 'T1' }, {})).toBe(
+                false,
+            );
+        });
+
+        it('allows a sender listed in the env var, by id or team-qualified id', () => {
+            const env = { [SLACK_BRIDGE_KB_ALLOWLIST_ENV]: 'U1, t1:u7' };
+            expect(isSlackKbAllowed({ settings: {} }, { userId: 'U1' }, env)).toBe(true);
+            expect(isSlackKbAllowed({ settings: {} }, { userId: 'U7', teamId: 'T1' }, env)).toBe(
+                true,
+            );
+            expect(isSlackKbAllowed({ settings: {} }, { userId: 'U7', teamId: 'T2' }, env)).toBe(
+                false,
+            );
+            expect(isSlackKbAllowed({ settings: {} }, { userId: 'U9' }, env)).toBe(false);
+            expect(isSlackKbAllowed({ settings: {} }, {}, env)).toBe(false);
+        });
+
+        it('allows a sender listed in the connector setting (CSV or array)', () => {
+            expect(
+                isSlackKbAllowed(
+                    { settings: { kbAllowedSlackUserIds: 'U7' } },
+                    { userId: 'U7' },
+                    {},
+                ),
+            ).toBe(true);
+            expect(
+                isSlackKbAllowed(
+                    { settings: { kbAllowedSlackUserIds: ['U8'] } },
+                    { userId: 'U8' },
+                    {},
+                ),
+            ).toBe(true);
+        });
+
+        it('passes allowKbMentions: true for an allow-listed mention author', async () => {
+            process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV] = 'U7';
+            const { service, openAiCompatService } = createService();
+            await service.bridgeMentionToChat(BINDING, mentionBody() as any);
+            expect(openAiCompatService.handleCompletion).toHaveBeenCalledWith(
+                expect.anything(),
+                { userId: 'user-1' },
+                { allowKbMentions: true },
+            );
+        });
+
+        it("matches a team-qualified entry against the AUTHOR's team (user_team), not the receiving workspace", async () => {
+            process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV] = 'T1:U7';
+            const { service, openAiCompatService } = createService();
+            // A Slack Connect guest U7 from team T9 posting into workspace T1.
+            await service.bridgeMentionToChat(BINDING, mentionBody({ user_team: 'T9' }) as any);
+            expect(openAiCompatService.handleCompletion).toHaveBeenLastCalledWith(
+                expect.anything(),
+                { userId: 'user-1' },
+                { allowKbMentions: false },
+            );
+            await service.bridgeMentionToChat(BINDING, mentionBody({ user_team: 'T1' }) as any);
+            expect(openAiCompatService.handleCompletion).toHaveBeenLastCalledWith(
+                expect.anything(),
+                { userId: 'user-1' },
+                { allowKbMentions: true },
+            );
+        });
+
+        it('passes allowKbMentions: false for anyone else', async () => {
+            process.env[SLACK_BRIDGE_KB_ALLOWLIST_ENV] = 'U1';
+            const { service, openAiCompatService } = createService();
+            await service.bridgeMentionToChat(
+                BINDING,
+                mentionBody({ text: '<@UBOT> @kb:legal/nda' }) as any,
+            );
+            expect(openAiCompatService.handleCompletion).toHaveBeenCalledWith(
+                expect.anything(),
+                { userId: 'user-1' },
+                { allowKbMentions: false },
+            );
         });
     });
 });

@@ -99,6 +99,16 @@ interface TriggerFormState {
     enabled: boolean;
 }
 
+/**
+ * The API's default `autoStart` for a NEW trigger: event-sourced triggers
+ * fire on text outsiders write (GitHub issues, Sentry messages, Slack,
+ * Jira), so they park their Task for a human unless the owner opts in;
+ * webhook triggers are signed by the owner's own sender.
+ */
+function defaultAutoStartFor(sourceType: InboundTriggerSourceType): InboundTriggerAutoStart {
+    return sourceType === 'event' ? 'manual' : 'always';
+}
+
 const EMPTY_FORM: TriggerFormState = {
     name: '',
     description: '',
@@ -599,8 +609,16 @@ export function TaskTriggersClient({
                                 <Select
                                     value={form.sourceType}
                                     onValueChange={(value) =>
-                                        patch({
-                                            sourceType: value as InboundTriggerSourceType,
+                                        setForm((prev) => {
+                                            const sourceType = value as InboundTriggerSourceType;
+                                            // Follow the API default (event → manual) unless
+                                            // the owner already picked something else.
+                                            const autoStart =
+                                                prev.autoStart ===
+                                                defaultAutoStartFor(prev.sourceType)
+                                                    ? defaultAutoStartFor(sourceType)
+                                                    : prev.autoStart;
+                                            return { ...prev, sourceType, autoStart };
                                         })
                                     }
                                     data-testid="task-trigger-form-source"

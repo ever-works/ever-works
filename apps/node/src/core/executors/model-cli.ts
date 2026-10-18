@@ -100,6 +100,35 @@ export interface ModelCliMcpBridge {
 export const MODEL_CLI_EMPTY_MCP_CONFIG = `${JSON.stringify({ mcpServers: {} }, null, 2)}\n`;
 
 /**
+ * The settings file every fleet Claude Code run is handed (control 17).
+ *
+ * Written to the run's SCRATCH directory and passed as
+ * `--setting-sources user --settings <file>`. Two holes, one file:
+ *
+ *   - **The worktree's own `.claude/settings.json` / `settings.local.json`.**
+ *     Without `--setting-sources user`, `claude -p` started in the worktree
+ *     loads the REPOSITORY's settings, and a repository is untrusted input:
+ *     whoever lands a commit (or a model run that left the file behind in a
+ *     reused worktree) decides its `hooks` (shell commands run on session
+ *     start and around every tool call, whatever the permission mode), its
+ *     `env`, `apiKeyHelper`, `statusLine` and plugin set. Measured
+ *     2026-10-18 on Claude Code 2.1.302 (Windows): a `SessionStart` hook in a
+ *     repository's `.claude/settings.json` FIRED on exactly the command this
+ *     node built, in an untrusted workspace, under `acceptEdits`.
+ *   - **Every hook at all.** `disableAllHooks` also silences the machine
+ *     owner's own hooks (an agent orchestrator's `PermissionRequest` hook
+ *     can approve tool calls; others run commands per tool call) and any
+ *     hook an earlier run wrote into the mirrored session home (control
+ *     14). A fleet session is not the owner's interactive session, and none
+ *     of those were written for it.
+ *
+ * The repository's `CLAUDE.md` is not auto-loaded once the project source
+ * is off (it rides the same source). The planner's instructions point the
+ * model at it as repository DATA instead, which is the trust it deserves.
+ */
+export const MODEL_CLI_FLEET_SETTINGS = `${JSON.stringify({ disableAllHooks: true }, null, 2)}\n`;
+
+/**
  * The machine owner's Codex settings a fleet run KEEPS once
  * `--ignore-user-config` drops the rest of `$CODEX_HOME/config.toml`
  * (fleet session trust model, control 16).
@@ -510,6 +539,29 @@ export function buildModelCliCommand(input: {
 	 */
 	emptyMcpConfigPath?: string;
 	/**
+	 * Control 17 — absolute path of the fleet settings file
+	 * ({@link MODEL_CLI_FLEET_SETTINGS}) the node wrote to this run's scratch
+	 * directory. A Claude Code run is then started with
+	 * `--setting-sources user --settings <file>`, so the worktree's own
+	 * `.claude/settings*.json` never loads and no hook fires. Ignored for
+	 * Codex.
+	 *
+	 * Optional so a direct caller keeps the command it always had; the
+	 * fleet's model step always passes it and then refuses to spawn a Claude
+	 * Code command that lacks it — see {@link assertSettingsIsolationInCommand}.
+	 */
+	settingsPath?: string;
+	/**
+	 * Control 17 — add Claude Code's `--restricted` mode: no command-running
+	 * built-ins and no WebFetch, no user/project/local settings files, file
+	 * tools confined to the granted directories, and writes to settings, git
+	 * and tool-configuration files (`.claude/settings.json`, `.npmrc`,
+	 * `.husky/*`) never auto-approved. Set only when the pinned binary
+	 * advertises the flag. Never emitted alongside
+	 * `--dangerously-skip-permissions`, which `--restricted` refuses.
+	 */
+	restricted?: boolean;
+	/**
 	 * Codex only: the owner settings kept under `--ignore-user-config` (see
 	 * {@link CodexUserSettings}), as read by {@link readCodexUserSettings}.
 	 * Absent: none are forwarded. The isolation flag itself is ALWAYS emitted
@@ -653,6 +705,17 @@ export function buildModelCliCommand(input: {
 		if (execution.effort && !omitted.has('--effort')) args.push('--effort', execution.effort);
 		if (budget && !omitted.has('--max-budget-usd')) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
+		// ── Control 17: the repository's settings never load ────────────
+		//
+		// `--setting-sources user` drops the project and local sources (the
+		// worktree's `.claude/settings*.json`: hooks, env, apiKeyHelper,
+		// plugins), and the node-owned `--settings` file switches every hook
+		// off. Neither flag is variadic, so they may sit anywhere before the
+		// variadic `--mcp-config` / `--add-dir` below.
+		if (input.settingsPath !== undefined) {
+			args.push('--setting-sources', 'user', '--settings', quoteShellPath(input.settingsPath, platform));
+		}
+		if (input.restricted === true && execution.skipPermissions !== true) args.push('--restricted');
 		// ── Slice Z: the platform MCP bridge ────────────────────────────
 		//
 		// Three flags, and all three are load-bearing:
@@ -827,6 +890,37 @@ const STRICT_MCP_CONFIG_IN_COMMAND = / --mcp-config "[^"]+" --strict-mcp-config 
 
 /** `exec --ignore-user-config`, adjacent: the flag the codex branch emits right after the subcommand. */
 const CODEX_IGNORE_USER_CONFIG_IN_COMMAND = / exec --ignore-user-config /;
+
+/**
+ * `--setting-sources user --settings "<file>"`, adjacent and in that order —
+ * exactly what the claude-code branch emits for control 17. A command that
+ * names ANY other source list (`user,project`, `project`) does not match.
+ */
+const SETTINGS_ISOLATION_IN_COMMAND = / --setting-sources user --settings "[^"]+" /;
+
+/**
+ * Refuse to spawn a Claude Code run that would load the repository's own
+ * `.claude/settings*.json` or run any hook (control 17).
+ *
+ * Same reasoning as {@link assertMcpIsolationInCommand}: the property is
+ * checked on the real string handed to the shell, immediately before the
+ * spawn, so a refactor that computes the isolation and fails to emit it
+ * fails the job instead of quietly running a repository's hooks under the
+ * machine owner's account. Codex is unaffected (its isolation is
+ * `--ignore-user-config`, checked by the MCP gate).
+ */
+export function assertSettingsIsolationInCommand(input: {
+	command: string;
+	execution: FleetAgentModelExecution;
+}): void {
+	if (input.execution.provider !== 'claude-code') return;
+	if (!SETTINGS_ISOLATION_IN_COMMAND.test(input.command)) {
+		throw new ModelCliCommandError(
+			'The claude-code command line does not carry --setting-sources user --settings <file>, so the run ' +
+				"would load the repository's own .claude/settings.json (its hooks, env and apiKeyHelper) and run hooks"
+		);
+	}
+}
 
 /**
  * Refuse to spawn a Claude Code run that is not isolated from the machine

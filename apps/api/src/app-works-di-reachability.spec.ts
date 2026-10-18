@@ -319,11 +319,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_LICENSE_SERVICE',
-        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_LICENSE_SERVICE` row for the reason.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
-    },
-    {
         key: 'AppDependencyProvisionWorkerModule :: APP_WORK_DELETION_COMPLETION',
         reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION` row for the reason.",
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
@@ -352,11 +347,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "APW-05's rebuild requester is unwritten.",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_LICENSE_SERVICE',
-        reason: "APW-03's `AppLicenseService` does not exist yet.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:134-135 (APW-03 T42)',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION',
@@ -2155,6 +2145,7 @@ if (process.env[CHILD_FLAG] === undefined) {
                     "AppUpstreamSyncWorkerModule :: remote 'AppLicenseService'",
                     "AppUpstreamSyncWorkerModule :: remote 'AppSpecService'",
                     "TriggerAppRuntimeModule :: remote 'AppDeployBuildSourceAdapter'",
+                    "TriggerAppRuntimeModule :: remote 'AppLicenseService'",
                     "TriggerAppRuntimeModule :: remote 'AppSpecService'",
                 ]),
             );

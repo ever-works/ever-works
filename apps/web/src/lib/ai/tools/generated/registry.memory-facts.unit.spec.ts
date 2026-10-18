@@ -9,8 +9,8 @@ import { selectActiveToolNames } from '../tool-selection';
  * a tool that stores it, as an ACTIVE fact, and hand the stored wording back
  * so the assistant can read it back in one line. That takes three things,
  * all pinned here: the registry entry exists and points at the real route,
- * it is not hidden behind a confirmation the person already gave by asking,
- * and it is REACHABLE — a tool without a keyword slot is gated out of every
+ * it sits behind a one-click confirmation (a fact reaches every agent, so it
+ * must be the person's own call — see registry.wave5.ts), and it is REACHABLE — a tool without a keyword slot is gated out of every
  * turn, which is how the Mission-create outage happened.
  */
 
@@ -28,9 +28,10 @@ describe('memory fact chat tools', () => {
         });
         expect(op?.bodyHint).toMatch(/body/);
         expect(op?.bodyHint).toMatch(/500/);
-        // The person asked for it in their own turn, and every fact is
-        // forgettable and restorable — a second confirmation would be noise.
-        expect(op?.requiresConfirmation).toBeUndefined();
+        // Security: a fact reaches every agent's prompt, so a write steered by
+        // injected text would persist across all agents — one-click confirm.
+        expect(op?.requiresConfirmation).toBe(true);
+        expect(op?.confirmationKind).toBe('privileged');
         // The tool tells the model to read the stored wording back.
         expect(op?.summary).toMatch(/read it back/i);
     });

@@ -61,12 +61,14 @@ import {
 } from '../subscriptions/billing/stripe-catalog';
 // CI feedback + autonomous fix loop (slice AC, EW-806). Concrete file
 // import, not the tasks-domain barrel: `task-ci-auto-resume.ts` is a pure
-// leaf (its only import is `node:crypto`) and pulling the barrel here
+// leaf (its only imports are `node:crypto` and the import-free
+// `review-feedback-fence.ts`) and pulling the barrel here
 // would drag the Nest service graph into config resolution.
 import {
     DEFAULT_CI_AUTO_RESUME_ATTEMPTS,
     MAX_CI_AUTO_RESUME_ATTEMPTS,
     clampAutoResumeAttempts,
+    parseTrustedCheckApps,
 } from '../tasks-domain/task-ci-auto-resume';
 // Same reasoning as the import above: the clamps that decide how much
 // money the reviewer agent stage may spend live next to the constants
@@ -2096,6 +2098,17 @@ export const config = {
             return clampAutoResumeAttempts(
                 parseInt(process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS ?? '', 10),
             );
+        },
+        /**
+         * The GitHub Apps whose check results may drive the CI fix loop
+         * (security finding F8): `github-actions` ALWAYS, plus
+         * `GITHUB_TRUSTED_CHECK_APPS` (comma-separated app slugs). Read by the
+         * webhook intake, the evaluator and the two-minute poll alike, so the
+         * three can never disagree. Results from any other app are still
+         * ingested and shown on the board; they never resume a run.
+         */
+        getTrustedCheckApps(): string[] {
+            return parseTrustedCheckApps(process.env.GITHUB_TRUSTED_CHECK_APPS);
         },
         /**
          * Reviewer agent stage (self-build slice AD, EW-811) — how many

@@ -38,6 +38,24 @@ export interface PrReviewRequest {
     workId?: string;
     /** Git provider plugin id (default `github`). */
     providerId?: string;
+    /**
+     * How far the pull request's AUTHOR is trusted, when the caller knows
+     * (security finding F2). The review is posted as a PUBLIC comment on the
+     * pull request, so its prompt must not carry the owner's private context
+     * when somebody outside the repository controls the title, body and diff
+     * it is built from.
+     *
+     *  - `untrusted` — no knowledge-base context and no memory recall; the
+     *    review is grounded in the diff alone. The webhook bridge sets this
+     *    for an author who is not an OWNER, MEMBER or COLLABORATOR (or a pull
+     *    request from a fork).
+     *  - `trusted` — the PR title may seed the KB / memory query.
+     *  - absent — callers that do not know (the chat tool, the REST
+     *    endpoint): private context is still included unless the fetched
+     *    pull request's head lives in ANOTHER repository, and the query is
+     *    built from the Work and the instruction, never from PR text.
+     */
+    prAuthorTrust?: 'trusted' | 'untrusted';
 }
 
 /** One structured per-file review note. */
@@ -78,6 +96,12 @@ export interface PrReviewResult {
         work: boolean;
         kb: boolean;
         memory: boolean;
+        /**
+         * Present (`true`) when the knowledge base and memory recall were
+         * deliberately left out because the pull request's author is not
+         * trusted — see {@link PrReviewRequest.prAuthorTrust}.
+         */
+        privateContextWithheld?: true;
     };
     error?: string;
 }

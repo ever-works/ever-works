@@ -363,55 +363,77 @@ describe('CodexPlugin', () => {
 			expect(result.outputs.items[0].name).toBe('Recovered Item');
 		});
 
-		it('retries once with sandbox bypass when Codex reports file writes were blocked', async () => {
+		// Security (prompt-injection): the write-block detector reads Codex's
+		// own stdout — model-produced text an injected page can steer. It must
+		// never escalate a run to --dangerously-bypass-approvals-and-sandbox
+		// unless the operator explicitly enabled `unsafeBypassSandbox`.
+		const SANDBOX_BLOCK_STDOUT =
+			'If you want the fastest recovery path, re-run this task in a session where local file tools are working and I can write the JSON files directly. If needed, I can also paste the full 12 ready-to-save JSON objects in the next reply.';
+
+		it('declines the sandbox-bypass retry when Codex output claims writes were blocked (setting off)', async () => {
 			const recoverySpy = vi
 				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
 				.mockResolvedValue([] as never);
-			vi.mocked(workspaceManager.readGeneratedItems)
-				.mockResolvedValueOnce([])
-				.mockResolvedValueOnce([
-					{
-						name: 'Bypass Item',
-						description: 'Created after bypass retry',
-						source_url: 'https://example.com/bypass',
-						category: 'Testing',
-						tags: ['test']
-					}
-				] as never);
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
 
-			vi.mocked(processRunner.executeCodex)
-				.mockReturnValueOnce({
-					promise: Promise.resolve({
-						stdout: 'If you want the fastest recovery path, re-run this task in a session where local file tools are working and I can write the JSON files directly. If needed, I can also paste the full 12 ready-to-save JSON objects in the next reply.',
-						stderr: 'tokens used',
-						exitCode: 0,
-						killed: false,
-						duration: 1000
-					}),
-					kill: vi.fn()
-				})
-				.mockReturnValueOnce({
-					promise: Promise.resolve({
-						stdout: 'Files written',
-						stderr: '',
-						exitCode: 0,
-						killed: false,
-						duration: 1000
-					}),
-					kill: vi.fn()
-				});
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: SANDBOX_BLOCK_STDOUT,
+					stderr: 'tokens used',
+					exitCode: 0,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
 
-			await plugin.onLoad(createMockContext());
+			const context = createMockContext();
+			await plugin.onLoad(context);
 
 			await plugin.execute(work, request, existing);
 
-			expect(processRunner.executeCodex).toHaveBeenNthCalledWith(
-				2,
-				expect.objectContaining({
-					bypassApprovalsAndSandbox: true
-				})
+			// Exactly one Codex run, and it was sandboxed.
+			expect(processRunner.executeCodex).toHaveBeenCalledTimes(1);
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(
+				expect.objectContaining({ bypassApprovalsAndSandbox: false })
 			);
-			expect(recoverySpy).not.toHaveBeenCalled();
+			// Structured recovery still runs — sandboxed.
+			expect(recoverySpy).toHaveBeenCalledTimes(1);
+			// The declined escalation is logged.
+			expect(context.logger.warn).toHaveBeenCalledWith(
+				expect.stringContaining('NOT retrying with sandbox bypass')
+			);
+			recoverySpy.mockRestore();
+		});
+
+		it('never adds a bypass retry even when the operator enabled unsafeBypassSandbox (first run already bypassed)', async () => {
+			vi.mocked(pipelineHelpers.resolveSettings).mockResolvedValueOnce({
+				apiKey: 'sk-test',
+				model: 'codex-mini-latest',
+				unsafeBypassSandbox: true
+			});
+			const recoverySpy = vi
+				.spyOn(plugin as never, 'recoverItemsFromStructuredOutput')
+				.mockResolvedValue([] as never);
+			vi.mocked(workspaceManager.readGeneratedItems).mockResolvedValue([]);
+			vi.mocked(processRunner.executeCodex).mockReturnValueOnce({
+				promise: Promise.resolve({
+					stdout: SANDBOX_BLOCK_STDOUT,
+					stderr: '',
+					exitCode: 0,
+					killed: false,
+					duration: 1000
+				}),
+				kill: vi.fn()
+			});
+
+			await plugin.onLoad(createMockContext());
+			await plugin.execute(work, request, existing);
+
+			expect(processRunner.executeCodex).toHaveBeenCalledTimes(1);
+			expect(processRunner.executeCodex).toHaveBeenCalledWith(
+				expect.objectContaining({ bypassApprovalsAndSandbox: true })
+			);
 			recoverySpy.mockRestore();
 		});
 

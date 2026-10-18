@@ -149,7 +149,9 @@ function bootstrap(): void {
 			startPaused: pausedByOperator,
 			workerSafetyGate: createConfigWorkerSafetyGate(fs, configPath, { platform: process.platform }),
 			persistUnsafe: async (unsafe) => {
-				const currentConfig = config;
+				// Re-read the file first so a quarantine records `unsafe` without
+				// reverting a local policy change made since the runtime started.
+				const currentConfig = (await loadConfig(fs, configPath).catch(() => null)) ?? config;
 				if (!currentConfig) throw new Error('Cannot persist worker quarantine without an enrolled node config');
 				const quarantinedConfig = { ...currentConfig, unsafe };
 				await saveConfig(fs, configPath, quarantinedConfig, { platform: process.platform });

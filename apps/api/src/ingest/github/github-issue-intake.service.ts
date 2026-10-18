@@ -63,6 +63,14 @@ export interface GitHubIssuesWebhookBody {
         updated_at?: string;
         closed_at?: string | null;
         user?: { login?: string; type?: string };
+        /**
+         * The issue AUTHOR's relationship to the repository (`OWNER`,
+         * `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR`, `NONE`, …). Carried onto
+         * the envelope as `authorAssociation` so the triage filer (and the
+         * inbound-trigger matcher) can tell a collaborator's issue from a
+         * stranger's (security finding F6).
+         */
+        author_association?: string;
         labels?: Array<{ name?: string } | string>;
         assignees?: Array<{ login?: string }>;
         milestone?: { title?: string } | null;
@@ -120,6 +128,11 @@ export function normalizeGitHubIssue(body: GitHubIssuesWebhookBody): IngestedEve
         .filter((login): login is string => typeof login === 'string' && login.length > 0)
         .slice(0, 50);
     const author = nonEmpty(issue.user?.login);
+    // The raw GitHub value, upper-cased and bounded; absent when GitHub sent
+    // none (every consumer treats absent as an outsider — fail closed).
+    const authorAssociation = nonEmpty(issue.author_association)?.toUpperCase().slice(0, 40);
+    // `Bot` for a GitHub App (the triage filer's bot allow-list requires it).
+    const authorType = nonEmpty(issue.user?.type)?.slice(0, 40);
     const actor = nonEmpty(body.sender?.login) ?? author ?? 'unknown';
     const url = httpsUrl(issue.html_url);
     const updatedAt = isoOrNow(issue.updated_at ?? issue.created_at);
@@ -169,6 +182,8 @@ export function normalizeGitHubIssue(body: GitHubIssuesWebhookBody): IngestedEve
             labels,
             assignees,
             ...(author ? { author } : {}),
+            ...(authorAssociation ? { authorAssociation } : {}),
+            ...(authorType ? { authorType } : {}),
             ...(url ? { url } : {}),
             ...(bodyText ? { body: capped(bodyText, INGESTED_EVENT_TEXT_MAX_CHARS) } : {}),
             ...(label ? { label } : {}),
@@ -201,6 +216,11 @@ export function normalizeGitHubIssue(body: GitHubIssuesWebhookBody): IngestedEve
  * the cross-vendor `incident` kind through `DependabotIncidentSource`)
  * and dedupe-inserts through the event-ingest spine, where the trigger
  * matcher and the triage filer pick them up.
+ *
+ * Every issue is ingested, whoever opened it; the envelope carries the
+ * author's `authorAssociation`, and the triage filer files a Task only for
+ * an OWNER, MEMBER or COLLABORATOR unless `GITHUB_ISSUE_INTAKE_OUTSIDERS`
+ * opts back in (security finding F6).
  */
 @Injectable()
 export class GitHubIssueIntakeService implements OnModuleInit, GitHubWebhookConsumer {

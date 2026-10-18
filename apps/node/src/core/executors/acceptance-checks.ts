@@ -5,6 +5,8 @@ import { homedir, tmpdir } from 'os';
 import { isAbsolute, relative, resolve, sep } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
 import { FLEET_JOB_MAX_RESULT_BYTES, resolveExclusiveAgentCredentials } from '@ever-works/contracts';
+import { enforceAcceptanceChecksExecutionPolicy } from '../execution-policy';
+import type { NodeExecutionPolicy } from '../types';
 
 /**
  * The `acceptance-checks` executor — the node's v1 job kind.
@@ -167,6 +169,12 @@ export interface AcceptanceChecksIo {
 	directoryExists?: (path: string) => boolean;
 	parentEnv?: NodeJS.ProcessEnv;
 	now?: () => number;
+	/**
+	 * Control 18 — the machine owner's local execution policy. The node's
+	 * runtime always passes the stored policy; absent (a direct library
+	 * caller, a spec) enforces nothing, exactly as before the control.
+	 */
+	executionPolicy?: NodeExecutionPolicy;
 }
 
 export class AcceptanceChecksPayloadError extends Error {
@@ -231,6 +239,10 @@ export async function runAcceptanceChecksJob(
 		throwIfCommandAborted(signal);
 		return { gateStatus: 'none', results: [] };
 	}
+	// Control 18: every check is a shell command run with the machine owner's
+	// privileges, in a directory the platform named. Off unless the owner
+	// allowed it on this machine.
+	enforceAcceptanceChecksExecutionPolicy(checks.length, io.executionPolicy);
 
 	const results: NodeCheckResult[] = [];
 	for (const check of checks) {

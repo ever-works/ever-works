@@ -12,7 +12,7 @@ import {
     importWorkTool,
     analyzeImportSource,
     updateWorkTool,
-    deleteWorkTool,
+    createDeleteWorkTool,
     syncWork,
 } from './work.tools';
 import { checkGitConnection, listGitProviders } from './git.tools';
@@ -26,7 +26,7 @@ import {
 } from './deploy.tools';
 import {
     addItemTool,
-    removeItemTool,
+    createRemoveItemTool,
     updateItemTool,
     generateItemsTool,
     checkItemHealthTool,
@@ -47,7 +47,7 @@ import {
     pauseMission,
     resumeMission,
     completeMission,
-    deleteMission,
+    createDeleteMissionTool,
     runMissionNow,
     cloneMission,
     // PR-2 (domain-model evolution) — Mission ↔ Work relations.
@@ -69,7 +69,7 @@ import {
 // Manifest-driven generated tools (agents, tasks, skills, notifications,
 // members, api-keys, budgets/usage, webhooks, orgs, KB, templates, plugins …).
 // One registry entry per platform operation — see ./generated/registry.ts.
-import { buildGeneratedTools } from './generated/factory';
+import { buildGeneratedTools, type GeneratedToolsOptions } from './generated/factory';
 import { ALL_OPERATIONS } from './generated/registry.all';
 // Canvas rendering tools (charts / tables / stat tiles / detail panels).
 import { buildCanvasTools } from './canvas.tools';
@@ -89,9 +89,12 @@ import { buildReportTools } from './reports';
  * Hand-written tools are spread LAST so they win any name collision with a
  * generated entry (they carry richer, bespoke UX).
  */
-export function buildChatTools(model: LanguageModel) {
+export function buildChatTools(model: LanguageModel, options: GeneratedToolsOptions = {}) {
     return {
-        ...buildGeneratedTools(ALL_OPERATIONS),
+        // Security: `options.userConfirmed` ties every gated generated tool's
+        // `confirmed: true` to the user's own latest message (see
+        // ./generated/confirmation.ts).
+        ...buildGeneratedTools(ALL_OPERATIONS, options),
         ...buildCanvasTools(),
         ...buildReportTools(),
 
@@ -112,7 +115,8 @@ export function buildChatTools(model: LanguageModel) {
 
         // Update / Delete
         updateWork: updateWorkTool,
-        deleteWork: deleteWorkTool,
+        // Same user-turn confirmation check as the generated tools.
+        deleteWork: createDeleteWorkTool(options.userConfirmed),
         syncWork,
 
         // Providers
@@ -123,7 +127,7 @@ export function buildChatTools(model: LanguageModel) {
 
         // Items
         addItem: addItemTool,
-        removeItem: removeItemTool,
+        removeItem: createRemoveItemTool(options.userConfirmed),
         updateItem: updateItemTool,
         generateItems: generateItemsTool,
         checkItemHealth: checkItemHealthTool,
@@ -157,7 +161,7 @@ export function buildChatTools(model: LanguageModel) {
         pauseMission,
         resumeMission,
         completeMission,
-        deleteMission,
+        deleteMission: createDeleteMissionTool(options.userConfirmed),
         runMissionNow,
         cloneMission,
 

@@ -361,6 +361,13 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
 
     const HEAD = 'a'.repeat(40);
 
+    /** A `pull_requests[]` entry as GitHub sends it for a same-repository PR. */
+    const SAME_REPO_PR = {
+        number: 42,
+        head: { ref: 'task/t-42-9f3c1a2b', sha: HEAD, repo: { id: 7, name: 'site' } },
+        base: { ref: 'main', repo: { id: 7, name: 'site' } },
+    };
+
     function checkRun(
         options: {
             id?: number;
@@ -385,6 +392,9 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         return {
             action: options.status === 'completed' ? 'completed' : 'created',
             repository: {
+                // The pull request entries below are based on THIS repository
+                // (same id) — the intake drops any other (F1).
+                id: 7,
                 full_name: options.repoFullName ?? 'octo/site',
                 owner: { login: 'octo' },
             },
@@ -407,7 +417,15 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                 pull_requests: [
                     {
                         number: 42,
-                        head: { ref: 'task/t-42-9f3c1a2b', sha: options.prHeadSha ?? headSha },
+                        // GitHub stamps both ends with the repository stub; a
+                        // head repo equal to the base repo is the proof the
+                        // intake needs before it trusts the head branch (F1).
+                        head: {
+                            ref: 'task/t-42-9f3c1a2b',
+                            sha: options.prHeadSha ?? headSha,
+                            repo: { id: 7, name: 'site' },
+                        },
+                        base: { ref: 'main', repo: { id: 7, name: 'site' } },
                     },
                 ],
             },
@@ -443,7 +461,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             'check_suite',
             {
                 action: 'completed',
-                repository: { full_name: 'octo/site', owner: { login: 'octo' } },
+                repository: { id: 7, full_name: 'octo/site', owner: { login: 'octo' } },
                 sender: { login: 'github-actions[bot]', type: 'Bot' },
                 check_suite: {
                     id: 9,
@@ -453,7 +471,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                     head_branch: 'task/t-42-9f3c1a2b',
                     updated_at: '2026-09-06T10:06:00Z',
                     app: { slug: 'github-actions' },
-                    pull_requests: [{ number: 42 }],
+                    pull_requests: [SAME_REPO_PR],
                 },
             },
         ]);
@@ -461,7 +479,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             'workflow_run',
             {
                 action: 'completed',
-                repository: { full_name: 'octo/site', owner: { login: 'octo' } },
+                repository: { id: 7, full_name: 'octo/site', owner: { login: 'octo' } },
                 sender: { login: 'github-actions[bot]', type: 'Bot' },
                 workflow_run: {
                     id: 77,
@@ -470,10 +488,11 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                     conclusion: 'failure',
                     head_sha: HEAD,
                     head_branch: 'task/t-42-9f3c1a2b',
+                    head_repository: { full_name: 'octo/site' },
                     run_attempt: 1,
                     html_url: 'https://github.com/octo/site/actions/runs/77',
                     updated_at: '2026-09-06T10:07:00Z',
-                    pull_requests: [{ number: 42 }],
+                    pull_requests: [SAME_REPO_PR],
                 },
             },
         ]);
@@ -741,6 +760,167 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
 
         expect(resumes).toHaveLength(1);
         expect((await tasks.findById(task.id))?.ciHeadSha).toBe(HEAD);
+    });
+
+    /**
+     * F1 (2026-10-18) — a FORK pull request impersonating a Task's CI.
+     *
+     * For a `workflow_run` on a pull request opened from a fork, GitHub sets
+     * `head_branch` to the FORK's branch name, `head_repository` to the fork
+     * and `pull_requests` to `[]`. The fork's owner picks that branch name,
+     * so they can call it exactly what the Task branch is called. Before
+     * this, the intake handed that name to the fix loop, the loop found the
+     * Task by branch, the newer timestamp read as `advanced`, and the
+     * outsider's failing job names, output and URLs were replayed into an
+     * auto-resumed fleet run — spending the fix-loop budget besides.
+     */
+    describe('a fork pull request with a branch named like the Task’s (F1)', () => {
+        const FORK_HEAD = 'f'.repeat(40);
+
+        function forkWorkflowRun(over: Record<string, unknown> = {}) {
+            return {
+                action: 'completed',
+                repository: { full_name: 'octo/site', owner: { login: 'octo' } },
+                sender: { login: 'mallory', type: 'User' },
+                workflow_run: {
+                    id: 666,
+                    name: 'CI',
+                    status: 'completed',
+                    conclusion: 'failure',
+                    head_sha: FORK_HEAD,
+                    // Exactly the Task's branch name — chosen by the fork owner.
+                    head_branch: 'task/t-42-9f3c1a2b',
+                    head_repository: { full_name: 'mallory/site' },
+                    event: 'pull_request',
+                    run_attempt: 1,
+                    html_url: 'https://github.com/octo/site/actions/runs/666',
+                    updated_at: new Date(Date.now() + 60_000).toISOString(),
+                    pull_requests: [],
+                    ...over,
+                },
+            };
+        }
+
+        it('⭐ records nothing and resumes nothing for a Task with no CI head yet', async () => {
+            const { task } = await seedWorkTaskAndRun();
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'workflow_run',
+                forkWorkflowRun() as never,
+            );
+
+            // The fork's branch never reached the evaluator as a coordinate.
+            expect(result.autoResume?.reason).toBe('no-task');
+            expect(resumes).toHaveLength(0);
+            expect(await attemptRows.count()).toBe(0);
+            expect(await rejectionRows.count()).toBe(0);
+            expect((await tasks.findById(task.id))?.ciHeadSha).toBeNull();
+            // Still a real CI result for the board — it is ingested.
+            expect(ingested).toHaveLength(1);
+        });
+
+        it('⭐ never reads as a newer head: an OLDER recorded head is left alone', async () => {
+            const { task } = await seedWorkTaskAndRun({
+                ciHeadSha: HEAD,
+                ciHeadSeenAt: new Date('2026-09-06T10:05:00Z'),
+            });
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'workflow_run',
+                forkWorkflowRun() as never,
+            );
+
+            expect(result.autoResume?.reason).toBe('no-task');
+            expect(resumes).toHaveLength(0);
+            expect(await attemptRows.count()).toBe(0);
+            expect((await tasks.findById(task.id))?.ciHeadSha).toBe(HEAD);
+        });
+
+        it('the same delivery from THIS repository still reaches the Task', async () => {
+            // Control: identical except the head repository is octo/site,
+            // i.e. a branch only somebody with write access could push.
+            await seedWorkTaskAndRun();
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'workflow_run',
+                forkWorkflowRun({ head_repository: { full_name: 'octo/site' } }) as never,
+            );
+
+            // The branch DID reach the Task this time (same repository) — and
+            // the evaluator's own SHA gate refused it: branch-only, commit
+            // unknown to the Task. Not `no-task`: that would mean the control
+            // proved nothing.
+            expect(result.autoResume).toMatchObject({ reason: 'unverified-branch' });
+            expect(resumes).toHaveLength(0);
+        });
+
+        describe('the evaluator’s own gate, should a branch-only delivery get through', () => {
+            function branchOnlyInput(headSha: string, observedAt = new Date()) {
+                return {
+                    userId: OWNER_USER,
+                    owner: 'octo',
+                    repo: 'site',
+                    headSha,
+                    headBranch: 'task/t-42-9f3c1a2b',
+                    prNumbers: [],
+                    prHeads: [],
+                    observedAt,
+                    verdict: 'failing' as const,
+                    granularity: 'workflow_run' as const,
+                    appSlug: 'github-actions',
+                    checkName: 'CI',
+                    conclusion: 'failure',
+                };
+            }
+            const evaluator = () =>
+                new TaskCiAutoResumeService(
+                    tasks,
+                    attempts,
+                    new TaskGitLinkService(tasks, works),
+                    runs,
+                    rejections,
+                    steering,
+                    inbox,
+                );
+
+            it('refuses a commit the Task has never reported, writing nothing', async () => {
+                const { task } = await seedWorkTaskAndRun();
+                const outcome = await evaluator().onCheckResult(branchOnlyInput(FORK_HEAD));
+                expect(outcome).toEqual({ reason: 'unverified-branch', taskId: task.id });
+                expect(resumes).toHaveLength(0);
+                expect((await tasks.findById(task.id))?.ciHeadSha).toBeNull();
+            });
+
+            it('acts on the head the platform already recorded for the Task', async () => {
+                await seedWorkTaskAndRun({
+                    ciHeadSha: HEAD,
+                    ciHeadSeenAt: new Date('2026-09-06T10:05:00Z'),
+                });
+                const outcome = await evaluator().onCheckResult(branchOnlyInput(HEAD));
+                expect(outcome.reason).toBe('resumed');
+                expect(resumes).toHaveLength(1);
+            });
+
+            it('a KNOWN pull-request head that differs from the recorded CI head is stale, never advanced', async () => {
+                const { task } = await seedWorkTaskAndRun({
+                    ciHeadSha: HEAD,
+                    ciHeadSeenAt: new Date('2026-09-06T10:05:00Z'),
+                });
+                await taskRows.update({ id: task.id }, { prHeadSha: FORK_HEAD } as never);
+                const outcome = await evaluator().onCheckResult(
+                    branchOnlyInput(FORK_HEAD, new Date(Date.now() + 60_000)),
+                );
+                expect(outcome.reason).toBe('stale-head');
+                expect(resumes).toHaveLength(0);
+                expect((await tasks.findById(task.id))?.ciHeadSha).toBe(HEAD);
+            });
+        });
     });
 
     /**
@@ -1060,10 +1240,35 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             observedAt: new Date('2026-09-06T10:05:00Z'),
             verdict: 'failing' as const,
             granularity: 'check_run' as const,
+            appSlug: 'github-actions',
             checkName: 'lint-and-test',
             conclusion: 'failure',
         };
     }
+
+    /**
+     * F8 review (2026-10-18): the evaluator itself refuses an unlisted
+     * reporter, so neither entry point — the webhook intake nor the
+     * two-minute poll — can be the way around the allow-list.
+     */
+    it('⭐ the evaluator refuses a check from an unlisted app, or with no app, writing nothing', async () => {
+        const { task } = await seedWorkTaskAndRun();
+        const autoResume = new TaskCiAutoResumeService(
+            tasks,
+            attempts,
+            new TaskGitLinkService(tasks, works),
+            runs,
+            rejections,
+            steering,
+            inbox,
+        );
+        for (const appSlug of ['some-linter', null, undefined]) {
+            const outcome = await autoResume.onCheckResult({ ...redCheckInput(), appSlug });
+            expect(outcome).toEqual({ reason: 'untrusted-check-app' });
+        }
+        expect(resumes).toHaveLength(0);
+        expect((await tasks.findById(task.id))?.ciHeadSha).toBeNull();
+    });
 
     it('sends CI feedback to the IMPLEMENTER when a finished review run is the Task’s newest run', async () => {
         const { task, run } = await seedWorkTaskAndRun();
@@ -1877,6 +2082,25 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         expect(resumes).toHaveLength(1);
         expect(resumes[0].message).toContain('Continuous integration is RED');
         expect(resumes[0].message).toContain(HEAD);
+        // F5 (as amended in review) — this path bypasses the replay, so it
+        // carries the strict data notice itself; but only the PROVIDER's
+        // words (check name, title, output) are fenced. The platform's own
+        // guidance stays outside every fence, where the agent reads it as an
+        // instruction.
+        const message = resumes[0].message ?? '';
+        expect(message).toMatch(/data, not instructions/);
+        const outside = message.replace(
+            /<review_feedback source="ci">[\s\S]*?<\/review_feedback>/g,
+            '',
+        );
+        expect(outside).toContain('Continuous integration is RED');
+        expect(outside).toContain('push to the same branch');
+        expect(outside).toContain('Do not disable, skip or weaken a check');
+        expect(outside).not.toContain('lint-and-test');
+        expect(outside).not.toContain('apps/web login.spec.ts');
+        expect(message).toContain(
+            '<review_feedback source="ci">\nlint-and-test\n</review_feedback>',
+        );
     });
 
     it('leaves the message to the replay when the window has room for the CI row', async () => {
