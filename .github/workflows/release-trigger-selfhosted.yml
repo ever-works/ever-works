@@ -22,6 +22,17 @@ on:
           - prod
           - staging
         default: prod
+      runner:
+        description: >-
+          Where to run. `self-hosted` (default) = the in-network ARC pool. `github-hosted` =
+          ubuntu-latest, for when cluster egress cannot reach Cloudflare (the daily ISP window):
+          after login the CLI deploys through the apiUrl the SERVER returns (https://trigger.ever.co),
+          so the in-cluster TRIGGER_SELFHOSTED_API_URL only gets an ARC runner past login.
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
+        default: self-hosted
   workflow_run:
     workflows: ["CI"]
     branches: [main, stage]
@@ -40,7 +51,7 @@ jobs:
       ${{ vars.TRIGGER_SELFHOSTED == 'true' &&
           (github.event_name == 'workflow_dispatch' ||
            github.event.workflow_run.conclusion == 'success') }}
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    runs-on: ${{ github.event.inputs.runner == 'github-hosted' && 'ubuntu-latest' || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     # Record the deployment under the matching GitHub environment for governance
     # parity with the legacy cloud workflows (prod/stage). These environments
     # currently carry no protection rules, so this does not add an approval gate;
@@ -110,7 +121,7 @@ jobs:
           verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
           verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
           force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
-          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' && github.event.inputs.runner != 'github-hosted' }}
 
       - name: Install dependencies
         if: steps.env.outputs.skip != 'true'
@@ -160,7 +171,10 @@ jobs:
           # Repo var override (2026-10-18): the in-cluster ARC runners use the in-cluster webapp
           # (http://trigger-webapp.trigger.svc.cluster.local:3030) because cluster egress cannot reach
           # Cloudflare 188.114.96.0/22 during the daily ISP window, so login against the public URL fails.
-          TRIGGER_API_URL: ${{ vars.TRIGGER_SELFHOSTED_API_URL || 'https://trigger.ever.co' }}
+          # ⚠️ That only fixes LOGIN: the deploy calls then use the apiUrl the server returns for the
+          # environment (trigger.dev CLI getProjectClient → projectEnv.apiUrl = https://trigger.ever.co),
+          # so during the window dispatch with `runner: github-hosted` instead (public URL below).
+          TRIGGER_API_URL: ${{ github.event.inputs.runner == 'github-hosted' && 'https://trigger.ever.co' || vars.TRIGGER_SELFHOSTED_API_URL || 'https://trigger.ever.co' }}
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
           # GHCR push token (evereq classic PAT, write:packages). The self-hosted
