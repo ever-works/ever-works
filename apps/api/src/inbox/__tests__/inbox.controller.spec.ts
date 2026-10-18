@@ -120,6 +120,69 @@ describe('InboxController', () => {
         });
     });
 
+    // Works-security (run-token scope) — a fleet-run token reads only the
+    // Inbox of the Organization it was minted for; before, a run in
+    // Organization A read the owner's whole Inbox across Organizations.
+    describe('fleet-run token Organization pin', () => {
+        const ORIGINAL = process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+        const apiKey = { userId: 'u1', authMethod: 'api-key' } as AuthenticatedUser;
+        const runReq = (organizationId: string | null) =>
+            ({
+                fleetRunCredential: { jobId: 'j1', nodeId: 'n1', runId: null, organizationId },
+            }) as never;
+        beforeEach(() => delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED);
+        afterAll(() => {
+            if (ORIGINAL === undefined) delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+            else process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = ORIGINAL;
+        });
+
+        it('narrows the list, the unread count and the single read to the pinned Organization', async () => {
+            await controller.list(apiKey, {}, runReq('org-a'));
+            expect(service.list).toHaveBeenCalledWith('u1', {
+                status: undefined,
+                limit: 50,
+                offset: 0,
+                organizationId: 'org-a',
+            });
+
+            await controller.unreadCount(apiKey, runReq('org-a'));
+            expect(service.unreadCount).toHaveBeenCalledWith('u1', { organizationId: 'org-a' });
+
+            await controller.getOne(apiKey, 'i1', runReq('org-a'));
+            expect(service.getForUser).toHaveBeenCalledWith('i1', 'u1', { organizationId: 'org-a' });
+        });
+
+        it('pins a personal-scope run token to items with no Organization', async () => {
+            await controller.list(apiKey, {}, runReq(null));
+            expect(service.list).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ organizationId: null }),
+            );
+        });
+
+        it('answers 404 for an item of another Organization (the service reads it as missing)', async () => {
+            service.getForUser.mockResolvedValue(null as never);
+            await expect(controller.getOne(apiKey, 'i1', runReq('org-a'))).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        });
+
+        it('leaves a session / personal key, and a switched-off pin, exactly as before', async () => {
+            await controller.unreadCount(auth, {} as never);
+            expect(service.unreadCount).toHaveBeenLastCalledWith('u1');
+            await controller.getOne(auth, 'i1', {} as never);
+            expect(service.getForUser).toHaveBeenLastCalledWith('i1', 'u1');
+
+            process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = 'false';
+            await controller.list(apiKey, {}, runReq('org-a'));
+            expect(service.list).toHaveBeenLastCalledWith('u1', {
+                status: undefined,
+                limit: 50,
+                offset: 0,
+            });
+        });
+    });
+
     describe('POST /api/inbox/:id/reply', () => {
         it('copies BOTH reply fields through to the service', async () => {
             await controller.reply(auth, 'i1', { text: 'Use Postgres', optionId: 'pg' });

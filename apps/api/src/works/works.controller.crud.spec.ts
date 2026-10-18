@@ -281,6 +281,52 @@ describe('WorksController — core CRUD endpoints', () => {
             );
         });
 
+        // Works-security (run-token scope) — a fleet-run token lists only the
+        // Works of the Organization it was minted for.
+        describe('fleet-run token Organization pin', () => {
+            const ORIGINAL = process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+            const runReq = (organizationId: string | null) =>
+                ({
+                    fleetRunCredential: {
+                        jobId: 'job-1',
+                        nodeId: 'node-1',
+                        runId: null,
+                        organizationId,
+                    },
+                }) as never;
+            afterEach(() => {
+                if (ORIGINAL === undefined) delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+                else process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = ORIGINAL;
+            });
+
+            it("narrows the list to the run token's Organization", async () => {
+                delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq('org-a'));
+                expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).toEqual(
+                    expect.objectContaining({ organizationId: 'org-a' }),
+                );
+            });
+
+            it('narrows a personal-scope run token to Works with no Organization', async () => {
+                delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
+                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq(null));
+                const options = s.workQueryService.getWorks.mock.calls.at(-1)?.[0];
+                expect(options).toHaveProperty('organizationId', null);
+            });
+
+            it('leaves a session / personal key, and a switched-off pin, unfiltered', async () => {
+                await controller.getWorks(auth, undefined, undefined, undefined, undefined, {} as never);
+                expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+                    'organizationId',
+                );
+                process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = 'false';
+                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq('org-a'));
+                expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).not.toHaveProperty(
+                    'organizationId',
+                );
+            });
+        });
+
         it('treats limit=0 as undefined (`0 && true === 0`, falsy short-circuit)', async () => {
             // The controller uses `parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined`,
             // so a parsed value of 0 short-circuits to undefined. This test pins
