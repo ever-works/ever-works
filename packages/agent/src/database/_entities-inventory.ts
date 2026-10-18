@@ -155,6 +155,7 @@ import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
 import { ComputerSession } from '../entities/computer-session.entity';
+import { FleetSession } from '../entities/fleet-session.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
 import { ModelPolicy } from '../entities/model-policy.entity';
@@ -435,6 +436,9 @@ export const ENTITIES = [
     FleetAudit,
     ComputerSession,
     NodeAgentProfile,
+    // Sessions on computers (FL-04) — persistent interactive processes on a
+    // Node, owned by its session daemon; one row per session.
+    FleetSession,
     // Model accounts (AW-16) — several credentials per AI provider, in
     // order, and the workspace / Agent / schedule model ladder.
     ModelAccount,

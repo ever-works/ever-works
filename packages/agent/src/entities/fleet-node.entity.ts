@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 import type {
     ComputerControlPolicy,
     FleetConsents,
+    FleetSessionDaemonReport,
     FleetControlPolicyFamiliesInput,
     FleetNodeKind,
     FleetNodeModelThrottleView,
@@ -629,6 +630,20 @@ export class FleetNode {
      */
     @Column({ type: 'boolean', default: false })
     previewProfileEnabled: boolean;
+
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1, §4.1) — the session
+     * daemon as the node last reported it in the heartbeat's `daemon` block:
+     * `{ state: running|stopped|failed, reason?, sessions, storage?, hooks? }`.
+     * NULL = never reported (a node without `--manage`/`--work`, or a daemon
+     * older than the field); the Sessions tab then reads only the `sessions`
+     * tag. Normalised on write (`normalizeFleetSessionDaemonReport`).
+     *
+     * `simple-json` in a `text` column like {@link consents}.
+     * Migration: `1796040000000-CreateFleetSessions`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    sessionDaemon?: FleetSessionDaemonReport | null;
 
     @CreateDateColumn()
     createdAt: Date;

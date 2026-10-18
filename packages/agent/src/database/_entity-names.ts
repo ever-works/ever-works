@@ -117,6 +117,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'FleetKillSwitch',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
     'FleetNode',
+    // Sessions on computers (FL-04) — persistent processes on a Node
+    'FleetSession',
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
