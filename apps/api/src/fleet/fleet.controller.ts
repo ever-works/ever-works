@@ -781,6 +781,8 @@ export class FleetController {
             maxMemoryMb: body.maxMemoryMb,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
+            // Sessions on computers (FL-04): the session daemon's health.
+            daemon: body.daemon,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

@@ -42,6 +42,7 @@ import {
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
     normalizeFleetNodeWorkerState,
+    normalizeFleetSessionDaemonReport,
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
@@ -235,6 +236,13 @@ export interface EnrollInput {
      * blanks it.
      */
     consents?: unknown;
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+     * health `{ state, reason?, sessions, storage?, hooks? }`. Untrusted off
+     * the wire: normalised (bounded reason, known keys only); absent leaves the
+     * stored report alone like every other telemetry field.
+     */
+    daemon?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -634,6 +642,9 @@ export class FleetService {
         applyReportedLimits(refresh, patch);
         // Fleet node link (FL-02): the consents, stored only when they changed.
         const consentChange = applyReportedConsents(node, refresh, patch);
+        // Sessions on computers (FL-04): the session daemon's health, as reported.
+        const daemonReport = normalizeFleetSessionDaemonReport(refresh.daemon);
+        if (daemonReport) patch.sessionDaemon = daemonReport;
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -1971,6 +1982,8 @@ export class FleetService {
             // `effectiveConsents`, never as "nothing allowed".
             consents: normalizeFleetConsents(node.consents),
             previewProfileEnabled: Boolean(node.previewProfileEnabled),
+            // Sessions on computers (FL-04). Null = never reported.
+            sessionDaemon: normalizeFleetSessionDaemonReport(node.sessionDaemon),
         };
     }
 }
