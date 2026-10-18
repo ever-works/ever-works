@@ -379,6 +379,9 @@ describe('Knowledge Base recording points', () => {
             source: 'imported' as never,
         });
         expect((await integration.getDocument(ORG_A, upload.id)).keyAuthored).toBe(false);
+        // A person's edit of the legacy document supersedes the key's content too.
+        await kb.updateOrgDocument(ORG_A, legacy.id, OWNER, { body: 'Reviewed by a person.' });
+        expect((await integration.getDocument(ORG_A, legacy.id)).keyAuthored).toBe(false);
     });
 
     it('an event leaves out a body above the event limit (bodyOmitted); the row keeps it', async () => {

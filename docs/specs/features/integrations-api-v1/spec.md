@@ -523,7 +523,7 @@ organization overlay into Works, locks, revisions and the activity trail therefo
   be accepting its own `proposed` create). It also never accepts **content the key wrote as itself**: every content
   write through this API stamps `metadata.lastContentWrite {principal: 'integration', integrationKeyId,
   integrationKind, actAsUserId, at}` on the document (any other content write — a person in the app, an agent —
-  clears it; a key-only create from before the marker, `source: imported` + `proposed`, counts too), and a `proposed`
+  supersedes it with `principal: 'app'`; a key-only create from before the marker, `source: imported` + `proposed`, counts too), and a `proposed`
   document whose current content has no person behind it answers `422 domain_rule`, `details.reason:
   key_authored_content`: a person accepts it in Ever Works, or the integration re-sends the content as the person's
   write. Proposals written by agents or fleet runs stay acceptable through a relay naming a person (Gauzy's review

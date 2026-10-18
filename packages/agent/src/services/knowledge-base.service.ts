@@ -35,6 +35,7 @@ import {
 import { rrfBlend } from './kb-rrf';
 import { hashNormalizedBody } from './kb-content-hash';
 import {
+    appContentWrite,
     KB_LAST_CONTENT_WRITE_KEY,
     type KbContentWrite,
 } from '../integrations-api/kb-content-provenance';
@@ -209,9 +210,9 @@ interface UpdateDocumentInput {
      * Works-security lane (integration API gates, finding 2) — who wrote this
      * content, set ONLY by the integration API (`kb-content-provenance.ts`).
      * Stored under `metadata.lastContentWrite` when the edit changes content
-     * (title, description, body, class); a content edit WITHOUT it clears the
-     * marker, so a person's edit in the app supersedes a key's. Never read
-     * from a request body.
+     * (title, description, body, class); a content edit WITHOUT it marks the
+     * content `principal: 'app'` (on a marked or `imported` document), so a
+     * person's edit in the app supersedes a key's. Never read from a request body.
      */
     contentWrite?: KbContentWrite;
 }
@@ -4293,18 +4294,26 @@ export class KnowledgeBaseService {
 
         // Works-security lane (integration API gates, finding 2) — the content
         // write marker follows every CONTENT edit: the integration API's own
-        // (stamped), anyone else's (cleared — their content supersedes it).
+        // (stamped as given), anyone else's (`principal: 'app'` — their content
+        // supersedes the key's). Written only where a marker can matter: a row
+        // that already has one, or an `imported` row (the pre-marker fallback
+        // reads those), so every other document's metadata is left as it was.
         const changesContent =
             input.title !== undefined ||
             input.description !== undefined ||
             input.body !== undefined ||
             input.class !== undefined;
         const existingMetadata = (patch.metadata ?? row.metadata ?? {}) as Record<string, unknown>;
-        if (changesContent && (input.contentWrite || KB_LAST_CONTENT_WRITE_KEY in existingMetadata)) {
-            const metadata = { ...existingMetadata };
-            if (input.contentWrite) metadata[KB_LAST_CONTENT_WRITE_KEY] = input.contentWrite;
-            else delete metadata[KB_LAST_CONTENT_WRITE_KEY];
-            patch.metadata = metadata;
+        if (
+            changesContent &&
+            (input.contentWrite ||
+                KB_LAST_CONTENT_WRITE_KEY in existingMetadata ||
+                row.source === KbDocumentSource.IMPORTED)
+        ) {
+            patch.metadata = {
+                ...existingMetadata,
+                [KB_LAST_CONTENT_WRITE_KEY]: input.contentWrite ?? appContentWrite(),
+            };
         }
 
         const revision = this.revisionPatch(row, {
