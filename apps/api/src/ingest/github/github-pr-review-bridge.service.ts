@@ -7,7 +7,7 @@ import {
     type IngestResult,
     type RecordIngestBindingData,
 } from '@ever-works/agent/ingest';
-import { PrReviewService } from '@ever-works/agent/pr-review';
+import { PrReviewService, isPrReviewComment } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
 import {
     TaskGitLinkService,
@@ -51,6 +51,20 @@ export const GITHUB_APP_BINDING_PLUGIN_ID = 'github-app';
 
 /** The mention token that routes a PR comment into the review loop. */
 export const EVER_WORKS_MENTION = '@ever-works';
+
+/**
+ * {@link EVER_WORKS_MENTION} as a standalone GitHub handle, case-insensitive:
+ * not inside a longer word (`ops@ever-works.example`) and not followed by `/`,
+ * `-` or a word character, so the `@ever-works/agent` package scope and other
+ * handles such as `@ever-works-bot` are not mentions. Review text quotes
+ * `@ever-works/*` packages all the time (#2774, 2026-10-18).
+ */
+const EVER_WORKS_MENTION_PATTERN = /(?<!\w)@ever-works(?![\w/-])/i;
+
+/** True when `text` mentions {@link EVER_WORKS_MENTION} as a handle. */
+export function mentionsEverWorks(text: string): boolean {
+    return EVER_WORKS_MENTION_PATTERN.test(text);
+}
 
 /** Payload text cap for envelopes built from webhook deliveries. */
 export const GITHUB_EVENT_TEXT_MAX_CHARS = 4000;
@@ -1505,7 +1519,18 @@ export class GitHubPrReviewBridgeService {
             if (comment.user?.type === 'Bot') {
                 return null;
             }
-            if (!text.toLowerCase().includes(EVER_WORKS_MENTION)) {
+            // The platform's OWN review comment. It is posted with the Work
+            // owner's user token, so it arrives as a `User` (often the OWNER)
+            // and the check above cannot see it; it is recognised by the
+            // marker the reviewer writes into it instead. Answering it was a
+            // self-reply loop: one paid review a minute on #2774 (2026-10-18).
+            if (isPrReviewComment(text)) {
+                this.logger.debug(
+                    `Ignored the platform's own review comment ${comment.id} on ${fullName}.`,
+                );
+                return null;
+            }
+            if (!mentionsEverWorks(text)) {
                 return null;
             }
             // A mention is an INSTRUCTION to the reviewer, so the same rule as
@@ -1627,8 +1652,14 @@ export class GitHubPrReviewBridgeService {
         }
     }
 
-    /** Strip `@ever-works` mention tokens (and stray whitespace) from the text. */
+    /**
+     * Strip `@ever-works` mention handles (and stray whitespace) from the
+     * text. Package names such as `@ever-works/agent` stay as written.
+     */
     private stripMention(text: string): string {
-        return text.replace(new RegExp(EVER_WORKS_MENTION, 'gi'), ' ').replace(/\s+/g, ' ').trim();
+        return text
+            .replace(new RegExp(EVER_WORKS_MENTION_PATTERN.source, 'gi'), ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 }
