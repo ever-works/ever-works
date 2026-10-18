@@ -5,6 +5,7 @@ import {
     IsBoolean,
     IsIn,
     IsInt,
+    IsObject,
     IsOptional,
     IsString,
     IsUUID,
@@ -15,6 +16,8 @@ import {
     ValidateIf,
 } from 'class-validator';
 import {
+    FLEET_ACTION_FAMILIES,
+    FLEET_AUDIENCES,
     FLEET_CREDENTIAL_MAX_LENGTH,
     FLEET_CREDENTIAL_MIN_LENGTH,
     FLEET_ENROLLABLE_NODE_KINDS,
@@ -41,6 +44,7 @@ import {
     FLEET_NODE_WORKER_STATES,
 } from '@ever-works/contracts';
 import type {
+    FleetControlPolicyFamiliesInput,
     FleetEnrollableNodeKind,
     FleetExecutionMode,
     FleetExecutionScopeType,
@@ -49,6 +53,7 @@ import {
     MaxConfiguredCapabilityTagLength,
     MaxConfiguredCapabilityTags,
 } from './fleet-capability.validators';
+import { IsFleetControlPolicyFamilies } from './fleet-access.validators';
 
 /**
  * Every bound below comes from the SHARED fleet contract
@@ -92,6 +97,15 @@ export class CreateFleetEnrollmentTokenDto {
     @IsIn(ENROLLABLE_KINDS)
     kind: FleetEnrollableNodeKind;
 }
+
+/**
+ * `GET /api/fleet/nodes?scope=` (Fleet hub). Absent or `own` is the
+ * owner-only list every existing caller reads; `visible` adds computers
+ * shared with the caller through an Organization. Read as one named query
+ * value (not a whitelisted DTO), so the route still ignores any other query
+ * parameter exactly as it did.
+ */
+export const FLEET_NODE_LIST_SCOPES = ['own', 'visible'] as const;
 
 /** Request body for `PATCH /api/fleet/nodes/:id` (partial update). */
 export class UpdateFleetNodeDto {
@@ -168,6 +182,36 @@ export class UpdateFleetNodeDto {
     @Min(1)
     @Max(FLEET_MAX_DAILY_COST_CEILING_CENTS)
     dailyCostCeilingCents?: number | null;
+
+    /**
+     * Fleet hub (FL-01) — the owner's star. Owner only: anyone else who may
+     * see the node is refused with `permission_denied`.
+     */
+    @ApiProperty({
+        required: false,
+        description:
+            'Fleet hub — star (true) or unstar (false) the computer; favourites sort first. Owner only.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    isFavorite?: boolean;
+
+    /**
+     * Fleet hub (FL-01) — a PARTIAL map from action family to audience
+     * (CONTRACTS §2.1). Families named change; the rest keep theirs. Writing
+     * `desktop` also writes the legacy `controlPolicy` (its mirror). Owner
+     * only; audited as `node.policy.change`, one row per family changed.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        additionalProperties: { type: 'string', enum: [...FLEET_AUDIENCES] },
+        description: `Fleet hub — who may act in each action family on this computer, e.g. { "sessions": "org-admins" }. Families: ${FLEET_ACTION_FAMILIES.join(', ')}. Audiences: ${FLEET_AUDIENCES.join(', ')}. Families not named keep their audience. Owner only.`,
+    })
+    @IsOptional()
+    @IsObject()
+    @IsFleetControlPolicyFamilies()
+    controlPolicyFamilies?: FleetControlPolicyFamiliesInput;
 }
 
 /**

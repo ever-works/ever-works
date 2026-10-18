@@ -40,14 +40,14 @@
   **Test**: `fleet-status.controller.spec.ts` — one call, all four parts; cross-user isolation.
 - [ ] **T-07**. Add `GET /api/fleet/tools/gate?agentId=` (`apps/api/src/fleet/fleet-tools-gate.controller.ts`) returning per-family read/act/refusedBy/fixRoute.
   **Test**: controller spec — matrix for one Agent across two nodes.
-- [ ] **T-08**. Add `apps/api/src/fleet/fleet-confirmation.interceptor.ts` — reads the catalogue class for the route, validates `confirm` / `confirmName` / `acknowledgeBlastRadius`, computes and echoes `summaryHash`; apply to every family controller as they land.
-  **Test**: `fleet-confirmation.interceptor.spec.ts` — three classes; stale summary refused; web `confirmationToken` still accepted.
+- [ ] **T-08**. Add `apps/api/src/fleet/fleet-confirmation.interceptor.ts` — reads the catalogue class for the route, validates `confirm` / `confirmName` / `acknowledgeBlastRadius`, and answers 409 `confirmation_required` with `details: { class, summary, preview?, sentence? }` when the field is missing (CONTRACTS §2.2 — the web, tools, MCP and CLI all use these fields; nothing is stored between the calls); apply to every family controller as they land.
+  **Test**: `fleet-confirmation.interceptor.spec.ts` — three classes; the preview shape; a confirming call against a changed target answers that target's own error; an unknown token-style field is ignored and still answers 409.
 
 ## P1.D — CLI group (reads)
 
 - [ ] **T-09**. Add `apps/cli/src/commands/fleet/index.ts`, `fleet-output.ts`, `fleet-exit.ts`, `fleet-confirm.ts`, `fleet-client.ts`; register in `apps/cli/src/main.ts:22-26`; add `handleFleetCliError` to `apps/cli/src/utils/error.ts` without changing `handleCliError`.
   **Test**: `apps/cli/src/commands/fleet/__tests__/index.spec.ts` — envelope; exit map `0/1/2/124`; `--yes` / `--confirm-name`; non-TTY without `--yes` exits 2.
-- [ ] **T-10**. Add read verbs: `status.ts`, `nodes.ts` (list/get/health/needs-a-look), `logs.ts`, `services.ts` (list), `docker.ts` (list), `processes.ts` (list), `ports.ts` (list), `files.ts` (list/stat/read), `command.ts` (list/get, FL-12 owns `run`), `schedule.ts` (list/get/runs), `checkout.ts` (list/get), `usage.ts`, `operation.ts` (get/list).
+- [ ] **T-10**. Add read verbs (plural groups with singular aliases, plan §9.3): `status.ts`, `nodes.ts` (list/get/health/needs-a-look/git-identity), `session.ts` (list/read/question), `desktop.ts` (screenshot/displays/recordings), `logs.ts`, `services.ts` (list), `processes.ts` (list), `docker.ts` (containers/images/compose list/describe), `ports.ts` (list), `files.ts` (list/stat/get), `command.ts` (list/get, FL-12 owns `run`), `schedule.ts` (list/get/runs), `checkout.ts` (list/get/changes), `usage.ts`, `operation.ts` (get/list).
   **Test**: one spec per file under `__tests__/` against a mocked HTTP client — human table and `--json` shape equal the contract views.
 
 ## P1.E — MCP (reads) and web
@@ -59,13 +59,13 @@
 
 ## P2 — Acts, Decisions, sessions, attach
 
-- [ ] **T-13**. Enable state-changing rows in the factory (T-04) with Decision creation at Ask/Draft through AW-03's proposal service (`packages/agent/src/entities/agent-action-proposal.entity.ts` action type `fleet_action`, no migration — `actionType` is `varchar(32)` without a check constraint).
-  **Test**: `fleet-tool-factory.spec.ts` — `held` reply with `decisionId`; approval executes once; expiry after 24 h.
-- [ ] **T-14**. Add `fleet_sessions_question` and `fleet_sessions_answer` invokers over FL-04 `GET /sessions/:id` and `POST /sessions/:id/answer`; audit `node.session.answer` with `requestedBy: agent:<id>`.
-  **Test**: `fleet-tool-gate.spec.ts` — refused without the grant; audited when allowed.
+- [ ] **T-13**. Enable state-changing rows in the factory (T-04) with Decision creation at Ask/Draft through AW-03's proposal service (`packages/agent/src/entities/agent-action-proposal.entity.ts`, `actionType: 'fleet_machine_action'` — FL-09's value, CONTRACTS R-33; no migration — `actionType` is a varchar without a check constraint; add the value to `AgentActionProposalActionType`). Approval re-runs the call with the class field set; an approval more than 24 h after the row was raised answers `confirmation_required` with a fresh summary (spec U12 default).
+  **Test**: `fleet-tool-factory.spec.ts` — `held` reply with `decisionId`; approval executes once; a stale approval runs nothing.
+- [ ] **T-14**. Add `fleet_sessions_question` and `fleet_sessions_answer` invokers over FL-04 `GET /sessions/:id` and `POST /sessions/:id/answer` (FL-05's tool rows); questions only, and another session's question only with FL-05's "may answer other sessions" setting (CONTRACTS R-32); audit `node.session.answer` with `requestedBy: agent:<id>`.
+  **Test**: `fleet-tool-gate.spec.ts` — refused without the grant; refused without the setting; every permission prompt refused; audited when allowed.
 - [ ] **T-15**. Add `apps/web/src/components/approvals/FleetActionDecisionCard.tsx`; mount in `apps/web/src/components/approvals/ApprovalsQueue.tsx` and in the Agent conversation renderer; i18n `fleet.tools.decision.*`.
   **Test**: `FleetActionDecisionCard.unit.spec.tsx`; Playwright `apps/web/e2e/flow-fleet-agent-tools-decision.spec.ts`.
-- [ ] **T-16**. CLI act verbs across the family files (`services action`, `docker …`, `processes signal`, `ports open|preview`, `files write|copy|delete`, `schedule create|…` (FL-13 owns), `checkout create|sync|delete`, `sessions start|send|answer|rename|end`, `operation cancel`), all through `fleet-confirm.ts`.
+- [ ] **T-16**. CLI act verbs across the family files (`services action`, `processes signal`, `docker …`, `ports open|preview|preview-close`, `files put|cp|rm`, `desktop input|paste`, `schedules create|…` (FL-13 owns), `checkouts create|sync|archive|delete`, `sessions start|send|answer|rename|end|action`, `nodes wake|git-identity --set`, `operations cancel`), all through `fleet-confirm.ts` (`--yes` → `confirm: true`, `--confirm-name` → `confirmName`).
   **Test**: per-file specs — `confirmation_required` → exit 2 without `--yes`; destructive needs `--confirm-name`.
 - [ ] **T-17**. Add `apps/cli/src/commands/fleet/session-attach.ts` — attach token, `ws` client, raw TTY, status bar, `Ctrl-]` detach, `--drive`.
   **Test**: `__tests__/session-attach.spec.ts` with a fake WS server — frames rendered; detach leaves the session; `--drive` requests `driver`.
@@ -76,7 +76,7 @@
 
 ## P3 — Machines, runners, docs, completion
 
-- [ ] **T-20**. Add catalogue rows and CLI files for FL-16 (`vm.ts`), FL-17 (`cloud.ts`, price shown before create), FL-18 (`runner.ts`) as those epics land; MCP parity.
+- [ ] **T-20**. Add catalogue rows and CLI files for FL-16 (`virtual.ts`), FL-17 (`cloud.ts`, price shown before create), FL-18 (`runners.ts`) as those epics land — the names those epics' plans use; MCP parity.
   **Test**: catalogue and whitelist parity specs.
 - [ ] **T-21**. Shell completion `ever-works completion <shell>` for the `fleet` group in `apps/cli/src/commands/fleet/completion.ts`.
   **Test**: snapshot spec.
@@ -84,8 +84,11 @@
 ## Docs and rollout
 
 - [ ] **T-22**. Agent-facing doc `docs/features/fleet-agent-tools.md` — how an Agent, an MCP client and the CLI reach the fleet; the gate; the two-step confirm; `wait:false`; "tools never carry a credential". Add to `apps/docs/sidebarsPlatform.ts` under fleet (`:183`); link from `docs/features/mcp-server.md` and `docs/features/fleet.md`.
+  **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
 - [ ] **T-23**. Update `docs/specs/features/fleet/TRACKER.md`.
+  **Test**: the FL-19 TRACKER row is current.
 - [ ] **T-24**. `pnpm format && pnpm lint && pnpm test && pnpm build`; docs build clean; banned-terms grep on this folder prints nothing.
+  **Test**: every command exits 0 and the grep prints nothing.
 
 ## Definition of done
 

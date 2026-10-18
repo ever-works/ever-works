@@ -276,6 +276,27 @@ export const ROUTES = {
     DASHBOARD_TEAM: (id: string) => `/teams/${id}`,
     DASHBOARD_TEAM_SETTINGS: (id: string) => `/teams/${id}/settings`,
     DASHBOARD_ORG_CHART: '/teams/org-chart',
+    // Fleet hub (FL-01, CONTRACTS §11.1) — the sidebar entry below Teams and
+    // the computers it opens, behind `FLEET_ENABLED` + `FLEET_HUB_ENABLED`.
+    // Six hub tabs, each a route; FL-01 creates every one of them (and the
+    // constants below), and the epic that owns a tab fills it through the
+    // module registry (`components/fleet/registry.ts`).
+    DASHBOARD_FLEET: '/fleet',
+    DASHBOARD_FLEET_COMPUTERS: '/fleet/computers',
+    // One computer; `tab` is one of the twelve computer-page tabs and is
+    // omitted for the default (Overview), so a plain link stays canonical.
+    DASHBOARD_FLEET_COMPUTER: (id: string, tab?: string) =>
+        tab && tab !== 'overview'
+            ? `/fleet/computers/${encodeURIComponent(id)}?tab=${encodeURIComponent(tab)}`
+            : `/fleet/computers/${encodeURIComponent(id)}`,
+    DASHBOARD_FLEET_SESSIONS: '/fleet/sessions',
+    DASHBOARD_FLEET_SESSION: (id: string) => `/fleet/sessions/${encodeURIComponent(id)}`,
+    DASHBOARD_FLEET_CHECKOUTS: '/fleet/checkouts',
+    DASHBOARD_FLEET_COMMANDS: '/fleet/commands',
+    DASHBOARD_FLEET_USAGE: '/fleet/usage',
+    // Activity → Sessions (FL-05) — the owner's board of every session, next
+    // to Runs; a `?view=` of the existing Activity page.
+    DASHBOARD_ACTIVITY_SESSIONS: '/activity?view=sessions',
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',

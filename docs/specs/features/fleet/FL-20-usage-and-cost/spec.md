@@ -9,7 +9,7 @@
 **Status:** `Draft`
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
-**Size:** M · **Blocked by:** FL-04 (sessions carry a provider session id) · **Related:** FL-01 (hub Usage tab), FL-05 (session card cost chip), FL-13 (scheduled Agent sessions), FL-14 (checkouts as folders), FL-19 (`fleet_usage_get`), AW-17 (price list, meters), AW-09 (Run receipts)
+**Size:** M · **Blocked by:** FL-04 (sessions carry a provider session id), FL-01 (P2 only — the Usage tab route and registry) · **Related:** FL-05 (session card cost chip), FL-13 (scheduled Agent sessions), FL-14 (checkouts as folders), FL-19 (`fleet_usage_get`), AW-17 (price list, meters), AW-09 (Run receipts)
 **Extends (existing Ever Works nouns):** Run (`costCents`) · Session · Node (UI: "Computer") · Budget · Usage · Checkout · Agent
 
 ---
@@ -85,7 +85,7 @@ charge but is not one is the kind of honesty bug this product refuses.
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "What did that fleet Run cost?"                  | Headless Task runs report tokens and a cost the CLI itself printed (`packages/contracts/src/fleet/fleet-jobs.types.ts:1021-1054` — `inputTokens`, `outputTokens`, `totalTokens`, `costCents`, `sessionId`). | Only `-p` runs report; a persistent Agent session (FL-04) has no end-of-run summary; an owner session has no Run at all.                                                                                                                 |
 | "Price it like the platform prices its own calls." | The credit price list prices `capability.operation` keys (`packages/agent/src/usage/credit-price-list.ts:16-27`); the model catalog carries per-1k input/output prices from external catalogs (`packages/agent/src/facades/model-catalog.ts:27-38`); plugins carry per-1k prices in their manifests (`docs/features/budgets-and-usage.md:104`). | None of these is a per-model, per-token-class (input, output, cache read, cache write) list for the Claude Code and Codex model families; none is versioned for re-pricing.                                                              |
-| "Show it on the session."                        | The Run's `costCents` (`packages/agent/src/entities/agent-run.entity.ts:394`) and the per-call ledger (`plugin-usage-event.entity.ts:114-120`) are platform-side.                       | Nothing writes either for work the machine's own sign-in paid for; Budgets aggregate the ledger by Agent (`agent-budget.entity.ts:28-30`) and therefore cannot see fleet spend.                                                           |
+| "Show it on the session."                        | The Run's `costCents` (`packages/agent/src/entities/agent-run.entity.ts:394`) and the per-call ledger (`plugin-usage-event.entity.ts:114-120`). A finished headless fleet Task run already writes one non-debiting ledger row (`pluginId: fleet-node:<provider>`, tagged with the Agent and Run) and stamps `costCents` from the CLI's own price (`apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:1028-1100`; `packages/contracts/src/fleet/fleet-jobs.types.ts:1323-1332`), so Budgets (`agent-budget.entity.ts:28-30`) see that spend. | Only when the CLI printed a price: a Codex run (tokens, no price) stays unpriced; a persistent Agent session (FL-04) and an owner session write nothing, so Budgets cannot see them.                                    |
 | "Which machine, which folder?"                   | Nothing.                                                                                                                                                                              | The platform knows the Session's checkout (FL-04/14) but has no usage to join to it.                                                                                                                                                      |
 
 ### 2.3 Why this epic is additive only
@@ -158,8 +158,9 @@ share of it.
   later-created Session (a late sync) can claim them on the next roll-up.
 - **U8 — Price list changes.** Existing figures keep their version and are not re-priced silently;
   the tab says _"priced at model list prices v3; v4 in effect since 12 Oct"_.
-- **U9 — Kill switch.** Scans are read-only and keep running? No: nodes lease no work while the
-  switch is on, so scans pause; stored numbers stay visible with their scan age.
+- **U9 — Kill switch.** Nodes lease no jobs while the switch is on (EXISTING-SUBSTRATE §2.7), so
+  `usage-scan` jobs pause even though they are read-only; stored numbers stay visible with their
+  scan age, and a manual rescan answers `kill_switch`.
 - **U10 — Permission.** Organization members outside the computer's `view` audience see no
   numbers for it; the hub totals exclude what the viewer may not see and say so.
 - **U11 — Huge backlog.** A first scan over a year of records reports in bounded batches across
@@ -172,7 +173,8 @@ share of it.
 
 ### 4.1 Consent and scope (P1)
 
-- **FR-1** The scan MUST run only on a computer whose owner switched it on locally, and MUST be
+- **FR-1** The scan MUST run only on a computer whose owner switched it on locally (`--usage-scan`,
+  reported as `consents.usageScan` and the `usage-scan` tag — CONTRACTS §1.1, §1.2), and MUST be
   switchable off locally; the platform MUST show the state and MUST never switch it on remotely.
 - **FR-2** The scan MUST read only Claude Code and Codex transcript records under the machine
   owner's CLI homes and under the node's own isolated session homes, and MUST extract only: model,
@@ -238,7 +240,9 @@ share of it.
 ### 5.1 Hub › Usage — loaded
 
 Shown in §0. Period segmented control; totals line; the FR-9 sentence directly beneath it; two
-cards (by model, by computer); busiest checkouts; sessions breakdown. Clicking a computer filters
+cards (by model, by computer); busiest checkouts; sessions breakdown. FL-17 mounts its **Cloud
+computers** block (FL-17 FR-23) below them; its money is provider list price for machines, kept
+separate from this model-work total. Clicking a computer filters
 the tab to it; clicking a model filters by model; clicking a checkout opens it (FL-14).
 
 ### 5.2 States
@@ -297,10 +301,10 @@ filtered to it. Agent page (Budgets tab): a row per computer with the period's c
 | --------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
 | **Session** (`FleetSession`)| FL-04     | Gains tokens by class and model, a list-price cost and the price-list version.                                    |
 | **Run**                     | Existing  | `costCents` filled for fleet Runs from the Session.                                                               |
-| **Usage sample**            | **NEW** (P2; see §8b) | One computer's tokens for one model on one day, split by attribution (session / other) and folder bucket. |
+| **Usage sample**            | **NEW** (P2; CONTRACTS §4.10) | One computer's tokens for one model in one hour, attributed to a Session or to **other**, with the checkout it ran in (none for other folders). |
 | **Model list price**        | **NEW**   | A published, versioned per-model table of list rates for four token classes; read-only in the product.           |
 | **Budget**                  | Existing  | Includes attributed fleet cost for the Agent's Runs, labelled as list price.                                      |
-| **Node / Computer**         | Existing  | Carries the scan opt-in state and last-scan time.                                                                 |
+| **Node / Computer**         | Existing  | Shows the scan opt-in (`consents.usageScan`, CONTRACTS §1.1) and the last-scan time (its newest scan job); no new column. |
 
 ---
 
@@ -311,27 +315,16 @@ filtered to it. Agent page (Budgets tab): a row per computer with the period's c
 - Other CLIs' records (only Claude Code and Codex in this epic).
 - Charging or debiting credits for fleet work; this is attribution and honesty, never billing.
 - Re-pricing history when the list changes (figures keep their version).
+- A preview-tunnel block on the Usage tab — open tunnels are listed and closed on the Ports tab and
+  through the tools (FL-10 FR-27); the Usage tab carries model work and FL-17's cloud block only.
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — R-13 says list prices come from "the existing model
-  price list (AW-17)", but AW-17's credit price list is keyed by capability.operation, not by
-  model and token class. Proposed: a new published, versioned per-model list-price table read
-  through its own port, with the model catalog's per-1k input/output rates as a fallback and
-  tokens-only beyond that. Confirm, or point at a list this spec has not found.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — the Usage tab (P2) needs per-computer, per-model,
-  per-day rows including "other" sessions; CONTRACTS §4 defines no usage table and §13 reserves
-  only slot 1796200000000 for Session columns. Proposed: `fleet_usage_samples` under a new slot
-  1796200100000. Without it P2 cannot ship.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — the per-node opt-in needs a platform-visible signal.
-  CONTRACTS §1.1 fixes consents to work/attend/manage and §1.2 lists no usage tag. Proposed:
-  capability tag `usage-scan` advertised when `--usage-scan` is on, required by the `usage-scan` job.]`
-- `[NEEDS CLARIFICATION: Budgets aggregate the per-call ledger; including fleet cost means either
-  writing ledger rows with a non-debiting payer (an AW-17 meter/payer addition) or a second
-  aggregation source in the budget guard. Which?]`
-- `[NEEDS CLARIFICATION: Should "other" sessions be visible to Organization members in the `view`
-  audience, or only to the machine owner? Default here: owner only; members see the total as "not
-  shown".]`
+- **Resolved** by CONTRACTS R-30 and R-13: per-model list prices come from a new versioned port `MODEL_LIST_PRICES` (model × token class → price) owned by this epic; AW-17's `capability.operation` price list stays as it is; unknown models are counted in tokens only, never as $0. The model catalog's per-1k input/output rates remain this epic's fallback for input/output only (plan §3).
+- **Resolved** by CONTRACTS §4.10 and §13: `fleet_usage_samples` (hourly `bucketStart`) under slot `1796200100000-CreateFleetUsageSamples`; P2 is not blocked.
+- **Resolved** by CONTRACTS §1.1 and §1.2: the opt-in is the `usageScan` consent (`--usage-scan`, reported in every heartbeat) and the `usage-scan` capability tag the `usage-scan` job requires; R-34's management lane leases the job.
+- **Resolved** by existing code (no CONTRACTS change): Budgets include fleet cost the way headless fleet Task runs already do — one non-debiting `plugin_usage_events` row per attributed Run through `PluginUsageService.record` with `pluginId: fleet-node:<provider>` and the Agent, Run and Task tags (`apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:1028-1100`), which the Agent budget aggregator already sums. Where a headless run already wrote a row for the same provider session, the scan writes only the difference (plan §10), so nothing is counted twice and no credit is ever debited (FR-15).
+- `[NEEDS CLARIFICATION: Should "other" sessions (not started from Ever Works) be visible to Organization members in the computer's view audience, or only to the machine owner? Default until answered: owner only; members see that total as "not shown" (FR-17).]`
 
 ---
 
@@ -364,7 +357,7 @@ filtered to it. Agent page (Budgets tab): a row per computer with the period's c
 - [x] **II — Capability-driven.** No provider id hard-coded; the price table is read through a port.
 - [x] **III — Source-of-truth repos.** Counts are metadata.
 - [x] **IV — Job runtime.** The scan dispatcher is a job-runtime cron task; `usage-scan` is a leased node job (CONTRACTS §12).
-- [x] **V — Forward-only migrations.** Slot `1796200000000` for Session columns; P2 table flagged in §8b.
+- [x] **V — Forward-only migrations.** Slot `1796200000000-AddFleetSessionUsage` for the Session's `costCents` and `tokens` (CONTRACTS §4.2) and slot `1796200100000-CreateFleetUsageSamples` for the P2 table (CONTRACTS §4.10, §13).
 - [x] **VI — Tests.** Fixture-driven scanner tests, attribution and pricing specs, Playwright for the tab.
 - [x] **VII — Secrets.** No credential, prompt or output leaves the machine; only counts and ids.
 - [x] **VIII — Plugin counts.** Not applicable.
@@ -375,7 +368,7 @@ filtered to it. Agent page (Budgets tab): a row per computer with the period's c
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) D6, D8, rule 9 ("what did it cost?") · [CONTRACTS](../CONTRACTS.md) R-1, R-13, R-22; §4.2; §8; §9 `FLEET_USAGE_SCAN_ENABLED`; §11.1 `/fleet/usage`; §11.2 `/usage`; §12 `usage-scan`; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) G
+- Program: [Fleet README](../README.md) D6, D8, rule 9 ("what did it cost?") · [CONTRACTS](../CONTRACTS.md) R-1, R-13, R-22, R-30, R-34, R-38; §1.1 `usageScan`; §1.2 `usage-scan`; §4.2; §4.10; §8; §9 `FLEET_USAGE_SCAN_ENABLED`; §11.1 `/fleet/usage`; §11.2 `/usage`; §12 `usage-scan`; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) G
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Related: [AW-17 Costs, caps and credits](../../agent-workspace/AW-17-costs-caps/spec.md) §4.2–4.3, §6.8, [AW-09 Runs & receipts](../../agent-workspace/AW-09-runs-receipts/spec.md), [FL-04](../FL-04-sessions-on-computers/), [FL-05](../FL-05-session-status-board/), [FL-13](../FL-13-schedules-on-computers/spec.md), [FL-19](../FL-19-agent-mcp-cli/spec.md)
 - User docs: `docs/features/budgets-and-usage.md`

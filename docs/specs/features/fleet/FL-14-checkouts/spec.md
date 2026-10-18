@@ -102,7 +102,7 @@ And right after:
 | "Fetch / pull / push from the dashboard."                         | Nothing.                                                                                                                             | The only git the platform can make a node do is the commit-and-push at the end of a Task run (`apps/node/src/core/executors/agent-task.ts:1048-1060`).                                                                                                                                                                                                                             |
 | "Delete that worktree, but not if I'd lose work."                 | `ever-works-node gc` on the machine, or `rm -rf` and hope.                                                                           | The reaper is fail-closed and age-based (`workspace-reaper.ts:36-56`); there is no person-initiated delete with a changes-check and a bin.                                                                                                                                                                                                                                       |
 | "Which repository Work does this clone belong to?"                | Know it.                                                                                                                             | A Work knows its source repository and GitHub App installation (`packages/agent/src/entities/work.entity.ts:399`, `:988-998`), and the installation snapshot knows every repository's `owner/repo` (`packages/agent/src/entities/github-app-installation-repository.entity.ts:10-30`), but nothing links a folder on a machine to either.                                              |
-| "Let my Agent fetch or browse it."                                | Nothing.                                                                                                                             | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:32-56`); the MCP whitelist exposes reads, affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`); `apps/cli/src/commands/` has `auth`, `kb`, `plugins`, `work` and no `fleet`. The node's file access is confined to Task worktrees (`docs/features/fleet.md:490`). |
+| "Let my Agent fetch or browse it."                                | Nothing.                                                                                                                             | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:32-56`); the MCP whitelist exposes reads, affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`); `apps/cli/src/commands/` has `auth`, `kb`, `plugins`, `work` and no `fleet`. The node's file access is confined to Task worktrees and the per-Agent `files/` dir (EXISTING-SUBSTRATE §1.14). |
 
 ### 2.3 The gaps this epic closes
 
@@ -226,7 +226,7 @@ tab says when the reaper would remove one.
   build-01 can manage checkouts"_; the server refuses the same act with `permission_denied` and
   the policy named.
 - **U5 — Limit exceeded.** A scan stops at 300 discovered checkouts per Node and the tab says
-  _"300 of more — narrow the code folders on build-01"_; create refuses with `limit_exceeded`
+  _"300 or more — narrow the code folders on build-01"_; create refuses with `limit_exceeded`
   while the Node is at the cap.
 - **U6 — Link drops mid-clone.** The node keeps cloning; when the link returns, the operation
   resumes reporting and the row settles to `ready` or `missing`; a clone that cannot be verified
@@ -319,13 +319,19 @@ tab says when the reaper would remove one.
 - **FR-23** On a `discovered` checkout, fetch, pull and push MUST run with the machine's own git
   configuration and login, exactly as the owner's terminal would.
 - **FR-24** Delete MUST compute, on the node, uncommitted files and commits unreachable from any
-  remote; when both are zero it MUST ask a plain confirmation, otherwise it MUST require typing
-  the checkout's name and MUST state the counts.
+  remote; when both are zero it MUST ask one `confirm` dialog, otherwise it MUST be
+  `confirm-destructive` — typing the checkout's name — and MUST state the counts.
 - **FR-25** Delete of a worktree MUST remove the folder and its registration and MUST keep the
   branch; delete of a clone MUST remove the folder; a `discovered` checkout MUST only be forgotten
   (row removed, folder untouched).
 - **FR-26** A deleted checkout MUST appear in the bin as "folder removed" and MUST NOT offer
   Restore.
+- **FR-26a** Session **Clean up** (FL-06) MUST be this delete with one extra gate — the checkout is
+  a worktree, its pull request is merged or closed, and no session runs in it — applied before the
+  changes-check when the caller asks for it; FL-06 owns the rule, this epic exposes the gate and
+  keeps the branch exactly as FR-25 says.
+- **FR-26b** The checkout list MUST, on request, also report the remote's branch names, so FL-06's
+  and this epic's branch-uniqueness rule (FR-19) can see branches that exist only on the remote.
 - **FR-27** Every Checkout path in `ready` MUST be an allowed file root for FL-11 on that Node;
   an `archived` or `missing` path MUST NOT be.
 - **FR-28** Every state-changing action MUST write one Fleet audit row naming the family
@@ -388,7 +394,7 @@ fix-login to confirm."_
 
 ### 5.5 Activity view and Agent page
 
-No new Activity view; checkout actions appear in the Activity log as sentences (_"Dana created a
+No new Activity view; checkout actions appear in the Activity log as sentences (_"You created a
 worktree of acme/api on build-01"_ pattern, names from the account). The Agent page is
 unchanged; sessions show their checkout through FL-06's git line.
 
@@ -440,19 +446,23 @@ unchanged; sessions show their checkout through FL-06's git line.
 ## 8b. Open questions
 
 - `[NEEDS CLARIFICATION: Should fetch/pull/push on a discovered checkout be allowed to use the
-machine's own credential helper (this spec: yes, because it is the owner's clone, D14), or must
-every platform-initiated git network action use a platform-minted credential?]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — the machine family vocabulary (§3.3) lists
-`checkouts.list|create|delete|sync`; FL-06 needs `checkouts.changes` (uncommitted diff) and
-FL-15 needs `git.identity|git.setIdentity`. This epic uses `checkouts.list { rescan, refresh,
-checkoutIds }` for scan and git-line refresh so it needs no new message itself.]`
+machine's own credential helper, or must every platform-initiated git network action use a
+platform-minted credential? Default until answered: yes — a discovered checkout is the owner's
+clone (D14), so FR-23 runs with the machine's own git configuration; platform-created checkouts
+never use it (FR-17).]`
+- **Resolved** by CONTRACTS §3.3: the `machine` family lists `checkouts.list|create|delete|sync|changes`
+  and `git.identity|setIdentity`; this epic uses `checkouts.list { rescan, refresh, checkoutIds,
+  remoteHeads }` (`remoteHeads` is FL-06's additive flag, FR-26b) and adds no message.
 - `[NEEDS CLARIFICATION: Code folders are set on the machine (`--code-folder`, persisted like
 `--workspace-root`). Should the owner also be able to set them from the computer page (a
-platform-to-machine config write), or does that cross D2's "nothing on a machine is done without
-the node" in spirit?]`
-- `[NEEDS CLARIFICATION: Bin purge after 30 days (FR-33) — keep, or never purge?]`
+platform-to-machine config write)? Default until answered: machine-only, as CONTRACTS R-18 does for
+`--files-root`; the computer page shows the folders and the command to change them.]`
+- `[NEEDS CLARIFICATION: Bin purge after 30 days (FR-33) — keep, or never purge? Default until
+answered: keep — P3 purges rows (never folders) older than 30 days whose folder is already gone.]`
 - `[NEEDS CLARIFICATION: Container image for isolated checkouts — a platform default image
-configurable in Fleet settings, or per Work?]`
+configurable in Fleet settings, or per Work? Default until answered: one default image set under
+Settings → Fleet (P3); no per-Work override.]`
+- **Resolved** by CONTRACTS rev 5: `node.checkout.restore` (§7); `/checkouts/:id/refresh|sync|archive|restore` (§11.2); 30 writes per minute (§10.1); ready-only roots and `--code-folder` (R-41).
 
 ---
 
@@ -479,6 +489,14 @@ configurable in Fleet settings, or per Work?]`
 - [ ] **ACC-FL14-19** (FR-14) Every row shows its size; the computer shows the total.
 - [ ] **ACC-FL14-20** (FR-31) `isolation: container` is refused on Windows and on nodes without `docker` with `unsupported_on_node`.
 - [ ] **ACC-FL14-21** Every user-visible string is a `fleet.checkouts.*` key; the banned-terms grep prints nothing.
+- [ ] **ACC-FL14-22** (FR-26a) A delete asked for as Clean up is refused `invalid` naming the rule when the checkout is not a worktree, its pull request is still open, or a session runs in it; otherwise it behaves exactly as FR-24–FR-26.
+- [ ] **ACC-FL14-23** (FR-26b) A list request asking for remote heads returns the remote's branch names; one without it is unchanged.
+- [ ] **ACC-FL14-24** (FR-1) Every checkout row records path, kind, state, branch, base ref, token-free remote, isolation, creator and creation time.
+- [ ] **ACC-FL14-25** (FR-2) The computer tab lists that Node's checkouts; Fleet → Checkouts lists every visible Node's checkouts grouped by repository.
+- [ ] **ACC-FL14-26** (FR-15) An offline Node shows its last-known rows dimmed with their age, never an empty tab.
+- [ ] **ACC-FL14-27** (FR-23) Fetch, pull and push on a discovered checkout run with the machine's own git configuration and never request a platform credential.
+- [ ] **ACC-FL14-28** (FR-32) A Work's shared folders are linked, not copied, into a new worktree of that repository.
+- [ ] **ACC-FL14-29** (FR-33) The bin purge removes only rows older than 30 days whose folder is gone, on its schedule, never on read.
 
 ---
 
@@ -499,7 +517,7 @@ configurable in Fleet settings, or per Work?]`
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) · [CONTRACTS](../CONTRACTS.md) §0 R-16, R-18, R-24; §1; §2; §3.3 `machine`; §4.3; §4.7; §7; §8; §9; §10; §11; §12; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §E
+- Program: [Fleet README](../README.md) · [CONTRACTS](../CONTRACTS.md) §0 R-16, R-18, R-24, R-39, R-40; §1; §2; §3.2 link controls; §3.3 `machine`; §4.3; §4.7; §7; §8; §9; §10; §11; §12; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §E
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Evidence (HEAD `e4334baf7`): `apps/node/src/core/workspaces/fleet-task-workspace.ts:584-600`, `apps/node/src/core/workspaces/workspace-inventory.ts:17-80`, `apps/node/src/core/workspaces/workspace-reaper.ts:30-60`, `apps/node/src/core/capabilities.ts:264-310`, `apps/node/src/cli/program.ts:383-421`, `packages/contracts/src/fleet/fleet-task-workspace.types.ts:9-40`, `packages/contracts/src/fleet/fleet-push-credential.types.ts:1-40`, `apps/api/src/fleet/fleet-push-credential.service.ts:1-70`, `packages/agent/src/entities/work.entity.ts:399,988-998`, `packages/agent/src/entities/github-app-installation-repository.entity.ts:10-30`
 - Related epics: FL-02, FL-04, FL-06, FL-11, FL-15, FL-19, FL-20; AW-11 (per-Agent profile dirs on a node)

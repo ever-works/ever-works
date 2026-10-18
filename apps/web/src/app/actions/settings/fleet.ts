@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
-import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
+import type { FleetControlPolicyFamiliesInput, FleetNodeLimitCeiling } from '@ever-works/contracts';
 import {
     fleetAPI,
     type CancelFleetInFlightPayload,
@@ -22,6 +22,7 @@ import {
     type FleetNodeDrainResult,
     type FleetExecutionPreferenceView,
     type FleetExecutionScopeType,
+    type FleetNeedsALookResult,
     type FleetNodeView,
     type FleetRunnerStatusView,
     type SetFleetExecutionPreferencePayload,
@@ -41,6 +42,13 @@ import {
  */
 
 const SETTINGS_PAGE_PATTERN = '/[locale]/(dashboard)/settings/fleet';
+
+/**
+ * Fleet hub (FL-01) — every `/fleet/*` page, revalidated as a LAYOUT so the
+ * Overview, the Computers tab and each computer page re-read together after a
+ * registry act (a star, a rename, a policy change).
+ */
+const HUB_LAYOUT_PATTERN = '/[locale]/(dashboard)/fleet';
 
 /**
  * The Agent's Capabilities tab, where the preferred-node picker lives.
@@ -512,6 +520,84 @@ export async function clearFleetExecutionPreferenceAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to clear the execution preference'),
+        };
+    }
+}
+
+/**
+ * Fleet hub (FL-01) — what needs a look across every computer the caller
+ * may see, for the Overview's "Try again" (spec U11). A failure is returned,
+ * never thrown, so the cards below keep rendering.
+ */
+export async function fetchFleetNeedsALookAction(): Promise<
+    FleetActionResult<FleetNeedsALookResult>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.needsALook();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Could not load what needs a look'),
+        };
+    }
+}
+
+/** Fleet hub (FL-01) — every computer the caller may see (own + shared), for a client refresh. */
+export async function listVisibleFleetNodesAction(): Promise<FleetActionResult<FleetNodeView[]>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.listVisibleNodes();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load the computers'),
+        };
+    }
+}
+
+/** Fleet hub (FL-01) — star or unstar a computer (owner only; no confirmation, no audit row). */
+export async function setFleetNodeFavoriteAction(
+    nodeId: string,
+    isFavorite: boolean,
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setFavorite(nodeId, isFavorite);
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to update the favourite'),
+        };
+    }
+}
+
+/**
+ * Fleet hub (FL-01) — change who may act in some action families on one
+ * computer (owner only; audited `node.policy.change` by the API).
+ */
+export async function setFleetNodePolicyFamiliesAction(
+    nodeId: string,
+    families: FleetControlPolicyFamiliesInput,
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setPolicyFamilies(nodeId, families);
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to change who can do what'),
         };
     }
 }

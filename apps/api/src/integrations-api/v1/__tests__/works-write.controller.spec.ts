@@ -119,7 +119,11 @@ describe('IntegrationWorksWriteController', () => {
         expect(lifecycle.createProjectWork).toHaveBeenCalledWith(
             { id: 'owner-1' },
             expect.objectContaining({ name: 'Site', slug: 'site-2', website: 'https://acme.test' }),
-            expect.objectContaining({ withinCreate: expect.any(Function) }),
+            // EW-P1-2: the Work is attributed to the integration key (the DTO's `createdBy`).
+            expect.objectContaining({
+                withinCreate: expect.any(Function),
+                createdBy: { type: 'integration', id: 'key-1' },
+            }),
         );
         // The link is written in the create's transaction (T17a pattern).
         expect(links.create).toHaveBeenCalledWith(

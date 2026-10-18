@@ -23,6 +23,9 @@ export * from './fleet-audit.service';
 // Fleet MCP bridge (self-build slice Z / EW-796) — run-scoped credentials.
 export * from './fleet-run-credential.service';
 export * from './agent-fleet-tools';
+// Fleet hub (FL-01) — role derivation + family checks, and the needs-a-look registry.
+export * from './fleet-access.service';
+export * from './needs-a-look';
 export { FleetNode } from '../entities/fleet-node.entity';
 export { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 export type { FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';

@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-01-fleet-hub`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft`
+**Status:** `In progress` — P1a foundations (T-01…T-08, T-16…T-19) in the first PR
 **Last updated:** 2026-10-18
 
 ---
@@ -25,22 +25,22 @@
 
 ## P1.A — Contracts, flags, routes
 
-- [ ] **T-01**. Add `fleet-access.types.ts` at `packages/contracts/src/fleet/fleet-access.types.ts`:
+- [x] **T-01**. Add `fleet-access.types.ts` at `packages/contracts/src/fleet/fleet-access.types.ts`:
       `FLEET_ACTION_FAMILIES`, `FLEET_AUDIENCES`, `FleetControlPolicyFamilies`,
       `FLEET_CONTROL_POLICY_DEFAULTS`, `effectiveControlPolicy(node)`, `audienceIncludes(audience, role)`;
       export from `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-access.spec.ts` — null map, legacy value
       as `desktop`, partial map, 3×4 audience/role truth table.
-- [ ] **T-02** (parallel). Add `fleet-needs-a-look.types.ts` at
-      `packages/contracts/src/fleet/fleet-needs-a-look.types.ts`: the eleven kinds of CONTRACTS §4.6,
+- [x] **T-02** (parallel). Add `fleet-needs-a-look.types.ts` at
+      `packages/contracts/src/fleet/fleet-needs-a-look.types.ts`: the kinds of CONTRACTS §4.6 (thirteen at revision 4),
       severity, the item shape exactly as §4.6 (no extra fields), `sortNeedsALook`. **Test**: `packages/contracts/src/fleet/__tests__/fleet-needs-a-look.spec.ts`.
-- [ ] **T-03**. Extend `FleetNodeView` in `packages/contracts/src/fleet/fleet-node.types.ts` (after
+- [x] **T-03**. Extend `FleetNodeView` in `packages/contracts/src/fleet/fleet-node.types.ts` (after
       `controlPolicy`, `:471`) with optional `isFavorite`, `hostNodeId`, `virtualKind`,
       `controlPolicyFamilies`, `viewerRole`. Add `'node.policy.change'` to `FleetAuditAction` and
       `FLEET_AUDIT_ACTIONS` in `packages/contracts/src/fleet/fleet-panic.types.ts`.
       **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-panic.spec.ts`; run
       `apps/api/src/fleet/__tests__/node-contract.conformance.spec.ts` unchanged.
-- [ ] **T-04**. Add `isFleetHubEnabled()` to `apps/web/src/lib/fleet-flags.ts` (reads
+- [x] **T-04**. Add `isFleetHubEnabled()` to `apps/web/src/lib/fleet-flags.ts` (reads
       `FLEET_HUB_ENABLED === 'true'`; default off) and `config.fleet.isHubEnabled()` beside
       `getMinNodeVersion` in `packages/agent/src/config/`. Add the seven `DASHBOARD_FLEET*` constants
       to `apps/web/src/lib/constants.ts` beside `DASHBOARD_SETTINGS_FLEET` (`:339`).
@@ -49,23 +49,24 @@
 
 ## P1.B — API: needs-a-look registry and widened reads
 
-- [ ] **T-05**. Create `packages/agent/src/fleet/needs-a-look/needs-a-look.producer.ts`
+- [x] **T-05**. Create `packages/agent/src/fleet/needs-a-look/needs-a-look.producer.ts`
       (`NeedsALookProducer { id, produce(nodes): Promise<NeedsALookItem[]> }`, DI token
       `NEEDS_A_LOOK_PRODUCERS`) and `needs-a-look.service.ts` (`forNodes(nodes)`: fan-out, skip and
       log a throwing producer, sort). Register in `packages/agent/src/fleet/fleet.module.ts`; export
       from `packages/agent/src/fleet/index.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/needs-a-look.service.spec.ts`.
-- [ ] **T-06**. Add `GET /api/fleet/needs-a-look` and `GET /api/fleet/nodes/:id/needs-a-look` to
+- [x] **T-06**. Add `GET /api/fleet/needs-a-look` and `GET /api/fleet/nodes/:id/needs-a-look` to
       `apps/api/src/fleet/fleet.controller.ts` (beside `GET nodes` `:267`), owner-scoped in P1.
       **Test**: extend `apps/api/src/fleet/fleet.controller.spec.ts` — empty registry → `[]`; one
       failing producer → partial result and a logged warning; foreign node id → 404.
-- [ ] **T-07**. Add `fleetAPI.needsALook()` / `nodeNeedsALook(id)` to `apps/web/src/lib/api/fleet.ts`
-      and `fetchNeedsALookAction` to `apps/web/src/lib/actions/fleet.ts`.
+- [x] **T-07**. Add `fleetAPI.needsALook()` / `nodeNeedsALook(id)` to `apps/web/src/lib/api/fleet.ts`
+      and `fetchFleetNeedsALookAction` to `apps/web/src/app/actions/settings/fleet.ts` (where the fleet
+      server actions live).
       **Test**: `apps/web/src/lib/api/fleet.unit.spec.ts` (new) — endpoint shapes.
 
 ## P1.C — Web: hub, overview, moved Computers tab
 
-- [ ] **T-08**. Create `apps/web/src/components/fleet/registry.ts` with `registerHubTab`,
+- [x] **T-08**. Create `apps/web/src/components/fleet/registry.ts` with `registerHubTab`,
       `registerComputerTab`, `registerOverviewBlock` (CONTRACTS §11.1), `getComputerTabs`, `resolvePlaceholder(entry, node)`
       and the twelve fixed tab ids in order.
       **Test**: `apps/web/src/components/fleet/registry.unit.spec.ts` — order, flag off, consent
@@ -112,24 +113,24 @@
 
 ## P2.A — Roles, families, favourites (API + schema)
 
-- [ ] **T-16**. Entity: add `isFavorite` and `controlPolicyFamilies` to
+- [x] **T-16**. Entity: add `isFavorite` and `controlPolicyFamilies` to
       `packages/agent/src/entities/fleet-node.entity.ts` (after `controlPolicy` `:502`), with doc
       comments stating the legacy mirror rule.
       **Test**: `pnpm --filter @ever-works/agent build` clean.
-- [ ] **T-17**. Migrations from `apps/api/`: `apps/api/src/migrations/1796010000000-AddFleetNodeControlPolicyFamilies.ts`
+- [x] **T-17**. Migrations from `apps/api/`: `apps/api/src/migrations/1796010000000-AddFleetNodeControlPolicyFamilies.ts`
       (add the column only — no backfill; a missing `desktop` key reads through to `controlPolicy`,
       CONTRACTS §2.1) and `apps/api/src/migrations/1796010100000-AddFleetNodeFavorite.ts`; per-step
       guards as in `1795161700000-AddFleetModelUsageLimits.ts`.
       **Test**: applies twice on sqlite and Postgres; `migration:generate` afterwards is empty; a row
       with `controlPolicy = 'org-admins'` and a null map yields `effectiveControlPolicy(node).desktop
-      === 'org-admins'`; writing `families.desktop = 'owner'` writes `controlPolicy = 'owner'` back.
-- [ ] **T-18**. Create `packages/agent/src/fleet/fleet-access.service.ts` (`roleFor`, `assertFamily`,
+  === 'org-admins'`; writing `families.desktop = 'owner'` writes `controlPolicy = 'owner'` back.
+- [x] **T-18**. Create `packages/agent/src/fleet/fleet-access.service.ts` (`roleFor`, `assertFamily`,
       `canAct`) over `OrganizationMemberRepository`
       (`packages/agent/src/database/repositories/organization-member.repository.ts`); register and export
       from `fleet.module.ts` / `index.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/fleet-access.service.spec.ts` — five role cases;
       `view` denial is `not_found`; other families `permission_denied` with hint.
-- [ ] **T-19**. Widen reads: `FleetService.listVisibleForUser(userId)` in
+- [x] **T-19**. Widen reads: `FleetService.listVisibleForUser(userId)` in
       `packages/agent/src/fleet/fleet.service.ts` (beside `listForUser` `:958`), stamping `viewerRole`;
       `GET /nodes`, `GET /nodes/:id`, `/needs-a-look` in `fleet.controller.ts` use it and 404 strangers.
       **Test**: extend `fleet.controller.spec.ts` — member of bound org sees the node; member of another

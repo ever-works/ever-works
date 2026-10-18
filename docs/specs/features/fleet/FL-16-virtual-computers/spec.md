@@ -10,7 +10,7 @@
 **Status:** `Draft`
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
-**Size:** L · **Blocked by:** FL-09 (Docker module), FL-02 (node link, `--manage`), FL-01 (hub nesting, module registry) · **Related:** FL-03 (health, "Runs here"), FL-07 (Desktop source), FL-10 (ports — watching the install), FL-17 (shares the `origin` column), FL-19 (tool parity), FL-20 (usage)
+**Size:** L · **Blocked by:** FL-09 (Docker module, the **Runs here** Overview block), FL-02 (node link, `--manage`), FL-01 (hub nesting, module registry), FL-10 (P2 only — "open on the machine" for Watch the install) · **Related:** FL-03 (health), FL-07 (Desktop source), FL-17 (shares the `origin` column), FL-19 (tool parity), FL-20 (usage)
 **Extends (existing Ever Works nouns):** Node · Fleet · Job · Enrolment token · Agent · Run · Fleet audit · Organization · Operation (FL-02)
 
 ---
@@ -70,8 +70,9 @@ From the Fleet hub (or from a host's own page) the owner picks **New virtual com
 chooses a system, a host and a size, and presses Create. The platform creates the new Node's
 registration first — in the `enrolling` state, nested under the host — and asks the host to build
 the machine. For a Container the host pulls a pinned base image, starts it with the chosen CPU and
-memory limits, installs the node runtime inside and hands it a one-time enrolment token; about a
-minute later the child heartbeats and turns green under its host. For a Windows VM the host checks
+memory limits, installs the node runtime inside and — once the runtime inside reports it is ready —
+hands it a one-time enrolment token minted at that moment (CONTRACTS R-35); about a minute later
+the child heartbeats and turns green under its host. For a Windows VM the host checks
 it can virtualise (`kvm`), has roughly 30 GB free, pulls the installer image and lets Windows install
 itself over 15–30 minutes while the owner watches progress — and, if they like, the installer's
 screen — from the hub. When Windows reaches its first desktop, a first-boot step installs the node
@@ -164,7 +165,8 @@ keep working; this epic adds a menu item beside them.
 
 - **S6 — Runs here.**
   **Given** `build-01` hosts two virtual computers, **when** the owner opens `build-01`'s Overview,
-  **then** a **Runs here** line lists them with their state and one-click Start/Stop, and the host's
+  **then** the **Runs here** block (FL-09 FR-30 — this epic adds rows to it, not a second block)
+  lists them beside the host's containers with their state and one-click Start/Stop, and the host's
   free-memory figure is shown net of what they reserve.
 
 - **S7 — Copy the Windows password (owner, P2).**
@@ -181,12 +183,15 @@ keep working; this epic adds a menu item beside them.
   made directly is refused `permission_denied`.
 
 - **S9 — An Agent creates its own box.**
-  **Given** Agent `Nina` holds the `machines` tool grant and the host's policy includes her owner,
-  **when** she calls `fleet_virtual_create` with `system: ubuntu-26.04`, `cpus: 2`, `memoryGiB: 4`,
-  **then** the tool is marked destructive and returns `confirmation_required` until an Approval is
-  granted (AW-24); the Approval card states _"Creates a Container on build-01 using 2 CPUs, 4 GB of
-  memory and about 3 GB of disk. No credits are spent."_; once approved, the child is created with
-  `requestedBy: agent:<id>` in the audit row.
+  **Given** Agent `Nina`'s tool grants allow `fleet_virtual_create`, her trust ladder puts _Change a
+  computer_ (`machine.admin`) at **Ask**, and the host's `machines` audience includes her owner
+  (CONTRACTS §2.1), **when** she calls `fleet_virtual_create` with `system: ubuntu-26.04`, `cpus: 2`,
+  `memoryGiB: 4`, **then** the call is held as an `agent_action_proposals` row (CONTRACTS R-33) and
+  returns `{ held: true, decisionId }`; the Decision states _"Creates a Container on build-01 using
+  2 CPUs, 4 GB of memory and about 3 GB of disk. No credits are spent."_; once approved, the child is
+  created with `requestedBy: agent:<id>` in the audit row. At **Auto** the same call answers 409
+  `confirmation_required` with that summary until it is repeated with `confirm: true` (CONTRACTS
+  §2.2).
 
 ### 3.2 Edge cases, refusals and failures
 
@@ -215,12 +220,13 @@ keep working; this epic adds a menu item beside them.
   the build continues on the host (it is a durable job), progress resumes when the link returns, and
   the child still enrols on its own because enrolment is outbound from the child.
 - **U10 — Guest never enrols.** A Windows install finishes but no heartbeat arrives within 20
-  minutes of the first-boot step → the row reads `needs a look — installed but not enrolled`, with
-  **Watch the screen**, **Retry enrolment** (re-mints the token) and **Destroy**.
+  minutes of the first-boot step → the row reads `installed but not enrolled`, with **Watch the
+  screen**, **Retry enrolment** (re-mints the token) and **Destroy**. This is a row state, not a
+  "needs a look" item (CONTRACTS §4.6 has no kind for it; R-23 does not list FL-16 as a producer).
 - **U11 — Kill switch.** The Fleet kill switch is on → **New virtual computer…** is disabled with
-  the stop banner's reason; create, start, stop and destroy requests are refused `kill_switch`;
-  running children keep running (they are Nodes and honour the switch themselves); nothing is
-  destroyed by the switch.
+  the stop banner's reason; create, start, stop, destroy and reveal requests are refused
+  `kill_switch`; running children keep running (they are Nodes, and their links are paused like
+  every node's — `link.pause`, CONTRACTS §3.2); nothing is destroyed by the switch.
 - **U12 — Permission denied.** Covered by S8; the server refuses with the audience named.
 - **U13 — Destroy while a Run is live.** A child is executing a Run → **Destroy…** is refused
   `busy` with _"Nina is working on ubuntu-nina right now; end the session or wait"_, never a silent
@@ -231,7 +237,7 @@ keep working; this epic adds a menu item beside them.
   names are 2–39 characters, lower-case letters, digits and hyphens.
 - **U16 — Password reveal by a non-owner.** An Organization admin asks to reveal the Windows
   password → refused `permission_denied` (_"only build-01's owner can reveal it"_), even when the
-  `machines` audience includes admins (§8b).
+  `machines` audience includes admins (the default until the owner answers §8b).
 
 ---
 
@@ -247,11 +253,15 @@ Every default and limit below is a number. Values marked **(C)** come from
 | Create             | `--manage`               | `machines` / owner                            | `confirm` — states CPUs, memory, disk, host  | `node.vm.create`                                | `fleet_virtual_create` — destructive                   |
 | Start / Stop       | `--manage`               | `machines` / owner                            | `plain` start; `confirm` stop               | `node.vm.start` · `node.vm.stop`                | `fleet_virtual_power` — destructive                    |
 | Destroy            | `--manage`               | `machines` / owner                            | `confirm-destructive` — type the name       | `node.vm.destroy`                               | `fleet_virtual_destroy` — destructive                  |
-| Reveal password    | `--manage`               | owner only (§8b)                              | `confirm` — "reveal once, audited"          | `node.vm.password.reveal` (§8b, CONTRACTS add)  | not offered to Agents                                  |
+| Reveal password    | `--manage`               | owner only (default; §8b)                     | `confirm` — "reveal once, audited"          | `node.vm.password.reveal` (C §7)                | not offered to Agents                                  |
+| Resize / Rebuild (P3) | `--manage`            | `machines` / owner                            | `confirm`                                   | `node.vm.resize` · `node.vm.rebuild` (C §7)     | not offered to Agents in this epic                     |
 | List / options     | enrolled                 | `view`                                        | `plain`                                     | —                                               | `fleet_virtual_list`, `fleet_virtual_options` — readOnly |
 
-Kill switch (R-24): every family above is refused `kill_switch` while the switch is on; no running
-child is stopped or destroyed by the switch itself. "Drain all" leaves virtual computers as they are.
+Every caller — the web dialog, Agent tools, MCP and the CLI — satisfies a class with the same
+request fields (`confirm: true`, `confirmName`), and a call without them answers 409
+`confirmation_required` with the summary to show (C §2.2). Kill switch (R-24): every family above is
+refused `kill_switch` while the switch is on; no running child is stopped or destroyed by the
+switch itself. "Drain all" leaves virtual computers as they are.
 
 ### 4.2 Creating (P1 Containers, P2 VMs)
 
@@ -291,9 +301,10 @@ child is stopped or destroyed by the switch itself. "Drain all" leaves virtual c
   installing the node runtime · enrolling · online` for Containers; `pulling image · downloading
   Windows · installing · first boot · installing the node runtime · enrolling · online` for VMs),
   updated at least every 5 seconds while the link is up, and resumable after a link drop.
-- **FR-14** The child MUST enrol by itself, outbound, with a one-time token minted for it; the
-  token MUST be handed to the guest through a private file, never on a command line and never in a
-  job payload, and MUST be deleted after use.
+- **FR-14** The child MUST enrol by itself, outbound, with a one-time token minted for it only when
+  the guest signals it is ready to enrol (both kinds — CONTRACTS R-35); the token MUST be handed to
+  the guest through a private file read by `enroll --token-file`, never on a command line and never
+  in a job payload, and MUST be deleted after use.
 - **FR-15** The child MUST run the node runtime with `--work --manage` by default and MUST NOT run
   with `--attend` unless the owner enables it later; the hub MUST show the child's consents like any
   Node's.
@@ -342,17 +353,21 @@ child is stopped or destroyed by the switch itself. "Drain all" leaves virtual c
   registration, and MUST keep the child's job history.
 - **FR-29** Removing a host's registration while it hosts virtual computers MUST be refused `busy`
   naming them; removing a virtual child's registration without destroying it MUST be refused
-  `busy` with the hint _"destroy it instead"_ (an orphaned machine would keep running on the host).
+  `unsupported_on_node` with the hint _"destroy it instead"_ (an orphaned machine would keep running
+  on the host) — the same additive guard CONTRACTS R-36 sets for cloud computers; Remove becomes
+  available again once the child's machine is gone (FR-30).
 - **FR-30** A child whose machine is gone on the host (destroyed outside Ever Works) MUST be shown
   `offline — its container is gone on build-01` within one reconcile cycle (5 minutes) and MAY then
   be removed.
 
 ### 4.5 Hub, host page and child page
 
-- **FR-31** Virtual computers MUST be nested under their host in the hub's Computers tab, with a
-  `VM on <host>` or `Container on <host>` label, their system and size, and their state.
-- **FR-32** The host's Overview MUST show **Runs here**: each child with state and Start/Stop, and
-  the host's free memory net of reservations.
+- **FR-31** Virtual computers MUST be nested under their host in the hub's Computers tab (FL-01
+  nests by `hostNodeId`), with a `VM on <host>` or `Container on <host>` label, their system and
+  size, and their state.
+- **FR-32** The host's **Runs here** Overview block (owned by FL-09, FR-30 there) MUST list each
+  child with state and Start/Stop, and MUST show the host's free memory net of reservations; this
+  epic adds those rows and that line to FL-09's block and defines no second block.
 - **FR-33** The child's page header MUST carry Start / Stop / **⋯** (Copy password for VMs,
   Destroy…), and its Overview MUST name its host with a link.
 - **FR-34** The command palette MUST offer **New virtual computer** and, per child, **Start <name>**
@@ -362,8 +377,9 @@ child is stopped or destroyed by the switch itself. "Drain all" leaves virtual c
 
 - **FR-35** `fleet_virtual_list` and `fleet_virtual_options` MUST be read-only tools; `fleet_virtual_create`,
   `fleet_virtual_power` and `fleet_virtual_destroy` MUST be marked destructive with the confirmation
-  class from §4.1, MUST be gated by the Agent's `machines` grant **and** the host's `machines`
-  audience (C §2.1), and MUST return CONTRACTS §8 errors with hints.
+  class from §4.1, MUST be gated as C §2.1 fixes — the Agent's tool grants and trust ladder (AW-15,
+  AW-24) allow the tool **and** the host's `machines` audience includes the Agent's owner — and MUST
+  return CONTRACTS §8 errors with hints.
 - **FR-36** `fleet_virtual_create` MUST include in its confirmation text the host, CPUs, memory,
   approximate disk and the sentence "No credits are spent".
 - **FR-37** Every state-changing action MUST write one `fleet_audit` row with `family: machines`,
@@ -420,10 +436,11 @@ Windows adds _"downloading Windows (2.1 of 6 GB)"_ and _"installing — 12 min s
 install]"_. On failure: `✕ failed — could not pull the image: <first stderr line>` with **Retry**
 and **Remove**.
 
-### 5.4 Runs here (host Overview)
+### 5.4 Runs here (rows added to FL-09's host Overview block)
 
 ```
- Runs here           win-11-vm  ■ stopped  [Start]      ubuntu-nina  ● online  [Stop]
+ Runs here           ● acme-api  ● acme-db (containers, FL-09)
+                     win-11-vm  ■ stopped  [Start]      ubuntu-nina  ● online  [Stop]
  Free memory         23 GB (12 GB reserved by virtual computers)
 ```
 
@@ -500,9 +517,9 @@ no literal dots.
 | **Virtual computer**     | UI copy          | A child Node with `origin: virtual`; **VM** when `virtualKind = vm`, **Container** when `container`.                            |
 | **System catalogue**     | New (node-side)  | The pinned images and Windows editions a host can build, advertised through the options endpoint.                              |
 | **Operation**            | Existing (FL-02) | Progress of a create / power / destroy; polled or streamed.                                                                    |
-| **Job kinds**            | Existing union   | `vm-create`, `vm-control` — durable, leased by the host's management lane (C §12).                                            |
-| **Enrolment token**      | Existing         | Minted for the child; late-minted for Windows guests (FR-24).                                                                  |
-| **Fleet audit**          | Existing         | `node.vm.create|start|stop|destroy`, plus the proposed `node.vm.password.reveal`.                                              |
+| **Job kinds**            | Existing union   | `vm-create`, `vm-control` — durable (C §12), leased by the host's management lane under `--manage` (C R-34).                   |
+| **Enrolment token**      | Existing         | Minted for the child when the guest signals readiness, both kinds (C R-35; FR-14, FR-24).                                      |
+| **Fleet audit**          | Existing         | `node.vm.create|start|stop|destroy|resize|rebuild` and `node.vm.password.reveal` (C §7).                                       |
 
 ---
 
@@ -519,13 +536,14 @@ no literal dots.
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — §7 audit names: add node.vm.password.reveal (owner-only one-time reveal, FR-21) and, for P3, node.vm.resize and node.vm.rebuild.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §13: the origin column is needed by both FL-16 (slot 1796160000000) and FL-17 (1796170000000). Proposed: whichever lands first adds origin with IF NOT EXISTS; the other migration is a no-op for that column. Please record the owner in §13.]`
-- `[NEEDS CLARIFICATION: Which lease lane carries vm-create / vm-control? CONTRACTS §1.1 puts VM creation under --manage and §12 makes the kinds durable jobs, but today only --work leases. Proposed (plan §6): a management lane on --manage, modelled on the attended lane, leasing only vm-* kinds — to be confirmed against FL-02's spec.]`
-- `[NEEDS CLARIFICATION: Password reveal audience. This spec makes it owner-only even when the host's machines audience includes Organization admins (U16). Confirm, or allow the machines audience to reveal.]`
-- `[NEEDS CLARIFICATION: Default consents inside a child — proposed --work --manage, --attend off. Should Windows VMs default to --attend so "watch the desktop" works at once (requires FL-07's native helper inside the guest, hash-pinned)?]`
-- `[NEEDS CLARIFICATION: The Windows installer image. The plan pins a community KVM-backed Windows-in-Docker installer image by digest with an operator override. Confirm licensing posture (Windows media is fetched from Microsoft by the image; unactivated) before P2 ships.]`
-- `[NEEDS CLARIFICATION: Container disk accounting. Containers have no fixed disk size; the host reports the child's data-directory usage. Should a per-Container disk ceiling be enforced (e.g. a 64 GB quota where the storage driver allows it)?]`
+- **Resolved** by CONTRACTS §7: `node.vm.password.reveal`, `node.vm.resize` and `node.vm.rebuild` are contract audit names (§4.1 above uses them).
+- **Resolved** by CONTRACTS R-35: FL-16's slot `1796160000000` adds `origin`, `hostNodeId` and `virtualKind`; FL-17's slot adds the provider columns; both migrations guard every column with `findColumnByName` so either may land first.
+- **Resolved** by CONTRACTS R-34: a management lane, modelled on the attended lane, leases `vm-create` / `vm-control` on nodes started with `--manage` and never competes with Agent work for `--concurrency`.
+- **Resolved** by CONTRACTS R-36 (by analogy, for the same UI action): a virtual child's registration cannot be removed while its machine exists — refused `unsupported_on_node`, hint "destroy it instead" (FR-29).
+- `[NEEDS CLARIFICATION: Password reveal audience — owner only, or everyone in the host's machines audience? Default until answered: owner only, even when the machines audience includes Organization admins (U16, FR-21).]`
+- `[NEEDS CLARIFICATION: Should Windows VMs start with --attend so "watch the desktop" works at once (needs FL-07's native helper inside the guest, hash-pinned)? Default until answered: every child runs --work --manage with --attend off; the owner turns attend on inside the guest (FR-15).]`
+- `[NEEDS CLARIFICATION: Windows installer image licensing — may Ever Works document a community KVM-backed Windows-in-Docker installer image that fetches Microsoft media and leaves Windows unactivated? Default until answered: P1 (Containers) ships; the Windows systems stay hidden behind FLEET_VIRTUAL_ENABLED's P2 gate (plan §13) with the image digest-pinned and operator-overridable.]`
+- `[NEEDS CLARIFICATION: Should a per-Container disk ceiling be enforced? Default until answered: no quota; Runs here and the child's page show the child's data-directory usage, and only Windows VMs get the 30 GB precheck (FR-18).]`
 
 ---
 
@@ -546,11 +564,11 @@ no literal dots.
 
 - [ ] `ACC-FL16-09` (FR-26, FR-27) Start and Stop answer ≤ 500 ms; a Container stops within 10 s; the row shows `starting` / `stopping`.
 - [ ] `ACC-FL16-10` (FR-28) Destroy requires the typed name, deletes the disk under the host's node data directory, removes the registration, keeps job history, and is refused `busy` under a live Run or Session.
-- [ ] `ACC-FL16-11` (FR-29, FR-30) Removing a host with children is refused `busy`; a child whose container vanished shows the gone state within 5 minutes.
+- [ ] `ACC-FL16-11` (FR-29, FR-30) Removing a host with children is refused `busy`; removing a child whose machine exists is refused `unsupported_on_node` with "destroy it instead"; a child whose container vanished shows the gone state within 5 minutes and may then be removed.
 
 **Hub and host page (P1)**
 
-- [ ] `ACC-FL16-12` (FR-31, FR-32, FR-33, FR-34) Children nest under their host with the `VM on` / `Container on` label; Runs here lists them with Start/Stop; the child header carries the actions; the palette offers the three entries.
+- [ ] `ACC-FL16-12` (FR-31, FR-32, FR-33, FR-34) Children nest under their host with the `VM on` / `Container on` label; FL-09's Runs here block lists them with Start/Stop (no second block exists); the child header carries the actions; the palette offers the three entries.
 
 **Windows VMs (P2)**
 
@@ -593,7 +611,7 @@ no literal dots.
 
 ## 11. References
 
-- Program: [README](../README.md) (§1 vocabulary, §3 "Calling Linux containers VMs" refused, D2, D8, rule 18) · [CONTRACTS](../CONTRACTS.md) (R-4, R-20, R-24, §1, §2, §4.1, §7, §8, §9, §10, §11.2, §12, §13) · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §F
+- Program: [README](../README.md) (§1 vocabulary, §3 "Calling Linux containers VMs" refused, D2, D8, rule 18) · [CONTRACTS](../CONTRACTS.md) (R-4, R-20, R-24, R-33, R-34, R-35, R-36, §1, §2, §3.2, §4.1, §7, §8, §9, §10, §11.2, §12, §13) · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §F
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Sibling epics: FL-01 (hub, registry), FL-02 (link, `--manage`, operations), FL-03 (health, wake), FL-09 (Docker module), FL-10 (open on the machine), FL-17 (cloud computers), FL-19 (tools)
 - Substrate evidence: `apps/web/src/components/settings/FleetSettings.tsx:826-891`; `packages/agent/src/fleet/fleet.service.ts:79,349-394`; `packages/contracts/src/fleet/fleet-jobs.types.ts:117-125`; `packages/contracts/src/fleet/fleet-node.types.ts:46-55`; `packages/agent/src/entities/fleet-node.entity.ts:96-115`; `apps/node/src/core/capabilities.ts:277-294`; `apps/node/src/core/runtime.ts:940-953,1049-1062`

@@ -25,11 +25,12 @@ flowchart LR
     SVC --> AUD[FleetAuditService → fleet_audit]
     SVC --> LINK[FleetLinkService · machine channel]
     SVC --> CRED[FleetGitCredentialService → GitHub App installation token]
-    LINK -- checkouts.list / create / sync / delete --> NODE[apps/node · checkouts module]
+    LINK -- checkouts.list / create / sync / delete --> NODE[apps/node · link/modules/checkouts.ts]
     NODE --> DISC[checkout-discovery · scan code folders]
     NODE --> OPS[checkout-operations · git clone / worktree / fetch / pull / push / remove]
     NODE --> GL[checkout-git-line · git status/diff/rev-list]
-    NODE --> REG[checkouts.json · node-local registry + file roots]
+    NODE --> REG[checkouts.json · node-local registry]
+    REG --> ROOTS[link/allowed-roots.ts · R-39 resolver shared with FL-08/FL-11]
     OPS -- http.extraheader in child env --> GIT[(git on the machine)]
     NODE -- operation.progress / operation.done --> LINK
     LINK -- row + gitLine --> SVC
@@ -60,6 +61,7 @@ snapshot and writes the audit row; the web tab polls the row list (10 s while an
 | MCP whitelist Fleet block; CLI has no fleet                                                                                                                           | `apps/mcp/src/openapi-tools/whitelist.ts:475-530`; `apps/cli/src/commands/` (`auth`, `kb`, `plugins`, `work`)                                                               | Whitelist entries; first `fleet` command group (FL-19 completes).                            |
 | Routes constants                                                                                                                                                      | `apps/web/src/lib/constants.ts:339` (`DASHBOARD_SETTINGS_FLEET`)                                                                                                            | `DASHBOARD_FLEET_CHECKOUTS` beside the FL-01 constants.                                      |
 | Module registry for computer-page tabs (FL-01)                                                                                                                        | `apps/web/src/components/fleet/registry.ts` (does not exist at HEAD; FL-01 creates it — `apps/web/src/components/` has no `fleet/`)                                         | Registers the `checkouts` tab.                                                               |
+| Node link module registry and the shared allowed-roots resolver                                                                                                      | _(FL-02)_ `apps/node/src/core/link/modules/index.ts` (CONTRACTS R-40); _(FL-08/11/14)_ `apps/node/src/core/link/allowed-roots.ts` (R-39)                                  | The checkouts module registers there; the registry's `ready` paths feed the resolver, which FL-14 never redefines. |
 
 Missing today (spec §2.2): no checkout entity, no discovery, no person-initiated clone/worktree,
 no fetch/pull/push from the platform, no delete with a changes-check, no git line, no file roots.
@@ -82,23 +84,25 @@ no fetch/pull/push from the platform, no delete with a changes-check, no git lin
 
 ### 4.1 `FleetCheckout` — `packages/agent/src/entities/fleet-checkout.entity.ts` → `fleet_checkouts`
 
-Columns exactly as CONTRACTS §4.3: `id`, `nodeId`, `userId`, `organizationId` (null; the Node's
-binding at creation, for R-19), `path`, `kind` (`clone|worktree|discovered`), `parentCheckoutId`,
-`remoteUrl` (token-free), `remoteHadCredential boolean default false` (FR-5 flag — a boolean
-beside the contract column, additive), `workId`, `branch`, `baseRef`, `isolation`
+Columns exactly as CONTRACTS §4.3 plus the house conventions: `id`, `nodeId`, `userId`, `path`,
+`kind` (`clone|worktree|discovered`), `parentCheckoutId`, `remoteUrl` (token-free),
+`remoteHadCredential boolean default false` (FR-5), `workId`, `branch`, `baseRef`, `isolation`
 (`host|container`), `state` (`creating|ready|missing|archived`), `createdBy`
-(`user|agent|task|discovery`), `gitLine` (simple-json, §4.7), `lastCommand` (simple-json
-`{ command, exitCode, at }`), `sizeBytes bigint null`, `lastSeenAt`, `archivedAt`, `createdAt`,
-`updatedAt`. Indexes: `(nodeId, state)`, `(userId, state)`, `(workId)`, unique `(nodeId, path)`.
+(`user|agent|task|discovery`), `gitLine` (`simple-json` text, §4.7), `lastCommand` (`simple-json`
+`{ command, exitCode, at }`), `sizeBytes bigint null` (FR-14), `lastSeenAt` (FR-11), `archivedAt`,
+`createdAt`, `updatedAt`. Enums are `varchar` validated in code (CONTRACTS §4 storage types). No
+Organization column (§4.3 has none; R-19 limits are read from the Node's binding at request time).
+Indexes: `(nodeId, state)`, `(userId, state)`, `(workId)`, unique `(nodeId, path)`.
 
-`[NEEDS CLARIFICATION: CONTRACTS change — §4.3 has no size or last-seen column; this plan adds
-`sizeBytes` and `lastSeenAt` (FR-14, FR-11) and `remoteHadCredential` (FR-5) as additive columns.]`
+**Resolved** by CONTRACTS §4.3 (rev 2): `remoteHadCredential`, `sizeBytes` and `lastSeenAt` are
+contract columns.
 
 ### 4.2 Migration
 
 `apps/api/src/migrations/1796140000000-CreateFleetCheckouts.ts` — one `CREATE TABLE`, four
-indexes, FKs on `nodeId → fleet_nodes`, `parentCheckoutId → fleet_checkouts`, `workId → works`
-(nullable). Forward-only; `down` drops exactly what `up` added. Authored from `apps/api/` with
+indexes, FKs `nodeId → fleet_nodes` **ON DELETE CASCADE**, `parentCheckoutId → fleet_checkouts`
+**ON DELETE SET NULL**, `workId → works` (nullable) **ON DELETE SET NULL** — so the existing
+`DELETE /api/fleet/nodes/:id` and Work deletion keep working exactly as today (additive only). Forward-only; `down` drops exactly what `up` added. Authored from `apps/api/` with
 `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateFleetCheckouts`,
 re-stamped if `develop` moved. Same PR as the entity.
 
@@ -109,14 +113,15 @@ re-stamped if `develop` moved. Same PR as the entity.
 (§4.7), `FleetCheckoutView`, `FleetCheckoutCreateRequest` (`nodeId`, `source: { kind:'clone',
 repositoryId?, repoUrl } | { kind:'worktree', parentCheckoutId } | { kind:'container', … }`,
 `branch?`, `baseRef?`, `isolation`), `FleetCheckoutSyncOp = 'fetch'|'pull'|'push'`, link messages
-`CheckoutsListRequest { rescan?, refresh?, checkoutIds? }`, `CheckoutsCreateRequest`,
-`CheckoutsSyncRequest`, `CheckoutsDeleteRequest { checkoutId, confirmationToken }`,
-`CheckoutsListReply { checkouts: NodeCheckoutRecord[], truncated, codeFolders[] }`,
+`CheckoutsListRequest { rescan?, refresh?, checkoutIds?, remoteHeads? }` (`remoteHeads` is FL-06's
+additive flag), `CheckoutsCreateRequest`, `CheckoutsSyncRequest`, `CheckoutsDeleteRequest
+{ checkoutId, mode, expected: { uncommitted, unpushedCommits } }`, `CheckoutsListReply { checkouts:
+NodeCheckoutRecord[], truncated, codeFolders[], remoteBranches?: string[] }`,
 `FLEET_CHECKOUTS_DISCOVERY_CAP = 300`, `FLEET_CHECKOUT_GIT_LINE_REFRESH_MS = 60_000`,
 `FLEET_CHECKOUT_MANUAL_REFRESH_MIN_MS = 10_000`, `FLEET_CHECKOUT_RECONCILE_MS = 600_000`.
-Additive to `fleet-panic.types.ts`: `node.checkout.create|delete|sync|archive`. Additive to
-`fleet-node.types.ts`: `codeFolders: string[]` in the heartbeat inventory (so the tab can show
-them before the link opens).
+Additive to `fleet-panic.types.ts`: `node.checkout.create|delete|sync|archive` (CONTRACTS §7).
+Code folders travel only in the `checkouts.list` reply — the heartbeat gains no field (CONTRACTS
+§1.1 lists none for FL-14); an offline Node's card shows the folders last listed.
 
 ### 4.4 Git credential request — `packages/contracts/src/fleet/fleet-git-credential.types.ts`
 
@@ -136,28 +141,33 @@ authenticated; every refusal is `{ error: { code, hint, details } }` (§8).
 | POST   | `/checkouts`                              | `FleetCheckoutCreateRequest`                   | `202 { checkout, operationId }`       | `checkouts` · `plain`                | `invalid`, `unreachable`, `consent_missing`, `permission_denied`, `limit_exceeded`, `unsupported_on_node`, `busy`, `kill_switch` |
 | GET    | `/checkouts/:id`                          | —                                              | `FleetCheckoutView`                   | `view`                               | `not_found`                                                                     |
 | POST   | `/checkouts/:id/refresh`                  | —                                              | `FleetCheckoutView` (new gitLine)     | `checkouts` · `plain`                | `unreachable`, `limit_exceeded` (1/10 s)                                        |
-| POST   | `/checkouts/:id/sync`                     | `{ op: 'fetch'|'pull'|'push', confirmationToken? }` | `202 { operationId }`            | `checkouts` · fetch `plain`, pull/push `confirm` | `busy`, `operation_failed`, `confirmation_required`, `consent_missing`, `unreachable`, `kill_switch` |
-| POST   | `/checkouts/:id/archive`                  | —                                              | `FleetCheckoutView`                   | `checkouts` · `confirm`              | `busy`                                                                          |
+| POST   | `/checkouts/:id/sync`                     | `{ op: 'fetch'|'pull'|'push', confirm? }`      | `202 { operationId }`                 | `checkouts` · fetch `plain`, pull/push `confirm` | `busy`, `operation_failed`, `confirmation_required`, `consent_missing`, `unreachable`, `kill_switch` |
+| POST   | `/checkouts/:id/archive`                  | `{ confirm: true }`                            | `FleetCheckoutView`                   | `checkouts` · `confirm`              | `busy`, `confirmation_required`                                                 |
 | POST   | `/checkouts/:id/restore`                  | —                                              | `FleetCheckoutView`                   | `checkouts` · `plain`                | `operation_failed` (folder gone)                                                |
-| POST   | `/checkouts/:id/delete-preview`           | —                                              | `{ uncommitted, unpushedCommits, class }` | `checkouts` · `plain`            | `unreachable`                                                                   |
-| DELETE | `/checkouts/:id`                          | `{ confirmationToken, mode: 'delete'|'forget' }` | `202 { operationId }`               | `checkouts` · `confirm` / `confirm-destructive` | `confirmation_required`, `busy`, `unreachable`, `kill_switch`         |
-| POST   | `/internal/fleet/checkouts/credential`    | `FleetGitCredentialRequest` (node credential)  | installation token response           | node-authenticated (`FleetNodeAuthGuard`) | undifferentiated 401; `operation_failed` with stable reason                |
+| DELETE | `/checkouts/:id` (`?cleanUp=1` — FL-06)   | `{ mode: 'delete'|'forget', confirm? , confirmName? }` | `202 { operationId }`           | `checkouts` · `confirm` / `confirm-destructive` | `confirmation_required` (with the counts), `busy`, `unreachable`, `kill_switch`; `invalid` naming the rule when `cleanUp=1` and FL-06's gate fails |
+| POST   | `/api/internal/fleet/checkouts/credential` | `FleetGitCredentialRequest` (node credential) | installation token response           | node-authenticated (`FleetNodeAuthGuard`) | undifferentiated 401; `operation_failed` with stable reason                |
 
-Confirmation tokens: `POST …/delete-preview` returns the class and a one-time token bound to
-(checkoutId, class, counts); the `DELETE` must present it — the same two-step the other families
-use for `confirm-destructive` (FL-01 defines the token helper; this plan consumes it). Rate tier:
-`long` 30/min per user on create/sync/delete; `refresh` 6/min per checkout.
+Confirmations follow CONTRACTS §2.2 for every caller. The **delete preview** is the first answer
+of `DELETE /checkouts/:id` sent without a confirmation field: `409 confirmation_required` with
+`details: { class, uncommitted, unpushedCommits }` computed on the node; the dialog (or FL-06's
+Clean up, or a tool) re-sends with `confirm: true` when both counts are zero, else with
+`confirmName: "<checkout name>"`. The node re-computes the evidence on execute and refuses when it
+grew (§6). `?cleanUp=1` (added by FL-06, its FR-25) makes the handler apply FL-06's gate —
+worktree, pull request merged or closed, no live session — before the changes-check; the branch is
+always kept. No confirmation-token route exists. Rates (proposed CONTRACTS §10.1 additions, spec
+§8b): 30/min per user on create/sync/delete; `refresh` 6/min per checkout.
 
 DTOs in `apps/api/src/fleet/dto/fleet-checkout.dto.ts` (`class-validator`; `repoUrl` validated by
 the existing token-free URL rule from `fleet-task-workspace.types.ts`).
 
 ## 6. Node side
 
-New module `apps/node/src/core/checkouts/` (TypeScript, no plugin — README D8):
+New module `apps/node/src/core/link/modules/checkouts.ts` with its helpers under
+`apps/node/src/core/link/modules/checkouts/` (TypeScript, no plugin — README D8; CONTRACTS R-40):
 
 | File                      | Responsibility                                                                                                                                                                                     |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `checkout-registry.ts`    | Node-local registry `checkouts.json` in the config dir: id, path, kind, parent, remote, branch, isolation, origin (`platform`/`discovery`/`task`). Source of FL-11 roots via `allowedRoots()`.      |
+| `checkout-registry.ts`    | Node-local registry `checkouts.json` in the config dir: id, path, kind, parent, remote, branch, isolation, origin (`platform`/`discovery`/`task`). Hands its `ready` paths to the shared resolver `apps/node/src/core/link/allowed-roots.ts` (`resolveAllowedRoots({ checkouts, … })`, CONTRACTS R-39); defines no resolver of its own. |
 | `checkout-discovery.ts`   | Walk code folders (depth 3, skip list, prune at `.git`), read `git remote get-url origin`, strip userinfo, flag it; honours the 300 cap; emits `truncated`.                                           |
 | `checkout-git-line.ts`    | `status --porcelain=v2 --branch`, `diff --numstat`, `rev-list --left-right --count`, `worktree list --porcelain` (isWorktree), base ref from `branch.<b>.base` config else upstream; never fetches. |
 | `checkout-evidence.ts`    | Shared with the reaper: dirty count, lock files, commits unreachable from any remote ref; returns `{ uncommitted, unpushedCommits, class }`.                                                        |
@@ -165,12 +175,15 @@ New module `apps/node/src/core/checkouts/` (TypeScript, no plugin — README D8)
 | `checkout-credential.ts`  | Asks `/api/internal/fleet/checkouts/credential` for an operation token; injects `http.<origin>.extraheader` into the child env for one command; never writes config.                               |
 | `checkout-task-import.ts` | Maps `workspace-inventory` records to `discovered`-origin rows of kind `worktree`, `createdBy: task`.                                                                                              |
 | `checkout-container.ts`   | P3: builds the `docker run` wrapper for sessions/commands in a `container` checkout.                                                                                                                 |
-| `checkouts-handler.ts`    | Registers `checkouts.list|create|sync|delete` on the `machine` channel (FL-02's channel host).                                                                                                      |
+| `checkouts.ts` (module)   | `apps/node/src/core/link/modules/checkouts.ts` — the `NodeModule` (CONTRACTS R-40, one entry in `link/modules/index.ts`) that registers `checkouts.list|create|sync|delete` on FL-02's `machine` verb router; FL-06 adds `checkouts.changes` and the `remoteHeads` flag to it. |
 
 **Messages (machine channel, JSON, `requestId` on every frame):**
 
-- `checkouts.list { rescan?, refresh?, checkoutIds? }` → `{ checkouts[], truncated, codeFolders, scannedAt }`.
-  `rescan` runs discovery and the Task import; `refresh` recomputes git lines for `checkoutIds`.
+- `checkouts.list { rescan?, refresh?, checkoutIds?, remoteHeads? }` → `{ checkouts[], truncated,
+  codeFolders, scannedAt, remoteBranches? }`. `rescan` runs discovery and the Task import; `refresh`
+  recomputes git lines for `checkoutIds`; `remoteHeads: true` (FL-06's additive flag) adds
+  `remoteBranches` from `git ls-remote --heads origin` — the one call that touches the remote, made
+  only on request; existing callers are unchanged.
 - `checkouts.create { checkoutId, source, path?, branch, baseRef, isolation }` → `{ operationId }`;
   then `operation.progress { percent, phase: 'credential'|'clone'|'checkout'|'worktree' }` and
   `operation.done { ok, path, branch, headSha, gitLine } | { error }`.
@@ -178,6 +191,7 @@ New module `apps/node/src/core/checkouts/` (TypeScript, no plugin — README D8)
 - `checkouts.delete { checkoutId, mode, expected: { uncommitted, unpushedCommits } }` →
   `{ operationId }`; the node **re-computes** the evidence and refuses with `busy`/`invalid` when
   it exceeds `expected` (the confirmation was given for smaller counts).
+- `checkouts.changes { checkoutId, maxBytes }` (FL-06, CONTRACTS §3.3) is served by the same module.
 - Refusals: `consent_missing` (no `--manage` for a person-initiated request; `--work` suffices for
   `createdBy: task`), `busy` (lease file alive, reaper intent pending, or a daemon session has
   the path as cwd), `unsupported_on_node`, `limit_exceeded`, `operation_failed`.
@@ -193,11 +207,12 @@ Default checkouts root: `<workspace-root>/checkouts/<repo key>/<slug>` (same vol
 floor as the pool — `effectiveMinFreeDiskBytes` check before clone).
 
 **Code folders:** `ever-works-node start --code-folder <dir>` (repeatable; persisted in
-`node-config.json` like `--workspace-root`, `program.ts:439`); reported in the heartbeat inventory
-and in `checkouts.list`. Home directory as a whole is refused at parse time.
+`node-config.json` like `--workspace-root`, `program.ts:439`); reported in `checkouts.list` only.
+Home directory as a whole is refused at parse time.
 
-**Kill switch:** the link host (FL-02) refuses every `checkouts.*` request with `kill_switch`;
-the handler aborts in-flight operations via their `AbortSignal` and removes partial clones.
+**Kill switch (R-24, CONTRACTS §3.2):** the link host (FL-02) refuses every `checkouts.*` request
+with `kill_switch`; on `link.pause` the module aborts in-flight operations via their
+`AbortSignal` and removes partial clones; `link.resume` lets requests through again.
 
 ## 7. Plugin surface
 
@@ -207,18 +222,20 @@ for non-GitHub credentials is out of scope and would hang off the credential end
 
 ## 8. Web surface
 
-- Routes: `/fleet/checkouts` → `DASHBOARD_FLEET_CHECKOUTS` in `apps/web/src/lib/constants.ts`;
-  computer tab `?tab=checkouts` through FL-01's registry (`apps/web/src/components/fleet/registry.ts`
-  entry `{ id: 'checkouts', consent: 'manage', flag: 'FLEET_CHECKOUTS_ENABLED', load: () => import(…) }`).
-- Pages: `apps/web/src/app/[locale]/(dashboard)/fleet/checkouts/page.tsx` (server component:
-  fetches the list and kill-switch state, hands to the client).
+- Routes: `/fleet/checkouts` and `DASHBOARD_FLEET_CHECKOUTS` are created by FL-01 (CONTRACTS §11.1);
+  this epic fills the hub tab with `registerHubTab({ id: 'checkouts', flag: 'FLEET_CHECKOUTS_ENABLED',
+  load: () => import(…) })` and the computer tab `?tab=checkouts` with `registerComputerTab({ id:
+  'checkouts', consent: 'manage', flag: 'FLEET_CHECKOUTS_ENABLED', load: () => import(…) })` in
+  `apps/web/src/components/fleet/registry.ts`; it creates no route file or constant.
+- Data: the hub tab's server data (list and kill-switch state) is loaded by the tab module FL-01's
+  page mounts.
 - Components `apps/web/src/components/fleet/checkouts/`: `CheckoutsHubTab.tsx`,
   `ComputerCheckoutsTab.tsx`, `CheckoutRow.tsx`, `GitLine.tsx` (shared renderer; FL-06 adds the
   PR pill slot), `CodeFoldersCard.tsx`, `NewCheckoutDialog.tsx`, `DeleteCheckoutDialog.tsx`,
   `CheckoutsBin.tsx`, `CheckoutStateCard.tsx` (empty / offline / consent-missing / error),
   `checkouts.shared.ts` (pure: grouping by repository, row ordering, action availability per
   state × consent × audience × busy, size formatting, reaper-note text).
-- BFF: `apps/web/src/app/api/fleet/checkouts/route.ts`, `.../[id]/{refresh,sync,archive,restore,delete-preview}/route.ts`,
+- BFF: `apps/web/src/app/api/fleet/checkouts/route.ts`, `.../[id]/route.ts` (GET, DELETE), `.../[id]/{refresh,sync,archive,restore}/route.ts`,
   `apps/web/src/app/api/fleet/nodes/[id]/checkouts/route.ts` — thin `bffProxy` like
   `apps/web/src/lib/api/computer-bff.ts`.
 - i18n groups (`apps/web/messages/en.json`, namespace `fleet.*`, camelCase leaves, no literal `.`):
@@ -247,8 +264,10 @@ Tools (`packages/agent/src/fleet/agent-fleet-tools.ts` builder, extended):
 
 Agent gating: AW-15 grant + AW-24 trust **and** the Node's `checkouts` audience includes the
 Agent's owner (CONTRACTS §2.1). MCP: the same six routes added to the Fleet block of
-`apps/mcp/src/openapi-tools/whitelist.ts`. CLI: `apps/cli/src/commands/fleet/checkouts.ts` —
-`ever-works fleet checkouts list|get|create|sync|archive|delete [--json]`, exit `0/1/2`; FL-19
+`apps/mcp/src/openapi-tools/whitelist.ts` with the same names (CONTRACTS §11.3). CLI:
+`apps/cli/src/commands/fleet/checkout.ts` (FL-19 §9.3's file) — `ever-works fleet checkouts
+list|get|create|sync|archive|delete [--json]`, exit `0/1/2`; FL-19's catalogue gains
+`fleet_checkouts_archive`; FL-19
 finishes the family.
 
 ## 10. Background jobs
@@ -294,7 +313,7 @@ per-family request counters cover `checkouts.*`.
 - **P2**: create (clone + worktree), credential endpoint, pull/push, delete with changes-check,
   file roots for FL-11, Agent tools + MCP + CLI.
 - **P3**: container isolation, shared folders, bin purge.
-- **Default-on**: after ACC-FL14-01…21 pass on `develop` and FL-02 is on.
+- **Default-on**: after ACC-FL14-01…29 pass on `develop` and FL-02 is on.
 
 ## 14. Test plan
 
@@ -305,14 +324,16 @@ per-family request counters cover `checkouts.*`.
   audit rows per action; `checkout-remote-match.spec.ts` — host-aware matching truth table;
   `fleet-checkout.repository.integration.spec.ts` — unique `(nodeId, path)`.
 - **API (Jest):** `apps/api/src/fleet/fleet-checkouts.controller.spec.ts` — every error code and
-  status, confirmation token round trip, cross-user 404; `fleet-git-credential.service.spec.ts` —
+  status, `confirmation_required` → `confirm` / `confirmName` round trip with the counts, `cleanUp=1`
+  gate passed through, cross-user 404; `fleet-git-credential.service.spec.ts` —
   read vs write scope, repository narrowing, revoke on done, host mismatch refused.
-- **Node (Vitest):** `apps/node/src/core/checkouts/checkout-discovery.spec.ts` (depth, prune, skip,
+- **Node (Vitest):** `apps/node/src/core/link/modules/checkouts/checkout-discovery.spec.ts` (depth, prune, skip,
   cap, token strip), `checkout-git-line.spec.ts` (fixtures for ahead/behind/dirty/worktree; no
   network), `checkout-evidence.spec.ts` (agrees with the reaper on the same fixtures),
   `checkout-operations.spec.ts` (clone/worktree/fetch/pull/push/remove argv, cancellation, partial
   cleanup, Windows longpaths), `checkout-credential.spec.ts` (header only in child env),
-  `checkouts-handler.spec.ts` (consent matrix, busy, kill switch), `checkout-task-import.spec.ts`.
+  `apps/node/src/core/link/modules/checkouts.spec.ts` (consent matrix, busy, `link.pause`,
+`remoteHeads`), `checkout-task-import.spec.ts`.
 - **Web unit (Vitest):** `apps/web/src/components/fleet/checkouts/checkouts.shared.unit.spec.ts`
   (grouping, action availability matrix), `GitLine.unit.spec.tsx`, `DeleteCheckoutDialog.unit.spec.tsx`.
 - **E2E (Playwright):** `apps/web/e2e/flow-fleet-checkouts.spec.ts`, `flow-fleet-checkouts-contract.spec.ts`.

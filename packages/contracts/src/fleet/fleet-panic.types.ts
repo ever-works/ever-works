@@ -111,7 +111,13 @@ export type FleetAuditAction =
 	/** A recorded demonstration finished. */
 	| 'computer.teach-finish'
 	/** One Agent's logins and files on one node were reset. */
-	| 'computer.profile-reset';
+	| 'computer.profile-reset'
+	/**
+	 * Fleet hub (FL-01) — the owner changed one action family's audience on a
+	 * node's control policy (CONTRACTS §2.1, §7). One row per family changed;
+	 * details carry `family`, `from`, `to` — never a member's name.
+	 */
+	| 'node.policy.change';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -145,7 +151,8 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'computer.control-refused',
 	'computer.teach-start',
 	'computer.teach-finish',
-	'computer.profile-reset'
+	'computer.profile-reset',
+	'node.policy.change'
 ];
 
 /**

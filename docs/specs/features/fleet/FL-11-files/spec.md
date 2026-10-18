@@ -113,7 +113,7 @@ view, at most 256 KiB, and never the other way — the machine's clipboard is ne
 | "Download that log."                        | Push it to a repo, or use another tool.                                            | Nothing streams a file off a node; the only streams are pictures and terminal frames (`apps/node/src/core/screen/frame-outbox.ts:14-38`).                                                                                                                                                                                                                                                                                      |
 | "Copy it from build-01 to build-02."         | Nothing.                                                                           | No platform-relayed transfer exists; the trust model forbids node-to-node contact (README D2).                                                                                                                                                                                                                                                                                                                             |
 | "Paste this into the window."                | Type it by hand while in control.                                                  | Clipboard combinations are deliberately blocked on the live view — "Clipboard combinations would move clipboard contents between the viewer's computer and the Agent's" (`packages/contracts/src/computer/computer-control.types.ts:140-146, 168-171`) and the injector refuses "a clipboard payload" outright (`apps/node/src/core/screen/input-injector.ts:20-22`). Right call for a bridge; this epic adds the one-way, opt-in paste instead. |
-| "Let my Agent fetch that file."              | Nothing.                                                                           | The only Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-42`); MCP exposes reads, affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`); the CLI has one file, `apps/cli/src/main.ts`, and no fleet command.                                                                                                                                                                 |
+| "Let my Agent fetch that file."              | Nothing.                                                                           | The only Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-42`); MCP exposes reads, affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`); the CLI's command groups are `auth`, `kb`, `plugins` and `work` (`apps/cli/src/main.ts:22-25`) and none is a fleet command (EXISTING-SUBSTRATE §8.2).                                                                                                                                                                 |
 | "Which files must never leave the machine?"  | Remember.                                                                          | The secret scanner knows credential *values* (`packages/contracts/src/secret/secret-patterns.ts:1-40`); nothing knows credential-shaped *names*.                                                                                                                                                                                                                                                                             |
 
 ### 2.3 The gaps this epic closes
@@ -312,7 +312,8 @@ on a new channel. No entity is added — files are read from the Node and never 
   the UI, the API and the tools.
 - **FR-22** Every user-visible string MUST be an i18n key under the `fleet` namespace.
 - **FR-23** When the kill switch is on, every `files` request MUST be refused `kill_switch` and
-  every in-flight operation MUST be cancelled within 5 seconds (R-24).
+  every in-flight operation MUST be cancelled within 5 seconds (R-24; the node acts on FL-02's
+  `link.pause`, CONTRACTS §3.2).
 
 ### 4.3 P2 — Copy between machines
 
@@ -337,8 +338,7 @@ on a new channel. No entity is added — files are read from the Node and never 
 - **FR-33** Paste MUST never be broadcast: exactly one view on one Node receives a paste.
 - **FR-34** The paste dialog MUST show the size against the cap, MUST warn (without blocking) when
   the text looks like it contains a secret, and MUST say nothing is read back.
-- **FR-35** Every paste MUST write `node.clip.paste` with the byte count only (see §8b for the
-  CONTRACTS addition).
+- **FR-35** Every paste MUST write `node.clip.paste` with the byte count only (CONTRACTS §7).
 
 ### 4.5 Agent tools (both phases)
 
@@ -346,11 +346,11 @@ on a new channel. No entity is added — files are read from the Node and never 
   person sees, with credential-shaped names flagged.
 - **FR-37** `fleet_files_copy` MUST be marked destructive, MUST list conflicts in its result before
   any write, and MUST write only with an explicit replace flag.
-- **FR-38** `fleet_files_delete` MUST be marked destructive with class `confirm-destructive` and,
-  because an Agent cannot type a name, MUST raise an approval (Decision) the owner confirms instead
-  of executing.
-- **FR-39** `fleet_clip_paste` MUST be marked destructive, MUST be denied unless granted per Agent,
-  and MUST follow FR-31 with the Agent as the controller.
+- **FR-38** `fleet_files_delete` MUST be marked destructive with class `confirm-destructive` and
+  MUST be held as an Agent action proposal (CONTRACTS R-33) that the owner approves in My
+  Decisions; it MUST NOT execute on the Agent's own `confirmName`.
+- **FR-39** `fleet_desktop_paste` MUST be marked destructive, MUST be denied unless granted per
+  Agent, and MUST follow FR-31 with the Agent as the controller.
 - **FR-40** Tool results MUST enter the Run's receipt with their size and tokens, so an Agent's file
   listing answers "what did it cost?".
 
@@ -492,12 +492,21 @@ _"Files on build-01"_, _"Upload to build-01"_, _"Copy files to another computer"
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — §7 has no audit name for a paste; proposed `node.clip.paste` (details: bytes only). Also §3.3 lists `files.pack`/`files.unpack`/`files.delete` but no `files.cancel`; this spec uses FL-02's operation cancel — confirm `operation.cancel` and `DELETE /api/fleet/operations/:id` exist in FL-02.]`
-- `[NEEDS CLARIFICATION: CONTRACTS §3.3 opens `clip` with `{ sessionId }`. This spec reads it as the **desktop view's** id (an AW-11 computer session, FL-07), not a `FleetSession`; a paste needs a focused desktop, which a PTY session does not have. Confirm, or rename the param to `viewId`.]`
-- `[NEEDS CLARIFICATION: Should an owner be able to add `--files-root` from the node drawer (platform → node config) rather than only on the machine? R-18 says "in the node's local config"; this spec keeps it machine-only.]`
-- `[NEEDS CLARIFICATION: Should `node.files.list` be audited at all (noise), or only once per root per visit as this spec proposes?]`
-- `[NEEDS CLARIFICATION: Credential-shaped pattern list — fixed in contracts (proposed) or owner-extendable per Node?]`
-- `[NEEDS CLARIFICATION: Daily bytes shown in the footer — per owner, per Node, or per Organization?]`
+- **Resolved** by CONTRACTS §7 and §3.2 / §11.2: the paste audit name is `node.clip.paste` (bytes
+  only); a transfer is cancelled with `operation.cancel` / `DELETE /api/fleet/operations/:id`
+  (FL-02), so the `files` family needs no `files.cancel`.
+- **Resolved** by CONTRACTS R-27: the `clip` channel opens with `{ viewId }` — the desktop view
+  (computer session, FL-07) being pasted into, never a `FleetSession`.
+- **Resolved** by CONTRACTS R-18: extra roots come only from the node's local config
+  (`--files-root` on the machine); the platform never writes them.
+- **Resolved** by CONTRACTS §2.3 / §7: file lists are audited (`node.files.list`); this epic writes
+  one row per root per tab visit.
+- `[NEEDS CLARIFICATION: Credential-shaped pattern list — fixed in contracts, or owner-extendable
+  per Node? Default until answered: one fixed list in contracts (plan §3), not extendable.]`
+- `[NEEDS CLARIFICATION: Daily bytes shown in the footer — per owner, per Node, or per
+  Organization? Default until answered: per Node — the sum of this Node's `node.files.read|write|copy`
+  audit rows since midnight in the viewer's time zone.]`
+- **Resolved** by CONTRACTS rev 5: file request and paste rates (§10.1: 60/min, 30/min), concurrent transfers 2 per Node / 4 per user (§10), confirmation by request fields with no tokens (§2.2).
 
 ---
 
@@ -517,7 +526,7 @@ _"Files on build-01"_, _"Upload to build-01"_, _"Copy files to another computer"
 - [ ] **ACC-FL11-12** (FR-20–FR-23) No-credits statement and bytes moved shown; codes + hints identical across surfaces; no literal strings; kill switch cancels within 5 s.
 - [ ] **ACC-FL11-13** (FR-24–FR-29) Copy moves bytes only through the platform (network capture shows no node-to-node connection), honours destination credits, lists conflicts, audits on both Nodes, needs both audiences and consents.
 - [ ] **ACC-FL11-14** (FR-30–FR-35) Paste works only with control + opt-in, caps at 256 KiB, lands in the focused window, never reads back, audits bytes only, and the opt-in resets on view end.
-- [ ] **ACC-FL11-15** (FR-36–FR-40) Tools carry the right annotations; delete raises a Decision; paste is default-denied; receipts show size and tokens.
+- [ ] **ACC-FL11-15** (FR-36–FR-40) Tools carry the right annotations; an Agent's delete is held as an action proposal (R-33) and runs only on the owner's approval; `fleet_desktop_paste` is default-denied; receipts show size and tokens.
 - [ ] **ACC-FL11-16** (FR-41, FR-42) Keyboard grid operation and announcements verified; axe sweep clean.
 - [ ] **ACC-FL11-17** Every FR has a passing test named in the plan.
 

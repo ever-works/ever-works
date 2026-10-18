@@ -276,8 +276,8 @@ click. No table changes (CONTRACTS §13 reserves no FL-15 slot).
   linked; it MUST read "No session on a computer yet" when none exists.
 - **FR-10** The session card MUST show the Task chip in its Task slot when the session's Run has a
   Task.
-- **FR-11** Starting a session MUST write the session-start audit row with the Task named in its
-  details; this epic adds no audit action of its own for P1.
+- **FR-11** Starting a session MUST write the session-start audit row (`node.session.start`) with
+  the Task named in its details; this epic adds no audit action of its own for P1.
 
 ### 4.2 P2 — Git identity
 
@@ -291,7 +291,8 @@ click. No table changes (CONTRACTS §13 reserves no FL-15 slot).
   else their account email with a stated warning; it MUST act only on click, only on that machine,
   after one confirmation naming the machine.
 - **FR-15** The fix MUST never write a credential, a token or a credential helper, and MUST write
-  one audit row with the machine and the fields set (never the email value).
+  one `node.git.identity.set` audit row (CONTRACTS §7) with the machine and the fields set (never
+  the email value); it is a `confirm` action in the `commands` family (CONTRACTS §2.1).
 - **FR-16** The dialog MUST show the identity line for the selected computer and MUST offer the fix
   inline when name or email is unset.
 
@@ -310,7 +311,8 @@ click. No table changes (CONTRACTS §13 reserves no FL-15 slot).
   head branch and fork origin, and the dialog MUST check out that head branch; a fork's branch
   MUST be read-only unless the fork allows maintainer edits.
 - **FR-21** Agents MUST get the hand-off and the identity check as tools, with CONTRACTS §11.3
-  annotations, gated by Agent permissions and the Node's family audiences.
+  names and annotations, gated by Agent permissions and the Node's family audiences; the hand-off is
+  the one session-start tool with a Task named, never a second start tool.
 
 ---
 
@@ -340,7 +342,7 @@ glyph with the machine name while a session runs.
 
 ```
 ┌ Git on design-mac ───────────────────────────────────────────────────────────┐
-│ Name      Dana Example                       ✓                                │
+│ Name      Your Name                          ✓                                │
 │ Email     not set                            ⚠                                │
 │ Helper    osxkeychain                        ✓                                │
 │ Ever Works can push for agents   yes — acme/api, acme/web                    │
@@ -349,8 +351,8 @@ glyph with the machine name while a session runs.
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Confirmation: _"Set the global Git identity on design-mac for every repository there? Name: Dana
-Example · Email: 12345+dana@users.noreply.github.com"_. Without a GitHub link the email line adds
+Confirmation: _"Set the global Git identity on design-mac for every repository there? Name: Your
+Name · Email: 12345+your-login@users.noreply.github.com"_. Without a GitHub link the email line adds
 _"Your account email will appear in public commits."_
 
 ### 5.5 Triggers page (P3)
@@ -403,17 +405,22 @@ context.
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — add `git.identity` (read) and `git.setIdentity`
-(write, class `confirm`) to the `machine` family vocabulary (§3.3), and `node.git.identity.set`
-to the audit names (§7). Until then the identity fix cannot be audited under its own name.]`
-- `[NEEDS CLARIFICATION: Which permission family governs the identity fix — `commands` (it is a
-command on the machine) or `checkouts`? This spec assumes `commands`.]`
-- `[NEEDS CLARIFICATION: Fork pull requests — read-only by default; should the dialog offer to
-push to the fork when maintainer edits are allowed, or always propose a same-repo branch?]`
+- **Resolved** by CONTRACTS §3.3 and §7: `git.identity` / `git.setIdentity` are `machine` verbs and
+  the audit name is `node.git.identity.set`.
+- **Resolved** by CONTRACTS §2.1: `git.setIdentity` belongs to the `commands` family.
+- `[NEEDS CLARIFICATION: Fork pull requests — should the dialog offer to push to the fork when
+maintainer edits are allowed, or always propose a same-repo branch? Default until answered: as
+FR-20 — the fork's branch is read-only unless the fork allows maintainer edits, and then the
+session pushes to the fork's branch; no same-repo branch is proposed.]`
 - `[NEEDS CLARIFICATION: Should the "for me" preset default to auto-start with the assigned Agent
-for review requests, or always park in Backlog (this spec: park)?]`
-- `[NEEDS CLARIFICATION: The audience filter needs the Trigger's event matcher column to accept an
-additional JSON key; confirm it is a JSON column (no migration) — plan T-12 verifies.]`
+for review requests, or always park in Backlog? Default until answered: always park in Backlog;
+auto-start stays an explicit choice in the preset.]`
+- **Resolved** by CONTRACTS §4 (storage types) and the code: `inbound_triggers.eventMatcher` is a
+  `simple-json` text column (`packages/agent/src/entities/inbound-trigger.entity.ts:151-152`), so
+  the audience key is an additive JSON key with no migration.
+- **Resolved** by CONTRACTS rev 5: `/tasks/:taskId/handoff-options` (§11.2), session start carries `taskId` through FL-04's `POST /nodes/:id/sessions`; identity rate 10 per minute (§10.1).
+- Cross-epic seam (not an owner question): FL-04's session start request has no `taskId`; this epic
+  adds it as an optional, additive field (plan §3) and FL-04's start path stays the only one.
 
 ---
 
@@ -432,8 +439,10 @@ additional JSON key; confirm it is a JSON column (no migration) — plan T-12 ve
 - [ ] **ACC-FL15-11** (FR-17, FR-18) A `review_requested` webhook becomes a `github.pr` event; a Trigger with "review requested from me" fires only when the reviewer login matches the owner's linked login.
 - [ ] **ACC-FL15-12** (FR-19, U11, U12) The preset creates the Trigger in one click, refuses without a GitHub link, and a repeated event updates the same Task.
 - [ ] **ACC-FL15-13** (FR-20, S4, U8) A PR Task checks out the head branch; a fork is read-only unless maintainer edits are allowed.
-- [ ] **ACC-FL15-14** (FR-21) `fleet_tasks_fix_on_computer` is refused outside the `sessions` audience with `permission_denied`; `fleet_git_identity_get` works for any Agent with the grant.
+- [ ] **ACC-FL15-14** (FR-21) `fleet_sessions_start` with a `taskId` is refused outside the `sessions` audience with `permission_denied`; `fleet_nodes_git_identity_get` works for any Agent with the grant; `fleet_nodes_git_identity_set` without `confirm: true` answers `confirmation_required`.
 - [ ] **ACC-FL15-15** Every string is a `fleet.*` key; the banned-terms grep prints nothing.
+- [ ] **ACC-FL15-16** (FR-11) A session started from a Task writes `node.session.start` with the Task in its details and no other new audit action.
+- [ ] **ACC-FL15-17** (FR-16) The dialog shows the selected computer's identity line and offers the fix inline when name or email is unset.
 
 ---
 
@@ -454,7 +463,7 @@ additional JSON key; confirm it is a JSON column (no migration) — plan T-12 ve
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) §2 ("Tasks stay the hand-off unit"), D7, D14 · [CONTRACTS](../CONTRACTS.md) R-1, R-5, R-16, R-22; §1; §2; §3.3; §7; §8; §9; §11 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §E
+- Program: [Fleet README](../README.md) §2 ("Tasks stay the hand-off unit"), D7, D14 · [CONTRACTS](../CONTRACTS.md) R-1, R-5, R-16, R-22, R-40; §1; §2; §3.2 link controls; §3.3; §4 storage types; §7; §8; §9; §11 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §E
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Evidence (HEAD `e4334baf7`): `apps/web/src/components/tasks/RunWithAgentMenu.tsx:20-50`, `apps/api/src/agents/agents.controller.ts:1886`, `apps/api/src/fleet/fleet-run-router.service.ts:294,326-340`, `packages/agent/src/fleet/fleet-agent-node-affinity.service.ts:26-78`, `apps/web/src/components/agents/AgentFleetSection.tsx:33-55`, `apps/web/src/components/tasks/TaskDetailClient.tsx:26-32,541,810`, `packages/agent/src/entities/inbound-trigger.entity.ts:12-69`, `apps/api/src/ingest/github/github-issue-intake.service.ts:31,40-48,160`, `apps/api/src/ingest/github/github-pr-review-bridge.service.ts:1298`, `packages/agent/src/entities/github-app-user-link.entity.ts:11-35`, `apps/node/src/core/capabilities.ts:264-310`, `docs/features/inbound-triggers.md:42`, `docs/features/tasks.md:217,286-299`
 - Related epics: FL-04, FL-05, FL-06, FL-14, FL-19

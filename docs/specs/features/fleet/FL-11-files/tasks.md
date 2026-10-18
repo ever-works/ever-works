@@ -18,8 +18,11 @@
   → Jest; `apps/web/e2e` → Playwright.
 - **No migration**: CONTRACTS §13 reserves no FL-11 slot; a PR that adds a schema change here is
   wrong by construction.
-- FL-02 owns `apps/node/src/core/link/`, the relay bus, operations and the viewer gateway; FL-01
-  owns `apps/web/src/components/fleet/registry.ts` and role derivation; FL-07 owns
+- FL-02 owns the link core (`apps/node/src/core/link/` mux and `link/modules/index.ts`), the relay
+  bus, operations and the viewer gateway; this epic adds `link/modules/files.ts`,
+  `link/modules/clip.ts` and helpers under `link/modules/files/` (CONTRACTS R-40) and imports the
+  shared resolver `apps/node/src/core/link/allowed-roots.ts` (R-39). FL-01 owns
+  `apps/web/src/components/fleet/registry.ts` and role derivation (`FleetAccessService`); FL-07 owns
   `apps/node/src/core/screen/desktop-host.ts` and the Desktop tab. Tasks that touch them say so.
 - Never name a third-party product anywhere (program rule 16); run the banned-terms grep before
   every PR.
@@ -42,49 +45,56 @@
 
 ## P1.B — Node files module
 
-- [ ] **T-02**. `apps/node/src/core/files/path-guard.ts`: `resolveInsideRoot(root, rel, io)` with
-      `realpath` of the root, `lstat` walk per component, link-target check, Windows case/drive
-      normalisation and UNC refusal; typed refusals `escape | link-escape | not-found`.
-      **Test**: `apps/node/src/core/files/path-guard.spec.ts` — `..`, absolute, `C:\`, `\\server\share`,
-      link out of root, link inside root, case-insensitive match on `win32` via injected platform.
-- [ ] **T-03** (parallel). `apps/node/src/core/files/allowed-roots.ts`: roots from the checkout
-      inventory (FL-14; fallback: worktree pool entries under the workspace root from
-      `apps/node/src/core/workspaces/fleet-task-workspace.ts`), the workspace root, and
-      `--files-root` entries; home never implied; missing roots refused with a log line.
-      Add `start --files-root <dir>` (repeatable) to `apps/node/src/cli/program.ts` reusing the
-      `--workspace-root` absolute-path parser; `doctor` prints roots.
-      **Test**: `allowed-roots.spec.ts`; `apps/node/src/cli/program.files-root.spec.ts` (relative
-      path is a usage error, exit 2).
-- [ ] **T-04**. `apps/node/src/core/files/list.ts` (`files.list`/`files.stat`: `readdir`
-      `withFileTypes`, `lstat` per entry, 5 000 cap + `truncated`, hidden filter per OS, flags
-      `credentialShaped`, `linkInsideRoot`) and `credential-shaped.ts` (re-export from contracts).
+- [ ] **T-02**. `apps/node/src/core/link/modules/files/path-guard.ts`: `resolveInsideRoot(root,
+      rel, io)` over the shared resolver's `isUnderAllowedRoot` (T-03), `lstat` walk per component,
+      link-target check, UNC refusal; typed refusals `escape | link-escape | not-found`. Never a
+      second canonicalisation rule.
+      **Test**: `apps/node/src/core/link/modules/files/path-guard.spec.ts` — `..`, absolute, `C:\`,
+      `\\server\share`, link out of root, link inside root, case-insensitive match on `win32` via
+      injected platform.
+- [ ] **T-03** (parallel). Import the shared resolver `apps/node/src/core/link/allowed-roots.ts`
+      (CONTRACTS R-39; create it with FL-08's API `resolveAllowedRoots({ checkouts, workspaceRoot,
+      extraRoots })` / `isUnderAllowedRoot(path)` only if neither FL-08 nor FL-14 has landed it):
+      roots from the checkout registry (FL-14; fallback: worktree pool entries under the workspace
+      root from `apps/node/src/core/workspaces/fleet-task-workspace.ts`), the workspace root, and
+      `--files-root` entries; home never implied; missing roots refused with a log line. Add
+      `start --files-root <dir>` (repeatable) to `apps/node/src/cli/program.ts` reusing the
+      `--workspace-root` absolute-path parser, unless already present; `doctor` prints roots.
+      **Test**: `apps/node/src/core/link/allowed-roots.spec.ts` (extend, do not duplicate);
+      `apps/node/src/cli/program.files-root.spec.ts` (relative path is a usage error, exit 2).
+- [ ] **T-04**. `apps/node/src/core/link/modules/files/list.ts` (`files.list`/`files.stat`:
+      `readdir` `withFileTypes`, `lstat` per entry, 5 000 cap + `truncated`, hidden filter per OS,
+      flags `credentialShaped`, `linkInsideRoot`) and `credential-shaped.ts` (re-export from
+      contracts).
       **Test**: `list.spec.ts` — cap, hidden per platform, flags, a 5 001-entry fixture truncates.
-- [ ] **T-05**. `apps/node/src/core/files/pack.ts`: tar (`tar-stream`) of the selection, in-set
+- [ ] **T-05**. `apps/node/src/core/link/modules/files/pack.ts`: tar (`tar-stream`) of the selection, in-set
       links as links, out-of-set links skipped and counted, `DATA` ≤ 64 KiB, sender window 8 MiB
       from `ACK`, `END` + `operation.done`; refuses > 5 000 entries or > 2 GiB **before** the first
       byte.
       **Test**: `pack.spec.ts` — tar listing equals the selection; link rules; a slow ACK pauses the
       sender at exactly one window; limits refuse before any `DATA`.
-- [ ] **T-06**. `apps/node/src/core/files/unpack.ts`: extract into `<dest>/.ever-works-partial-<opId>/`,
+- [ ] **T-06**. `apps/node/src/core/link/modules/files/unpack.ts`: extract into `<dest>/.ever-works-partial-<opId>/`,
       per-entry policy (`skip` default, `replace`), rename on `END`, remove the partial dir on
       `CLOSE`/cancel/failure, `ACK` as consumed; `delete.ts`: canonical check per entry, `fs.rm`
       recursive, never follows links out of root.
       **Test**: `unpack.spec.ts` — no partial file after cancel/interrupt/failure; `skip` leaves the
       original byte-identical; `delete.spec.ts` — link target outside root untouched.
-- [ ] **T-07**. `apps/node/src/core/files/files-module.ts` (node module per D8: wires T-02…T-06,
-      exposes `FilesHost`), `files` tag in `apps/node/src/core/capabilities.ts` (iff `--manage` and
-      roots non-empty), and `apps/node/src/core/link/channels/files-channel.ts` _(FL-02 dir)_
-      implementing plan §6.3 (every request answered with its `requestId`; limits before the first
-      byte; `CLOSE` removes partial dirs).
-      **Test**: `files-module.spec.ts`; extend `capabilities.spec.ts` (`files` iff roots);
-      `apps/node/src/core/link/channels/files-channel.spec.ts` (message table; refusal codes).
+- [ ] **T-07**. `apps/node/src/core/link/modules/files.ts` — the `files` `NodeModule` (D8, CONTRACTS
+      R-40) wiring T-02…T-06, with one entry in `apps/node/src/core/link/modules/index.ts`; `files`
+      tag from its `tags(env)` (iff `--manage` and roots non-empty); the channel handler implementing
+      plan §6.3 (every request answered with its `requestId`; limits before the first byte; `CLOSE`
+      removes partial dirs; `link.pause` closes in-flight operations).
+      **Test**: `apps/node/src/core/link/modules/files.spec.ts` (message table; refusal codes;
+      `link.pause`); extend `capabilities.spec.ts` (`files` iff roots).
 
 ## P1.C — Platform: service, transfer bridge, API
 
-- [ ] **T-08**. `packages/agent/src/fleet/files/fleet-files.service.ts`: audience check (`files`
-      family via FL-01 `resolveNodeRole`), consent check from `FleetNode.consents`, kill switch,
-      credential gate (people: `confirmation_required` class `confirm`; Agents: `permission_denied`),
-      delete gate (`confirm-destructive`, typed name verified), same-folder refusal, audit rows
+- [ ] **T-08**. `packages/agent/src/fleet/files/fleet-files.service.ts`: audience check
+      (`FleetAccessService.assertFamily(node, userId, 'files')`, FL-01), consent check from
+      `FleetNode.consents`, kill switch, credential gate (people: `confirmation_required` class
+      `confirm` until `confirm: true`; Agents: `permission_denied`), delete gate
+      (`confirm-destructive`: `confirmName` compared with the target, CONTRACTS §2.2), same-folder
+      refusal, audit rows
       (`node.files.list` once per root per visit, `read`, `write`, `delete`) with `root`, `path`,
       `entries`, `bytes`, `requestedBy`, `confirmed`.
       **Test**: `packages/agent/src/fleet/files/__tests__/fleet-files.service.spec.ts` — every
@@ -102,7 +112,7 @@
       P2, delete) with `dto/fleet-files.dto.ts`; module imported in `apps/api/src/api.module.ts`;
       `FleetEnabledGuard` + `FLEET_MACHINE_FACTS_ENABLED`; throttles per plan §5.
       **Test**: `fleet-files.controller.spec.ts` — codes + hints; cross-user node 404s like unknown;
-      `confirmation_required` without tokens; throttles present.
+      `confirmation_required` without `confirm` / `confirmName`; throttles present.
 
 ## P1.D — Web
 
@@ -161,11 +171,12 @@
 
 ## P2.B — Paste into a desktop
 
-- [ ] **T-19**. Node: `apps/node/src/core/link/channels/clip-channel.ts` _(FL-02 dir)_ — opens with
-      `{ sessionId }` (desktop view id), `--attend` and FL-07 source required, one `CLIP` ≤ 256 KiB,
-      calls `apps/node/src/core/screen/desktop-host.ts` `pasteText` _(FL-07)_, replies `clip.pasted`.
-      **Test**: `clip-channel.spec.ts` — over-cap refused before paste; consent refusal; never reads
-      the clipboard (the host mock has no read method).
+- [ ] **T-19**. Node: `apps/node/src/core/link/modules/clip.ts` — the `clip` `NodeModule` (one entry
+      in `link/modules/index.ts`, CONTRACTS R-40); opens with `{ viewId }` (R-27), `--attend` and
+      FL-07 source required, one `CLIP` ≤ 256 KiB, calls `apps/node/src/core/screen/desktop-host.ts`
+      `pasteText` _(FL-07)_, replies `clip.pasted`.
+      **Test**: `apps/node/src/core/link/modules/clip.spec.ts` — over-cap refused before paste;
+      consent refusal; never reads the clipboard (the host mock has no read method).
 - [ ] **T-20**. Platform: `packages/agent/src/fleet/files/fleet-clip.service.ts` (holder check via
       `packages/agent/src/computer/control-arbiter.service.ts`; per-view `pasteAllowed` relay state,
       reset on view end; cap; audit `node.clip.paste` bytes only) and
@@ -181,11 +192,12 @@
       **Test**: `DesktopPasteDialog.unit.spec.tsx` (cap; warning; disabled reasons verbatim);
       `apps/web/e2e/flow-fleet-desktop-paste.spec.ts`.
 - [ ] **T-22**. Tools: `fleet_files_copy` (`destructive`, `confirm`, conflicts in result, `replace`
-      flag), `fleet_files_delete` (`destructive`, `confirm-destructive` → raises an AW-03 Decision
-      carrying the entries; executes on approval), `fleet_clip_paste` (`destructive`, denied unless
-      granted, FL-07 grant required); MCP entries; CLI `apps/cli/src/commands/fleet/files.ts`
-      _(with FL-19)_.
-      **Test**: extend `agent-fleet-files-tools.spec.ts` — delete creates a Decision and writes
+      flag), `fleet_files_delete` (`destructive`, `confirm-destructive` → held as an
+      `agent_action_proposals` row carrying the entries, CONTRACTS R-33; executes on the owner's
+      approval), `fleet_desktop_paste` (`destructive`, denied unless granted, FL-07 grant required);
+      MCP entries with the same names; CLI `apps/cli/src/commands/fleet/files.ts` and `fleet desktop
+      paste` _(with FL-19)_.
+      **Test**: extend `agent-fleet-files-tools.spec.ts` — delete creates a held proposal and writes
       nothing; paste default denied; copy without `replace` skips conflicts.
 - [ ] **T-23**. Accessibility: `apps/web/e2e/flow-fleet-files-a11y.spec.ts` — keyboard-only grid
       and dialogs, live-region announcements for operation states, axe pass on the tab and the
@@ -200,8 +212,9 @@
       cross-link from `docs/features/fleet.md`.
       **Test**: `pnpm --filter ever-works-docs build` — no broken links.
 - [ ] **T-25**. Update `docs/specs/features/fleet/TRACKER.md` (FL-11 per phase) and the spec/plan
-      status fields; propose the CONTRACTS additions from spec §8b (`node.clip.paste`, operation
-      cancel, `clip` param naming) in the same PR, owner-approved before merge.
+      status fields; amend CONTRACTS in the same PR with the change spec §8b still lists (files and
+      paste rates, transfer concurrency, operation states), owner-approved before merge
+      (`node.clip.paste`, operation cancel and `{ viewId }` are already in CONTRACTS rev 2).
       **Test**: banned-terms grep over `docs/specs/features/fleet/FL-11-files/` and
       `docs/features/fleet-files.md` prints nothing.
 - [ ] **T-26**. Flip `FLEET_MACHINE_FACTS_ENABLED` per D12 together with FL-08/09/10 P1 once their

@@ -5,12 +5,12 @@
 > have this today" claims (program rule 13). Implementation lives in [plan.md](./plan.md).
 
 **Epic ID:** `FL-18-actions-runners`
-**Program:** [Fleet](../README.md) · Wave 3 (creating machines)
+**Program:** [Fleet](../README.md) · Wave 3 (machines and CI)
 **Branch:** `feat/fl-18-actions-runners`
 **Status:** `Draft`
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
-**Size:** M · **Blocked by:** FL-09 (services module), FL-02 (node link, operations), FL-08 (log sources) · **Related:** FL-01 (hub Overview panels), FL-03 ("needs a look"), FL-15 (GitHub on the fleet), FL-16 (Docker on a host, P3), FL-19 (tool parity)
+**Size:** M · **Blocked by:** FL-09 (services module), FL-02 (node link, operations), FL-08 (log sources), FL-01 (Overview block registry) · **Related:** FL-03 ("needs a look"), FL-15 (GitHub on the fleet), FL-16 (Docker on a host, P3), FL-19 (tool parity)
 **Extends (existing Ever Works nouns):** Node · Fleet · Job · Plugin (GitHub App) · Service (FL-09) · Log source (FL-08) · Fleet audit · Needs a look · Inbox
 
 ---
@@ -155,7 +155,7 @@ node's own service install are untouched.
   **Given** a queued job no runner can take, **when** the owner presses **Cancel workflow run…** and confirms
   _"Cancel workflow run #4822 of acme/api? Every job in it stops."_, **then** the whole workflow run is
   cancelled at GitHub, the row leaves the panel within one poll, and `node.runner.job.cancel` is
-  audited (§8b).
+  audited (CONTRACTS §7).
 
 - **S7 — Organisation scope (P2).**
   **Given** the owner picks the organisation `acme` as target, **when** the installation lacks the
@@ -165,11 +165,13 @@ node's own service install are untouched.
   **Use a repository instead**; Install stays disabled until a re-check passes.
 
 - **S8 — An Agent asks.**
-  **Given** Agent `Ops` holds the `machines` grant, **when** it calls `fleet_runners_list`, **then**
-  it receives the owner's runners read-only; **when** it calls `fleet_runners_install`, **then** the
-  tool is destructive and refused `confirmation_required` until an Approval states _"Installs 2
-  Actions runners for acme/api on build-01 as services. They run CI jobs on that computer; no credits
-  are spent."_
+  **Given** Agent `Ops`'s tool grants allow the runner tools and `build-01`'s `machines` audience
+  includes its owner (CONTRACTS §2.1), **when** it calls `fleet_runners_list`, **then** it receives
+  the owner's runners read-only; **when** it calls `fleet_runners_install` with its ladder at **Ask**
+  for _Change a computer_, **then** the call is held as an `agent_action_proposals` row (CONTRACTS
+  R-33) whose Decision states _"Installs 2 Actions runners for acme/api on build-01 as services. They
+  run CI jobs on that computer; no credits are spent."_; at **Auto** it answers 409
+  `confirmation_required` with that summary until repeated with `confirm: true` (CONTRACTS §2.2).
 
 ### 3.2 Edge cases, refusals and failures
 
@@ -181,10 +183,10 @@ node's own service install are untouched.
   does not advertise `actions-runner`; a direct request is refused `unsupported_on_node` with _"no
   service manager was found on build-01"_.
 - **U4 — Linux without passwordless sudo.** Installing a systemd service needs root → the node
-  refuses `unsupported_on_node` with the exact command the owner can run once on the machine
-  (README §3: no sudo password is ever typed into the web UI).
+  refuses `root_required` (CONTRACTS §8) with the exact command the owner can run once on the
+  machine (README §3: no sudo password is ever typed into the web UI).
 - **U5 — Windows, not elevated.** The node is not running elevated and a service install needs it →
-  `unsupported_on_node` with the exact elevated command; Windows never offers a non-service mode.
+  `root_required` with the exact elevated command; Windows never offers a non-service mode.
 - **U6 — Checksum mismatch.** The downloaded archive does not match GitHub's published checksum →
   `operation_failed`, hint _"checksum mismatch for actions-runner-linux-x64-2.3xx.tar.gz — nothing
   was installed"_, the archive is deleted, the row is `failed` with **Retry**.
@@ -203,8 +205,9 @@ node's own service install are untouched.
   for raises nothing.
 - **U13 — Job stuck.** A queued job has waited 5 minutes and no runner could take it → a
   `job-unassignable` item with the diagnosis and **Cancel workflow run…**.
-- **U14 — Kill switch.** Install, control and cancel are refused `kill_switch`; running runners keep
-  running (they are the owner's CI, not Ever Works work) and the panel says so.
+- **U14 — Kill switch.** Install, control and cancel are refused `kill_switch`; the node's link is
+  paused (`link.pause`, CONTRACTS §3.2) so it refuses any `runner.*` request still in flight; running
+  runners keep running (they are the owner's CI, not Ever Works work) and the panel says so.
 - **U15 — Permission denied.** Outside the computer's `machines` audience → `permission_denied` with
   the audience named; the panel still shows jobs to `view` audience viewers.
 - **U16 — Remove while working.** The runner is mid-job → **Remove runner…** is refused `busy` with
@@ -223,13 +226,15 @@ Values marked **(C)** come from [CONTRACTS.md](../CONTRACTS.md).
 | Family action          | Consent on node (C §1.1) | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                                 | Audit (C §7)                                | Agent tool (C §11.3)                        |
 | ---------------------- | ------------------------ | --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------- | ------------------------------------------- |
 | Install runners        | `--work`                 | `machines` / owner                            | `confirm` — names target, count, mode, computer       | `node.runner.install` (one per runner)      | `fleet_runners_install` — destructive       |
-| Start / Stop / Restart | `--work`                 | `machines` / owner                            | `plain` start; `confirm` stop and restart             | `node.runner.start` · `node.runner.stop` · `node.runner.restart` (§8b) | `fleet_runners_action` — destructive |
+| Start / Stop / Restart | `--work`                 | `machines` / owner                            | `plain` start; `confirm` stop and restart             | `node.runner.start` · `node.runner.stop` · `node.runner.restart` (C §7) | `fleet_runners_action` — destructive |
 | Remove runner          | `--work`                 | `machines` / owner                            | `confirm-destructive` — type the name                 | `node.runner.remove`                        | `fleet_runners_remove` — destructive        |
-| Cancel workflow run             | — (platform → GitHub)    | `machines` / owner                            | `confirm` — "every job in it stops"                   | `node.runner.job.cancel` (§8b)              | `fleet_runners_cancel_run` — destructive    |
+| Cancel workflow run    | — (platform → GitHub)    | `machines` / owner                            | `confirm` — "every job in it stops"                   | `node.runner.job.cancel` (C §7)             | `fleet_runners_cancel_run` — destructive (R-37) |
 | List runners / jobs    | enrolled                 | `view`                                        | `plain`                                               | —                                           | `fleet_runners_list`, `fleet_runners_jobs` — readOnly |
 
-Kill switch (R-24): every state-changing action above is refused `kill_switch`; runners already
-running are left alone and the surfaces say so.
+Every caller satisfies a class with the same request fields (`confirm: true`, `confirmName`); a
+call without them answers 409 `confirmation_required` with the summary to show (C §2.2). Every
+runner action is in the `machines` family (C §2.1). Kill switch (R-24): every state-changing action
+above is refused `kill_switch`; runners already running are left alone and the surfaces say so.
 
 ### 4.2 Installing (P1)
 
@@ -256,7 +261,8 @@ running are left alone and the surfaces say so.
 - **FR-8** The runner MUST be configured unattended with the chosen name and labels; "replace" MUST be
   used only when GitHub already lists that name for this computer.
 - **FR-9** The runner MUST be installed as a service through the computer's service manager (FL-09):
-  systemd on Linux (requires passwordless `sudo -n`, else refused with the exact command), launchd on
+  systemd on Linux (requires passwordless `sudo -n`, else refused `root_required` with the exact
+  command), launchd on
   macOS, a Windows service on Windows; on Windows the runner's own service mode MUST be used and no
   other mode offered.
 - **FR-10** The runner's folder MUST live under the node's data directory with owner-only
@@ -268,9 +274,11 @@ running are left alone and the surfaces say so.
 
 ### 4.3 Status and control (P1)
 
-- **FR-13** Each runner MUST show one of `working · idle · offline · stopped · installing · failed ·
-  unknown`, the source of that state (GitHub or the node) and the last check time; GitHub's view
-  MUST win when both are fresh.
+- **FR-13** Each runner MUST carry one of the stored states `installing · idle · working · offline ·
+  removed · unknown` (CONTRACTS §4.11; `removed` rows are not listed), shown as **stopped (by you)**
+  when it is `offline` after an owner stop and as **failed** when it is `installing` and its install
+  job failed, with the source of that state (GitHub or the node) and the last check time; GitHub's
+  view MUST win when both are fresh.
 - **FR-14** Runner state MUST be refreshed from GitHub every **30 s** while a page showing it is open
   and every **5 minutes** otherwise, using conditional requests, and MUST back off to GitHub's reset
   time when rate-limited (U17).
@@ -323,7 +331,8 @@ running are left alone and the surfaces say so.
 
 - **FR-29** `fleet_runners_list` and `fleet_runners_jobs` MUST be read-only; `fleet_runners_install`,
   `fleet_runners_action`, `fleet_runners_remove` and `fleet_runners_cancel_run` MUST be destructive
-  with the classes in §4.1, gated by the Agent's `machines` grant **and** the computer's audience.
+  with the classes in §4.1, gated as C §2.1 fixes — the Agent's tool grants and trust ladder (AW-15,
+  AW-24) allow the tool **and** the computer's `machines` audience includes the Agent's owner.
 - **FR-30** `fleet_runners_install`'s confirmation text MUST state target, count, mode, computer and
   "No credits are spent"; runners cost nothing in Ever Works and the dialog MUST say so.
 - **FR-31** Every state-changing action MUST write one `fleet_audit` row with `family: machines`,
@@ -428,7 +437,7 @@ Actions runners on <computer>**, **Actions jobs**. i18n groups: `fleet.runners.i
 
 | Concept                      | New?          | Description                                                                                                                                 |
 | ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Actions runner**           | **New** (`FleetActionsRunner`) | One registered self-hosted runner on a Node: target scope, name, labels, mode, service unit, version, state and its source, last check, current job — §8b: CONTRACTS §4 needs the table |
+| **Actions runner**           | **New** (`FleetActionsRunner`, C §4.11) | One registered self-hosted runner on a Node: target scope, name, labels, mode, state, GitHub runner id, last seen, installed at (C §4.11) plus the epic-local service unit, version, state source, last check and current job (plan §4.1) |
 | **Target**                   | Read model     | A repository or organisation covered by one of the owner's GitHub App installations                                                        |
 | **Watched targets**          | Plugin setting | The repositories/organisations whose jobs the panel shows (user scope)                                                                      |
 | **Actions job**              | Read model     | A queued or in-progress GitHub Actions job targeting self-hosted runners, with its labels and assigned runner — GitHub's own noun, shown as-is; its "workflow run" is never called a Run (README §1) |
@@ -446,17 +455,17 @@ Actions runners on <computer>**, **Actions jobs**. i18n groups: `fleet.runners.i
 - **Personal access tokens or the `gh` CLI** — refused by design (R-14).
 - **Automatic runner updates** — shown, not applied (FR-28).
 - **Ephemeral (one-job) runners, runner groups, autoscaling** — later.
-- **A dedicated Jobs route or hub tab** — the panel lives on the hub Overview (D1 fixes six tabs; §8b).
+- **A dedicated Jobs route or hub tab** — the panel lives on the hub Overview (D1 fixes six tabs; CONTRACTS R-37).
 - **Workflow authoring** — the build plugin's business.
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — §4: add the FleetActionsRunner entity (table fleet_actions_runners) with the columns proposed in plan §4.1; §13 slot 1796180000000-CreateFleetActionsRunners already exists but §4 has no shape.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §7: add node.runner.restart and node.runner.job.cancel (restart is not stop+start in the audit, and a cancelled workflow run is a distinct act on the owner's CI).]`
-- `[NEEDS CLARIFICATION: Permission family. This spec puts every runner action under machines; start/stop/restart could instead follow services (a runner is a service). Confirm one family.]`
-- `[NEEDS CLARIFICATION: Where the Actions jobs view lives. Proposed: a hub Overview panel via the FL-01 registry (D1 keeps six tabs). A dedicated route would need README D1 and CONTRACTS §11.1 additions.]`
-- `[NEEDS CLARIFICATION: Token transport. Proposed: minted at the node's awaiting-token phase and pushed over the node link as a runner.* message (C §3.3). Alternative: a node-credential HTTPS mint like the push credential. Confirm the link path.]`
-- `[NEEDS CLARIFICATION: Should the GitHub App's required permissions ("Self-hosted runners", repository "Administration") be added to the App's manifest now so new installations carry them, accepting the re-authorisation prompt existing installations will see?]`
+- **Resolved** by CONTRACTS §4.11: `FleetActionsRunner` (table `fleet_actions_runners`, slot `1796180000000`) has the contract columns `nodeId, name, scope, target, labels, mode, state, githubRunnerId, lastSeenAt, installedAt`; the stored `state` uses only §4.11's values (FR-13). The epic-local columns in plan §4.1 are additive to that shape and are listed for the CONTRACTS maintainer in the audit report.
+- **Resolved** by CONTRACTS §7: `node.runner.restart` and `node.runner.job.cancel` are contract audit names.
+- **Resolved** by CONTRACTS §2.1: Actions runner install/control map to the `machines` family — every runner action in §4.1 is `machines`.
+- **Resolved** by CONTRACTS R-37: the Actions jobs view is a hub Overview panel (`registerOverviewBlock`), not a seventh tab or route; the run-level act is worded "Cancel workflow run" and the tool is `fleet_runners_cancel_run`.
+- **Resolved** by CONTRACTS §3.3 (`runner.*` on the `machine` channel) and §12 (runner jobs are durable): the registration token is minted at the node's `awaiting-token` phase and pushed over the link as `runner.token`; if the link is down the job waits at that phase and the token is sent on reconnect (U11).
+- `[NEEDS CLARIFICATION: Should the Ever Works GitHub App manifest gain "Self-hosted runners" (organisation) and repository "Administration" now, accepting the re-authorisation prompt existing installations will see? Default until answered: the manifest is unchanged; repository runners use the permission when an installation already has it, and every missing permission shows the exact name with Grant access (S7, FR-26).]`
 
 ---
 

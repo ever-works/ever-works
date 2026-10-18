@@ -28,6 +28,42 @@ export function isFleetEnabled(): boolean {
 }
 
 /**
+ * The `FLEET_HUB_ENABLED` switch (Fleet hub, FL-01): the sidebar entry
+ * "Fleet", the `/fleet` hub and its computer pages, the runner pill's
+ * link to the hub, the palette's hub screens, and Settings → Fleet's
+ * "Computers are under Fleet" card. Matches `config.fleet.isHubEnabled()`
+ * on the API exactly.
+ *
+ * **Default OFF** (CONTRACTS §9) and ON only for the literal `'true'`:
+ * off is today's Settings → Fleet, byte for byte (spec FR-15). It can
+ * never resurrect a fleet `FLEET_ENABLED=false` switched off (spec U3).
+ */
+export function isFleetHubEnabled(): boolean {
+    return isFleetEnabled() && process.env.FLEET_HUB_ENABLED === 'true';
+}
+
+/**
+ * The per-epic Fleet flags of CONTRACTS §9, read on the server and passed
+ * down to the hub so a tab whose epic shipped behind a flag can say "switched
+ * off on this deployment" instead of rendering (spec U4). Every flag is
+ * default OFF and on only for the literal `'true'`, and none is on while
+ * `FLEET_ENABLED` is off.
+ *
+ * The list is the registry's (`components/fleet/registry.ts`), passed in so
+ * this file stays dependency-free.
+ */
+export function readFleetFeatureFlags<F extends string>(
+    names: readonly F[],
+): Partial<Record<F, boolean>> {
+    const fleet = isFleetEnabled();
+    const flags: Partial<Record<F, boolean>> = {};
+    for (const name of names) {
+        flags[name] = fleet && process.env[name] === 'true';
+    }
+    return flags;
+}
+
+/**
  * The API base a NODE should call — which is not necessarily the one the
  * web tier calls.
  *

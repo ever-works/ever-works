@@ -354,8 +354,9 @@ legalName?, countryCode?}`, scope `org:write` — opt-in, not in the Ever Gauzy 
 teamIds?, visibility?, externalRef?}`, scope `works:write`) is Gauzy's "Create in Ever Works" for a project (plan D3):
 a repo-less **Project Work** — no repositories, no deploy, no generator, so nothing is provisioned and nothing spends
 (D9). Only `kind: 'project'` (anything else `400`). `Idempotency-Key` required; a repeated `externalRef` answers `200`
-with the existing Work. The owner is the act-as user, else the key's owner; the slug is derived from `name` (`<slug>-N`
-when taken). `teamIds` become `team_resources` rows (type `work`); a Work's visibility is derived from them (CR-1), so
+with the existing Work. The owner is the act-as user, else the key's owner, and `createdBy` is the integration key (or
+the act-as person), as for every integration create (stored on the Work, migration `1795162200000`); the slug is derived
+from `name` (`<slug>-N` when taken). `teamIds` become `team_resources` rows (type `work`); a Work's visibility is derived from them (CR-1), so
 `visibility` is only validated (`private` → `422`). While `EVER_WORKS_PROJECT_WORKS_ENABLED` is off the route answers
 `422 domain_rule` with `details.reason: 'project_works_disabled'`. Answers `201` with the work DTO and records
 `work.created` (plus `team.resource.added` / `work.updated` per Team). `work` stays a served link type.

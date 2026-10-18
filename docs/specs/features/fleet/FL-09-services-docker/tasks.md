@@ -18,7 +18,7 @@
   `apps/web` unit → **Vitest**; `apps/web` e2e → **Playwright**.
 - Prerequisites: FL-02 (link client, module contract, operation runner, `NodeLinkService`,
   gateway), FL-01 (`registerComputerTab`, `registerOverviewBlock`, `assertFamily`), FL-08
-  (`apps/node/src/core/link/modules/shared/allowed-roots.ts`, `FleetMachineFactsEnabledGuard`, log deep links), FL-04 for
+  (`apps/node/src/core/link/allowed-roots.ts`, `FleetMachineFactsEnabledGuard`, log deep links), FL-04 for
   P3 exec Sessions. Adapt their merged names in one place each.
 - No migration in this epic (no FL-09 slot in CONTRACTS §13).
 - Never pass a user-supplied name through a shell string; every child gets an argv array. The

@@ -371,9 +371,10 @@ export async function buildAgentSnapshot(
 }
 
 /**
- * `createdBy` of a P2 aggregate (ideas, goals, missions): the stored author when an
- * integration or agent created it (`createdByType` / `createdById`, migration
- * 1795100000000), else the owning user.
+ * `createdBy` of a P2 aggregate (ideas, goals, missions, and works — a Project Work created
+ * through the integration API, EW-P2-4): the stored author when an integration or agent
+ * created it (`createdByType` / `createdById`, migrations 1795100000000 and 1795162200000),
+ * else the owning user.
  */
 function p2CreatedBy(row: {
     userId: string;
@@ -609,7 +610,7 @@ export async function buildWorkSnapshot(
         visibility: derivedVisibility(teamIds),
         visibilityExplicit: false,
         owner: { type: 'user', id: work.userId },
-        createdBy: { type: 'user', id: work.userId },
+        createdBy: p2CreatedBy(work),
         externalLinks: [],
         teamIds,
         name: work.name,

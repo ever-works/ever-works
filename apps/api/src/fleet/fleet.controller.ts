@@ -15,10 +15,11 @@ import {
     Post,
     Put,
     Query,
+    Res,
     UnauthorizedException,
     UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type {
     CreateEnrollmentTokenResult,
@@ -30,6 +31,7 @@ import {
     FleetExecutionPreferenceService,
     FleetJobService,
     FleetService,
+    NeedsALookService,
 } from '@ever-works/agent/fleet';
 import type {
     FleetAuditView,
@@ -40,13 +42,18 @@ import type {
     FleetNodeRotateCredentialResponse,
     FleetNodeView,
     FleetRunnerStatusView,
+    NeedsALookItem,
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '@ever-works/agent/database';
 import {
     COMPUTER_PENDING_SESSIONS,
     type ComputerPendingSessionsLookup,
 } from '@ever-works/agent/computer';
-import { FLEET_ATTENDED_CAPABILITY, FLEET_AUDIT_DEFAULT_LIMIT } from '@ever-works/contracts';
+import {
+    FLEET_ATTENDED_CAPABILITY,
+    FLEET_AUDIT_DEFAULT_LIMIT,
+    NEEDS_A_LOOK_PARTIAL_HEADER,
+} from '@ever-works/contracts';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -67,6 +74,7 @@ import {
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    FLEET_NODE_LIST_SCOPES,
     RotateFleetNodeCredentialDto,
     SetFleetCostCeilingDto,
     SetFleetNodeLimitCeilingDto,
@@ -78,6 +86,16 @@ import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 
 /** How much of a node's job history the detail drawer reads. */
 const NODE_HISTORY_LIMIT = 25;
+
+/**
+ * Fleet hub (FL-01) — set on a needs-a-look response when at least one
+ * producer failed or timed out and was skipped (spec U11): the list is what
+ * the others said, not proof that nothing needs a look.
+ */
+export const FLEET_PARTIAL_HEADER = NEEDS_A_LOOK_PARTIAL_HEADER;
+
+/** The one thing the needs-a-look routes do with the response (same posture as the CSV export's). */
+type HeaderResponse = { setHeader(name: string, value: string): void };
 
 /**
  * Fleet (Wave 12, slice 1) — thin HTTP surface over the agent-side
@@ -177,6 +195,10 @@ export class FleetController {
         @Optional()
         @Inject(COMPUTER_PENDING_SESSIONS)
         private readonly pendingComputerSessions?: ComputerPendingSessionsLookup,
+        // Fleet hub (FL-01) — the needs-a-look registry. Appended LAST and
+        // @Optional() like the three above: unbound, both needs-a-look routes
+        // answer an empty, complete list.
+        @Optional() private readonly needsALook?: NeedsALookService,
     ) {}
 
     @Get('cost-ceiling')
@@ -267,11 +289,29 @@ export class FleetController {
     @Get('nodes')
     @ApiOperation({
         summary:
-            'List my fleet nodes (enrolled machines + live nodes of my own configured clusters), each with its current execution load',
+            'List my fleet nodes (enrolled machines + live nodes of my own configured clusters), each with its current execution load. `scope=visible` (the Fleet hub) also lists computers other people own that are shared with me through an Organization, each row carrying my role on it (`viewerRole`).',
     })
     @HttpCode(HttpStatus.OK)
-    async list(@CurrentUser() auth: AuthenticatedUser): Promise<FleetNodeView[]> {
-        const nodes = await this.service.listForUser(auth.userId);
+    @ApiQuery({
+        name: 'scope',
+        required: false,
+        enum: FLEET_NODE_LIST_SCOPES,
+        description:
+            '`own` (default): my computers. `visible`: also the computers shared with me through an Organization.',
+    })
+    async list(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('scope') scope?: string,
+    ): Promise<FleetNodeView[]> {
+        // The default stays OWNER-ONLY, byte for byte: Settings → Fleet, the
+        // panic controls and every existing caller keep reading exactly what
+        // they read before the hub existed (spec FR-15). A single named query
+        // value, not a whitelisted DTO, so any other query parameter is still
+        // ignored rather than refused; an unknown scope reads as `own`.
+        const nodes =
+            scope === 'visible'
+                ? await this.service.listVisibleForUser(auth.userId)
+                : await this.service.listForUser(auth.userId);
         // Per-node load (Desktop PRD §4.1 "current load (running Tasks)")
         // is composed at the edge rather than inside `FleetService`, so
         // the registry stays independent of the job runtime. Strictly
@@ -286,8 +326,48 @@ export class FleetController {
         return nodes.map((node) => ({
             ...node,
             // Cluster-sourced rows are never leased onto, so they stay null.
+            // A shared row is someone else's runner: its load is not in the
+            // caller's job ledger, so it is not shown (null = idle/unknown).
             load: node.persisted ? (load[node.id] ?? null) : null,
         })) as FleetNodeView[];
+    }
+
+    @Get('needs-a-look')
+    @ApiOperation({
+        summary:
+            'Fleet hub — what needs a look across every computer I may see (CONTRACTS §4.6): critical first, then warn, then info, the longest-standing first. Computed from the registered producers, never stored; a producer that fails is skipped and the response carries `X-Fleet-Partial: true`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async needsALookFleet(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Res({ passthrough: true }) res?: HeaderResponse,
+    ): Promise<NeedsALookItem[]> {
+        if (!this.needsALook) return [];
+        const nodes = (
+            await this.service.listVisibleForUser(auth.userId, { includeClusters: false })
+        ).filter((node) => node.persisted);
+        const result = await this.needsALook.forNodes(nodes, { userId: auth.userId });
+        if (result.partial) res?.setHeader(FLEET_PARTIAL_HEADER, 'true');
+        return result.items;
+    }
+
+    @Get('nodes/:id/needs-a-look')
+    @ApiOperation({
+        summary:
+            'Fleet hub — what needs a look on one computer I may see. A computer outside my view answers 404, exactly like an unknown id.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async needsALookNode(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Res({ passthrough: true }) res?: HeaderResponse,
+    ): Promise<NeedsALookItem[]> {
+        // Visibility FIRST: a hidden node 404s before any producer runs.
+        const { view } = await this.service.getVisibleForUser(auth.userId, id);
+        if (!this.needsALook) return [];
+        const result = await this.needsALook.forNodes([view], { userId: auth.userId });
+        if (result.partial) res?.setHeader(FLEET_PARTIAL_HEADER, 'true');
+        return result.items;
     }
 
     @Get('nodes/:id')
@@ -300,19 +380,22 @@ export class FleetController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<FleetNodeDetailView> {
-        // Ownership is settled FIRST and by the registry: if this throws
-        // 404 nothing else runs, so the job history can never be read
-        // for a node the caller does not own.
-        const node = await this.service.getForUser(auth.userId, id);
+        // Visibility is settled FIRST and by the registry: if this throws
+        // 404 nothing else runs. The job history is the OWNER's ledger, so it
+        // is read only for the owner — someone the node is shared with
+        // (Fleet hub, `view` grants listing only) gets the node, no history.
+        const { view: node, role } = await this.service.getVisibleForUser(auth.userId, id);
 
         let recentJobs: Awaited<ReturnType<FleetJobService['historyForNode']>> = [];
         let historyUnavailable = false;
-        try {
-            recentJobs = await this.jobs.historyForNode(auth.userId, id, NODE_HISTORY_LIMIT);
-        } catch {
-            // Same degradation contract as `list`: a job-runtime hiccup
-            // must not make an existing node look missing.
-            historyUnavailable = true;
+        if (role === 'owner') {
+            try {
+                recentJobs = await this.jobs.historyForNode(auth.userId, id, NODE_HISTORY_LIMIT);
+            } catch {
+                // Same degradation contract as `list`: a job-runtime hiccup
+                // must not make an existing node look missing.
+                historyUnavailable = true;
+            }
         }
 
         // The RECONCILED outcome (EW-776): a fleet job and the Agent run it
@@ -518,10 +601,12 @@ export class FleetController {
             typeof body.disabled !== 'boolean' &&
             typeof body.paused !== 'boolean' &&
             !Array.isArray(body.capabilities) &&
-            body.dailyCostCeilingCents === undefined
+            body.dailyCostCeilingCents === undefined &&
+            typeof body.isFavorite !== 'boolean' &&
+            body.controlPolicyFamilies === undefined
         ) {
             throw new BadRequestException(
-                'Provide name, disabled, paused, capabilities and/or dailyCostCeilingCents',
+                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite and/or controlPolicyFamilies',
             );
         }
         let view: FleetNodeView | null = null;
@@ -546,6 +631,19 @@ export class FleetController {
                 id,
                 body.capabilities,
                 body.capabilitiesPinned ?? true,
+            );
+        }
+        // Fleet hub (FL-01): the owner's star and the per-family policy —
+        // both owner-only, refused with permission_denied for anyone else who
+        // may see the node. The policy write audits node.policy.change.
+        if (typeof body.isFavorite === 'boolean') {
+            view = await this.service.setFavoriteForUser(auth.userId, id, body.isFavorite);
+        }
+        if (body.controlPolicyFamilies !== undefined) {
+            view = await this.service.setControlPolicyFamiliesForUser(
+                auth.userId,
+                id,
+                body.controlPolicyFamilies,
             );
         }
         // Pause first, disable second: when both arrive, the harder stop

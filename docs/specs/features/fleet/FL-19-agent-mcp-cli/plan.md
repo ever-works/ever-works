@@ -37,8 +37,10 @@ flowchart LR
 ```
 
 Agents and MCP share the controllers; only Agents pass through the gate (MCP acts as a person).
-Confirmation is a controller concern (`confirmationToken` for the web, `confirm`/`confirmName`/
-`acknowledgeBlastRadius` body fields for tools and CLI), so every surface hits one code path.
+Confirmation is a controller concern with one mechanism for every caller — the web, tools, MCP and
+the CLI send the same request fields `confirm` / `confirmName` / `acknowledgeBlastRadius`, and a call
+without them gets 409 `confirmation_required` with `details: { class, summary, preview?, sentence? }`
+(CONTRACTS §2.2). There are no confirmation tokens, so every surface hits one code path.
 
 ## 2. Current state in the codebase
 
@@ -67,11 +69,12 @@ audience; any fleet CLI verb; any `--json`/exit-code contract in the CLI; `fleet
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Catalogue               | One declarative table `FLEET_TOOL_CATALOGUE` in contracts (`name`, `family`, `verb`, `readOnly`, `destructive`, `confirmationClass`, `category`, `permissionFamily`, `route`) consumed by the Agent factory, the MCP whitelist test and the CLI | One source for three surfaces; tests assert parity                                       |
 | Gate                    | `FleetToolGate` in `packages/agent/src/fleet/fleet-tool-gate.ts`, pure decision function + thin service; order = AW-24 FR-19                 | Testable truth table; reuses the existing safety gate port rather than a second ladder    |
-| Confirmation for tools  | Body fields `confirm`, `confirmName`, `acknowledgeBlastRadius`; summary hash echoed in `details.summaryHash`                                  | Mirrors FL-12's `confirmationToken` without needing a browser round trip                 |
+| Confirmation            | Body fields `confirm`, `confirmName`, `acknowledgeBlastRadius` for every caller; 409 `confirmation_required` with `details: { class, summary, preview?, sentence? }`; the confirming call is evaluated against current state (spec U8) | CONTRACTS §2.2: one mechanism, no tokens, no signed summaries                           |
 | Operations              | FL-02 operations; tools add `wait` (default true, 25 s cap) then fall back to `{ operationId }`                                               | Long node work never blocks a model turn                                                 |
 | CLI JSON envelope       | `{ ok: true, data } | { ok: false, error: { code, hint, details } }`, exit map `0/1/2/124`                                                   | CONTRACTS §11.3                                                                         |
 | CLI attach              | `ws` client, raw-mode TTY, `Ctrl-]` detach, `--drive` requests role `driver`                                                                  | Same viewer protocol as the web (R-21: one renderer, here the user's own terminal)        |
 | MCP                     | Whitelist entries only; existing eight names kept; new entries use `fleet_<family>_<verb>`                                                   | Additive; CONTRACTS §11.3                                                               |
+| Held actions            | Ask/Draft rungs write an `agent_action_proposals` row, `actionType: 'fleet_machine_action'` (FL-09's value; `actionType` is a varchar with no DB check), the tool call as payload; approval re-runs it with the class field set | CONTRACTS R-33; no new table                                                            |
 | i18n                    | `fleet.tools.*` for the Capabilities block and decision cards                                                                                 | CONTRACTS §11.4                                                                         |
 
 ## 4. Data model
@@ -97,10 +100,12 @@ No new fleet routes except one read:
 | GET    | `/api/fleet/status`      | `FleetStatusView`           | `view`   | 60/min | —                            |
 | GET    | `/api/fleet/tools/gate?agentId=` | per-family `{ read, act, refusedBy?, fixRoute? }` for the Capabilities block | Agent owner | 60/min | `not_found` |
 
-Every family controller (FL-04…18) accepts `FleetConfirmArgs` in the body and returns
-`confirmation_required` with `details.summary` + `summaryHash` when the class is not satisfied —
-a shared `FleetConfirmationInterceptor` in `apps/api/src/fleet/fleet-confirmation.interceptor.ts`
-does this uniformly, reading the class from the catalogue entry for the route.
+Every family controller (FL-04…18) accepts `FleetConfirmArgs` in the body and returns 409
+`confirmation_required` with `details: { class, summary, preview?, sentence? }` when the class is not
+satisfied (CONTRACTS §2.2) — a shared `FleetConfirmationInterceptor` in
+`apps/api/src/fleet/fleet-confirmation.interceptor.ts` does this uniformly, reading the class from the
+catalogue entry for the route. Nothing is stored between the two calls. Operation states are C §3.3's
+`running · done · failed · cancelled · interrupted`.
 
 ## 6. Node side
 
@@ -126,29 +131,40 @@ None.
 
 ### 9.1 Catalogue (Agent tool name · annotation · class · category · permission family · route)
 
-| Family     | Read-only tools                                                                 | State-changing tools (destructive? · class · category)                                                                                                                     | Family (§2.1) |
-| ---------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| status     | `fleet_status`                                                                  | —                                                                                                                                                                         | view          |
-| nodes      | `fleet_nodes_list`, `fleet_nodes_get`, `fleet_nodes_health`, `fleet_nodes_needs_a_look` | `fleet_nodes_wake` (no · plain · machine.admin)                                                                                                                     | view / machines† |
-| sessions   | `fleet_sessions_list`, `fleet_sessions_get`, `fleet_sessions_read`, `fleet_sessions_question` | `fleet_sessions_start` (no · plain · machine.run), `fleet_sessions_send` (no · plain · machine.run), `fleet_sessions_answer` (no · confirm · machine.run), `fleet_sessions_rename` (no · plain · write.internal), `fleet_sessions_end` (yes · confirm · machine.run) | sessions      |
-| desktop    | `fleet_desktop_screenshot`, `fleet_desktop_displays`                            | `fleet_desktop_input` (yes · confirm · machine.admin), `fleet_desktop_set_display` (no · plain · machine.admin)                                                            | desktop       |
-| logs       | `fleet_logs_sources`, `fleet_logs_read`                                         | —                                                                                                                                                                         | view†         |
-| services   | `fleet_services_list`                                                           | `fleet_services_action` (yes · confirm or blast-radius · machine.admin)                                                                                                    | services      |
-| docker     | `fleet_docker_containers`, `fleet_docker_images`, `fleet_docker_compose_list`, `fleet_docker_logs` | `fleet_docker_container_action` (yes · confirm · machine.admin), `fleet_docker_run` (yes · confirm · machine.admin), `fleet_docker_image_pull` (no · confirm · machine.admin), `fleet_docker_image_remove` (yes · confirm-destructive · write.destructive), `fleet_docker_compose_action` (yes · confirm · machine.admin) | docker        |
-| processes  | `fleet_processes_list`                                                          | `fleet_processes_signal` (yes · confirm · machine.admin)                                                                                                                   | processes     |
-| ports      | `fleet_ports_list`                                                              | `fleet_ports_open` (no · plain · machine.run), `fleet_ports_preview` (no · confirm · machine.run)                                                                           | view / desktop / commands† |
-| files      | `fleet_files_list`, `fleet_files_stat`, `fleet_files_read`                      | `fleet_files_write` (yes · confirm · machine.admin), `fleet_files_copy` (no · confirm · machine.admin), `fleet_files_delete` (yes · confirm-destructive · write.destructive) | files         |
-| commands   | `fleet_commands_list`, `fleet_commands_get`                                     | `fleet_commands_run` (yes · confirm · machine.run), `fleet_commands_cancel` (no · plain · machine.run)                                                                      | commands      |
-| schedules  | `fleet_schedules_list`, `fleet_schedules_get`, `fleet_schedules_runs`           | `fleet_schedules_create` (yes · confirm · agent.fanout), `fleet_schedules_update` (yes · confirm · agent.fanout), `fleet_schedules_delete` (yes · confirm · write.destructive), `fleet_schedules_run` (yes · confirm · machine.run), `fleet_schedules_pause` / `_resume` (no · plain · agent.fanout) | schedules     |
-| checkouts  | `fleet_checkouts_list`, `fleet_checkouts_get`                                   | `fleet_checkouts_create` (no · confirm · machine.run), `fleet_checkouts_sync` (no · plain · machine.run), `fleet_checkouts_delete` (yes · confirm-destructive · write.destructive) | checkouts     |
-| machines   | `fleet_machines_virtual_list`, `fleet_machines_cloud_options`, `fleet_machines_cloud_usage` | `fleet_machines_virtual_create` (yes · confirm · machine.admin), `fleet_machines_power` (yes · confirm · machine.admin), `fleet_machines_virtual_destroy` / `fleet_machines_cloud_destroy` (yes · confirm-destructive · write.destructive), `fleet_machines_cloud_create` (yes · confirm with price · spend.metered + machine.admin) | machines      |
-| runners    | `fleet_runners_list`, `fleet_runners_jobs`                                      | `fleet_runners_install` (yes · confirm · machine.admin), `fleet_runners_action` (yes · confirm · machine.admin), `fleet_runners_remove` (yes · confirm-destructive · write.destructive) | machines†     |
-| usage      | `fleet_usage_get`                                                               | —                                                                                                                                                                         | view          |
-| operations | `fleet_operations_get`, `fleet_operations_list`                                 | `fleet_operations_cancel` (no · plain · machine.run)                                                                                                                       | view          |
+Each row is **defined by its owning epic's plan §9**; this table assembles them into
+`FLEET_TOOL_CATALOGUE`. Where this table and an owner disagree, the owner is right and this table is
+corrected (the audit of 2026-10-18 aligned every row below with its owner). Annotation shorthand:
+`destructive? · confirmation class · AW-24 category`. Family = the tool family of FR-1; Permission =
+the CONTRACTS §2.1 family the gate checks.
 
-† mapping flagged in spec §8b. Every entry's `route` is the FL-xx controller path; the factory
-builds the tool from the entry and a typed invoker, so adding a family is one table row plus a
-route.
+| Family     | Read-only tools (owner)                                                                                   | State-changing tools (destructive? · class · category) (owner)                                                                                                                                                                                                                                                                         | Permission (§2.1) |
+| ---------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| status     | `fleet_status` (FL-19)                                                                                    | —                                                                                                                                                                                                                                                                                                                                      | view              |
+| nodes      | `fleet_nodes_list`, `fleet_nodes_get` (FL-19); `fleet_nodes_health` (`range?`, `fresh: true` runs `health.now` — R-31), `fleet_nodes_needs_a_look` (FL-03); `fleet_nodes_git_identity_get` (FL-15) | `fleet_nodes_wake` (no · plain · machine.admin) (FL-03); `fleet_nodes_git_identity_set` (no · confirm · machine.admin) (FL-15)                                                                                                                                                                                                       | view; wake → machines; git identity set → commands |
+| sessions   | `fleet_sessions_list`, `fleet_sessions_read` (FL-04); `fleet_sessions_question` (FL-05); `fleet_sessions_actions_list` (FL-06) | `fleet_sessions_start` (no · plain · machine.run; accepts `taskId` — FL-15) (FL-04), `fleet_sessions_send` (no · plain · machine.run) (FL-04), `fleet_sessions_answer` (no · confirm · machine.run; questions only, R-32) (FL-05), `fleet_sessions_rename` (no · plain · write.internal) (FL-04), `fleet_sessions_end` (yes · confirm · machine.run) (FL-04), `fleet_sessions_action` (no · plain · machine.run) (FL-06) | sessions          |
+| desktop    | `fleet_desktop_screenshot`, `fleet_desktop_displays`, `fleet_desktop_recordings_list` (FL-07)             | `fleet_desktop_input` (yes · plain · machine.admin; the control grant is the gate) (FL-07), `fleet_desktop_set_display` (no · plain · machine.admin) (FL-07), `fleet_desktop_display_add` / `_remove` (yes · confirm · machine.admin; P3) (FL-07), `fleet_desktop_paste` (yes · plain · machine.admin; denied unless granted, AW-15) (FL-11) | desktop           |
+| logs       | `fleet_logs_sources`, `fleet_logs_read` (FL-08)                                                           | —                                                                                                                                                                                                                                                                                                                                      | logs              |
+| services   | `fleet_services_list` (FL-09)                                                                             | `fleet_services_action` (yes · confirm or blast-radius · machine.admin) (FL-09)                                                                                                                                                                                                                                                       | services          |
+| processes  | `fleet_processes_list` (FL-09)                                                                            | `fleet_processes_signal` (yes · confirm · machine.admin) (FL-09)                                                                                                                                                                                                                                                                      | processes         |
+| docker     | `fleet_docker_containers_list`, `fleet_docker_images_list`, `fleet_docker_compose_list`, `fleet_docker_compose_describe` (FL-09) | `fleet_docker_container_action` (yes · confirm, `remove` confirm-destructive · machine.admin), `fleet_docker_run` (no · confirm · machine.admin; explicit grant), `fleet_docker_image_action` (`pull` no, `remove`/`prune` yes · per FL-09 §4 · machine.admin), `fleet_docker_compose_action` (yes for `down` · confirm · machine.admin), `fleet_docker_exec` (no · plain · machine.run; P3) (all FL-09) | docker            |
+| ports      | `fleet_ports_list` (FL-10)                                                                                | `fleet_ports_open` (no · plain · machine.run), `fleet_ports_preview_open` (no · plain · machine.run; P2), `fleet_ports_preview_close` (no · plain · machine.run; P2) (FL-10)                                                                                                                                                          | view (list); ports (open, preview) |
+| files      | `fleet_files_list`, `fleet_files_stat`, `fleet_files_read` (download) (FL-11)                             | `fleet_files_write` (upload; yes · confirm · machine.admin), `fleet_files_copy` (yes · confirm · machine.admin), `fleet_files_delete` (yes · confirm-destructive · write.destructive; always held, R-33) (FL-11)                                                                                                                       | files             |
+| commands   | `fleet_commands_list`, `fleet_commands_get` (FL-12)                                                       | `fleet_commands_run` (yes · confirm · machine.run), `fleet_commands_cancel` (no · plain · machine.run) (FL-12)                                                                                                                                                                                                                        | commands          |
+| schedules  | `fleet_schedules_list`, `fleet_schedules_get`, `fleet_schedules_runs` (FL-13)                             | `fleet_schedules_create`, `fleet_schedules_update` (yes · confirm · agent.fanout), `fleet_schedules_delete` (yes · confirm · write.destructive), `fleet_schedules_run` (yes · confirm · machine.run), `fleet_schedules_pause` / `_resume` (no · plain · agent.fanout) (FL-13)                                                          | schedules         |
+| checkouts  | `fleet_checkouts_list`, `fleet_checkouts_get` (FL-14); `fleet_checkouts_changes` (FL-06)                  | `fleet_checkouts_create` (no · plain · machine.run), `fleet_checkouts_sync` (no · plain for fetch, confirm for pull/push · machine.run), `fleet_checkouts_archive` (no · confirm · machine.run), `fleet_checkouts_delete` (yes · confirm / confirm-destructive · write.destructive) (FL-14); `fleet_checkouts_open_pull_request` (no · plain · publish.external) (FL-06) | checkouts         |
+| tasks      | `fleet_tasks_handoff_options` (FL-15)                                                                     | — (the hand-off itself is `fleet_sessions_start` with `taskId`; no second start tool)                                                                                                                                                                                                                                                 | sessions          |
+| virtual    | `fleet_virtual_list`, `fleet_virtual_options` (FL-16)                                                     | `fleet_virtual_create` (yes · confirm · machine.admin), `fleet_virtual_power` (yes · plain start / confirm stop · machine.admin), `fleet_virtual_destroy` (yes · confirm-destructive · write.destructive) (FL-16)                                                                                                                     | view (reads); machines |
+| cloud      | `fleet_cloud_list`, `fleet_cloud_options`, `fleet_cloud_usage` (FL-17)                                    | `fleet_cloud_create` (yes · confirm with the price · spend.metered + machine.admin), `fleet_cloud_power` (yes · confirm · machine.admin), `fleet_cloud_destroy` (yes · confirm-destructive · write.destructive), `fleet_cloud_idle_policy` (no · plain · machine.admin) (FL-17)                                                        | view (reads); machines |
+| runners    | `fleet_runners_list`, `fleet_runners_jobs` (FL-18)                                                        | `fleet_runners_install` (yes · confirm · machine.admin), `fleet_runners_action` (yes · plain start / confirm stop and restart · machine.admin), `fleet_runners_remove` (yes · confirm-destructive · write.destructive), `fleet_runners_cancel_run` (yes · confirm · machine.admin; "Cancel workflow run", R-37) (FL-18)              | view (reads); machines |
+| usage      | `fleet_usage_get` (FL-20)                                                                                 | —                                                                                                                                                                                                                                                                                                                                      | view              |
+| operations | `fleet_operations_get` (FL-02), `fleet_operations_list` (FL-19)                                           | `fleet_operations_cancel` (no · plain · machine.run) (FL-02)                                                                                                                                                                                                                                                                          | view              |
+
+Every entry's `route` is the owning epic's controller path; the factory builds the tool from the
+entry and a typed invoker, so adding a family is one table row plus a route. The legacy
+`list_fleet_nodes` and the eight existing MCP entries stay as they are beside these (C §11.3). The
+family segments `virtual`, `cloud`, `usage` and `status` are API path segments rather than plural
+nouns (C §11.3 says "plural families"); that wording is raised with the CONTRACTS maintainer in the
+audit report and nothing here waits on it.
 
 ### 9.2 MCP additions (`apps/mcp/src/openapi-tools/whitelist.ts`)
 
@@ -163,9 +179,15 @@ and the whitelist and fails on a missing or extra fleet entry, and on any forbid
 
 `index.ts` (group, `--json`, exit map, `--yes`, `--confirm-name`, `--wait/--no-wait`), `fleet-output.ts`,
 `fleet-exit.ts`, `fleet-confirm.ts`, `fleet-client.ts` (typed wrapper over `getHttpClient`), and one
-file per family: `status.ts`, `nodes.ts`, `session.ts` (incl. `attach` via `apps/cli/src/commands/fleet/session-attach.ts`, `ws`),
-`logs.ts`, `services.ts`, `docker.ts`, `processes.ts`, `ports.ts`, `files.ts`, `command.ts` (FL-12),
-`schedule.ts` (FL-13), `checkout.ts`, `vm.ts`, `cloud.ts`, `runner.ts`, `usage.ts`, `operation.ts`.
+file per family. Command groups are the plural families of CONTRACTS §11.3 (`ever-works fleet
+sessions|commands|schedules|checkouts|runners|nodes|operations …`); each also answers to its singular
+(`session`, `command`, `schedule`, `checkout`, `runner`, `node`, `operation`) as a commander alias, so
+the singular forms FL-04, FL-05, FL-12 and FL-13 quote keep working. Files, named as the owning epics
+name them: `status.ts`, `nodes.ts` (FL-03 health/wake, FL-15 git identity), `session.ts` (FL-04, FL-05,
+FL-06, FL-15 verbs; `attach` via `session-attach.ts`, `ws`), `desktop.ts` (FL-07, FL-11 paste),
+`logs.ts`, `services.ts`, `processes.ts`, `docker.ts`, `ports.ts`, `files.ts` (FL-11), `command.ts`
+(FL-12), `schedule.ts` (FL-13), `checkout.ts` (FL-14), `virtual.ts` (FL-16), `cloud.ts` (FL-17),
+`runners.ts` (FL-18), `usage.ts` (FL-20), `operation.ts`.
 Registered in `apps/cli/src/main.ts` beside `registerKbCommands`. `apps/cli/src/utils/error.ts`
 gains `handleFleetCliError(error, { json })` that maps an API `{ error }` body to the envelope and
 exit code without changing the existing `handleCliError`.
@@ -181,7 +203,9 @@ None.
   (category-specific rule). Published as a constant array, not control flow.
 - Refusals at 4–5 go through `RailRefusalService` (AW-24); refusals at 7 return
   `permission_denied` / `consent_missing` and create no Decision.
-- Confirmation summaries are hashed server-side; a mismatch re-issues `confirmation_required`.
+- Confirmation is re-evaluated on every call against the current state (C §2.2: no tokens, no
+  signed summaries); a blast-radius sentence that appears between the calls re-issues
+  `confirmation_required`.
 - Tools never return credentials, raw paths outside roots, or unredacted output — the family
   services already guarantee that; FL-19 adds a test that every tool result passes `redactSecrets`.
 - MCP acts as the API-key user: the Node audience is checked for that user; Organization-scoped
@@ -218,9 +242,9 @@ Metrics `fleet_tool_calls_total{tool,outcome}`, `fleet_tool_gate_refusals_total{
 | Risk                                                      | Likelihood | Impact | Mitigation                                                                              |
 | --------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------- |
 | Catalogue drifts from the family controllers              | High       | Medium | Parity tests on three surfaces; a family PR must add its row                            |
-| Two confirmation mechanisms (token vs body fields)        | Medium     | Low    | One interceptor; the web may also use body fields                                       |
+| A caller sends a token-style confirmation instead of the fields | Low   | Low    | C §2.2 has no tokens; the interceptor ignores unknown fields and answers 409 with the preview |
 | Agents loop on `confirmation_required`                    | Medium     | Low    | Hint says exactly what to send; summary stable for 5 min                                 |
-| MCP naming inconsistency                                  | High       | Low    | Flagged in spec §8b; parity test allows exactly the eight legacy names                   |
+| MCP naming inconsistency                                  | High       | Low    | C §11.3 keeps the eight legacy names; the parity test allows exactly those               |
 
 ## 16. Constitution reconciliation
 
@@ -228,4 +252,4 @@ I n/a · II n/a · III n/a · IV operations are FL-02's · V no schema · VI tes
 
 ## 17. References
 
-Spec `./spec.md` · Tasks `./tasks.md` · CONTRACTS §2, §3.3, §7, §8, §11.3 · AW-15 §4.3 · AW-24 §4.1–4.3 · FL-01 plan (roles, needs-a-look) · FL-02 plan (operations) · FL-04 plan (attach tokens)
+Spec `./spec.md` · Tasks `./tasks.md` · CONTRACTS §2, §3.3, §7, §8, §11.3, R-32, R-33 · AW-15 §4.3 · AW-24 §4.1–4.3 · FL-01 plan (roles, needs-a-look) · FL-02 plan (operations) · FL-04 plan (attach tokens) · every family epic's plan §9 (the catalogue rows)

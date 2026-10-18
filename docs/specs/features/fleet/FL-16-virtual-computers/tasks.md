@@ -18,9 +18,14 @@
   `packages/contracts`, `apps/web` unit use **Vitest**; `apps/web` e2e uses **Playwright**.
 - Migrations are authored from `apps/api/`; the API applies them on boot. Re-stamp slot
   `1796160000000` only if `develop` moved past it (README rule 10).
-- Prerequisites assumed landed: FL-01 (registry, roles), FL-02 (link, operations, `managed`,
-  `--manage`), FL-09 (`apps/node/src/core/docker/docker-cli.ts`). Where a prerequisite is not yet
-  merged, build against its contract and mark the task blocked in the PR.
+- Prerequisites assumed landed: FL-01 (registry, roles, nesting), FL-02 (link, operations, `managed`,
+  `--manage`, the link module registry `apps/node/src/core/link/modules/index.ts`), FL-09
+  (`apps/node/src/core/link/modules/docker/docker-cli.ts`, the Runs here block); FL-10 for P2. Where a
+  prerequisite is not yet merged, build against its contract and mark the task blocked in the PR.
+- Node modules live under `apps/node/src/core/link/modules/<family>/` (CONTRACTS R-40); job
+  executors stay in `apps/node/src/core/executors/`.
+- Confirmation is the request fields `confirm` / `confirmName` with a 409 `confirmation_required`
+  preview (CONTRACTS §2.2) — never a token.
 - Commit style: `feat(fleet-virtual): …`, `test(fleet-virtual): …`, `chore(i18n): …`.
 - Never name a third-party product that informed this program (README rule 16).
 
@@ -42,8 +47,10 @@
       **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-jobs.spec.ts` — the record has
       an entry for every kind; `isFleetJobKind('vm-create')` is true.
 - [ ] **T-03** _(parallel)_. Extend `packages/contracts/src/fleet/fleet-node.types.ts`: optional
-      `origin`, `hostNodeId`, `virtualKind`, `virtual` on `FleetNodeView` (L329); extend
-      `fleet-panic.types.ts` with `node.vm.create|start|stop|destroy` (L60, L116).
+      `origin`, `hostNodeId`, `virtualKind`, `virtual` (with `FleetVirtualState`, plan §4.3) on
+      `FleetNodeView` (L329); extend `fleet-panic.types.ts` with
+      `node.vm.create|start|stop|destroy|resize|rebuild` and `node.vm.password.reveal` (CONTRACTS §7;
+      L60, L116).
       **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-panic.spec.ts`; the node
       contract conformance fixture `packages/contracts/fixtures/fleet-node-contract.v1.json` still
       validates (fields are optional).
@@ -56,8 +63,9 @@
       **Test**: `pnpm --filter @ever-works/agent build` clean; entity inventory spec
       `packages/agent/src/database/_entities-inventory.spec.ts` unchanged.
 - [ ] **T-05**. Author `apps/api/src/migrations/1796160000000-AddFleetNodeVirtualFields.ts` from
-      `apps/api/` (`pnpm typeorm migration:generate …`), hand-edit `origin` to
-      `ADD COLUMN IF NOT EXISTS` (shared with FL-17), `down` per plan §4.2.
+      `apps/api/` (`pnpm typeorm migration:generate …`), hand-edit every `ADD COLUMN` to be guarded
+      with `findColumnByName` (CONTRACTS R-35 — FL-17's slot may have added `origin` first), `down`
+      per plan §4.2.
       **Test**: applies on an empty DB and on one with FL-17's migration already applied; a second
       `migration:generate` yields an empty diff.
 
@@ -81,7 +89,8 @@
       rows carry no token.
 - [ ] **T-08**. Add the delete guards to `FleetService.deleteForUser`
       (`packages/agent/src/fleet/fleet.service.ts`): host with children → `busy`; virtual child whose
-      machine exists → `busy` with hint "destroy it instead".
+      machine exists → `unsupported_on_node` with hint "destroy it instead" (the R-36 shape, spec
+      FR-29); allowed again once the reconcile marks the child gone.
       **Test**: extend `packages/agent/src/fleet/__tests__/fleet.service.spec.ts`.
 - [ ] **T-09**. Add `packages/agent/src/fleet/virtual/fleet-virtual.module.ts` and export the subpath
       from `packages/agent/src/fleet/index.ts`; register in `apps/api/src/fleet/fleet.module.ts`.
@@ -113,47 +122,57 @@
       the current user or wider than 0600 on POSIX.
       **Test**: extend `apps/node/src/cli/program.spec.ts` — token read, file deleted, both flags →
       usage error (exit 2).
-- [ ] **T-14**. Add `apps/node/src/core/virtual/catalogue.ts`, `host-facts.ts`, `state.ts`,
-      `docker-args.ts`, `password.ts` per plan §6.1 (all IO injected).
+- [ ] **T-14**. Add `apps/node/src/core/link/modules/virtual/catalogue.ts`, `host-facts.ts`,
+      `state.ts`, `docker-args.ts`, `password.ts` per plan §6.1 (all IO injected).
       **Test**: `catalogue.spec.ts` (digest present for every system; override honoured),
       `docker-args.spec.ts` (exact argv for a Container; no shell metacharacters pass; name
       validated), `password.spec.ts` (24 chars; keychain roundtrip via a fake `SecretStore`).
-- [ ] **T-15**. Add `apps/node/src/core/virtual/container-bootstrap.ts` — generates the bootstrap
-      script (install Node 26, `npm i -g ever-works-node@<version>`, wait for token file, `enroll
-      --token-file`, `exec start --work --manage`).
+- [ ] **T-15**. Add `apps/node/src/core/link/modules/virtual/container-bootstrap.ts` — generates the
+      bootstrap script (install Node 26, `npm i -g ever-works-node@<version>`, write the readiness
+      marker, wait for the token file, `enroll --token-file`, `exec start --work --manage`).
       **Test**: `container-bootstrap.spec.ts` — the script never contains the token; it pins the
-      host's runtime version; it deletes the token file after `enroll`.
+      host's runtime version; it writes the readiness marker before waiting.
 - [ ] **T-16**. Add `apps/node/src/core/executors/vm-create.ts` (Container path): phases, `docker
-      pull`/`run` via `docker-cli.ts`, request the token through the internal endpoint only after the
-      container is up, write `<datadir>/run/enroll-token` 0600, progress via FL-02 operations,
-      cleanup on failure (`docker rm -f`, data dir).
+      pull`/`run` via `apps/node/src/core/link/modules/docker/docker-cli.ts`, request the token through
+      the internal endpoint only when the guest's readiness marker appears (R-35), write
+      `<datadir>/run/enroll-token` 0600 and delete it host-side once `enroll` exits or the first
+      heartbeat arrives, progress via FL-02 operations, cleanup on failure (`docker rm -f`, data dir).
       **Test**: `apps/node/src/core/executors/vm-create.spec.ts` — phase order; failure leaves no
-      container; token requested once; progress events ≤ 5 s apart with a fake clock.
+      container; token requested once, after readiness; token file gone after enrolment; progress
+      events ≤ 5 s apart with a fake clock.
 - [ ] **T-17**. Add `apps/node/src/core/executors/vm-control.ts`: start / stop (`-t 10` Containers) /
       destroy (rm, data dir, keychain).
       **Test**: `vm-control.spec.ts` — stop grace per kind; destroy removes exactly the child's dir.
-- [ ] **T-18**. Add `createManagementLane` to `apps/node/src/core/runtime.ts` (model: L1049-1062),
-      `kinds: ['vm-create','vm-control']`, only under `--manage`; register the executors only when
+- [ ] **T-18**. Extend FL-02's `createManagementLane` (FL-02 T-27) in
+      `apps/node/src/core/runtime.ts` (model: `createAttendedLane`, L1026-1070) per CONTRACTS R-34:
+      add `vm-create`/`vm-control` to its kinds when `--manage` is on; register the executors only when
       `docker` is advertised; `excludeKinds` on the work lane; export from `apps/node/src/core/index.ts`.
-      **Test**: extend `apps/node/src/core/runtime.spec.ts` — no lane without `--manage`; lane without
-      `--work`; both lanes never lease the same kinds.
-- [ ] **T-19**. Add `vm.list` / `vm.status` handlers to the `machine` channel in FL-02's link module
-      (`apps/node/src/core/link/machine-channel.ts`).
-      **Test**: extend its spec — replies carry container state and data-dir size, never a password.
+      **Test**: extend `apps/node/src/core/runtime.spec.ts` — no `vm-*` kinds without `--manage`; lane
+      runs without `--work`; the work lane never leases a management kind; one lane only.
+- [ ] **T-19**. Add `apps/node/src/core/link/modules/virtual/index.ts` with the `vm.list` /
+      `vm.status` handlers (C §3.3 `machine` family) and register it once in
+      `apps/node/src/core/link/modules/index.ts` (CONTRACTS R-40).
+      **Test**: `apps/node/src/core/link/modules/virtual/index.spec.ts` — replies carry container state
+      and data-dir size, never a password; refused while `link.pause` holds.
 
 ## P1.F — Web
 
 - [ ] **T-20**. Add `apps/web/src/components/fleet/virtual/virtual.shared.ts` (pure eligibility,
-      auto-pick label, phase labels, size options per system) and register `computers.addMenu` +
-      `computers.rowChildren` + `overview.runsHere` contributions in
-      `apps/web/src/components/fleet/registry.ts`.
-      **Test**: `virtual.shared.unit.spec.ts` — every reason has a string key; Windows shows disk.
+      auto-pick label, phase labels, size options per system); add **New virtual computer…** to FL-01's
+      Add computer menu (`apps/web/src/components/fleet/FleetHubHeader.tsx`) and the child actions to
+      FL-01's `computer/ComputerActionsMenu.tsx`, both behind `FLEET_VIRTUAL_ENABLED` (FL-01's registry
+      has no entry point for menus — plan §8); nesting stays FL-01's `groupNodesByHost`.
+      **Test**: `virtual.shared.unit.spec.ts` — every reason has a string key; Windows shows disk; the
+      menu item is absent with the flag off.
 - [ ] **T-21**. Add `NewVirtualComputerDialog.tsx`, `VirtualHostPicker.tsx`, `VirtualProgressLine.tsx`,
-      `VirtualChildRow.tsx`, `RunsHereBlock.tsx`, `VirtualActionsMenu.tsx`, `DestroyVirtualDialog.tsx`
-      under `apps/web/src/components/fleet/virtual/`; BFF routes under
-      `apps/web/src/app/api/fleet/nodes/[id]/virtual/**` (plan §8).
+      `VirtualChildRow.tsx`, `VirtualRunsHereRows.tsx` (mounted inside FL-09's
+      `apps/web/src/components/fleet/docker/RunsHereBlock.tsx`, no second block),
+      `VirtualActionsMenu.tsx`, `DestroyVirtualDialog.tsx` under
+      `apps/web/src/components/fleet/virtual/`; BFF routes under
+      `apps/web/src/app/api/fleet/nodes/[id]/virtual/**` (plan §8). Confirmations render the 409
+      `confirmation_required` preview and repeat the call with `confirm` / `confirmName`.
       **Test**: `NewVirtualComputerDialog.unit.spec.tsx` (Create disabled until valid; cost sentence
-      present), `RunsHereBlock.unit.spec.tsx`.
+      present; preview → repeat with `confirm: true`), `VirtualRunsHereRows.unit.spec.tsx`.
 - [ ] **T-22**. Palette entries in `apps/web/src/components/command-palette/registry/screens.ts`
       (beside L212) and `fleet.virtual.*` keys in `apps/web/messages/en.json` (spec §5.9; camelCase,
       no literal dots).
@@ -186,10 +205,10 @@
 
 # PHASE 2 — Windows VMs
 
-- [ ] **T-27**. Add `apps/node/src/core/virtual/kvm-probe.ts` and advertise `kvm` in
+- [ ] **T-27**. Add `apps/node/src/core/link/modules/virtual/kvm-probe.ts` and advertise `kvm` in
       `apps/node/src/core/capabilities.ts` (beside `docker`, L294): Linux x64 + R/W `/dev/kvm`.
       **Test**: extend `capabilities.spec.ts` — never on macOS/Windows/arm64; never without R/W access.
-- [ ] **T-28**. Add `apps/node/src/core/virtual/windows-oem.ts` — first-boot step (install Node 26 +
+- [ ] **T-28**. Add `apps/node/src/core/link/modules/virtual/windows-oem.ts` — first-boot step (install Node 26 +
       the published runtime, set the generated account password, wait for the token file in the OEM
       share, `enroll --token-file`, start-at-boot via the `install-service.ps1` logic as the generated
       account); write `ready.txt` when the step begins so the host requests the token (late mint).
@@ -197,20 +216,21 @@
       runtime is never registered as a built-in account.
 - [ ] **T-29**. Extend `vm-create.ts` with the Windows path: prechecks (`kvm`, ≥ 30 GB, x64 Linux),
       `--env-file` for the password (0600, removed after start), loopback viewer port registration
-      with FL-10's port module (`apps/node/src/core/ports/`), phases `downloading Windows · installing
+      with FL-10's port module (`apps/node/src/core/link/modules/ports/`), phases `downloading Windows · installing
       · first boot`, token request on `ready.txt`.
       **Test**: extend `vm-create.spec.ts` — each precheck message; viewer bound to `127.0.0.1`
       only; password never in argv (`--env-file` path only).
 - [ ] **T-30**. Extend `vm-control.ts`: `docker stop -t 120` for VMs; destroy deletes the keychain
-      entry; `vm.password.reveal` link handler reading the keychain once.
-      **Test**: extend `vm-control.spec.ts` and the machine-channel spec — reveal returns the value
-      once and logs nothing.
-- [ ] **T-31**. API: `password/reveal` (owner-only, 5/min, never cached — `Cache-Control: no-store`)
-      and `retry-enrollment` routes in `fleet-virtual.controller.ts`; audit `node.vm.password.reveal`
-      once CONTRACTS §7 confirms (until then `node.vm.start` with `extra.revealed: true` is NOT
-      acceptable — block the task on the clarification).
-      **Test**: extend the controller spec — 403 for non-owners; audit row written; response body
-      never appears in logs.
+      entry; add the `vm.password.reveal` handler to `apps/node/src/core/link/modules/virtual/index.ts`
+      reading the keychain once.
+      **Test**: extend `vm-control.spec.ts` and `link/modules/virtual/index.spec.ts` — reveal returns
+      the value once and logs nothing.
+- [ ] **T-31**. API: `password/reveal` (owner-only by default — spec §8b; requires `confirm: true`,
+      else 409 `confirmation_required`; 5/min; never cached — `Cache-Control: no-store`) and
+      `retry-enrollment` routes in `fleet-virtual.controller.ts`; audit `node.vm.password.reveal`
+      (CONTRACTS §7) with `extra.revealed: true`, never the value.
+      **Test**: extend the controller spec — 403 for non-owners; 409 without `confirm`; audit row
+      written; response body never appears in logs.
 - [ ] **T-32**. Web: Windows systems in the dialog (disk field, download/install note, activation
       note), `RevealPasswordDialog.tsx` (60 s auto-hide), `Watch the install` button (opens the
       viewer port through FL-10's "open on the machine"), `not activated` chip.
@@ -225,7 +245,8 @@
 
 - [ ] **T-34**. `PATCH …/virtual/:childId` (resize, stopped only) and `POST …/rebuild` in the
       controller/service; `vm-control` actions `resize` (`docker update --cpus --memory`) and `rebuild`
-      (recreate the container keeping `home/`); menu items; audit names per CONTRACTS §7 decision.
+      (recreate the container keeping `home/`); both `confirm`-class (`confirm: true`); menu items;
+      audit `node.vm.resize` / `node.vm.rebuild` (CONTRACTS §7).
       **Test**: controller + executor specs — resize refused `busy` while running; rebuild keeps
       `home/` and the registration.
 - [ ] **T-35**. CLI `apps/cli/src/commands/fleet/virtual.ts` (`list|options|create|start|stop|destroy
@@ -243,10 +264,13 @@
 - [ ] **T-37**. Finish `docs/features/fleet-virtual-computers.md` (what a VM vs a Container is, what
       is needed on the host, passwords and activation, destroy semantics, limits); cross-link from
       `docs/features/fleet.md`; no plugin-count doc change (no plugin).
+      **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
 - [ ] **T-38**. Update `docs/specs/features/fleet/TRACKER.md` (spec `Reviewed` → impl states) and
       mark this folder's status lines.
+      **Test**: the FL-16 TRACKER row shows `FLEET_VIRTUAL_ENABLED` and slot `1796160000000`.
 - [ ] **T-39**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; run the banned-terms
       grep from the program brief over this folder and the code — it must print nothing.
+      **Test**: every command exits 0 and the grep prints nothing.
 
 ## Definition of done
 

@@ -82,6 +82,16 @@ jest.mock('../fleet-kill-switch.service', () => ({
 jest.mock('../fleet-audit.service', () => ({
     FleetAuditService: class FleetAuditService {},
 }));
+// Fleet hub (FL-01) — the role derivation's directory and the two services.
+jest.mock('../fleet-organization-directory', () => ({
+    FleetOrganizationDirectory: class FleetOrganizationDirectory {},
+}));
+jest.mock('../fleet-access.service', () => ({
+    FleetAccessService: class FleetAccessService {},
+}));
+jest.mock('../needs-a-look/needs-a-look.service', () => ({
+    NeedsALookService: class NeedsALookService {},
+}));
 
 import 'reflect-metadata';
 import { FleetModule } from '../fleet.module';
@@ -100,6 +110,9 @@ import { FleetKillSwitchService } from '../fleet-kill-switch.service';
 import { FleetAuditService } from '../fleet-audit.service';
 import { FleetRunCredentialService } from '../fleet-run-credential.service';
 import { ApiKeyRepository } from '../../database/repositories/api-key.repository';
+import { FleetOrganizationDirectory } from '../fleet-organization-directory';
+import { FleetAccessService } from '../fleet-access.service';
+import { NeedsALookService } from '../needs-a-look/needs-a-look.service';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
@@ -130,6 +143,10 @@ describe('FleetModule', () => {
             FleetKillSwitchService,
             ApiKeyRepository,
             FleetRunCredentialService,
+            // Fleet hub (FL-01).
+            FleetOrganizationDirectory,
+            FleetAccessService,
+            NeedsALookService,
         ]);
     });
 
@@ -149,7 +166,21 @@ describe('FleetModule', () => {
             FleetAuditService,
             FleetKillSwitchService,
             FleetRunCredentialService,
+            FleetAccessService,
+            NeedsALookService,
         ]);
+    });
+
+    /**
+     * Fleet hub (FL-01) — FL-02's link authoriser and every family-gated
+     * route inject the access service, and producers register into the
+     * needs-a-look registry, so both must be exported. The directory the
+     * role derivation reads through is an internal detail and is not.
+     */
+    it('exports the access service and the needs-a-look registry, not the directory', () => {
+        expect(meta('exports')).toContain(FleetAccessService);
+        expect(meta('exports')).toContain(NeedsALookService);
+        expect(meta('exports')).not.toContain(FleetOrganizationDirectory);
     });
 
     /**
@@ -203,6 +234,9 @@ describe('fleet barrel', () => {
         expect(barrel.FleetKillSwitchRepository).toBe(FleetKillSwitchRepository);
         expect(barrel.FleetAuditService).toBe(FleetAuditService);
         expect(barrel.FleetRunCredentialService).toBe(FleetRunCredentialService);
+        expect(barrel.FleetAccessService).toBe(FleetAccessService);
+        expect(barrel.NeedsALookService).toBe(NeedsALookService);
+        expect(barrel.NEEDS_A_LOOK_PRODUCERS).toBe('NEEDS_A_LOOK_PRODUCERS');
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 

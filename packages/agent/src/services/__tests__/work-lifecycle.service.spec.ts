@@ -764,6 +764,31 @@ describe('WorkLifecycleService', () => {
             expect(result).toBe(persisted);
         });
 
+        it('stores who created it when it was not the owner (an integration key, EW-P1-2)', async () => {
+            process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
+            workRepository.create.mockResolvedValue({ id: 'w-p', kind: 'project' } as any);
+
+            await service.createProjectWork(
+                user,
+                { name: 'Relaunch', slug: 'relaunch' },
+                { createdBy: { type: 'integration', id: 'key-1' } },
+            );
+            await service.createProjectWork(
+                user,
+                { name: 'Relaunch', slug: 'relaunch-2' },
+                { createdBy: { type: 'user', id: user.id } },
+            );
+            await service.createProjectWork(user, { name: 'Relaunch', slug: 'relaunch-3' });
+
+            const dtos = workRepository.create.mock.calls.map(([dto]: [any]) => dto);
+            expect(dtos[0]).toMatchObject({ createdByType: 'integration', createdById: 'key-1' });
+            // The owner (or the act-as person) created it: nothing is stored, as for every other Work.
+            for (const dto of dtos.slice(1)) {
+                expect(dto.createdByType).toBeUndefined();
+                expect(dto.createdById).toBeUndefined();
+            }
+        });
+
         it('records work.created (this path emits no work.created app event for the bridge)', async () => {
             process.env.EVER_WORKS_PROJECT_WORKS_ENABLED = 'true';
             workRepository.create.mockResolvedValue({ id: 'w-p', kind: 'project' } as any);

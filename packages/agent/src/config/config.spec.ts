@@ -261,6 +261,27 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.isHubEnabled (Fleet hub, FL-01)', () => {
+        it('is OFF by default (CONTRACTS §9)', () => {
+            expect(config.fleet.isHubEnabled()).toBe(false);
+        });
+
+        it("is ON only for the literal 'true'", () => {
+            process.env.FLEET_HUB_ENABLED = 'true';
+            expect(config.fleet.isHubEnabled()).toBe(true);
+            for (const value of ['1', 'yes', 'TRUE', '']) {
+                process.env.FLEET_HUB_ENABLED = value;
+                expect(config.fleet.isHubEnabled()).toBe(false);
+            }
+        });
+
+        it('cannot resurrect a fleet that FLEET_ENABLED switched off (spec U3)', () => {
+            process.env.FLEET_HUB_ENABLED = 'true';
+            process.env.FLEET_ENABLED = 'false';
+            expect(config.fleet.isHubEnabled()).toBe(false);
+        });
+    });
+
     describe('config.fleet.getMinNodeVersion (node lifecycle, slice AR)', () => {
         it('defaults to the first daemon ever published, so no machine is refused by default', () => {
             expect(config.fleet.getMinNodeVersion()).toBe('0.1.0');

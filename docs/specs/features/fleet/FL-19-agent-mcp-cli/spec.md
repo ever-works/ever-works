@@ -9,7 +9,7 @@
 **Status:** `Draft`
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
-**Size:** M · **Blocked by:** FL-04 … FL-18 (each family's API) · **Related:** FL-01 (roles, needs a look), FL-02 (operations), AW-15 (tool grants), AW-24 (trust ladder), AW-03 (Decisions)
+**Size:** M · **Blocked by:** FL-01 (roles, needs-a-look registry), FL-02 (operations), FL-04 (the first family) for P1–P2; each family's epic for its own catalogue rows as it lands — FL-16, FL-17, FL-18 (Wave 3) for P3 · **Related:** FL-01 (roles, needs a look), FL-02 (operations), AW-15 (tool grants), AW-24 (trust ladder), AW-03 (Decisions)
 **Extends (existing Ever Works nouns):** Agent · Agent tool · MCP server · CLI · Node (UI: "Computer") · Session · Command · Schedule · Checkout · Run · Decision · Fleet audit
 
 ---
@@ -50,17 +50,18 @@ state-changing call writes the audit row with `requestedBy: agent:<id>`.
 | Phase  | Ships                                                                                                                                                 |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | The gate (grants × ladder × node audience), tool annotations, typed errors, `fleet_status`, read-only tools for every shipped family, `wait:false` + `fleet_operations_get`, the CLI `fleet` group with `--json` and exit codes, MCP read-only additions, Agent Capabilities "Fleet tools" block |
-| **P2** | State-changing tools for every shipped family with confirmation arguments and Decisions at the Ask rung, `fleet_sessions_question` / `fleet_sessions_answer`, `ever-works fleet session attach`, MCP state-changing additions, audit `requestedBy: agent:<id>` everywhere |
+| **P2** | State-changing tools for every shipped family with confirmation arguments and Decisions at the Ask rung, `fleet_sessions_question` / `fleet_sessions_answer`, `ever-works fleet sessions attach`, MCP state-changing additions, audit `requestedBy: agent:<id>` everywhere |
 | **P3** | Tools for FL-16/17/18 (virtual, cloud, runners) as those epics land; the agent-facing doc; the CLI shell-completion                                     |
 
 ---
 
 ## 1. Overview
 
-Today an Agent sees one fleet tool, `list_fleet_nodes`; the MCP server exposes eight fleet reads
-plus affinity and drain; the CLI has no fleet verbs. The program adds fourteen families of machine
-actions (CONTRACTS §3.3, §11.2); without this epic each would invent its own tool shape, its own
-error vocabulary and its own idea of permission. This epic fixes them once:
+Today an Agent sees one fleet tool, `list_fleet_nodes`; the MCP server exposes eight fleet entries —
+four reads, three affinity entries and drain (EXISTING-SUBSTRATE §8.2); the CLI has no fleet verbs.
+The program adds machine actions in thirteen permission families (CONTRACTS §2.1); without this epic
+each would invent its own tool shape, its own error vocabulary and its own idea of permission. This
+epic fixes them once:
 
 - **Naming and annotations.** Tools are `fleet_<family>_<verb>`. A read-only tool is marked so and
   is always available to an Agent that may _see_ the computer. A state-changing tool is marked
@@ -70,9 +71,11 @@ error vocabulary and its own idea of permission. This epic fixes them once:
   computer's family audience includes the Agent's owner — plus the computer's consent. Refusals are
   typed and say which gate refused and what would fix it.
 - **Confirmation without a browser.** Where a human sees a dialog, a tool call sees a first reply
-  that describes exactly what would happen and a second call that confirms it — `confirm: true`
-  for the `confirm` class, the target's name for `confirm-destructive`, an explicit acknowledgement
-  of the node-computed warning for `blast-radius`.
+  (409 `confirmation_required` with the summary) that describes exactly what would happen and a
+  second call that confirms it — `confirm: true` for the `confirm` class, the target's name for
+  `confirm-destructive`, an explicit acknowledgement of the node-computed warning for
+  `blast-radius`. The web dialog uses the same fields (CONTRACTS §2.2); there are no confirmation
+  tokens.
 - **Long operations.** Any tool that may take more than a few seconds accepts `wait: false` and
   returns an operation id the caller polls with `fleet_operations_get`.
 - **Three surfaces, one shape.** The MCP server exposes the same routes through its whitelist; the
@@ -118,7 +121,8 @@ to its owner (D15).
   kill-switch state, and `generatedAt`; the call is read-only and needs no confirmation.
 
 - **S2 — A read that is always allowed.**
-  **Given** `Ops` may see `build-01`,
+  **Given** `build-01`'s `logs` audience includes `Ops`'s owner (log reads are the `logs` family,
+  CONTRACTS §2.1),
   **when** it calls `fleet_logs_read` for the system log,
   **then** it receives the last 500 lines; no Decision is created and no audit row is written for a
   read, exactly as the web surface behaves.
@@ -127,7 +131,8 @@ to its owner (D15).
   **Given** `Nina`'s ladder puts _Change a computer_ at **Ask** and `build-01`'s owner has set the
   `services` family to **org-members**,
   **when** she calls `fleet_services_action` with `{ node: 'build-01', service: 'nginx', action: 'restart' }`,
-  **then** the tool returns `{ held: true, decisionId }`, a Decision appears in My Decisions
+  **then** the call is held as an `agent_action_proposals` row (CONTRACTS R-33) and the tool returns
+  `{ held: true, decisionId }`; a Decision appears in My Decisions
   reading _"Nina wants to restart nginx on build-01"_ with the confirm class and the node's
   blast-radius sentence when there is one; approving executes it, writes `node.service.restart`
   with `requestedBy: agent:<Nina>`, and the tool's follow-up `fleet_operations_get` reports done.
@@ -146,20 +151,23 @@ to its owner (D15).
   members: services"_, nothing is held and nothing is audited except the refusal record (AW-24).
 
 - **S6 — Unblocking another Agent's session.**
-  **Given** `Nina`'s session on `build-01` is _needs you_ with the question _"Overwrite
-  .env.local?"_ and `Ops` has been granted `fleet_sessions_answer`,
+  **Given** `Nina`'s session on `build-01` is _needs you_ with the **question** _"Overwrite
+  .env.local?"_, `Ops` has been granted `fleet_sessions_answer`, and `Ops`'s owner switched on
+  "may answer other sessions" for `Ops` (CONTRACTS R-32; the setting is FL-05's),
   **when** `Ops` calls `fleet_sessions_question` for that session and then
-  `fleet_sessions_answer` with `{ key, answer: 'no' }`,
+  `fleet_sessions_answer` with `{ key, answer: 'no', confirm: true }`,
   **then** the answer reaches the session, the attention clears on every surface, and the audit row
-  `node.session.answer` names `agent:<Ops>`; an Agent without that grant is refused
-  `permission_denied` with the hint naming the grant.
+  `node.session.answer` names `agent:<Ops>`; an Agent without the grant or the setting is refused
+  `permission_denied` with the hint naming what is missing, and a **permission** prompt is refused
+  for every Agent — _"permission prompts are answered by people"_.
 
 - **S7 — From the CLI.**
   **Given** the owner is signed in,
   **when** they run `ever-works fleet sessions list --on build-01 --json`,
   **then** they get `{ "ok": true, "data": [...] }` with the same `FleetSessionView` objects the
-  web uses, exit `0`; `ever-works fleet session attach <id>` opens the session's terminal in their
-  own terminal (read-only unless `--drive`), and `Ctrl-]` detaches without ending it.
+  web uses, exit `0`; `ever-works fleet sessions attach <id>` (the singular `session` group is an
+  alias) opens the session's terminal in their own terminal (read-only unless `--drive`), and
+  `Ctrl-]` detaches without ending it.
 
 - **S8 — The MCP server exposes the same.**
   **Given** an external assistant is connected to the MCP server with the owner's API key,
@@ -183,18 +191,23 @@ to its owner (D15).
   Work scope"_.
 - **U6 — Limit exceeded.** `limit_exceeded` naming the §10 limit (_"8 owner sessions on build-01"_).
 - **U7 — Link drops mid-operation.** `wait: true` calls return `operation_failed` with
-  `details.operationId`; the caller polls `fleet_operations_get`, which reports `interrupted` or the
-  late result when the node reconnects.
-- **U8 — Confirmation stale.** A `confirm: true` call whose summary no longer matches (a service
-  disappeared, a machine went offline) is refused `confirmation_required` again with the new summary.
+  `details.operationId`; the caller polls `fleet_operations_get`, which reports `interrupted`
+  (CONTRACTS §3.3 — never `done`) or the late result when the node reconnects.
+- **U8 — Target changed between the two calls.** A `confirm: true` call is evaluated against the
+  computer's state at that moment (no token or stored summary exists — CONTRACTS §2.2): a service
+  that disappeared answers `not_found`, an offline computer `unreachable`, and a blast-radius warning
+  that appeared since the first reply answers `confirmation_required` with the sentence until
+  `acknowledgeBlastRadius: true` is sent.
 - **U9 — Wrong name on destructive confirm.** `confirm-destructive` with the wrong `confirmName`
   → `invalid` with the hint _"type the exact name: win-11-vm"_.
 - **U10 — CLI without a TTY.** A `confirm` class verb without `--yes` in a non-interactive shell
   exits `2` with the summary on stderr and the JSON error on stdout when `--json`.
 - **U11 — MCP without Organization scope.** Family checks that need the Organization (R-19) return
   `invalid` with the existing scope hint used by the affinity tools.
-- **U12 — Decision expires.** A held fleet action not decided within 24 h expires; the tool's
-  operation reports `expired` and nothing runs.
+- **U12 — Held action goes stale.** A held fleet action (an `agent_action_proposals` row, R-33)
+  approved more than 24 h after it was raised does not run: approval answers `confirmation_required`
+  with a fresh summary and the Agent must ask again (default until §8b is answered); nothing runs on
+  its own.
 
 ---
 
@@ -202,9 +215,12 @@ to its owner (D15).
 
 ### 4.1 Catalogue and annotations (P1)
 
-- **FR-1** Every fleet tool MUST be named `fleet_<family>_<verb>` where `family` is the channel or
-  noun family (`status · nodes · sessions · desktop · logs · services · docker · processes · ports ·
-  files · commands · schedules · checkouts · machines · runners · usage · operations`).
+- **FR-1** Every fleet tool MUST be named `fleet_<family>_<verb>` (CONTRACTS §11.3) where `family` is
+  the plural noun or API path segment of the thing acted on: `status · nodes · sessions · desktop ·
+  logs · services · processes · docker · ports · files · commands · schedules · checkouts · tasks ·
+  virtual · cloud · runners · usage · operations` (Compose is under `docker`, paste under `desktop`,
+  health, wake and git identity under `nodes`). The tool family is a name, not a permission: each
+  catalogue row also names its CONTRACTS §2.1 permission family.
 - **FR-2** Every tool MUST declare `readOnly: true` or `destructive: true|false`; a non-read tool
   MUST also declare its confirmation class and its AW-24 category.
 - **FR-3** Existing tool names (`list_fleet_nodes` on both surfaces and the seven other MCP fleet
@@ -217,7 +233,9 @@ to its owner (D15).
 ### 4.2 The gate (P1 reads, P2 acts)
 
 - **FR-6** A read-only fleet tool MUST be callable by an Agent whenever the Agent's tool grants
-  allow its name and the computer's `view` audience includes the Agent's owner.
+  allow its name and the computer's audience for the row's permission family includes the Agent's
+  owner (CONTRACTS §2.1: `view` for status, nodes, port lists and `health.now`; `logs` for log reads;
+  the family itself for the other families' lists).
 - **FR-7** A state-changing fleet tool MUST run only when: the tool grants allow its name; the
   trust ladder resolves its category to **Auto** (or to **Ask**/**Draft**, in which case a Decision
   is created and the tool returns `held`); the computer's family audience includes the Agent's
@@ -232,25 +250,27 @@ to its owner (D15).
 
 ### 4.3 Confirmation for non-interactive callers (P2)
 
-- **FR-11** A `confirm` class tool called without `confirm: true` MUST return
-  `confirmation_required` with a `details.summary` describing exactly what would happen, and MUST
-  execute when called again with `confirm: true` and an unchanged summary.
+- **FR-11** A `confirm` class tool called without `confirm: true` MUST return 409
+  `confirmation_required` with `details: { class, summary, preview? }` describing exactly what would
+  happen (CONTRACTS §2.2), and MUST execute when called again with `confirm: true`, evaluated against
+  the state at that moment (U8).
 - **FR-12** A `confirm-destructive` class tool MUST require `confirmName` equal to the target's
   display name.
 - **FR-13** A `blast-radius` class tool MUST first return the node-computed warning and MUST
   require `acknowledgeBlastRadius: true` to proceed.
 - **FR-14** A tool MUST accept `wait: false` and return `{ operationId }` for any action that may
-  exceed 5 seconds; `fleet_operations_get` MUST report `running · done · failed · interrupted ·
-  expired` with the result or the error.
+  exceed 5 seconds; `fleet_operations_get` MUST report the CONTRACTS §3.3 states `running · done ·
+  failed · cancelled · interrupted` with the result or the error.
 
 ### 4.4 Sessions between Agents (P2)
 
 - **FR-15** `fleet_sessions_question` MUST return a session's pending attention (reason, prompt,
   options, key) to an Agent allowed to see that computer's `sessions` family.
 - **FR-16** `fleet_sessions_answer` MUST deliver an answer to another Agent's or an owner's session
-  only when the calling Agent's grants allow the tool, its ladder allows `machine.run`, and the
-  computer's `sessions` audience includes its owner; it MUST be audited as `node.session.answer`
-  with `requestedBy: agent:<id>`.
+  only for a **question** (permission prompts are human-only in every case), only when the calling
+  Agent's owner enabled "may answer other sessions" on it (CONTRACTS R-32; FL-05 FR-30), its grants
+  allow the tool, its ladder allows `machine.run`, and the computer's `sessions` audience includes
+  its owner; it MUST be audited as `node.session.answer` with `requestedBy: agent:<id>`.
 
 ### 4.5 MCP (P1 reads, P2 acts)
 
@@ -268,7 +288,8 @@ to its owner (D15).
   or missing confirmation, `124` a command timed out.
 - **FR-21** `confirm` class verbs MUST prompt on a TTY and MUST require `--yes` otherwise;
   `confirm-destructive` verbs MUST require `--confirm-name <name>`.
-- **FR-22** `ever-works fleet session attach <id>` MUST render the session's terminal in the
+- **FR-22** `ever-works fleet sessions attach <id>` (alias `fleet session attach`) MUST render the
+  session's terminal in the
   caller's terminal, read-only by default and typable with `--drive` when the caller may drive,
   and MUST detach on `Ctrl-]` without ending the session.
 - **FR-23** The CLI MUST never store or print a machine credential; it authenticates to the
@@ -365,23 +386,12 @@ denied by a tool grant at {scope} scope` · `ask the owner of {computer} to allo
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS §11.3 names tools `fleet_<family>_<verb>`, but the eight
-  existing MCP fleet tools are `list_fleet_nodes`, `get_fleet_node`, … Keep both conventions side by
-  side (this spec), or add `fleet_nodes_list`-style twins for the eight? Twins would be the only
-  duplicate names in the catalogue.]`
-- `[NEEDS CLARIFICATION: the brief names `fleet_session_question` / `fleet_session_answer`
-  (singular); CONTRACTS §11.3 family naming gives `fleet_sessions_question` / `fleet_sessions_answer`.
-  This spec uses the plural; confirm.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §2.1 lists families `view · sessions · desktop ·
-  services · docker · processes · files · commands · schedules · checkouts · machines`; tools exist
-  for logs, ports, runners and wake. Proposed mapping: logs → `view`; ports list → `view`, port
-  open → `desktop`, port preview → `commands`; runners and wake → `machines`. Confirm or add
-  families.]`
-- `[NEEDS CLARIFICATION: Should `fleet_sessions_answer` require an explicit per-Agent setting
-  ("may answer other Agents' sessions") beyond grants + ladder, since it can approve a permission
-  prompt in another Agent's session?]`
-- `[NEEDS CLARIFICATION: Decision expiry for held fleet actions — 24 h assumed here; AW-24's
-  default for held actions should win if different.]`
+- **Resolved** by CONTRACTS §11.3: the existing `list_fleet_nodes` tool and the eight existing MCP fleet entries stay exactly as they are beside the new `fleet_<family>_<verb>` names; `fleet_nodes_list` / `fleet_nodes_get` are the new names (the parity test allows exactly the eight legacy names).
+- **Resolved** by CONTRACTS §11.3: plural families — `fleet_sessions_question` / `fleet_sessions_answer`.
+- **Resolved** by CONTRACTS §2.1: the families now include `logs` and `ports`; log reads → `logs`, port list → `view`, port open / preview / tunnel → `ports`, wake, VM, cloud and Actions runner actions → `machines`, `git.setIdentity` → `commands`, `health.now` → `view` (plan §9.1 uses exactly this).
+- **Resolved** by CONTRACTS R-32: an Agent may answer another session's **question** only when its owner enabled "may answer other sessions" on it (FL-05 FR-30); permission prompts are human-only (S6, FR-16).
+- **Resolved** by CONTRACTS R-33: held Agent actions are `agent_action_proposals` rows (`actionType: 'fleet_machine_action'`, FL-09's value); no new table.
+- `[NEEDS CLARIFICATION: How long may a held fleet action wait for approval? `agent_action_proposals` has only `pending · approved · rejected` and no expiry sweep exists. Default until answered: 24 h, checked at approval time the way merge approvals check staleness (`packages/agent/src/agent-approvals/merge-approval.service.ts:97,210-221`) — an older approval answers `confirmation_required` with a fresh summary and nothing runs (U12); no new status, no sweep.]`
 
 ---
 
@@ -395,9 +405,9 @@ denied by a tool grant at {scope} scope` · `ask the owner of {computer} to allo
 - [ ] **ACC-FL19-06** (FR-7, FR-8, S3, U4, U5) The gate truth table — grants × rung × audience × consent — produces exactly the specified outcome and names the first refusing gate.
 - [ ] **ACC-FL19-07** (FR-9) An audience refusal creates no Decision; a ladder refusal creates a refusal record.
 - [ ] **ACC-FL19-08** (FR-10) Every Agent-initiated audit row carries `requestedBy: agent:<id>`.
-- [ ] **ACC-FL19-09** (FR-11–13, S4, U8, U9) The two-step confirm works for all three classes and a stale summary is refused.
-- [ ] **ACC-FL19-10** (FR-14, U7) `wait: false` returns an operation; `fleet_operations_get` reports every state including `interrupted`.
-- [ ] **ACC-FL19-11** (FR-15, FR-16, S6) Question/answer between Agents works only with the grant and is audited.
+- [ ] **ACC-FL19-09** (FR-11–13, S4, U8, U9) The two-step confirm works for all three classes with the C §2.2 fields and no token; a call against a changed target answers that target's own error.
+- [ ] **ACC-FL19-10** (FR-14, U7) `wait: false` returns an operation; `fleet_operations_get` reports every C §3.3 state including `cancelled` and `interrupted`.
+- [ ] **ACC-FL19-11** (FR-15, FR-16, S6) Answering another session works only for a question, only with the grant and the "may answer other sessions" setting, is refused for every permission prompt, and is audited.
 - [ ] **ACC-FL19-12** (FR-17, FR-18, S8) Every exposed fleet route is in the MCP whitelist with an annotation; enrolment, heartbeat, lease and credential routes are absent (asserted).
 - [ ] **ACC-FL19-13** (FR-19–21, S7, U10) Each CLI verb exists, `--json` matches the web shape, exit codes are as specified, `--yes` / `--confirm-name` gate confirmations.
 - [ ] **ACC-FL19-14** (FR-22) `fleet session attach` renders, is read-only by default, drives with `--drive`, detaches on `Ctrl-]`.
@@ -424,7 +434,7 @@ denied by a tool grant at {scope} scope` · `ask the owner of {computer} to allo
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) D7, D15 · [CONTRACTS](../CONTRACTS.md) §2.1–2.3, §3.3, §7, §8, §11.2, §11.3, R-5, R-19, R-24 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) G
+- Program: [Fleet README](../README.md) D7, D15 · [CONTRACTS](../CONTRACTS.md) §2.1–2.3, §3.3, §7, §8, §11.2, §11.3, R-5, R-19, R-24, R-32, R-33 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) G
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Related: [AW-15 Connections & scopes](../../agent-workspace/AW-15-connections-scopes/spec.md) §4.3, [AW-24 Safety rails](../../agent-workspace/AW-24-safety-rails/spec.md) §4.1–4.3, [FL-12](../FL-12-commands/spec.md), [FL-13](../FL-13-schedules-on-computers/spec.md), [FL-20](../FL-20-usage-and-cost/spec.md)
 - Constitution: `.specify/memory/constitution.md`

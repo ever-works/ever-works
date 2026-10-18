@@ -2,6 +2,7 @@ import { defineConfig } from '@trigger.dev/sdk';
 import { emitDecoratorMetadata } from '@trigger.dev/build/extensions/typescript';
 import { additionalPackages, additionalFiles } from '@trigger.dev/build/extensions/core';
 import { collectPluginDependencies } from './src/build/collect-plugin-deps';
+import { lazyNestOptionalModules } from './src/build/lazy-nest-optional-modules';
 
 const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
@@ -65,6 +66,11 @@ export default defineConfig({
         extensions: [
             // Enable TypeScript decorator metadata for TypeORM
             emitDecoratorMetadata(),
+            // Load @nestjs/core's optional socket/microservices modules on first
+            // NestApplication construction instead of at import (~0.5 s off the
+            // deploy indexer's fixed 20 s budget and every worker cold start).
+            // Off with TRIGGER_NEST_EAGER_OPTIONAL_MODULES=true. See the file.
+            lazyNestOptionalModules(),
             // Copy built plugin artifacts into the deployment
             additionalFiles({
                 files: ['./plugins/**'],

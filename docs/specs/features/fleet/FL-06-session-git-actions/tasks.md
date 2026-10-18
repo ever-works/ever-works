@@ -47,7 +47,7 @@
       `apps/api/src/fleet/fleet-session-actions.controller.ts` (taken names = `fleet_checkouts.branch`
       for the remote incl. archived + node `git ls-remote --heads` through an optional
       `remoteHeads: true` request flag this task adds to FL-14's `checkouts.list` in
-      `apps/node/src/core/checkouts/checkouts-handler.ts`, answered in a new optional reply field
+      `apps/node/src/core/link/modules/checkouts.ts`, answered in a new optional reply field
       `remoteBranches` — additive, FL-14's callers unchanged), DTO in
       `apps/api/src/fleet/dto/fleet-session-actions.dto.ts`. The path is one of the §11.2 additions
       raised in spec §8b.
@@ -76,7 +76,7 @@
       60 s while `working` and once on `done`/`ended` (`checkouts.list { refresh: true, checkoutIds }`).
       **Test**: extend `packages/agent/src/fleet/sessions/__tests__/fleet-session.service.spec.ts` —
       timer starts/stops with state, stop refresh happens exactly once.
-- [ ] **T-08**. Add `checkouts.changes` to `apps/node/src/core/checkouts/checkouts-handler.ts` and
+- [ ] **T-08**. Add `checkouts.changes` to `apps/node/src/core/link/modules/checkouts.ts` and
       `apps/node/src/core/checkouts/checkout-changes.ts` (porcelain v2 + `git diff HEAD`, caps,
       binary without patch, `.ever-works/` and `.mounts/` excluded). The verb is in the CONTRACTS
       §3.3 `machine` vocabulary (rev 2).

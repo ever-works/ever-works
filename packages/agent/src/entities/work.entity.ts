@@ -858,6 +858,17 @@ export class Work {
     @Column({ type: 'int', default: 1 })
     version: number;
 
+    /**
+     * Who created the Work when it was not the owning user (migration 1795162200000-AddWorkCreatedBy):
+     * `integration` + the integration key id for a Project Work created through the integration API
+     * (EW-P2-4; the DTO's `createdBy`, EW-P1-2). NULL = the owner created it.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    createdByType?: 'user' | 'agent' | 'integration' | null;
+
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    createdById?: string | null;
+
     getDataRepo() {
         return this.getRelatedRepository('data').repo;
     }

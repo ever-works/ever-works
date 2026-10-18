@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import type {
     ComputerControlPolicy,
+    FleetControlPolicyFamiliesInput,
     FleetNodeKind,
     FleetNodeModelThrottleView,
     FleetNodeStatus,
@@ -508,6 +509,34 @@ export class FleetNode {
     /** Days a recording of this machine is kept. Clamped 1–90 by the service that reads it. */
     @Column({ type: 'int', default: 14 })
     recordingRetentionDays: number;
+
+    /**
+     * Fleet hub (FL-01) — the per-family control policy (CONTRACTS §2.1): a
+     * map from action family (`view · sessions · desktop · logs · services ·
+     * docker · processes · ports · files · commands · schedules · checkouts ·
+     * machines`) to audience (`owner · org-admins · org-members`). Absent
+     * families take their default (`view: org-members`, the rest `owner`).
+     *
+     * {@link controlPolicy} stays, unchanged, as the `desktop` family's
+     * MIRROR: a map with no `desktop` entry reads `desktop` from it, and
+     * every write of the map's `desktop` entry writes it back in the same
+     * UPDATE (`FleetService.setControlPolicyFamiliesForUser`). Read it only
+     * through `effectiveControlPolicy` from `@ever-works/contracts`, never
+     * by indexing this column. NULL = no map stored (every existing row).
+     *
+     * Migration: `1796010000000-AddFleetNodeControlPolicyFamilies`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    controlPolicyFamilies?: FleetControlPolicyFamiliesInput | null;
+
+    /**
+     * Fleet hub (FL-01) — the owner's star; favourites sort first on the hub.
+     * One flag per Node because a Node has one owner (README D15); it is
+     * never shown as set to anyone else. Migration:
+     * `1796010100000-AddFleetNodeFavorite`.
+     */
+    @Column({ type: 'boolean', default: false })
+    isFavorite: boolean;
 
     /**
      * The four `controlHolder*` columns are a COMPARE-AND-SET LOCK, not a

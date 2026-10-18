@@ -35,6 +35,7 @@ import type { FleetNodeLoadView } from './fleet-jobs.types.js';
 import type { FleetNodeModelThrottleView } from './fleet-model-usage-limit.types.js';
 
 import type { ComputerControlPolicy } from '../computer/computer-session.types.js';
+import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access.types.js';
 
 /**
  * App shape of a fleet node.
@@ -478,7 +479,43 @@ export interface FleetNodeView {
 	 * nobody does. At most one person at a time, across every live view.
 	 */
 	controlHolder?: FleetNodeControlHolderView | null;
+
+	/**
+	 * Fleet hub (FL-01) — the owner's star. Favourites sort first on the hub.
+	 * Owner-only: always false on a row someone else sees through an
+	 * Organization (a favourite is the owner's mark, not a shared one).
+	 */
+	isFavorite?: boolean;
+	/**
+	 * Fleet hub (FL-01) — the policy in force, every family filled in
+	 * (CONTRACTS §2.1): the stored map over the defaults, `desktop` read
+	 * through from {@link FleetNodeView.controlPolicy} when the map has no
+	 * entry for it. Optional on the wire so an older API build still
+	 * satisfies this type.
+	 */
+	controlPolicyFamilies?: FleetControlPolicyFamilies;
+	/**
+	 * Fleet hub (FL-01) — the caller's role relative to this node, derived
+	 * server-side for the request that produced this view. Absent on reads
+	 * that are owner-only by construction (every row is then the caller's).
+	 * The UI mirrors it; the server decides with it.
+	 */
+	viewerRole?: FleetViewerRole;
+	/**
+	 * Virtual computers (FL-16 writes it; FL-01 only renders it) — the Node
+	 * this one runs on, so the hub can nest a VM or a container under its
+	 * host. Null / absent for every machine enrolled on its own.
+	 */
+	hostNodeId?: string | null;
+	/** Virtual computers (FL-16) — what kind of child this is. Null / absent for an ordinary machine. */
+	virtualKind?: FleetNodeVirtualKind | null;
 }
+
+/**
+ * Virtual computers (FL-16) — a VM (a KVM-backed Windows image) or a
+ * Container (a Linux container). Containers are never called VMs (README §3).
+ */
+export type FleetNodeVirtualKind = 'vm' | 'container';
 
 /** The current holder of a node's control lock. */
 export interface FleetNodeControlHolderView {
