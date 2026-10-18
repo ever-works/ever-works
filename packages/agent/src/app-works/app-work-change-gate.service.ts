@@ -97,7 +97,7 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 rules,
                 diff,
                 ...(await this.guardedSpecs(input, baseSha, diff)),
-                labels: input.taskLabels,
+                taskOrigin: input.taskOrigin,
             });
 
             if (verdict.allowed) return { allowed: true, note: verdict.note };
@@ -171,10 +171,10 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 rules,
                 diff: pathsOnlyDiff(input.paths),
                 ...specs,
-                // The cloud path's pre-push caller passes the Task's labels so
-                // its verdict equals `evaluate`'s (APW-04's `app-provision`
-                // exemption); the tool path passes none, which is no labels.
-                labels: input.taskLabels ?? [],
+                // The cloud path's pre-push caller passes the Task's origin so
+                // its verdict equals `evaluate`'s (APW-04's provisioning
+                // exemption); the tool path passes none, which is no exemption.
+                taskOrigin: input.taskOrigin ?? null,
             });
             if (verdict.allowed) return { allowed: true, note: null };
             return {

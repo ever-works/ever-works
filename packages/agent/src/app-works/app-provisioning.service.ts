@@ -4,7 +4,7 @@ import { ownershipScopeOf } from '../database/ownership-scope';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { NotificationCategory, NotificationType } from '../entities/notification.types';
-import { TaskStatus, type Task } from '../entities/task.entity';
+import { TASK_ORIGIN_APP_PROVISIONING, TaskStatus, type Task } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
 import { AiFacadeService } from '../facades/ai.facade';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
@@ -48,8 +48,9 @@ import { APP_WORK_AGENT_RESOLVER, type AppWorkAgentResolver } from './app-work-a
  *      (`draftAppSpecDocument`) and run it through the platform's ONE validator
  *      (`validateAppSpecDocument`). The draft is evidence for the Agent, never a guess
  *      written over the member's repository.
- *   3. **Delegate** — file an `app-provision` Task on the Work (the label the change guard
- *      exempts from the guarded-spec-block rule, `app-change-guard.ts:268`), with the
+ *   3. **Delegate** — file an `app-provision` Task on the Work, stamped with the
+ *      server-written `origin: 'app-provisioning'` the change guard exempts from the
+ *      guarded-spec-block rule (`app-change-guard.ts`; never the label), with the
  *      detection, the validator's verdict on the draft and the `provision-app` Skill's hard
  *      rules as the brief, assigned to the Agent APW-08's rule resolves, and start it
  *      through `TasksService.runTask`. The Agent writes `.works/works.yml` (and only
@@ -332,6 +333,9 @@ export class AppProvisioningService implements AppProvisioningCapability {
                 agentId,
                 createdByType: 'user',
                 createdById: input.userId || work.userId,
+                // The App change guard's provisioning exemption reads THIS, never the
+                // label above (works-security 2026-10-18): only this service writes it.
+                origin: TASK_ORIGIN_APP_PROVISIONING,
             },
             scope,
         );

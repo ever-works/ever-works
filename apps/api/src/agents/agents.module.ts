@@ -1870,7 +1870,7 @@ async function assertRealWriteTarget(
                                     rulesBase
                                         ? gate.evaluate({
                                               work: target.work,
-                                              taskLabels: [],
+                                              taskOrigin: null,
                                               owner: target.owner,
                                               repo: target.repo,
                                               gitOptions: { userId, providerId, workId },

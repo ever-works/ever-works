@@ -1,4 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
+import {
+    reservedTaskLabelChanges,
+    reservedTaskLabelRefusal,
+    taskReservedLabelsEnforced,
+    TASK_RESERVED_LABELS_ENFORCED_ENV,
+    type ReservedTaskLabelChange,
+} from '@ever-works/contracts';
 import type { AuthenticatedUser, FleetRunCredentialBinding } from './types/auth.types';
 import { IntegrationHttpException } from './integration/integration-http.exception';
 import { isIntegrationPrincipal } from './integration/integration-attribution';
@@ -116,6 +123,172 @@ export function refuseMachinePrincipalAction(
     if (!kind || !kinds.includes(kind)) return;
     throwMachinePrincipalRefusal(kind, `${PRINCIPAL_LABEL[kind]} cannot ${action}; ${why}`, {
         reason: 'machine_principal',
+    });
+}
+
+// ── Autonomous Task text (recurring templates, scheduled Tasks) ─────────────
+
+/**
+ * Works-security (2026-10-18) — the Task fields every later autonomous run
+ * DISPATCHES: what the agent reads (title, description) and which Work's
+ * repository it runs in. The integrations route already refuses them on a
+ * recurring template (`tasks-write.controller.ts`, lane 3a); the core
+ * `PATCH /api/tasks/:id` — fleet-run allowlisted, and what MCP `update_task`
+ * reaches — did not.
+ */
+export const AUTONOMOUS_TASK_TEXT_FIELDS: readonly string[] = Object.freeze([
+    'title',
+    'description',
+    'workId',
+]);
+
+/** Off (refused) unless `MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT=true`. Default-safe. */
+export function machinePrincipalAutonomousTextEditAllowed(): boolean {
+    return (process.env.MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT ?? '').trim().toLowerCase() === 'true';
+}
+
+/** A Task whose text a FUTURE run dispatches with no person in between. */
+export function isAutonomouslyDispatchedTask(
+    task: { isRecurring?: boolean | null; scheduledAt?: Date | string | null } | null | undefined,
+): boolean {
+    return task?.isRecurring === true || (task?.scheduledAt !== undefined && task?.scheduledAt !== null);
+}
+
+/**
+ * Refuse a machine principal's edit of {@link AUTONOMOUS_TASK_TEXT_FIELDS} on
+ * a recurring template or a scheduled Task: every later fire dispatches that
+ * text to an agent (`task-recurrence-dispatcher.service.ts`), so one injected
+ * run would author the instructions of every run after it. Re-sending the
+ * current value is not a change. A person edits it in the app; the operator
+ * can re-open it with `MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT=true`.
+ */
+export function refuseMachinePrincipalAutonomousTextEdit(
+    auth: AuthenticatedUser | null | undefined,
+    req: MachinePrincipalRequest | null | undefined,
+    task: Record<string, unknown> & { isRecurring?: boolean | null; scheduledAt?: Date | string | null },
+    body: Record<string, unknown> | null | undefined,
+): void {
+    const kind = machinePrincipalKind(auth, req);
+    if (!kind || machinePrincipalAutonomousTextEditAllowed()) return;
+    if (!isAutonomouslyDispatchedTask(task)) return;
+    const changed = presentFields(body, AUTONOMOUS_TASK_TEXT_FIELDS).filter(
+        (field) => (body as Record<string, unknown>)[field] !== (task[field] ?? null),
+    );
+    if (changed.length === 0) return;
+    const recurring = task.isRecurring === true;
+    throwMachinePrincipalRefusal(
+        kind,
+        `${PRINCIPAL_LABEL[kind]} cannot change ${changed.join(', ')} on a ${
+            recurring ? 'recurring Task template' : 'scheduled Task'
+        }: every run it starts dispatches that text to an agent. A person edits it in the app.`,
+        { fields: changed, reason: recurring ? 'recurring_template' : 'scheduled_task' },
+    );
+}
+
+// ── Re-filing a Task that already has a branch ──────────────────────────────
+
+/**
+ * Works-security (2026-10-18) — a fleet run may not move a Task that already
+ * has a branch or a pull request to another Work, or hand it to another Agent.
+ * The merge gate resolves the Task's pull request NUMBER in the Task's Work's
+ * repository and judges it under that Work's / Agent's merge policy, so
+ * re-filing it would have the gate judge (and possibly merge) a different
+ * pull request under a different policy. Re-sending the current value is not a
+ * change. A person re-files it in the app.
+ */
+export function refuseRunTokenRefileOfBranchedTask(
+    req: MachinePrincipalRequest | null | undefined,
+    task: {
+        workId?: string | null;
+        agentId?: string | null;
+        prNumber?: number | null;
+        branchRef?: string | null;
+    },
+    body: { workId?: string | null; agentId?: string | null } | null | undefined,
+): void {
+    if (!isFleetRunRequest(req)) return;
+    if (!task.prNumber && !(task.branchRef && task.branchRef.trim())) return;
+    const changed: string[] = [];
+    if (body?.workId !== undefined && (body.workId ?? null) !== (task.workId ?? null)) {
+        changed.push('workId');
+    }
+    if (body?.agentId !== undefined && (body.agentId ?? null) !== (task.agentId ?? null)) {
+        changed.push('agentId');
+    }
+    if (changed.length === 0) return;
+    throw new ForbiddenException(
+        `A fleet-run credential cannot change ${changed.join(', ')} on a Task that already has a branch or ` +
+            "pull request: its merge is judged in that Work, under that Agent's policy. A person re-files it in the app.",
+    );
+}
+
+// ── Reserved Task labels ────────────────────────────────────────────────────
+
+/**
+ * Works-security (2026-10-18) — the restriction `TasksService` applies to a
+ * machine principal's label writes: no RESERVED label (`awaiting-owner`,
+ * `app-provision`, `release:*`, `provision-attempt-*`) may be added or
+ * removed. `undefined` for a session / personal key — a person keeps full
+ * control.
+ */
+export function reservedLabelRestrictionOf(
+    auth: AuthenticatedUser | null | undefined,
+    req: MachinePrincipalRequest | null | undefined,
+): { who: string } | undefined {
+    const kind = machinePrincipalKind(auth, req);
+    return kind ? { who: PRINCIPAL_LABEL[kind] } : undefined;
+}
+
+/**
+ * Refuse a machine principal's label write that would add or remove a reserved
+ * label, in the principal's own envelope (fleet run → 403, integration key →
+ * `422 domain_rule`). `before` is the Task's current labels (`[]` on create).
+ * No-op for a person, a write that leaves labels alone, or with
+ * `TASK_RESERVED_LABELS_ENFORCED=false`.
+ */
+export function refuseMachinePrincipalReservedLabels(
+    auth: AuthenticatedUser | null | undefined,
+    req: MachinePrincipalRequest | null | undefined,
+    before: readonly string[] | null | undefined,
+    after: readonly string[] | null | undefined,
+): void {
+    const kind = machinePrincipalKind(auth, req);
+    if (!kind) return;
+    if (!taskReservedLabelsEnforced(process.env[TASK_RESERVED_LABELS_ENFORCED_ENV])) return;
+    const change = reservedTaskLabelChanges(before, after);
+    if (change.added.length === 0 && change.removed.length === 0) return;
+    throwReservedLabelRefusal(kind, change);
+}
+
+/**
+ * Re-throw a `TasksService` reserved-label refusal (`ReservedTaskLabelError`,
+ * a 403) in the integration envelope when the caller is an integration key;
+ * anything else is re-thrown unchanged. Duck-typed on the error's `name` and
+ * `change` so this file need not import the agent package.
+ */
+export function rethrowReservedLabelRefusal(
+    error: unknown,
+    auth: AuthenticatedUser | null | undefined,
+    req: MachinePrincipalRequest | null | undefined,
+): never {
+    const kind = machinePrincipalKind(auth, req);
+    const change = (error as { name?: unknown; change?: ReservedTaskLabelChange } | null)?.change;
+    if (
+        kind === 'integration' &&
+        (error as { name?: unknown } | null)?.name === 'ReservedTaskLabelError' &&
+        change
+    ) {
+        throwReservedLabelRefusal(kind, change);
+    }
+    throw error;
+}
+
+function throwReservedLabelRefusal(kind: MachinePrincipalKind, change: ReservedTaskLabelChange): never {
+    throwMachinePrincipalRefusal(kind, reservedTaskLabelRefusal(PRINCIPAL_LABEL[kind], change), {
+        fields: ['labels'],
+        reason: 'reserved_label',
+        added: change.added,
+        removed: change.removed,
     });
 }
 

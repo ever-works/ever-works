@@ -46,8 +46,13 @@ export const APP_WORK_SPEC_PATH = '.works/works.yml';
 /** What the finalize path hands the gate. Every value is one it resolved itself. */
 export interface AppWorkChangeGateInput {
     readonly work: Work;
-    /** The Task's labels; only APW-04's `app-provision` exemption reads them. */
-    readonly taskLabels: readonly string[];
+    /**
+     * The Task's server-written provenance (`Task.origin`); only APW-04's
+     * provisioning exemption reads it (`'app-provisioning'`). Never the Task's
+     * labels: those are free-form and writable by any Task-PATCH caller
+     * (works-security 2026-10-18). `null` = an ordinary Task.
+     */
+    readonly taskOrigin: string | null;
     readonly owner: string;
     readonly repo: string;
     readonly gitOptions: { userId: string; providerId: string; workId: string };
@@ -110,11 +115,12 @@ export interface AppWorkChangePathsInput {
      */
     readonly contents?: Readonly<Record<string, string>>;
     /**
-     * The Task's labels, for APW-04's `app-provision` exemption — so the
-     * pre-push verdict on the cloud path equals `evaluate`'s for every rule the
-     * two share. Absent (the `commitToRepo` tool) is no labels.
+     * The Task's server-written provenance (`Task.origin`), for APW-04's
+     * provisioning exemption — so the pre-push verdict on the cloud path equals
+     * `evaluate`'s for every rule the two share. Absent (the `commitToRepo`
+     * tool) is no exemption.
      */
-    readonly taskLabels?: readonly string[];
+    readonly taskOrigin?: string | null;
 }
 
 export interface AppWorkChangeGate {

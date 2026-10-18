@@ -1346,7 +1346,7 @@ export class TaskWorkspaceService {
             try {
                 verdict = await this.appChangeGate.evaluate({
                     work,
-                    taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                    taskOrigin: task.origin ?? null,
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
@@ -3259,7 +3259,7 @@ export class TaskWorkspaceService {
                 input.baseRef ?? (await this.resolveBaseRef(work, owner, repo, gitOptions));
             verdict = await this.appChangeGate.evaluate({
                 work,
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
                 owner,
                 repo,
                 gitOptions,
@@ -3704,7 +3704,7 @@ export class TaskWorkspaceService {
                           },
                       }
                     : {}),
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
             });
         } catch (error) {
             // The gate's contract is that it never rejects; this is the net.
@@ -3907,7 +3907,7 @@ export class TaskWorkspaceService {
             };
             const verdict = await this.appChangeGate.evaluate({
                 work,
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
                 owner,
                 repo,
                 gitOptions,

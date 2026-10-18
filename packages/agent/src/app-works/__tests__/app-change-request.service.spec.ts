@@ -331,6 +331,8 @@ describe('AppProvisioningService (APW-04)', () => {
         });
         const [, input] = tasks.create.mock.calls[0];
         expect(input.labels).toEqual([PROVISION_LABEL]);
+        // The guard's exemption keys off this server-written provenance, never the label.
+        expect(input.origin).toBe('app-provisioning');
         expect(String(input.description)).toContain('Dockerfile found (EXPOSE 3000)');
         expect(String(input.description)).toContain('strategy: dockerfile');
         expect(tasks.runTask).toHaveBeenCalled();

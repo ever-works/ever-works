@@ -6,6 +6,7 @@ import type { GitDiffFile, GitDiffResult } from '@ever-works/plugin';
 import { diffGuardedSpecBlocks, isProtectedPath } from '../app-spec/app-spec-guarded-blocks';
 // A value import from the ring-free port (it has no runtime imports of its own).
 import { APP_WORK_SPEC_PATH } from '../tasks-domain/app-work-change-gate.port';
+import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
 import type { AppWorkRules } from './app-work-rules.service';
 
 /**
@@ -74,7 +75,15 @@ export const APP_SPEC_PATH = APP_WORK_SPEC_PATH;
 /** Over this multiple of the size guidance, a note becomes a refusal. */
 export const REFUSAL_MULTIPLE = 3;
 
-/** The label that exempts a Task from rule 4, and from nothing else. */
+/**
+ * The label APW-04 files its provisioning Tasks with — display, the board
+ * filter, and the provisioner's own "is one already open?" lookup.
+ *
+ * It exempts NOTHING (works-security 2026-10-18). Labels are free-form and any
+ * caller of `PATCH /api/tasks/:id` could add it to its own Task, so rule 4's
+ * exemption reads the server-written {@link AppChangeGuardInput.taskOrigin}
+ * instead, which only `AppProvisioningService.start` sets.
+ */
 export const PROVISION_LABEL = 'app-provision';
 
 /**
@@ -133,8 +142,12 @@ export interface AppChangeGuardInput {
      * must not collapse them.
      */
     readonly headSpec?: AppSpec | null;
-    /** The Task's labels; only `app-provision` is read. */
-    readonly labels?: readonly string[];
+    /**
+     * The Task's server-written provenance (`Task.origin`). Only
+     * `'app-provisioning'` is read: it exempts the Task from rule 4, and from
+     * nothing else. Never the Task's labels (see {@link PROVISION_LABEL}).
+     */
+    readonly taskOrigin?: string | null;
 }
 
 /** How many offending paths a refusal names before it stops listing. */
@@ -265,11 +278,12 @@ export class AppChangeGuard {
         );
         if (!touchesSpec) return null;
 
-        if ((input.labels ?? []).includes(PROVISION_LABEL)) {
+        if (input.taskOrigin === TASK_ORIGIN_APP_PROVISIONING) {
             // APW-04 provisioning legitimately writes `source` and `blueprint`.
-            // The exemption is this rule and nothing else.
+            // The exemption is this rule and nothing else, and it keys off the
+            // server-written origin — never a label a caller could add.
             this.logger.log(
-                `App change guard: skipping the guarded-spec-block rule for an "${PROVISION_LABEL}" Task.`,
+                `App change guard: skipping the guarded-spec-block rule for an App provisioning Task.`,
             );
             return null;
         }

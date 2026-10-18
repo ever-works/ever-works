@@ -167,7 +167,7 @@ describe('finalizeMountPush — a mount that is ANOTHER App Work’s code reposi
             baseRef: 'main',
             branch: 'task/tsk-9-task1',
             gitOptions: { userId: USER, providerId: 'github', workId: APP_B.id },
-            taskLabels: ['checkout'],
+            taskOrigin: null,
         });
         expect(handed.work).toBe(APP_B);
     });
