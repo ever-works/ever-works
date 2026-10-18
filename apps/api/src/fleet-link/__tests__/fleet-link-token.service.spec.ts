@@ -1,6 +1,11 @@
 import { TerminalAttachService } from '../../terminal/terminal-attach.service';
 import { ComputerAttachService } from '../../computer/computer-attach.service';
-import { FleetLinkTokenService, InProcessFleetLinkReplayGuard } from '../fleet-link-token.service';
+import {
+    CacheEntryFleetLinkReplayGuard,
+    FleetLinkTokenService,
+    InProcessFleetLinkReplayGuard,
+    fleetLinkCredentialGeneration,
+} from '../fleet-link-token.service';
 import { NODE_ID } from './link-test-kit';
 
 /**
@@ -103,5 +108,152 @@ describe('InProcessFleetLinkReplayGuard', () => {
         expect(guard.claim('jti-1', 1_000)).toBe(false);
         now = 1_001;
         expect(guard.claim('jti-1', 1_000)).toBe(true);
+    });
+});
+
+/**
+ * Works-security (run-token scope, 2026-10-18) — finding 6.
+ *
+ *   - A link token is bound to the credential generation it was minted under:
+ *     a rotation between mint and hello refuses it (it used to stay valid for
+ *     the rest of its five minutes).
+ *   - "Single use" holds across API replicas: the replay guard is the shared
+ *     `cache_entries` table, not a per-process map (`FLEET_LINK_REPLAY_GUARD`
+ *     was never bound, so every replica accepted the same token once).
+ */
+describe('FleetLinkTokenService — credential generation', () => {
+    const signer = () => new TerminalAttachService();
+
+    function nodesWith(hash: string | null) {
+        const state = { hash };
+        const nodes = {
+            findById: jest.fn(async (id: string) =>
+                id === NODE_ID ? { id, enrollmentTokenHash: state.hash } : null,
+            ),
+        };
+        return { state, nodes };
+    }
+
+    it('accepts a token minted for the current credential, once', async () => {
+        const { nodes } = nodesWith('hash-1');
+        const tokens = new FleetLinkTokenService(signer(), undefined, nodes as never);
+        const { token } = await tokens.mintForNode(NODE_ID);
+        await expect(tokens.consume(token, NODE_ID)).resolves.toBe(true);
+        await expect(tokens.consume(token, NODE_ID)).resolves.toBe(false);
+    });
+
+    it('refuses a token minted before a credential rotation', async () => {
+        const { state, nodes } = nodesWith('hash-1');
+        const tokens = new FleetLinkTokenService(signer(), undefined, nodes as never);
+        const { token } = await tokens.mintForNode(NODE_ID);
+        state.hash = 'hash-2'; // self-rotation or the owner's rotate replaced it
+        await expect(tokens.consume(token, NODE_ID)).resolves.toBe(false);
+        // A token minted after the rotation works.
+        await expect(tokens.consume((await tokens.mintForNode(NODE_ID)).token, NODE_ID)).resolves.toBe(
+            true,
+        );
+    });
+
+    it('refuses a token that names no generation, and one for a node that is gone', async () => {
+        const { state, nodes } = nodesWith('hash-1');
+        const tokens = new FleetLinkTokenService(signer(), undefined, nodes as never);
+        await expect(tokens.consume(tokens.mint(NODE_ID).token, NODE_ID)).resolves.toBe(false);
+        const { token } = await tokens.mintForNode(NODE_ID);
+        nodes.findById.mockResolvedValueOnce(null as never);
+        await expect(tokens.consume(token, NODE_ID)).resolves.toBe(false);
+        expect(state.hash).toBe('hash-1');
+    });
+
+    it('carries only a fingerprint of the credential hash, never the hash itself', async () => {
+        const { nodes } = nodesWith('very-distinctive-credential-hash');
+        const terminal = signer();
+        const tokens = new FleetLinkTokenService(terminal, undefined, nodes as never);
+        const { token } = await tokens.mintForNode(NODE_ID);
+        const claims = terminal.verify(token);
+        expect(claims?.cred).toBe(fleetLinkCredentialGeneration('very-distinctive-credential-hash'));
+        expect(token).not.toContain('very-distinctive');
+        expect(Buffer.from(token.split('.')[0], 'base64url').toString('utf8')).not.toContain(
+            'very-distinctive',
+        );
+    });
+});
+
+describe('CacheEntryFleetLinkReplayGuard — one store for every replica', () => {
+    /** A `cache_entries` double: PK-keyed rows, a duplicate insert is `23505`. */
+    function sharedTable() {
+        const rows = new Map<string, { key: string; value: string; expiresAt: number }>();
+        const repo = {
+            rows,
+            insert: jest.fn(async (row: { key: string; value: string; expiresAt: number }) => {
+                if (rows.has(row.key)) {
+                    throw Object.assign(new Error('duplicate key value violates unique constraint'), {
+                        code: '23505',
+                    });
+                }
+                rows.set(row.key, row);
+            }),
+            createQueryBuilder: jest.fn(() => {
+                const filter: { key?: string; now?: number } = {};
+                const qb = {
+                    delete: () => qb,
+                    where: (_sql: string, params: { key: string }) => {
+                        filter.key = params.key;
+                        return qb;
+                    },
+                    andWhere: (_sql: string, params: { now: number }) => {
+                        filter.now = params.now;
+                        return qb;
+                    },
+                    execute: async () => {
+                        const row = filter.key ? rows.get(filter.key) : undefined;
+                        if (row && filter.now !== undefined && row.expiresAt < filter.now) {
+                            rows.delete(row.key);
+                        }
+                        return { affected: 0 };
+                    },
+                };
+                return qb;
+            }),
+        };
+        return repo;
+    }
+
+    it('refuses on replica B a token id already claimed on replica A', async () => {
+        const table = sharedTable();
+        const replicaA = new CacheEntryFleetLinkReplayGuard(table as never, () => 1_000);
+        const replicaB = new CacheEntryFleetLinkReplayGuard(table as never, () => 1_001);
+        await expect(replicaA.claim('jti-1', 300_000)).resolves.toBe(true);
+        await expect(replicaB.claim('jti-1', 300_000)).resolves.toBe(false);
+        expect(table.rows.get('fleet-link-jti:jti-1')?.expiresAt).toBe(301_000);
+    });
+
+    it('two services on two replicas accept one token exactly once between them', async () => {
+        const table = sharedTable();
+        const terminal = new TerminalAttachService();
+        const a = new FleetLinkTokenService(terminal, new CacheEntryFleetLinkReplayGuard(table as never));
+        const b = new FleetLinkTokenService(terminal, new CacheEntryFleetLinkReplayGuard(table as never));
+        const { token } = a.mint(NODE_ID);
+        await expect(a.consume(token, NODE_ID)).resolves.toBe(true);
+        await expect(b.consume(token, NODE_ID)).resolves.toBe(false);
+    });
+
+    it('sweeps an expired claim, so the key space stays bounded', async () => {
+        const table = sharedTable();
+        let now = 0;
+        const guard = new CacheEntryFleetLinkReplayGuard(table as never, () => now);
+        await expect(guard.claim('jti-1', 1_000)).resolves.toBe(true);
+        now = 1_001;
+        await expect(guard.claim('jti-1', 1_000)).resolves.toBe(true);
+    });
+
+    it('rethrows a store failure that is not a duplicate (consume then refuses)', async () => {
+        const table = sharedTable();
+        table.insert.mockRejectedValueOnce(new Error('connection reset') as never);
+        const guard = new CacheEntryFleetLinkReplayGuard(table as never);
+        await expect(guard.claim('jti-x', 1_000)).rejects.toThrow('connection reset');
+
+        table.insert.mockRejectedValueOnce(new Error('connection reset') as never);
+        const tokens = new FleetLinkTokenService(new TerminalAttachService(), guard);
+        await expect(tokens.consume(tokens.mint(NODE_ID).token, NODE_ID)).resolves.toBe(false);
     });
 });

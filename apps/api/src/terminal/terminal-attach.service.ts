@@ -39,6 +39,13 @@ export interface TerminalAttachClaims {
      * it the second time. Absent on every terminal and computer token.
      */
     jti?: string;
+    /**
+     * Fleet node link (works-security, run-token scope) — the credential
+     * generation a link token was minted under (a one-way fingerprint of the
+     * node's credential hash). The link refuses a token whose generation is
+     * no longer the node's. Absent on every other token.
+     */
+    cred?: string;
 }
 
 /**
@@ -131,6 +138,9 @@ export class TerminalAttachService {
         if (payload.jti === undefined) {
             delete payload.jti;
         }
+        if (payload.cred === undefined) {
+            delete payload.cred;
+        }
         const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
         const mac = createHmac('sha256', key).update(body).digest('base64url');
         return { token: `${body}.${mac}`, expiresInSec: ttlSec };
@@ -170,7 +180,11 @@ export class TerminalAttachService {
                 (claims.jti !== undefined &&
                     (typeof claims.jti !== 'string' ||
                         claims.jti.length === 0 ||
-                        claims.jti.length > 128))
+                        claims.jti.length > 128)) ||
+                (claims.cred !== undefined &&
+                    (typeof claims.cred !== 'string' ||
+                        claims.cred.length === 0 ||
+                        claims.cred.length > 128))
             ) {
                 return null;
             }

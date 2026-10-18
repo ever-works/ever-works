@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { FLEET_LINK_CLOSE_CODES } from '@ever-works/contracts';
+import { CacheEntry } from '@ever-works/agent/entities';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetEnabledGuard } from '../fleet/guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from '../fleet/guards/fleet-node-auth.guard';
@@ -10,7 +12,12 @@ import { FleetLinkController } from './fleet-link.controller';
 import { FleetLinkGatewayService } from './fleet-link-gateway.service';
 import { FleetLinkRegistry } from './fleet-link.registry';
 import { FleetLinkService } from './fleet-link.service';
-import { FleetLinkTokenService } from './fleet-link-token.service';
+import {
+    CacheEntryFleetLinkReplayGuard,
+    FLEET_LINK_REPLAY_GUARD,
+    FleetLinkTokenService,
+    type FleetLinkReplayGuard,
+} from './fleet-link-token.service';
 import {
     FLEET_LINK_AUDIENCE,
     FLEET_LINK_DRAIN_NOTIFIER,
@@ -56,6 +63,15 @@ import { FleetOperationsService } from './fleet-operations.service';
     providers: [
         FleetLinkRegistry,
         FleetLinkTokenService,
+        // Works-security (run-token scope) — link tokens are single-use across
+        // EVERY replica: the replay guard claims a token id in the shared
+        // `cache_entries` table instead of a per-process map.
+        {
+            provide: FLEET_LINK_REPLAY_GUARD,
+            useFactory: (dataSource: DataSource): FleetLinkReplayGuard =>
+                new CacheEntryFleetLinkReplayGuard(dataSource.getRepository(CacheEntry)),
+            inject: [DataSource],
+        },
         FleetOperationsService,
         FleetLinkAuthorizer,
         FleetLinkService,
