@@ -308,6 +308,79 @@ describe('Knowledge Base recording points', () => {
         for (const event of recorded) expectValid(event);
     });
 
+    // Works-security lane (integration API gates, finding 2) — the content-write
+    // marker the integration API stamps, and the Knowledge Base clears on every other
+    // content write, is what tells the accept route a key's own content from a person's.
+    it('records who wrote the current content: stamped by the integration API, cleared by any other content edit', async () => {
+        const integration = new IntegrationKbService(dataSource);
+        const keyWrite = (actAsUserId: string | null) => ({
+            principal: 'integration' as const,
+            integrationKeyId: 'key-1',
+            integrationKind: 'ever-gauzy',
+            actAsUserId,
+            at: '2026-10-18T12:00:00.000Z',
+        });
+        const doc = await kb.createOrgDocument(ORG_A, OWNER, {
+            path: 'support/refunds.md',
+            title: 'Refunds',
+            class: KbDocumentClass.FREEFORM,
+            body: 'Within 30 days.',
+            source: 'imported' as never,
+            reviewState: 'proposed' as never,
+            metadata: { lastContentWrite: keyWrite(null) },
+        });
+        const authored = async () => (await integration.getDocument(ORG_A, doc.id)).keyAuthored;
+        expect(await authored()).toBe(true);
+        // The body still lives beside the marker.
+        expect((await integration.getDocument(ORG_A, doc.id)).dto).toMatchObject({
+            body: 'Within 30 days.',
+        });
+
+        // A metadata-only edit leaves the marker alone.
+        await kb.updateOrgDocument(ORG_A, doc.id, OWNER, { tags: ['refunds'] });
+        expect(await authored()).toBe(true);
+
+        // A person's content edit (no marker) supersedes the key's.
+        await kb.updateOrgDocument(ORG_A, doc.id, OWNER, { title: 'Refund policy' });
+        expect(await authored()).toBe(false);
+
+        // The key writing as itself again; then a write it relayed for a person.
+        await kb.updateOrgDocument(ORG_A, doc.id, OWNER, {
+            body: 'Within 14 days.',
+            contentWrite: keyWrite(null),
+        });
+        expect(await authored()).toBe(true);
+        await kb.updateOrgDocument(ORG_A, doc.id, OWNER, {
+            body: 'Within 21 days.',
+            contentWrite: keyWrite('person-1'),
+        });
+        expect(await authored()).toBe(false);
+        expect((await integration.getDocument(ORG_A, doc.id)).dto).toMatchObject({
+            body: 'Within 21 days.',
+        });
+    });
+
+    it('a key-only create from before the marker (source imported, proposed) still counts as key-authored', async () => {
+        const integration = new IntegrationKbService(dataSource);
+        const legacy = await kb.createOrgDocument(ORG_A, OWNER, {
+            path: 'support/legacy.md',
+            title: 'Legacy',
+            class: KbDocumentClass.FREEFORM,
+            body: 'Old.',
+            source: 'imported' as never,
+            reviewState: 'proposed' as never,
+        });
+        expect((await integration.getDocument(ORG_A, legacy.id)).keyAuthored).toBe(true);
+        const upload = await kb.createOrgDocument(ORG_A, OWNER, {
+            path: 'support/upload.md',
+            title: 'Upload',
+            class: KbDocumentClass.FREEFORM,
+            body: 'A person uploaded it.',
+            source: 'imported' as never,
+        });
+        expect((await integration.getDocument(ORG_A, upload.id)).keyAuthored).toBe(false);
+    });
+
     it('an event leaves out a body above the event limit (bodyOmitted); the row keeps it', async () => {
         const big = 'x'.repeat(KB_EVENT_BODY_MAX_BYTES + 1);
         const doc = await createWorkDoc(big);

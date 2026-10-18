@@ -177,6 +177,15 @@ describe('IntegrationKbController', () => {
                 class: 'freeform',
                 source: 'imported',
                 reviewState: 'proposed',
+                // Integration API gates lane (finding 2) — the content-write marker:
+                // the key wrote this content as itself.
+                metadata: {
+                    lastContentWrite: expect.objectContaining({
+                        principal: 'integration',
+                        integrationKeyId: 'key-1',
+                        actAsUserId: null,
+                    }),
+                },
             }),
             { withinCreate: expect.any(Function) },
         );
@@ -349,6 +358,13 @@ describe('IntegrationKbController', () => {
         expect(knowledgeBase.updateOrgDocument).toHaveBeenCalled();
     });
 
+    const keyWrite = expect.objectContaining({
+        principal: 'integration',
+        integrationKeyId: 'key-1',
+        integrationKind: 'ever-gauzy',
+        actAsUserId: null,
+    });
+
     it('edits a Work document through updateDocument and an organization one through updateOrgDocument; a stale If-Match is 412', async () => {
         const work = setup({ workId: WORK });
         await work.controller.updateDocument(user(), 'doc-1', { body: 'New' }, undefined, res());
@@ -357,12 +373,14 @@ describe('IntegrationKbController', () => {
         expect(work.knowledgeBase.updateDocument).toHaveBeenCalledWith(WORK, 'doc-1', 'owner-1', {
             body: 'New',
             reviewState: 'proposed',
+            contentWrite: keyWrite,
         });
         const org = setup();
         await org.controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"1"', res());
         expect(org.knowledgeBase.updateOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1', {
             title: 'T',
             reviewState: 'proposed',
+            contentWrite: keyWrite,
         });
         // A metadata-only edit leaves the review state alone…
         await org.controller.updateDocument(user(), 'doc-1', { tags: ['a'] }, undefined, res());
@@ -388,6 +406,11 @@ describe('IntegrationKbController', () => {
             'user-7',
             {
                 body: 'Mine',
+                contentWrite: expect.objectContaining({
+                    principal: 'integration',
+                    integrationKeyId: 'key-1',
+                    actAsUserId: 'user-7',
+                }),
             },
         );
         await expect(
@@ -412,10 +435,11 @@ describe('IntegrationKbController', () => {
 
     it('accepts, archives, restores and files through the Knowledge Base and the library', async () => {
         // `/accept` stays open to an integration (works-security lane 3a): it
-        // relays a person's review decision made in the integration's own queue.
+        // relays a person's review decision made in the integration's own queue
+        // (X-Act-As-User = the reviewer; integration API gates lane, finding 2).
         const { controller, knowledgeBase, library } = setup();
-        await controller.acceptDocument(user(), 'doc-1', res());
-        expect(knowledgeBase.acceptOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1');
+        await controller.acceptDocument(user('user-7'), 'doc-1', res());
+        expect(knowledgeBase.acceptOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'user-7');
         await controller.archiveDocument(user(), 'doc-1', res());
         expect(library.archive).toHaveBeenCalledWith(
             expect.objectContaining({ organizationId: ORG }),
@@ -427,6 +451,89 @@ describe('IntegrationKbController', () => {
         expect(library.fileDocuments).toHaveBeenCalledWith(expect.anything(), {
             documentIds: ['doc-1'],
             folderId: null,
+        });
+    });
+
+    // Works-security lane (integration API gates, finding 2) — accepting is the M7
+    // review gate (an accepted document feeds every later agent prompt): an
+    // integration relays a PERSON's decision, and never accepts content it wrote as
+    // itself.
+    describe('accept relays a person (finding 2)', () => {
+        const ENV = 'INTEGRATION_KB_ACCEPT_REQUIRES_PERSON';
+        let saved: string | undefined;
+        beforeEach(() => {
+            saved = process.env[ENV];
+            delete process.env[ENV];
+        });
+        afterEach(() => {
+            if (saved === undefined) delete process.env[ENV];
+            else process.env[ENV] = saved;
+        });
+        const proposedDoc = (keyAuthored: boolean, workId: string | null = null) => ({
+            dto: { ...docDto(workId), reviewState: 'proposed' },
+            etag: '"1"',
+            workId,
+            keyAuthored,
+        });
+
+        it('refuses (422 act_as_required) an accept with no person behind it — the key accepting its own proposal', async () => {
+            const { controller, kb, knowledgeBase } = setup();
+            kb.getDocument.mockResolvedValue(proposedDoc(true) as never);
+            await expect(controller.acceptDocument(user(), 'doc-1', res())).rejects.toMatchObject({
+                status: 422,
+                response: { error: { code: 'domain_rule', details: { reason: 'act_as_required' } } },
+            });
+            expect(knowledgeBase.acceptOrgDocument).not.toHaveBeenCalled();
+            expect(knowledgeBase.acceptDocument).not.toHaveBeenCalled();
+        });
+
+        it('refuses (422 key_authored_content) relaying an accept of content the key wrote as itself', async () => {
+            const { controller, kb, knowledgeBase } = setup({ workId: WORK });
+            kb.getDocument.mockResolvedValue(proposedDoc(true, WORK) as never);
+            await expect(
+                controller.acceptDocument(user('user-7'), 'doc-1', res()),
+            ).rejects.toMatchObject({
+                status: 422,
+                response: { error: { details: { reason: 'key_authored_content' } } },
+            });
+            expect(knowledgeBase.acceptDocument).not.toHaveBeenCalled();
+        });
+
+        it("relays a person's accept of an agent's (or a person's) proposal", async () => {
+            const { controller, kb, knowledgeBase } = setup({ workId: WORK });
+            kb.getDocument.mockResolvedValue(proposedDoc(false, WORK) as never);
+            await controller.acceptDocument(user('user-7'), 'doc-1', res());
+            expect(knowledgeBase.acceptDocument).toHaveBeenCalledWith(WORK, 'doc-1', 'user-7');
+        });
+
+        it('INTEGRATION_KB_ACCEPT_REQUIRES_PERSON=false restores the key-only accept', async () => {
+            process.env[ENV] = 'false';
+            const { controller, kb, knowledgeBase } = setup();
+            kb.getDocument.mockResolvedValue(proposedDoc(true) as never);
+            await controller.acceptDocument(user(), 'doc-1', res());
+            expect(knowledgeBase.acceptOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1');
+        });
+
+        it('a relayed create stamps the person it was written for', async () => {
+            const { controller, knowledgeBase } = setup();
+            await controller.createDocument(
+                user('user-7'),
+                createBody({ type: 'organization', id: ORG }),
+                undefined,
+                req(),
+                res(),
+            );
+            expect(knowledgeBase.createOrgDocument).toHaveBeenCalledWith(
+                ORG,
+                'user-7',
+                expect.objectContaining({
+                    source: 'user',
+                    metadata: {
+                        lastContentWrite: expect.objectContaining({ actAsUserId: 'user-7' }),
+                    },
+                }),
+                expect.anything(),
+            );
         });
     });
 

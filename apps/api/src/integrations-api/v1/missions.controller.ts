@@ -42,7 +42,7 @@ import {
     type KeysetPage,
     ResourceNotFoundError,
 } from '@ever-works/agent/integrations-api';
-import { MissionStatus, type MissionOutcome } from '@ever-works/agent/entities';
+import type { MissionOutcome } from '@ever-works/agent/entities';
 import { MissionsService } from '@ever-works/agent/missions';
 import { RecordVisibilityService } from '@ever-works/agent/record-visibility';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
@@ -472,14 +472,14 @@ export class IntegrationMissionsController {
         const resulting = dto.status ?? String(current.status);
         if (
             textFields.length > 0 &&
-            resulting === MissionStatus.ACTIVE &&
+            resulting === 'active' &&
             integrationMissionEditPausedOnly()
         ) {
             throw new IntegrationHttpException(
                 422,
                 'domain_rule',
                 `An integration cannot change ${textFields.join(', ')} of an active Mission: every tick hands its description to the Idea generator. Pause the Mission first (status "paused"), or a person edits it in Ever Works.`,
-                { fields: textFields, reason: 'autonomous_mission', status: MissionStatus.ACTIVE },
+                { fields: textFields, reason: 'autonomous_mission', status: 'active' },
             );
         }
         await withExpectedVersion('mission', id, expected, async () => {
