@@ -15,12 +15,22 @@ import type {
 	WorkspacePushCredential
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { execFile, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileWithVerifiedCancellation } from './verified-exec.js';
+import {
+	checkoutHardeningEnv,
+	emptyHooksDir,
+	FILTER_DRIVER_PROBE_ARGS,
+	finalizeHardeningEntries,
+	gitConfigEnvOverlay,
+	parseFilterDriverConfig,
+	type FilterDriverConfigEntry
+} from './git-hardening.js';
 
 /** Binding stamp kept INSIDE the worktree's gitdir so it can never be
  *  committed and never shows up in the working tree. */
@@ -124,6 +134,12 @@ interface RegisteredCheckout {
 	canonicalGitDir: string;
 	remoteUrl: string;
 	registration: WorktreeRegistration;
+}
+
+/** The live overlay of a hardened provision (see {@link LocalWorkspacePlugin.provision}). */
+interface CheckoutHardeningScope {
+	hooksDir: string;
+	env: Record<string, string>;
 }
 
 export interface LocalWorkspacePluginOptions {
@@ -276,11 +292,41 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// Concurrent `git worktree add` on one clone corrupts refs —
 		// serialize ALL provision work per repo-key. A second path lock also
 		// prevents two colliding repository keys from racing the same binding.
-		return this.withRepoLock(`repo:${normalizedPath(poolDir)}`, () =>
-			this.withRepoLock(`worktree:${normalizedPath(worktreeDir)}`, () =>
-				this.provisionLocked(spec, poolDir, worktreeDir)
-			)
-		);
+		const locked = (): Promise<WorkspaceHandle> =>
+			this.withRepoLock(`repo:${normalizedPath(poolDir)}`, () =>
+				this.withRepoLock(`worktree:${normalizedPath(worktreeDir)}`, () =>
+					this.provisionLocked(spec, poolDir, worktreeDir)
+				)
+			);
+		if (!spec.hardenRepoHooks) return locked();
+		// works-security finding 3 (fleet node 0.2.7): EVERY git command of a
+		// hardened provision — fetches, ownership probes, `worktree add`,
+		// removals — runs with hooks, fsmonitor, filter drivers, `ext::` and
+		// submodule recursion neutralised (see `git-hardening.ts`). The scope
+		// starts with the static half plus `lfs`; the drivers the pool's own
+		// config names are added once it exists, and re-read right before the
+		// checkout itself.
+		const scope: CheckoutHardeningScope = {
+			hooksDir: await emptyHooksDir(),
+			env: checkoutHardeningEnv(await emptyHooksDir(), [])
+		};
+		return this.checkoutHardening.run(scope, locked);
+	}
+
+	/**
+	 * Re-read the filter drivers visible from `dir` and rebuild the scope's
+	 * overlay. A no-op outside a hardened provision.
+	 */
+	private async refreshCheckoutHardening(dir: string, signal?: AbortSignal): Promise<void> {
+		const scope = this.checkoutHardening.getStore();
+		if (!scope) return;
+		scope.env = checkoutHardeningEnv(scope.hooksDir, await this.probeFilterDrivers(dir, signal));
+	}
+
+	/** Every `filter.<driver>.*` key visible from `dir`, with its scope; `[]` when none (or unreadable). */
+	private async probeFilterDrivers(dir: string, signal?: AbortSignal): Promise<FilterDriverConfigEntry[]> {
+		const result = await this.git([...FILTER_DRIVER_PROBE_ARGS], dir, undefined, signal);
+		return result.code === 0 ? parseFilterDriverConfig(result.stdout) : [];
 	}
 
 	private async provisionLocked(
@@ -342,6 +388,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				throw workspaceOwnershipError('Repository pool is already bound to a different token-free remote');
 			}
 		}
+
+		// The pool now exists and is proven ours: fold the filter drivers its
+		// config defines into the hardening overlay (hardened provisions only).
+		await this.refreshCheckoutHardening(poolDir, spec.signal);
 
 		// A prior crash or external cleanup can remove the checkout while
 		// leaving Git's exact worktree registration behind. Reconcile only
@@ -417,6 +467,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		try {
 			await this.writeProvisionIntent(poolDir, worktreeDir, spec);
 			throwIfAborted(spec.signal);
+			// Re-read immediately before the one command that writes files from
+			// the repository: the checkout is where a filter driver would run.
+			await this.refreshCheckoutHardening(poolDir, spec.signal);
 			await this.gitOrThrow(
 				['worktree', 'add', '-B', spec.branch, worktreeDir, startPoint],
 				poolDir,
@@ -472,7 +525,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// / `commit` would otherwise run a repository `pre-commit` hook or an
 		// fsmonitor hook under the node's identity. `undefined` when the flag is
 		// off (the cloud runner), which keeps that path byte-for-byte unchanged.
-		const hardening = opts.hardenRepoHooks ? await this.finalizeHardeningEnv() : undefined;
+		const hardening = opts.hardenRepoHooks ? await this.finalizeHardeningEnv(dir, signal) : undefined;
 		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal, null, hardening);
 
 		const status = await this.gitOrThrow(
@@ -1379,13 +1432,19 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			// otherwise do to a credentialed push.
 			for (const name of LocalWorkspacePlugin.credentialEnvRemovals) delete inherited[name];
 		}
+		// An explicit overlay wins; otherwise a hardened provision's scope
+		// supplies one (works-security finding 3).
+		const scoped = this.checkoutHardening.getStore()?.env;
+		const overlay =
+			extraEnv && 'GIT_CONFIG_COUNT' in extraEnv ? extraEnv : scoped ? { ...scoped, ...extraEnv } : extraEnv;
+		const layered: NodeJS.ProcessEnv = { ...inherited, GIT_TERMINAL_PROMPT: '0', ...overlay };
 		return execFileWithVerifiedCancellation('git', args, {
 			...(cwd ? { cwd } : {}),
 			env: {
-				...inherited,
-				GIT_TERMINAL_PROMPT: '0',
-				...extraEnv,
-				...(credential ? this.credentialEnv(credential, inherited) : {})
+				...layered,
+				// Appended AFTER the overlay's `GIT_CONFIG_*` entries, never on
+				// top of them: both use the same indexed variables.
+				...(credential ? this.credentialEnv(credential, layered) : {})
 			},
 			maxBuffer: 16 * 1024 * 1024,
 			windowsHide: true,
@@ -1432,16 +1491,8 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return result;
 	}
 
-	/** An empty directory the finalize points `core.hooksPath` at, created once. */
-	private emptyHooksDirPromise: Promise<string> | null = null;
-
-	private emptyHooksDir(): Promise<string> {
-		return (this.emptyHooksDirPromise ??= (async () => {
-			const dir = join(tmpdir(), `ew-no-hooks-${randomUUID()}`);
-			await fs.mkdir(dir, { recursive: true });
-			return dir;
-		})());
-	}
+	/** Hardened-provision scope (works-security finding 3); see {@link provision}. */
+	private readonly checkoutHardening = new AsyncLocalStorage<CheckoutHardeningScope>();
 
 	/**
 	 * The `GIT_CONFIG_*` overlay that neutralises repo-hostile Git config on the
@@ -1459,18 +1510,21 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	 * `--no-verify` on the commit is the companion hook switch; the two together
 	 * mean neither a `pre-commit` hook nor an fsmonitor hook runs under the
 	 * node's identity, matching what the credentialed push already does.
+	 *
+	 * Filter drivers (works-security finding 3, node 0.2.7): `add -A` runs the
+	 * `clean` filter of every driver a tracked `.gitattributes` names. The
+	 * operator's own definitions (system / global / process env — git-lfs) keep
+	 * working; a driver key defined or overridden in a repository-writable
+	 * scope (the shared pool config) is pinned back to the operator's value or
+	 * emptied ({@link finalizeHardeningEntries}).
 	 */
-	private async finalizeHardeningEnv(inherited: NodeJS.ProcessEnv = process.env): Promise<Record<string, string>> {
-		const hooksDir = (await this.emptyHooksDir()).replace(/\\/g, '/');
-		const parsed = Number.parseInt(String(inherited.GIT_CONFIG_COUNT ?? ''), 10);
-		const base = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
-		return {
-			GIT_CONFIG_COUNT: String(base + 2),
-			[`GIT_CONFIG_KEY_${base}`]: 'core.hooksPath',
-			[`GIT_CONFIG_VALUE_${base}`]: hooksDir,
-			[`GIT_CONFIG_KEY_${base + 1}`]: 'core.fsmonitor',
-			[`GIT_CONFIG_VALUE_${base + 1}`]: 'false'
-		};
+	private async finalizeHardeningEnv(
+		dir: string,
+		signal?: AbortSignal,
+		inherited: NodeJS.ProcessEnv = process.env
+	): Promise<Record<string, string>> {
+		const found = await this.probeFilterDrivers(dir, signal);
+		return gitConfigEnvOverlay(finalizeHardeningEntries(await emptyHooksDir(), found), inherited);
 	}
 
 	/** The worktree's PRIVATE gitdir (never the shared common dir, never
