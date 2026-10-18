@@ -59,6 +59,7 @@ export function AppLicenseAttestationDialog({
     const [serverMessage, setServerMessage] = useState<string | null>(null);
 
     const spdx = license.spdx ?? t('unknownSpdx');
+    const errorText = serverMessage ?? (refusal ? t(`refusals.${refusal}`) : null);
 
     const submit = async () => {
         if (!confirmed || pending) return;
@@ -138,13 +139,13 @@ export function AppLicenseAttestationDialog({
                         {t('footer')}
                     </p>
 
-                    {(refusal || serverMessage) && (
+                    {errorText && (
                         <p
                             role="alert"
                             className="text-sm text-red-600 dark:text-red-400"
                             data-testid="app-license-attest-error"
                         >
-                            {serverMessage ?? t(`refusals.${refusal}`)}
+                            {errorText}
                         </p>
                     )}
 
