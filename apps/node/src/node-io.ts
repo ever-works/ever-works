@@ -22,11 +22,123 @@ import type { HealthProbeIo } from './core/health-probe';
  * that binds those interfaces to Node built-ins. Tests never import it.
  */
 
+/**
+ * works-security finding 4 (node 0.2.7) — how a probe command is spawned.
+ *
+ * The capability / health probes name their tools bare (`powershell`,
+ * `nvidia-smi`, `where`, `claude --version`). On Windows they used to run
+ * through `cmd.exe` (`shell: true`) with the node's own working directory,
+ * and `cmd.exe` looks in the CURRENT DIRECTORY before `PATH` — so a
+ * `powershell.exe` or `nvidia-smi.exe` (or `.bat`/`.cmd`) sitting in
+ * whatever directory the node happened to start in ran as the machine owner
+ * on every heartbeat. Now:
+ *
+ *  - the Windows system tools resolve to their ABSOLUTE paths under
+ *    `%SystemRoot%\System32` and start with `shell: false` — no `cmd.exe`,
+ *    no search at all;
+ *  - `nvidia-smi` resolves to the driver's known install locations
+ *    (`System32` for DCH drivers, `NVSMI` for older ones); when none exists
+ *    the probe reports "not installed" (`ENOENT`) without spawning anything;
+ *  - everything else (the model CLIs' `.cmd` shims still need `cmd.exe`)
+ *    runs with an explicit, owner-controlled `cwd` (`System32` on Windows,
+ *    the home directory elsewhere) and `NoDefaultCurrentDirectoryInExePath`
+ *    set, which tells `cmd.exe` (and libuv) not to search the current
+ *    directory at all.
+ */
+export interface ProbeSpawnPlan {
+	/** What to execute: an absolute path for the resolved tools, else the name as given. */
+	file: string;
+	shell: boolean;
+	cwd: string;
+	env: NodeJS.ProcessEnv;
+}
+
+export interface ProbeSpawnDeps {
+	platform: NodeJS.Platform;
+	env: NodeJS.ProcessEnv;
+	exists: (filePath: string) => boolean;
+	homedir: () => string;
+}
+
+/** `C:\Windows`-shaped: a drive root plus plain segments, nothing relative or quoted. */
+const WINDOWS_SYSTEM_ROOT = /^[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n]+)*)?\\?$/;
+
+/** The Windows directory the system tools live under; `C:\Windows` when the environment is unusable. */
+export function windowsSystemRoot(env: NodeJS.ProcessEnv): string {
+	for (const key of ['SystemRoot', 'SYSTEMROOT', 'windir', 'WINDIR']) {
+		const value = env[key];
+		if (typeof value === 'string' && WINDOWS_SYSTEM_ROOT.test(value.trim())) {
+			const trimmed = value.trim();
+			// `C:\` stays `C:\` — stripping it to `C:` would make every join drive-RELATIVE.
+			return trimmed.length > 3 ? trimmed.replace(/\\+$/, '') : trimmed;
+		}
+	}
+	return 'C:\\Windows';
+}
+
+/** Bare names the node runs that are part of Windows itself, relative to `System32`. */
+const WINDOWS_SYSTEM_TOOLS: Readonly<Record<string, readonly string[]>> = {
+	powershell: ['WindowsPowerShell', 'v1.0', 'powershell.exe'],
+	where: ['where.exe'],
+	icacls: ['icacls.exe']
+};
+
+/**
+ * Plan one probe spawn — `null` when the tool is known not to be installed
+ * (nothing is spawned and the caller reports `ENOENT`). Pure: every fact
+ * comes from `deps`, so the plan is unit-testable on any OS.
+ */
+export function planProbeSpawn(command: string, deps: ProbeSpawnDeps): ProbeSpawnPlan | null {
+	if (deps.platform !== 'win32') {
+		let cwd = '/';
+		try {
+			cwd = deps.homedir() || '/';
+		} catch {
+			cwd = '/';
+		}
+		// execvp searches PATH only (never the current directory unless PATH
+		// itself names it), so the name is kept and only the cwd is pinned.
+		return { file: command, shell: false, cwd, env: deps.env };
+	}
+	const systemRoot = windowsSystemRoot(deps.env);
+	const system32 = path.win32.join(systemRoot, 'System32');
+	const env: NodeJS.ProcessEnv = { ...deps.env, NoDefaultCurrentDirectoryInExePath: '1' };
+	const bare = path.win32.basename(command) === command ? command.toLowerCase().replace(/\.exe$/, '') : null;
+	if (bare !== null) {
+		const tool = WINDOWS_SYSTEM_TOOLS[bare];
+		if (tool) return { file: path.win32.join(system32, ...tool), shell: false, cwd: system32, env };
+		if (bare === 'nvidia-smi') {
+			const candidates = [path.win32.join(system32, 'nvidia-smi.exe')];
+			for (const key of ['ProgramW6432', 'ProgramFiles']) {
+				const base = deps.env[key];
+				if (typeof base === 'string' && WINDOWS_SYSTEM_ROOT.test(base.trim())) {
+					candidates.push(path.win32.join(base.trim(), 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe'));
+				}
+			}
+			const found = candidates.find((candidate) => deps.exists(candidate));
+			return found ? { file: found, shell: false, cwd: system32, env } : null;
+		}
+	}
+	// The model CLIs (`claude.cmd`, `codex.cmd`), git, node … keep `cmd.exe` —
+	// a `.cmd` shim cannot start without it — but never search the cwd.
+	return { file: command, shell: true, cwd: system32, env };
+}
+
+function currentProbeSpawnDeps(): ProbeSpawnDeps {
+	return { platform: process.platform, env: process.env, exists: existsSync, homedir: os.homedir };
+}
+
 /** `execFile`-backed runner, matching `apps/desktop`'s command-runner shape. */
 export function createCommandRunner(): CommandRunner {
 	return {
 		run: (command, args, options) =>
 			new Promise((resolve) => {
+				const plan = planProbeSpawn(command, currentProbeSpawnDeps());
+				if (!plan) {
+					// Known not installed: report it exactly as a failed spawn would.
+					resolve({ code: 1, stdout: '', stderr: '', spawnError: 'ENOENT', timedOut: false });
+					return;
+				}
 				// A caller's deadline (the health probe's per-fact budget) replaces
 				// the default; anything that is not a positive finite number keeps it.
 				const timeout =
@@ -36,9 +148,9 @@ export function createCommandRunner(): CommandRunner {
 						? options.timeoutMs
 						: 10_000;
 				execFile(
-					command,
+					plan.file,
 					args,
-					{ shell: process.platform === 'win32', windowsHide: true, timeout },
+					{ shell: plan.shell, cwd: plan.cwd, env: plan.env, windowsHide: true, timeout },
 					(error, stdout, stderr) => {
 						const code = error
 							? ((error as NodeJS.ErrnoException & { code?: number | string }).code ?? 1)
@@ -81,10 +193,12 @@ export function restrictFileToOwnerWindows(filePath: string): void {
 	if (!user.trim() || user.trim() === '\\') {
 		throw new Error('Cannot determine the current Windows user to grant the config file to');
 	}
-	execFileSync('icacls', [filePath, '/inheritance:r', '/grant:r', `${user}:(F)`], {
+	const icacls = planProbeSpawn('icacls', currentProbeSpawnDeps());
+	execFileSync(icacls?.file ?? 'icacls', [filePath, '/inheritance:r', '/grant:r', `${user}:(F)`], {
 		windowsHide: true,
 		stdio: 'ignore',
-		timeout: 10_000
+		timeout: 10_000,
+		...(icacls ? { cwd: icacls.cwd, env: icacls.env } : {})
 	});
 }
 
@@ -112,11 +226,12 @@ export function restrictDirectoryToOwnerWindows(dirPath: string): Promise<void> 
 	if (!user.trim() || user.trim() === '\\' || user.trim().endsWith('\\')) {
 		return Promise.reject(new Error('Cannot determine the current Windows user to grant the directory to'));
 	}
+	const icacls = planProbeSpawn('icacls', currentProbeSpawnDeps());
 	return new Promise((resolve, reject) => {
 		execFile(
-			'icacls',
+			icacls?.file ?? 'icacls',
 			windowsOwnerOnlyDirectoryAclArgs(dirPath, user),
-			{ windowsHide: true, timeout: 10_000 },
+			{ windowsHide: true, timeout: 10_000, ...(icacls ? { cwd: icacls.cwd, env: icacls.env } : {}) },
 			(error) => (error ? reject(new Error(`icacls failed: ${error.message}`)) : resolve())
 		);
 	});
@@ -226,13 +341,14 @@ export function lookupOnPath(command: string): string | null {
  * actually run, so the single-hit variant above is a view over this.
  */
 export function lookupAllOnPath(command: string): string[] {
-	const which = process.platform === 'win32' ? 'where' : 'which';
+	const which = planProbeSpawn(process.platform === 'win32' ? 'where' : 'which', currentProbeSpawnDeps());
 	try {
-		const output = execFileSync(which, [command], {
+		const output = execFileSync(which?.file ?? 'which', [command], {
 			encoding: 'utf8',
 			windowsHide: true,
 			stdio: ['ignore', 'pipe', 'ignore'],
-			timeout: 5_000
+			timeout: 5_000,
+			...(which ? { cwd: which.cwd, env: which.env } : {})
 		});
 		return output
 			.split(/\r?\n/)
