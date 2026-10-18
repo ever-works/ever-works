@@ -456,6 +456,26 @@ export interface AppEnvApplyInput {
     readonly acknowledgeNeverRotate?: boolean;
 }
 
+/**
+ * `apply`'s optional fourth argument — used by ONE caller today, the APW-01
+ * prompted-values adapter (`app-env-prompted-values.adapter.ts`, FR-55).
+ *
+ * At create time an App Work has no effective App spec yet (a Link waits for its
+ * setup pull request; a fork for its readiness run), so the member's answers
+ * would otherwise be refused `specUnavailable` and lost. `allowWithoutSpec`
+ * applies them against an EMPTY spec instead: every name is then undeclared
+ * (FR-1 allows that, with the `undeclared` warning), every validation that does
+ * not need a spec still runs, and the row is re-read against the real spec the
+ * moment one exists (`list` / the resolver judge rows by name, never by the spec
+ * they were written under). `origin: 'prompted'` records the row as the
+ * member's prompt answer rather than a later hand-typed `user` value, for an
+ * undeclared name or one the spec declares as a prompt.
+ */
+export interface AppEnvApplyOptions {
+    readonly allowWithoutSpec?: boolean;
+    readonly origin?: 'prompted';
+}
+
 /** FR-29's per-item outcomes, plus the two write verbs of a `set` call. */
 export type AppEnvApplyAction = 'set' | 'created' | 'unset' | 'reset' | 'skipped' | 'refused';
 
@@ -1025,6 +1045,7 @@ export class AppEnvService {
         workId: string,
         actor: AppEnvActor,
         input: AppEnvApplyInput,
+        options?: AppEnvApplyOptions,
     ): Promise<AppEnvApplyResult> {
         const empty: AppEnvApplyResult = {
             workId,
@@ -1034,7 +1055,9 @@ export class AppEnvService {
             activityRecorded: false,
         };
 
-        const snapshot = await this.readSpec(workId);
+        const snapshot =
+            (await this.readSpec(workId)) ??
+            (options?.allowWithoutSpec ? EMPTY_APP_ENV_SPEC_SNAPSHOT : null);
         if (!snapshot) {
             return { ...empty, reason: 'specUnavailable' };
         }
@@ -1189,7 +1212,12 @@ export class AppEnvService {
                     kind: 'write',
                     name,
                     value,
-                    origin: originForWrite(facts, name, index),
+                    origin:
+                        options?.origin === 'prompted' &&
+                        (facts === undefined || facts.source === 'prompt') &&
+                        !index.publicHalves.has(name)
+                            ? 'prompted'
+                            : originForWrite(facts, name, index),
                     line,
                     action: undeclared ? 'created' : 'set',
                     undeclared,
@@ -2051,6 +2079,16 @@ function differs(
 function validationRefusal(result: { readonly ok: boolean }): AppEnvValidationRefusal | null {
     return result.ok === true ? null : (result as AppEnvValidationRefusal);
 }
+
+/**
+ * The spec `apply({ allowWithoutSpec })` runs against when the Work has none yet
+ * (see {@link AppEnvApplyOptions}): no entries, no hash, no commit.
+ */
+const EMPTY_APP_ENV_SPEC_SNAPSHOT: AppEnvSpecSnapshot = Object.freeze({
+    specHash: null,
+    commitSha: null,
+    spec: Object.freeze({ env: [] }) as unknown as AppSpec,
+});
 
 /** The stored origin a `set` produces (plan §4.2:372-374). */
 function originForWrite(

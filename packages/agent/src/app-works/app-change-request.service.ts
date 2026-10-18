@@ -15,6 +15,8 @@ import {
     type AppWorkAgentResolver,
     type AppWorkAgentSource,
 } from './app-work-agent-resolver';
+import { GitFacadeService } from '../facades/git.facade';
+import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
 
 /**
  * APW-08 T25 — the evolve loop's entry point: "change this App Work" → a Task on the Work,
@@ -96,7 +98,10 @@ export interface AppChangeRefused {
         | 'agentRequired'
         | 'agentNotEligible'
         | 'tasksUnavailable'
-        | 'taskCreateFailed';
+        | 'taskCreateFailed'
+        // Live e2e 2026-10-18 (T-40): the base branch has no `.works/works.yml`, so
+        // the change gate would refuse the pull request after the run anyway.
+        | 'appSpecMissing';
     readonly message: string;
     readonly candidates?: ReadonlyArray<{ id: string; name: string }>;
     readonly createFromTemplate?: { templateSlug: string; reason: 'noCommittableAgent' };
@@ -117,6 +122,14 @@ export interface AppChangeSummary {
     readonly prUrl: string | null;
     readonly prState: string | null;
     readonly ciState: string | null;
+    /**
+     * The branch's own state (`pushed`, `pr-open`, `conflict`, …) — additive
+     * (live e2e 2026-10-18): T-40's branch was `pushed` with no PR and the read said
+     * nothing about why.
+     */
+    readonly branchState: string | null;
+    /** Why the platform refused to open the PR, in the member's words, when it did. */
+    readonly refusal: string | null;
     readonly createdAt: string | null;
     readonly updatedAt: string | null;
 }
@@ -133,6 +146,11 @@ export class AppChangeRequestService {
         @Inject(APP_WORK_AGENT_RESOLVER)
         private readonly resolver?: AppWorkAgentResolver,
         @Optional() private readonly resolverService?: AppWorkAgentResolverService,
+        // Appended LAST (positional constructions keep their slots) — the evolve
+        // preflight (live e2e 2026-10-18). Absent ⇒ no preflight; the finalize gate
+        // still judges the branch.
+        @Optional() private readonly rules?: AppWorkRulesService,
+        @Optional() private readonly git?: GitFacadeService,
     ) {}
 
     async request(input: AppChangeRequestInput): Promise<AppChangeRequestResult> {
@@ -216,6 +234,16 @@ export class AppChangeRequestService {
                       }
                     : {}),
             };
+        }
+
+        // ── the base branch must hold an App spec (live e2e 2026-10-18) ─────
+        // Without one the change gate refuses the pull request AFTER the agent ran
+        // (T-40: branch pushed, no PR, "rules could not be read"). Said up front
+        // instead — only for a spec that is definitely MISSING; a provider that
+        // cannot answer does not stop the request (the gate still judges).
+        const missing = await this.appSpecMissingOnBase(work);
+        if (missing) {
+            return refused(409, 'appSpecMissing', missing);
         }
 
         // ── the Task ──────────────────────────────────────────────────────────
@@ -316,6 +344,52 @@ export class AppChangeRequestService {
         return summaryOf(task);
     }
 
+    /**
+     * The refusal text when the Work's base branch has NO App spec, else `null`.
+     * Fail-open on everything else: no rules/git collaborator, no resolvable
+     * repository, an unreadable head, an invalid spec (the gate names that one).
+     */
+    private async appSpecMissingOnBase(work: Work): Promise<string | null> {
+        if (!this.rules || !this.git) return null;
+        const target = safeTarget(work);
+        if (!target) return null;
+        const gitOptions = {
+            userId: work.userId,
+            providerId: work.gitProvider || 'github',
+            workId: work.id,
+        };
+        let branch: string | undefined;
+        try {
+            const configured = work.taskIsolationBaseBranch?.trim();
+            branch =
+                configured ||
+                (await this.git.getRepository(target.owner, target.repo, gitOptions))
+                    ?.defaultBranch;
+            if (!branch) return null;
+            const head = await this.git.getLatestCommit(
+                target.owner,
+                target.repo,
+                branch,
+                gitOptions,
+            );
+            if (!head?.sha) return null;
+            await this.rules.resolve(work, head.sha);
+            return null;
+        } catch (error) {
+            if (error instanceof AppSpecUnreadableError && error.status === 'missing') {
+                return (
+                    `This App Work has no App spec (\`.works/works.yml\`) on \`${branch || error.branch}\` yet, ` +
+                    "so a change cannot be checked against its rules. Merge the App Work's setup pull " +
+                    'request (or add the App spec), then ask again.'
+                );
+            }
+            this.logger.debug(
+                `App change: the App spec preflight of work ${work.id} could not decide (${errorText(error)}); continuing.`,
+            );
+            return null;
+        }
+    }
+
     private async resolve(
         userId: string,
         workId: string,
@@ -354,6 +428,8 @@ function summaryOf(task: Task): AppChangeSummary {
         prUrl: task.prUrl ?? null,
         prState: task.prState ?? null,
         ciState: task.ciState ?? null,
+        branchState: task.branchState ?? null,
+        refusal: task.branchGuardRefusal ?? null,
         createdAt: isoOf(task.createdAt),
         updatedAt: isoOf(task.updatedAt),
     };

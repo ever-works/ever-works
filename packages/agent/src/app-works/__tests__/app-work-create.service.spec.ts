@@ -1514,10 +1514,15 @@ describe('AppWorkCreateService', () => {
             );
 
             expect(h.promptedValues.storePrompted).toHaveBeenCalledTimes(1);
-            expect(h.promptedValues.storePrompted).toHaveBeenCalledWith('work-1', {
-                admin_email: 'ops@example.com',
-                admin_password: 'secret',
-            });
+            expect(h.promptedValues.storePrompted).toHaveBeenCalledWith(
+                'work-1',
+                {
+                    admin_email: 'ops@example.com',
+                    admin_password: 'secret',
+                },
+                // The creator is the actor APW-07 records (live e2e 2026-10-18).
+                { userId: USER.id },
+            );
         });
 
         it('never echoes a value in the response', async () => {

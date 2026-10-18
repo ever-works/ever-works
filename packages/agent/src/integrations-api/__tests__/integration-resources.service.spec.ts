@@ -17,6 +17,7 @@ import { OrganizationMember } from '../../entities/organization-member.entity';
 import { Task } from '../../entities/task.entity';
 import { TaskChatMessage } from '../../entities/task-chat-message.entity';
 import { Team } from '../../entities/team.entity';
+import { Tenant } from '../../entities/tenant.entity';
 import { User } from '../../entities/user.entity';
 import { WorkProposal } from '../../entities/work-proposal.entity';
 import { ExternalRecordLinksService } from '../external-record-links.service';
@@ -74,6 +75,7 @@ describe('IntegrationResourcesService', () => {
             'users',
             'external_record_links',
             'work_proposals',
+            'tenants',
         ]) {
             await dataSource.query(`DELETE FROM "${table}"`);
         }
@@ -349,5 +351,96 @@ describe('IntegrationResourcesService', () => {
             username: 'ruslan',
         });
         expectValid('resources/member.schema.json', members.data[0]);
+    });
+
+    it('lists the Tenant owner as a member (role owner) when they have no roster row', async () => {
+        // The owner of a one-person tenant created the organization and has no
+        // organization_members row: the roster was empty, so an integration could
+        // never pair them (local Gauzy ↔ Ever Works e2e, 2026-10-18).
+        const ownerId = randomUUID();
+        await dataSource.getRepository(User).insert({
+            id: ownerId,
+            username: 'owner',
+            slug: `owner-${ownerId.slice(0, 6)}`,
+            email: 'owner@example.com',
+            tenantId: TENANT,
+            isActive: true,
+        } as unknown as User);
+        await dataSource.getRepository(Tenant).insert({
+            id: TENANT,
+            ownerUserId: ownerId,
+            slug: `t-${ownerId.slice(0, 6)}`,
+            displayName: 'Tenant',
+        } as unknown as Tenant);
+
+        const first = await resources.members(ORG_A, {});
+        expect(first.data).toHaveLength(1);
+        expect(first.data[0]).toMatchObject({
+            organizationId: ORG_A,
+            userId: ownerId,
+            role: 'owner',
+            isActive: true,
+        });
+        expectValid('resources/member.schema.json', first.data[0]);
+        await expect(resources.assertLinkTarget('member', ORG_A, ownerId, 'gauzy')).resolves.toBe(
+            true,
+        );
+        await expect(
+            resources.assertLinkTarget('member', ORG_A, randomUUID(), 'gauzy'),
+        ).rejects.toBeInstanceOf(ResourceNotFoundError);
+
+        // Not when nothing changed since `updatedSince`, and only on the first page.
+        expect(
+            (await resources.members(ORG_A, { updatedSince: new Date(Date.now() + 60_000) })).data,
+        ).toEqual([]);
+        const others = [randomUUID(), randomUUID()];
+        for (const [i, id] of others.entries()) {
+            await dataSource.getRepository(User).insert({
+                id,
+                username: `m${i}`,
+                slug: `m${i}-${id.slice(0, 6)}`,
+                email: `m${i}@example.com`,
+                tenantId: TENANT,
+                isActive: true,
+            } as unknown as User);
+            await dataSource.getRepository(OrganizationMember).insert({
+                organizationId: ORG_A,
+                userId: id,
+                tenantId: TENANT,
+                role: 'member',
+                joinedAt: new Date(),
+            } as unknown as OrganizationMember);
+        }
+        // The owner counts toward the page limit (review on #2723): every page holds at most `limit` members,
+        // and walking the cursor lists everybody exactly once.
+        for (const limit of [1, 2]) {
+            const seen: unknown[] = [];
+            let cursor: string | null | undefined;
+            for (let n = 0; n < 5; n++) {
+                const page = await resources.members(ORG_A, { limit, cursor });
+                expect(page.data.length).toBeLessThanOrEqual(limit);
+                seen.push(...page.data.map((m) => m.userId));
+                if (!page.hasMore) break;
+                expect(page.nextCursor).toBeTruthy();
+                cursor = page.nextCursor;
+            }
+            expect(seen[0]).toBe(ownerId);
+            expect([...seen].sort()).toEqual([ownerId, ...others].sort());
+        }
+        await dataSource.query(
+            `DELETE FROM "organization_members" WHERE "userId" IN (?, ?)`,
+            others,
+        );
+
+        // Once the owner has a roster row of their own, it is listed once, as that row.
+        await dataSource.getRepository(OrganizationMember).insert({
+            organizationId: ORG_A,
+            userId: ownerId,
+            tenantId: TENANT,
+            role: 'owner',
+            joinedAt: new Date(),
+        } as unknown as OrganizationMember);
+        const again = await resources.members(ORG_A, {});
+        expect(again.data.map((m) => m.userId)).toEqual([ownerId]);
     });
 });

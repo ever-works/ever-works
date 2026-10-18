@@ -120,6 +120,47 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
         });
     });
 
+    describe('a Task started by `runTask` from backlog (live e2e 2026-10-18, T-40)', () => {
+        it('walks backlog → in_review through the sync path instead of an illegal direct move', async () => {
+            const backlog = makeTask({ status: TaskStatus.BACKLOG });
+            tasks.findById.mockResolvedValue(backlog);
+            const sync = jest.fn().mockResolvedValue({ task: backlog, from: 'backlog', path: [] });
+            (transitions as unknown as { transitionSync: jest.Mock }).transitionSync = sync;
+
+            await build().finalizeRemotePush({ ...input(), task: backlog });
+
+            expect(sync).toHaveBeenCalledWith(backlog, TaskStatus.IN_REVIEW, {
+                actorType: 'agent',
+            });
+            expect(transitions.transition).not.toHaveBeenCalled();
+        });
+
+        it('keeps the direct move for a Task already in progress (control)', async () => {
+            const running = makeTask({ status: TaskStatus.IN_PROGRESS });
+            tasks.findById.mockResolvedValue(running);
+            const sync = jest.fn();
+            (transitions as unknown as { transitionSync: jest.Mock }).transitionSync = sync;
+
+            await build().finalizeRemotePush(input());
+
+            expect(transitions.transition).toHaveBeenCalledWith(running, TaskStatus.IN_REVIEW, {
+                actorType: 'agent',
+            });
+            expect(sync).not.toHaveBeenCalled();
+        });
+
+        it('never re-opens a Task a person already closed', async () => {
+            const done = makeTask({ status: TaskStatus.DONE });
+            tasks.findById.mockResolvedValue(done);
+            const sync = jest.fn();
+            (transitions as unknown as { transitionSync: jest.Mock }).transitionSync = sync;
+
+            await build().finalizeRemotePush({ ...input(), task: done });
+
+            expect(sync).not.toHaveBeenCalled();
+        });
+    });
+
     it('honours the Work base branch', async () => {
         works.findById.mockResolvedValue(makeWork({ taskIsolationBaseBranch: 'develop' }));
         await build().finalizeRemotePush(input());

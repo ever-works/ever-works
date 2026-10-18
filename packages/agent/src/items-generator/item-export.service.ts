@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import { format as formatDate } from 'date-fns';
 import type { ItemData, Tag, Brand } from '@ever-works/contracts';
 import { ALL_IMPORT_FIELDS, type ImportFieldName, serializeArrayCell } from './column-mapping';
 import type { ExportFormat, ExportPayload } from './item-import-export.types';
+// `exceljs` loads lazily — see `lazy-office-libs.ts` for why.
+import { loadExcelJs } from '../utils/lazy-office-libs';
 
 /**
  * Sample rows shipped with the import template so users have a concrete
@@ -119,7 +120,8 @@ export class ItemExportService {
     private async serializeXLSX(
         rows: ReadonlyArray<Record<ImportFieldName, string>>,
     ): Promise<Buffer> {
-        const workbook = new ExcelJS.Workbook();
+        const { Workbook } = await loadExcelJs();
+        const workbook = new Workbook();
         workbook.creator = 'Ever Works';
         workbook.created = new Date();
         const sheet = workbook.addWorksheet('Items');

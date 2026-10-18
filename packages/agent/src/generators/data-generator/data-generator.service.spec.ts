@@ -232,4 +232,39 @@ describe('DataGeneratorService runtime YAML certification', () => {
         expect(assertRuntimeCompatible).toHaveBeenCalledTimes(1);
         expect(getItems).not.toHaveBeenCalled();
     });
+
+    describe('refreshDataCache — kinds with no directory corpus (live e2e 2026-10-18)', () => {
+        it.each(['app', 'repo', 'project'])(
+            'answers null for a %s Work without cloning and without a WARN',
+            async (kind) => {
+                const create = jest.spyOn(DataRepository, 'create');
+                const warn = jest.spyOn((service as any).logger, 'warn');
+
+                await expect(
+                    service.refreshDataCache({ ...work, kind } as unknown as Work, user),
+                ).resolves.toBeNull();
+
+                expect(create).not.toHaveBeenCalled();
+                expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+                expect(warn).not.toHaveBeenCalled();
+            },
+        );
+
+        it('still refreshes a directory Work (control)', async () => {
+            const updateWork = jest.fn();
+            (service as any).workOperations.updateWork = updateWork;
+            jest.spyOn(DataRepository, 'create').mockResolvedValue({
+                getConfig: jest.fn().mockResolvedValue({ company_name: 'Acme' }),
+                getCategories: jest.fn().mockResolvedValue([{}, {}]),
+                getTags: jest.fn().mockResolvedValue([]),
+                countItems: jest.fn().mockResolvedValue(3),
+                countComparisons: jest.fn().mockResolvedValue(0),
+            } as unknown as DataRepository);
+
+            await expect(
+                service.refreshDataCache({ ...work, kind: 'directory' } as unknown as Work, user),
+            ).resolves.toMatchObject({ categoriesCount: 2, itemsCount: 3 });
+            expect(updateWork).toHaveBeenCalledTimes(1);
+        });
+    });
 });

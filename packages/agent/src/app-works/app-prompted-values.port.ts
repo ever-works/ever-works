@@ -40,12 +40,26 @@
  * contract forbids logging the values.
  */
 export interface AppPromptedValuesPort {
-    storePrompted(workId: string, values: Record<string, string>): Promise<void>;
+    /**
+     * `context.userId` (additive, 2026-10-18) is the member who created the Work
+     * — the actor APW-07's write path records as `setByUserId`. Optional so an
+     * adapter can still answer from the Work row's owner when a caller omits it.
+     */
+    storePrompted(
+        workId: string,
+        values: Record<string, string>,
+        context?: { readonly userId?: string | null },
+    ): Promise<void>;
 }
 
 /**
  * DI token for {@link AppPromptedValuesPort} — bound by APW-07's env service,
  * injected `@Optional()` by APW-01's create path.
+ *
+ * Bound since 2026-10-18 (live e2e): the agent `AppWorksModule` binds it to
+ * `AppEnvPromptedValuesAdapter` (`app-env/app-env-prompted-values.adapter.ts`),
+ * which applies the answers through `AppEnvService.apply` with
+ * `allowWithoutSpec` + origin `prompted`.
  *
  * A symbol, not the class: the implementing service lives in another epic and a
  * class token would make this package import it.

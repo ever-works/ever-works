@@ -289,6 +289,9 @@ const BOUND: readonly string[] = [
     // APW-03 T42 (2026-10-17) — `AppLicenseService` (`useExisting`), bound by
     // `AppLicenseModule` for APW-06's gate and APW-01's ready handler.
     'APP_LICENSE_SERVICE',
+    // APW-01 FR-55 → APW-07 (2026-10-18, lane aw-live-fix) — `AppWorksModule` binds it
+    // to `AppEnvPromptedValuesAdapter`; until then every `appEnv` answer was dropped.
+    'APP_PROMPTED_VALUES_PORT',
     'APP_PROVISIONING_SERVICE',
     'APP_PROVISION_EVENTS_PORT',
     'APP_RUNTIME_ENV_SOURCE',
@@ -427,13 +430,10 @@ const UNBOUND: readonly string[] = [
     'APP_HOSTS_REBUILD_REQUESTER',
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_IMAGE_REFERENCE_RESOLVER',
-    // Still unbound ON PURPOSE (2026-09-22): its declared owner is APW-07's env
-    // write path, and `AppEnvService.apply` needs an `AppEnvActor` and a spec
-    // that declares the name. `storePrompted(workId, values)` carries neither,
-    // and at create time the Blueprint that would declare the names has not
-    // been applied. Binding it means inventing an actor and an ordering that
-    // APW-07 T24/T25 own, and both are open.
-    'APP_PROMPTED_VALUES_PORT',
+    // `APP_PROMPTED_VALUES_PORT` left this list on 2026-10-18 (lane aw-live-fix): the
+    // live e2e on prod logged every `appEnv` answer as dropped, so `AppWorksModule`
+    // binds it to `AppEnvPromptedValuesAdapter` (the creator is the actor; an empty
+    // spec stands in until one is effective — see BOUND).
     'APP_PUBLISHED_HOSTS',
     'APP_RUNTIME_DELETION_FACADE',
     'APP_RUNTIME_EVENT_SINK',
@@ -570,8 +570,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         // policy, the cluster-op dispatcher, T26's host stores, the host source and APW-07's
         // dependency spec source in the API — measured, not added up by hand.
         // 31/43 → 30/44 on 2026-10-17: `APP_SPEC_DISPLAY_NAMES` is bound by `AppLauncherModule`.
-        expect(UNBOUND).toHaveLength(30);
-        expect(BOUND).toHaveLength(44);
+        // 30/44 → 29/45 on 2026-10-18 (lane aw-live-fix): `APP_PROMPTED_VALUES_PORT` is
+        // bound by `AppWorksModule`.
+        expect(UNBOUND).toHaveLength(29);
+        expect(BOUND).toHaveLength(45);
     });
 
     it('names where the worker binds what this package does not', () => {

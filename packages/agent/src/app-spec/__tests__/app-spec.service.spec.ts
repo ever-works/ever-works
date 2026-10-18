@@ -980,6 +980,68 @@ describe('AppSpecService (APW-03 T12)', () => {
         });
     });
 
+    // ── refreshIfHeadMoved (live e2e 2026-10-18) ────────────────────────────
+
+    describe('refreshIfHeadMoved — the in-process refresh a Build request runs first', () => {
+        it('re-evaluates IN THIS PROCESS when the tracked head moved past the stored head', async () => {
+            await seedState();
+            // The pre-merge head had no `.works/works.yml` (a Link waiting on its setup PR).
+            setBranch('main', SHA_A, null);
+            await service.evaluate(WORK);
+            expect(await stored()).toMatchObject({
+                headCommitSha: SHA_A,
+                validationStatus: 'missing',
+            });
+
+            // The setup pull request merged: `main` moved to a commit with a valid spec.
+            setBranch('main', SHA_B, validDocument());
+            dispatchAppSpecEvaluate.mockClear();
+
+            const outcome = await service.refreshIfHeadMoved(WORK);
+
+            expect(outcome).toMatchObject({
+                refreshed: true,
+                headCommitSha: SHA_B,
+                previousHeadCommitSha: SHA_A,
+                reason: null,
+            });
+            // No worker involved — the evaluation ran here.
+            expect(dispatchAppSpecEvaluate).not.toHaveBeenCalled();
+            expect(await stored()).toMatchObject({
+                headCommitSha: SHA_B,
+                effectiveCommitSha: SHA_B,
+            });
+            expect(emitted).toHaveLength(1);
+        });
+
+        it('reads the head once and evaluates nothing when it has not moved', async () => {
+            await seedState();
+            await service.evaluate(WORK);
+            getLatestCommit.mockClear();
+            getFileContent.mockClear();
+
+            const outcome = await service.refreshIfHeadMoved(WORK);
+
+            expect(outcome).toMatchObject({ refreshed: false, reason: 'unchanged' });
+            expect(getLatestCommit).toHaveBeenCalledTimes(1);
+            expect(getFileContent).not.toHaveBeenCalled();
+        });
+
+        it('never throws: no row, and an unreadable head, are named', async () => {
+            await expect(service.refreshIfHeadMoved(WORK_2)).resolves.toMatchObject({
+                refreshed: false,
+                reason: 'no_state',
+            });
+
+            await seedState();
+            getLatestCommit.mockRejectedValueOnce(new Error('offline'));
+            await expect(service.refreshIfHeadMoved(WORK)).resolves.toMatchObject({
+                refreshed: false,
+                reason: 'headUnreadable',
+            });
+        });
+    });
+
     // ── getEffectiveSpec ────────────────────────────────────────────────────
 
     describe('getEffectiveSpec (FR-19(g), plan §2.3:195-198)', () => {

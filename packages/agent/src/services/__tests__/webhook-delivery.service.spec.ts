@@ -1,7 +1,9 @@
 import {
+    isLoopbackWebhookUrl,
     PayloadTooLargeError,
     WEBHOOK_MAX_BODY_BYTES,
     WebhookDeliveryService,
+    webhookLoopbackAllowed,
     type WebhookHttpClient,
 } from '../webhook-delivery.service';
 
@@ -333,5 +335,81 @@ describe('WebhookDeliveryService.deliver', () => {
         } finally {
             nowSpy.mockRestore();
         }
+    });
+});
+
+describe('EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK (local development only)', () => {
+    const saved = {
+        allow: process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK,
+        env: process.env.NODE_ENV,
+    };
+    afterEach(() => {
+        process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK = saved.allow;
+        process.env.NODE_ENV = saved.env;
+        if (saved.allow === undefined) delete process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK;
+    });
+    const deliverTo = async (url: string) => {
+        const client: WebhookHttpClient = { post: jest.fn().mockResolvedValue({ status: 202 }) };
+        const result = await new WebhookDeliveryService(client).deliver({
+            url,
+            secret: 's',
+            event: 'x',
+            payload: {},
+        });
+        return { result, client };
+    };
+
+    it.each([
+        [{ EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK: 'true', NODE_ENV: 'development' }, true],
+        [{ EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK: 'true', NODE_ENV: 'test' }, true],
+        [{ EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK: 'true', NODE_ENV: 'production' }, false],
+        [{ EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK: 'true' }, false],
+        [{ EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK: '1', NODE_ENV: 'development' }, false],
+        [{ NODE_ENV: 'development' }, false],
+    ])('webhookLoopbackAllowed(%j) is %s', (env, expected) => {
+        expect(webhookLoopbackAllowed(env as NodeJS.ProcessEnv)).toBe(expected);
+    });
+
+    it.each([
+        ['http://127.0.0.1:3000/hook', true],
+        ['http://localhost:3000/hook', true],
+        ['http://[::1]:3000/hook', true],
+        ['http://127.0.0.2/hook', false],
+        ['http://10.0.0.1/hook', false],
+        ['http://169.254.169.254/latest', false],
+        ['http://user:pw@127.0.0.1/hook', false],
+        ['ftp://127.0.0.1/hook', false],
+    ])('isLoopbackWebhookUrl(%s) is %s', (url, expected) => {
+        expect(isLoopbackWebhookUrl(url)).toBe(expected);
+    });
+
+    it('delivers to a loopback receiver when the switch is on in development', async () => {
+        process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK = 'true';
+        process.env.NODE_ENV = 'development';
+        const { result, client } = await deliverTo('http://127.0.0.1:3000/api/hook');
+        expect(result.ok).toBe(true);
+        expect(client.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('still blocks every other private target with the switch on', async () => {
+        process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK = 'true';
+        process.env.NODE_ENV = 'development';
+        for (const url of [
+            'http://10.0.0.1/hook',
+            'http://169.254.169.254/latest',
+            'http://127.0.0.2/hook',
+        ]) {
+            const { result, client } = await deliverTo(url);
+            expect(result.outcome).toBe('ssrf_blocked');
+            expect(client.post).not.toHaveBeenCalled();
+        }
+    });
+
+    it('blocks loopback in production even with the switch set', async () => {
+        process.env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK = 'true';
+        process.env.NODE_ENV = 'production';
+        const { result, client } = await deliverTo('http://127.0.0.1:3000/api/hook');
+        expect(result.outcome).toBe('ssrf_blocked');
+        expect(client.post).not.toHaveBeenCalled();
     });
 });

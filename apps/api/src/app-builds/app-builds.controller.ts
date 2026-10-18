@@ -184,7 +184,10 @@ export class AppBuildsController {
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 202, description: '`{ build, deduped }`.' })
     @ApiResponse({ status: 403, description: '`editAccessRequired` — a viewer.' })
-    @ApiResponse({ status: 422, description: '`commitNotReachable` · `nothingToBuild`.' })
+    @ApiResponse({
+        status: 422,
+        description: '`commitNotReachable` · `nothingToBuild` · `specMissing`.',
+    })
     @ApiResponse({ status: 429, description: '`rebuildRateLimited` with `retryAfterMinutes`.' })
     @ApiResponse({ status: 503, description: '`buildProviderUnavailable`.' })
     async request(
@@ -217,6 +220,13 @@ export class AppBuildsController {
                         'nothingToBuild',
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "This App Work's build strategy builds nothing.",
+                    );
+                case 'specMissing':
+                    throw refusal(
+                        'specMissing',
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        'This App Work has no App spec (`.works/works.yml`) on its tracked branch yet. ' +
+                            'Merge its setup pull request (or add the App spec), then build again.',
                     );
                 default:
                     throw refusal(

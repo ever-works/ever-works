@@ -473,6 +473,14 @@ import { GitFacadeService } from '../facades/git.facade';
                     if (!specs) return null;
                     return new AppBuildSpecReadSource(specs).read(workId, sha);
                 },
+                // Live e2e 2026-10-18 — the in-process head refresh a Build request and
+                // a prepare pass run first, so a moved tracked branch (a merged setup
+                // pull request) is seen without waiting for the Trigger worker.
+                refresh: async (workId: string) => {
+                    const specs = getOptionalProvider<AppSpecService>(ref, AppSpecService);
+                    if (!specs || typeof specs.refreshIfHeadMoved !== 'function') return;
+                    await specs.refreshIfHeadMoved(workId);
+                },
             }),
             inject: [ModuleRef],
         },

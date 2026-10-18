@@ -1092,13 +1092,17 @@ describe('AppSourceInitializerService (APW-01 T15)', () => {
             await expect(h.run()).resolves.toEqual({ result: 'initialized' });
         });
 
-        it('runs no follow-up while the setup pull request is unmerged', async () => {
+        it('classifies the licence but starts no provisioning while the setup pull request is unmerged', async () => {
             const h = harness({ record: { type: 'app_link', createdByThisWork: false } });
 
             const outcome = await h.run();
 
             expect(outcome.result).toBe('waiting_for_setup_pr');
-            expect(h.license.request).not.toHaveBeenCalled();
+            // Live e2e 2026-10-18: the licence of the default branch is already a fact,
+            // so `GET /app-license` must not render the UNKNOWN attestation text while
+            // the member reviews the setup pull request.
+            expect(h.license.request).toHaveBeenCalledTimes(1);
+            expect(h.license.request).toHaveBeenCalledWith(WORK_ID);
             expect(h.provisioning.start).not.toHaveBeenCalled();
             expect(h.appSpec.hasValidAppSpec).not.toHaveBeenCalled();
         });
