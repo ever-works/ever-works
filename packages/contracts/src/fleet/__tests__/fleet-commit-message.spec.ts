@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	classifyFleetChangedPaths,
 	composeFleetTaskCommitMessage,
+	containsCiSkipDirective,
 	fleetCommitTypeFromTitle,
+	neutralizeCiSkipDirectives,
 	retypeFleetCommitMessage
 } from '../fleet-commit-message.types.js';
 
@@ -93,5 +95,72 @@ describe('retypeFleetCommitMessage', () => {
 		expect(retypeFleetCommitMessage('Update stuff', ['docs/a.md'])).toBe('Update stuff');
 		expect(retypeFleetCommitMessage('docs: x', ['docs/a.md'])).toBe('docs: x');
 		expect(retypeFleetCommitMessage(message, [])).toBe(message);
+	});
+});
+
+// works-security finding 1 (node 0.2.7): a Task title is the fleet commit
+// subject, and GitHub starts no `push` / `pull_request` workflow for a head
+// commit whose message carries a skip directive — the merge gate would then
+// read the third-party checks (or none) as the PR's whole CI.
+describe('CI-skip directives never reach a fleet commit', () => {
+	const GITHUB_DIRECTIVES = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]'];
+
+	it.each(GITHUB_DIRECTIVES)('neutralises %s in the title, any case and spacing', (directive) => {
+		const spaced = directive.replace(' ', '   ').replace('[', '[ ').replace(']', ' ]').toUpperCase();
+		for (const variant of [directive, spaced]) {
+			const message = composeFleetTaskCommitMessage({ title: `Fix login redirect ${variant}`, slug: 'T-1' });
+			expect(containsCiSkipDirective(message)).toBe(false);
+			expect(message).not.toMatch(/\[[^\]]*(?:skip|no\s*ci)[^\]]*\]/i);
+			// The words survive; only the syntax is broken.
+			expect(message.split('\n')[0]).toContain('(');
+		}
+	});
+
+	it('neutralises a directive in a conventional title and in the slug', () => {
+		const message = composeFleetTaskCommitMessage({
+			title: 'docs(api): [skip ci] lease protocol',
+			slug: 'T-2 [ci skip]'
+		});
+		expect(message).toBe('docs(api): (skip ci) lease protocol\n\nTask: T-2 (ci skip)');
+		expect(containsCiSkipDirective(message)).toBe(false);
+	});
+
+	it("neutralises the other CIs' forms and the skip-checks trailer", () => {
+		expect(
+			neutralizeCiSkipDirectives('a [skip travis] b [skip azurepipelines] c [skipci] d [ci-skip] e [NO_CI]')
+		).toBe('a (skip travis) b (skip azurepipelines) c (skipci) d (ci-skip) e (NO_CI)');
+		expect(neutralizeCiSkipDirectives('x ***NO_CI*** y')).toBe('x NO_CI y');
+		expect(neutralizeCiSkipDirectives('feat: x\n\n\nskip-checks: true')).toBe('feat: x\n\n\nskip-checks true');
+		expect(neutralizeCiSkipDirectives('feat: x\n\nSkip-Checks:TRUE')).toBe('feat: x\n\nskip-checks TRUE');
+	});
+
+	it('leaves ordinary brackets alone and is idempotent', () => {
+		const plain = 'fix: handle [object Object] in [WIP] list [1/2]\n\nTask: T-3';
+		expect(neutralizeCiSkipDirectives(plain)).toBe(plain);
+		expect(containsCiSkipDirective(plain)).toBe(false);
+		const input = 'feat: x [skip ci] [ci skip]';
+		const once = neutralizeCiSkipDirectives(input);
+		expect(neutralizeCiSkipDirectives(once)).toBe(once);
+		expect(once.length).toBe(input.length);
+	});
+
+	it('is applied by retypeFleetCommitMessage — the last step before the node commits', () => {
+		const message = 'feat: add the runbook [skip ci]\n\nTask: T-13\n\nEver-Works-Agent: [no ci] (a1)';
+		// Re-typed …
+		expect(retypeFleetCommitMessage(message, ['docs/runbook.md'])).toBe(
+			'docs: add the runbook (skip ci)\n\nTask: T-13\n\nEver-Works-Agent: (no ci) (a1)'
+		);
+		// … or not: the neutralisation happens either way.
+		expect(retypeFleetCommitMessage(message, ['src/a.ts', 'docs/a.md'])).toBe(
+			'feat: add the runbook (skip ci)\n\nTask: T-13\n\nEver-Works-Agent: (no ci) (a1)'
+		);
+		expect(retypeFleetCommitMessage('Update stuff [actions skip]', [])).toBe('Update stuff (actions skip)');
+	});
+
+	it('scans hostile input in linear time', () => {
+		const hostile = `${'['.repeat(20_000)}${' skip'.repeat(5_000)}${']'.repeat(20_000)}`;
+		const started = Date.now();
+		neutralizeCiSkipDirectives(hostile);
+		expect(Date.now() - started).toBeLessThan(1_000);
 	});
 });

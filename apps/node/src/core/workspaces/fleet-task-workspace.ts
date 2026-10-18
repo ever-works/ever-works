@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } fro
 import {
 	FLEET_AGENT_TASK_META_DIR,
 	normalizeFleetRunEnvFileRefs,
+	neutralizeCiSkipDirectives,
 	normalizeFleetTaskWorkspaceMounts,
 	retypeFleetCommitMessage,
 	type FleetRunEnvFileRef,
@@ -1259,7 +1260,13 @@ export class FleetTaskWorkspaceProvisioner {
 				// abort that arrives mid-push is already too late: the remote may
 				// have accepted the ref before the kill landed.
 				{
-					commitMessage: authorization.commitMessage,
+					// works-security finding 1: no CI-skip directive (`[skip ci]`
+					// & co.) survives into a fleet commit, whichever route it
+					// came by — a Task title from an older planner, a trailer
+					// value. `commitMessageFor` below neutralises the re-typed
+					// message too; this covers the provider's fallback to
+					// `commitMessage` when the callback is not used.
+					commitMessage: neutralizeCiSkipDirectives(authorization.commitMessage),
 					push: opts.push,
 					// Self-build slice AL: a fleet checkout is attacker-authored
 					// and the model holds `acceptEdits` over it, so the node's own
@@ -1272,7 +1279,8 @@ export class FleetTaskWorkspaceProvisioner {
 					// docs-only change commits as `docs`, a tests-only one as
 					// `test`, whatever the Task title implied. Only the type token
 					// of the subject changes; the body and trailers are untouched.
-					commitMessageFor: (changedPaths, message) => retypeFleetCommitMessage(message, changedPaths),
+					commitMessageFor: (changedPaths, message) =>
+						neutralizeCiSkipDirectives(retypeFleetCommitMessage(message, changedPaths)),
 					...(signal ? { signal } : {}),
 					...(opts.publishFence ? { publishFence: opts.publishFence } : {}),
 					...(authorization.identity ? { identity: authorization.identity } : {}),

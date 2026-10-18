@@ -350,7 +350,9 @@ const COMMIT_MESSAGE_EXPORTS = [
 	'isFleetCommitType',
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
-	'retypeFleetCommitMessage'
+	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective'
 ] as const;
 
 // Computer health (FL-03) — `fleet-node-health.types.ts`, pinned in
@@ -614,6 +616,8 @@ const FUNCTION_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective',
 	'sanitizeFleetNodeHealthSnapshot',
 	'hasFleetNodeHealthReading',
 	'isFleetNodeHealthStale',

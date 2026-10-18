@@ -87,8 +87,12 @@ export function isFleetCommitType(value: unknown): value is FleetCommitType {
  * output for that Task — rather than inventing a summary.
  */
 export function composeFleetTaskCommitMessage(input: { title?: string | null; slug?: string | null }): string {
-	const slug = cleanText(input.slug).slice(0, 64);
-	const title = cleanText(input.title);
+	// CI-skip directives are neutralised BEFORE the title is parsed (so the
+	// conventional-commit read sees what will be committed) and again on the
+	// finished message (so nothing the slug or a future body line carries can
+	// smuggle one in). See {@link neutralizeCiSkipDirectives}.
+	const slug = neutralizeCiSkipDirectives(cleanText(input.slug)).slice(0, 64);
+	const title = neutralizeCiSkipDirectives(cleanText(input.title));
 	const conventional = title ? CONVENTIONAL_SUBJECT.exec(title) : null;
 	let subject: string;
 	if (conventional && isFleetCommitType(conventional[1])) {
@@ -101,7 +105,67 @@ export function composeFleetTaskCommitMessage(input: { title?: string | null; sl
 	}
 	const body: string[] = [];
 	if (slug) body.push(`Task: ${slug}`);
-	return body.length > 0 ? `${cutSubject(subject)}\n\n${body.join('\n')}` : cutSubject(subject);
+	return neutralizeCiSkipDirectives(
+		body.length > 0 ? `${cutSubject(subject)}\n\n${body.join('\n')}` : cutSubject(subject)
+	);
+}
+
+/**
+ * Bracketed CI-skip directives: `[skip ci]`, `[ci skip]`, `[no ci]`,
+ * `[skip actions]`, `[actions skip]` (GitHub Actions), and the same shape for
+ * every other CI that copied it (`[skip travis]`, `[skip azurepipelines]`,
+ * `[skip netlify]`, `[ci-skip]`, `[skipci]` …). Case-insensitive, any spacing
+ * inside the brackets. The inner text is matched separately (see
+ * {@link isCiSkipDirectiveText}) so the outer scan stays linear.
+ */
+const BRACKETED_TEXT = /\[([^[\]\n]{1,48})\]/g;
+const SKIP_FIRST = /^\s*skip[\s_-]*[a-z0-9.]{1,32}\s*$/i;
+const SKIP_LAST = /^\s*[a-z0-9.]{1,32}[\s_-]*skip\s*$/i;
+const NO_CI = /^\s*no[\s_-]*ci\s*$/i;
+/** Azure Pipelines' unbracketed form. */
+const AZURE_NO_CI = /\*{3}\s*NO_CI\s*\*{3}/gi;
+/**
+ * GitHub's trailer form: `skip-checks: true` / `skip-checks:true` at the end of
+ * the message suppresses the check suites a push would create. The colon is
+ * what makes it a trailer, so neutralising drops the colon.
+ */
+const SKIP_CHECKS_TRAILER = /\bskip-checks[ \t]*:[ \t]*(?=true\b)/gi;
+
+function isCiSkipDirectiveText(inner: string): boolean {
+	return SKIP_FIRST.test(inner) || SKIP_LAST.test(inner) || NO_CI.test(inner);
+}
+
+/**
+ * Neutralise every directive a CI system reads out of a commit message to
+ * SKIP its run, so a fleet commit can never switch off the checks the merge
+ * gate is about to read.
+ *
+ * Why: the subject of a fleet commit is the Task TITLE, and a Task title is
+ * written by whoever created the Task — an integration (a Gauzy / GitHub
+ * issue import), a trusted email, a run token's `create_task`. GitHub does not
+ * start ANY `push` / `pull_request` workflow when the PR's head commit message
+ * carries `[skip ci]` (or `[ci skip]`, `[no ci]`, `[skip actions]`,
+ * `[actions skip]`, or a final `skip-checks: true` trailer). The platform's CI
+ * roll-up then sees only third-party checks — or none — and a merge gate that
+ * reads "every reported check passed" as green would merge a change whose own
+ * test suite never ran.
+ *
+ * Neutralising keeps the words and breaks the syntax: `[skip ci]` becomes
+ * `(skip ci)`, `***NO_CI***` becomes `NO_CI`, `skip-checks: true` becomes
+ * `skip-checks true`. Nothing else in the text changes, and the result is
+ * never longer than the input. Pure and idempotent.
+ */
+export function neutralizeCiSkipDirectives(text: string): string {
+	if (typeof text !== 'string' || !text) return text;
+	return text
+		.replace(BRACKETED_TEXT, (match, inner: string) => (isCiSkipDirectiveText(inner) ? `(${inner})` : match))
+		.replace(AZURE_NO_CI, 'NO_CI')
+		.replace(SKIP_CHECKS_TRAILER, 'skip-checks ');
+}
+
+/** True when {@link neutralizeCiSkipDirectives} would change `text`. */
+export function containsCiSkipDirective(text: string | null | undefined): boolean {
+	return typeof text === 'string' && text.length > 0 && neutralizeCiSkipDirectives(text) !== text;
 }
 
 /** What a set of changed paths is, for re-typing. */
@@ -125,9 +189,19 @@ export function classifyFleetChangedPaths(paths: readonly string[] | null | unde
  * token of the first line changes — scope, `!`, subject, body and trailers
  * are kept byte-for-byte. A message that is not conventional, or a mixed
  * change, is returned unchanged.
+ *
+ * The one exception to "byte-for-byte": CI-skip directives are ALWAYS
+ * neutralised ({@link neutralizeCiSkipDirectives}), whatever the change is —
+ * this is the last function the node runs over the message before `git
+ * commit`, so it is where a `[skip ci]` that reached the node by any route
+ * (an older planner, a trailer value) is stopped.
  */
 export function retypeFleetCommitMessage(message: string, changedPaths: readonly string[] | null | undefined): string {
 	if (typeof message !== 'string' || !message) return message;
+	return neutralizeCiSkipDirectives(retypeConventionalType(message, changedPaths));
+}
+
+function retypeConventionalType(message: string, changedPaths: readonly string[] | null | undefined): string {
 	const newline = message.indexOf('\n');
 	const firstLine = newline === -1 ? message : message.slice(0, newline);
 	const rest = newline === -1 ? '' : message.slice(newline);
