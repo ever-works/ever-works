@@ -283,7 +283,10 @@ describe('missions chat tools — Lifecycle', () => {
             ideasQueued: 3,
         };
         runNowMock.mockResolvedValueOnce(runResult);
-        const result = await run<typeof runResult>(runMissionNow, { missionId: 'm-1' });
+        const result = await run<typeof runResult>(runMissionNow, {
+            missionId: 'm-1',
+            confirmed: true,
+        });
         expect(runNowMock).toHaveBeenCalledWith('m-1');
         expect(result).toEqual(runResult);
     });

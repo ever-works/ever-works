@@ -3,6 +3,7 @@ import { tool } from 'ai';
 import { ROUTES } from '@/lib/constants';
 import { searchAPI } from '@/lib/api/plugins-capabilities/search';
 import { sanitizeText } from '@/lib/utils';
+import { looksLikeSecret } from './generated/secret-guard';
 
 export const webSearch = tool({
     description: [
@@ -18,6 +19,19 @@ export const webSearch = tool({
         maxResults: z.number().optional().describe('Maximum number of results (default: 10)'),
     }),
     execute: async ({ query, maxResults }) => {
+        // Works-security (2026-10-18): the query goes to a third-party search
+        // provider. A planted instruction must not smuggle a credential out
+        // in it.
+        if (looksLikeSecret(query)) {
+            return {
+                success: false,
+                results: [],
+                secretRejected: true,
+                message:
+                    'Refused: the query contains something that looks like a credential (an API key, token ' +
+                    'or password). It is never sent to a search provider. Remove it and try again.',
+            };
+        }
         try {
             const availability = await searchAPI.checkAvailability();
 

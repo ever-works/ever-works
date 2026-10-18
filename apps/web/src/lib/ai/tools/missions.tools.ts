@@ -274,20 +274,40 @@ export function createDeleteMissionTool(userConfirmed?: UserConfirmationCheck) {
 /** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
 export const deleteMission = createDeleteMissionTool();
 
-export const runMissionNow = tool({
-    description: [
-        'Trigger a Mission tick immediately, bypassing the cron schedule.',
-        'For one-shot Missions this is the primary way to spawn Ideas. For scheduled Missions it does an out-of-band run while still honoring the outstanding-Ideas cap.',
-    ].join(' '),
-    inputSchema: z.object({
-        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-    }),
-    execute: async ({ missionId }) => {
-        const result = await runMissionNowAction(missionId);
-        return result;
-    },
-});
+/**
+ * Works-security (2026-10-18): a Mission tick is a paid model run that spawns
+ * Ideas — the user's call, confirmed in their own message.
+ */
+export function createRunMissionNowTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Trigger a Mission tick immediately, bypassing the cron schedule.',
+            'For one-shot Missions this is the primary way to spawn Ideas. For scheduled Missions it does an out-of-band run while still honoring the outstanding-Ideas cap.',
+            'Starts a paid run — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+            missionId: z.string().uuid().describe('Mission ID'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ missionId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'runMissionNow',
+                action: 'Run a Mission tick now',
+                target: missionId,
+                args: { missionId },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            const result = await runMissionNowAction(missionId);
+            return result;
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const runMissionNow = createRunMissionNowTool();
 
 export const cloneMission = tool({
     description: [

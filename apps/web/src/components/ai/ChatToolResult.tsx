@@ -308,6 +308,14 @@ export function ChatToolResult({
         );
     }
 
+    // One-time secret (a freshly minted API key) — shown to the user only.
+    const secretOnce = secretOnceEntries(output);
+    if (secretOnce) {
+        return (
+            <SecretOnceBox label={LABELS[toolName] ?? humanizeToolName(toolName)} entries={secretOnce} />
+        );
+    }
+
     // Canvas artifact — the agent rendered rich output into the side panel.
     if (isCanvasToolOutput(output)) {
         return <CanvasChip artifact={output.artifact} />;
@@ -479,6 +487,74 @@ function ConfirmCard({
                     Cancel
                 </button>
             </div>
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────────
+// One-time secret (works-security, 2026-10-18)
+// ────────────────────────────────────────────────────────────────
+
+interface SecretOnceEntryView {
+    field: string;
+    value: string | null;
+}
+
+/**
+ * The `__secretOnce` entries a generated tool lifted out of its result
+ * (`create_api_key`'s plaintext key). The model never sees the value and the
+ * stored conversation never keeps it, so a replayed message carries `null`.
+ */
+function secretOnceEntries(output: unknown): SecretOnceEntryView[] | null {
+    if (!output || typeof output !== 'object') return null;
+    const raw = (output as { __secretOnce?: unknown }).__secretOnce;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    return raw.map((entry) => {
+        const record = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+        return {
+            field: typeof record.field === 'string' ? record.field : 'secret',
+            value: typeof record.value === 'string' && record.value ? record.value : null,
+        };
+    });
+}
+
+function SecretOnceBox({ label, entries }: { label: string; entries: SecretOnceEntryView[] }) {
+    const [copied, setCopied] = useState<string | null>(null);
+    return (
+        <div className="mt-2 p-3 rounded-lg border border-warning/30 bg-warning/5">
+            <div className="flex items-center gap-2 mb-1.5">
+                <ShieldAlert className="w-4 h-4 text-warning" />
+                <span className="text-xs font-medium text-text dark:text-text-dark">{label}</span>
+            </div>
+            {entries.map((entry) =>
+                entry.value ? (
+                    <div key={entry.field} className="mb-2">
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 overflow-x-auto whitespace-nowrap rounded border border-border bg-surface-secondary px-2 py-1 text-[11px] text-text dark:border-white/15 dark:bg-white/5 dark:text-text-dark">
+                                {entry.value}
+                            </code>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void navigator.clipboard
+                                        ?.writeText(entry.value ?? '')
+                                        .then(() => setCopied(entry.field))
+                                        .catch(() => undefined);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface-secondary text-text dark:bg-surface-secondary-dark dark:text-text-dark hover:opacity-80 transition-opacity cursor-pointer"
+                            >
+                                <Check className="w-3 h-3" />
+                                {copied === entry.field ? 'Copied' : 'Copy'}
+                            </button>
+                        </div>
+                    </div>
+                ) : null,
+            )}
+            <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                {entries.some((entry) => entry.value)
+                    ? 'Copy it now: it is shown only here, once. It is not saved in this conversation and the assistant cannot see it.'
+                    : 'A secret was shown once when this ran. It is not kept in the conversation; create a new one in Settings if you no longer have it.'}
+            </p>
         </div>
     );
 }

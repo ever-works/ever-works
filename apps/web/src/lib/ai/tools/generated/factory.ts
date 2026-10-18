@@ -4,6 +4,7 @@ import { callApi } from './api-call';
 import { OPERATION_REGISTRY, type OperationSpec } from './registry';
 import type { UserConfirmationCheck } from './confirmation';
 import { fenceUntrusted } from '../../untrusted';
+import { argsCarrySecret, liftSecretFields, withoutSecretValues } from './secret-guard';
 
 /**
  * Marker returned (instead of performing the mutation) when a destructive /
@@ -36,11 +37,62 @@ export interface ConfirmationRequired {
 /** Fields whose value IS the content of a privileged write, in preview priority order. */
 const PREVIEW_FIELDS = ['body', 'content', 'definition', 'instructionsMd', 'text', 'description'];
 const MAX_PREVIEW_CHARS = 400;
+/**
+ * A privileged-FIELD preview (`bodyFields.privileged`) shows exactly the
+ * controls being set — an acceptance check is a shell command, and the user
+ * must see all of it — so it gets a longer budget than a content preview.
+ */
+const MAX_FIELD_PREVIEW_CHARS = 1_500;
+
+function bodyRecordOf(args: Record<string, unknown>): Record<string, unknown> | null {
+    const body = args[BODY_FIELD];
+    return body && typeof body === 'object' && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
+        : null;
+}
+
+/** The `bodyFields.privileged` keys this call actually sets (`undefined` = absent). */
+function privilegedFieldsSet(spec: OperationSpec, args: Record<string, unknown>): string[] {
+    const privileged = spec.bodyFields?.privileged;
+    const body = bodyRecordOf(args);
+    if (!privileged?.length || !body) return [];
+    return privileged.filter((field) => body[field] !== undefined);
+}
+
+function fieldPreviewOf(args: Record<string, unknown>, fields: string[]): string | undefined {
+    const body = bodyRecordOf(args);
+    if (!body || fields.length === 0) return undefined;
+    let text: string;
+    try {
+        text = JSON.stringify(Object.fromEntries(fields.map((field) => [field, body[field]])), null, 1);
+    } catch {
+        return undefined;
+    }
+    return text.length > MAX_FIELD_PREVIEW_CHARS ? `${text.slice(0, MAX_FIELD_PREVIEW_CHARS)}…` : text;
+}
+
+/**
+ * Apply `spec.bodyFields`: keep only the allowed + privileged keys of the
+ * body. Returns the args to use from here on (card, confirmation binding and
+ * the request all see the same filtered body) and the keys that were dropped.
+ */
+function applyBodyAllowlist(
+    spec: OperationSpec,
+    args: Record<string, unknown>,
+): { args: Record<string, unknown>; ignored: string[] } {
+    const fields = spec.bodyFields;
+    const body = bodyRecordOf(args);
+    if (!fields || !body) return { args, ignored: [] };
+    const keep = new Set<string>([...fields.allowed, ...(fields.privileged ?? [])]);
+    const ignored = Object.keys(body).filter((key) => !keep.has(key));
+    if (ignored.length === 0) return { args, ignored };
+    const filtered = Object.fromEntries(Object.entries(body).filter(([key]) => keep.has(key)));
+    return { args: { ...args, [BODY_FIELD]: filtered }, ignored };
+}
 
 function previewOf(args: Record<string, unknown>): string | undefined {
-    const body = args[BODY_FIELD];
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
-    const record = body as Record<string, unknown>;
+    const record = bodyRecordOf(args);
+    if (!record) return undefined;
     const field = PREVIEW_FIELDS.find((key) => typeof record[key] === 'string' && record[key]);
     let text: string;
     if (field) {
@@ -88,11 +140,17 @@ function serializeForModel(output: unknown): string {
  * refusal) are platform text and stay plain JSON.
  */
 function toModelOutputFor(toolName: string) {
-    return ({ output }: { output: unknown }) => {
+    return ({ output: rawOutput }: { output: unknown }) => {
+        // A one-time secret (`__secretOnce`) is for the user's eyes only:
+        // the model sees that one was shown, never the value — also when the
+        // result is replayed from history.
+        const output = withoutSecretValues(rawOutput);
         if (
             output &&
             typeof output === 'object' &&
-            ('__confirmationRequired' in output || 'bulkRejected' in output)
+            ('__confirmationRequired' in output ||
+                'bulkRejected' in output ||
+                'secretRejected' in output)
         ) {
             return { type: 'json' as const, value: JSON.parse(serializeForModel(output)) };
         }
@@ -106,9 +164,13 @@ function toModelOutputFor(toolName: string) {
     };
 }
 
-/** Whether this call needs the confirmation handshake (static flag or per-args predicate). */
+/**
+ * Whether this call needs the confirmation handshake (static flag, a
+ * privileged body field, or the per-args predicate).
+ */
 function needsConfirmation(spec: OperationSpec, args: Record<string, unknown>): boolean {
     if (spec.requiresConfirmation) return true;
+    if (privilegedFieldsSet(spec, args).length > 0) return true;
     if (spec.confirmWhen) {
         try {
             return spec.confirmWhen(args);
@@ -125,6 +187,20 @@ export interface BulkRejected {
     success: false;
     error: string;
     bulkRejected: true;
+}
+
+/** Result shape when a `refuseSecretArgs` tool is handed something that looks like a credential. */
+export interface SecretRejected {
+    success: false;
+    error: string;
+    secretRejected: true;
+}
+
+/** Whether the spec can ever ask for confirmation (drives the `confirmed` field + description). */
+function isGated(spec: OperationSpec): boolean {
+    return Boolean(
+        spec.requiresConfirmation || spec.confirmWhen || spec.bodyFields?.privileged?.length,
+    );
 }
 
 const CONFIRM_FIELD = 'confirmed';
@@ -156,7 +232,7 @@ function buildInputSchema(spec: OperationSpec): z.ZodObject<z.ZodRawShape> {
             );
     }
 
-    if (spec.requiresConfirmation || spec.confirmWhen) {
+    if (isGated(spec)) {
         shape[CONFIRM_FIELD] = z
             .boolean()
             .optional()
@@ -175,13 +251,24 @@ function buildDescription(spec: OperationSpec): string {
     const tags: string[] = [];
     if (spec.confirmationKind === 'privileged') {
         tags.push(
-            spec.confirmWhen
+            !spec.requiresConfirmation
                 ? 'Privileged — may require user confirmation (call once without `confirmed`; if a confirmation card comes back, call again with `confirmed: true` only after the user agrees).'
                 : 'Privileged — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
         );
     } else if (spec.kind === 'destructive' || spec.requiresConfirmation) {
         tags.push(
             'Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        );
+    }
+    if (spec.bodyFields?.privileged?.length) {
+        tags.push(
+            `Setting any of ${spec.bodyFields.privileged.join(', ')} needs the user's confirmation; ` +
+                `other body fields than ${[...spec.bodyFields.allowed, ...spec.bodyFields.privileged].join(', ')} are ignored.`,
+        );
+    }
+    if (spec.secretResultFields?.length) {
+        tags.push(
+            'The created secret is shown to the user once in the chat UI; you never see it — do not ask for it or repeat it.',
         );
     }
     if (spec.canvas) {
@@ -248,7 +335,27 @@ export function buildGeneratedTools(
             inputSchema: buildInputSchema(spec),
             toModelOutput: toModelOutputFor(spec.toolName),
             execute: async (rawArgs) => {
-                const args = (rawArgs ?? {}) as Record<string, unknown>;
+                // 0. Body allowlist (`bodyFields`): from here on the card, the
+                //    confirmation binding and the request all see the same,
+                //    filtered body.
+                const allowlisted = applyBodyAllowlist(
+                    spec,
+                    (rawArgs ?? {}) as Record<string, unknown>,
+                );
+                const args = allowlisted.args;
+
+                // 0b. Credential guard for tools that hand text to a third party.
+                if (spec.refuseSecretArgs && argsCarrySecret(args)) {
+                    const rejected: SecretRejected = {
+                        success: false,
+                        secretRejected: true,
+                        error:
+                            'Refused: the request contains something that looks like a credential (an API key, ' +
+                            'token or password). It is never sent to an outside service from chat. Remove it ' +
+                            'and try again.',
+                    };
+                    return rejected;
+                }
 
                 // 1. No-bulk guard (top-level args + nested body).
                 const bulk = detectBulk(args) ?? detectBulk(args[BODY_FIELD]);
@@ -283,7 +390,15 @@ export function buildGeneratedTools(
                             args,
                             confirmationKind: spec.confirmationKind ?? 'destructive',
                         };
-                        if (spec.confirmationKind === 'privileged') {
+                        const fieldsSet = privilegedFieldsSet(spec, args);
+                        if (fieldsSet.length > 0) {
+                            // A privileged FIELD is the decision: the card
+                            // shows its full value (and the kind is
+                            // privileged whatever the spec's default wording).
+                            confirmation.confirmationKind = 'privileged';
+                            const preview = fieldPreviewOf(args, fieldsSet);
+                            if (preview) confirmation.preview = preview;
+                        } else if (spec.confirmationKind === 'privileged') {
                             const preview = previewOf(args);
                             if (preview) confirmation.preview = preview;
                         }
@@ -309,13 +424,33 @@ export function buildGeneratedTools(
                     }
                 }
 
-                return callApi({
+                const result = await callApi({
                     method: spec.method,
                     path: spec.path,
                     pathParams,
                     query,
                     body: spec.body ? (args[BODY_FIELD] as Record<string, unknown>) : undefined,
                 });
+
+                let output: Record<string, unknown> = { ...result };
+                // 4. One-time secrets leave the payload for the UI-only slot.
+                if (spec.secretResultFields?.length && result.success) {
+                    const { data, lifted } = liftSecretFields(result.data, spec.secretResultFields);
+                    if (lifted.length > 0) {
+                        output = { ...output, data, __secretOnce: lifted };
+                    }
+                }
+                // 5. Tell the model which body fields were not forwarded.
+                if (allowlisted.ignored.length > 0) {
+                    output = {
+                        ...output,
+                        ignoredFields: allowlisted.ignored,
+                        ignoredFieldsNote:
+                            'These body fields are not accepted from chat and were not sent. The user can ' +
+                            'set them in the app.',
+                    };
+                }
+                return output;
             },
         });
     }
