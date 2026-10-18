@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { appLifecycleAction, rollbackAppAction } from '@/app/actions/dashboard/app-runtime';
 import {
+    isAppOwnerRequired,
     rollbackCandidates,
     type AppLifecycleActionChoice,
     type AppStatusView,
@@ -27,6 +28,14 @@ export interface AppLifecycleActionsProps {
     status: AppStatusView;
     /** Called after the API accepted an action, so the page can re-read the status. */
     onChanged?: () => void;
+    /**
+     * Works-security — whether the member is the Work's owner. Remove WITH stored data is the
+     * owner's while the API's `APP_DATA_DELETE_OWNER_ONLY` switch is on, so `false` disables that
+     * one option in the Remove dialog with a line saying so; Remove without data, Pause, Resume
+     * and Roll back stay. `undefined` = not known: nothing is disabled and the API's refusal is
+     * shown if it comes.
+     */
+    isOwner?: boolean;
 }
 
 /**
@@ -40,14 +49,22 @@ export interface AppLifecycleActionsProps {
  *   the button stays disabled until it matches (the API checks it again: `CONFIRM_SLUG_MISMATCH`).
  *
  * Every action is single-flight and answers with a toast or an inline message — never silently.
+ * An owner-only refusal (`403 ownerRequired`) reads "Only the Work owner can do this."
  */
-export function AppLifecycleActions({ work, status, onChanged }: AppLifecycleActionsProps) {
+export function AppLifecycleActions({
+    work,
+    status,
+    onChanged,
+    isOwner,
+}: AppLifecycleActionsProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.lifecycle');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const tRollback = useTranslations('dashboard.workDetail.appDeploy.rollback');
     const inFlight = useRef(false);
     const [pending, setPending] = useState<AppLifecycleActionChoice | 'rollback' | null>(null);
     const [rollbackOpen, setRollbackOpen] = useState(false);
     const [removeOpen, setRemoveOpen] = useState(false);
+    const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
     const candidates = rollbackCandidates(status);
     const deployed = status.state !== 'not-deployed' && status.state !== 'deleting';
@@ -60,6 +77,7 @@ export function AppLifecycleActions({ work, status, onChanged }: AppLifecycleAct
         if (inFlight.current) return false;
         inFlight.current = true;
         setPending(action);
+        if (action === 'remove') setRemoveMessage(null);
         try {
             const result = await appLifecycleAction(work.id, { action, ...extra });
             if (result.success) {
@@ -69,14 +87,20 @@ export function AppLifecycleActions({ work, status, onChanged }: AppLifecycleAct
                 onChanged?.();
                 return true;
             }
-            toast.error(
+            const message =
                 result.code === 'CONFIRM_SLUG_MISMATCH'
                     ? t('slugMismatch')
-                    : t('failed', { reason: result.error ?? result.code ?? '' }),
-            );
+                    : isAppOwnerRequired(result)
+                      ? tApp('ownerRequired')
+                      : t('failed', { reason: result.error ?? result.code ?? '' });
+            toast.error(message);
+            // The Remove dialog stays open on a refusal, so it says why there too.
+            if (action === 'remove') setRemoveMessage(message);
             return false;
         } catch {
-            toast.error(t('failed', { reason: '' }));
+            const message = t('failed', { reason: '' });
+            toast.error(message);
+            if (action === 'remove') setRemoveMessage(message);
             return false;
         } finally {
             inFlight.current = false;
@@ -132,7 +156,10 @@ export function AppLifecycleActions({ work, status, onChanged }: AppLifecycleAct
                     type="button"
                     variant="danger"
                     className="gap-1.5"
-                    onClick={() => setRemoveOpen(true)}
+                    onClick={() => {
+                        setRemoveMessage(null);
+                        setRemoveOpen(true);
+                    }}
                     disabled={pending !== null}
                     data-testid="app-lifecycle-remove-open"
                 >
@@ -153,6 +180,8 @@ export function AppLifecycleActions({ work, status, onChanged }: AppLifecycleAct
                 <AppRemoveDialog
                     slug={work.slug}
                     pending={pending === 'remove'}
+                    deleteDataLocked={isOwner === false}
+                    message={removeMessage}
                     onOpenChange={setRemoveOpen}
                     onConfirm={async (deleteData, confirmSlug) => {
                         const accepted = await lifecycle('remove', {
@@ -181,6 +210,7 @@ function AppRollbackDialog({
     onRequested,
 }: AppRollbackDialogProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.rollback');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const groupId = useId();
     const jobsId = useId();
     const [selected, setSelected] = useState<string>(candidates[0]?.deploymentId ?? '');
@@ -201,6 +231,12 @@ function AppRollbackDialog({
                 toast.success(t('started'));
                 onRequested();
                 onOpenChange(false);
+                return;
+            }
+            if (isAppOwnerRequired(result)) {
+                // Roll back never sends `confirmClusterChange`: the refusal means another member
+                // saved the cluster connection and the owner has to confirm it first.
+                setMessage(`${tApp('ownerRequired')} ${tApp('ownerConfirmCluster')}`);
                 return;
             }
             const unmet = result.data?.unmet?.length ? result.data.unmet : (result.unmet ?? []);
@@ -315,14 +351,26 @@ function AppRollbackDialog({
 interface AppRemoveDialogProps {
     slug: string;
     pending: boolean;
+    /** The member is not the owner: "also delete stored data" is disabled, with the reason. */
+    deleteDataLocked?: boolean;
+    /** Why the last Remove was refused, shown in the dialog (it stays open). */
+    message?: string | null;
     onOpenChange: (open: boolean) => void;
     onConfirm: (deleteData: boolean, confirmSlug: string) => Promise<void>;
 }
 
-function AppRemoveDialog({ slug, pending, onOpenChange, onConfirm }: AppRemoveDialogProps) {
+function AppRemoveDialog({
+    slug,
+    pending,
+    deleteDataLocked = false,
+    message = null,
+    onOpenChange,
+    onConfirm,
+}: AppRemoveDialogProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.lifecycle');
     const dataId = useId();
     const slugId = useId();
+    const ownerOnlyId = useId();
     const [deleteData, setDeleteData] = useState(false);
     const [typed, setTyped] = useState('');
     const slugMatches = typed.trim() === slug;
@@ -348,11 +396,22 @@ function AppRemoveDialog({ slug, pending, onOpenChange, onConfirm }: AppRemoveDi
                             type="checkbox"
                             checked={deleteData}
                             onChange={(event) => setDeleteData(event.target.checked)}
+                            disabled={deleteDataLocked}
+                            aria-describedby={deleteDataLocked ? ownerOnlyId : undefined}
                             data-testid="app-remove-delete-data"
                         />
                         <span>
                             {t('deleteData')}
                             <span className="block text-danger">{t('deleteDataWarning')}</span>
+                            {deleteDataLocked && (
+                                <span
+                                    id={ownerOnlyId}
+                                    className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                    data-testid="app-remove-delete-data-owner-only"
+                                >
+                                    {t('deleteDataOwnerOnly')}
+                                </span>
+                            )}
                         </span>
                     </label>
 
@@ -370,6 +429,16 @@ function AppRemoveDialog({ slug, pending, onOpenChange, onConfirm }: AppRemoveDi
                                 data-testid="app-remove-confirm-slug"
                             />
                         </div>
+                    )}
+
+                    {message && (
+                        <p
+                            role="alert"
+                            className="text-sm text-danger"
+                            data-testid="app-remove-message"
+                        >
+                            {message}
+                        </p>
                     )}
 
                     <DialogFooter className="gap-2">

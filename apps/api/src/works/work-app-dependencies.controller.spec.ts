@@ -46,7 +46,9 @@ import { WorkAppDependenciesController } from './work-app-dependencies.controlle
 
 const WORK_ID = '5a07fa3f-367a-444e-9d1e-311d03cc1327';
 const USER_ID = '22222222-2222-4222-8222-222222222222';
-const USER = { userId: USER_ID } as never;
+// A signed-in member: Delete data is the owner's in a session (works-security,
+// `app-works-owner-gates.spec.ts`).
+const USER = { userId: USER_ID, authMethod: 'session' } as never;
 const SLUG = 'hello-app';
 
 const worksEnabled = (config as unknown as { everWorks: { apps: { worksEnabled: jest.Mock } } })
@@ -55,7 +57,11 @@ const worksEnabled = (config as unknown as { everWorks: { apps: { worksEnabled: 
 type Role = 'owner' | 'viewer' | 'foreign' | 'missing';
 
 function ownership(role: Role, kind = 'app'): WorkOwnershipService {
-    const access = { work: { id: WORK_ID, kind, slug: SLUG }, isCreator: role === 'owner' };
+    const access = {
+        work: { id: WORK_ID, kind, slug: SLUG },
+        isCreator: role === 'owner',
+        role: role === 'owner' ? 'owner' : 'viewer',
+    };
     return {
         ensureCanView: jest.fn(async () => {
             if (role === 'missing') throw new NotFoundException('Work not found');
@@ -65,6 +71,10 @@ function ownership(role: Role, kind = 'app'): WorkOwnershipService {
         ensureCanEdit: jest.fn(async () => {
             if (role === 'missing') throw new NotFoundException('Work not found');
             if (role !== 'owner') throw new ForbiddenException('Edit access required');
+            return access;
+        }),
+        ensureIsOwner: jest.fn(async () => {
+            if (role !== 'owner') throw new ForbiddenException('Owner required');
             return access;
         }),
     } as unknown as WorkOwnershipService;
@@ -262,6 +272,7 @@ describe('WorkAppDependenciesController — GET', () => {
             dependencies: [card()],
             refreshing: false,
             canEdit: true,
+            canDeleteData: true,
         });
     });
 

@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "GitHub uygulaması erişimini incele",
                     "openOnGitHub": "GitHub'da aç",
                     "enableBuildWorkflow": "Derleme iş akışını etkinleştir"
-                }
+                },
+                "editAccessRequired": "Bunu yapmak için bu App Work üzerinde düzenleme erişimine ihtiyacınız var."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Ajanıyla geliştirin",
                     "body": "Uygulamayı değiştirmesi için Work'ün ajanından isteyin — bir özellik ekleyin, bir hatayı düzeltin, bir bağımlılığı yükseltin. Ajan Work Deposunda çalışır ve pull request açar.",
                     "button": "Bu App hakkında sohbet et"
-                }
+                },
+                "editAccessRequired": "Tekrar denemek için bu App Work üzerinde düzenleme erişimine ihtiyacınız var."
             },
             "builds": {
                 "title": "Derlemeler",
@@ -7178,7 +7180,8 @@
                     "saved": "Hedef kaydedildi.",
                     "saveFailed": "Hedef kaydedilemedi: {reason}",
                     "changeNote": "Hedefi değiştirmek, zaten çalışan hiçbir şeyi kaldırmaz.",
-                    "routeUnavailable": "Hedef değiştirme bu örnekte henüz kullanılamıyor."
+                    "routeUnavailable": "Hedef değiştirme bu örnekte henüz kullanılamıyor.",
+                    "ownerOnly": "Uygulamanın nerede çalışacağını değiştirmeyi veya yeni bir küme bağlamayı yalnızca iş sahibi yapabilir."
                 },
                 "connect": {
                     "title": "Kümenizi bağlayın",
@@ -7219,7 +7222,8 @@
                     "saving": "Kaydediliyor…",
                     "saveBlocked": "Kontrol gerekli tüm izinlerle geçtiğinde kaydedebilirsiniz.",
                     "saved": "Küme bağlandı.",
-                    "saveFailed": "Küme bağlantısı kaydedilemedi: {reason}"
+                    "saveFailed": "Küme bağlantısı kaydedilemedi: {reason}",
+                    "ownerOnly": "Bir küme bağlamayı veya bağlamını değiştirmeyi yalnızca iş sahibi yapabilir."
                 },
                 "check": {
                     "ok": "Bağlı",
@@ -7356,7 +7360,8 @@
                         "resume": "Sürdürme istendi.",
                         "remove": "Kaldırma istendi.",
                         "cancelDeploy": "İptal istendi."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Depolanan verileri yalnızca iş sahibi silebilir."
                 },
                 "environment": {
                     "title": "Ortam",
@@ -7445,8 +7450,11 @@
                         "confirm": "Verileri sil",
                         "requested": "{kind} verileri siliniyor.",
                         "failed": "Veriler silinemedi. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Bu verileri yalnızca iş sahibi silebilir."
+                },
+                "ownerRequired": "Bunu yalnızca iş sahibi yapabilir.",
+                "ownerConfirmCluster": "Bu küme bağlantısını başka bir üye kaydetti; bu yüzden iş sahibinin onaylamak için bir kez dağıtım yapması gerekir."
             },
             "appEnv": {
                 "errors": {

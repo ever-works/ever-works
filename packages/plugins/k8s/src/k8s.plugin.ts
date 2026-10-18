@@ -42,6 +42,7 @@ import type {
 } from '@ever-works/plugin';
 
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { K8sPluginError, buildSecretPattern, scrubError } from './errors.js';
 import type { K8sPluginErrorCode } from './errors.js';
@@ -106,11 +107,16 @@ import { APP_ANNOTATION_EXPIRES_AT } from './app/app-names.js';
 import {
 	assertSupportedKubeconfig,
 	CLUSTER_PRIVATE_ALLOWLIST_ENV,
+	findLocalCredentialSource,
 	pinKubeconfigServer,
 	readClusterPrivateAllowlist
 } from './app/app-kubeconfig.guard.js';
 import type { AppClusterCheckReport } from './app/app-cluster-check.js';
-import type { KubeconfigDnsResolver } from './app/app-kubeconfig.guard.js';
+import type {
+	KubeconfigDnsResolver,
+	KubeconfigLocalCredentialFinding,
+	KubeconfigUnsupportedUserField
+} from './app/app-kubeconfig.guard.js';
 import type {
 	ClusterNodeDescriptor,
 	ClusterSource,
@@ -408,6 +414,11 @@ export type ClusterCredentialShapeVerdict = { ok: true } | { ok: false; code: st
  */
 const UNSUPPORTED_KUBECONFIG_SENTENCES: ReadonlyArray<{ readonly tail: string; readonly sentence: string }> = [
 	{
+		tail: 'this check cannot see. Write the fields out in full instead.',
+		sentence:
+			"This kubeconfig uses a YAML merge key ('<<'), which could hide a credential setting from the check. Write the fields out in full instead."
+	},
+	{
 		tail: 'the plugin would run an arbitrary local command. Use a token or an inline certificate instead.',
 		sentence:
 			'This kubeconfig uses an exec credential plugin, which would run a command on Ever Works servers. Use a service-account token or an inline client certificate instead.'
@@ -419,7 +430,8 @@ const UNSUPPORTED_KUBECONFIG_SENTENCES: ReadonlyArray<{ readonly tail: string; r
 	},
 	{
 		tail: 'Paste the token itself instead.',
-		sentence: 'This kubeconfig reads its token from a local file (tokenFile). Paste the token itself instead.'
+		sentence:
+			'This kubeconfig reads its token from a local file (tokenFile or token-file). Paste the token itself instead.'
 	},
 	{
 		tail: "Use 'client-certificate-data' instead.",
@@ -500,6 +512,100 @@ function dependencyGuardFailure(error: unknown): AppDependencyProvisionOutcome {
 function dependencyGuardError(error: unknown): K8sPluginError {
 	const { code, message } = describeKubeconfigRefusal(error);
 	return new K8sPluginError(code, message);
+}
+
+/**
+ * Lane works-security — the WEBSITE path's switch (`validateConnection`, `listClusterNodes`, `deploy`,
+ * `getDeploymentStatus`, `listProjects`, `lookupExistingDeployment` and the four domain members).
+ *
+ * Off unless the value is exactly `'true'`. While off, a MEMBER-SUPPLIED kubeconfig that would make the
+ * Kubernetes client obtain a credential locally — an `exec` or `auth-provider` plugin (a command run in the
+ * API process), or a `tokenFile` / `token-file` / `client-certificate` / `client-key` file of the API host —
+ * is refused before it is ever handed to the client. `'true'` restores the previous behaviour exactly
+ * (including `requiresExecPlugin` in `validateConnection`'s report). Platform-managed kubeconfigs are never
+ * refused (see {@link KubernetesPlugin.assertMemberKubeconfigAccepted}).
+ */
+export const MEMBER_KUBECONFIG_EXEC_ALLOWED_ENV = 'EVER_WORKS_K8S_MEMBER_KUBECONFIG_EXEC_ALLOWED';
+
+/** Are local credential sources allowed in a member's kubeconfig? (Only when {@link MEMBER_KUBECONFIG_EXEC_ALLOWED_ENV} is exactly `'true'`.) */
+export function memberKubeconfigExecAllowed(
+	env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env
+): boolean {
+	return env?.[MEMBER_KUBECONFIG_EXEC_ALLOWED_ENV] === 'true';
+}
+
+/**
+ * The operator-held kubeconfigs the platform substitutes ITSELF, by environment variable: `k8s-works` and
+ * `k8s-works-shared` (`resolveKubeconfigForClusterSource`, `deployment-context.resolver.ts`) and the managed
+ * `ever-works` provider's dedicated / shared cluster (`DeployFacadeService.resolveEverWorksManagedKubeconfig`,
+ * `EverWorksK8sDeployProvider.resolveKubeconfig`, which reads `…_PATH` as a file).
+ */
+const OPERATOR_KUBECONFIG_ENVS = [
+	'EVER_WORKS_K8S_WORKS_KUBECONFIG',
+	'EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG',
+	'EVER_WORKS_DEPLOY_KUBECONFIG'
+] as const;
+const OPERATOR_KUBECONFIG_PATH_ENVS = ['EVER_WORKS_DEPLOY_KUBECONFIG_PATH'] as const;
+
+/**
+ * Is this exactly (whitespace-trimmed) one of the operator's own kubeconfigs from this process's environment?
+ * The managed `ever-works` provider's settings may still say `custom-kubeconfig` while the facade hands the
+ * plugin the platform's kubeconfig, so the credential itself — not the stored source — is what proves it is
+ * the operator's. A `…_PATH` file is read only here, and only for a kubeconfig that would otherwise be refused.
+ */
+export function isOperatorKubeconfig(
+	kubeconfig: string,
+	env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env
+): boolean {
+	const wanted = typeof kubeconfig === 'string' ? kubeconfig.trim() : '';
+	if (!wanted) return false;
+	for (const name of OPERATOR_KUBECONFIG_ENVS) {
+		const value = env?.[name]?.trim();
+		if (value && value === wanted) return true;
+	}
+	for (const name of OPERATOR_KUBECONFIG_PATH_ENVS) {
+		const path = env?.[name]?.trim();
+		if (!path) continue;
+		try {
+			if (readFileSync(path, 'utf-8').trim() === wanted) return true;
+		} catch {
+			// An unreadable operator file proves nothing about this kubeconfig.
+		}
+	}
+	return false;
+}
+
+/** What each refused user field makes the client do — fixed text, never a value from the kubeconfig. */
+const LOCAL_CREDENTIAL_EFFECT: Record<KubeconfigUnsupportedUserField, string> = {
+	exec: "an exec credential plugin ('exec'), which the Kubernetes client would run as a command on the Ever Works servers",
+	'auth-provider':
+		"an 'auth-provider' credential plugin, which the Kubernetes client may run as a command or use to read files on the Ever Works servers",
+	tokenFile: "a token read from a local file ('tokenFile'), which would be a file of the Ever Works servers",
+	'token-file': "a token read from a local file ('token-file'), which would be a file of the Ever Works servers",
+	'client-certificate':
+		"a client certificate read from a local file ('client-certificate'), which would be a file of the Ever Works servers",
+	'client-key': "a client key read from a local file ('client-key'), which would be a file of the Ever Works servers"
+};
+
+/** The website path's refusal — a clear sentence naming the switch, never echoing the kubeconfig. */
+function memberKubeconfigRefusal(finding: KubeconfigLocalCredentialFinding): K8sPluginError {
+	const operatorHint = `An operator of this installation can allow it with ${MEMBER_KUBECONFIG_EXEC_ALLOWED_ENV}=true.`;
+	if (finding.kind === 'unreadable') {
+		return new K8sPluginError(
+			'INVALID_YAML',
+			`This pasted kubeconfig could not be read, so it cannot be checked for exec credential plugins, and it is not accepted on this installation. ${operatorHint}`
+		);
+	}
+	if (finding.kind === 'merge-key') {
+		return new K8sPluginError(
+			'KUBECONFIG_UNSUPPORTED',
+			`This pasted kubeconfig uses a YAML merge key ('<<'), which can hide an exec credential plugin, so it is not accepted on this installation. Write the fields out in full instead. ${operatorHint}`
+		);
+	}
+	return new K8sPluginError(
+		'KUBECONFIG_UNSUPPORTED',
+		`Exec credential plugins and local credential files are not accepted for a pasted kubeconfig on this installation: this one uses ${LOCAL_CREDENTIAL_EFFECT[finding.field]}. Use a service-account token or inline client certificate data (client-certificate-data / client-key-data) instead. ${operatorHint}`
+	);
 }
 
 export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
@@ -958,6 +1064,13 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			return { success: false, message: 'Paste a kubeconfig before validating.' };
 		}
 
+		// Save & verify is the first place a pasted kubeconfig reaches the client — refused here, before it.
+		try {
+			this.assertMemberKubeconfigAccepted(cfg.kubeconfig, clusterSource);
+		} catch (err) {
+			return { success: false, message: err instanceof Error ? err.message : String(err) };
+		}
+
 		try {
 			const info = await this.api.validateConnection(cfg.kubeconfig, {
 				contextOverride: cfg.kubeContext,
@@ -1014,6 +1127,9 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 */
 	async listClusterNodes(kubeconfig: string, contextOverride?: string): Promise<ClusterNodeDescriptor[]> {
 		if (!kubeconfig) return [];
+		// No settings travel with this call, so only the credential itself can exempt it (an operator
+		// kubeconfig); Fleet calls it for `custom-kubeconfig` sources only.
+		this.assertMemberKubeconfigAccepted(kubeconfig);
 		return this.api.listNodes(kubeconfig, contextOverride);
 	}
 
@@ -1024,6 +1140,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			...((opts.settingsOverride ?? {}) as Partial<KubernetesSettings>)
 		} as KubernetesSettings;
 		applyKubeContextOverride(settings, opts.kubeContextOverride);
+		// Before anything below loads the credential into the client (`controllerForClassName` is the first).
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		// `namespaceOverride` is the namespace the PLATFORM enforced server-side
 		// (per-tenant override + reserved-namespace blocklist). It must win over
 		// the plugin's own persisted `namespace`, which is free-text the user
@@ -1189,6 +1307,19 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		const createdAt = new Date().toISOString();
 
 		try {
+			this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
+		} catch (err) {
+			// This member reports every failure as an `error` status rather than throwing; a refusal too.
+			return {
+				id: effectiveDeploymentId,
+				status: 'error',
+				error: err instanceof Error ? err.message : String(err),
+				createdAt,
+				completedAt: new Date().toISOString()
+			};
+		}
+
+		try {
 			const deployment = await this.api.getDeployment(kubeconfig, namespace, name, settings.kubeContext);
 			if (!deployment) {
 				return { id: effectiveDeploymentId, status: 'pending', createdAt };
@@ -1214,6 +1345,9 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async listProjects(kubeconfig: string): Promise<DeploymentProject[]> {
 		const settings = await this.loadSettings();
+		// No per-call settings: the plugin-level ones are not this credential's provenance, so only the
+		// credential itself (an operator kubeconfig) exempts it. Thrown, not swallowed into `[]`.
+		this.assertMemberKubeconfigAccepted(kubeconfig);
 		try {
 			const deployments = await this.api.listManagedDeployments(kubeconfig, settings.kubeContext);
 			return deployments.map((d) => ({
@@ -1233,6 +1367,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		const projectNameOverride = context?.projectNameOverride?.trim();
 		const slug = sanitiseSlug(projectNameOverride || projectName);
 		const requestedNamespace = context?.namespaceOverride?.trim();
@@ -1258,6 +1393,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<DeploymentDomain[]> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!ingress?.spec) return [];
@@ -1289,6 +1425,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<AddDomainResult> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		// Security: the domain is written verbatim as the Ingress `host:` rule.
 		// Reject anything that is not a strict RFC-1123 hostname so a value like
 		// `*` (catch-all rule that hijacks unmatched cluster traffic) or an empty
@@ -1338,6 +1475,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<boolean> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
@@ -1366,6 +1504,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<DeploymentDomain> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
+		this.assertMemberKubeconfigAccepted(kubeconfig, settings.clusterSource);
 		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		// Resolve the cluster's actual ingress LB host/IP. Without this, any
 		// domain with any DNS record was returned `verified: true` —
@@ -1833,6 +1972,37 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * narrows `guardedAppCredential` for an operator-held credential (the managed tier's shape-only rule)
 	 * cannot narrow this one.
 	 */
+	/**
+	 * Lane works-security — the website path's refusal of a member-supplied kubeconfig that would make the
+	 * Kubernetes client run a command or read a file of the API host ({@link MEMBER_KUBECONFIG_EXEC_ALLOWED_ENV},
+	 * off by default). Throws `K8sPluginError` (`KUBECONFIG_UNSUPPORTED`, or `INVALID_YAML` for a document that
+	 * cannot be checked); returns when the call may go on. Pure but for one case (below) — no client is built.
+	 *
+	 * Refused only when the credential is PROVEN to be the member's, i.e. none of these holds:
+	 *
+	 * - the switch is `'true'` (the previous behaviour, exactly);
+	 * - there is nothing to load (an empty value — each member's own handling stays);
+	 * - nothing local is named ({@link findLocalCredentialSource} answers `null` — every static-token or
+	 *   inline-certificate kubeconfig, so the common case never reaches the next two checks);
+	 * - the call's `clusterSource` is platform-managed (`k8s-works` / `k8s-works-shared`): the facade has
+	 *   substituted the operator's kubeconfig from the environment;
+	 * - the credential IS one of the operator's environment kubeconfigs ({@link isOperatorKubeconfig}) — what
+	 *   covers the managed `ever-works` provider, whose stored source may still read `custom-kubeconfig`, and
+	 *   the members that carry no settings at all. Only here may a `…_PATH` operator file be read.
+	 *
+	 * Every user of the document is checked (not just the selected one): the website members pass the
+	 * context name to the client untrimmed, so the selected user is not something this side can compute.
+	 */
+	private assertMemberKubeconfigAccepted(kubeconfig: string, clusterSource?: ClusterSource): void {
+		if (memberKubeconfigExecAllowed()) return;
+		if (typeof kubeconfig !== 'string' || kubeconfig.trim().length === 0) return;
+		const finding = findLocalCredentialSource(kubeconfig);
+		if (finding === null) return;
+		if (isPlatformManagedClusterSource(clusterSource)) return;
+		if (isOperatorKubeconfig(kubeconfig)) return;
+		throw memberKubeconfigRefusal(finding);
+	}
+
 	private async guardMemberCredential(credential: string, kubeContext?: string | null): Promise<string> {
 		const allowlist = readClusterPrivateAllowlist();
 		if (allowlist.invalid.length > 0) {

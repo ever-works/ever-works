@@ -5580,7 +5580,8 @@
                     "reviewGitHubAppAccess": "GitHub-App-Zugriff prüfen",
                     "openOnGitHub": "Auf GitHub öffnen",
                     "enableBuildWorkflow": "Build-Workflow aktivieren"
-                }
+                },
+                "editAccessRequired": "Sie benötigen Bearbeitungszugriff auf dieses App-Werk, um das zu tun."
             },
             "settings": {
                 "tabs": {
@@ -6973,7 +6974,8 @@
                     "title": "Mit seinem Agenten weiterentwickeln",
                     "body": "Bitten Sie den Agenten des Werks, die App zu ändern — eine Funktion hinzufügen, einen Fehler beheben, eine Abhängigkeit aktualisieren. Er arbeitet im Werk-Repository und öffnet Pull Requests.",
                     "button": "Über diese App chatten"
-                }
+                },
+                "editAccessRequired": "Sie benötigen Bearbeitungszugriff auf dieses App-Werk, um es erneut zu versuchen."
             },
             "builds": {
                 "title": "Builds",
@@ -7246,7 +7248,8 @@
                     "saved": "Ziel gespeichert.",
                     "saveFailed": "Das Ziel konnte nicht gespeichert werden: {reason}",
                     "changeNote": "Das Ändern des Ziels entfernt nichts, was bereits läuft.",
-                    "routeUnavailable": "Das Ändern des Ziels ist auf dieser Instanz noch nicht verfügbar."
+                    "routeUnavailable": "Das Ändern des Ziels ist auf dieser Instanz noch nicht verfügbar.",
+                    "ownerOnly": "Nur der Werkbesitzer kann ändern, wo die App läuft, oder einen neuen Cluster verbinden."
                 },
                 "connect": {
                     "title": "Ihren Cluster verbinden",
@@ -7287,7 +7290,8 @@
                     "saving": "Wird gespeichert…",
                     "saveBlocked": "Speichern ist möglich, sobald die Prüfung mit allen erforderlichen Berechtigungen bestanden ist.",
                     "saved": "Cluster verbunden.",
-                    "saveFailed": "Die Cluster-Verbindung konnte nicht gespeichert werden: {reason}"
+                    "saveFailed": "Die Cluster-Verbindung konnte nicht gespeichert werden: {reason}",
+                    "ownerOnly": "Nur der Werkbesitzer kann einen Cluster verbinden oder dessen Kontext ändern."
                 },
                 "check": {
                     "ok": "Verbunden",
@@ -7424,7 +7428,8 @@
                         "resume": "Fortsetzen angefordert.",
                         "remove": "Entfernen angefordert.",
                         "cancelDeploy": "Abbruch angefordert."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Nur der Werkbesitzer kann gespeicherte Daten löschen."
                 },
                 "environment": {
                     "title": "Umgebung",
@@ -7513,8 +7518,11 @@
                         "confirm": "Daten löschen",
                         "requested": "Die Daten von {kind} werden gelöscht.",
                         "failed": "Die Daten konnten nicht gelöscht werden. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Nur der Werkbesitzer kann diese Daten löschen."
+                },
+                "ownerRequired": "Nur der Werkbesitzer kann dies tun.",
+                "ownerConfirmCluster": "Ein anderes Mitglied hat diese Cluster-Verbindung gespeichert, daher muss der Werkbesitzer einmal bereitstellen, um sie zu bestätigen."
             },
             "appEnv": {
                 "errors": {

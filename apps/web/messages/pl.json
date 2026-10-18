@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "Sprawdź dostęp aplikacji GitHub",
                     "openOnGitHub": "Otwórz w GitHubie",
                     "enableBuildWorkflow": "Włącz przepływ pracy kompilacji"
-                }
+                },
+                "editAccessRequired": "Aby to zrobić, potrzebujesz uprawnień do edycji tego App Work."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Rozwijaj ją z jej agentem",
                     "body": "Poproś agenta tego Work o zmianę aplikacji — dodanie funkcji, naprawę błędu, aktualizację zależności. Pracuje w repozytorium Work i otwiera pull requesty.",
                     "button": "Porozmawiaj o tej aplikacji"
-                }
+                },
+                "editAccessRequired": "Aby spróbować ponownie, potrzebujesz uprawnień do edycji tego App Work."
             },
             "builds": {
                 "title": "Kompilacje",
@@ -7178,7 +7180,8 @@
                     "saved": "Cel zapisany.",
                     "saveFailed": "Nie udało się zapisać celu: {reason}",
                     "changeNote": "Zmiana celu nie usuwa niczego, co już działa.",
-                    "routeUnavailable": "Zmiana celu nie jest jeszcze dostępna w tej instancji."
+                    "routeUnavailable": "Zmiana celu nie jest jeszcze dostępna w tej instancji.",
+                    "ownerOnly": "Tylko właściciel pracy może zmienić, gdzie działa aplikacja, lub połączyć nowy klaster."
                 },
                 "connect": {
                     "title": "Połącz swój klaster",
@@ -7219,7 +7222,8 @@
                     "saving": "Zapisywanie…",
                     "saveBlocked": "Zapis będzie możliwy, gdy sprawdzenie przejdzie ze wszystkimi wymaganymi uprawnieniami.",
                     "saved": "Klaster połączony.",
-                    "saveFailed": "Nie udało się zapisać połączenia z klastrem: {reason}"
+                    "saveFailed": "Nie udało się zapisać połączenia z klastrem: {reason}",
+                    "ownerOnly": "Tylko właściciel pracy może połączyć klaster lub zmienić jego kontekst."
                 },
                 "check": {
                     "ok": "Połączono",
@@ -7356,7 +7360,8 @@
                         "resume": "Zażądano wznowienia.",
                         "remove": "Zażądano usunięcia.",
                         "cancelDeploy": "Zażądano anulowania."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Tylko właściciel pracy może usunąć zapisane dane."
                 },
                 "environment": {
                     "title": "Środowisko",
@@ -7445,8 +7450,11 @@
                         "confirm": "Usuń dane",
                         "requested": "Usuwanie danych: {kind}.",
                         "failed": "Nie udało się usunąć danych. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Tylko właściciel pracy może usunąć te dane."
+                },
+                "ownerRequired": "Tylko właściciel pracy może to zrobić.",
+                "ownerConfirmCluster": "Inny członek zapisał to połączenie z klastrem, więc właściciel pracy musi raz wykonać wdrożenie, aby je potwierdzić."
             },
             "appEnv": {
                 "errors": {
