@@ -14,10 +14,82 @@ import type {
 } from '@ever-works/plugin';
 
 import axios, { type AxiosError } from 'axios';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import { isIP } from 'node:net';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
-import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+import { isPrivateIPv4, isPrivateIPv6, isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+
+/** True when a resolved address must never be connected to (private / loopback / link-local / metadata / embedded). */
+function isBlockedAddress(address: string, family?: number): boolean {
+	const kind = family === 6 || isIP(address) === 6 ? 6 : 4;
+	return kind === 6 ? isPrivateIPv6(address) : isPrivateIPv4(address);
+}
+
+type LookupCallback = (
+	error: NodeJS.ErrnoException | null,
+	address: string | dns.LookupAddress[],
+	family?: number
+) => void;
+
+/**
+ * Security (SSRF, review of #2769) — the DNS lookup every connection of this
+ * extractor makes, the first request AND every redirect hop: it resolves the
+ * name, refuses when ANY returned address is private, loopback, link-local,
+ * cloud-metadata or an IPv6 form embedding one, and hands the socket exactly
+ * the address it checked. Because the check runs inside the connection's own
+ * lookup, a name that answers publicly for one query and privately for the
+ * next (DNS rebinding) cannot slip a private address past it — the connection
+ * uses the answer that was checked. Literal-IP hosts never reach a lookup;
+ * the lexical guard (`isSafeWebhookUrl`) covers those on every hop.
+ */
+export function guardedLookup(
+	hostname: string,
+	options: dns.LookupOptions | number | LookupCallback,
+	callback?: LookupCallback
+): void {
+	const done: LookupCallback = typeof options === 'function' ? options : (callback as LookupCallback);
+	const opts: dns.LookupOptions =
+		typeof options === 'object' && options !== null
+			? options
+			: typeof options === 'number'
+				? { family: options }
+				: {};
+	dns.lookup(hostname, { ...opts, all: true }, (error, addresses) => {
+		if (error) {
+			done(error, '', 0);
+			return;
+		}
+		const list = (Array.isArray(addresses) ? addresses : []) as dns.LookupAddress[];
+		if (list.length === 0) {
+			done(Object.assign(new Error(`SSRF guard: ${hostname} did not resolve`), { code: 'ENOTFOUND' }), '', 0);
+			return;
+		}
+		const blocked = list.find((entry) => isBlockedAddress(entry.address, entry.family));
+		if (blocked) {
+			done(
+				Object.assign(new Error(`SSRF guard: ${hostname} resolved to a private address (${blocked.address})`), {
+					code: 'ESSRFBLOCKED'
+				}),
+				'',
+				0
+			);
+			return;
+		}
+		if (opts.all) {
+			done(null, list);
+			return;
+		}
+		done(null, list[0].address, list[0].family);
+	});
+}
+
+/** Agents that route every connection (and every redirect hop) through {@link guardedLookup}. */
+const guardedHttpAgent = new http.Agent({ lookup: guardedLookup as never });
+const guardedHttpsAgent = new https.Agent({ lookup: guardedLookup as never });
 
 export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly id = 'local-content-extractor';
@@ -113,6 +185,17 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 					'User-Agent': userAgent
 				},
 				timeout,
+				// Security (SSRF): every connection — the first request and each
+				// redirect hop — resolves through `guardedLookup`, which refuses a
+				// private / metadata answer and pins the socket to the checked
+				// address (no DNS-rebinding window).
+				httpAgent: guardedHttpAgent,
+				httpsAgent: guardedHttpsAgent,
+				// Security (SSRF): never through an environment proxy
+				// (HTTP_PROXY / HTTPS_PROXY). Through a proxy the guarded lookup
+				// resolves the PROXY's host, and the proxy resolves the target
+				// itself — outside the check above (CodeRabbit on #2769).
+				proxy: false,
 				maxRedirects: 5,
 				// Security (SSRF): the lexical guard above only vets the INITIAL
 				// url. axios/follow-redirects will transparently follow up to 5

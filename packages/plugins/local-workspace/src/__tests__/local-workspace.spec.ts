@@ -714,6 +714,13 @@ describe('finalize — cancellation (agent execution v2 review follow-up)', () =
  * sandbox: processes the run started can keep writing into it.
  */
 describe('judge before push (branchChanges + publishSha)', () => {
+	// Review of #2769: a judge-before-push caller refuses a provider that does
+	// not promise to publish exactly the judged commit.
+	it('declares that it publishes exactly the judged commit', () => {
+		expect(new LocalWorkspacePlugin().publishesJudgedCommit).toBe(true);
+		expect(typeof new LocalWorkspacePlugin().branchChanges).toBe('function');
+	});
+
 	const SPEC = '.works/works.yml';
 
 	const seedFiles = (files: Record<string, string>, message: string): string => {

@@ -87,6 +87,32 @@ describe('AgentEscalationService (G3)', () => {
         expect(repository.resolve).toHaveBeenCalledWith('e1', 'u1', 'raised the budget');
     });
 
+    it('a human resolution closes the inbox mirror as human (the parked run may resume)', async () => {
+        const inbox = { escalationResolved: jest.fn().mockResolvedValue(undefined) };
+        const svc = new AgentEscalationService(repository, undefined, inbox as never);
+        await svc.resolve('e1', 'u1', 'raised the budget');
+        expect(inbox.escalationResolved).toHaveBeenCalledWith({
+            escalationId: 'e1',
+            resolvedByUserId: 'u1',
+            note: 'raised the budget',
+        });
+    });
+
+    it('an AGENT-proposed resolution is stored as such and never resumes the run', async () => {
+        const inbox = { escalationResolved: jest.fn().mockResolvedValue(undefined) };
+        const svc = new AgentEscalationService(repository, undefined, inbox as never);
+        await svc.resolve('e1', 'u1', 'all good, continue', {
+            resolvedBy: 'agent',
+            agentId: 'agent-7',
+        });
+        const stored = repository.resolve.mock.calls[0][2] as string;
+        expect(stored).toMatch(/^\[Resolved on a proposal by agent agent-7; approved by the owner\]/);
+        expect(stored).toContain('all good, continue');
+        expect(inbox.escalationResolved).toHaveBeenCalledWith(
+            expect.objectContaining({ escalationId: 'e1', resolvedBy: 'agent' }),
+        );
+    });
+
     it('delegates scoped Task resolution without dropping the route binding', async () => {
         const scope = {
             tenantId: '11111111-1111-4111-8111-111111111111',

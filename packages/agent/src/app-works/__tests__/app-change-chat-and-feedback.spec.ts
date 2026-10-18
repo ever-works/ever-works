@@ -94,6 +94,20 @@ describe('request_app_change / get_app_change (APW-08 T26)', () => {
         expect(service.request).not.toHaveBeenCalled();
     });
 
+    it("refuses a Work the agent's owner can edit but does not OWN — a member's agent never launches the owner's", async () => {
+        const service = { request: jest.fn(), getChange: jest.fn(), listChanges: jest.fn() };
+        const tools = buildAppChangeTools({
+            agent: { id: 'm-agent', userId: 'member', permissions: { canCommitToRepo: true } as never },
+            service: service as never,
+            authorize: jest.fn(async () => work),
+        });
+        const result = await tools
+            .find((t) => t.name === 'request_app_change')!
+            .invoke({ workId: 'w1', request: 'Push my change' });
+        expect(result).toMatchObject({ code: 'not_owner' });
+        expect(service.request).not.toHaveBeenCalled();
+    });
+
     it('get_app_change returns the PR link', async () => {
         const { tools } = build({});
         await expect(tools[0].invoke({ workId: 'w1', taskId: 't1' })).resolves.toMatchObject({

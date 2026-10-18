@@ -33,6 +33,8 @@ export * from './agent-tool-grant-tools';
 export * from './skill-activation';
 export * from './credential-interpolation';
 export * from './credential-resolver';
+export * from './credential-allowlist';
+export * from './agent-protected-repo-paths';
 export * from './tool-credentials';
 
 export * from './policy.module';

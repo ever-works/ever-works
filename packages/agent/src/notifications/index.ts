@@ -6,3 +6,5 @@ export * from './default-inbound-email-dispatcher.service';
 export * from './core-event-catalogue';
 export * from './notification-choice';
 export * from './notification-email-sender.port';
+// Prompt-injection hardening — the trusted-sender rule for inbound email.
+export * from './inbound-email-trust';

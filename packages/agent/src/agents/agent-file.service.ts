@@ -166,7 +166,24 @@ export class AgentFileService {
         const prevHash = agent.contentHash ?? null;
         const updates = this.computeInlineUpdates(agent, name, body);
         const newHash = this.hashOf(updates, agent);
-        await this.agents.updateById(agent.id, { ...updates, contentHash: newHash });
+        if (expectedHash !== undefined) {
+            // Atomic compare-and-set on the hash the caller saw: a concurrent
+            // edit that landed between the read above and this write makes
+            // the update match nothing, and this caller is refused instead of
+            // silently overwriting the newer content (an owner-approved agent
+            // edit replayed over an owner's own later change included).
+            const applied = await this.agents.updateByIdIfContentHash(agent.id, expectedHash, {
+                ...updates,
+                contentHash: newHash,
+            });
+            if (!applied) {
+                throw new BadRequestException(
+                    `Agent file was modified elsewhere — reload and try again (etag mismatch).`,
+                );
+            }
+        } else {
+            await this.agents.updateById(agent.id, { ...updates, contentHash: newHash });
+        }
 
         // Activity row — captured before throwing if logger unavailable, so we
         // don't fail the write if telemetry is wedged.
@@ -196,6 +213,58 @@ export class AgentFileService {
         }
 
         return { newHash };
+    }
+
+    /**
+     * Prompt-injection hardening — run every check {@link write} would run on
+     * an AGENT-authored edit, without writing anything, and describe what the
+     * edit would change.
+     *
+     * The `editAgentFile` chat tool no longer writes: the five files are
+     * re-injected as trusted identity into every later run, so a single
+     * injected instruction that rewrote SOUL.md would persist forever. The
+     * tool calls this, files the full proposed body as an owner-approval
+     * proposal, and the approved body is written later through {@link write}
+     * with `expectedHash: baseHash` — so a file that changed in between is
+     * refused rather than overwritten by a stale proposal.
+     *
+     * Throws exactly what `write` would throw for the same input (bad name,
+     * over 64 KB, a secret in the body, a foreign agent, an etag mismatch).
+     */
+    async validateProposedWrite(args: {
+        userId: string;
+        agentId: string;
+        name: AgentFileName;
+        body: string;
+        expectedHash?: string;
+    }): Promise<{
+        baseHash: string;
+        agentSlug: string;
+        previousChars: number;
+        addedChars: number;
+        removedChars: number;
+        changed: boolean;
+    }> {
+        const { userId, agentId, name, body, expectedHash } = args;
+        this.assertValidName(name);
+        this.assertSize(body);
+        assertNoSecrets(body, `Agent file ${name}`);
+        const agent = await this.requireOwned(userId, agentId);
+        if (expectedHash !== undefined && (agent.contentHash ?? '') !== expectedHash) {
+            throw new BadRequestException(
+                `Agent file was modified elsewhere — reload and try again (etag mismatch).`,
+            );
+        }
+        const current = this.readInline(agent, name) ?? '';
+        const diff = this.makeDiffSummary(current, body);
+        return {
+            baseHash: agent.contentHash ?? '',
+            agentSlug: agent.slug,
+            previousChars: current.length,
+            addedChars: diff.addedChars,
+            removedChars: diff.removedChars,
+            changed: current !== body,
+        };
     }
 
     // ── helpers ───────────────────────────────────────────────────

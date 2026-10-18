@@ -239,6 +239,13 @@ describe('gc', () => {
  * and nothing the tree gained afterwards.
  */
 describe('judge before push (branchChanges + publishSha)', () => {
+	// Review of #2769: a judge-before-push caller refuses a provider that does
+	// not promise to publish exactly the judged commit.
+	it('declares that it publishes exactly the judged commit', () => {
+		expect(new SandboxWorkspacePlugin().publishesJudgedCommit).toBe(true);
+		expect(typeof new SandboxWorkspacePlugin().branchChanges).toBe('function');
+	});
+
 	const SPEC = '.works/works.yml';
 
 	/** Commit several files (creating their directories) onto origin/main. */

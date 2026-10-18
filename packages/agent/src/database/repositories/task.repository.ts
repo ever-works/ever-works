@@ -851,46 +851,63 @@ export class TaskRepository {
      * tasks across tenant boundaries.
      */
     async findFanoutCandidates(limit: number): Promise<Task[]> {
-        return this.repository
-            .createQueryBuilder('task')
-            .where('task.status = :status', { status: TaskStatus.TODO })
-            .andWhere('task.isRecurring = :recurring', { recurring: false })
-            .andWhere('task.scheduledAt IS NULL')
-            .andWhere('task.hiddenFromBoard = :hidden', { hidden: false })
-            .andWhere('task.goalId IS NULL')
-            .andWhere('task.parentRecurringTaskId IS NULL')
-            .andWhere('task.createdByType <> :fanoutIntegrationAuthor', {
-                fanoutIntegrationAuthor: 'integration',
-            })
-            .andWhere(
-                (qb: SelectQueryBuilder<Task>) => {
-                    // `entityId` is a varchar, `tasks.id` a uuid on Postgres: compare as text.
-                    const type = String(qb.connection.options.type);
-                    const taskId = `${qb.escape('task')}.${qb.escape('id')}`;
-                    const taskIdText =
-                        type === 'postgres'
-                            ? `CAST(${taskId} AS text)`
-                            : type === 'mysql'
-                              ? `CAST(${taskId} AS CHAR)`
-                              : taskId;
-                    const linked = qb
-                        .subQuery()
-                        .select('1')
-                        .from(ExternalRecordLink, 'fanout_link')
-                        .where('fanout_link.entityType = :fanoutLinkType')
-                        .andWhere(`fanout_link.entityId = ${taskIdText}`)
-                        .getQuery();
-                    return `NOT EXISTS ${linked}`;
-                },
-                { fanoutLinkType: 'task' },
-            )
-            .andWhere('task.startedAt IS NULL')
-            .andWhere('task.latestRunId IS NULL')
-            .orderBy('task.priority', 'ASC')
-            .addOrderBy('task.createdAt', 'ASC')
-            .addOrderBy('task.id', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('task')
+                .where('task.status = :status', { status: TaskStatus.TODO })
+                .andWhere('task.isRecurring = :recurring', { recurring: false })
+                .andWhere('task.scheduledAt IS NULL')
+                .andWhere('task.hiddenFromBoard = :hidden', { hidden: false })
+                .andWhere('task.goalId IS NULL')
+                .andWhere('task.parentRecurringTaskId IS NULL')
+                .andWhere('task.createdByType <> :fanoutIntegrationAuthor', {
+                    fanoutIntegrationAuthor: 'integration',
+                })
+                .andWhere(
+                    (qb: SelectQueryBuilder<Task>) => {
+                        // `entityId` is a varchar, `tasks.id` a uuid on Postgres: compare as text.
+                        const type = String(qb.connection.options.type);
+                        const taskId = `${qb.escape('task')}.${qb.escape('id')}`;
+                        const taskIdText =
+                            type === 'postgres'
+                                ? `CAST(${taskId} AS text)`
+                                : type === 'mysql'
+                                  ? `CAST(${taskId} AS CHAR)`
+                                  : taskId;
+                        const linked = qb
+                            .subQuery()
+                            .select('1')
+                            .from(ExternalRecordLink, 'fanout_link')
+                            .where('fanout_link.entityType = :fanoutLinkType')
+                            .andWhere(`fanout_link.entityId = ${taskIdText}`)
+                            .getQuery();
+                        return `NOT EXISTS ${linked}`;
+                    },
+                    { fanoutLinkType: 'task' },
+                )
+                .andWhere('task.startedAt IS NULL')
+                .andWhere('task.latestRunId IS NULL')
+                // Prompt-injection hardening — a Task filed from an untrusted email
+                // waits for its owner; the fan-out never starts it. Excluded IN the
+                // query, so held Tasks never use up the scan limit and starve the
+                // ones behind them (CodeRabbit on #2769). `labels` is `simple-json`,
+                // i.e. JSON text on every driver, so the quoted label is matched as
+                // text; the filter below re-checks the parsed array.
+                .andWhere('(task.labels IS NULL OR task.labels NOT LIKE :awaitingOwnerLabel)', {
+                    awaitingOwnerLabel: '%"awaiting-owner"%',
+                })
+                .orderBy('task.priority', 'ASC')
+                .addOrderBy('task.createdAt', 'ASC')
+                .addOrderBy('task.id', 'ASC')
+                .take(limit)
+                .getMany()
+                .then((rows) =>
+                    rows.filter(
+                        (row) =>
+                            !(Array.isArray(row.labels) && row.labels.includes('awaiting-owner')),
+                    ),
+                )
+        );
     }
 
     /**

@@ -220,10 +220,12 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
         expect(tools.some((tool) => tool.name.startsWith('mcp__'))).toBe(false);
     });
 
-    it('applies `{{cred.key}}` interpolation to MCP tool arguments', async () => {
-        // MCP servers are exactly the outbound calls credentials exist
-        // for — an unwrapped descriptor would forward the literal
-        // `{{cred.api_token}}` text to a third party.
+    it('never substitutes a `{{cred.key}}` into an MCP tool argument — refused before the call', async () => {
+        // Prompt-injection hardening: an MCP tool argument is free text sent to
+        // a third-party server, and its schema is the server's to write — so it
+        // can never be a credential slot. The literal reference is not sent
+        // either: the call is refused and nothing is resolved. (Connection
+        // auth headers have their own `{{cred.key}}` path.)
         const credentials = { resolve: jest.fn().mockResolvedValue(new Map()) };
         const invoke = jest.fn(async () => ({ ok: true }));
         const source = sourceReturning(mcpDescriptor('mcp__github__create_issue', invoke));
@@ -234,9 +236,10 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
         const tool = tools.find((entry) => entry.name === 'mcp__github__create_issue')!;
         const result = (await tool.invoke({ body: '{{cred.api_token}}' })) as { error?: string };
 
-        // Unresolvable → refused BEFORE the outbound call happens.
         expect(invoke).not.toHaveBeenCalled();
-        expect(result.error).toContain(`${ENV_CREDENTIAL_PREFIX}API_TOKEN`);
+        expect(credentials.resolve).not.toHaveBeenCalled();
+        expect(result.error).toMatch(/declared credential fields/);
+        expect(result.error).not.toContain(`${ENV_CREDENTIAL_PREFIX}API_TOKEN=`);
     });
 });
 

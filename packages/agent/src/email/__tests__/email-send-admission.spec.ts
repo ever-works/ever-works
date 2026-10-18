@@ -305,6 +305,11 @@ function buildSendPath(dailySendCap: number | null) {
     };
     const organizations = { findOne: jest.fn(async () => null) };
     const proposals = { findOne: jest.fn(async () => null) };
+    // `ada@example.com` is a known correspondent of the Agent, so the
+    // unknown-recipient review rule (prompt-injection hardening) does not hold
+    // the burst: this suite is about ceilings under concurrency.
+    (messages as unknown as { listCorrespondentAddresses: jest.Mock }).listCorrespondentAddresses =
+        jest.fn(async () => ['ada@example.com']);
     const policy = new EmailSendPolicyService(
         inboxes as never,
         messages,

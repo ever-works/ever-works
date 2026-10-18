@@ -1,6 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, MoreThan, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
+import {
+    In,
+    IsNull,
+    MoreThan,
+    MoreThanOrEqual,
+    Not,
+    Repository,
+    type FindOptionsWhere,
+} from 'typeorm';
 import type { EmailMessageStatus } from '@ever-works/contracts';
 import { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 import { EmailMessage, EmailMessageDirection } from '../../entities/email-message.entity';
@@ -443,6 +451,49 @@ export class EmailMessageRepository {
             });
         }
         return moved;
+    }
+
+    /**
+     * Prompt-injection hardening (agent email) — everyone one Agent of this
+     * owner has actually corresponded with: the senders of the mail it
+     * received, and the recipients of the mail it really SENT (`sentAt` set —
+     * a draft or a refused send is not correspondence). The newest `limit`
+     * messages are read; addresses are returned as stored (callers normalize).
+     */
+    async listCorrespondentAddresses(
+        userId: string,
+        agentId: string,
+        limit = 500,
+    ): Promise<string[]> {
+        const rows = await this.repository.find({
+            select: {
+                id: true,
+                direction: true,
+                from: true,
+                toAddresses: true,
+                ccAddresses: true,
+                bccAddresses: true,
+            },
+            where: [
+                { userId, agentId, direction: 'inbound' },
+                { userId, agentId, direction: 'outbound', sentAt: Not(IsNull()) },
+            ],
+            order: { createdAt: 'DESC' },
+            take: Math.max(1, Math.min(limit, 2_000)),
+        });
+        const out: string[] = [];
+        for (const row of rows) {
+            if (row.direction === 'inbound') {
+                if (row.from) out.push(row.from);
+                continue;
+            }
+            out.push(
+                ...(row.toAddresses ?? []),
+                ...(row.ccAddresses ?? []),
+                ...(row.bccAddresses ?? []),
+            );
+        }
+        return out;
     }
 
     private sentWindowWhere(

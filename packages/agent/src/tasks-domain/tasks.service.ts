@@ -80,6 +80,7 @@ import {
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
 
 /**
  * Options of {@link TasksService.create} (T17a). `withinCreate` runs right
@@ -1760,6 +1761,13 @@ export class TasksService {
             opts.agentId ?? null,
             ownershipScope,
         );
+        // Prompt-injection hardening — pressing Run is the owner starting the
+        // Task, so a binding `awaiting-owner` label (an untrusted email's
+        // Task) is cleared; the run's own transitions then go through.
+        if (isAwaitingOwner(task)) {
+            await this.tasks.updateById(task.id, { labels: withoutAwaitingOwner(task.labels) });
+            task.labels = withoutAwaitingOwner(task.labels);
+        }
 
         if (this.agentRuns) {
             const inFlight = await this.agentRuns

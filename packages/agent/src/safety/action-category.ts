@@ -81,6 +81,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     commentOnTask: 'write.internal',
     transitionTask: 'write.internal',
     submitTaskReview: 'write.internal',
+    // Both only ever FILE an owner-approval proposal (prompt-injection
+    // hardening); the proposal is the gate. Kept at `write.internal` so a
+    // held `access.grant` rung cannot stop the proposal from being filed.
     editAgentFile: 'write.internal',
     resolve_escalation: 'write.internal',
     review_pull_request: 'write.internal',

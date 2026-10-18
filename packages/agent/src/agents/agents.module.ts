@@ -47,6 +47,7 @@ import { RunSteeringService } from './run-steering.service';
 import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { AgentEscalationService } from './agent-escalation.service';
+import { AgentProposalExecutionListener } from './agent-proposal-execution.listener';
 import { EscalationConfidenceService } from './escalation-confidence';
 import { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
 import { WorkflowAiDecisionAdapter } from './workflow-ai-decision.adapter';
@@ -194,6 +195,10 @@ import { FacadesModule } from '../facades/facades.module';
         AgentToolService,
         // Judgment layer G3 - the one place a give-up becomes a record.
         AgentEscalationService,
+        // Prompt-injection hardening - applies an owner-APPROVED agent
+        // proposal (`resolve_escalation`, `editAgentFile`) once a person
+        // decides it in the approvals queue. Nothing else applies them.
+        AgentProposalExecutionListener,
         // Judgment layer G3 - scores the confidence column on every
         // escalation (AI judge through the AI facade, deterministic
         // table otherwise). FacadesModule is already imported above, so

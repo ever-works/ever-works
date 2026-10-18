@@ -256,6 +256,24 @@ describe('TaskWorkspaceService.describeFleetWorkspace — mounts', () => {
         });
     });
 
+    // CodeRabbit on #2769: the node pushes a writable mount's Task branch
+    // before any pull request exists — that branch may never be the mount's
+    // own base, or the push would update the base directly.
+    it('refuses a writable mount whose base branch IS the Task branch, naming it', async () => {
+        attachments.listEnabledForAgentWithRepos.mockResolvedValue([
+            attachment({ defaultBranch: 'task/tsk-9-task1' }),
+        ]);
+        await expect(
+            build().describeFleetWorkspace({
+                task: makeTask(),
+                userId: 'user-1',
+                agentId: 'agent-1',
+            }),
+        ).rejects.toThrow(
+            /mounted repository ever-works\/directory-web-template cannot be written on branch 'task\/tsk-9-task1'/,
+        );
+    });
+
     it('skips an attachment that is the primary repository instead of mounting it twice', async () => {
         attachments.listEnabledForAgentWithRepos.mockResolvedValue([
             attachment({ url: 'https://github.com/Ever-Works/Ever-Works.git', name: 'platform' }),
@@ -494,6 +512,32 @@ describe('TaskWorkspaceService.finalizeMountPush', () => {
             ['ever-works/workspace', 'pr-open'],
             ['ever-works/directory-web-template', 'pr-open'],
         ]);
+    });
+
+    // CodeRabbit on #2769: the always-protected-path floor runs on a mounted
+    // repository too, before any pull request is opened or re-recorded.
+    it('opens NO pull request for a mount whose pushed branch changes a workflow file', async () => {
+        const getCompareDiff = jest.fn().mockResolvedValue({
+            files: [{ path: '.github/workflows/deploy.yml', status: 'added' }],
+            truncated: false,
+        });
+        Object.assign(gitFacade, { getCompareDiff });
+
+        const outcome = await build().finalizeMountPush(base());
+
+        expect(outcome).toMatchObject({
+            repositoryId: 'ever-works/directory-web-template',
+            outcome: 'blocked-by-guard',
+        });
+        expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+        expect(getCompareDiff).toHaveBeenCalledWith(
+            'ever-works',
+            'directory-web-template',
+            'develop',
+            'task/tsk-9-task1',
+            { maxFiles: 300 },
+            { userId: 'user-1', providerId: 'github', workId: 'work-1' },
+        );
     });
 
     it('re-records an already-open pull request on a re-run instead of asking the provider for another', async () => {

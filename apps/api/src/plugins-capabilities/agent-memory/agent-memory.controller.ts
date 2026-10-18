@@ -35,6 +35,27 @@ import {
  */
 const OWNER_METADATA_KEY = 'ownerUserId';
 
+/** RFC 4122-shaped id (any version) — a caller-supplied project that may name a Work. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Prompt-injection hardening — the agent-memory backend partitions ONLY by
+ * `project`, so the project a request reads or writes is decided here,
+ * server-side, never by the request:
+ *
+ *  - with a `workId` — that Work's id (the same partition `AgentRunService`
+ *    opens every run's memory session in), after VIEW access for a read and
+ *    EDIT access for a write;
+ *  - without one — a caller `projectId` is honoured only when it is the id of
+ *    a Work the caller may view (read) / edit (write); anything else (absent,
+ *    a slug, a foreign Work, an arbitrary string) falls back to the project
+ *    the operator configured for the plugin (`settings.project`, else the
+ *    plugin default) — exactly what an install without a `workId` used before.
+ *
+ * Reads and writes resolve through the SAME function, so a memory saved for a
+ * Work is found again by a search for that Work.
+ */
+
 /**
  * REST surface for the `agent-memory` capability (follow-up to PR #1073
  * + #1081 + #1084). Lets the web admin UI list, search, save, and
@@ -42,7 +63,9 @@ const OWNER_METADATA_KEY = 'ownerUserId';
  *
  * All endpoints are JWT-protected. Reads enforce
  * `WorkOwnershipService.ensureCanView` when a `workId` is supplied so users
- * can't read another user's Work memory. Mutating, id-addressed handlers
+ * can't read another user's Work memory. Writes (`save`, `openSession`)
+ * require EDIT access and land in a server-derived project (the Work's id, or
+ * a project private to the caller) — never a caller-chosen or shared one. Mutating, id-addressed handlers
  * (`closeSession` / `deleteEntry`) require `ensureCanEdit` for Work-scoped
  * calls AND verify the target session/entry's `ownerUserId` stamp so an
  * omitted or foreign `workId` cannot be used to mutate another user's
@@ -95,13 +118,17 @@ export class AgentMemoryController {
     @ApiOperation({ summary: 'Open a memory session' })
     @ApiResponse({ status: 201, description: 'Opened session' })
     async openSession(@CurrentUser() auth: AuthenticatedUser, @Body() dto: OpenSessionDto) {
-        await this.assertWorkAccess(auth, dto.workId);
+        // Opening a session is a WRITE into a project: edit access with a
+        // `workId`, and a server-derived project (see `resolveProject`).
+        const projectId = await this.resolveProject(auth, dto.workId, dto.projectId, 'edit');
         // Codex P2 on PR #1086 — the facade's openSession takes
         // `metadata` but the plugin reads `projectId` separately. Fold
-        // a caller-supplied projectId into metadata so the session
-        // actually scopes to the requested namespace.
+        // the resolved projectId into metadata so the session actually
+        // scopes to it (a caller-supplied `metadata.projectId` is overwritten).
         const metadata: Record<string, unknown> = { ...(dto.metadata ?? {}) };
-        if (dto.projectId) metadata.projectId = dto.projectId;
+        // A caller-supplied `metadata.projectId` never chooses the partition.
+        delete metadata.projectId;
+        if (projectId) metadata.projectId = projectId;
         // Security (EW-711 #29): stamp the creating user onto the session so
         // close/delete can verify per-session ownership. The agent-memory
         // backend partitions only by `project` (shared across users), so the
@@ -113,7 +140,7 @@ export class AgentMemoryController {
         try {
             const session = await this.agentMemory.openSession(
                 metadata,
-                this.facadeOptions(auth, dto.workId),
+                this.facadeOptions(auth, projectId),
             );
             return { status: 'success', session };
         } catch (error) {
@@ -155,11 +182,11 @@ export class AgentMemoryController {
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListSessionsQueryDto,
     ) {
-        await this.assertWorkAccess(auth, query.workId);
+        const projectId = await this.resolveProject(auth, query.workId, query.projectId, 'view');
         try {
             const sessions = await this.agentMemory.listSessions(
-                { limit: query.limit, projectId: query.projectId },
-                this.facadeOptions(auth, query.workId),
+                { limit: query.limit, projectId },
+                this.facadeOptions(auth, projectId),
             );
             return { status: 'success', sessions };
         } catch (error) {
@@ -171,7 +198,13 @@ export class AgentMemoryController {
     @ApiOperation({ summary: 'Persist a memory observation' })
     @ApiResponse({ status: 201, description: 'Saved record' })
     async save(@CurrentUser() auth: AuthenticatedUser, @Body() dto: SaveMemoryDto) {
-        await this.assertWorkAccess(auth, dto.workId);
+        // Prompt-injection hardening: saving is a WRITE that every later
+        // agent run in that project reads back as memory. With a `workId` it
+        // needs EDIT access, and the project is derived server-side — a
+        // viewer (or a chat tool steered by injected text) can no longer
+        // plant observations in a Work it may only read, nor pick any other
+        // project by name.
+        const projectId = await this.resolveProject(auth, dto.workId, dto.projectId, 'edit');
         // Security (EW-711 #29): stamp the creating user onto the record so
         // `deleteEntry` can verify per-entry ownership. Same rationale as
         // `openSession` — the backend is project-scoped, not user-scoped, so
@@ -189,9 +222,9 @@ export class AgentMemoryController {
                     tags: dto.tags,
                     metadata,
                     sessionId: dto.sessionId,
-                    projectId: dto.projectId,
+                    projectId,
                 },
-                this.facadeOptions(auth, dto.workId),
+                this.facadeOptions(auth, projectId),
             );
             return { status: 'success', record };
         } catch (error) {
@@ -203,7 +236,7 @@ export class AgentMemoryController {
     @ApiOperation({ summary: 'Search persisted memories' })
     @ApiResponse({ status: 200, description: 'Search response' })
     async search(@CurrentUser() auth: AuthenticatedUser, @Body() dto: SearchMemoryDto) {
-        await this.assertWorkAccess(auth, dto.workId);
+        const projectId = await this.resolveProject(auth, dto.workId, dto.projectId, 'view');
         try {
             const response = await this.agentMemory.searchMemory(
                 {
@@ -211,9 +244,9 @@ export class AgentMemoryController {
                     limit: dto.limit,
                     tags: dto.tags,
                     sessionId: dto.sessionId,
-                    projectId: dto.projectId,
+                    projectId,
                 },
-                this.facadeOptions(auth, dto.workId),
+                this.facadeOptions(auth, projectId),
             );
             return { status: 'success', ...response };
         } catch (error) {
@@ -225,17 +258,17 @@ export class AgentMemoryController {
     @ApiOperation({ summary: 'Build a context payload for a prompt' })
     @ApiResponse({ status: 200, description: 'Context payload' })
     async context(@CurrentUser() auth: AuthenticatedUser, @Body() dto: BuildContextDto) {
-        await this.assertWorkAccess(auth, dto.workId);
+        const projectId = await this.resolveProject(auth, dto.workId, dto.projectId, 'view');
         try {
             const context = await this.agentMemory.buildContext(
                 {
                     query: dto.query,
                     purpose: dto.purpose,
                     sessionId: dto.sessionId,
-                    projectId: dto.projectId,
+                    projectId,
                     maxTokens: dto.maxTokens,
                 },
-                this.facadeOptions(auth, dto.workId),
+                this.facadeOptions(auth, projectId),
             );
             return { status: 'success', context };
         } catch (error) {
@@ -269,6 +302,48 @@ export class AgentMemoryController {
     }
 
     // ── helpers ────────────────────────────────────────────────────────
+
+    /**
+     * The project a request reads or writes — see the comment at the top of
+     * this file. `undefined` means "the operator-configured / plugin default
+     * project", i.e. the facade sends no `projectId` and the plugin resolves
+     * `settings.project` as it always has.
+     *
+     * The Work id (never its slug) is the partition: slugs are not unique
+     * across accounts, and the agent run loop keys a Work's memory by its id.
+     */
+    private async resolveProject(
+        auth: AuthenticatedUser,
+        workId: string | undefined,
+        requested: string | undefined,
+        level: 'view' | 'edit',
+    ): Promise<string | undefined> {
+        const ensure = (id: string) =>
+            level === 'edit'
+                ? this.ownership.ensureCanEdit(id, auth.userId)
+                : this.ownership.ensureCanView(id, auth.userId);
+        if (workId) {
+            const access = await ensure(workId);
+            return access?.work?.id ?? workId;
+        }
+        const candidate = typeof requested === 'string' ? requested.trim() : '';
+        if (candidate && UUID_PATTERN.test(candidate)) {
+            try {
+                const access = await ensure(candidate);
+                return access?.work?.id ?? candidate;
+            } catch (error) {
+                // Not a Work the caller may reach (the ownership service's own
+                // 404 / 403) — fall through to the default. Anything else (its
+                // repository is down…) is NOT "no such Work": rethrown, so a
+                // save never lands in the default project by accident
+                // (CodeRabbit on #2769).
+                if (!(error instanceof NotFoundException || error instanceof ForbiddenException)) {
+                    throw error;
+                }
+            }
+        }
+        return undefined;
+    }
 
     /**
      * Enforce ownership when the caller scopes the request to a Work.
@@ -389,6 +464,12 @@ export class AgentMemoryController {
         return error instanceof Error && error.message.includes('does not support');
     }
 
+    /**
+     * Facade options for one call. The project-resolving handlers pass the
+     * RESOLVED project — always an authorised Work's id when set (from
+     * `workId`, or a `projectId` naming a Work) — so that Work's provider and
+     * settings serve the call the memory lands in (CodeRabbit on #2769).
+     */
     private facadeOptions(auth: AuthenticatedUser, workId?: string): FacadeOptions {
         return {
             userId: auth.userId,

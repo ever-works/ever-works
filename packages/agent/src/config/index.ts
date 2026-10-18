@@ -2572,6 +2572,43 @@ export const config = {
             const raw = (process.env.EMAIL_DEFAULT_AGENT_SEND_MODE || '').trim().toLowerCase();
             return raw === 'draft-review' ? 'draft-review' : 'auto-send';
         },
+        /**
+         * Prompt-injection hardening — `true` only when the operator wrote
+         * `EMAIL_DEFAULT_AGENT_SEND_MODE=auto-send` explicitly. The platform
+         * default (unset) still resolves to `auto-send` above, but only an
+         * EXPLICIT setting lets an Agent with no inbox / organization mode
+         * mail a recipient it has never corresponded with without review.
+         */
+        isDefaultAgentModeExplicitAutoSend(): boolean {
+            return (
+                (process.env.EMAIL_DEFAULT_AGENT_SEND_MODE || '').trim().toLowerCase() ===
+                'auto-send'
+            );
+        },
+        /**
+         * Prompt-injection hardening — what happens when an Agent on the
+         * platform-default `auto-send` mode mails someone who is NOT a known
+         * correspondent (never mailed it, never received its mail, not one of
+         * the owner's own addresses, not on the allowlist below):
+         * `draft-review` (default) holds that message for the owner;
+         * `auto-send` (`EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE=auto-send`) restores
+         * the old behaviour deployment-wide.
+         */
+        getUnknownRecipientMode(): AgentInboxMode {
+            const raw = (process.env.EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE || '').trim().toLowerCase();
+            return raw === 'auto-send' ? 'auto-send' : 'draft-review';
+        },
+        /**
+         * Recipients an Agent may always mail without review on the platform
+         * default: `EMAIL_AGENT_AUTO_SEND_ALLOWLIST`, comma-separated full
+         * addresses (`ops@acme.test`) or domains (`@acme.test`). Lower-cased.
+         */
+        getAgentAutoSendAllowlist(): string[] {
+            return (process.env.EMAIL_AGENT_AUTO_SEND_ALLOWLIST || '')
+                .split(',')
+                .map((entry) => entry.trim().toLowerCase())
+                .filter((entry) => entry.length > 0);
+        },
     },
 
     /**

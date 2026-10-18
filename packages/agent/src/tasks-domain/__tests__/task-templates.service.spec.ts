@@ -322,6 +322,36 @@ describe('TaskTemplatesService', () => {
             expect(parent.branchRef).toBe('feature/ship-x');
         });
 
+        it.each(['develop', 'main', 'Master', 'refs/heads/stage'])(
+            'refuses a protected branchName (%s) before anything is created',
+            async (branchName) => {
+                const { saved } = arm();
+                await expect(
+                    svc.instantiateTemplate('u1', 'tpl-1', { title: 'T', branchName }),
+                ).rejects.toThrow(/protected branch/);
+                expect(saved).toHaveLength(0);
+            },
+        );
+
+        // CodeRabbit on #2769: the Work's configured base branch is refused
+        // at creation too, not only when the Task runs.
+        it("refuses the Work's own base branch as branchName before anything is created", async () => {
+            const { saved } = arm();
+            works.findById.mockResolvedValue({
+                id: 'work-1',
+                userId: 'u1',
+                taskIsolationBaseBranch: 'trunk',
+            });
+            await expect(
+                svc.instantiateTemplate('u1', 'tpl-1', {
+                    title: 'T',
+                    workId: 'work-1',
+                    branchName: 'Trunk',
+                }),
+            ).rejects.toThrow(/this Work's base branch/);
+            expect(saved).toHaveLength(0);
+        });
+
         it('404s on a foreign template id', async () => {
             templates.findByIdAndUser.mockResolvedValue(null);
             await expect(

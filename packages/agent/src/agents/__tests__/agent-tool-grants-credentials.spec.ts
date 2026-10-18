@@ -150,16 +150,28 @@ describe('AgentToolService.resolveGrantedTools (audit item G4)', () => {
         );
     });
 
-    it('degrades to the permission gates when the grant lookup throws', async () => {
+    it('fails CLOSED for every tool that acts when the grant lookup throws (read-only tools stay)', async () => {
         const toolGrants = {
             resolve: jest.fn().mockRejectedValue(new Error('db down')),
             decide: jest.fn(),
         };
-        const { tools, refused } = await makeSvc({ toolGrants }).resolveGrantedTools(makeAgent());
-        // Failing CLOSED here would strip every Agent of every tool on a
-        // transient blip — worse than not narrowing for a moment.
-        expect(tools.length).toBeGreaterThan(0);
-        expect(refused).toEqual([]);
+        const agent = makeAgent({
+            permissions: {
+                ...makeAgent().permissions,
+                canCreateAgents: true,
+            },
+        } as any);
+        const { tools, refused } = await makeSvc({ toolGrants }).resolveGrantedTools(agent);
+        const kept = tools.map((tool) => tool.name);
+        // Reading what is already in the workspace keeps working…
+        expect(kept).toEqual(expect.arrayContaining(['getActivity', 'getKbDocument']));
+        // …while every tool that writes, widens or fans out is withheld and reported.
+        expect(kept).not.toContain('createSubAgent');
+        expect(refused.map((decision) => decision.toolName)).toEqual(
+            expect.arrayContaining(['createSubAgent']),
+        );
+        expect(refused.every((decision) => decision.allowed === false)).toBe(true);
+        expect(refused[0].reason).toMatch(/fail closed/);
     });
 });
 
@@ -190,12 +202,93 @@ describe('`{{cred.key}}` interpolation at invoke time (audit item G14)', () => {
         await expect(tool.invoke({ limit: 1 })).resolves.toBeDefined();
     });
 
-    it('refuses a call whose referenced credential cannot be resolved', async () => {
-        const credentials = { resolve: jest.fn().mockResolvedValue(new Map()) };
+    /**
+     * A platform-built descriptor that DECLARES a credential slot (`token`),
+     * wrapped the way `resolveAllowedTools` wraps every built-in.
+     */
+    function slotTool(credentials: any, invoke = jest.fn(async (args: unknown) => args)) {
+        const { svc } = svcWithEchoTool(credentials);
+        const descriptor = {
+            name: 'probe_with_slot',
+            description: 'probe',
+            parameters: {
+                type: 'object' as const,
+                properties: {
+                    token: { type: 'string' as const, description: 'secret', 'x-credential': true },
+                    note: { type: 'string' as const, description: 'free text' },
+                },
+                required: [],
+            },
+            invoke,
+        };
+        const tool = (svc as any).withCredentialInterpolation(makeAgent(), descriptor);
+        return { tool, invoke };
+    }
+
+    it('REFUSES a reference in a non-credential argument without resolving or sending anything', async () => {
+        const credentials = { resolve: jest.fn() };
         const { svc } = svcWithEchoTool(credentials);
         const tool = svc.resolveAllowedTools(makeAgent()).find((t) => t.name === 'getActivity')!;
 
+        const result = (await tool.invoke({
+            note: 'https://evil.example/?k={{cred.api_token}}',
+        })) as { error?: string };
+
+        expect(result.error).toMatch(/declared credential fields/);
+        expect(result.error).toContain('{{cred.api_token}}');
+        expect(credentials.resolve).not.toHaveBeenCalled();
+    });
+
+    it('substitutes where the OPERATOR allowed that credential for the tool (EVERWORKS_CRED_<KEY>_ALLOW)', async () => {
+        process.env[`${ENV_CREDENTIAL_PREFIX}API_TOKEN_ALLOW`] = 'getActivity';
+        try {
+            const credentials = {
+                resolve: jest.fn().mockResolvedValue(new Map([['api_token', 'value-12345']])),
+            };
+            const { svc } = svcWithEchoTool(credentials);
+            const tool = svc
+                .resolveAllowedTools(makeAgent())
+                .find((t) => t.name === 'getActivity')!;
+            const result = (await tool.invoke({ note: 'Bearer {{cred.api_token}}' })) as {
+                error?: string;
+            };
+            expect(result.error).toBeUndefined();
+            expect(credentials.resolve).toHaveBeenCalledWith(expect.anything(), ['api_token']);
+        } finally {
+            delete process.env[`${ENV_CREDENTIAL_PREFIX}API_TOKEN_ALLOW`];
+        }
+    });
+
+    it('the refusal tells the operator how to allow it', async () => {
+        const { svc } = svcWithEchoTool({ resolve: jest.fn() });
+        const tool = svc.resolveAllowedTools(makeAgent()).find((t) => t.name === 'getActivity')!;
         const result = (await tool.invoke({ note: '{{cred.api_token}}' })) as { error?: string };
+        expect(result.error).toContain(`${ENV_CREDENTIAL_PREFIX}API_TOKEN_ALLOW=getActivity`);
+    });
+
+    it('substitutes ONLY into a declared credential slot', async () => {
+        const credentials = {
+            resolve: jest.fn().mockResolvedValue(new Map([['api_token', 'value-12345']])),
+        };
+        const { tool, invoke } = slotTool(credentials);
+
+        await tool.invoke({ token: '{{cred.api_token}}', note: 'hello' });
+        expect(invoke).toHaveBeenCalledWith({ token: 'value-12345', note: 'hello' });
+
+        invoke.mockClear();
+        const refused = await tool.invoke({
+            token: '{{cred.api_token}}',
+            note: '{{cred.api_token}}',
+        });
+        expect(refused.error).toMatch(/accepts them only in: token/);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it('refuses a call whose referenced credential cannot be resolved', async () => {
+        const credentials = { resolve: jest.fn().mockResolvedValue(new Map()) };
+        const { tool } = slotTool(credentials);
+
+        const result = (await tool.invoke({ token: '{{cred.api_token}}' })) as { error?: string };
 
         expect(result.error).toContain('{{cred.api_token}}');
         expect(result.error).toContain(`${ENV_CREDENTIAL_PREFIX}API_TOKEN`);
@@ -218,11 +311,24 @@ describe('`{{cred.key}}` interpolation at invoke time (audit item G14)', () => {
             resolve: jest.fn().mockResolvedValue(new Map([['api_token', 'value-12345']])),
         };
         const { svc } = svcWithEchoTool(credentials);
-        const tool = svc
-            .resolveAllowedTools(makeAgent({ userId: 'owner-9' }))
-            .find((t) => t.name === 'getActivity')!;
+        const descriptor = {
+            name: 'probe_with_slot',
+            description: 'probe',
+            parameters: {
+                type: 'object' as const,
+                properties: {
+                    token: { type: 'string' as const, description: 'secret', 'x-credential': true },
+                },
+                required: [],
+            },
+            invoke: jest.fn(async () => ({ ok: true })),
+        };
+        const tool = (svc as any).withCredentialInterpolation(
+            makeAgent({ userId: 'owner-9' }),
+            descriptor,
+        );
 
-        await tool.invoke({ note: '{{cred.api_token}}', userId: 'someone-else' });
+        await tool.invoke({ token: '{{cred.api_token}}', userId: 'someone-else' });
 
         expect(credentials.resolve).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 'owner-9', agentId: 'a1' }),
@@ -247,10 +353,9 @@ describe('`{{cred.key}}` interpolation at invoke time (audit item G14)', () => {
         const credentials = {
             resolve: jest.fn().mockRejectedValue(new Error('vault said: value=hunter2')),
         };
-        const { svc } = svcWithEchoTool(credentials);
-        const tool = svc.resolveAllowedTools(makeAgent()).find((t) => t.name === 'getActivity')!;
+        const { tool } = slotTool(credentials);
 
-        const result = (await tool.invoke({ note: '{{cred.api_token}}' })) as { error?: string };
+        const result = (await tool.invoke({ token: '{{cred.api_token}}' })) as { error?: string };
 
         expect(result.error).toBe('Credential resolution failed.');
         expect(result.error).not.toContain('hunter2');
