@@ -39,6 +39,8 @@ Options:
   --add-dir <directories...>        Additional directories to allow tool access to
   --mcp-config <configs...>         Load MCP servers from JSON files or strings
   --strict-mcp-config               Only use MCP servers from --mcp-config
+  --setting-sources <sources>       Comma-separated list of setting sources to load (user, project, local).
+  --settings <file-or-json>         Path to a settings JSON file or a JSON string to load additional settings from
   --allowedTools, --allowed-tools <tools...>  Comma or space-separated list of tool names to allow
   --dangerously-skip-permissions    Bypass all permission checks
   --verbose                         Override verbose mode setting from config
@@ -98,6 +100,29 @@ describe('judgeModelCliHelp', () => {
 		expect(compat.unsupportedOptionalFlags).toEqual([]);
 		expect(compat.missingConditionalFlags).toEqual([]);
 		expect(compat.supportedFlags).not.toBeNull();
+	});
+
+	it('control 17: a build without --restricted is still compatible, and says what an upgrade buys', () => {
+		const without = judgeModelCliHelp('claude-code', '/bin/claude', '2.1.3', CLAUDE_HELP);
+		expect(isModelCliCompatible(without)).toBe(true);
+		expect(without.missingHardeningFlags).toEqual(['--restricted']);
+		const withIt = judgeModelCliHelp(
+			'claude-code',
+			'/bin/claude',
+			'2.1.302',
+			`${CLAUDE_HELP}  --restricted                      Restricted mode\n`
+		);
+		expect(withIt.missingHardeningFlags).toEqual([]);
+		expect(withIt.supportedFlags?.has('--restricted')).toBe(true);
+	});
+
+	it('control 17: a build that cannot isolate project settings is INCOMPATIBLE', () => {
+		const help = CLAUDE_HELP.split('\n')
+			.filter((line) => !line.includes('--setting-sources'))
+			.join('\n');
+		const compat = judgeModelCliHelp('claude-code', '/bin/claude', '1.0.0', help);
+		expect(isModelCliCompatible(compat)).toBe(false);
+		expect(compat.missingRequiredFlags).toEqual(['--setting-sources']);
 	});
 
 	it('names the optional flags a build no longer advertises', () => {

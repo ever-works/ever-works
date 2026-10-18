@@ -52,6 +52,7 @@ ever-works-node status
 ever-works-node capabilities
 ever-works-node doctor [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--offline] [--json]
 ever-works-node gc [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--dry-run] [--offline]
+ever-works-node policy [--allow-skip-permissions on|off] [--allow-shell-commands on|off] [--restricted-mode on|off]
 ```
 
 - **`enroll`** consumes a one-time token from the platform's Fleet page (`POST /api/fleet/enroll`)
@@ -70,6 +71,13 @@ ever-works-node gc [--workspace-root <dir>] [--max-age <days>] [--max-count <n>]
   (`POST /api/fleet/pause`, so the scheduler stops offering work) _and_ records the intent locally,
   so a service restart comes back paused. A paused node keeps heartbeating: a drained machine that
   vanishes from Fleet is indistinguishable from a dead one.
+- **`policy`** shows or changes this machine's **local execution policy** — what a platform job may
+  make the PC do, decided here and never by the platform. Both switches are **off** by default:
+  `--allow-skip-permissions` (run the model CLI with its permission checks off) and
+  `--allow-shell-commands` (run a job's setup, command steps and acceptance checks, and lease
+  `acceptance-checks` jobs — repository code, after a model step possibly code the model wrote).
+  `--restricted-mode` (default **on**) adds Claude Code's `--restricted` when supported. A job that
+  needs a switch that is off is refused before anything is provisioned, naming the switch. Restart the service after a change. See the fleet session trust model, control 18.
 - **`unenroll`** retires the machine — `POST /api/fleet/unenroll` deletes the registration, then the
   local credential is erased. The local erase happens **even if the API call fails**: a
   decommissioned laptop holding a live fleet secret is the worse outcome.

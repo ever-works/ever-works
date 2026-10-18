@@ -297,20 +297,45 @@ Check subprocesses get an environment built **from scratch**, never the inherite
 
 `ever-works-node` is the headless node: a CLI and a long-running service. It enrolls this machine, keeps it visible in Fleet with a heartbeat, and — only when you ask for it with `--work` — leases and executes platform work on it.
 
-| Command                                                  | What it does                                                                                                                        |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `ever-works-node enroll --api-url <url> --token <token>` | Consumes the one-time token from **Settings → Fleet** and writes the local config; the credential goes to the OS keychain.          |
-| `ever-works-node start [--work] [-c <count>]`            | Runs the heartbeat loop until `SIGINT`/`SIGTERM`. With `--work`, also runs the worker host: lease → execute → report.               |
-| `ever-works-node pause` / `resume`                       | Drain and undrain this machine. Pausing stops leasing immediately and lets in-flight jobs finish and report — it is not a kill.     |
-| `ever-works-node unenroll`                               | Retires the machine: deletes the platform registration, then erases the local credential.                                           |
-| `ever-works-node status`                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
-| `ever-works-node capabilities`                           | Prints the tags this machine would report, without enrolling.                                                                       |
-| `ever-works-node clear-quarantine`                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
-| `ever-works-node doctor [--json]`                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
+| Command                                                                                                                  | What it does                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `ever-works-node enroll --api-url <url> --token <token>`                                                                 | Consumes the one-time token from **Settings → Fleet** and writes the local config; the credential goes to the OS keychain.          |
+| `ever-works-node start [--work] [-c <count>]`                                                                            | Runs the heartbeat loop until `SIGINT`/`SIGTERM`. With `--work`, also runs the worker host: lease → execute → report.               |
+| `ever-works-node pause` / `resume`                                                                                       | Drain and undrain this machine. Pausing stops leasing immediately and lets in-flight jobs finish and report — it is not a kill.     |
+| `ever-works-node unenroll`                                                                                               | Retires the machine: deletes the platform registration, then erases the local credential.                                           |
+| `ever-works-node status`                                                                                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
+| `ever-works-node capabilities`                                                                                           | Prints the tags this machine would report, without enrolling.                                                                       |
+| `ever-works-node clear-quarantine`                                                                                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
+| `ever-works-node doctor [--json]`                                                                                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
+| `ever-works-node policy [--allow-skip-permissions on\|off] [--allow-shell-commands on\|off] [--restricted-mode on\|off]` | Shows or changes this machine's **local execution policy** (below). Local only — the platform has no way to change it.              |
 
 `--work` is opt-in on purpose: **enrolling a machine and letting it run the owner's commands are two different consents.** A paused node keeps heartbeating, too — a drained machine that vanished from Fleet would be indistinguishable from a dead one.
 
 Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, --concurrency <count>` (jobs at once), `--max-cpu <percent>` and `--max-memory <mb>` (refuse new work while the host is above a ceiling — the owner can lower all three from Fleet, see "Remote node limits"), `--capabilities <tags>` (offer a narrower set than was detected), and `--local-only` on `pause` / `resume` / `unenroll` for a machine being drained or decommissioned offline. Exit codes are `0` ok, `1` failure, `3` not enrolled — so provisioning scripts can branch on them.
+
+### The local execution policy (what jobs may make this machine do)
+
+A job is the platform's plan, and the platform is one more party a prompt injection, a compromised account, a leaked API key or a bug can speak through. Two things a job can ask for would turn "a model edits a worktree" into "anything can run as you", so **they are decided on the machine, never by the platform**, and both are **off** until you turn them on:
+
+| Switch                     | Off (default)                                                                                                                                                                                    | On                                                                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--allow-skip-permissions` | A job that asks to run the model CLI with its permission checks off (`--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox`) is refused before anything is provisioned. | Such jobs run. The model then has an unrestricted shell as your account, with no filesystem or network boundary (trust model gaps 12–13).                                                                      |
+| `--allow-shell-commands`   | A job carrying a setup phase, command steps or acceptance checks is refused, and `acceptance-checks` jobs are not leased at all. Model runs and the node's own Git work still run.               | The node runs those commands. They execute repository code as your account — after a model step, code the model may just have written (an edited `package.json` script or test file makes `pnpm test` run it). |
+
+A third switch, `--restricted-mode` (default **on**), starts Claude Code with `--restricted` when the installed CLI supports it: no command-running built-ins, no WebFetch, and no settings files at all — including your own `~/.claude/settings.json`. Turn it off only if this PC authenticates Claude Code through settings `env` / `apiKeyHelper` (Bedrock, Vertex, a proxy base URL).
+
+**Upgrading to 0.2.6:** with the default policy, a job that carries setup, command steps or acceptance checks now fails on this machine with a message naming `--allow-shell-commands`, and `acceptance-checks` jobs stay with nodes that allow them. Works with checks off (the default for repository Works) are unaffected. The desktop app has no policy screen yet: run `ever-works-node policy …` with `EVER_WORKS_NODE_CONFIG` set to the app's `node-config.json`.
+
+```bash
+ever-works-node policy                                  # show
+ever-works-node policy --allow-shell-commands on        # opt in on THIS machine
+ever-works-node policy --allow-shell-commands off       # back to the default
+ever-works-node policy --restricted-mode off             # only if the CLI authenticates via settings env/apiKeyHelper
+```
+
+Restart the node service after a change. `ever-works-node status` prints the policy on its `policy` line. A refused job fails with a message naming the switch, so the Task shows why it did not run on this machine.
+
+Every Claude Code fleet run is also started with `--setting-sources user --settings <hook-free file>` — the repository's own `.claude/settings.json` (its hooks, `env`, `apiKeyHelper`) never loads and no hook runs — plus `--restricted` when the installed Claude Code supports it. See [fleet session trust model](../specs/security/fleet-session-trust-model.md), controls 17–18.
 
 ### Enroll a machine end to end
 

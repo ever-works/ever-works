@@ -301,6 +301,12 @@ export class Task {
         status: string;
         conclusion?: string | null;
         detailsUrl?: string;
+        /**
+         * The app that reported the check (`GitPullRequestCheck.appSlug`) —
+         * the CI fix loop's poll safety net only re-offers a red check from
+         * an allow-listed app (F8). JSON column: no migration.
+         */
+        appSlug?: string | null;
     }> | null;
 
     // ── Merge approval (self-build slice AE, EW-805) ─────────────────

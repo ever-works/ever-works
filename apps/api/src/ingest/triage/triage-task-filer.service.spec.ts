@@ -49,7 +49,11 @@ import { GITHUB_ISSUE_EVENT_KIND } from '../github/github-issue-intake.service';
 import { INCIDENT_EVENT_KIND } from '../incidents/incident-source.types';
 import { JIRA_ISSUE_EVENT_KIND } from '../jira/jira-issue-bridge.service';
 import { TRIAGE_EVENT_KINDS, TRIAGE_LABEL } from './triage-task-body';
-import { TriageTaskFilerService } from './triage-task-filer.service';
+import {
+    TRIAGE_OUTSIDE_AUTHOR_LABEL,
+    TriageTaskFilerService,
+    isOutsiderGithubIssue,
+} from './triage-task-filer.service';
 
 const WORK = { id: 'work-1', userId: 'user-1', tenantId: 'tenant-1', organizationId: 'org-1' };
 const SCOPE = { tenantId: 'tenant-1', organizationId: 'org-1' };
@@ -78,6 +82,8 @@ const storedEvent = (overrides: Partial<IngestedEvent> = {}): IngestedEvent =>
             labels: ['bug'],
             assignees: [],
             author: 'reporter',
+            // A collaborator's issue — the shape that files a Task (F6).
+            authorAssociation: 'MEMBER',
             url: 'https://github.com/octo/site/issues/42',
             body: 'Steps to reproduce.',
         },
@@ -171,6 +177,181 @@ describe('TriageTaskFilerService', () => {
             ]),
         );
         expect(TRIAGE_EVENT_KINDS).toHaveLength(3);
+    });
+
+    /**
+     * F6 (2026-10-18): on a public repository anyone can open an issue, and
+     * every one used to become a Task in the owner's Work, filed AS the
+     * owner, with no rate limit. A stranger's issue is still ingested (the
+     * Activity row and the trigger matcher run upstream of this processor);
+     * it just files nothing unless the operator opts back in.
+     */
+    describe('who may file a Task from a GitHub issue (F6)', () => {
+        const original = process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+        afterEach(() => {
+            if (original === undefined) delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+            else process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS = original;
+        });
+
+        const byAssociation = (authorAssociation: string | undefined) =>
+            storedEvent({
+                payload: {
+                    ...storedEvent().payload,
+                    authorAssociation,
+                },
+            });
+
+        it.each(['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', undefined])(
+            '⭐ files NOTHING for an issue whose author is %s',
+            async (association) => {
+                delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+                const { filer, tasks, links, works } = build();
+                const result = await filer.process(byAssociation(association));
+                expect(result).toEqual({ outcome: 'skipped', reason: 'outsider-author' });
+                expect(tasks.create).not.toHaveBeenCalled();
+                expect(links.link).not.toHaveBeenCalled();
+                // Refused before anything else is spent on it.
+                expect(works.findById).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(['OWNER', 'MEMBER', 'COLLABORATOR', 'owner'])(
+            'files a Task for an issue whose author is %s',
+            async (association) => {
+                delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+                const { filer, tasks } = build();
+                const result = await filer.process(byAssociation(association));
+                expect(result).toEqual({ outcome: 'filed', taskId: 'task-1' });
+                expect(tasks.create.mock.calls[0][1].labels).not.toContain(
+                    TRIAGE_OUTSIDE_AUTHOR_LABEL,
+                );
+            },
+        );
+
+        it('a stranger’s REOPEN of a closed Task’s issue does not re-file either — it comments', async () => {
+            delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+            const { filer, tasks, links, taskRows, chat } = build();
+            links.find.mockResolvedValue({
+                id: 'link-1',
+                userId: 'user-1',
+                taskId: 'task-9',
+                source: 'github',
+                externalIssueId: 'octo/site#42',
+                lastIngestedEventId: 'row-0',
+                regressionCount: 0,
+            });
+            taskRows.findByIdAndUser.mockResolvedValue({
+                id: 'task-9',
+                slug: 'T-9',
+                status: 'done',
+                tenantId: 'tenant-1',
+                organizationId: 'org-1',
+            });
+            const result = await filer.process(
+                storedEvent({
+                    id: 'row-r1',
+                    payload: {
+                        ...storedEvent().payload,
+                        action: 'reopened',
+                        authorAssociation: 'NONE',
+                    },
+                }),
+            );
+            expect(tasks.create).not.toHaveBeenCalled();
+            expect(result).toMatchObject({ outcome: 'updated', taskId: 'task-9' });
+            expect(chat.post).toHaveBeenCalledTimes(1);
+        });
+
+        describe('trusted GitHub App bots (Dependabot, Renovate by default)', () => {
+            const originalBots = process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS;
+            afterEach(() => {
+                if (originalBots === undefined) delete process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS;
+                else process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS = originalBots;
+            });
+            // `null` = the payload carries no `authorType` at all.
+            const byBot = (author: string, authorType: string | null = 'Bot') =>
+                storedEvent({
+                    payload: {
+                        ...storedEvent().payload,
+                        author,
+                        ...(authorType === null ? {} : { authorType }),
+                        authorAssociation: 'NONE',
+                    },
+                });
+
+            it.each(['dependabot[bot]', 'renovate[bot]', 'Dependabot[bot]'])(
+                'files a Task for an issue opened by %s (type Bot), unlabelled',
+                async (login) => {
+                    delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+                    delete process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS;
+                    const { filer, tasks } = build();
+                    const result = await filer.process(byBot(login));
+                    expect(result).toEqual({ outcome: 'filed', taskId: 'task-1' });
+                    expect(tasks.create.mock.calls[0][1].labels).not.toContain(
+                        TRIAGE_OUTSIDE_AUTHOR_LABEL,
+                    );
+                },
+            );
+
+            it('never trusts the name without `type: Bot`, nor an unlisted bot', async () => {
+                delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+                delete process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS;
+                for (const event of [
+                    byBot('dependabot[bot]', 'User'),
+                    byBot('dependabot[bot]', null),
+                    byBot('some-other[bot]'),
+                ]) {
+                    const { filer, tasks } = build();
+                    expect(await filer.process(event)).toEqual({
+                        outcome: 'skipped',
+                        reason: 'outsider-author',
+                    });
+                    expect(tasks.create).not.toHaveBeenCalled();
+                }
+            });
+
+            it('GITHUB_ISSUE_INTAKE_TRUSTED_BOTS replaces the list; `none` empties it', async () => {
+                delete process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS;
+                process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS = 'some-other[bot]';
+                expect((await build().filer.process(byBot('some-other[bot]'))).outcome).toBe(
+                    'filed',
+                );
+                expect((await build().filer.process(byBot('dependabot[bot]'))).outcome).toBe(
+                    'skipped',
+                );
+                process.env.GITHUB_ISSUE_INTAKE_TRUSTED_BOTS = 'none';
+                expect((await build().filer.process(byBot('dependabot[bot]'))).outcome).toBe(
+                    'skipped',
+                );
+            });
+        });
+
+        it('GITHUB_ISSUE_INTAKE_OUTSIDERS=true files it, labelled as an outside author', async () => {
+            process.env.GITHUB_ISSUE_INTAKE_OUTSIDERS = 'true';
+            const { filer, tasks } = build();
+            const result = await filer.process(byAssociation('NONE'));
+            expect(result).toEqual({ outcome: 'filed', taskId: 'task-1' });
+            expect(tasks.create.mock.calls[0][1]).toMatchObject({
+                labels: [TRIAGE_LABEL, 'source:github', TRIAGE_OUTSIDE_AUTHOR_LABEL],
+                // Provenance column unchanged: `integration` means an
+                // integration KEY (its id in `createdById`), not a webhook.
+                createdByType: 'user',
+            });
+        });
+
+        it('never judges Jira issues or incidents — those come from systems the owner configured', () => {
+            expect(isOutsiderGithubIssue({ kind: 'jira.issue', payload: {} } as never)).toBe(false);
+            expect(isOutsiderGithubIssue({ kind: 'incident', payload: {} } as never)).toBe(false);
+            expect(isOutsiderGithubIssue({ kind: 'github.issue', payload: {} } as never)).toBe(
+                true,
+            );
+            expect(
+                isOutsiderGithubIssue({
+                    kind: 'github.issue',
+                    payload: { authorAssociation: 'COLLABORATOR' },
+                } as never),
+            ).toBe(false);
+        });
     });
 
     describe('first sight → one Task + the persisted dedup key', () => {

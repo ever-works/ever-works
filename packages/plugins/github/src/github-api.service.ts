@@ -2324,7 +2324,10 @@ export class GitHubApiService {
 						name: run.name,
 						status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
 						conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
-						...(run.details_url ? { detailsUrl: run.details_url } : {})
+						...(run.details_url ? { detailsUrl: run.details_url } : {}),
+						// Who reported it — the CI fix loop only acts on an
+						// allow-listed app (security finding F8).
+						appSlug: run.app?.slug ? run.app.slug.toLowerCase() : null
 					};
 					out.push(check);
 				}
@@ -2379,7 +2382,10 @@ export class GitHubApiService {
 					name: status.context,
 					status: settled ? 'completed' : 'queued',
 					conclusion: settled ? (CHECK_CONCLUSION_MAP[status.state] ?? null) : null,
-					...(status.target_url ? { detailsUrl: status.target_url } : {})
+					...(status.target_url ? { detailsUrl: status.target_url } : {}),
+					// A commit status has no app: anything with status write
+					// access can post one, so it is never a trusted reporter.
+					appSlug: null
 				});
 			}
 		} catch {

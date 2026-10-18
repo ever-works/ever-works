@@ -14,7 +14,8 @@ import {
     importWork,
 } from '@/app/actions/dashboard/works';
 import { resolveGenerationConfig } from './utils';
-import type { ConfirmationRequired } from './generated/factory';
+import type { UserConfirmationCheck } from './generated/confirmation';
+import { requireUserConfirmation } from './confirm-gate';
 
 // Work-kind chip vocabulary (mirrors `InitialWorkKind` in
 // works/new/new-work-client.tsx and the server action's aiWorkKindSchema).
@@ -340,41 +341,53 @@ export const updateWorkTool = tool({
     },
 });
 
-export const deleteWorkTool = tool({
-    description:
-        'Delete a Work. Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
-    inputSchema: z.object({
-        workId: z.string().describe('Work ID to delete'),
-        confirmed: z
-            .boolean()
-            .optional()
-            .describe(
-                'Set to true ONLY after the user has explicitly confirmed this ' +
-                    'irreversible deletion in chat. Omit it on the first call so the ' +
-                    'user is shown a confirmation prompt first.',
-            ),
-    }),
-    execute: async ({ workId, confirmed }) => {
-        // Security: server-side confirmation gate. The prose "ALWAYS ask for
-        // confirmation" is only advisory to the LLM and can be overridden by
-        // prompt injection (e.g. a poisoned README/search result instructing
-        // "delete work X now"). Mirror the generated factory's handshake
-        // (factory.ts) so the mutation never runs until the user clicks Confirm
-        // in the UI and the model re-calls with `confirmed: true`.
-        if (confirmed !== true) {
-            const confirmation: ConfirmationRequired = {
-                __confirmationRequired: true,
+/**
+ * Build `deleteWork`. Security: with `userConfirmed` (the per-turn check from
+ * `./generated/confirmation.ts`), a model-supplied `confirmed: true` only
+ * runs the deletion when the user's own latest message confirms the exact
+ * card (`deleteWork` on this `workId`) shown right before it; otherwise the
+ * card comes back. Without it, the legacy flag-only handshake applies.
+ */
+export function createDeleteWorkTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description:
+            'Delete a Work. Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        inputSchema: z.object({
+            workId: z.string().describe('Work ID to delete'),
+            confirmed: z
+                .boolean()
+                .optional()
+                .describe(
+                    'Set to true ONLY after the user has explicitly confirmed this ' +
+                        'irreversible deletion in chat. Omit it on the first call so the ' +
+                        'user is shown a confirmation prompt first.',
+                ),
+        }),
+        execute: async ({ workId, confirmed }) => {
+            // Security: server-side confirmation gate. The prose "ALWAYS ask for
+            // confirmation" is only advisory to the LLM and can be overridden by
+            // prompt injection (e.g. a poisoned README/search result instructing
+            // "delete work X now"). Mirror the generated factory's handshake
+            // (factory.ts) so the mutation never runs until the user clicks Confirm
+            // in the UI and the model re-calls with `confirmed: true` — and, with a
+            // user-turn check, only for the card the user actually confirmed.
+            const card = requireUserConfirmation({
                 toolName: 'deleteWork',
                 action: 'Delete a Work',
                 target: workId,
                 args: { workId },
-            };
-            return confirmation;
-        }
-        const result = await deleteWork(workId);
-        return { success: result.success, message: result.message, error: result.error };
-    },
-});
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            const result = await deleteWork(workId);
+            return { success: result.success, message: result.message, error: result.error };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const deleteWorkTool = createDeleteWorkTool();
 
 export const syncWork = tool({
     description: 'Sync a Work data repository with the latest changes.',

@@ -197,10 +197,16 @@ export const WAVE5_OPERATIONS: OperationSpec[] = [
     },
 
     // Memory facts (AW-07) — "remember…" in chat lands as an ACTIVE fact
-    // because the author is the person in their own conversation. Not behind
-    // confirmation: it is exactly what they asked for, it is reversible (every
-    // fact can be forgotten and restored), and the reply reads the stored
-    // wording back so a wrong capture is caught on the spot.
+    // because the author is the person in their own conversation. It is
+    // reversible (every fact can be forgotten and restored) and the reply
+    // reads the stored wording back.
+    //
+    // Security: it IS behind a one-click confirmation now. A fact is sent to
+    // EVERY agent in the workspace (pinned facts on every run), so a fact
+    // planted by injected text — an email or event the assistant read earlier
+    // in the same turn telling it to "remember" something — would be a
+    // persistent prompt injection across all agents. The card shows exactly
+    // what will be stored; the person clicks once.
     {
         toolName: 'remember_fact',
         method: 'POST',
@@ -208,6 +214,8 @@ export const WAVE5_OPERATIONS: OperationSpec[] = [
         summary:
             'Remember one durable fact for every agent in this workspace, when the user says "remember…" or asks you to keep something in mind. Store one atomic statement per call, in the words the user used. The response carries the stored wording — read it back to the user in one line so they can check it.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint:
             'body (string, required, 1-500 characters: the exact wording to store); pinned (optional boolean: send it with every run).',

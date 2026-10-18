@@ -98,6 +98,10 @@ interface ConfirmationOutput {
     action?: string;
     target?: string;
     args?: Record<string, unknown>;
+    /** `privileged` = reversible, but changes what agents can do / know / are told. */
+    confirmationKind?: 'destructive' | 'privileged';
+    /** Plain-text preview of the content a privileged write would store. */
+    preview?: string;
 }
 
 // Security: tool outputs are LLM-authored and can be poisoned via prompt
@@ -294,9 +298,12 @@ export function ChatToolResult({
     if (confirmation?.__confirmationRequired) {
         return (
             <ConfirmCard
+                toolCallId={toolCallId}
                 confirmToolName={confirmation.toolName ?? toolName}
                 action={confirmation.action ?? ''}
                 target={confirmation.target}
+                kind={confirmation.confirmationKind}
+                preview={confirmation.preview}
             />
         );
     }
@@ -366,13 +373,20 @@ export function ChatToolResult({
  * until the user clicks Confirm.
  */
 function ConfirmCard({
+    toolCallId,
     confirmToolName,
     action,
     target,
+    kind,
+    preview,
 }: {
+    /** The tool call that produced this card — named in the Confirm text so the server binds to it. */
+    toolCallId: string;
     confirmToolName: string;
     action: string;
     target?: string;
+    kind?: 'destructive' | 'privileged';
+    preview?: string;
 }) {
     const { sendMessage } = useChatContext();
     const [resolved, setResolved] = useState<null | 'confirmed' | 'cancelled'>(null);
@@ -410,8 +424,19 @@ function ConfirmCard({
             </div>
             <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-3">
                 {action}
-                {target ? ` (${target})` : ''}. This can’t be undone.
+                {target ? ` (${target})` : ''}.{' '}
+                {kind === 'privileged'
+                    ? 'This changes what your agents can do, know or are told.'
+                    : 'This can’t be undone.'}
             </p>
+            {preview ? (
+                // Rendered as text (React escapes it) — the content the
+                // assistant wants to store, so the user confirms the words,
+                // not just the action name.
+                <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-surface-secondary p-2 text-[11px] text-text dark:border-white/15 dark:bg-white/5 dark:text-text-dark">
+                    {preview}
+                </pre>
+            ) : null}
             <div className="flex gap-2">
                 <button
                     onClick={() => {
@@ -426,7 +451,14 @@ function ConfirmCard({
                         const safeName = sanitizeConfirmRef(confirmToolName);
                         const safeTarget = sanitizeConfirmRef(target);
                         const ref = safeTarget ? `${safeName} for ${safeTarget}` : safeName;
-                        sendMessage(`Yes, I confirm — proceed with ${ref} (confirmed: true).`);
+                        // The card's call id rides along so the server-side
+                        // check (`generated/confirmation.ts`) honours exactly
+                        // THIS card, not another pending one for the same tool.
+                        const cardId = toolCallId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 100);
+                        const cardRef = cardId ? `, card ${cardId}` : '';
+                        sendMessage(
+                            `Yes, I confirm — proceed with ${ref} (confirmed: true${cardRef}).`,
+                        );
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors cursor-pointer"
                 >

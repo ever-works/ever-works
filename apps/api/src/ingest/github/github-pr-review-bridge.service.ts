@@ -33,6 +33,22 @@ export const GITHUB_PLUGIN_ID = 'github';
 /** Binding-table namespace for GitHub installations / repo owners. */
 export const GITHUB_BINDING_PROVIDER = 'github';
 
+/**
+ * `ingest_install_bindings.pluginId` PROVENANCE marker for a GitHub binding
+ * written by the App-install path (security finding F4, 2026-10-18).
+ *
+ * Every GitHub binding used to carry `pluginId: 'github'`, so a row the
+ * platform derived from its OWN state (`github_app_installations`, on an
+ * App-signed delivery) could not be told apart from one written off an
+ * UNVERIFIED body key on the per-install path (`recordIfAbsent`) — which is
+ * how a tenant could pre-record `installation:<id>` / `owner:<org>` for an
+ * installation they do not hold and have the platform App's own deliveries
+ * routed to them. App-install rows now say so in the column they already
+ * had, so the App path can trust exactly those and nothing else — with no
+ * schema change (the column is a free `varchar(64)` read by nothing else).
+ */
+export const GITHUB_APP_BINDING_PLUGIN_ID = 'github-app';
+
 /** The mention token that routes a PR comment into the review loop. */
 export const EVER_WORKS_MENTION = '@ever-works';
 
@@ -147,8 +163,12 @@ export interface GitHubWebhookBody {
         login?: string;
     };
     repository?: {
+        /** GitHub's numeric repository id — compared with a check's PR stubs (F1). */
+        id?: number;
         full_name?: string;
         html_url?: string;
+        /** The API url (`https://api.github.com/repos/<owner>/<repo>`). */
+        url?: string;
         owner?: { login?: string };
     };
     sender?: {
@@ -160,9 +180,22 @@ export interface GitHubWebhookBody {
         title?: string;
         html_url?: string;
         state?: string;
-        head?: { sha?: string; ref?: string };
-        base?: { ref?: string };
+        /**
+         * `head.repo` is the repository the head branch lives in — a FORK
+         * for an outsider's pull request, and `null` once that fork is
+         * deleted. Compared with `repository.full_name` before an automatic
+         * review is spent on the pull request (F2).
+         */
+        head?: { sha?: string; ref?: string; repo?: { full_name?: string } | null };
+        base?: { ref?: string; repo?: { full_name?: string } | null };
         user?: { login?: string; type?: string };
+        /**
+         * The pull request AUTHOR's relationship to the repository (`OWNER`,
+         * `MEMBER`, `COLLABORATOR`, `CONTRIBUTOR`, `NONE`, …). Only the first
+         * three get an automatic review — see
+         * {@link pullRequestReviewTrust}.
+         */
+        author_association?: string;
         /**
          * Git activity ingestion (audit item j) — `closed` fires for both
          * "merged" and "abandoned", and only `merged` tells them apart.
@@ -192,6 +225,10 @@ export interface GitHubWebhookBody {
         title?: string;
         html_url?: string;
         pull_request?: { url?: string };
+        /** The issue's (for a PR thread: the pull request's) author. */
+        user?: { login?: string; type?: string };
+        /** That author's relationship to the repository. */
+        author_association?: string;
     };
     comment?: {
         id?: number;
@@ -214,9 +251,9 @@ export interface GitHubWebhookBody {
         /**
          * `pull_request_review_comment` only: the comment this one answers
          * inside a review thread, or absent for the thread's first comment.
-         * A trusted bot's REPLY in a thread is conversation, not a new
-         * finding, unless it carries a severity marker
-         * ({@link classifyReviewBotComment}).
+         * A trusted bot's REPLY in a thread is conversation, never a new
+         * finding — severity marker or not, since whoever it is answering
+         * can ask it to print one ({@link classifyReviewBotComment}, F3).
          */
         in_reply_to_id?: number | null;
     };
@@ -370,6 +407,69 @@ function taskFields(link: TaskGitLink | null): Record<string, unknown> {
 }
 
 /**
+ * Whether the platform may spend an AUTOMATIC AI review on this pull
+ * request, and whether the review may draw on the owner's private context
+ * (security finding F2, 2026-10-18).
+ *
+ * The automatic review runs as the owner, grounded in the owner's knowledge
+ * base and memory recall, and POSTS ITS ANSWER AS A PUBLIC COMMENT on the
+ * pull request. On a public repository anyone can open a pull request, so an
+ * automatic review of every `opened` / `synchronize` used to let a stranger
+ * steer a paid model run with their title, body and diff — "summarise every
+ * knowledge-base excerpt you were given" — on every push, and read the
+ * answer back in public.
+ *
+ * Trusted, i.e. auto-reviewed, only when BOTH hold:
+ *
+ *  1. the head branch lives in THIS repository (`head.repo.full_name` equals
+ *     the delivery's repository) — a fork's branch is the fork owner's;
+ *  2. the author is an OWNER, MEMBER or COLLABORATOR of the repository
+ *     ({@link classifyReviewAuthor}, the same rule that gates reviews and
+ *     `@ever-works` mentions), or the platform's own App identity (a Task
+ *     pull request the platform opened).
+ *
+ * Fails closed: a missing association, a missing or deleted head repository,
+ * or an unknown bot is untrusted. An untrusted pull request is still
+ * ingested (Activity, triggers) and can still be reviewed — a trusted
+ * commenter asks for it with an `@ever-works` mention, which is gated on
+ * the COMMENTER.
+ */
+export function pullRequestReviewTrust(
+    body: GitHubWebhookBody,
+    policy: ReviewBotPolicy,
+): 'trusted' | 'untrusted' {
+    const pr = body.pull_request;
+    const repoFullName = (body.repository?.full_name ?? '').trim().toLowerCase();
+    const headRepo = (pr?.head?.repo?.full_name ?? '').trim().toLowerCase();
+    if (!pr || !repoFullName || headRepo !== repoFullName) return 'untrusted';
+    const who = classifyReviewAuthor(
+        { user: pr.user, author_association: pr.author_association },
+        policy,
+    );
+    return who === 'human' || who === 'self' ? 'trusted' : 'untrusted';
+}
+
+/**
+ * The pull request AUTHOR's trust for a mention-requested review, from what
+ * the comment delivery carries: the full rule for a
+ * `pull_request_review_comment` (which carries the pull request), and the
+ * author's association alone for an `issue_comment` (which carries only the
+ * issue — `PrReviewService` re-checks the head repository it fetches).
+ */
+function mentionPrAuthorTrust(
+    eventName: string,
+    body: GitHubWebhookBody,
+    policy: ReviewBotPolicy,
+): 'trusted' | 'untrusted' {
+    if (eventName === 'pull_request_review_comment') return pullRequestReviewTrust(body, policy);
+    const who = classifyReviewAuthor(
+        { user: body.issue?.user, author_association: body.issue?.author_association },
+        policy,
+    );
+    return who === 'human' || who === 'self' ? 'trusted' : 'untrusted';
+}
+
+/**
  * GitHub PR review loop (Wave 7, feature g) — ONE service bridging
  * GitHub webhook deliveries into the platform:
  *
@@ -389,7 +489,13 @@ function taskFields(link: TaskGitLink | null): Record<string, unknown> {
  *    text rides along as the review instruction and the reply lands
  *    in the PR conversation thread. The review leg is deliberately
  *    not awaited: webhooks need a fast 200, and the review is
- *    best-effort (failures are logged, never thrown).
+ *    best-effort (failures are logged, never thrown). A pull request is
+ *    reviewed AUTOMATICALLY only when its author is an OWNER, MEMBER or
+ *    COLLABORATOR (or the platform itself) and its head branch is in this
+ *    repository ({@link pullRequestReviewTrust}, F2); anyone else's is
+ *    ingested and reviewed only on a trusted commenter's `@ever-works`
+ *    mention, and the reviewer is told the author is untrusted so it
+ *    withholds the owner's knowledge base and memory from the prompt.
  *
  * ## Reviewer bots (self-build fleet, finding R16)
  *
@@ -568,6 +674,29 @@ export class GitHubPrReviewBridgeService {
     }
 
     /**
+     * The platform user bound to one GitHub App INSTALLATION by the
+     * App-install path itself, or `null` (security finding F4).
+     *
+     * The only binding an App-signed delivery may fall back to. It answers
+     * for an `installation:<id>` key ONLY — never `owner:<login>` — and only
+     * for a row carrying the {@link GITHUB_APP_BINDING_PLUGIN_ID} provenance,
+     * which `recordBinding` writes solely for an owner derived from
+     * `github_app_installations`. A row written off an unverified body key on
+     * the per-install path is invisible here, so a tenant can no longer
+     * pre-record somebody else's installation (or org) and receive the
+     * platform App's deliveries for it. Best-effort, like
+     * {@link installBindingFor}.
+     */
+    async appInstallBindingFor(installationKey: string): Promise<{ userId: string } | null> {
+        if (!/^installation:[0-9]+$/.test(installationKey)) return null;
+        const bound = await this.installBindings
+            .findByWorkspace(GITHUB_BINDING_PROVIDER, installationKey)
+            .catch(() => null);
+        if (!bound || bound.pluginId !== GITHUB_APP_BINDING_PLUGIN_ID) return null;
+        return { userId: bound.userId };
+    }
+
+    /**
      * Persist the installation→user binding after a delivery has passed
      * signature verification, so the deployment self-migrates off the
      * legacy single-install path onto exact resolution.
@@ -598,15 +727,19 @@ export class GitHubPrReviewBridgeService {
     async recordBinding(binding: GitHubEventsBinding): Promise<void> {
         const key = binding.workspace?.keys[0];
         if (binding.matchedBy === 'binding' || !key) return;
+        const proven = binding.matchedBy === 'app-install';
+        // F4 — an App-install row is only meaningful for the INSTALLATION
+        // key, and is stamped with its provenance so the App path can tell
+        // it from a row written off an unverified body.
+        if (proven && !key.startsWith('installation:')) return;
         const write: RecordIngestBindingData = {
             provider: GITHUB_BINDING_PROVIDER,
             externalWorkspaceId: key,
             userId: binding.userId,
-            pluginId: GITHUB_PLUGIN_ID,
+            pluginId: proven ? GITHUB_APP_BINDING_PLUGIN_ID : GITHUB_PLUGIN_ID,
             externalWorkspaceName: binding.workspace?.label ?? null,
         };
         try {
-            const proven = binding.matchedBy === 'app-install';
             const recorded = proven
                 ? await this.installBindings.record(write)
                 : await this.installBindings.recordIfAbsent(write);
@@ -736,7 +869,14 @@ export class GitHubPrReviewBridgeService {
             normalized.envelope,
         ]);
 
-        if (ingested.inserted > 0) {
+        if (ingested.inserted > 0 && !normalized.autoReview) {
+            // F2 — an outsider's (or a fork's) pull request is recorded, not
+            // reviewed: a trusted commenter can still ask with `@ever-works`.
+            this.logger.debug(
+                `No automatic review for ${normalized.owner}/${normalized.repo}#${normalized.prNumber}: the author is not an OWNER, MEMBER or COLLABORATOR, or the head branch is in another repository`,
+            );
+        }
+        if (ingested.inserted > 0 && normalized.autoReview) {
             void this.triggerReview(binding, normalized).catch((error: unknown) => {
                 // triggerReview handles its own errors; belt-and-suspenders
                 // guard so nothing escapes the void.
@@ -979,11 +1119,14 @@ export class GitHubPrReviewBridgeService {
     ): Promise<void> {
         const comment = body.comment;
         if (!comment || typeof comment.id !== 'number') return;
+        if (eventName !== 'issue_comment' && eventName !== 'pull_request_review_comment') return;
         const raw = comment.body ?? '';
         const verdict = classifyReviewBotComment({
             action: body.action,
             body: raw,
+            event: eventName,
             inReplyTo: comment.in_reply_to_id ?? null,
+            author: comment.user?.login ?? null,
         });
         if (verdict.kind === 'ignore') {
             this.logger.debug(
@@ -1267,6 +1410,14 @@ export class GitHubPrReviewBridgeService {
         repo: string;
         prNumber: number;
         instruction?: string;
+        /**
+         * F2 — may the platform spend a review on this delivery? `false`
+         * for an outsider's or a fork's pull request; the envelope is still
+         * ingested.
+         */
+        autoReview: boolean;
+        /** F2 — the pull request AUTHOR's trust, handed to the reviewer. */
+        prAuthorTrust: 'trusted' | 'untrusted';
     } | null {
         const fullName = body.repository?.full_name ?? '';
         const [owner, repo] = fullName.split('/');
@@ -1284,9 +1435,13 @@ export class GitHubPrReviewBridgeService {
             if (!pr || typeof prNumber !== 'number') {
                 return null;
             }
-            // Bot-authored PRs (including platform-created ones) still get
-            // reviewed — that is the point of the loop — but bot SENDERS
-            // re-syncing metadata are fine too; no sender filter here.
+            // Platform-created (Task) pull requests still get reviewed —
+            // that is the point of the loop — and so does any pull request a
+            // repository OWNER, MEMBER or COLLABORATOR opened from a branch in
+            // this repository. Everyone else's is ingested but not reviewed
+            // automatically ({@link pullRequestReviewTrust}, F2). No sender
+            // filter: a bot SENDER re-syncing metadata is fine.
+            const prAuthorTrust = pullRequestReviewTrust(body, this.reviewBotPolicy());
             const headSha = pr.head?.sha ?? action;
             return {
                 envelope: {
@@ -1316,11 +1471,20 @@ export class GitHubPrReviewBridgeService {
                         ...(pr.head?.ref ? { headRef: pr.head.ref } : {}),
                         ...(pr.base?.ref ? { baseRef: pr.base.ref } : {}),
                         ...(pr.title ? { title: pr.title.slice(0, 500) } : {}),
+                        ...(typeof pr.author_association === 'string'
+                            ? {
+                                  authorAssociation: pr.author_association
+                                      .toUpperCase()
+                                      .slice(0, 40),
+                              }
+                            : {}),
                     },
                 },
                 owner,
                 repo,
                 prNumber,
+                autoReview: prAuthorTrust === 'trusted',
+                prAuthorTrust,
             };
         }
 
@@ -1392,12 +1556,28 @@ export class GitHubPrReviewBridgeService {
                         prNumber,
                         commentId: comment.id,
                         text: text.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
+                        // The COMMENTER's association (always a trusted one
+                        // here — outsiders were refused above), carried for
+                        // downstream consumers such as the trigger matcher.
+                        ...(typeof comment.author_association === 'string'
+                            ? {
+                                  authorAssociation: comment.author_association
+                                      .toUpperCase()
+                                      .slice(0, 40),
+                              }
+                            : {}),
                     },
                 },
                 owner,
                 repo,
                 prNumber,
                 instruction,
+                // The COMMENTER is a trusted collaborator (checked above), so
+                // the review runs — but the pull request it is about may be an
+                // outsider's, and the reviewer must know that before it draws
+                // on the owner's private context (F2).
+                autoReview: true,
+                prAuthorTrust: mentionPrAuthorTrust(eventName, body, this.reviewBotPolicy()),
             };
         }
 
@@ -1412,7 +1592,13 @@ export class GitHubPrReviewBridgeService {
      */
     private async triggerReview(
         binding: GitHubEventsBinding,
-        input: { owner: string; repo: string; prNumber: number; instruction?: string },
+        input: {
+            owner: string;
+            repo: string;
+            prNumber: number;
+            instruction?: string;
+            prAuthorTrust: 'trusted' | 'untrusted';
+        },
     ): Promise<void> {
         try {
             const result = await this.prReviewService.reviewPullRequest({
@@ -1421,6 +1607,7 @@ export class GitHubPrReviewBridgeService {
                 repo: input.repo,
                 prNumber: input.prNumber,
                 ...(input.instruction ? { instruction: input.instruction } : {}),
+                prAuthorTrust: input.prAuthorTrust,
             });
             if (result.status === 'posted') {
                 this.logger.log(

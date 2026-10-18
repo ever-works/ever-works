@@ -166,9 +166,10 @@ describe('AgentRunService — the safety gate at the tool choke point', () => {
             messages: Array<{ role: string; content: string }>;
         };
         const toolMessage = dispatched.messages.find((message) => message.role === 'tool');
-        const fenced = /<<<TOOL_RESULT\n([\s\S]*?)\n>>>END_TOOL_RESULT/.exec(
-            toolMessage?.content ?? '',
-        );
+        const fenced =
+            /<untrusted_tool_result id="[^"]+">\n([\s\S]*?)\n<\/untrusted_tool_result id="[^"]+">/.exec(
+                toolMessage?.content ?? '',
+            );
         return JSON.parse(fenced?.[1] ?? '{}');
     }
 

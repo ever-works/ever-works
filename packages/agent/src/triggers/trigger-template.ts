@@ -49,8 +49,12 @@ export interface TriggerTemplateContext {
     event?: TriggerTemplateEvent | null;
 }
 
-/** Any `{{ … }}` occurrence, lazily matched. */
-const PLACEHOLDER_RE = /\{\{\s*([^{}]*?)\s*\}\}/g;
+/**
+ * Any `{{ … }}` occurrence. The inner text cannot contain a brace, and the
+ * surrounding whitespace is trimmed by the callers — not by `\s*…?\s*`
+ * around a lazy group, which backtracks polynomially on long whitespace runs.
+ */
+const PLACEHOLDER_RE = /\{\{([^{}]*)\}\}/g;
 
 const PAYLOAD_KEY_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -101,16 +105,50 @@ function resolvePath(path: string, context: TriggerTemplateContext): unknown {
 }
 
 /**
+ * Event fields the PLATFORM sets (ids, the connector's own source/kind
+ * strings, timestamps, the routed Work) — as opposed to the fields the
+ * outside world writes (`title`, `actorName`, `sourceUrl`, subject ids and
+ * every `event.payload.*` key). Renderers may treat the two differently.
+ */
+export const PLATFORM_EVENT_TEMPLATE_PATHS: ReadonlySet<string> = new Set([
+    'event.id',
+    'event.source',
+    'event.kind',
+    'event.occurredAt',
+    'event.workId',
+]);
+
+export interface RenderTriggerTemplateOptions {
+    /**
+     * Security (prompt-injection hardening): transform every substituted
+     * EVENT value before it is spliced in. The template is the owner's own
+     * text; `{{trigger.name}}` is the owner's too and is never passed here.
+     * Event values come from outside (an issue title anyone can write, a
+     * Sentry message an app's end users control), so the caller fences or
+     * neutralizes them here. Empty values are not passed.
+     */
+    transformEventValue?: (value: string, path: string) => string;
+}
+
+/**
  * Render `template` against `context`. Well-formed-but-unknown paths →
  * empty string; malformed placeholders are left verbatim (they were
  * rejected at save time; leaving them visible beats silently eating
  * text at fire time).
  */
-export function renderTriggerTemplate(template: string, context: TriggerTemplateContext): string {
+export function renderTriggerTemplate(
+    template: string,
+    context: TriggerTemplateContext,
+    options: RenderTriggerTemplateOptions = {},
+): string {
     return template.replace(PLACEHOLDER_RE, (match: string, rawPath: string) => {
         const path = rawPath.trim();
         if (!isValidPath(path)) return match;
-        return stringifyValue(resolvePath(path, context));
+        const value = stringifyValue(resolvePath(path, context));
+        if (options.transformEventValue && path !== 'trigger.name' && value.length > 0) {
+            return options.transformEventValue(value, path);
+        }
+        return value;
     });
 }
 

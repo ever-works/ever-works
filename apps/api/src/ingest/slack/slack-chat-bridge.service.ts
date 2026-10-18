@@ -26,6 +26,57 @@ export const SLACK_BINDING_PROVIDER = 'slack';
 export const SLACK_EVENT_TEXT_MAX_CHARS = 4000;
 
 /**
+ * Security — who may pull the owner's knowledge base into a Slack reply.
+ *
+ * Any member of the bound Slack workspace (and any Slack Connect guest from
+ * another organization in a shared channel) can @mention the bot or run its
+ * slash command, and the prompt runs as the account OWNER. Resolving `@kb:`
+ * tokens for them handed the owner's KB documents to whoever asked. KB
+ * resolution is therefore OFF for bridged prompts unless the sender is
+ * allow-listed, by Slack user id (`U0123`) or team-qualified (`T01:U0123`):
+ *
+ *  - env `SLACK_BRIDGE_KB_ALLOWED_USERS` — comma/space separated, server-wide;
+ *  - slack-connector setting `kbAllowedSlackUserIds` — CSV string or array.
+ *
+ * Both default to empty, i.e. disabled. (There is no memory/recall injection
+ * on this path to strip — the bridge calls the plain completion surface.)
+ */
+export const SLACK_BRIDGE_KB_ALLOWLIST_ENV = 'SLACK_BRIDGE_KB_ALLOWED_USERS';
+export const SLACK_KB_ALLOWLIST_SETTING = 'kbAllowedSlackUserIds';
+
+/** The Slack identity that wrote a bridged prompt. */
+export interface SlackSenderRef {
+    readonly userId?: string;
+    readonly teamId?: string;
+}
+
+function parseSlackAllowlist(raw: unknown): string[] {
+    const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
+    return values
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim().toUpperCase())
+        .filter((value) => value.length > 0);
+}
+
+/** True only when the sender is explicitly allow-listed for `@kb:` resolution. */
+export function isSlackKbAllowed(
+    binding: Pick<SlackEventsBinding, 'settings'>,
+    sender: SlackSenderRef,
+    env: NodeJS.ProcessEnv = process.env,
+): boolean {
+    const userId = sender.userId?.trim().toUpperCase();
+    if (!userId) return false;
+    const allowed = new Set([
+        ...parseSlackAllowlist(env[SLACK_BRIDGE_KB_ALLOWLIST_ENV]),
+        ...parseSlackAllowlist(binding.settings?.[SLACK_KB_ALLOWLIST_SETTING]),
+    ]);
+    if (allowed.size === 0) return false;
+    if (allowed.has(userId)) return true;
+    const teamId = sender.teamId?.trim().toUpperCase();
+    return Boolean(teamId && allowed.has(`${teamId}:${userId}`));
+}
+
+/**
  * The external workspace identity a Slack delivery carries. `teamId` is
  * the discriminator (unique per workspace, including inside an Enterprise
  * Grid); `enterpriseId` is an extra guard applied when both the delivery
@@ -89,6 +140,11 @@ export interface SlackEventCallbackBody extends SlackWorkspaceCarrier {
         type?: string;
         subtype?: string;
         user?: string;
+        /**
+         * The team the AUTHOR belongs to — differs from `team_id` for a
+         * Slack Connect guest posting in a shared channel.
+         */
+        user_team?: string;
         username?: string;
         bot_id?: string;
         text?: string;
@@ -115,6 +171,8 @@ export interface SlackSlashCommandBody extends SlackWorkspaceCarrier {
     channel_id?: string;
     channel_name?: string;
     user_id?: string;
+    /** The invoking user's own team, when Slack sends it (Slack Connect). */
+    user_team?: string;
     user_name?: string;
     /** Unique per invocation — the dedupe identity for the spine. */
     trigger_id?: string;
@@ -446,7 +504,12 @@ export class SlackChatBridgeService {
         }
 
         try {
-            const replyText = await this.runChatCompletion(binding, prompt);
+            const replyText = await this.runChatCompletion(binding, prompt, {
+                userId: event.user,
+                // The author's own team, not the workspace that received the
+                // event: a Slack Connect guest's `T…:U…` entry names THEIR team.
+                teamId: event.user_team ?? body.team_id,
+            });
             if (!replyText) {
                 this.logger.warn('Slack mention chat completion returned no content; not replying');
                 return;
@@ -567,7 +630,10 @@ export class SlackChatBridgeService {
         }
 
         try {
-            const replyText = await this.runChatCompletion(binding, prompt);
+            const replyText = await this.runChatCompletion(binding, prompt, {
+                userId: command.user_id,
+                teamId: command.user_team ?? command.team_id,
+            });
             if (!replyText) {
                 this.logger.warn('Slack command chat completion returned no content; not replying');
                 return;
@@ -598,6 +664,7 @@ export class SlackChatBridgeService {
     private async runChatCompletion(
         binding: SlackEventsBinding,
         prompt: string,
+        sender: SlackSenderRef,
     ): Promise<string | null> {
         const completion = await this.openAiCompatService.handleCompletion(
             {
@@ -605,6 +672,12 @@ export class SlackChatBridgeService {
                 messages: [{ role: 'user', content: prompt }],
             } as OpenAiChatCompletionRequestDto,
             { userId: binding.userId },
+            // Security: the prompt was written by whoever can @mention the bot
+            // in the bound workspace — every member, and Slack Connect guests
+            // from other organizations — not by the account owner. `@kb:`
+            // tokens in it would pull the owner's knowledge-base documents
+            // into the reply, so they resolve only for allow-listed senders.
+            { allowKbMentions: isSlackKbAllowed(binding, sender) },
         );
         return completion.choices?.[0]?.message?.content?.trim() ?? null;
     }

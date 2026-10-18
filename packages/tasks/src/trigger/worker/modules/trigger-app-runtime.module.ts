@@ -61,6 +61,10 @@ import {
     workerAppDeployDispatcher,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPLOY_HOST_SOURCE } from '@ever-works/agent/app-runtime';
+import {
+    APP_LICENSE_SERVICE,
+    type AppLicenseService as AppLicenseGateReader,
+} from '@ever-works/agent/app-runtime';
 import { APP_DEPENDENCIES_SERVICE } from '@ever-works/agent/app-runtime';
 // Lane aw-deploy-3 (2026-10-17) — APW-07's service, composed HERE so the worker's preconditions
 // enforce dependency readiness and the orchestrator's `remove` can order the dependency deletion.
@@ -209,8 +213,9 @@ import { createRemoteProxy } from '../remote-proxy';
  * - `AppImageReferenceResolver` — APW-06 **T72** (`packages/agent/src/app-runtime/app-image-reference.resolver.ts`).
  * - `AppRuntimeEventRelayService` (the `APP_RUNTIME_EVENT_SINK` proxy) — APW-06 **T28**
  *   (`apps/api/src/app-runtime/app-runtime-event-relay.service.ts`).
- * - APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`). (APW-05's `WorkBuild` reads were
- *   on this list until 2026-09-25; they are proxied above.)
+ * - (APW-03's `AppLicenseService` — T29/T30's `APP_LICENSE_SERVICE` — was on this list until
+ *   2026-10-18; it has landed and is proxied by name below, see `workerAppLicenseService`. APW-05's
+ *   `WorkBuild` reads were on it until 2026-09-25; they are proxied above.)
  *
  * (`WORK_APP_RUNTIME_STATES` was on this list, blamed on APW-06 T17. That was stale: T17's
  * `WorkAppRuntimeStateRepository` has landed and the API binds the token to it. It moved to the
@@ -354,6 +359,9 @@ export const APP_RUNTIME_REMOTE_PROXIES = [
     'AppDependencyProvisionDispatchRelay',
     'AppDeployRequestService',
     'WorkUpstreamStateRepository',
+    // APW-03 T42 — the license gate's one read (`getHostingEligibility`), see
+    // `workerAppLicenseService`.
+    'AppLicenseService',
 ] as const;
 
 /**
@@ -375,6 +383,32 @@ export function hydratingWorkRepositoryProxy(apiClient: TriggerInternalApiClient
 function hydrateWork<T>(row: T): T {
     if (!row || typeof row !== 'object' || row instanceof Work) return row;
     return Object.assign(Object.create(Work.prototype), row) as T;
+}
+
+/**
+ * The worker's `APP_LICENSE_SERVICE`: the ONE read `AppLicenseGate` makes —
+ * `getHostingEligibility(workId, opts?)` — over the internal channel to the API's three-member
+ * `AppLicenseService` facade (`TriggerInternalController.remoteMap`, APW-03 T42).
+ *
+ * Unbound, the gate had no verdict to read, so every `ever-works-apps` Deployment failed closed
+ * with `license_blocks_target` / `license_eligibility_unavailable` even for a green App (prod
+ * Deployment d08b60ab, run `run_cmvdxu7np1zwj2y4722nqpd7c`, 2026-10-18).
+ *
+ * - **Narrow**: an object with that one method, never the raw proxy — the raw proxy answers a
+ *   forwarding function for ANY property, so a typo or a later caller could dial another member.
+ * - **Fail-closed**: a failed RPC (the API down, the facade unbound — the controller's loud
+ *   `Unknown remote target`) throws, and the gate turns a throw into "no verdict"
+ *   (`readEligibility` → `null`): `license_blocks_target` on the managed tier, a warning on
+ *   `your-cluster`. An absent answer is `null`, the gate's own "unreadable", never a guess.
+ */
+export function workerAppLicenseService(apiClient: TriggerInternalApiClient): AppLicenseGateReader {
+    const remote = createRemoteProxy(apiClient, 'AppLicenseService');
+    return {
+        async getHostingEligibility(workId: string, opts?: { commitSha?: string }) {
+            const answer = await remote.getHostingEligibility(workId, opts);
+            return answer ?? null;
+        },
+    };
 }
 
 /**
@@ -494,6 +528,13 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
             provide: WORK_APP_RUNTIME_STATES,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'WorkAppRuntimeStateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-03 T42: the license gate's verdict, read in the API (the classification and its
+        // evidence live there). Narrow and fail-closed — see `workerAppLicenseService`.
+        {
+            provide: APP_LICENSE_SERVICE,
+            useFactory: (apiClient: TriggerInternalApiClient) => workerAppLicenseService(apiClient),
             inject: [TriggerInternalApiClient],
         },
         // §6.4 "proxied by name" (T73): APW-07's env source reads the stored env and decrypts it in

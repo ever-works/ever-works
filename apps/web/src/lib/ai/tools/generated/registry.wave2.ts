@@ -1,4 +1,5 @@
 import type { OperationSpec } from './registry';
+import { mentionsSomeone } from './privileged';
 
 /**
  * Wave 2 — registry entries generated from the chat-everything-wave2 workflow
@@ -112,6 +113,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/works/{id}/advanced-prompts',
         summary: 'Update advanced prompts for work generation',
         kind: 'update',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'id',
@@ -1196,6 +1199,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/agents/{id}/files/{name}',
         summary: 'Replace one Agent definition file body with optimistic concurrency guard',
         kind: 'update',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'id',
@@ -1236,6 +1241,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/agents/import',
         summary: 'Import an Agent envelope with conflict mode control (skip | overwrite | rename)',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'onConflict',
@@ -1427,6 +1434,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/agent-memory/save',
         summary: 'Persist a memory observation with tags and metadata',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint:
             'content (required, string max 64000), tags (optional, string array), metadata (optional, object), sessionId (optional, string), workId (optional, uuid), projectId (optional, string)',
@@ -1603,6 +1612,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         summary:
             'Edit a task chat message within the 5-minute window. Only the original author can edit.',
         kind: 'update',
+        confirmWhen: mentionsSomeone,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'id',
@@ -2396,6 +2407,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/organizations/{orgId}/kb/documents',
         summary: 'Create an organization-level KB document',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'orgId',

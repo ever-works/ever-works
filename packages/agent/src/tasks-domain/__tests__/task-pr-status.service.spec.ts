@@ -432,11 +432,17 @@ describe('TaskPrStatusService', () => {
             ciState: 'failing' as const,
             headSha: 'deadbeef',
             checks: [
-                { name: 'build', status: 'completed' as const, conclusion: 'success' as const },
+                {
+                    name: 'build',
+                    status: 'completed' as const,
+                    conclusion: 'success' as const,
+                    appSlug: 'github-actions',
+                },
                 {
                     name: 'lint-and-test',
                     status: 'completed' as const,
                     conclusion: 'failure' as const,
+                    appSlug: 'github-actions',
                 },
             ],
         };
@@ -457,6 +463,7 @@ describe('TaskPrStatusService', () => {
                 verdict: 'failing',
                 checkName: 'lint-and-test',
                 conclusion: 'failure',
+                appSlug: 'github-actions',
                 prNumbers: [41],
                 // The poll reads the PULL REQUEST, so its head IS the pull
                 // request's head by construction — the staleness rule can
@@ -468,6 +475,79 @@ describe('TaskPrStatusService', () => {
             expect(tasks.recordCiHead).toHaveBeenCalledWith(
                 expect.objectContaining({ expectedHeadSha: 'old', headSha: 'deadbeef' }),
             );
+        });
+
+        /**
+         * F8 review (2026-10-18): the webhook intake and the evaluator refuse
+         * a check reported by an unlisted app, and this safety net must not
+         * be the way around them.
+         */
+        describe('only a red check REPORTED BY an allow-listed app is re-offered (F8)', () => {
+            const original = process.env.GITHUB_TRUSTED_CHECK_APPS;
+            afterEach(() => {
+                if (original === undefined) delete process.env.GITHUB_TRUSTED_CHECK_APPS;
+                else process.env.GITHUB_TRUSTED_CHECK_APPS = original;
+            });
+
+            const redFrom = (...reporters: Array<string | null | undefined>) => ({
+                ...redStatus,
+                checks: reporters.map((appSlug, index) => ({
+                    name: `check-${index}`,
+                    status: 'completed' as const,
+                    conclusion: 'failure' as const,
+                    ...(appSlug === undefined ? {} : { appSlug }),
+                })),
+            });
+
+            it.each([
+                ['an unlisted GitHub App', ['some-linter']],
+                ['a commit status (no app)', [null]],
+                ['a row cached before the reporter was recorded', [undefined]],
+            ])('⭐ re-offers nothing when the only red check is from %s', async (_label, apps) => {
+                delete process.env.GITHUB_TRUSTED_CHECK_APPS;
+                git.getPullRequestStatus.mockResolvedValue(redFrom(...apps));
+                tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+                await service.syncDuePrStatuses();
+                expect(autoResume.onCheckResult).not.toHaveBeenCalled();
+            });
+
+            it('names the TRUSTED red check, skipping an untrusted one listed first', async () => {
+                delete process.env.GITHUB_TRUSTED_CHECK_APPS;
+                git.getPullRequestStatus.mockResolvedValue(
+                    redFrom('some-linter', 'github-actions'),
+                );
+                tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+                await service.syncDuePrStatuses();
+                expect(autoResume.onCheckResult).toHaveBeenCalledWith(
+                    expect.objectContaining({ checkName: 'check-1', appSlug: 'github-actions' }),
+                );
+            });
+
+            it('honours an operator-listed app', async () => {
+                process.env.GITHUB_TRUSTED_CHECK_APPS = 'some-linter';
+                git.getPullRequestStatus.mockResolvedValue(redFrom('some-linter'));
+                tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+                await service.syncDuePrStatuses();
+                expect(autoResume.onCheckResult).toHaveBeenCalledWith(
+                    expect.objectContaining({ appSlug: 'some-linter' }),
+                );
+            });
+
+            it('caches the reporter with each check', async () => {
+                git.getPullRequestStatus.mockResolvedValue(redFrom('github-actions', null));
+                tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+                await service.syncDuePrStatuses();
+                const patches = tasks.updatePrStatusCache.mock.calls.map(
+                    (call: unknown[]) => call[1],
+                );
+                const cached = patches.find((patch: { prChecks?: unknown }) =>
+                    Array.isArray(patch?.prChecks),
+                ) as { prChecks: Array<{ appSlug?: string | null }> } | undefined;
+                expect(cached?.prChecks.map((check) => check.appSlug)).toEqual([
+                    'github-actions',
+                    null,
+                ]);
+            });
         });
 
         it('offers nothing for a green or pending gate', async () => {

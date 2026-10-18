@@ -103,7 +103,8 @@ function seedHappyPath() {
 					name: 'build',
 					status: 'completed',
 					conclusion: 'success',
-					details_url: 'https://ci.invalid/build'
+					details_url: 'https://ci.invalid/build',
+					app: { slug: 'GitHub-Actions' }
 				},
 				{ name: 'lint', status: 'in_progress', conclusion: null, details_url: null }
 			]
@@ -131,6 +132,17 @@ describe('GitHubApiService — getPullRequestStatus', () => {
 		expect(status!.ciState).toBe('pending');
 		expect(status!.checks.map((c) => c.name)).toEqual(['build', 'lint']);
 		expect(status!.checks[0].detailsUrl).toBe('https://ci.invalid/build');
+		// F8 — the reporting app rides along (lower-cased); a run with no app is null.
+		expect(status!.checks.map((c) => c.appSlug)).toEqual(['github-actions', null]);
+	});
+
+	it('records a commit status with NO reporting app — never a trusted CI reporter (F8)', async () => {
+		listCommitStatusesMock.mockResolvedValue({
+			data: [{ context: 'ci/legacy', state: 'failure', target_url: null }]
+		});
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		const legacy = status!.checks.find((c) => c.name === 'ci/legacy');
+		expect(legacy?.appSlug).toBeNull();
 	});
 
 	it('reports the base branch the pull request merges into (reviewer agent stage, slice AD)', async () => {
