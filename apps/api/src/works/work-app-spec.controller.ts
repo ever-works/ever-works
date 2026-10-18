@@ -20,6 +20,7 @@ import {
 } from '@ever-works/contracts';
 import type { LicenseAttestation } from '@ever-works/contracts';
 import { AppLicenseService } from '@ever-works/agent/app-license';
+import { appLicenseAttestSessionOnly } from '@ever-works/agent/app-runtime';
 import type { WorkAppSpecLinks } from '@ever-works/contracts';
 import {
     AppSpecService,
@@ -32,6 +33,7 @@ import { GitFacadeService } from '@ever-works/agent/facades';
 import type { Work } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { requireHumanSession } from '../auth/machine-principal';
 import {
     AppSpecDraftValidationDto,
     AppSpecErrorDto,
@@ -200,6 +202,11 @@ export class WorkAppSpecController {
      * attestation (`422 attestationNotRequired`), and — when the body names the
      * classification the caller reviewed — it must still be current (`409
      * licenseChanged`). 10 per minute per member.
+     *
+     * Works-security (2026-10-18): an attestation is a person's statement, so while
+     * `APP_LICENSE_ATTEST_SESSION_ONLY` is on (the default) it is taken only from a signed-in
+     * session — never from the owner's personal API key, a fleet run or an integration key,
+     * which is how every other attestation and approval on the platform already works.
      */
     @Post(':id/app-license/attest')
     @ApiOperation({
@@ -221,6 +228,7 @@ export class WorkAppSpecController {
         @Body() body: { spdx?: string | null; class?: string | null } = {},
     ): Promise<{ attestation: LicenseAttestation }> {
         await this.authorize(id, auth.userId, 'view');
+        if (appLicenseAttestSessionOnly()) requireHumanSession(auth, 'attest an App licence');
         this.takeAllowance(`attest:${auth.userId}`, LICENSE_ATTEST_PER_MIN);
         if (!this.licenses) {
             throw new HttpException(

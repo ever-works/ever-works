@@ -16,6 +16,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
+import { requireHumanSession } from '../auth/machine-principal';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
 import { CreateOrganizationInvitationDto } from './dto/create-organization-invitation.dto';
@@ -68,6 +69,32 @@ export interface OrganizationMemberResponse {
  * tenant-wide access — the one-way `sha256` in the database is pointless if
  * the plaintext is handed back over HTTP.
  */
+/**
+ * Works-security (2026-10-18) — who is in an Organization, and who is its admin, is a person's
+ * decision. An admin can mint integration keys pinned to the Organization, and an invitation
+ * grants tenant-wide access, so while `ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY` is on (the
+ * default; only exactly `false` turns it off) inviting, removing a member and changing a role are
+ * taken only from a signed-in session — never from a personal API key, a fleet-run token or an
+ * integration key, any of which a model can be steered into using. Key minting itself is already
+ * `@SessionCredentialOnly()`; this closes the "promote, then mint" path around it. Listing and
+ * revoking a pending invitation are unchanged.
+ */
+export const ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY_ENV = 'ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY';
+
+export function organizationMemberChangesSessionOnly(
+    env: Record<string, string | undefined> = process.env,
+): boolean {
+    return (
+        String(env[ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY_ENV] ?? '')
+            .trim()
+            .toLowerCase() !== 'false'
+    );
+}
+
+function requireSessionForMemberChange(user: AuthenticatedUser, action: string): void {
+    if (organizationMemberChangesSessionOnly()) requireHumanSession(user, action);
+}
+
 @ApiTags('Organizations')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/organizations/:orgId')
@@ -117,6 +144,7 @@ export class OrganizationInvitationsController {
         @CurrentUser() user: AuthenticatedUser,
         @Body() dto: CreateOrganizationInvitationDto,
     ): Promise<OrganizationInvitationResponse> {
+        requireSessionForMemberChange(user, 'invite a person into an Organization');
         const { invitation } = await this.flow.invite(
             orgId,
             user.userId,
@@ -157,6 +185,7 @@ export class OrganizationInvitationsController {
         @Param('userId', ParseUUIDPipe) targetUserId: string,
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<void> {
+        requireSessionForMemberChange(user, 'remove a member from an Organization');
         await this.flow.removeMember(orgId, targetUserId, user.userId);
     }
 
@@ -171,13 +200,17 @@ export class OrganizationInvitationsController {
     })
     @ApiResponse({ status: 200, description: 'The member, with the new role' })
     @ApiResponse({ status: 400, description: 'Not a member, the owner, or an unknown role' })
-    @ApiResponse({ status: 403, description: 'The caller is not the Tenant owner' })
+    @ApiResponse({
+        status: 403,
+        description: 'The caller is not the Tenant owner, or is not in a signed-in session',
+    })
     async updateMemberRole(
         @Param('orgId', ParseUUIDPipe) orgId: string,
         @Param('userId', ParseUUIDPipe) targetUserId: string,
         @Body() dto: UpdateOrganizationMemberRoleDto,
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<OrganizationMemberResponse> {
+        requireSessionForMemberChange(user, "change a member's role");
         return this.flow.setMemberRole(orgId, targetUserId, dto.role, user.userId);
     }
 

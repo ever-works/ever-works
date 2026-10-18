@@ -29,7 +29,9 @@ import {
     type AppDependencyListEntry,
 } from '@ever-works/agent/app-dependencies';
 import { isAppEnvEncryptionUnavailableError } from '@ever-works/agent/app-env';
+import { appDataDeleteOwnerOnly } from '@ever-works/agent/app-runtime';
 import { config } from '@ever-works/agent/config';
+import { WorkMemberRole } from '@ever-works/agent/entities';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import {
     APP_DEPENDENCY_KINDS,
@@ -39,6 +41,7 @@ import {
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { recordAppDependencyActivity } from './app-dependency-activity';
+import { requireAppWorkOwnerSession } from './app-owner-gate';
 
 /**
  * Lane aw-deps-api (APW-07 T25, 2026-10-18) — the App dependency routes (plan §5:787-790).
@@ -121,13 +124,25 @@ export class WorkAppDependenciesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AppDependenciesListBody> {
-        await this.authorize(id, auth.userId, 'view');
+        const access = await this.authorize(id, auth.userId, 'view');
         const [dependencies, canEdit, deployTarget] = await Promise.all([
             this.dependencies.list(id, { userId: auth.userId }),
             this.canEdit(id, auth.userId),
             this.deployTarget(id),
         ]);
-        return { workId: id, deployTarget, dependencies, refreshing: false, canEdit };
+        // Works-security — Delete data is the owner's while `APP_DATA_DELETE_OWNER_ONLY` is on, so
+        // the card can disable that one button (with the reason) for everyone else.
+        const canDeleteData = appDataDeleteOwnerOnly()
+            ? access?.role === WorkMemberRole.OWNER
+            : canEdit;
+        return {
+            workId: id,
+            deployTarget,
+            dependencies,
+            refreshing: false,
+            canEdit,
+            canDeleteData,
+        };
     }
 
     /** `PUT /api/works/:id/app-dependencies/:kind` — provider, prompted config and volume size. */
@@ -270,6 +285,16 @@ export class WorkAppDependenciesController {
     ): Promise<{ dependency: AppDependencyListEntry | null }> {
         const access = await this.authorize(id, auth.userId, 'edit');
         const kind = this.parseKind(kindParam);
+        // Works-security — irreversible, so the owner's alone (in a signed-in session) while
+        // `APP_DATA_DELETE_OWNER_ONLY` is on, exactly like deleting a Work with its data.
+        if (appDataDeleteOwnerOnly()) {
+            await requireAppWorkOwnerSession(
+                this.ownership,
+                id,
+                auth,
+                "delete an App dependency's data",
+            );
+        }
         const confirmSlug = text((body as { confirmSlug?: unknown } | null)?.confirmSlug);
         const workSlug = text((access.work as { slug?: unknown }).slug);
 
@@ -427,6 +452,8 @@ export interface AppDependenciesListBody {
     dependencies: AppDependencyListEntry[];
     refreshing: boolean;
     canEdit: boolean;
+    /** Works-security — whether the caller may Delete data (`APP_DATA_DELETE_OWNER_ONLY`). */
+    canDeleteData: boolean;
 }
 
 /** `POST …/:kind/provision`'s `202`. */

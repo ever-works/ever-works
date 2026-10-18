@@ -15,13 +15,18 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
     AppTargetService,
+    appDataDeleteOwnerOnly,
+    appTargetChangeRequiresOwner,
     type AppStatusBody,
     type AppTargetBody,
     type AppTargetRefusal,
 } from '@ever-works/agent/app-runtime';
+import { WorkMemberRole } from '@ever-works/agent/entities';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { isHumanSession } from '../auth/machine-principal';
+import { carriesValue, requireAppWorkOwnerSession } from './app-owner-gate';
 
 /**
  * APW-06 T33 (lane aw-deploy-2, 2026-10-17) — the App target and status routes the web's Deploy tab
@@ -49,6 +54,16 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
  * {@link AppTargetService.check}, never parsed, never loaded, never logged and never echoed: the
  * `202` carries a request id and nothing else, and `GET app-target` returns the worker's
  * secret-free `clusterCheck` result.
+ *
+ * ## The owner's decisions (works-security, 2026-10-18)
+ *
+ * Whoever chooses the cluster receives every secret the App renders into it, and whoever deletes
+ * the App's data cannot undo it. So, behind default-on switches (`app-owner-gates.ts`), these need
+ * the Work OWNER in a signed-in session (`app-owner-gate.ts`): a `check` that carries a
+ * `kubeconfig` or `kubeContext`, a `PUT app-target` that changes the target or its namespace, a
+ * rollback that confirms a cluster change or first uses a credential a non-owner saved
+ * (`APP_TARGET_CHANGE_REQUIRES_OWNER`), and `remove` with `deleteData`
+ * (`APP_DATA_DELETE_OWNER_ONLY`). Editors keep every other action here.
  */
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
@@ -83,6 +98,17 @@ export class WorkAppRuntimeController {
         @Body() body: { target?: unknown; settings?: unknown },
     ): Promise<AppTargetBody> {
         await this.authorize(id, auth.userId, 'edit');
+        if (appTargetChangeRequiresOwner()) {
+            const change = await this.targets.pendingTargetChange(id, body ?? {});
+            if (change.targetChanges || change.namespaceChanges) {
+                await requireAppWorkOwnerSession(
+                    this.ownership,
+                    id,
+                    auth,
+                    "change the App's deploy target or its namespace",
+                );
+            }
+        }
         const result = await this.targets.putTarget(id, auth.userId, body ?? {});
         if ('refusal' in result) throw refusalException(result.refusal);
         return (result as { body: AppTargetBody }).body;
@@ -103,8 +129,19 @@ export class WorkAppRuntimeController {
         @Body() body: { kubeconfig?: unknown; kubeContext?: unknown },
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<{ status: 'accepted'; requestId: string; dispatched: boolean }> {
-        await this.authorize(id, auth.userId, 'edit');
-        const result = await this.targets.check(id, auth.userId, body ?? {});
+        const access = await this.authorize(id, auth.userId, 'edit');
+        const savesCredential = carriesValue(body?.kubeconfig) || carriesValue(body?.kubeContext);
+        if (savesCredential && appTargetChangeRequiresOwner()) {
+            await requireAppWorkOwnerSession(
+                this.ownership,
+                id,
+                auth,
+                'connect a cluster to this App or change its context',
+            );
+        }
+        const result = await this.targets.check(id, auth.userId, body ?? {}, {
+            isOwner: access.role === WorkMemberRole.OWNER,
+        });
         if ('refusal' in result) throw refusalException(result.refusal);
         response.status(HttpStatus.ACCEPTED);
         const accepted = result as { requestId: string; dispatched: boolean };
@@ -138,11 +175,29 @@ export class WorkAppRuntimeController {
     async rollbackApp(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { deploymentId?: unknown; runPreDeployJobs?: unknown },
+        @Body()
+        body: { deploymentId?: unknown; runPreDeployJobs?: unknown; confirmClusterChange?: unknown },
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<Record<string, unknown>> {
         await this.authorize(id, auth.userId, 'edit');
-        const answer = await this.targets.rollback(id, auth.userId, body ?? {});
+        if (appTargetChangeRequiresOwner()) {
+            const confirmsChange = body?.confirmClusterChange === true;
+            const needsConfirmation = await this.targets.clusterCredentialNeedsOwnerConfirmation(id);
+            if (confirmsChange || needsConfirmation) {
+                await requireAppWorkOwnerSession(
+                    this.ownership,
+                    id,
+                    auth,
+                    needsConfirmation
+                        ? 'confirm a cluster credential another member saved'
+                        : 'confirm a change of the cluster this App runs on',
+                );
+                if (needsConfirmation) await this.targets.confirmClusterCredential(id, auth.userId);
+            }
+        }
+        const answer = await this.targets.rollback(id, auth.userId, body ?? {}, {
+            requestedByHumanSession: isHumanSession(auth),
+        });
         if ('refusal' in answer) throw refusalException(answer.refusal);
         const result = (
             answer as unknown as { result: Record<string, unknown> & { httpStatus: number } }
@@ -187,6 +242,18 @@ export class WorkAppRuntimeController {
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<{ status: 'accepted'; action: string; requestId: string; dispatched: boolean }> {
         const access = await this.authorize(id, auth.userId, 'edit');
+        if (
+            appDataDeleteOwnerOnly() &&
+            body?.action === 'remove' &&
+            body?.deleteData === true
+        ) {
+            await requireAppWorkOwnerSession(
+                this.ownership,
+                id,
+                auth,
+                "delete the App's stored data",
+            );
+        }
         const answer = await this.targets.lifecycle(
             { id, slug: (access.work as { slug?: string | null }).slug ?? null },
             auth.userId,
