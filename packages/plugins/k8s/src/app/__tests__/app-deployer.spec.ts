@@ -1618,7 +1618,7 @@ function jobObject(name: string, label: string, creationTimestamp: string): Json
 
 describe('a Job whose pod can never start fails with the rollout’s own code (2026-10-18)', () => {
 	const MIGRATE_JOB = `job-migrate-${DEPLOYMENT_SHORT}`;
-	const ROOT_KUBELET_MESSAGE = `Error: container has runAsNonRoot and image will run as root (pod: "${MIGRATE_JOB}-x7k2p_${NAMESPACE}(0a1b2c3d)", container: migrate)`;
+	const ROOT_KUBELET_MESSAGE = `Error: container has runAsNonRoot and image will run as root (pod: "${MIGRATE_JOB}-x7k2p_${NAMESPACE}(0a1b2c3d-1111-4a2b-9c3d-4e5f60718293)", container: migrate)`;
 
 	/** The Job controller's pod for `jobName`, its one container waiting the way kubelet left it. */
 	const waitingJobPod = (manifest: Json, waiting: Json, owner = String(manifest.metadata?.name)): Json => ({
@@ -1665,7 +1665,10 @@ describe('a Job whose pod can never start fails with the rollout’s own code (2
 		expect(result.failure?.message).toContain('image will run as root');
 		expect(result.failure?.message).toContain('USER');
 		expect(result.failure?.message).toContain('components[].runAsUser');
-		expect(result.failure?.message?.length ?? 0).toBeLessThanOrEqual(500);
+		// The code and the fix come first, so `lastError`'s 500 characters never cut them off.
+		const message = result.failure?.message ?? '';
+		expect(message.indexOf('works.yml')).toBeLessThan(500);
+		expect(message.indexOf('works.yml')).toBeLessThan(message.indexOf('Kubelet:'));
 		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'failed' });
 		expect(h.clock.millis - startedAt).toBeLessThan(60_000);
 		// ACC-06-09 still holds: a pre-deploy failure leaves the running app untouched.

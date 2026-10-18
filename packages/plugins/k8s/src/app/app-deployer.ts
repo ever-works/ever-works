@@ -2159,20 +2159,27 @@ function jobFailureMessage(entry: AppJobPlanEntry, result: AppJobResult): string
 	return `Job '${entry.name}' ended ${result.status}${expectation}${found}.`;
 }
 
-/** A Job whose pod never started: what the kubelet said, the code, and the fix when there is one. */
+/** A Job whose pod never started: the code, the fix when there is one, and what the kubelet said. */
 function jobPodFailureMessage(entry: AppJobPlanEntry, failure: AppPodFailure): string {
-	const detail = failure.message ?? failure.reason ?? failure.code;
-	const advice = podFailureAdvice(failure.code);
-	return `Job '${entry.name}' could not start its container: ${detail} (${failure.code}).${advice ? ` ${advice}` : ''}`;
+	return podFailureMessage(`Job '${entry.name}' could not start its container`, failure);
 }
 
 function rolloutFailureMessage(
 	objectName: string,
 	failure: { code: AppFailureCode; reason?: string; message?: string }
 ): string {
+	return podFailureMessage(`Component '${objectName}' failed to roll out`, failure);
+}
+
+/**
+ * `<head>: <detail> (<code>).` — or, for a code with a fix ({@link podFailureAdvice}), the code and
+ * the fix **before** the kubelet's text: the Deployment's `lastError` keeps 500 characters, and the
+ * kubelet message (pod name, namespace, uid) is the part that can afford to be cut.
+ */
+function podFailureMessage(head: string, failure: { code: AppFailureCode; reason?: string; message?: string }): string {
 	const detail = failure.message ?? failure.reason ?? failure.code;
 	const advice = podFailureAdvice(failure.code);
-	return `Component '${objectName}' failed to roll out: ${detail} (${failure.code}).${advice ? ` ${advice}` : ''}`;
+	return advice ? `${head} (${failure.code}). ${advice} Kubelet: ${detail}` : `${head}: ${detail} (${failure.code}).`;
 }
 
 /**

@@ -840,7 +840,7 @@ export function classifyJobPodFailure(
 export function podFailureAdvice(code: AppFailureCode): string | null {
 	switch (code) {
 		case 'managed_root_forbidden':
-			return 'The image runs as root, and this target only runs non-root containers. Fix: add a numeric non-root `USER` to the Dockerfile (for example `USER 1001`, after a `chown` of the paths the app writes), or set `components[].runAsUser` to a non-zero uid in works.yml.';
+			return 'The image runs as root, which this target refuses. Fix: set a numeric non-root `USER` in the Dockerfile (for example `USER 1001`, after a `chown` of the paths the app writes), or a non-zero `components[].runAsUser` in works.yml.';
 		case 'image_user_unverifiable':
 			return "The image's `USER` is a name, so Kubernetes cannot verify that it is not root. Fix: use the numeric uid in the Dockerfile (for example `USER 1001` instead of `USER nextjs`), or set `components[].runAsUser` to that uid in works.yml.";
 		case 'image_pull':
