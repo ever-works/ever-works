@@ -21,6 +21,30 @@ import { requireHumanSession } from '../auth/machine-principal';
  */
 export const APP_OWNER_REQUIRED_CODE = 'ownerRequired';
 
+/**
+ * The three switches, read per call. They mirror `appTargetChangeRequiresOwner` /
+ * `appDataDeleteOwnerOnly` / `appLicenseAttestSessionOnly` in
+ * `packages/agent/src/app-runtime/app-owner-gates.ts` (same names, same rule: ON unless exactly
+ * `false`) and are kept here so the controllers do not load the App runtime barrel for a flag.
+ */
+type EnvLike = Record<string, string | undefined>;
+
+function defaultOn(name: string, env: EnvLike | undefined): boolean {
+    return String((env ?? process.env)[name] ?? '').trim().toLowerCase() !== 'false';
+}
+
+export function appTargetChangeRequiresOwner(env?: EnvLike): boolean {
+    return defaultOn('APP_TARGET_CHANGE_REQUIRES_OWNER', env);
+}
+
+export function appDataDeleteOwnerOnly(env?: EnvLike): boolean {
+    return defaultOn('APP_DATA_DELETE_OWNER_ONLY', env);
+}
+
+export function appLicenseAttestSessionOnly(env?: EnvLike): boolean {
+    return defaultOn('APP_LICENSE_ATTEST_SESSION_ONLY', env);
+}
+
 export async function requireAppWorkOwnerSession(
     ownership: Pick<WorkOwnershipService, 'ensureIsOwner'>,
     workId: string,
@@ -47,6 +71,14 @@ export async function requireAppWorkOwnerSession(
         );
     }
     requireHumanSession(auth, action);
+}
+
+/**
+ * Whether a resolved access is the owner's (`WorkMemberRole.OWNER`, the creator's implicit role).
+ * Compared by value so this file needs no entities barrel (several controller specs stub it).
+ */
+export function isOwnerAccess(access: { role?: unknown } | null | undefined): boolean {
+    return access?.role === 'owner';
 }
 
 /** True when `value` is something a body "carries" — not absent, not null, not blank text. */

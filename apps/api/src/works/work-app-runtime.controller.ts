@@ -15,18 +15,21 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
     AppTargetService,
-    appDataDeleteOwnerOnly,
-    appTargetChangeRequiresOwner,
     type AppStatusBody,
     type AppTargetBody,
     type AppTargetRefusal,
 } from '@ever-works/agent/app-runtime';
-import { WorkMemberRole } from '@ever-works/agent/entities';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { isHumanSession } from '../auth/machine-principal';
-import { carriesValue, requireAppWorkOwnerSession } from './app-owner-gate';
+import {
+    appDataDeleteOwnerOnly,
+    appTargetChangeRequiresOwner,
+    carriesValue,
+    isOwnerAccess,
+    requireAppWorkOwnerSession,
+} from './app-owner-gate';
 
 /**
  * APW-06 T33 (lane aw-deploy-2, 2026-10-17) — the App target and status routes the web's Deploy tab
@@ -140,7 +143,7 @@ export class WorkAppRuntimeController {
             );
         }
         const result = await this.targets.check(id, auth.userId, body ?? {}, {
-            isOwner: access.role === WorkMemberRole.OWNER,
+            isOwner: isOwnerAccess(access),
         });
         if ('refusal' in result) throw refusalException(result.refusal);
         response.status(HttpStatus.ACCEPTED);

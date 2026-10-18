@@ -29,9 +29,7 @@ import {
     type AppDependencyListEntry,
 } from '@ever-works/agent/app-dependencies';
 import { isAppEnvEncryptionUnavailableError } from '@ever-works/agent/app-env';
-import { appDataDeleteOwnerOnly } from '@ever-works/agent/app-runtime';
 import { config } from '@ever-works/agent/config';
-import { WorkMemberRole } from '@ever-works/agent/entities';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import {
     APP_DEPENDENCY_KINDS,
@@ -41,7 +39,11 @@ import {
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { recordAppDependencyActivity } from './app-dependency-activity';
-import { requireAppWorkOwnerSession } from './app-owner-gate';
+import {
+    appDataDeleteOwnerOnly,
+    isOwnerAccess,
+    requireAppWorkOwnerSession,
+} from './app-owner-gate';
 
 /**
  * Lane aw-deps-api (APW-07 T25, 2026-10-18) — the App dependency routes (plan §5:787-790).
@@ -133,7 +135,7 @@ export class WorkAppDependenciesController {
         // Works-security — Delete data is the owner's while `APP_DATA_DELETE_OWNER_ONLY` is on, so
         // the card can disable that one button (with the reason) for everyone else.
         const canDeleteData = appDataDeleteOwnerOnly()
-            ? access?.role === WorkMemberRole.OWNER
+            ? isOwnerAccess(access)
             : canEdit;
         return {
             workId: id,

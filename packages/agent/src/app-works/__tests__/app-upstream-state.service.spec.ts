@@ -41,6 +41,7 @@ import { WorkRepository } from '../../database/repositories/work.repository';
 import { WorkUpstreamStateRepository } from '../../database/repositories/work-upstream-state.repository';
 import { Task, TaskStatus } from '../../entities/task.entity';
 import { WorkMember } from '../../entities/work-member.entity';
+import { WorkMemberRole } from '../../entities/types';
 import { Work } from '../../entities/work.entity';
 import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import { NoGitCredentialsError } from '../../facades/git.facade';
@@ -1168,6 +1169,59 @@ describe('AppUpstreamStateService', () => {
             const error = await refusalOf(service().requestSync(WORK_ID, OTHER_USER));
             expect(error.status).toBe(404);
             expect(error.code).toBe('not_found');
+        });
+    });
+
+    // ── works-security (2026-10-18) — the two write routes need edit access ──
+
+    describe('Sync now / Try again need edit access', () => {
+        async function seedMember(role: WorkMemberRole): Promise<void> {
+            const memberRepository = dataSource.getRepository(WorkMember);
+            await memberRepository.save(
+                memberRepository.create({ workId: WORK_ID, userId: MEMBER, role }),
+            );
+        }
+
+        it('refuses a viewer with 403 edit_access_required and queues nothing', async () => {
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'timed_out' });
+            await seedMember(WorkMemberRole.VIEWER);
+
+            const retry = await refusalOf(service().retryReadiness(WORK_ID, MEMBER));
+            expect(retry.status).toBe(403);
+            expect(retry.code).toBe('edit_access_required');
+
+            const sync = await refusalOf(service().requestSync(WORK_ID, MEMBER));
+            expect(sync.status).toBe(403);
+            expect(sync.code).toBe('edit_access_required');
+
+            // The viewer can still read the card.
+            await expect(service().get(WORK_ID, MEMBER)).resolves.toMatchObject({
+                workId: WORK_ID,
+            });
+            // Nothing was consumed or queued by the refusals.
+            const row = await states.findByWorkId(WORK_ID);
+            expect(row?.readinessState).toBe('timed_out');
+        });
+
+        it('lets an editor through to the ordinary rules', async () => {
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'ready', relation: 'link' });
+            await seedMember(WorkMemberRole.EDITOR);
+
+            const retry = await refusalOf(service().retryReadiness(WORK_ID, MEMBER));
+            expect(retry.code).toBe('not_retryable');
+            const sync = await refusalOf(service().requestSync(WORK_ID, MEMBER));
+            expect(sync.code).toBe('no_upstream');
+        });
+
+        it('still answers not found to a stranger, before any edit check', async () => {
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'timed_out' });
+
+            expect((await refusalOf(service().requestSync(WORK_ID, OTHER_USER))).code).toBe(
+                'not_found',
+            );
         });
     });
 

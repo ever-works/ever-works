@@ -20,7 +20,6 @@ import {
 } from '@ever-works/contracts';
 import type { LicenseAttestation } from '@ever-works/contracts';
 import { AppLicenseService } from '@ever-works/agent/app-license';
-import { appLicenseAttestSessionOnly } from '@ever-works/agent/app-runtime';
 import type { WorkAppSpecLinks } from '@ever-works/contracts';
 import {
     AppSpecService,
@@ -34,6 +33,7 @@ import type { Work } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { requireHumanSession } from '../auth/machine-principal';
+import { appLicenseAttestSessionOnly } from './app-owner-gate';
 import {
     AppSpecDraftValidationDto,
     AppSpecErrorDto,

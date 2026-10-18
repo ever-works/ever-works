@@ -19,8 +19,7 @@ import { AuthSessionGuard, CurrentUser } from '../auth';
 import { RefuseFleetRunGuard } from '../auth/guards/refuse-fleet-run.guard';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { WorkOwnershipService } from '@ever-works/agent/services';
-import { appTargetChangeRequiresOwner } from '@ever-works/agent/app-runtime';
-import { requireAppWorkOwnerSession } from '../works/app-owner-gate';
+import { appTargetChangeRequiresOwner, requireAppWorkOwnerSession } from '../works/app-owner-gate';
 import { PluginOperationsService, PluginInstallerService } from '@ever-works/agent/plugins';
 // EW-693 — catalog + install endpoints.
 import { PluginCatalogService } from './plugin-catalog.service';

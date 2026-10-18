@@ -14,7 +14,6 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@ne
 import {
     AppDeployRequestService,
     AppTargetService,
-    appTargetChangeRequiresOwner,
     type AppDeployRequestResult,
 } from '@ever-works/agent/app-runtime';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
@@ -24,7 +23,7 @@ import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { isHumanSession } from '../auth/machine-principal';
 import { AppDeployRequestDto, AppDeployResponseDto } from './dto/app-deploy.dto';
-import { requireAppWorkOwnerSession } from './app-owner-gate';
+import { appTargetChangeRequiresOwner, requireAppWorkOwnerSession } from './app-owner-gate';
 import { recordAppDependencyActivity } from './app-dependency-activity';
 
 /**
