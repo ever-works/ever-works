@@ -548,9 +548,14 @@ export type FleetSessionNotice =
 	/** The viewer could not keep up and is being dropped. */
 	| { type: 'session.notice'; notice: 'slow-viewer' }
 	/** The terminal was resized by the newest driver. */
-	| { type: 'session.notice'; notice: 'size'; cols: number; rows: number };
+	| { type: 'session.notice'; notice: 'size'; cols: number; rows: number }
+	/**
+	 * The stream restarts with a fresh replay (the link came back and the node
+	 * re-attached): clear the terminal before writing what follows.
+	 */
+	| { type: 'session.notice'; notice: 'replay' };
 
-export const FLEET_SESSION_NOTICE_KINDS = ['paused', 'resumed', 'drain', 'slow-viewer', 'size'] as const;
+export const FLEET_SESSION_NOTICE_KINDS = ['paused', 'resumed', 'drain', 'slow-viewer', 'size', 'replay'] as const;
 
 export function parseFleetSessionNotice(value: unknown): FleetSessionNotice | null {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
@@ -565,6 +570,8 @@ export function parseFleetSessionNotice(value: unknown): FleetSessionNotice | nu
 			return { type: 'session.notice', notice: 'resumed' };
 		case 'slow-viewer':
 			return { type: 'session.notice', notice: 'slow-viewer' };
+		case 'replay':
+			return { type: 'session.notice', notice: 'replay' };
 		case 'drain':
 			return typeof record.seconds === 'number' && Number.isFinite(record.seconds) && record.seconds >= 0
 				? { type: 'session.notice', notice: 'drain', seconds: Math.floor(record.seconds) }

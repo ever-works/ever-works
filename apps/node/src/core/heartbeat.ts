@@ -71,7 +71,11 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Fleet node link (FL-02): the consents. A platform that
+	// NEWEST first. Sessions on computers (FL-04): the session daemon's health.
+	// A platform that predates it answers 400; the node strips this tier first
+	// and keeps beating — losing only the daemon line, never its consents.
+	['daemon'],
+	// Fleet node link (FL-02): the consents. A platform that
 	// predates them answers 400; the node strips this tier, keeps beating with
 	// everything else, and does not open the link (spec U11).
 	['consents'],
@@ -438,10 +442,16 @@ function describeStrippedTiers(tiers: number): string {
 	if (tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length) {
 		return 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.';
 	}
-	if (tiers >= 2) {
+	// Named by the fields dropped, not by the tier's index, so a newer tier
+	// added on top never changes what an older one's message says.
+	const dropped = new Set<string>(OPTIONAL_DESCRIPTION_FIELD_TIERS.slice(0, tiers).flat());
+	if (dropped.has('cliVersions')) {
 		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
 	}
-	return 'Platform rejected the consents field; it predates the node link. Still reporting everything else; the node link stays closed until this node restarts.';
+	if (dropped.has('consents')) {
+		return 'Platform rejected the consents field; it predates the node link. Still reporting everything else; the node link stays closed until this node restarts.';
+	}
+	return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */
