@@ -45,6 +45,7 @@ import {
     fleetRunBindingOf,
     machinePrincipalKind,
     refuseMachinePrincipalAction,
+    refuseMachinePrincipalFields,
     type MachinePrincipalRequest,
 } from '../auth/machine-principal';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -256,6 +257,19 @@ export class KbController {
         // Appended LAST so positional callers (specs) keep their meaning.
         @Req() req?: MachinePrincipalRequest,
     ) {
+        // Works-security (run-token scope) — `status` archives / un-archives
+        // (or re-drafts) a document: archiving hides it from every later run
+        // and from the owner's working set, un-archiving brings a retired one
+        // back into context. The dedicated archive routes are not granted to a
+        // machine principal, so neither is this side door; content edits stay.
+        refuseMachinePrincipalFields(
+            auth,
+            req,
+            body as unknown as Record<string, unknown>,
+            ['status'],
+            'a knowledge-base document',
+            'archiving and restoring documents is done by a person in the app.',
+        );
         return this.kb.updateDocument(workId, docId, auth.userId, {
             ...body,
             status: body.status as KbDocumentStatus | undefined,

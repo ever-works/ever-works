@@ -179,6 +179,29 @@ describe('KbController — machine-written documents are review-gated', () => {
         expect(kb.updateDocument.mock.calls[2][3].reviewState).toBeUndefined();
     });
 
+    // Works-security (run-token scope) — finding 4: the core PATCH's `status`
+    // was a side door to archive / un-archive a document (the dedicated
+    // archive routes are not granted to a run token).
+    it('refuses a status change (archive / restore / re-draft) from a fleet run or an integration key', async () => {
+        for (const status of ['archived', 'active', 'draft']) {
+            await expect(
+                controller.updateDocument(auth, WORK_ID, DOC_ID, { status } as never, runToken),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        }
+        await expect(
+            controller.updateDocument(integration, WORK_ID, DOC_ID, { status: 'archived' } as never),
+        ).rejects.toMatchObject({ status: 422 });
+        expect(kb.updateDocument).not.toHaveBeenCalled();
+        // A person (personal key or session) keeps it.
+        await controller.updateDocument(auth, WORK_ID, DOC_ID, { status: 'archived' } as never, {});
+        expect(kb.updateDocument).toHaveBeenLastCalledWith(
+            WORK_ID,
+            DOC_ID,
+            'u-1',
+            expect.objectContaining({ status: 'archived' }),
+        );
+    });
+
     it('refuses accept and unlock from a fleet run, keeps them for a person', async () => {
         await expect(
             controller.acceptDocument(auth, WORK_ID, DOC_ID, runToken),
