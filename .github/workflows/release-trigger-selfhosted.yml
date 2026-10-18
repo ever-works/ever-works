@@ -157,7 +157,10 @@ jobs:
           # (TRIGGER_ACCESS_TOKEN) untouched for the legacy cloud workflows.
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_SELFHOSTED_ACCESS_TOKEN }}
           # Public origin of our self-hosted instance (used by the CLI to deploy).
-          TRIGGER_API_URL: https://trigger.ever.co
+          # Repo var override (2026-10-18): the in-cluster ARC runners use the in-cluster webapp
+          # (http://trigger-webapp.trigger.svc.cluster.local:3030) because cluster egress cannot reach
+          # Cloudflare 188.114.96.0/22 during the daily ISP window, so login against the public URL fails.
+          TRIGGER_API_URL: ${{ vars.TRIGGER_SELFHOSTED_API_URL || 'https://trigger.ever.co' }}
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
           # GHCR push token (evereq classic PAT, write:packages). The self-hosted
