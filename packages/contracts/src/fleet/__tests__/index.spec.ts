@@ -761,7 +761,10 @@ describe('fleet barrel', () => {
 		// → 381 with computer health (FL-03): the twenty-eight symbols of
 		// `fleet-node-health.types.ts` — a NEW module, so the witness table
 		// below gains a row.
-		expect(Object.keys(fleet)).toHaveLength(381);
+		// → 383 with the CI-skip neutraliser (works-security, node 0.2.7):
+		// `neutralizeCiSkipDirectives` + `containsCiSkipDirective` in
+		// `fleet-commit-message.types.ts`, an existing module — no new witness row.
+		expect(Object.keys(fleet)).toHaveLength(383);
 	});
 
 	it.each([

@@ -598,7 +598,15 @@ export async function runAgentTaskJob(
 	// is provisioned or spawned: skip-permissions and node-run shell commands
 	// are this machine's decision, not the platform's.
 	enforceAgentTaskExecutionPolicy(
-		{ execution, setupCount: setup.length, stepCount: grantedSteps.length, checkCount: checks.length },
+		{
+			execution,
+			setupCount: setup.length,
+			stepCount: grantedSteps.length,
+			checkCount: checks.length,
+			// works-security (node 0.2.7): the bridge is the machine owner's
+			// decision too — the payload alone no longer turns it on.
+			mcpBridge: resolveMcpBridgeSpec(payload) !== null
+		},
 		io.executionPolicy
 	);
 
