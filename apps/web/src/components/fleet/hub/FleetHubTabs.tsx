@@ -4,6 +4,8 @@ import { useRef, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
+import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
+import { useShortcut } from '@/lib/hooks/use-shortcut';
 import { FLEET_HUB_TABS, type FleetHubTabId } from '../registry';
 
 /**
@@ -14,11 +16,28 @@ import { FLEET_HUB_TABS, type FleetHubTabId } from '../registry';
  * A `tablist` (spec §5.13): Left / Right / Home / End move focus between the
  * tabs (roving tab index), Enter or Space opens the focused one — it is a
  * navigation, so a tab is a link, never a panel toggled in place.
+ *
+ * `1` – `6` open the hub tabs in order from anywhere on a hub page, never while
+ * typing (spec §5.12), through the shared shortcut registry.
  */
 export function FleetHubTabs({ active }: { active: FleetHubTabId }) {
     const t = useTranslations('fleet.hub');
     const router = useRouter();
     const refs = useRef<Array<HTMLAnchorElement | null>>([]);
+
+    useShortcut(
+        { id: 'fleet.hub.tabs', scope: 'fleet-hub', priority: SHORTCUT_PRIORITY.screen },
+        (event) =>
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey &&
+            /^[1-9]$/.test(event.key) &&
+            Number(event.key) <= FLEET_HUB_TABS.length,
+        (event) => {
+            const tab = FLEET_HUB_TABS[Number(event.key) - 1];
+            if (tab && tab.id !== active) router.push(tab.href);
+        },
+    );
 
     const focusTab = (index: number) => {
         const count = FLEET_HUB_TABS.length;

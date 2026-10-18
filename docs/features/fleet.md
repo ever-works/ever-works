@@ -69,6 +69,8 @@ Every invalid credential path — unknown token, expired token, already-consumed
 
 ## Managing nodes
 
+With `FLEET_HUB_ENABLED` on, the same registry has its own place in the app: the [Fleet hub](./fleet-hub.md) — one sidebar entry, what needs a look first, a page per computer and who in your Organization may do what on each one. The routes below are unchanged by it.
+
 ```
 GET    /api/fleet/nodes              list mine (enrolled + live own-cluster), each with its current load
 GET    /api/fleet/nodes/:id          one node + its recent job history (and the failed subset)
