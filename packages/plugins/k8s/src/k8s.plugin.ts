@@ -44,6 +44,7 @@ import type {
 import { createHash } from 'node:crypto';
 
 import { K8sPluginError, buildSecretPattern, scrubError } from './errors.js';
+import type { K8sPluginErrorCode } from './errors.js';
 import { KubernetesApiService } from './k8s-api.service.js';
 import { defaultIngressStrategyRegistry, IngressStrategyRegistry } from './ingress/strategy.registry.js';
 import { defaultRegistryProviderRegistry, RegistryProviderRegistry } from './registries/provider.registry.js';
@@ -376,6 +377,130 @@ const REGISTRY_SCHEMA: JsonSchema = {
 		}
 	]
 };
+
+/**
+ * Lane works-security — the switch over §6.1 on the App **dependency** path (`provision`, `getOutputs`,
+ * `deprovision`, `backupStatus`).
+ *
+ * On unless the value is exactly `'false'`: a member-supplied `your-cluster` kubeconfig is refused for the
+ * shapes the App entrypoints refuse (exec / auth-provider plugins, local file reads, `proxy-url`,
+ * `insecure-skip-tls-verify`, no inline CA, non-https) and its server is pinned to a validated public
+ * address before any provider dials it. `'false'` restores the unguarded pass-through exactly. Read at call
+ * time, so an operator flips it without a code change.
+ */
+export const DEPENDENCY_KUBECONFIG_GUARD_ENV = 'EVER_WORKS_APPS_GUARD_DEPENDENCY_KUBECONFIG';
+
+/** Is the dependency-path kubeconfig guard on? (On unless {@link DEPENDENCY_KUBECONFIG_GUARD_ENV} is exactly `'false'`.) */
+export function dependencyKubeconfigGuardEnabled(
+	env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env
+): boolean {
+	return env?.[DEPENDENCY_KUBECONFIG_GUARD_ENV] !== 'false';
+}
+
+/** {@link KubernetesPlugin.checkClusterCredentialShape}'s answer. */
+export type ClusterCredentialShapeVerdict = { ok: true } | { ok: false; code: string; message: string };
+
+/**
+ * The owner-facing sentence for one `KUBECONFIG_UNSUPPORTED` refusal, chosen by the guard message's FIXED
+ * tail — the text after every value the guard interpolates (user, cluster, server, proxy) — so a crafted
+ * name can neither leak into the sentence nor pick another rule's sentence. A guard message that matches
+ * no tail (its wording changed) falls back to the code's generic sentence: never to the raw message.
+ */
+const UNSUPPORTED_KUBECONFIG_SENTENCES: ReadonlyArray<{ readonly tail: string; readonly sentence: string }> = [
+	{
+		tail: 'the plugin would run an arbitrary local command. Use a token or an inline certificate instead.',
+		sentence:
+			'This kubeconfig uses an exec credential plugin, which would run a command on Ever Works servers. Use a service-account token or an inline client certificate instead.'
+	},
+	{
+		tail: 'credential plugin, which App Works refuse. Use a token or an inline certificate instead.',
+		sentence:
+			'This kubeconfig uses the legacy auth-provider credential plugin. Use a service-account token or an inline client certificate instead.'
+	},
+	{
+		tail: 'Paste the token itself instead.',
+		sentence: 'This kubeconfig reads its token from a local file (tokenFile). Paste the token itself instead.'
+	},
+	{
+		tail: "Use 'client-certificate-data' instead.",
+		sentence: 'This kubeconfig points at a client certificate file. Use client-certificate-data instead.'
+	},
+	{
+		tail: "Use 'client-key-data' instead.",
+		sentence: 'This kubeconfig points at a client key file. Use client-key-data instead.'
+	},
+	{
+		tail: "Use 'certificate-authority-data' instead.",
+		sentence: 'This kubeconfig points at a certificate-authority file. Use certificate-authority-data instead.'
+	},
+	{
+		tail: 'and App Works never skip certificate verification.',
+		sentence:
+			"This kubeconfig sets insecure-skip-tls-verify, and Ever Works never skips certificate verification. Add the cluster's CA as certificate-authority-data instead."
+	},
+	{
+		tail: 'the connection must go to the cluster address itself.',
+		sentence:
+			'This kubeconfig sets a proxy-url. Ever Works connects to the cluster address itself; remove the proxy.'
+	},
+	{
+		tail: "Add the cluster's CA to the kubeconfig.",
+		sentence:
+			"This kubeconfig has no certificate-authority-data, so the cluster certificate cannot be verified. Add the cluster's CA to the kubeconfig."
+	},
+	{ tail: 'is not a valid URL.', sentence: 'The cluster server in this kubeconfig is not a valid URL.' },
+	{ tail: 'Plain http is refused.', sentence: 'The cluster server in this kubeconfig must use https.' },
+	{ tail: 'kubeconfig server has no host.', sentence: 'The cluster server in this kubeconfig has no host.' }
+];
+
+/** One fixed sentence per refusal code — the fallback, and the whole answer for the non-shape codes. */
+const KUBECONFIG_REFUSAL_SENTENCES: Partial<Record<K8sPluginErrorCode, string>> = {
+	KUBECONFIG_UNSUPPORTED:
+		'This kubeconfig uses a credential or connection setting Ever Works does not accept (an exec or auth-provider plugin, a local file, a proxy, skipped certificate verification, a missing inline CA, or a non-https server).',
+	INVALID_YAML: 'This is not a valid kubeconfig YAML document.',
+	MISSING_CONTEXT: 'This kubeconfig has no usable context: set current-context, or choose a context it defines.',
+	MISSING_CLUSTER: "The kubeconfig's selected context names a cluster that is missing or has no server.",
+	MISSING_USER: "The kubeconfig's selected context names a user that is missing.",
+	CLUSTER_ADDRESS_NOT_PUBLIC:
+		'The cluster address in this kubeconfig is not a public address. An operator of a self-hosted installation can allow a private range explicitly.',
+	CLUSTER_UNREACHABLE: 'The cluster address in this kubeconfig could not be resolved right now.'
+};
+
+/**
+ * A §6.1 refusal as `{ code, message }` with a message that NEVER echoes any part of the kubeconfig (no
+ * server, no names, no proxy, no token, no path). `code` is the guard's own (`KUBECONFIG_UNSUPPORTED`,
+ * `INVALID_YAML`, `MISSING_*`, `CLUSTER_ADDRESS_NOT_PUBLIC`, `CLUSTER_UNREACHABLE`); anything the guard did
+ * not raise itself (a malformed document tripping the parser) reads as `INVALID_YAML`.
+ */
+export function describeKubeconfigRefusal(error: unknown): { code: K8sPluginErrorCode; message: string } {
+	const code: K8sPluginErrorCode = error instanceof K8sPluginError ? error.code : 'INVALID_YAML';
+	if (code === 'KUBECONFIG_UNSUPPORTED') {
+		const raw = error instanceof Error ? error.message.trim() : '';
+		const hit = UNSUPPORTED_KUBECONFIG_SENTENCES.find(({ tail }) => raw.endsWith(tail));
+		if (hit) return { code, message: hit.sentence };
+	}
+	return { code, message: KUBECONFIG_REFUSAL_SENTENCES[code] ?? 'This kubeconfig cannot be used.' };
+}
+
+/**
+ * A refused dependency credential as a provision outcome. A DNS answer that did not come is transient
+ * (`clusterUnreachable`, retried under the allowance); every other refusal is definite and reads as the
+ * card's "your cluster hasn't passed its check" (`targetNotChecked`). The detail carries the guard's code
+ * only — never its message, which names parts of the kubeconfig.
+ */
+function dependencyGuardFailure(error: unknown): AppDependencyProvisionOutcome {
+	const { code } = describeKubeconfigRefusal(error);
+	if (code === 'CLUSTER_UNREACHABLE') {
+		return { state: 'failed', reason: 'clusterUnreachable', transient: true, detail: { code } };
+	}
+	return { state: 'failed', reason: 'targetNotChecked', transient: false, detail: { code } };
+}
+
+/** The same refusal, thrown, for the members whose contract answers by throwing — with the safe sentence. */
+function dependencyGuardError(error: unknown): K8sPluginError {
+	const { code, message } = describeKubeconfigRefusal(error);
+	return new K8sPluginError(code, message);
+}
 
 export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	// `string`, not the literal: APW-10 lite's `k8s-apps-tier` plugin extends this class with its own id.
@@ -1505,27 +1630,42 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	/**
 	 * Provision one dependency (`providerId` selects among this plugin's providers) — plan §4.9.
 	 *
-	 * The credential is **not** re-guarded here, and that is deliberate: §4.8:547-557 makes APW-06's
-	 * `AppRuntimeTargetPort.prepareDependencyTarget(workId)` the one thing that resolves a target, and the job
-	 * builds `ctx.cluster` from it before calling a provider. Re-running §6.1's guard over that YAML would
-	 * re-resolve an address APW-06 has already pinned, which is exactly the double-resolution the guard exists
-	 * to prevent.
+	 * The credential IS guarded here (lane works-security, {@link DEPENDENCY_KUBECONFIG_GUARD_ENV}). The old
+	 * premise — "APW-06 already pinned it" — did not hold: `prepareDependencyTarget` answers only
+	 * `{ ref, podLabels }`, and the job builds `ctx.cluster.kubeconfig` from the member's credential VERBATIM
+	 * (`AppDependenciesService.prepareTarget` → `resolveClusterAccess`). `prepareAppNamespace` does run §6.1,
+	 * but its pinned YAML is used for its own calls and then dropped, so every provider call dialled the
+	 * unpinned original — free to re-resolve to an internal address after the check. Pinning here, once per
+	 * call, and handing the providers the PINNED YAML is what makes "connect to the address that was
+	 * validated" true on this path too. See {@link guardedDependencyContext}.
 	 */
 	async provision(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyProvisionOutcome> {
 		const provider = this.dependencyProviderFor(providerId);
 		if (!provider) {
 			return { state: 'failed', reason: 'providerNotSupported', transient: false, detail: { providerId } };
 		}
-		return provider.provision(providerId, ctx);
+		let guarded: AppDependencyContext;
+		try {
+			guarded = await this.guardedDependencyContext(ctx);
+		} catch (error) {
+			return dependencyGuardFailure(error);
+		}
+		return provider.provision(providerId, guarded);
 	}
 
-	/** Re-read a dependency's outputs — the `refresh` mode (FR-42). */
+	/** Re-read a dependency's outputs — the `refresh` mode (FR-42). The credential is guarded first. */
 	async getOutputs(providerId: string, ctx: AppDependencyContext): Promise<Record<string, string>> {
 		const provider = this.dependencyProviderFor(providerId);
 		if (!provider) {
 			throw new K8sPluginError('NOT_CONFIGURED', `No Kubernetes dependency provider serves '${providerId}'.`);
 		}
-		return provider.getOutputs(providerId, ctx);
+		let guarded: AppDependencyContext;
+		try {
+			guarded = await this.guardedDependencyContext(ctx);
+		} catch (error) {
+			throw dependencyGuardError(error);
+		}
+		return provider.getOutputs(providerId, guarded);
 	}
 
 	/**
@@ -1542,14 +1682,89 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	): Promise<AppDependencyDeprovisionOutcome> {
 		const provider = this.dependencyProviderFor(providerId);
 		if (!provider) return { state: 'released' };
-		return provider.deprovision(providerId, ctx, opts);
+		let guarded: AppDependencyContext;
+		try {
+			guarded = await this.guardedDependencyContext(ctx);
+		} catch (error) {
+			// A plain release (`deleteData: false`, no `stopWorkloads`) is the contract's no-cluster-call
+			// answer, `released` — given here without handing the refused credential to anyone, so the row is
+			// not stuck in `deleting` over a credential nothing was going to dial. Anything that WOULD dial
+			// is refused, and the caller reports its resources as possibly remaining.
+			if (opts?.deleteData !== true && opts?.stopWorkloads !== true) return { state: 'released' };
+			throw dependencyGuardError(error);
+		}
+		return provider.deprovision(providerId, guarded, opts);
 	}
 
-	/** FR-48/FR-49 — the card's one backup state, read from individual records. */
+	/** FR-48/FR-49 — the card's one backup state, read from individual records. The credential is guarded first. */
 	async backupStatus(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyBackupStatus> {
 		const provider = this.dependencyProviderFor(providerId);
 		if (!provider) return { state: 'none' };
-		return provider.backupStatus(providerId, ctx);
+		let guarded: AppDependencyContext;
+		try {
+			guarded = await this.guardedDependencyContext(ctx);
+		} catch (error) {
+			throw dependencyGuardError(error);
+		}
+		return provider.backupStatus(providerId, guarded);
+	}
+
+	/**
+	 * §6.1 over the credential a dependency call carries — the reason all four dialling members above call
+	 * this before they hand `ctx` to a provider.
+	 *
+	 * - Switch off ({@link DEPENDENCY_KUBECONFIG_GUARD_ENV} `=== 'false'`): `ctx` itself, untouched.
+	 * - The managed tier: `ctx` itself, untouched. The `ever-works-apps` credential is the OPERATOR's,
+	 *   assembled by the platform for a platform cluster that is legitimately internal, and this lite tier's
+	 *   dependency path has always passed it straight through (the shape-only rule lives in the subclass's
+	 *   `guardedAppCredential`, for its App members). Told apart by BOTH the call's target and this plugin
+	 *   serving that target ({@link servesAppTarget}): the `k8s` plugin never serves `ever-works-apps`, so a
+	 *   context naming it here is still guarded.
+	 * - No credential (`ctx.cluster` absent or an empty kubeconfig): `ctx` itself — the providers already
+	 *   answer "no cluster" for that, without a client.
+	 * - Otherwise — a member's `your-cluster` kubeconfig: {@link guardMemberCredential} (shape refusals, the
+	 *   public-address check, the pin), and a COPY of `ctx` whose `cluster.kubeconfig` is the pinned YAML.
+	 *   The context name, namespace and labels are kept; the rewrite leaves context names as they were.
+	 */
+	private async guardedDependencyContext(ctx: AppDependencyContext): Promise<AppDependencyContext> {
+		if (!dependencyKubeconfigGuardEnabled()) return ctx;
+		if (this.dependencyCredentialIsOperatorHeld(ctx?.target)) return ctx;
+
+		const cluster = ctx?.cluster;
+		const kubeconfig = typeof cluster?.kubeconfig === 'string' ? cluster.kubeconfig : '';
+		if (!cluster || kubeconfig.length === 0) return ctx;
+
+		const pinned = await this.guardMemberCredential(kubeconfig, cluster.context);
+		return { ...ctx, cluster: { ...cluster, kubeconfig: pinned } };
+	}
+
+	/** The managed tier's operator-held credential: the `ever-works-apps` target, on a plugin that serves it. */
+	private dependencyCredentialIsOperatorHeld(target: AppDependencyTarget | undefined): boolean {
+		return target === 'ever-works-apps' && this.servesAppTarget(target);
+	}
+
+	/**
+	 * Is this kubeconfig one App Works can use — shape only? For the API process to call at SAVE time.
+	 *
+	 * **Pure**: no DNS, no network, no file, no client — exactly `assertSupportedKubeconfig`, so it answers
+	 * the §6.1 step-1 refusals (exec / auth-provider plugins, `tokenFile`, certificate / key / CA files,
+	 * `insecure-skip-tls-verify`, `proxy-url`, no inline CA, non-https server) plus the parser's own
+	 * (`INVALID_YAML`, `MISSING_CONTEXT`, `MISSING_CLUSTER`, `MISSING_USER`). Whether the server's address is
+	 * public is NOT judged here (that needs DNS); the worker's guard still decides it at dial time.
+	 *
+	 * The refusal's `code` is the guard's own; its `message` is a fixed sentence that never echoes any part
+	 * of the kubeconfig ({@link describeKubeconfigRefusal}). Never throws. Not gated by
+	 * {@link DEPENDENCY_KUBECONFIG_GUARD_ENV}: the caller decides whether to ask.
+	 */
+	checkClusterCredentialShape(kubeconfig: string, kubeContext?: string): ClusterCredentialShapeVerdict {
+		try {
+			const context = typeof kubeContext === 'string' && kubeContext.trim() ? kubeContext.trim() : undefined;
+			assertSupportedKubeconfig(typeof kubeconfig === 'string' ? kubeconfig : '', context);
+			return { ok: true };
+		} catch (error) {
+			const { code, message } = describeKubeconfigRefusal(error);
+			return { ok: false, code, message };
+		}
 	}
 
 	/**
@@ -1609,6 +1824,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * to `KubernetesApiService`, and therefore the one the client loads.
 	 */
 	protected async guardedAppCredential(credential: string, kubeContext?: string | null): Promise<string> {
+		return this.guardMemberCredential(credential, kubeContext);
+	}
+
+	/**
+	 * The full §6.1 guard over a MEMBER's credential: {@link guardedAppCredential}'s body, kept `private` so
+	 * the dependency path ({@link guardedDependencyContext}) always gets all three steps — a subclass that
+	 * narrows `guardedAppCredential` for an operator-held credential (the managed tier's shape-only rule)
+	 * cannot narrow this one.
+	 */
+	private async guardMemberCredential(credential: string, kubeContext?: string | null): Promise<string> {
 		const allowlist = readClusterPrivateAllowlist();
 		if (allowlist.invalid.length > 0) {
 			// Plan §6.1: an entry that does not parse never widens the policy — it is reported, then

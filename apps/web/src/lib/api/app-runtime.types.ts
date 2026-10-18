@@ -155,6 +155,26 @@ export interface AppRuntimeActionResult<T = undefined> {
 export const APP_RUNTIME_ROUTE_UNAVAILABLE = 'route_unavailable';
 
 /**
+ * Works-security (2026-10-18) — the code the API's `403` carries when an App Works action is the
+ * Work OWNER's alone (`apps/api/src/works/app-owner-gate.ts`): connecting a cluster or changing
+ * its context, changing the target or its namespace, confirming a cluster credential another
+ * member saved (a Deploy / Roll back), Remove with stored data, and a dependency's Delete data.
+ *
+ * The switches behind these are the operator's (default on), so the web never assumes the
+ * refusal: it renders it — "Only the Work owner can do this." — when it comes back. The owner's
+ * own API key gets a `403` too, but without this code ("Only a person signed in to Ever Works
+ * can …"); that sentence is shown as the API wrote it.
+ */
+export const APP_OWNER_REQUIRED_CODE = 'ownerRequired';
+
+/** Whether an action's answer is the owner-only refusal ({@link APP_OWNER_REQUIRED_CODE}). */
+export function isAppOwnerRequired(
+    result: { code?: string | null } | null | undefined,
+): boolean {
+    return result?.code === APP_OWNER_REQUIRED_CODE;
+}
+
+/**
  * The target an App Work has when the API cannot tell us (its `app-target`
  * route answered 404): derived once from the persisted `deployProvider`, the
  * same rule as plan §9.1's `deriveInitialAppTarget` (FR-63) —
