@@ -243,6 +243,43 @@ describe('PrReviewService', () => {
         expect(body).toContain('Work: Acme Directory');
     });
 
+    // Self-reply loop (2026-10-18, #2774 / #2769): the review is posted with
+    // the owner's GitHub USER token, so the webhook bridge cannot tell it from
+    // the owner's own comments by its author. Its footer used to say
+    // "replying to an @ever-works mention", so every reply was a new mention
+    // and a new paid review, about once a minute.
+    describe('the posted comment never asks for another review', () => {
+        it('opens with the hidden marker the webhook bridge skips', async () => {
+            const service = build();
+            await service.reviewPullRequest({
+                userId: 'user-1',
+                owner: 'octo',
+                repo: 'site',
+                prNumber: 7,
+            });
+            const body = gitFacade.createPullRequestComment.mock.calls[0][3] as string;
+            // A literal on purpose: the bridge matches comments already on
+            // GitHub by it, so it must never drift.
+            expect(body.split('\n')[0]).toBe('<!-- ever-works-ai-review -->');
+        });
+
+        it('a reply to a mention names no @ever-works handle in its footer', async () => {
+            const service = build();
+            await service.reviewPullRequest({
+                userId: 'user-1',
+                owner: 'octo',
+                repo: 'site',
+                prNumber: 7,
+                instruction: 'is the migration reversible?',
+            });
+            const body = gitFacade.createPullRequestComment.mock.calls[0][3] as string;
+            expect(body).toContain(
+                '<sub>replying to a review request · Work: Acme Directory</sub>',
+            );
+            expect(body).not.toContain('@ever-works');
+        });
+    });
+
     it('lands a github.pr.review ingest envelope with the PR sourceUrl', async () => {
         const service = build();
         await service.reviewPullRequest({

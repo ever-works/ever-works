@@ -20,6 +20,7 @@ import {
     type PrReviewResult,
     type PrStructuredReview,
 } from './pr-review.types';
+import { renderPrReviewComment } from './pr-review-comment';
 
 // Repo→Work matching lives in ONE place (`works/work-repo-match.ts`) so
 // the ingest `workHint` resolver and this reviewer can never drift apart
@@ -249,7 +250,7 @@ export class PrReviewService {
                 owner,
                 repo,
                 prNumber,
-                this.renderComment({
+                renderPrReviewComment({
                     review,
                     owner,
                     repo,
@@ -569,40 +570,6 @@ export class PrReviewService {
             summary: trimmed.slice(0, 4000) || 'The reviewer produced no readable output.',
             comments: [],
         };
-    }
-
-    /** Render the single summary comment posted on the PR (v1). */
-    private renderComment(input: {
-        review: PrStructuredReview;
-        owner: string;
-        repo: string;
-        prNumber: number;
-        work: Work | null;
-        instruction?: string;
-    }): string {
-        const { review, owner, repo, prNumber, work } = input;
-        const lines: string[] = [
-            `### Ever Works AI review — \`${owner}/${repo}#${prNumber}\``,
-            '',
-            review.summary,
-        ];
-        if (review.comments.length > 0) {
-            lines.push('', '**File notes:**');
-            for (const comment of review.comments) {
-                lines.push(`- \`${comment.path}\` — ${comment.comment}`);
-            }
-        }
-        const footer: string[] = [];
-        if (input.instruction) {
-            footer.push('replying to an @ever-works mention');
-        }
-        if (work) {
-            footer.push(`Work: ${work.name}`);
-        }
-        if (footer.length > 0) {
-            lines.push('', `<sub>${footer.join(' · ')}</sub>`);
-        }
-        return lines.join('\n');
     }
 
     /** Land the review as an ingest-spine envelope (best-effort). */

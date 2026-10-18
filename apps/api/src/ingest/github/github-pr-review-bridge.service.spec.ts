@@ -2,7 +2,12 @@ jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestService: class {},
     IngestInstallBindingRepository: class {},
 }));
-jest.mock('@ever-works/agent/pr-review', () => ({ PrReviewService: class {} }));
+jest.mock('@ever-works/agent/pr-review', () => ({
+    PrReviewService: class {},
+    // The comment renderer and its marker are pure, so the REAL ones load:
+    // the self-reply-loop specs feed the bridge exactly what the reviewer posts.
+    ...jest.requireActual('../../../../../packages/agent/src/pr-review/pr-review-comment'),
+}));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class {},
     UserPluginRepository: class {},
@@ -22,6 +27,7 @@ import {
     extractGitHubWorkspaceRef,
     isGitActivityDelivery,
 } from './github-pr-review-bridge.service';
+import { renderPrReviewComment } from '@ever-works/agent/pr-review';
 import {
     reviewBotCommentFixture,
     reviewBotCommentFixtures,
@@ -885,6 +891,118 @@ describe('GitHubPrReviewBridgeService', () => {
                 expect(prReviewService.reviewPullRequest).toHaveBeenCalledTimes(1);
             },
         );
+
+        // Self-reply loop (2026-10-18). The review is posted with the owner's
+        // GitHub USER token, so its own comment arrives as `type: 'User'`,
+        // `author_association: 'OWNER'`, and the bot check cannot see it. Its
+        // footer said "replying to an @ever-works mention" and its text quoted
+        // `@ever-works/egress-audit`, so every reply was a new mention: 66+
+        // paid reviews in 45 minutes on #2774, 21 on #2769.
+        describe('the self-reply loop (#2774)', () => {
+            /** A comment exactly as the reviewer renders it, posted as the owner. */
+            function ownReviewComment(summary: string, instruction?: string) {
+                const body = mentionCommentBody();
+                body.comment = {
+                    ...body.comment,
+                    body: renderPrReviewComment({
+                        review: {
+                            summary,
+                            comments: [
+                                {
+                                    path: 'tools/egress-audit/src/walk.ts',
+                                    comment: 'Imports `@ever-works/agent` directly.',
+                                },
+                            ],
+                        },
+                        owner: 'octo',
+                        repo: 'site',
+                        prNumber: 7,
+                        work: { name: 'Ever Works Platform' },
+                        ...(instruction ? { instruction } : {}),
+                    }),
+                    user: { login: 'evereq', type: 'User' },
+                    author_association: 'OWNER',
+                };
+                return body;
+            }
+
+            it('ignores its own reply to a mention (footer + a quoted package name)', async () => {
+                const { service, eventIngestService, prReviewService } = createService();
+                const result = await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    ownReviewComment(
+                        'The browser leg in `@ever-works/egress-audit` walks every page.',
+                        'is the walk complete?',
+                    ),
+                );
+                await flush();
+                expect(result.ingested).toBeNull();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            });
+
+            it('ignores its own review even when the model wrote a bare @ever-works handle', async () => {
+                const { service, eventIngestService, prReviewService } = createService();
+                const result = await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    ownReviewComment('Looks fine. Ask @ever-works again after the next push.'),
+                );
+                await flush();
+                expect(result.ingested).toBeNull();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('only a standalone @ever-works handle is a mention', () => {
+            it.each([
+                'Bumped `@ever-works/egress-audit` to 0.4.0.',
+                'See @ever-works/agent and @ever-works/contracts.',
+                'cc @ever-works-bot',
+                '@ever-worksbot please look',
+                'mail ops@ever-works.example',
+            ])('ignores %p (a package name, another handle or an address)', async (text) => {
+                const { service, eventIngestService, prReviewService } = createService();
+                const body = mentionCommentBody();
+                (body.comment as any).body = text;
+                const result = await service.handleEvent(BINDING, 'issue_comment', body);
+                await flush();
+                expect(result.ingested).toBeNull();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            });
+
+            it.each([
+                '@ever-works is this safe?',
+                'Thoughts, @Ever-Works?',
+                '(@ever-works) please check',
+                'Done.\n@ever-works.',
+            ])('treats %p as a mention', async (text) => {
+                const { service, prReviewService } = createService();
+                const body = mentionCommentBody();
+                (body.comment as any).body = text;
+                await service.handleEvent(BINDING, 'issue_comment', body);
+                await flush();
+                expect(prReviewService.reviewPullRequest).toHaveBeenCalledTimes(1);
+            });
+
+            it('strips only the handle from the instruction, not package names', async () => {
+                const { service, prReviewService } = createService();
+                const body = mentionCommentBody();
+                (body.comment as any).body =
+                    '@ever-works does @ever-works/agent still build without @ever-works/contracts?';
+                await service.handleEvent(BINDING, 'issue_comment', body);
+                await flush();
+                expect(prReviewService.reviewPullRequest).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        instruction:
+                            'does @ever-works/agent still build without @ever-works/contracts?',
+                    }),
+                );
+            });
+        });
     });
 
     /**
