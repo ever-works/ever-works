@@ -429,7 +429,7 @@ function readCapped(response, maxBytes) {
 }
 
 function runIsolationProbe(probe) {
-	// The renderer sends `port: null` when it has no target, and Number(null) is 0, so a plain
+	// The renderer sends port: null when it has no target, and Number(null) is 0, so a plain
 	// finiteNumber() turned "no port given" into port 0 and the probe never ran (prod 2026-10-18,
 	// cal-e2e: "no host or port to connect to" on every deploy). A non-positive port is "not given".
 	// Last resort for the host: the API server by its in-cluster name, then its HTTPS port.
