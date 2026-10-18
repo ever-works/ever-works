@@ -1086,8 +1086,8 @@ export class AppDeployPreconditionsService {
             unmet.push({
                 code: 'no_green_build',
                 message:
-                    'No green Build exists for this App Work yet. Wait for a Build to succeed, then ' +
-                    'Deploy.',
+                    'No green Build exists for this App Work yet. Start a Build on the Builds tab, ' +
+                    'wait for it to succeed, then Deploy.',
             });
             return null;
         }
