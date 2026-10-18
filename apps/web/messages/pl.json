@@ -287,6 +287,8 @@
             "signIn": "Zaloguj się przez Ever ID",
             "signUp": "Zarejestruj się przez Ever ID",
             "redirecting": "Otwieranie Ever ID…",
+            "signInWith": "Zaloguj się przez <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Zarejestruj się przez <wordmark>Ever ID</wordmark>",
             "consentRequired": "Zaakceptuj powyższe warunki, aby kontynuować.",
             "createAccount": {
                 "title": "Utwórz konto Ever Works",
@@ -7354,6 +7356,63 @@
                         "resume": "Zażądano wznowienia.",
                         "remove": "Zażądano usunięcia.",
                         "cancelDeploy": "Zażądano anulowania."
+                    }
+                },
+                "environment": {
+                    "title": "Środowisko",
+                    "description": "Wartości, z którymi działa ta aplikacja. Wartości tajne nigdy nie są pokazywane — tylko to, czy są ustawione.",
+                    "summary": "Ustawiono {set} z {total}",
+                    "missingRequired": "{count, plural, one {Brakuje # wymaganej wartości} few {Brakuje # wymaganych wartości} many {Brakuje # wymaganych wartości} other {Brakuje # wymaganej wartości}}",
+                    "loading": "Odczytywanie środowiska…",
+                    "unavailable": "Wartości środowiska nie można jeszcze edytować w tej instancji.",
+                    "error": "Nie udało się odczytać środowiska. Odśwież stronę, aby spróbować ponownie.",
+                    "empty": "Specyfikacja tej aplikacji nie deklaruje żadnych wartości środowiska.",
+                    "secureStorageOff": "Bezpieczny magazyn nie jest skonfigurowany w tej instalacji, więc nie można zapisać wartości.",
+                    "edit": "Edytuj",
+                    "setValue": "Ustaw wartość",
+                    "editAria": "Edytuj {name}",
+                    "saved": "Zapisano {name}",
+                    "removed": "Usunięto {name}",
+                    "states": {
+                        "set": "Ustawiona",
+                        "unset": "Nieustawiona",
+                        "missing": "Wymagana — nieustawiona",
+                        "fromSpec": "Ze specyfikacji aplikacji",
+                        "fromDependency": "Dostarczana przez {kind}",
+                        "generated": "Wygenerowana"
+                    },
+                    "badges": {
+                        "secret": "Tajna",
+                        "required": "Wymagana"
+                    },
+                    "phases": {
+                        "build": "Kompilacja",
+                        "runtime": "Działanie",
+                        "both": "Kompilacja + działanie"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Magazyn obiektów",
+                        "smtp": "Poczta SMTP"
+                    },
+                    "dialog": {
+                        "title": "Edytuj {name}",
+                        "valueLabel": "Wartość",
+                        "secretHint": "Ta wartość jest tajna. Jest przechowywana w postaci zaszyfrowanej i nigdy więcej nie jest pokazywana.",
+                        "secretStored": "Zapisano wartość. Wpisz nową, aby ją zastąpić.",
+                        "dependencyHint": "Zwykle dostarczana przez {kind}. Wartość ustawiona tutaj ma pierwszeństwo — na przykład Twój własny serwer SMTP.",
+                        "redeployHint": "Tam, gdzie aplikacja używa tej wartości, zostanie przebudowana lub ponownie wdrożona z nową.",
+                        "empty": "Wpisz wartość albo usuń zapisaną.",
+                        "save": "Zapisz",
+                        "saving": "Zapisywanie…",
+                        "remove": "Usuń wartość",
+                        "cancel": "Anuluj"
+                    },
+                    "errors": {
+                        "undeclaredName": "Specyfikacja aplikacji nie deklaruje tej nazwy.",
+                        "specUnavailable": "Ta aplikacja nie ma jeszcze użytecznej specyfikacji.",
+                        "failed": "Nie udało się zapisać wartości. Spróbuj ponownie."
                     }
                 }
             },

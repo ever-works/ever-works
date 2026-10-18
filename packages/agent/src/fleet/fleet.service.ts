@@ -38,11 +38,14 @@ import {
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
+    normalizeFleetConsents,
     normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
+    FleetConsents,
     FleetControlPolicyFamiliesInput,
     FleetNodeLimitCeiling,
     FleetNodeView,
@@ -224,6 +227,14 @@ export interface EnrollInput {
     maxConcurrentJobs?: number;
     maxCpuPercent?: number | null;
     maxMemoryMb?: number | null;
+    /**
+     * Fleet node link (FL-02, CONTRACTS §1.1) — the four consents the node
+     * was started with. An untrusted value off the wire: normalized here
+     * (only a literal `true` grants), and absent leaves the stored set alone
+     * like every other telemetry field — a daemon older than the field never
+     * blanks it.
+     */
+    consents?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -250,6 +261,14 @@ export interface FleetHeartbeatResult {
      * all-null when none is set, so lifting one reaches the machine too.
      */
     limitCeiling: FleetNodeLimitCeiling;
+    /**
+     * Fleet node link (FL-02) — the consents THIS beat reported (normalized),
+     * or null when it carried none. What the link registry compares against
+     * the open channels: a consent withdrawn closes its families' channels.
+     */
+    consents: FleetConsents | null;
+    /** Fleet node link (FL-02, CONTRACTS §1.1) — `FLEET_RECOMMENDED_NODE_VERSION`, or null when unset. */
+    recommendedNodeVersion: string | null;
 }
 
 export interface EnrollResult {
@@ -496,6 +515,10 @@ export class FleetService {
         // Remote node limits (slice AS) — the same keyed set as a beat; a
         // fresh row starts from whatever the machine said (usually nothing).
         applyReportedLimits(input, patch);
+        // Fleet node link (FL-02): an enrolling node's consents, when it sent any
+        // (the first heartbeat reports them in any case).
+        const enrollConsents = normalizeFleetConsents(input.consents);
+        if (enrollConsents) patch.consents = enrollConsents;
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
         const consumed = await this.repository.consumeEnrollment(node.id, tokenHash, patch);
@@ -609,6 +632,8 @@ export class FleetService {
         this.applyHousekeeping(refresh, patch);
         // Remote node limits (slice AS): what the worker reports enforcing.
         applyReportedLimits(refresh, patch);
+        // Fleet node link (FL-02): the consents, stored only when they changed.
+        const consentChange = applyReportedConsents(node, refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -627,6 +652,21 @@ export class FleetService {
         // Inbox call then fails we log it rather than re-arming, exactly
         // as the daily-ceiling notice does.
         await this.announceWorkerTransition(node, patch, workerState);
+        // Fleet node link (FL-02, CONTRACTS §7): a consent set that CHANGED
+        // between two beats (a restart with different flags) is one row,
+        // with both sets. The first report of a daemon is not a change, and
+        // an unchanged beat writes nothing — one row per node per minute is
+        // the firehose the header above refuses.
+        if (consentChange?.before) {
+            await this.tryAuditNode({
+                action: 'node.consent.change',
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                before: { ...consentChange.before },
+                after: { ...consentChange.after },
+            });
+        }
         const view = this.toView({ ...node, ...patch });
         return {
             node: view,
@@ -640,6 +680,8 @@ export class FleetService {
             // Remote node limits (slice AS) — read off the ROW: a beat never
             // writes the ceiling, only the owner does.
             limitCeiling: toLimitCeiling(node),
+            consents: normalizeFleetConsents(refresh.consents),
+            recommendedNodeVersion: config.fleet.getRecommendedNodeVersion(),
         };
     }
 
@@ -1925,8 +1967,34 @@ export class FleetService {
             // `desktop` when the map has no entry for it).
             isFavorite: Boolean(node.isFavorite),
             controlPolicyFamilies: effectiveControlPolicy(node),
+            // Fleet node link (FL-02). Null = never reported — read it through
+            // `effectiveConsents`, never as "nothing allowed".
+            consents: normalizeFleetConsents(node.consents),
+            previewProfileEnabled: Boolean(node.previewProfileEnabled),
         };
     }
+}
+
+/**
+ * Fleet node link (FL-02) — fold a beat's consents into the patch.
+ *
+ * Absent (or not an object) leaves the stored set alone, the additive
+ * contract every telemetry field follows. A set is written only when it
+ * differs from the stored one, and the change is returned so the caller can
+ * audit it: `before` is null on a daemon's first report, which is not a
+ * change.
+ */
+function applyReportedConsents(
+    node: FleetNode,
+    refresh: EnrollInput,
+    patch: Partial<FleetNode>,
+): { before: FleetConsents | null; after: FleetConsents } | null {
+    const after = normalizeFleetConsents(refresh.consents);
+    if (after === null) return null;
+    const before = normalizeFleetConsents(node.consents);
+    if (!fleetConsentsDiffer(before, after)) return null;
+    patch.consents = after;
+    return { before, after };
 }
 
 /**

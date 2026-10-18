@@ -287,6 +287,8 @@
             "signIn": "Se connecter avec Ever ID",
             "signUp": "S'inscrire avec Ever ID",
             "redirecting": "Ouverture d'Ever ID…",
+            "signInWith": "Se connecter avec <wordmark>Ever ID</wordmark>",
+            "signUpWith": "S'inscrire avec <wordmark>Ever ID</wordmark>",
             "consentRequired": "Acceptez les conditions ci-dessus pour continuer.",
             "createAccount": {
                 "title": "Créez votre compte Ever Works",
@@ -7422,6 +7424,63 @@
                         "resume": "Reprise demandée.",
                         "remove": "Retrait demandé.",
                         "cancelDeploy": "Annulation demandée."
+                    }
+                },
+                "environment": {
+                    "title": "Environnement",
+                    "description": "Les valeurs avec lesquelles cette app s'exécute. Les valeurs secrètes ne sont jamais affichées — seulement si elles sont définies.",
+                    "summary": "{set} sur {total} définies",
+                    "missingRequired": "{count, plural, one {# valeur obligatoire manquante} other {# valeurs obligatoires manquantes}}",
+                    "loading": "Lecture de l'environnement…",
+                    "unavailable": "Les valeurs d'environnement ne peuvent pas encore être modifiées sur cette instance.",
+                    "error": "Impossible de lire l'environnement. Rechargez la page pour réessayer.",
+                    "empty": "La spécification de cette app ne déclare aucune valeur d'environnement.",
+                    "secureStorageOff": "Le stockage sécurisé n'est pas configuré sur cette installation : les valeurs ne peuvent pas être enregistrées.",
+                    "edit": "Modifier",
+                    "setValue": "Définir",
+                    "editAria": "Modifier {name}",
+                    "saved": "{name} enregistrée",
+                    "removed": "{name} supprimée",
+                    "states": {
+                        "set": "Définie",
+                        "unset": "Non définie",
+                        "missing": "Obligatoire — non définie",
+                        "fromSpec": "De la spécification de l'app",
+                        "fromDependency": "Injectée par {kind}",
+                        "generated": "Générée"
+                    },
+                    "badges": {
+                        "secret": "Secrète",
+                        "required": "Obligatoire"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Exécution",
+                        "both": "Build + exécution"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Stockage d'objets",
+                        "smtp": "E-mail SMTP"
+                    },
+                    "dialog": {
+                        "title": "Modifier {name}",
+                        "valueLabel": "Valeur",
+                        "secretHint": "Cette valeur est secrète. Elle est stockée chiffrée et n'est plus jamais affichée.",
+                        "secretStored": "Une valeur est enregistrée. Saisissez-en une nouvelle pour la remplacer.",
+                        "dependencyHint": "Normalement injectée par {kind}. Une valeur définie ici la remplace — par exemple votre propre serveur SMTP.",
+                        "redeployHint": "Là où l'app utilise cette valeur, elle est reconstruite ou redéployée avec la nouvelle.",
+                        "empty": "Saisissez une valeur ou supprimez celle qui est enregistrée.",
+                        "save": "Enregistrer",
+                        "saving": "Enregistrement…",
+                        "remove": "Supprimer la valeur",
+                        "cancel": "Annuler"
+                    },
+                    "errors": {
+                        "undeclaredName": "La spécification de l'app ne déclare pas ce nom.",
+                        "specUnavailable": "Cette app n'a pas encore de spécification utilisable.",
+                        "failed": "La valeur n'a pas pu être enregistrée. Réessayez."
                     }
                 }
             },

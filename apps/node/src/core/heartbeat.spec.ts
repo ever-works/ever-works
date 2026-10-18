@@ -412,6 +412,116 @@ describe('HeartbeatLoop', () => {
 			expect(scripted.requests[2]).toHaveProperty('workerState', 'quarantined');
 		});
 
+		it('strips the consents first (FL-02), keeping everything an older platform still understands (U11)', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok, ok]);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: ['managed'],
+					cliVersions: ['claude-code 2.1.3'],
+					workerState: 'idle',
+					consents: { work: true, attend: false, manage: true, usageScan: false }
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+			expect(loop.acceptsField('consents')).toBe(true);
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('consents');
+			expect(scripted.requests[1]).not.toHaveProperty('consents');
+			// The platform took the rest: pinned CLIs and worker state still go.
+			expect(scripted.requests[1]).toMatchObject({ cliVersions: ['claude-code 2.1.3'], workerState: 'idle' });
+			expect(loop.acceptsField('consents')).toBe(false);
+			expect(loop.acceptsField('cliVersions')).toBe(true);
+			expect(entries.some((entry) => entry.message.includes('the node link stays closed'))).toBe(true);
+
+			await loop.tick();
+			expect(scripted.sent()).toBe(3);
+			expect(scripted.requests[2]).not.toHaveProperty('consents');
+		});
+
+		it('falls back to the legacy 16 tags first when a platform refuses a longer list, keeping every field', async () => {
+			const scheduler = fakeScheduler();
+			const tags = Array.from({ length: 18 }, (_, index) => `tag-${index}`);
+			const capped = scriptedClient([ok]);
+			const entries: LogEntry[] = [];
+			// A platform that takes the consents but caps tags at 16 (an operator's explicit cap).
+			const loop = new HeartbeatLoop({
+				client: {
+					heartbeat: async (request) => {
+						if ((request.capabilities?.length ?? 0) > 16) {
+							capped.requests.push(request);
+							throw rejected();
+						}
+						return capped.client.heartbeat(request);
+					}
+				},
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: tags,
+					consents: { work: true, attend: false, manage: true, usageScan: false }
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+
+			await loop.start();
+
+			expect(capped.requests[0].capabilities).toHaveLength(18);
+			expect(capped.requests.at(-1)?.capabilities).toEqual(tags.slice(0, 16));
+			// The consents survived: only the tag list was cut.
+			expect(capped.requests.at(-1)).toHaveProperty('consents');
+			expect(loop.acceptsField('consents')).toBe(true);
+			expect(entries.some((entry) => entry.message.includes('more than 16 capability tags'))).toBe(true);
+			const before = capped.requests.length;
+			await loop.tick();
+			expect(capped.requests).toHaveLength(before + 1);
+			expect(capped.requests.at(-1)?.capabilities).toHaveLength(16);
+		});
+
+		it('sends the consents to a platform that accepts them, on every beat', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([ok, ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					consents: { work: false, attend: true, manage: false, usageScan: false }
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+			await loop.tick();
+
+			expect(scripted.sent()).toBe(2);
+			for (const request of scripted.requests) {
+				expect(request).toHaveProperty('consents', {
+					work: false,
+					attend: true,
+					manage: false,
+					usageScan: false
+				});
+			}
+			expect(loop.acceptsField('consents')).toBe(true);
+		});
+
 		it('falls back to liveness only when the platform refuses the older tier too', async () => {
 			const scheduler = fakeScheduler();
 			const scripted = scriptedClient([rejected(), rejected(), ok]);

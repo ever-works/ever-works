@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-01-fleet-hub`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1a foundations (T-01…T-08, T-16…T-19) in the first PR
+**Status:** `In progress` — P1a merged (#2734); P1b hub + computer page shell (T-09…T-15, T-22, T-25; T-24 editor) in the second PR
 **Last updated:** 2026-10-18
 
 ---
@@ -71,10 +71,10 @@
       and the twelve fixed tab ids in order.
       **Test**: `apps/web/src/components/fleet/registry.unit.spec.ts` — order, flag off, consent
       missing, kind cannot, not shipped.
-- [ ] **T-09**. Create `apps/web/src/components/fleet/fleet-hub.shared.ts` (card ordering,
+- [x] **T-09**. Create `apps/web/src/components/fleet/fleet-hub.shared.ts` (card ordering,
       `groupNodesByHost`, state word, staleness).
       **Test**: `apps/web/src/components/fleet/fleet-hub.shared.unit.spec.ts`.
-- [ ] **T-10**. Create routes under `apps/web/src/app/[locale]/(dashboard)/fleet/`: `layout.tsx`
+- [x] **T-10**. Create routes under `apps/web/src/app/[locale]/(dashboard)/fleet/`: `layout.tsx`
       (gate + `FleetHubTabs`), `page.tsx` (Overview, server-fetches nodes + needs-a-look + kill switch
       with `Promise.allSettled` like `settings/fleet/page.tsx`), `computers/page.tsx`,
       `sessions/page.tsx`, `checkouts/page.tsx`, `commands/page.tsx`, `usage/page.tsx` (placeholders
@@ -83,7 +83,7 @@
       under `apps/web/src/components/fleet/`.
       **Test**: `apps/web/src/components/fleet/overview/NeedsALookList.unit.spec.tsx`,
       `ComputerCards.unit.spec.tsx` (nesting, "—" cells).
-- [ ] **T-11**. Move `FleetEnrollHandoff.tsx`, `FleetQrCode.tsx`, `FleetNodeDrawer.tsx`,
+- [x] **T-11**. Move `FleetEnrollHandoff.tsx`, `FleetQrCode.tsx`, `FleetNodeDrawer.tsx`,
       `fleet-node-drawer.shared.ts`, `fleet-node-limits.shared.ts` (+ their `.unit.spec` files) from
       `apps/web/src/components/settings/` to `apps/web/src/components/fleet/computers/`; leave
       `export * from '../fleet/computers/<name>'` at each old path. Extract the table block
@@ -92,24 +92,29 @@
       is off and `FleetSettingsLinkCard.tsx` when on.
       **Test**: moved unit specs pass from the new location; `apps/web/e2e/flow-fleet-enrollment-contract.spec.ts`
       and `flow-fleet-panic-controls.spec.ts` green with the flag off and on.
-- [ ] **T-12**. Sidebar entry: insert Fleet between Teams (`DashboardSidebar.tsx:186-197`) and Memory
+- [x] **T-12**. Sidebar entry: insert Fleet between Teams (`DashboardSidebar.tsx:186-197`) and Memory
       (`:205-210`) with `matchPrefixes: [ROUTES.DASHBOARD_FLEET]`; thread `fleetHubEnabled` from
       `apps/web/src/app/[locale]/(dashboard)/layout.tsx` → `layout-client.tsx:521` →
       `DashboardSidebarProps` (`:68`). Runner pill: `RunnerStatusPill.tsx:262` targets
       `ROUTES.DASHBOARD_FLEET` when the prop is on.
       **Test**: `apps/web/src/components/dashboard/DashboardSidebar.unit.spec.tsx` (new) — entry
       present/absent, index = Teams index + 1; extend `apps/web/e2e/flow-fleet-runner-pill.spec.ts`.
-- [ ] **T-13**. Palette: add `fleet`, `fleet.computers`, `fleet.sessions`, `fleet.checkouts`,
+      _As built:_ `DashboardSidebar.fleet.unit.spec.tsx` (new, beside the existing sidebar spec); the
+      pill's Manage → hub in `apps/web/e2e/fleet-hub.spec.ts` (the existing pill spec is untouched).
+- [x] **T-13**. Palette: add `fleet`, `fleet.computers`, `fleet.sessions`, `fleet.checkouts`,
       `fleet.commands`, `fleet.usage` screens to `apps/web/src/components/command-palette/registry/screens.ts`
       (after `teams` `:96`), gated on the hub flag the way `settings.fleet` is gated on fleet.
       **Test**: extend `apps/web/src/components/command-palette/registry/registry.unit.spec.ts`.
-- [ ] **T-14**. i18n: add the `fleet` namespace groups of plan §8.4 to `apps/web/messages/en.json`
+- [x] **T-14**. i18n: add the `fleet` namespace groups of plan §8.4 to `apps/web/messages/en.json`
       (only `en.json`; leaf keys camelCase, no literal `.`).
       **Test**: `grep -rn "fleet\.[a-z]*\.[A-Za-z]*\." apps/web/messages/en.json` finds no dotted leaf;
       no literal user string in `apps/web/src/components/fleet/**`.
-- [ ] **T-15**. Playwright `apps/web/e2e/flow-fleet-hub.spec.ts` — sidebar, six tabs, four
+- [x] **T-15**. Playwright `apps/web/e2e/flow-fleet-hub.spec.ts` — sidebar, six tabs, four
       placeholders naming their epics, card ordering, kill-switch banner, flag-off 404.
       **Test**: itself; green on a cold database.
+      _As built:_ `apps/web/e2e/fleet-hub.spec.ts`. The kill-switch banner and note are covered by
+      `components/fleet/hub/FleetHubFrame.unit.spec.tsx`, not the browser walk: stopping the fleet
+      is platform-wide, and a walk that stops it would stop every e2e spec running beside it.
 
 ## P2.A — Roles, families, favourites (API + schema)
 
@@ -153,7 +158,7 @@
 
 ## P2.B — Computer page shell
 
-- [ ] **T-22**. Route `apps/web/src/app/[locale]/(dashboard)/fleet/computers/[id]/page.tsx` (server
+- [x] **T-22**. Route `apps/web/src/app/[locale]/(dashboard)/fleet/computers/[id]/page.tsx` (server
       component; `?tab=` resolved like `activity/page.tsx:49-59`; 404 on `not_found`). Components
       `computer/ComputerPageShell.tsx`, `ComputerHeader.tsx`, `ComputerTabPlaceholder.tsx`,
       `tabs/OverviewTab.tsx` (slot layout), `tabs/SettingsTab.tsx` under `apps/web/src/components/fleet/`.
@@ -170,7 +175,7 @@
       capability / limits / cost / lifecycle sections reused from `fleet/computers/FleetNodeDrawer.tsx`.
       **Test**: `PolicyFamiliesEditor.unit.spec.tsx` — thirteen selects (CONTRACTS §2.1), defaults,
       `desktop` read through from legacy.
-- [ ] **T-25**. Favourite ordering in `ComputerCards.tsx` and `FleetComputersTable.tsx`; star column
+- [x] **T-25**. Favourite ordering in `ComputerCards.tsx` and `FleetComputersTable.tsx`; star column
       writes through `setFavorite`.
       **Test**: extend `fleet-hub.shared.unit.spec.ts` — favourites first, then online by last check.
 - [ ] **T-26**. Playwright `apps/web/e2e/flow-fleet-computer-page.spec.ts` (header, twelve tabs,

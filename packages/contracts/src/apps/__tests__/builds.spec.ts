@@ -1266,7 +1266,8 @@ describe('app-dependencies.ts — kinds, outputs and statuses (APW-07 plan.md:29
 			'managed-postgres',
 			'managed-redis',
 			'managed-object-storage',
-			'managed-smtp'
+			'managed-smtp',
+			'k8s-inline-mailpit'
 		]);
 	});
 });

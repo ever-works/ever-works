@@ -287,6 +287,8 @@
             "signIn": "Masuk dengan Ever ID",
             "signUp": "Daftar dengan Ever ID",
             "redirecting": "Membuka Ever ID…",
+            "signInWith": "Masuk dengan <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Daftar dengan <wordmark>Ever ID</wordmark>",
             "consentRequired": "Setujui ketentuan di atas untuk melanjutkan.",
             "createAccount": {
                 "title": "Buat akun Ever Works Anda",
@@ -7354,6 +7356,63 @@
                         "resume": "Pelanjutan diminta.",
                         "remove": "Penghapusan diminta.",
                         "cancelDeploy": "Pembatalan diminta."
+                    }
+                },
+                "environment": {
+                    "title": "Lingkungan",
+                    "description": "Nilai yang digunakan aplikasi ini saat berjalan. Nilai rahasia tidak pernah ditampilkan — hanya apakah sudah diatur.",
+                    "summary": "{set} dari {total} diatur",
+                    "missingRequired": "{count, plural, other {# nilai wajib belum diisi}}",
+                    "loading": "Membaca lingkungan…",
+                    "unavailable": "Nilai lingkungan belum dapat diedit di instans ini.",
+                    "error": "Tidak dapat membaca lingkungan. Muat ulang halaman untuk mencoba lagi.",
+                    "empty": "Spesifikasi aplikasi ini tidak mendeklarasikan nilai lingkungan.",
+                    "secureStorageOff": "Penyimpanan aman belum dikonfigurasi di instalasi ini, jadi nilai tidak dapat disimpan.",
+                    "edit": "Edit",
+                    "setValue": "Atur nilai",
+                    "editAria": "Edit {name}",
+                    "saved": "{name} disimpan",
+                    "removed": "{name} dihapus",
+                    "states": {
+                        "set": "Diatur",
+                        "unset": "Belum diatur",
+                        "missing": "Wajib — belum diatur",
+                        "fromSpec": "Dari spesifikasi aplikasi",
+                        "fromDependency": "Disuntikkan oleh {kind}",
+                        "generated": "Dibuat otomatis"
+                    },
+                    "badges": {
+                        "secret": "Rahasia",
+                        "required": "Wajib"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Penyimpanan objek",
+                        "smtp": "Email SMTP"
+                    },
+                    "dialog": {
+                        "title": "Edit {name}",
+                        "valueLabel": "Nilai",
+                        "secretHint": "Nilai ini rahasia. Disimpan terenkripsi dan tidak pernah ditampilkan lagi.",
+                        "secretStored": "Ada nilai yang tersimpan. Ketik nilai baru untuk menggantinya.",
+                        "dependencyHint": "Biasanya disuntikkan oleh {kind}. Nilai yang Anda atur di sini menggantikannya — misalnya server SMTP Anda sendiri.",
+                        "redeployHint": "Di bagian aplikasi yang memakai nilai ini, aplikasi dibuild ulang atau dideploy ulang dengan nilai baru.",
+                        "empty": "Masukkan nilai, atau hapus nilai yang tersimpan.",
+                        "save": "Simpan",
+                        "saving": "Menyimpan…",
+                        "remove": "Hapus nilai",
+                        "cancel": "Batal"
+                    },
+                    "errors": {
+                        "undeclaredName": "Spesifikasi aplikasi tidak mendeklarasikan nama ini.",
+                        "specUnavailable": "Aplikasi ini belum memiliki spesifikasi yang dapat digunakan.",
+                        "failed": "Nilai tidak dapat disimpan. Coba lagi."
                     }
                 }
             },

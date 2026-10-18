@@ -106,6 +106,8 @@ const NODE_EXPORTS = [
 	'FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS',
 	'FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS',
 	'FLEET_DEFAULT_MAX_CAPABILITY_TAGS',
+	// FL-02 — the pre-link 16-tag cap a newer node falls back to.
+	'FLEET_LEGACY_MAX_CAPABILITY_TAGS',
 	'FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH',
 	'FLEET_MAX_CAPABILITY_TAGS_CEILING',
 	'FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING',
@@ -389,6 +391,107 @@ const NEEDS_A_LOOK_EXPORTS = [
 	'sortNeedsALook'
 ] as const;
 
+// Fleet node link (FL-02) — `fleet-link.types.ts` and `fleet-link.codec.ts`,
+// pinned in `fleet-link.types.spec.ts`, `fleet-link.codec.spec.ts` and the wire
+// fixture spec `fleet-link.fixture.spec.ts`.
+const LINK_EXPORTS = [
+	'FLEET_LINK_VERSION',
+	'FLEET_LINK_WS_PATH',
+	'FLEET_WS_PATH_PREFIX',
+	'FLEET_LINK_MAX_FRAME_BYTES',
+	'FLEET_LINK_FRAME_HEADER_BYTES',
+	'FLEET_LINK_MAX_PAYLOAD_BYTES',
+	'FLEET_LINK_MAX_JSON_BYTES',
+	'FLEET_LINK_MAX_CHANNEL_NUMBER',
+	'FLEET_LINK_MAX_CHANNELS',
+	'FLEET_LINK_PING_INTERVAL_MS',
+	'FLEET_LINK_SILENCE_MS',
+	'FLEET_LINK_BACKOFF_BASE_MS',
+	'FLEET_LINK_BACKOFF_MAX_MS',
+	'FLEET_LINK_REFUSED_RETRY_MS',
+	'FLEET_LINK_TOKEN_TTL_SEC',
+	'FLEET_LINK_HELLO_RATE_LIMIT',
+	'FLEET_LINK_HELLO_RATE_WINDOW_MS',
+	'FLEET_LINK_HELLO_BLOCK_MS',
+	'FLEET_LINK_AUTH_TIMEOUT_MS',
+	'FLEET_LINK_INLINE_REPLY_MS',
+	'FLEET_LINK_REQUEST_TIMEOUT_MS',
+	'FLEET_LINK_CHANNEL_OPEN_TIMEOUT_MS',
+	'FLEET_LINK_RESUME_WINDOW_MS',
+	'FLEET_OPERATION_RETENTION_MS',
+	'FLEET_LINK_SLOW_READER_MS',
+	'FLEET_LINK_KILL_SWITCH_POLL_MS',
+	'FLEET_LINK_DRAIN_GRACE_SEC',
+	'FLEET_LINK_DEFAULT_LIMITS',
+	'FLEET_LINK_CLOSE_CODES',
+	'FLEET_LINK_FRAME_KINDS',
+	'isFleetLinkFrameKind',
+	'FLEET_LINK_MAX_CLIP_BYTES',
+	'FLEET_LINK_CREDIT_WINDOW_BYTES',
+	'FLEET_LINK_CREDIT_FAMILIES',
+	'FLEET_CONSENT_KEYS',
+	'FLEET_CONSENT_FLAGS',
+	'FLEET_NO_CONSENTS',
+	'normalizeFleetConsents',
+	'effectiveConsents',
+	'isFleetLinkEligible',
+	'fleetConsentsDiffer',
+	'FLEET_LINK_FAMILIES',
+	'isFleetLinkFamily',
+	'FLEET_LINK_CONSENT_REQUIREMENTS',
+	'isFleetLinkConsentRequirement',
+	'FLEET_LINK_FAMILY_CONSENT',
+	'FLEET_LINK_VERB_CONSENT_OVERRIDES',
+	'fleetLinkVerbConsent',
+	'fleetLinkChannelOpenConsent',
+	'fleetConsentSatisfies',
+	'fleetConsentFlagsFor',
+	'fleetConsentMissingHint',
+	'FLEET_LINK_ACTION_FAMILIES',
+	'isFleetLinkActionFamily',
+	'FLEET_LINK_FAMILY_ACTION_FAMILY',
+	'FLEET_LINK_STATE_CHANGING_FAMILIES',
+	'isFleetLinkStateChangingFamily',
+	'FLEET_LINK_MACHINE_VERB_ACTION_FAMILY',
+	'fleetLinkMachineVerbActionFamily',
+	'isFleetLinkVerb',
+	'FLEET_LINK_ERROR_CODES',
+	'isFleetLinkErrorCode',
+	'FLEET_LINK_ERROR_HTTP_STATUS',
+	'FLEET_LINK_MAX_HINT_LENGTH',
+	'FLEET_LINK_CONTROL_TYPES',
+	'isFleetLinkId',
+	'FLEET_NODE_LINK_STATES',
+	'FLEET_LINK_MAX_JSON_DEPTH',
+	'encodeFleetLinkFrame',
+	'decodeFleetLinkFrame',
+	'peekFleetLinkFrameChannel',
+	'decodeFleetLinkJson',
+	'encodeFleetLinkJson',
+	'normalizeFleetLinkError',
+	'makeFleetLinkError',
+	'decodeFleetLinkControl',
+	'isFleetLinkControlMessage',
+	'encodeFleetLinkControl',
+	'asFleetLinkRequest',
+	'asFleetLinkReply',
+	'encodeFleetLinkResize',
+	'decodeFleetLinkResize',
+	'encodeFleetLinkExit',
+	'decodeFleetLinkExit',
+	'encodeFleetLinkAck',
+	'decodeFleetLinkAck',
+	'encodeFleetLinkCloseReason',
+	'decodeFleetLinkCloseReason'
+] as const;
+
+// Fleet operations (FL-02) — `fleet-operations.types.ts`.
+const OPERATION_EXPORTS = [
+	'FLEET_OPERATION_STATES',
+	'FLEET_OPERATION_TERMINAL_STATES',
+	'isFleetOperationTerminal'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -404,7 +507,9 @@ const ALL_EXPORTS = [
 	...USAGE_LIMIT_EXPORTS,
 	...COMMIT_MESSAGE_EXPORTS,
 	...ACCESS_EXPORTS,
-	...NEEDS_A_LOOK_EXPORTS
+	...NEEDS_A_LOOK_EXPORTS,
+	...LINK_EXPORTS,
+	...OPERATION_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -487,7 +592,46 @@ const FUNCTION_EXPORTS = [
 	'isNeedsALookSeverity',
 	'isNeedsALookRoute',
 	'normalizeNeedsALookItem',
-	'sortNeedsALook'
+	'sortNeedsALook',
+	'fleetLinkVerbConsent',
+	'fleetLinkChannelOpenConsent',
+	'isFleetLinkFrameKind',
+	'normalizeFleetConsents',
+	'effectiveConsents',
+	'isFleetLinkEligible',
+	'fleetConsentsDiffer',
+	'isFleetLinkFamily',
+	'isFleetLinkConsentRequirement',
+	'fleetConsentSatisfies',
+	'fleetConsentFlagsFor',
+	'fleetConsentMissingHint',
+	'isFleetLinkActionFamily',
+	'isFleetLinkStateChangingFamily',
+	'fleetLinkMachineVerbActionFamily',
+	'isFleetLinkVerb',
+	'isFleetLinkErrorCode',
+	'isFleetLinkId',
+	'encodeFleetLinkFrame',
+	'decodeFleetLinkFrame',
+	'peekFleetLinkFrameChannel',
+	'decodeFleetLinkJson',
+	'encodeFleetLinkJson',
+	'normalizeFleetLinkError',
+	'makeFleetLinkError',
+	'decodeFleetLinkControl',
+	'isFleetLinkControlMessage',
+	'encodeFleetLinkControl',
+	'asFleetLinkRequest',
+	'asFleetLinkReply',
+	'encodeFleetLinkResize',
+	'decodeFleetLinkResize',
+	'encodeFleetLinkExit',
+	'decodeFleetLinkExit',
+	'encodeFleetLinkAck',
+	'decodeFleetLinkAck',
+	'encodeFleetLinkCloseReason',
+	'decodeFleetLinkCloseReason',
+	'isFleetOperationTerminal'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -502,7 +646,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 261 runtime symbols', () => {
+	it('exposes exactly these 353 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -560,7 +704,12 @@ describe('fleet barrel', () => {
 		// `fleet-access.types.ts` and the fourteen of `fleet-needs-a-look.types.ts`
 		// — two NEW modules, so the witness table below gains two rows.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(261);
+		// → 353 with the node link (FL-02): the sixty-seven symbols of
+		// `fleet-link.types.ts`, the twenty-one of `fleet-link.codec.ts`, the
+		// three of `fleet-operations.types.ts` — three NEW modules, so the
+		// witness table below gains three rows — and the legacy tag cap in
+		// `fleet-node.types.ts`.
+		expect(Object.keys(fleet)).toHaveLength(353);
 	});
 
 	it.each([
@@ -577,7 +726,10 @@ describe('fleet barrel', () => {
 		['fleet-model-usage-limit.types.js', 'FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT'],
 		['fleet-commit-message.types.js', 'FLEET_COMMIT_TYPES'],
 		['fleet-access.types.js', 'FLEET_ACTION_FAMILIES'],
-		['fleet-needs-a-look.types.js', 'NEEDS_A_LOOK_KINDS']
+		['fleet-needs-a-look.types.js', 'NEEDS_A_LOOK_KINDS'],
+		['fleet-link.types.js', 'FLEET_LINK_FAMILIES'],
+		['fleet-link.codec.js', 'encodeFleetLinkFrame'],
+		['fleet-operations.types.js', 'FLEET_OPERATION_STATES']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

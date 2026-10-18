@@ -275,6 +275,40 @@ describe('FleetPanicService', () => {
             expect(result.nodes.find((n) => n.id === 'node-enrolling')?.status).toBe('enrolling');
         });
 
+        it('warns the owner sessions on every enrolled node over the link, 60 s ahead — an earlier-disabled one too (FL-02, FR-27)', async () => {
+            const linkDrain = { drainNodes: jest.fn() };
+            const withLink = new FleetPanicService(
+                fleet as never,
+                jobs as never,
+                agentRuns as never,
+                audit as never,
+                linkDrain,
+            );
+            await withLink.drainAllForUser('user-1');
+            expect(linkDrain.drainNodes).toHaveBeenCalledTimes(1);
+            expect(linkDrain.drainNodes).toHaveBeenCalledWith(
+                ['node-online', 'node-busy', 'node-disabled'],
+                60,
+            );
+        });
+
+        it('drains all the same when the link notice throws', async () => {
+            const withLink = new FleetPanicService(
+                fleet as never,
+                jobs as never,
+                agentRuns as never,
+                audit as never,
+                {
+                    drainNodes: jest.fn(() => {
+                        throw new Error('registry down');
+                    }),
+                },
+            );
+            await expect(withLink.drainAllForUser('user-1')).resolves.toMatchObject({
+                drainedNodes: 2,
+            });
+        });
+
         it('records the drain-all decision ONCE, not once per node', async () => {
             // EW-799: per-node drains under drain-all are suppressed, so
             // the aggregate row (written through `record`) stays the one

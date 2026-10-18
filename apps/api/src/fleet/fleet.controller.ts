@@ -54,6 +54,14 @@ import {
     FLEET_AUDIT_DEFAULT_LIMIT,
     NEEDS_A_LOOK_PARTIAL_HEADER,
 } from '@ever-works/contracts';
+import {
+    FLEET_LINK_HEARTBEAT_OBSERVER,
+    FLEET_LINK_NODE_LIFECYCLE,
+    FLEET_LINK_NODE_STATE,
+    type FleetLinkHeartbeatObserver,
+    type FleetLinkNodeLifecycle,
+    type FleetLinkNodeStateLookup,
+} from '../fleet-link/fleet-link.types';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -199,6 +207,21 @@ export class FleetController {
         // @Optional() like the three above: unbound, both needs-a-look routes
         // answer an empty, complete list.
         @Optional() private readonly needsALook?: NeedsALookService,
+        // Fleet node link (FL-02) — the consents a beat reported reach the
+        // link (a withdrawn consent closes its channels), and the node views
+        // show the link as the platform's own socket sees it. Appended LAST +
+        // @Optional() like the four above: unbound, every response keeps
+        // its exact shape.
+        @Optional()
+        @Inject(FLEET_LINK_HEARTBEAT_OBSERVER)
+        private readonly linkHeartbeat?: FleetLinkHeartbeatObserver,
+        @Optional()
+        @Inject(FLEET_LINK_NODE_STATE)
+        private readonly linkState?: FleetLinkNodeStateLookup,
+        // A removed or re-keyed node's live link closes at once (FL-02).
+        @Optional()
+        @Inject(FLEET_LINK_NODE_LIFECYCLE)
+        private readonly linkLifecycle?: FleetLinkNodeLifecycle,
     ) {}
 
     @Get('cost-ceiling')
@@ -324,7 +347,7 @@ export class FleetController {
             load = {};
         }
         return nodes.map((node) => ({
-            ...node,
+            ...this.withLink(node),
             // Cluster-sourced rows are never leased onto, so they stay null.
             // A shared row is someone else's runner: its load is not in the
             // caller's job ledger, so it is not shown (null = idle/unknown).
@@ -411,7 +434,7 @@ export class FleetController {
         const history = buildNodeJobHistory(recentJobs, runs);
 
         return {
-            node,
+            node: this.withLink(node),
             recentJobs: history,
             // Reconciled-aware, so the subset agrees with the badge each
             // row renders: a job the node called `done` whose run failed
@@ -484,7 +507,11 @@ export class FleetController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<CreateEnrollmentTokenResult> {
-        return this.service.rotateCredentialForUser(auth.userId, id);
+        const result = await this.service.rotateCredentialForUser(auth.userId, id);
+        // The old secret is dead the instant the hash is replaced; so is the
+        // link it authenticated.
+        this.closeLink(id, 'credential replaced');
+        return result;
     }
 
     @Get('nodes/:id/audit')
@@ -666,6 +693,7 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<void> {
         await this.service.deleteForUser(auth.userId, id);
+        this.closeLink(id, 'node removed');
     }
 
     @Public()
@@ -706,6 +734,8 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Fleet node link (FL-02): the consents, should an enrolling node send them.
+            consents: body.consents,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -749,9 +779,25 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Fleet node link (FL-02): the four consents the node runs with.
+            consents: body.consents,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
+        }
+        // Fleet node link (FL-02, spec FR-22): a consent the node no longer
+        // holds closes the link channels that needed it. Never able to fail
+        // the beat.
+        if (result.consents && this.linkHeartbeat) {
+            try {
+                this.linkHeartbeat.onHeartbeat(result.node.id, result.consents);
+            } catch (err) {
+                this.logger.debug(
+                    `link consent update skipped for node ${result.node.id}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
         }
         // Two independent follow-ups, started together and awaited together
         // (neither can reject: each swallows its own failure), so the beat
@@ -795,7 +841,47 @@ export class FleetController {
         if (pending.length > 0) {
             response.pendingComputerSessions = pending;
         }
+        // Fleet node link (FL-02, CONTRACTS §1.1): the recommended daemon
+        // version, only when the operator named one.
+        if (result.recommendedNodeVersion) {
+            response.recommendedNodeVersion = result.recommendedNodeVersion;
+        }
         return response;
+    }
+
+    /**
+     * Fleet node link (FL-02) — the link as the platform's own socket sees it
+     * (spec FR-42), on an enrolled row the caller owns; a cluster row and a
+     * build without the link module keep their exact shape. A row someone
+     * else sees through an Organization (FL-01's shared view, an allow-list)
+     * does not gain it: the link's traffic counters and generation are the
+     * owner's, and a shared field is a decision, not a side effect.
+     */
+    /** Close a gone node's live link; never the reason a lifecycle call fails. */
+    private closeLink(
+        nodeId: string,
+        reason: Parameters<FleetLinkNodeLifecycle['nodeGone']>[1],
+    ): void {
+        if (!this.linkLifecycle) return;
+        try {
+            this.linkLifecycle.nodeGone(nodeId, reason);
+        } catch (error) {
+            this.logger.warn(
+                `node ${nodeId}: its link could not be closed (${reason}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    private withLink<T extends FleetNodeView>(node: T): T {
+        if (!this.linkState || node.persisted === false) return node;
+        if (node.viewerRole !== undefined && node.viewerRole !== 'owner') return node;
+        try {
+            return { ...node, link: this.linkState.linkView({ id: node.id, kind: node.kind }) };
+        } catch {
+            return node;
+        }
     }
 
     private async promoteWaitingJobsFor(node: FleetHeartbeatResponse['node']): Promise<void> {
@@ -899,6 +985,7 @@ export class FleetController {
         if (!removed) {
             throw new UnauthorizedException('Invalid node credential');
         }
+        this.closeLink(body.nodeId, 'node unenrolled');
         return { ok: true };
     }
 }

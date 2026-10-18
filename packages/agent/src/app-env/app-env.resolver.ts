@@ -455,6 +455,29 @@ export const APP_ENV_EXTERNAL_PROVIDER_IDS = [
 /** The one provider that serves `platform.smtp.*` (plan §2.2:123, §4.10:662). */
 export const APP_ENV_SMTP_RELAY_PROVIDER_ID = 'platform-smtp-relay' as const;
 
+/**
+ * APW-10 lite (lane aw-env-smtp, 2026-10-18): the provider-id prefix of the in-namespace providers the
+ * `k8s-apps-tier` plugin publishes for `ever-works-apps` (`k8s-inline-postgres`, `-redis`, `-minio`,
+ * `-mailpit`).
+ *
+ * The full APW-10 zone holds a managed dependency's outputs itself and substitutes `ew-dep://` tokens
+ * in-zone (§4.11:689-696) — but the lite tier HAS no zone: the platform provisions these dependencies
+ * itself, stores their outputs like Your cluster's (`outputsEncrypted`), and applies the env Secret
+ * directly. Nothing would ever replace a token there, so a lite row's reference resolves to its real
+ * output; a `managed-*` row (or no row) keeps the token, exactly as before.
+ */
+export const APP_ENV_LITE_MANAGED_PROVIDER_PREFIX = 'k8s-inline-' as const;
+
+/** Does the platform hold this managed-target row's outputs (the lite tier, above)? */
+export function appEnvPlatformHoldsManagedOutputs(
+    fact: Pick<AppEnvDependencyFact, 'providerId'> | null | undefined,
+): boolean {
+    return (
+        typeof fact?.providerId === 'string' &&
+        fact.providerId.startsWith(APP_ENV_LITE_MANAGED_PROVIDER_PREFIX)
+    );
+}
+
 /** The `POSTGRES_*` names a `postgres` build service may carry (plan §4.6.2:459). */
 export const APP_ENV_BUILD_SERVICE_POSTGRES_ENV = {
     user: 'POSTGRES_USER',
@@ -848,6 +871,34 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
     }
 
     /* ---------------------------------------------------------------------- *
+     * The App env → dependency bridge (lane aw-env-smtp, 2026-10-18)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * The stored, decrypted values of `names` — `{}` when none is stored.
+     *
+     * Its one caller is `AppEnvSmtpBridgeListener`, which turns an owner's own `SMTP_*` values (the
+     * names the App spec binds to `deps.smtp.*`) into the `smtp` dependency's configuration through
+     * `AppDependenciesService.configure` — which encrypts them again before anything is stored (FR-5).
+     * Nothing here is logged or returned by a route. An envelope that cannot be read is the 503
+     * refusal of {@link decrypt}, exactly as on every other read.
+     */
+    async readStoredValuesOf(
+        workId: string,
+        names: readonly string[],
+    ): Promise<Record<string, string>> {
+        const wanted = new Set(names.filter((name) => typeof name === 'string' && name.length > 0));
+        const values: Record<string, string> = {};
+        if (wanted.size === 0 || !workId) return values;
+
+        const stored = await this.readStoredValues(workId, false);
+        for (const [name, row] of stored) {
+            if (wanted.has(name)) values[name] = row.value;
+        }
+        return values;
+    }
+
+    /* ---------------------------------------------------------------------- *
      * Reading the world
      * ---------------------------------------------------------------------- */
 
@@ -877,14 +928,16 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
                     .filter((service) => typeof service?.name === 'string')
                     .map((service) => [service.name, service]),
             ),
-            // The managed tier's row never has an outputs envelope at all
-            // (§3.2:230) and the platform must not hold one (§4.11:689-693), so
-            // this path does not read them: every dependency reference is a
-            // placeholder and `egress` is empty on that target.
-            dependencyFacts:
-                ephemeral || target === 'ever-works-apps'
-                    ? new Map<AppDependencyKind, AppEnvDependencyFact>()
-                    : await this.readDependencyFacts(workId),
+            // The full managed tier's row never has an outputs envelope at all
+            // (§3.2:230) and the platform must not hold one (§4.11:689-693): its
+            // references stay placeholders and `egress` is empty on that target.
+            // The rows ARE read there since lane aw-env-smtp — the lite tier's
+            // in-namespace rows hold real outputs (see
+            // `APP_ENV_LITE_MANAGED_PROVIDER_PREFIX`) — and a `managed-*` row's
+            // missing envelope simply reads as "no outputs".
+            dependencyFacts: ephemeral
+                ? new Map<AppDependencyKind, AppEnvDependencyFact>()
+                : await this.readDependencyFacts(workId),
             ephemeralOutputs: new Map(
                 Object.entries(ephemeralOutputs ?? {}) as [
                     AppDependencyKind,
@@ -1575,8 +1628,14 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
     ): ReferenceOutcome {
         // The managed tier: the platform holds no outputs, so the reference
         // becomes the zone's literal token — decided from the TARGET, never from
-        // the stored row.
-        if (scope.target === 'ever-works-apps') {
+        // the stored row's `deployTarget`. The one exception is the lite tier's
+        // in-namespace provider (lane aw-env-smtp): there is no zone to replace a
+        // token, and the platform holds the real outputs, so it falls through to
+        // the live-output path below.
+        if (
+            scope.target === 'ever-works-apps' &&
+            !appEnvPlatformHoldsManagedOutputs(scope.dependencyFacts.get(reference.dependency))
+        ) {
             const placeholder = `ew-dep://${reference.dependency}/${reference.output}`;
             return {
                 kind: 'value',
@@ -1677,6 +1736,9 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
      * the managed target, where no output is read at all.
      */
     private collectEgress(scope: ResolutionScope): AppEnvEgressDestination[] {
+        // The managed tier's destinations are the zone's business (§4.11) —
+        // unchanged now that its rows are read for the lite tier.
+        if (scope.target === 'ever-works-apps') return [];
         const byHost = new Map<string, Set<number>>();
 
         for (const fact of scope.dependencyFacts.values()) {

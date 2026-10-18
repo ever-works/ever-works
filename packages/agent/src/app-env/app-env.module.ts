@@ -57,6 +57,7 @@
  * `dependencyNotReady`. The rows are read, never written, here.
  *
  * ## The seams this module still does NOT bind (and why that is deliberate)
+ * (`APP_ENV_ACTIVITY` left this list on 2026-10-18, lane aw-env-smtp: `AppEnvActivityService` binds it.)
  * `APP_ENV_SPEC_SOURCE`, `APP_ENV_ACTIVITY`, `APP_ENV_BUILD_FINGERPRINTS`,
  * `APP_ENV_DEPLOY_FINGERPRINTS` and `APP_ENV_ACTOR_NAMES` are other owners' —
  * APW-03's `AppSpecService`, APW-07 T26's activity writer, APW-05's
@@ -86,11 +87,14 @@ import { WorkAppEnvValueRepository } from '../database/repositories/work-app-env
 import { AppEnvCrypto } from './app-env-crypto';
 import { AppSpecService } from '../app-spec/app-spec.service';
 import {
+    APP_ENV_ACTIVITY,
     APP_ENV_RESOLVER_FINGERPRINTS,
     APP_ENV_SPEC_SOURCE,
     AppEnvService,
     type AppEnvSpecSource,
 } from './app-env.service';
+import { AppEnvActivityService } from './app-env.activity';
+import { AppEnvEditorService } from './app-env-editor.service';
 import { AppEnvSpecReadSource } from './app-env-spec.source';
 import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
 
@@ -138,9 +142,17 @@ import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
             }),
             inject: [ModuleRef],
         },
+        // APW-07 T26 (lane aw-env-smtp, 2026-10-18) — FR-8's Activity row per env change. The writer
+        // looks `ActivityLogService` up at call time (see `app-env.activity.ts`), so this module
+        // still compiles standalone; unbound there, `apply` answers `activityRecorded: false`.
+        AppEnvActivityService,
+        { provide: APP_ENV_ACTIVITY, useExisting: AppEnvActivityService },
+        // Lane aw-env-smtp — the two Environment routes' service (`GET`/`PUT /api/works/:id/app-env`).
+        AppEnvEditorService,
     ],
     exports: [
         AppEnvService,
+        AppEnvEditorService,
         AppEnvCrypto,
         AppEnvResolver,
         WorkAppEnvValueRepository,

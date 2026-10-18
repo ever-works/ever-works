@@ -544,3 +544,39 @@ describe('detectCapabilities — live view tags (Agent computers)', () => {
 		expect(description.capabilities).toEqual(expect.arrayContaining(['attended', 'screen', 'terminal']));
 	});
 });
+
+describe('the node link’s tags and consents (FL-02)', () => {
+	it('appends the link modules’ tags after everything detected, and nothing without them', async () => {
+		const plain = await detectCapabilities(runnerWith([]), environment());
+		expect(plain).not.toContain('managed');
+		const managed = await detectCapabilities(
+			runnerWith([]),
+			environment({ managed: true, linkModuleTags: ['managed'] })
+		);
+		expect(managed.at(-1)).toBe('managed');
+		expect(managed.slice(0, -1)).toEqual(plain);
+	});
+
+	it('keeps `managed` through an operator selection that predates it — --manage IS the opt-in', async () => {
+		const description = await describeSelf(
+			runnerWith([]),
+			environment({ managed: true, linkModuleTags: ['managed'] }),
+			'0.3.0',
+			['terminal']
+		);
+		expect(description.capabilities).toEqual(expect.arrayContaining(['managed', 'terminal']));
+	});
+
+	it('carries the four consents as literal booleans when a source is wired, and none otherwise', async () => {
+		const withConsents = await describeSelf(runnerWith([]), environment(), '0.3.0', null, {
+			consents: () => ({ work: true, attend: false, manage: true, usageScan: false })
+		});
+		expect(withConsents.consents).toEqual({ work: true, attend: false, manage: true, usageScan: false });
+		const sloppy = await describeSelf(runnerWith([]), environment(), '0.3.0', null, {
+			consents: () => ({ work: 'yes', attend: 1, manage: true }) as never
+		});
+		expect(sloppy.consents).toEqual({ work: false, attend: false, manage: true, usageScan: false });
+		const without = await describeSelf(runnerWith([]), environment(), '0.3.0');
+		expect(without).not.toHaveProperty('consents');
+	});
+});

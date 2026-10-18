@@ -69,6 +69,9 @@ export interface RotateCredentialPatch {
     rotationRequestedByUserId: string | null;
 }
 
+/** Ids per `IN (...)` read in {@link FleetNodeRepository.findStatusesByIds}. */
+const STATUS_READ_CHUNK = 500;
+
 /**
  * Feature-owned repository (provided by `FleetModule`, not
  * `DatabaseModule` — same split as `MeetingRepository`).
@@ -91,6 +94,28 @@ export class FleetNodeRepository {
 
     async findById(id: string): Promise<FleetNode | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    /**
+     * Fleet node link (FL-02) — the id and status of each of these rows; an
+     * id with no row is simply absent from the answer. Read in chunks so a
+     * large fleet stays under every driver's bound-parameter limit. Empty
+     * input reads nothing.
+     */
+    async findStatusesByIds(
+        ids: readonly string[],
+    ): Promise<Array<Pick<FleetNode, 'id' | 'status'>>> {
+        const out: Array<Pick<FleetNode, 'id' | 'status'>> = [];
+        for (let start = 0; start < ids.length; start += STATUS_READ_CHUNK) {
+            const chunk = ids.slice(start, start + STATUS_READ_CHUNK);
+            out.push(
+                ...(await this.repository.find({
+                    select: { id: true, status: true },
+                    where: { id: In([...chunk]) },
+                })),
+            );
+        }
+        return out;
     }
 
     /** Credential lookup (sha256 hex) — enroll resolves the row by it. */

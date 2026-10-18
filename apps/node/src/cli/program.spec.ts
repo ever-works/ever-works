@@ -849,3 +849,74 @@ describe('startLanesAfterAcceptedHeartbeat (#2628)', () => {
 		).resolves.toMatchObject({ started: false, failed: true });
 	});
 });
+
+describe('ever-works-node start --manage (Fleet node link, FL-02)', () => {
+	const beatOk: FetchLike = async () => ({
+		ok: true,
+		status: 200,
+		text: async () => JSON.stringify({ ok: true, node: apiNode })
+	});
+
+	it('passes --manage to the runtime as its own consent and turns the node link on', async () => {
+		runtimeCalls.options.length = 0;
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn: beatOk });
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--manage'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options[0]).toMatchObject({ manageEnabled: true, nodeLink: true });
+		expect(runtimeCalls.options[0]?.workerEnabled).toBe(false);
+		expect(runtimeCalls.options[0]?.attendEnabled).toBe(false);
+		expect(h.output()).toContain('Consents — manage; the node link opens after the first accepted heartbeat');
+	});
+
+	it('keeps --manage off unless it is passed, independent of --work and --attend', async () => {
+		runtimeCalls.options.length = 0;
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn: beatOk });
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--work', '--attend'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options[0]).toMatchObject({
+			manageEnabled: false,
+			workerEnabled: true,
+			attendEnabled: true
+		});
+	});
+
+	it('says the link stays closed when no consent opens it', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn: beatOk });
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain(
+			'Consents — none: the node link stays closed and this computer only reports health'
+		);
+	});
+
+	it('prints the consents and the link the service last recorded in `status`', async () => {
+		const record = {
+			version: 1,
+			recordedAt: '2026-10-18T09:41:00.000Z',
+			consents: { work: true, attend: false, manage: true, usageScan: false },
+			phase: 'connected',
+			detail: null,
+			linkGeneration: 8,
+			connectedSince: '2026-10-18T09:40:58.000Z'
+		};
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig, [`${CONFIG_PATH}.link.json`]: JSON.stringify(record) }
+		});
+		h.deps.now = () => Date.parse('2026-10-18T09:41:30.000Z');
+
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('consents     work · manage');
+		expect(h.output()).toContain('link         connected since 2026-10-18T09:40:58.000Z (generation 8)');
+	});
+
+	it('says the link is unknown before the service recorded anything', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('consents     unknown (the service has not reported them yet)');
+		expect(h.output()).toContain('link         unknown (the service has not reported its link yet)');
+	});
+});

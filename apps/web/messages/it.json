@@ -287,6 +287,8 @@
             "signIn": "Accedi con Ever ID",
             "signUp": "Registrati con Ever ID",
             "redirecting": "Apertura di Ever ID…",
+            "signInWith": "Accedi con <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Registrati con <wordmark>Ever ID</wordmark>",
             "consentRequired": "Accetta i termini qui sopra per continuare.",
             "createAccount": {
                 "title": "Crea il tuo account Ever Works",
@@ -7354,6 +7356,63 @@
                         "resume": "Ripresa richiesta.",
                         "remove": "Rimozione richiesta.",
                         "cancelDeploy": "Annullamento richiesto."
+                    }
+                },
+                "environment": {
+                    "title": "Ambiente",
+                    "description": "I valori con cui viene eseguita questa app. I valori segreti non vengono mai mostrati, solo se sono impostati.",
+                    "summary": "{set} di {total} impostati",
+                    "missingRequired": "{count, plural, one {Manca # valore obbligatorio} other {Mancano # valori obbligatori}}",
+                    "loading": "Lettura dell'ambiente…",
+                    "unavailable": "I valori d'ambiente non possono ancora essere modificati su questa istanza.",
+                    "error": "Impossibile leggere l'ambiente. Ricarica la pagina per riprovare.",
+                    "empty": "La specifica di questa app non dichiara valori d'ambiente.",
+                    "secureStorageOff": "L'archiviazione sicura non è configurata su questa installazione, quindi i valori non possono essere salvati.",
+                    "edit": "Modifica",
+                    "setValue": "Imposta valore",
+                    "editAria": "Modifica {name}",
+                    "saved": "{name} salvato",
+                    "removed": "{name} rimosso",
+                    "states": {
+                        "set": "Impostato",
+                        "unset": "Non impostato",
+                        "missing": "Obbligatorio — non impostato",
+                        "fromSpec": "Dalla specifica dell'app",
+                        "fromDependency": "Fornito da {kind}",
+                        "generated": "Generato"
+                    },
+                    "badges": {
+                        "secret": "Segreto",
+                        "required": "Obbligatorio"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Archiviazione oggetti",
+                        "smtp": "Posta SMTP"
+                    },
+                    "dialog": {
+                        "title": "Modifica {name}",
+                        "valueLabel": "Valore",
+                        "secretHint": "Questo valore è segreto. Viene salvato cifrato e non viene più mostrato.",
+                        "secretStored": "È presente un valore salvato. Scrivine uno nuovo per sostituirlo.",
+                        "dependencyHint": "Di norma fornito da {kind}. Un valore impostato qui ha la precedenza, per esempio il tuo server SMTP.",
+                        "redeployHint": "Dove l'app usa questo valore, viene ricompilata o ridistribuita con quello nuovo.",
+                        "empty": "Inserisci un valore oppure rimuovi quello salvato.",
+                        "save": "Salva",
+                        "saving": "Salvataggio…",
+                        "remove": "Rimuovi valore",
+                        "cancel": "Annulla"
+                    },
+                    "errors": {
+                        "undeclaredName": "La specifica dell'app non dichiara questo nome.",
+                        "specUnavailable": "Questa app non ha ancora una specifica utilizzabile.",
+                        "failed": "Impossibile salvare il valore. Riprova."
                     }
                 }
             },

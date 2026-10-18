@@ -280,6 +280,7 @@ import {
     type AppDependencyProvisionDispatcher,
 } from '../tasks/app-dependency-provision-dispatcher';
 import type { AppDependencyProvisionPayload } from '../tasks/app-dependency-provision.types';
+import { describeDependencyError } from './describe-dependency-error';
 
 export { APP_DEPENDENCY_PROVISION_DISPATCHER };
 export type { AppDependencyProvisionDispatcher, AppDependencyProvisionPayload };
@@ -1107,6 +1108,12 @@ export class AppDependenciesService {
 
         const prepared = await this.prepareTarget(workId);
         if ('unavailable' in prepared) {
+            // Said in the log by its own name: the row's reason is the contract's, and
+            // `cluster_unreachable` is also what an unresolvable target maps to — the line
+            // before this one (the target port's or the runtime facade's) says which.
+            this.logger.warn(
+                `${kind} of work ${workId}: the dependency target is unavailable (${prepared.unavailable}).`,
+            );
             // Definite for every reason but an unreachable cluster (FR-43,
             // plan §4.8:554-556). The row carries the CONTRACT reason, not the
             // port's discriminant (APW07-G28): `asReason` reads a stored reason
@@ -1196,6 +1203,13 @@ export class AppDependenciesService {
             // as a transient failure with its own retry allowance (FR-43), so a
             // single bad call can never look like a `ready` dependency.
             const aborted = opts.signal?.aborted === true || errorName(error) === 'AbortError';
+            // The row keeps the error's NAME only (it is shown to the owner); the log carries
+            // the message and its cause chain, redacted, so the cause can be diagnosed.
+            this.logger.warn(
+                `${kind} provider call for work ${workId} threw${
+                    aborted ? ' (aborted at the readiness deadline)' : ''
+                }: ${describeDependencyError(error)}`,
+            );
             return this.recordAttemptFailure(
                 row,
                 aborted ? 'deadlineExceeded' : 'clusterUnreachable',
@@ -1240,7 +1254,7 @@ export class AppDependenciesService {
             // keeps its status and records that the check happened (FR-48's
             // "Couldn't check" is the card's rendering of an unknown state).
             this.logger.warn(
-                `Refresh of ${row.kind} for work ${row.workId} failed: ${errorName(error)}`,
+                `Refresh of ${row.kind} for work ${row.workId} failed: ${describeDependencyError(error)}`,
             );
             await this.updateRow(row.id, { lastCheckedAt: new Date(this.nowMs()) });
             return {
@@ -1305,7 +1319,7 @@ export class AppDependenciesService {
             prepared = await this.target.prepareDependencyTarget(workId);
         } catch (error) {
             this.logger.warn(
-                `prepareDependencyTarget failed for work ${workId}: ${errorName(error)}`,
+                `prepareDependencyTarget failed for work ${workId}: ${describeDependencyError(error)}`,
             );
             return { unavailable: 'cluster_unreachable' };
         }
@@ -1332,7 +1346,9 @@ export class AppDependenciesService {
             const credential = answer?.access?.credential;
             return answer?.outcome === 'access' && credential ? credential : null;
         } catch (error) {
-            this.logger.warn(`Cluster access for work ${workId} failed: ${errorName(error)}`);
+            this.logger.warn(
+                `Cluster access for work ${workId} failed: ${describeDependencyError(error)}`,
+            );
             return null;
         }
     }

@@ -88,6 +88,7 @@ import {
     IntegrationUpdateMissionDto,
 } from '../missions.controller';
 import { IntegrationCreateOrganizationDto } from '../organizations-write.controller';
+import { IntegrationInviteMemberDto } from '../members-write.controller';
 import {
     IntegrationCreateCommentDto,
     IntegrationExternalAuthorDto,
@@ -379,6 +380,8 @@ const REQUEST_BODIES: Readonly<Record<string, BodyPair>> = {
     },
     // EW-P2-6 — organization create.
     CreateOrganization: { dto: IntegrationCreateOrganizationDto },
+    // CR-13 — member invitations.
+    InviteMember: { dto: IntegrationInviteMemberDto },
     // EW-P2-4 — Project Works (Gauzy CR-6).
     CreateWork: { dto: IntegrationCreateWorkDto, nested: { externalRef: EXTERNAL_REF } },
     CreateWebhook: { dto: IntegrationCreateWebhookDto },

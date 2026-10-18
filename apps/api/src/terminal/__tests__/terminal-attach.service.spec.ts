@@ -144,5 +144,52 @@ describe('TerminalAttachService', () => {
                 .digest('base64url');
             expect(svc.verify(`${body}.${mac}`)).toBeNull();
         });
+
+        it('round-trips the node link claims: channel, jti and a longer lifetime (FL-02)', () => {
+            const svc = withSecret();
+            const before = Date.now();
+            const { token, expiresInSec } = svc.mint(
+                {
+                    userId: 'node:n1',
+                    runId: RUN,
+                    role: 'worker',
+                    channel: 'fleet-link',
+                    jti: 'jti-1',
+                },
+                { ttlSec: 300 },
+            );
+            expect(expiresInSec).toBe(300);
+            const claims = svc.verify(token);
+            expect(claims).toMatchObject({ channel: 'fleet-link', jti: 'jti-1', role: 'worker' });
+            expect(claims!.exp).toBeGreaterThanOrEqual(before + 300_000);
+        });
+
+        it('caps a requested lifetime at five minutes and keeps the 60 s default otherwise', () => {
+            const svc = withSecret();
+            expect(
+                svc.mint({ userId: 'u1', runId: RUN, role: 'viewer' }, { ttlSec: 86_400 })
+                    .expiresInSec,
+            ).toBe(300);
+            expect(svc.mint({ userId: 'u1', runId: RUN, role: 'viewer' }).expiresInSec).toBe(60);
+        });
+
+        it('refuses a correctly signed token with a malformed jti', () => {
+            const svc = withSecret();
+            const { createHmac } = jest.requireActual('crypto') as typeof import('crypto');
+            const body = Buffer.from(
+                JSON.stringify({
+                    userId: 'u1',
+                    runId: RUN,
+                    role: 'worker',
+                    channel: 'fleet-link',
+                    jti: 42,
+                    exp: Date.now() + 60_000,
+                }),
+            ).toString('base64url');
+            const mac = createHmac('sha256', 'a-very-strong-terminal-secret')
+                .update(body)
+                .digest('base64url');
+            expect(svc.verify(`${body}.${mac}`)).toBeNull();
+        });
     });
 });

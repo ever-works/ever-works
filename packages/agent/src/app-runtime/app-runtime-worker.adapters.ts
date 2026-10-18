@@ -35,6 +35,7 @@ import type {
     AppRuntimeNotificationProducers,
 } from './app-deploy.orchestrator';
 import { parseBearerChallenge, parseImageReference } from './app-image-reference.resolver';
+import { describeDependencyError } from '../app-dependencies/describe-dependency-error';
 import {
     AppPortUnavailableError,
     type AppImagePullCredentialSource,
@@ -307,7 +308,16 @@ export class AppRuntimeTargetAdapter implements AppRuntimeTargetPort {
             return { unavailable: 'cluster_unreachable' };
         }
 
-        if (answer.outcome !== 'access') return { unavailable: unavailableFor(answer.refusal) };
+        if (answer.outcome !== 'access') {
+            const unavailable = unavailableFor(answer.refusal);
+            // The facade's refusal by its own name: several of them (`target_unavailable`, for
+            // one — no plugin serves the target) collapse into `cluster_unreachable` here, and
+            // without this line the dependency row's reason was the only trace left.
+            this.logger.warn(
+                `Cluster access for work ${workId} was refused (${String(answer.refusal)}); the dependency target is ${unavailable}.`,
+            );
+            return { unavailable };
+        }
 
         const { ref, credential, plugin } = answer.access;
         const prepare = (
@@ -648,9 +658,13 @@ export function workerAppDeployDispatcher(relay: {
     };
 }
 
+/**
+ * A caught value for a LOG line: name, code, message and cause chain, credential material
+ * redacted. A plugin wraps the Kubernetes client's error (`K8sPluginError` → `ApiException` →
+ * the socket error), so the message alone hid which of them failed.
+ */
 function messageOf(error: unknown): string {
-    if (error instanceof Error) return error.message.slice(0, 300);
-    return typeof error === 'string' ? error.slice(0, 300) : 'unknown error';
+    return describeDependencyError(error);
 }
 
 /**

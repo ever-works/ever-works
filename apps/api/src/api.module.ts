@@ -71,6 +71,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
+import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
 import { SchedulesModule } from './schedules/schedules.module';
@@ -296,6 +297,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Rides the terminal's attach-token signer and the fleet's node
         // auth and job runtime; dark with FLEET_ENABLED=false.
         ComputerApiModule,
+        // Fleet node link (FL-02) — every machine's one outbound multiplexed
+        // socket (/ws/fleet/link) on this same HTTP server, the link-token and
+        // operations routes, and the service every machine tab calls. Dark
+        // unless FLEET_ENABLED and FLEET_NODE_LINK_ENABLED are both on.
+        FleetLinkApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,

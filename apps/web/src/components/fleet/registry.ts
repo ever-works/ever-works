@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { FleetActionFamily, FleetNodeView } from '@ever-works/contracts';
+import { isNeedsALookRoute } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 
 /**
@@ -281,11 +282,133 @@ export function getOverviewBlocks(
         .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
+// ─── Add computer ▾ and computer actions (CONTRACTS §11.1, revision 6) ─────
+
+/**
+ * One more entry in the hub's "Add computer ▾" menu (FL-16 "Virtual computer
+ * on a host", FL-17 "Cloud computer"), beside the two FL-01 ships (a
+ * command-line node, the desktop app). The entry navigates to `href`, where
+ * the epic's own creation flow lives.
+ */
+export interface FleetAddComputerItemRegistration {
+    /** Unique id, e.g. `fl-17.cloud`. */
+    id: string;
+    /** Lower renders first; FL-01's two built-in entries are 10 and 20. */
+    order: number;
+    epic: string;
+    /** Shown only while this flag is on. */
+    flag?: FleetFeatureFlag;
+    /** Full message key of the label, e.g. `fleet.cloud.addItem`. */
+    labelKey: string;
+    /** An app route (a same-origin path). */
+    href: string;
+    /** Which glyph the entry shows. */
+    icon?: 'server' | 'laptop' | 'virtual' | 'cloud';
+}
+
+/** What a computer action component receives. */
+export interface FleetComputerActionProps {
+    node: FleetNodeView;
+    flags: FleetFeatureFlags;
+}
+
+/**
+ * One act on a computer (CONTRACTS §11.1): a control in the computer page's
+ * header (`placement: 'header'`, e.g. FL-04's "New session ▾", FL-07's
+ * "Desktop") or an entry in its ⋯ menu (`placement: 'menu'`, e.g. FL-16's
+ * "Stop VM", FL-17's "Destroy…"). The component owns its own confirmation and
+ * permission rendering; `family` is the action family it acts in, so the
+ * page can say who may use it. `replaces` names the FL-01 placeholder a
+ * header action takes the place of (the disabled "New session" / "Desktop").
+ */
+export interface FleetComputerActionRegistration {
+    /** Unique id, e.g. `fl-04.new-session`. */
+    id: string;
+    placement: 'header' | 'menu';
+    /** Lower renders first within its placement. */
+    order: number;
+    epic: string;
+    /** Rendered only while this flag is on. */
+    flag?: FleetFeatureFlag;
+    family: FleetActionFamily;
+    replaces?: 'new-session' | 'desktop';
+    load: Loader<FleetComputerActionProps>;
+}
+
+const addComputerItems = new Map<string, FleetAddComputerItemRegistration>();
+const computerActions = new Map<string, FleetComputerActionRegistration>();
+
+/** Add an entry to the hub's "Add computer ▾" menu. */
+export function registerAddComputerItem(registration: FleetAddComputerItemRegistration): void {
+    if (!isNeedsALookRoute(registration.href)) {
+        throw new Error(`Fleet Add computer item "${registration.id}" must link to an app route`);
+    }
+    addComputerItems.set(registration.id, registration);
+}
+
+/** The registered Add computer entries whose flag is on, in order. */
+export function getAddComputerItems(flags: FleetFeatureFlags): FleetAddComputerItemRegistration[] {
+    return [...addComputerItems.values()]
+        .filter((item) => !item.flag || flags[item.flag] === true)
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+/** Add an act to every computer page's header or ⋯ menu. */
+export function registerComputerAction(registration: FleetComputerActionRegistration): void {
+    computerActions.set(registration.id, registration);
+}
+
+/** The registered computer actions for one placement whose flag is on, in order. */
+export function getComputerActions(
+    placement: FleetComputerActionRegistration['placement'],
+    flags: FleetFeatureFlags,
+): FleetComputerActionRegistration[] {
+    return [...computerActions.values()]
+        .filter(
+            (action) =>
+                action.placement === placement && (!action.flag || flags[action.flag] === true),
+        )
+        .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+/** What the session page (`/fleet/sessions/[id]`) component receives. */
+export interface FleetSessionPageProps {
+    sessionId: string;
+    flags: FleetFeatureFlags;
+}
+
+/**
+ * The one session page (CONTRACTS §11.1: `DASHBOARD_FLEET_SESSION`). FL-01 owns
+ * the route; FL-04 fills it here with its flag, the way a tab is filled.
+ */
+export interface FleetSessionPageRegistration {
+    epic: string;
+    flag: FleetFeatureFlag;
+    load: Loader<FleetSessionPageProps>;
+}
+
+let sessionPage: FleetSessionPageRegistration | null = null;
+
+/** Fill `/fleet/sessions/[id]` (FL-04). */
+export function registerSessionPage(registration: FleetSessionPageRegistration): void {
+    sessionPage = registration;
+}
+
+/** What `/fleet/sessions/[id]` renders: the registered page, or the placeholder naming FL-04. */
+export function resolveSessionPage(flags: FleetFeatureFlags): FleetTabState<FleetSessionPageProps> {
+    if (!sessionPage) return { kind: 'not-shipped', epic: 'FL-04' };
+    if (flags[sessionPage.flag] !== true) return { kind: 'switched-off', epic: sessionPage.epic };
+    return { kind: 'ready', load: sessionPage.load };
+}
+
 /** For tests only: forget every registration. */
 export function resetFleetRegistryForTests(): void {
     computerTabs.clear();
     hubTabs.clear();
     overviewBlocks.clear();
+    addComputerItems.clear();
+    computerActions.clear();
+    sessionPage = null;
 }
 
 // ─── Resolution ─────────────────────────────────────────────────────────────

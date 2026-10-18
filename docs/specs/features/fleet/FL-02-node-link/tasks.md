@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-02-node-link`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft`
+**Status:** `In progress` — P1 (T-01 … T-15) in PR 1
 **Last updated:** 2026-10-18
 
 ---
@@ -26,56 +26,56 @@
 
 ## P1.A — Contracts
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-link.types.ts` (constants, frame kinds,
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-link.types.ts` (constants, frame kinds,
       families, control message union, `FleetLinkError`, `FleetConsents`, `effectiveConsents`,
       `FLEET_LINK_FAMILY_CONSENT`, `FLEET_LINK_STATE_CHANGING_FAMILIES`) and export from
       `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-link.types.spec.ts` — every family has a
       consent; `effectiveConsents` for null/partial/full; constants equal CONTRACTS §10.
-- [ ] **T-02**. Add `packages/contracts/src/fleet/fleet-link.codec.ts` (`encodeLinkFrame`,
+- [x] **T-02**. Add `packages/contracts/src/fleet/fleet-link.codec.ts` (`encodeLinkFrame`,
       `decodeLinkFrame`, `encodeControl`, `decodeControl`; null-never-throw; 16 MiB cap before parse).
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-link.codec.spec.ts` — round-trip per kind,
       cap + 1 refused, truncated header, `__proto__` stripped, 10 000-buffer fuzz never throws.
-- [ ] **T-03** (parallel). Extend `packages/contracts/src/fleet/fleet-node.types.ts`:
+- [x] **T-03** (parallel). Extend `packages/contracts/src/fleet/fleet-node.types.ts`:
       `FleetNodeSelfDescription.consents?`, `FleetNodeView.consents?`, `FleetNodeView.link?`,
       `FleetHeartbeatResponse.recommendedNodeVersion?`. Add `packages/contracts/src/fleet/fleet-operations.types.ts`.
       Add `node.consent.change`, `node.link.connect`, `node.link.disconnect`, `node.link.channel-open`
       to `packages/contracts/src/fleet/fleet-panic.types.ts` (`:60-131`).
       **Test**: extend `fleet-node.spec.ts`, `fleet-panic.spec.ts`; `apps/api/src/fleet/__tests__/node-contract.conformance.spec.ts`
       still green (optional fields only).
-- [ ] **T-04**. Add fixture `packages/contracts/fixtures/fleet-link-contract.v1.json` (hello, ready,
+- [x] **T-04**. Add fixture `packages/contracts/fixtures/fleet-link-contract.v1.json` (hello, ready,
       channel.open/ready/refused/close, operation.progress/done, one frame per kind as hex).
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-link.fixture.spec.ts` — codec decodes
       every fixture entry to the typed shape.
 
 ## P1.B — Node: consent, socket extraction, link client
 
-- [ ] **T-05**. Extract socket mechanics from `apps/node/src/core/screen/node-leg.ts` (`:76-89`,
+- [x] **T-05**. Extract socket mechanics from `apps/node/src/core/screen/node-leg.ts` (`:76-89`,
       `:107-116`, `:142-148`, `:171-177`) into `apps/node/src/core/link/link-socket.ts`
       (`isSecureLegOrigin`, `toWsUrl`, `createReconnectingSocket({ baseMs, maxMs, jitter, acceptedAfterMs })`);
       `node-leg.ts` imports it with its 2 s base unchanged.
       **Test**: `apps/node/src/core/link/link-socket.spec.ts` (ladder 1 s → 30 s with jitter bounds,
       reset only on accept); `apps/node/src/core/screen/node-leg.spec.ts` passes unchanged.
-- [ ] **T-06**. `--manage` on `start` in `apps/node/src/cli/program.ts` (beside `--attend` `:1549-1552`;
+- [x] **T-06**. `--manage` on `start` in `apps/node/src/cli/program.ts` (beside `--attend` `:1549-1552`;
       `manageEnabled` beside `attendEnabled` `:464`); `createNodeRuntime` option `manageEnabled` in
       `apps/node/src/core/runtime.ts` (beside `attendEnabled` `:480`); `CapabilityEnvironment.managed`
       and the `managed` tag in `apps/node/src/core/capabilities.ts` (`detectCapabilities` `:277-330`).
       `status` / `doctor` print consents.
       **Test**: extend `apps/node/src/core/capabilities.spec.ts` (`managed` only with the flag) and
       `apps/node/src/cli/program.spec.ts` (flag parsed, independent of `--work`/`--attend`).
-- [ ] **T-07**. Heartbeat `consents`: `describe()` in `runtime.ts` adds `{ work, attend, manage,
+- [x] **T-07**. Heartbeat `consents`: `describe()` in `runtime.ts` adds `{ work, attend, manage,
       usageScan: false }` (CONTRACTS §1.1; FL-20 wires `usageScan`);
       `OPTIONAL_DESCRIPTION_FIELD_TIERS` in `apps/node/src/core/heartbeat.ts:72-90` gains `consents` in
       the newest tier; `apps/node/src/core/types.ts` `NodeSelfDescription.consents?`.
       **Test**: extend `apps/node/src/core/heartbeat.spec.ts` — sent on every beat; dropped first on a
       400 from an older platform; `node-contract.conformance.spec.ts` fixture updated.
-- [ ] **T-08**. Module registry: `apps/node/src/core/link/modules/registry.ts` (`NodeModule`,
+- [x] **T-08**. Module registry: `apps/node/src/core/link/modules/registry.ts` (`NodeModule`,
       `composeModules`), `modules/control.ts` (ch 0: ping/pong, pause/resume/drain flags),
       `modules/machine.ts` (lazy channel, verb router, `unsupported_on_node`), `modules/index.ts`.
       `detectCapabilities` appends `composeModules(env).tags`.
       **Test**: `apps/node/src/core/link/modules/registry.spec.ts` — tag composition; unknown verb;
       consent refusal on the node; pause blocks new input, not replies.
-- [ ] **T-09**. Link client: `apps/node/src/core/link/link-client.ts` (hello/ready, generation, resume
+- [x] **T-09**. Link client: `apps/node/src/core/link/link-client.ts` (hello/ready, generation, resume
       list, 15 s ping / 45 s silence, `refusedUntil` 5 min on flag-off close) and
       `apps/node/src/core/link/channel-mux.ts` (64 channels, per-channel queues, slow-reader drop,
       ACK credit). Wire into `runtime.ts` after `untilHeartbeatAccepted` (`heartbeat.ts:127`) when any
@@ -85,7 +85,7 @@
 
 ## P1.C — API: token, gateway, registry, authoriser, operations
 
-- [ ] **T-10**. Migration `apps/api/src/migrations/1796020000000-AddFleetNodeConsents.ts` (guarded
+- [x] **T-10**. Migration `apps/api/src/migrations/1796020000000-AddFleetNodeConsents.ts` (guarded
       `ADD COLUMN consents text NULL` and `ADD COLUMN previewProfileEnabled boolean NOT NULL DEFAULT
       false` — CONTRACTS §13 puts both in this slot; FL-10 owns the behaviour); entity columns in
       `packages/agent/src/entities/fleet-node.entity.ts`;
@@ -95,33 +95,33 @@
       **Test**: `packages/agent/src/fleet/__tests__/fleet.service.consents.spec.ts`; migration applies
       twice; `apps/api/src/fleet/dto/fleet-heartbeat-consents.dto.spec.ts` (shape accepted; unknown key
       still 400).
-- [ ] **T-11**. Create `apps/api/src/fleet-link/` module: `fleet-link.module.ts` (registered in
+- [x] **T-11**. Create `apps/api/src/fleet-link/` module: `fleet-link.module.ts` (registered in
       `apps/api/src/api.module.ts` beside `TerminalModule` `:72,292`), `fleet-link-token.service.ts`
       (HMAC via `TerminalAttachService` signer family, `jti` seen-set with Valkey/in-process),
       `fleet-link.controller.ts` (`POST /api/fleet/link-token` under `FleetEnabledGuard` +
       `FleetNodeAuthGuard`, 404 when `FLEET_NODE_LINK_ENABLED` is off).
       **Test**: `apps/api/src/fleet-link/fleet-link.controller.spec.ts` — guard reuse, undifferentiated
       401, single use, 5 min TTL, flag off.
-- [ ] **T-12**. `apps/api/src/fleet-link/fleet-link-gateway.service.ts` on `/ws/fleet/link` (shape of
+- [x] **T-12**. `apps/api/src/fleet-link/fleet-link-gateway.service.ts` on `/ws/fleet/link` (shape of
       `apps/api/src/computer/computer-ws.service.ts:27-69`); add `/ws/fleet/` to
       `TERMINAL_WS_FOREIGN_PATH_PREFIXES` (`apps/api/src/terminal/terminal-ws.service.ts:50`) and to the
       computer gateway's ignore list. `fleet-link.registry.ts` (links, generations, channels, resume).
       **Test**: `fleet-link-gateway.spec.ts` — query string destroyed; 4001 after 5 s; replay refused;
       foreign node refused; 10 hellos/min; generation increments; resumed/closed lists; 45 s silence.
-- [ ] **T-13**. `fleet-link.authorizer.ts` (kill switch → consent → `FleetAccessService.assertFamily`;
+- [x] **T-13**. `fleet-link.authorizer.ts` (kill switch → consent → `FleetAccessService.assertFamily`;
       audit `node.link.channel-open` for `FLEET_LINK_STATE_CHANGING_FAMILIES`) and `fleet-link.service.ts`
       (`request(nodeId, family, verb, params, caller)`, channel reuse, `requestId` correlation, typed
       errors with CONTRACTS §8 hints).
       **Test**: `fleet-link.authorizer.spec.ts` (order; no node contact on refusal; audit only for
       state-changing); `fleet-link.service.spec.ts` (`unreachable` when no link; `limit_exceeded` on
       the 65th; `unsupported_on_node` passthrough).
-- [ ] **T-14**. Operations: `fleet-operations.service.ts` (in-memory + Valkey TTL 1 h) and
+- [x] **T-14**. Operations: `fleet-operations.service.ts` (in-memory + Valkey TTL 1 h) and
       `GET /api/fleet/operations/:id` + `DELETE /api/fleet/operations/:id` (sends `operation.cancel`,
       CONTRACTS §3.3 / §11.2) in `fleet-link.controller.ts`; ch 0 `operation.progress/done` handling
       in the registry.
       **Test**: `fleet-operations.service.spec.ts` — progress, done, cancel → `cancelled`, expiry,
       foreign caller 404.
-- [ ] **T-15**. Kill switch and panic: `fleet-link.registry.ts` subscribes to
+- [x] **T-15**. Kill switch and panic: `fleet-link.registry.ts` subscribes to
       `FleetKillSwitchService` changes (poll each ping tick, as the computer relay does) → `link.pause`
       / `link.resume` broadcast; `apps/api/src/fleet/fleet-panic.service.ts` drain-all → `link.drain
       { graceSec: 60 }`. Consent withdrawal (T-10 listener) closes affected channels with

@@ -365,6 +365,14 @@ export interface AppEnvActivityEvent {
     readonly status: 'completed';
     readonly summary: string;
     readonly details: { names?: string[]; actions?: string[]; name?: string };
+    /**
+     * Added 2026-10-18 (lane aw-env-smtp): the Work and the actor the row belongs to. The writer
+     * (`AppEnvActivityService`) needs both — `ActivityLogService.log` requires a `userId` and files the
+     * row under the `workId` — and nothing else in the event could carry them. Optional so a caller
+     * built against the earlier shape still type-checks.
+     */
+    readonly workId?: string;
+    readonly userId?: string | null;
 }
 
 /** The Activity writer of {@link AppEnvActivityEvent}. */
@@ -1488,6 +1496,8 @@ export class AppEnvService {
                 actionType: 'app_env',
                 action: 'app.env.changed',
                 status: 'completed',
+                workId,
+                userId: actor?.userId ?? null,
                 summary:
                     result.changed.length === 1
                         ? `Environment value ${result.changed[0]} ${activityWord(operations)}`
@@ -1618,6 +1628,8 @@ export class AppEnvService {
             actionType: 'app_env',
             action: 'app.env.rotated',
             status: 'completed',
+            workId,
+            userId: actor?.userId ?? null,
             summary: `Environment value ${name} rotated`,
             details: { name },
         });

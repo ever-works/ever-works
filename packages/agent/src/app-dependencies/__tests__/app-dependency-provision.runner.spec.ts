@@ -25,6 +25,7 @@
  *   `app.dependency.data_deleted`.
  */
 
+import { Logger } from '@nestjs/common';
 import { type AppDependencyKind, type AppDependencyTarget } from '@ever-works/contracts';
 import type {
     AppDependencyContext,
@@ -690,6 +691,40 @@ describe('AppDependencyProvisionRunner — failures (FR-43)', () => {
         // The service records the failure event once, when the allowance is
         // spent (FR-43) — the runner adds nothing on top of it.
         expect(h.events.map((event) => event.name)).toEqual(['app.dependency.failed']);
+    });
+
+    it('logs what a throwing attempt threw — message and cause chain, never the kubeconfig', async () => {
+        const h = harness({ rows: [row()] });
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        const cause = Object.assign(
+            new Error(
+                'namespaces "ewapp-x" is forbidden: User "system:serviceaccount:a:b" cannot get ' +
+                    'resource "namespaces" token: eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl',
+            ),
+            { code: 403 },
+        );
+        const thrown = Object.assign(new Error('applyObject Namespace failed', { cause }), {
+            name: 'K8sPluginError',
+            code: 'API_ERROR',
+        });
+        jest.spyOn(h.service, 'runAttempt').mockRejectedValue(thrown);
+
+        try {
+            const result = await provision(h, 'postgres');
+
+            // The row's reason is the contract's, unchanged.
+            expect(result.kinds).toEqual([
+                { kind: 'postgres', status: 'failed', reason: 'clusterUnreachable' },
+            ]);
+            const line = warn.mock.calls
+                .map((call) => String(call[0]))
+                .find((text) => text.includes('threw:'));
+            expect(line).toContain('K8sPluginError [API_ERROR]: applyObject Namespace failed');
+            expect(line).toContain('caused by Error [403]: namespaces "ewapp-x" is forbidden');
+            expect(line).not.toContain('eyJhbGciOiJSUzI1NiJ9');
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it('fails a definite reason at once, with no re-dispatch', async () => {

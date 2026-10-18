@@ -78,6 +78,12 @@ import {
 	REDIS_PROVIDER_ID,
 	RedisDependencyProvider
 } from './app-dependencies/redis.provider.js';
+// Lane aw-env-smtp (GAP-22) — the in-namespace mail sink, or the owner's own SMTP server.
+import {
+	SMTP_PROVIDER_DESCRIPTOR,
+	SMTP_PROVIDER_ID,
+	SmtpDependencyProvider
+} from './app-dependencies/smtp.provider.js';
 import {
 	appendHostToIngress,
 	buildDnsGuidance,
@@ -124,7 +130,11 @@ const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works-shared', 'k8
  * rather than three times against three classes. A provider that stopped answering one of them would be a
  * compile error here rather than a `undefined is not a function` at the first dependency of that kind.
  */
-type AppDependencyK8sProvider = PostgresDependencyProvider | RedisDependencyProvider | ObjectStorageDependencyProvider;
+type AppDependencyK8sProvider =
+	| PostgresDependencyProvider
+	| RedisDependencyProvider
+	| ObjectStorageDependencyProvider
+	| SmtpDependencyProvider;
 
 function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
@@ -391,13 +401,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	/**
 	 * APW-07 T19/T20/T21 — the dependency providers this plugin answers for (plan §4.9:570, §4.9:617-618).
 	 *
-	 * All three in-cluster providers, and the AppDependencyFacadeService orders the whole set by
-	 * `preference` — which is why the list is a `readonly` array of descriptors rather than three named fields.
+	 * All four in-cluster providers, and the AppDependencyFacadeService orders the whole set by
+	 * `preference` — which is why the list is a `readonly` array of descriptors rather than named fields.
+	 * `k8s-inline-mailpit` (lane aw-env-smtp, GAP-22) is the `smtp` one: an in-namespace mail sink, or the
+	 * owner's own SMTP server when the dependency's configuration names one.
 	 */
 	readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [
 		POSTGRES_PROVIDER_DESCRIPTOR,
 		REDIS_PROVIDER_DESCRIPTOR,
-		OBJECT_STORAGE_PROVIDER_DESCRIPTOR
+		OBJECT_STORAGE_PROVIDER_DESCRIPTOR,
+		SMTP_PROVIDER_DESCRIPTOR
 	];
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
@@ -584,7 +597,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 					},
 					redis: { type: 'string', title: 'Redis 7' },
 					objectStorage: { type: 'string', title: 'S3-compatible server' },
-					objectStorageClient: { type: 'string', title: 'S3 client (init job)' }
+					objectStorageClient: { type: 'string', title: 'S3 client (init job)' },
+					smtp: { type: 'string', title: 'Mail sink (Mailpit)' }
 				}
 			}
 		},
@@ -625,6 +639,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly redisDependencies: RedisDependencyProvider;
 	/** T21's provider (`k8s-inline-minio`). */
 	private readonly objectStorageDependencies: ObjectStorageDependencyProvider;
+	/** Lane aw-env-smtp's provider (`k8s-inline-mailpit`). */
+	private readonly smtpDependencies: SmtpDependencyProvider;
 	/**
 	 * The providers by id — the one lookup {@link dependencyProviderFor} performs, so adding a provider is one
 	 * entry in the published descriptor list and one entry here, and the two cannot drift silently: a
@@ -656,10 +672,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		this.postgresDependencies = new PostgresDependencyProvider(this.api);
 		this.redisDependencies = new RedisDependencyProvider(this.api);
 		this.objectStorageDependencies = new ObjectStorageDependencyProvider(this.api);
+		this.smtpDependencies = new SmtpDependencyProvider(this.api);
 		this.dependencyProviderInstances = {
 			[POSTGRES_PROVIDER_ID]: this.postgresDependencies,
 			[REDIS_PROVIDER_ID]: this.redisDependencies,
-			[OBJECT_STORAGE_PROVIDER_ID]: this.objectStorageDependencies
+			[OBJECT_STORAGE_PROVIDER_ID]: this.objectStorageDependencies,
+			[SMTP_PROVIDER_ID]: this.smtpDependencies
 		};
 		this.clusterAddressResolver = opts.clusterAddressResolver;
 	}

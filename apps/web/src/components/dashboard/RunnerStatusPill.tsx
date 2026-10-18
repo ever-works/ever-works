@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
 import { useRunnerStatusPolling } from '@/lib/hooks/use-runner-status-polling';
+import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import type { FleetRunnerStatusView } from '@/lib/api/fleet';
 import {
     formatBytes,
@@ -72,6 +73,8 @@ export function RunnerStatusPill({
 }: RunnerStatusPillProps) {
     const t = useTranslations('dashboard.runner');
     const { status, error, refresh } = useRunnerStatusPolling(initialStatus);
+    // Fleet hub (FL-01, FR-12): Manage opens the hub when it is on, Settings → Fleet otherwise.
+    const fleetHubEnabled = useFleetHubEnabled();
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -260,7 +263,11 @@ export function RunnerStatusPill({
                             {t('refreshCaption', { seconds: status.refreshIntervalSec })}
                         </p>
                         <Link
-                            href={ROUTES.DASHBOARD_SETTINGS_FLEET}
+                            href={
+                                fleetHubEnabled
+                                    ? ROUTES.DASHBOARD_FLEET
+                                    : ROUTES.DASHBOARD_SETTINGS_FLEET
+                            }
                             onClick={() => {
                                 onInteraction?.();
                                 setOpen(false);

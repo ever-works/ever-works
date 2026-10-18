@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { FLEET_DEFAULT_MAX_CAPABILITY_TAGS } from '@ever-works/contracts';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator';
 import { FleetController } from './fleet.controller';
@@ -530,6 +531,8 @@ describe('FleetController', () => {
                     'maxConcurrentJobs',
                     'maxCpuPercent',
                     'maxMemoryMb',
+                    // Fleet node link (FL-02).
+                    'consents',
                 ].sort(),
             );
             expect(result.secret).toBe('node-secret');
@@ -961,7 +964,12 @@ describe('FleetController', () => {
 
             const badCapabilities = plainToInstance(EnrollFleetNodeDto, {
                 token: 'x'.repeat(43),
-                capabilities: Array.from({ length: 17 }, (_, i) => `tag-${i}`),
+                // One over the configured cap (the default: 32 since FL-02, which
+                // raised it from 16 for the program's consent tags).
+                capabilities: Array.from(
+                    { length: FLEET_DEFAULT_MAX_CAPABILITY_TAGS + 1 },
+                    (_, i) => `tag-${i}`,
+                ),
             });
             expect((await validate(badCapabilities)).length).toBeGreaterThan(0);
 

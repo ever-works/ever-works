@@ -19,6 +19,11 @@ vi.mock('@/app/actions/dashboard/app-runtime', () => ({
     getAppTargetAction: vi.fn(),
     requestAppDeployAction: vi.fn(),
 }));
+// Lane aw-env-smtp — the page now renders the Environment card, which reads the App env on mount.
+vi.mock('@/app/actions/dashboard/app-env', () => ({
+    getAppEnvAction: vi.fn(async () => ({ success: false, code: 'route_unavailable' })),
+    updateAppEnvAction: vi.fn(),
+}));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ href, children, ...rest }: { href: string; children: ReactNode }) => (
