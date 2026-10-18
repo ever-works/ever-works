@@ -23,6 +23,7 @@ import {
     PluginRegistryService,
 } from '../plugins/services/plugin-registry.service';
 import type { AppBuildPluginBinding, AppBuildPluginResolver } from './app-builds.service';
+import type { RepositoryVisibilityProbe } from './repository-visibility.probe';
 
 /**
  * DI token for {@link BuildTokenSource}.
@@ -38,6 +39,12 @@ export const BUILD_REPOSITORY_FACTS_SOURCE = Symbol('BUILD_REPOSITORY_FACTS_SOUR
 
 /** DI token for {@link BuildSettingsSource}. Declared here for the same reason. */
 export const BUILD_SETTINGS_SOURCE = Symbol('BUILD_SETTINGS_SOURCE');
+
+/**
+ * DI token for the provider visibility probe (2026-10-18). Optional: absent, the
+ * facts source's answer stands — see `repository-visibility.probe.ts`.
+ */
+export const BUILD_REPOSITORY_VISIBILITY_PROBE = Symbol('BUILD_REPOSITORY_VISIBILITY_PROBE');
 
 /**
  * The full binding {@link BuildFacadeService.resolve} answers (2026-10-17,
@@ -186,6 +193,14 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         @Optional()
         @Inject(BUILD_SETTINGS_SOURCE)
         private readonly settingsSource?: BuildSettingsSource,
+        /**
+         * Asks GitHub whether the repository is public when the facts source
+         * answered its `private` fail-safe. `@Optional()` and last; absent, the
+         * facts answer stands (the pre-2026-10-18 behaviour).
+         */
+        @Optional()
+        @Inject(BUILD_REPOSITORY_VISIBILITY_PROBE)
+        private readonly visibilityProbe?: RepositoryVisibilityProbe,
     ) {}
 
     /**
@@ -240,11 +255,19 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         }
         const repository = this.repositoryOf(work);
         const facts = await this.factsFor(workId);
+        const visibility = repository
+            ? await this.visibilityOf(
+                  repository.owner,
+                  repository.repo,
+                  auth.token,
+                  facts.visibility,
+              )
+            : facts.visibility;
         const repositoryRef: BuildRepositoryRef | null = repository
             ? {
                   owner: repository.owner,
                   repo: repository.repo,
-                  visibility: facts.visibility,
+                  visibility,
                   // APW-03's `WorkAppSpecState.trackedBranch` when the facts source
                   // knows it; `repositoryOf`'s `main` only as the last resort.
                   trackedBranch: facts.trackedBranch ?? repository.branch,
@@ -515,6 +538,26 @@ export class BuildFacadeService implements AppBuildPluginResolver {
                 }); taking the safe defaults.`,
             );
             return { visibility: 'private', createdByAppWork: false };
+        }
+    }
+
+    /**
+     * The facts source's visibility, upgraded to `public` only when the provider
+     * says so explicitly. The facts source answers `private` whenever it cannot
+     * know, which picks the 7 GiB private runner and blocks a public App whose
+     * build needs more (`runnerTooSmall`). A probe failure keeps the facts answer.
+     */
+    private async visibilityOf(
+        owner: string,
+        repo: string,
+        token: string,
+        fallback: 'public' | 'private',
+    ): Promise<'public' | 'private'> {
+        if (fallback === 'public' || !this.visibilityProbe) return fallback;
+        try {
+            return (await this.visibilityProbe({ owner, repo, token })) ?? fallback;
+        } catch {
+            return fallback;
         }
     }
 
