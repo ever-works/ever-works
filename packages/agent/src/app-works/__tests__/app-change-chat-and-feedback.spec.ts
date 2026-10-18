@@ -240,8 +240,20 @@ describe('AppProvisioningFeedbackService (APW-04 loop)', () => {
                 trigger: 'build-failed',
                 restart: true,
                 attempt: 1,
+                // A platform trigger, checked against `provisioning.autoReprovision` —
+                // never a start "by the owner" (works-security 2026-10-18).
+                systemTrigger: true,
             }),
         );
+        expect(provisioning.start.mock.calls[0]).not.toHaveProperty('0.userId');
+    });
+
+    it('never starts an open provisioning Task that is held for its owner', async () => {
+        const { service, tasks, chat } = build(openTask(['app-provision', 'awaiting-owner']));
+        await service.onBuildFailed(failed());
+        // The evidence is still posted; the hold is not lifted by a build event.
+        expect(chat.post).toHaveBeenCalled();
+        expect(tasks.runTask).not.toHaveBeenCalled();
     });
 
     it('posts a success without dispatching', async () => {

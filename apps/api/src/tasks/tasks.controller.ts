@@ -167,6 +167,19 @@ function clampNumeric(raw: string | undefined, max: number): number {
  * surface admits, and a path allowlist cannot see a body field. `true` (the
  * default) is let through: it can only keep the gate on.
  */
+/**
+ * Works-security (2026-10-18) — the trailing `TasksService.create` / `update`
+ * options argument that restricts a machine principal's reserved-label writes,
+ * or NO argument for a person (so a person's call is exactly what it was).
+ */
+function reservedLabelOptionsOf(
+    auth: AuthenticatedUser,
+    req: MachinePrincipalRequest | undefined,
+): [] | [{ restrictReservedLabels: { who: string } }] {
+    const restrictReservedLabels = reservedLabelRestrictionOf(auth, req);
+    return restrictReservedLabels ? [{ restrictReservedLabels }] : [];
+}
+
 function refuseRunTokenApproverPolicy(
     body: { requireAllApprovers?: unknown } | null | undefined,
     req: { fleetRunCredential?: unknown } | undefined,
@@ -531,7 +544,7 @@ export class TasksController {
         await this.refuseRunTokenWiderAgent(auth, req, body.agentId);
         if (body.parentTaskId) await this.refuseIntegrationPrivateTask(auth, body.parentTaskId);
         const createdBy = this.createdByFor(auth, req);
-        const restrictReservedLabels = reservedLabelRestrictionOf(auth, req);
+        const labelOptions = reservedLabelOptionsOf(auth, req);
         return this.service.create(
             auth.userId,
             {
@@ -561,7 +574,7 @@ export class TasksController {
                 estimateMinutes: body.estimateMinutes ?? null,
             },
             this.scopeContext.getScope(),
-            restrictReservedLabels ? { restrictReservedLabels } : {},
+            ...labelOptions,
         );
     }
 
@@ -718,7 +731,7 @@ export class TasksController {
             );
             refuseRunTokenRefileOfBranchedTask(req, current, body);
         }
-        const restrictReservedLabels = reservedLabelRestrictionOf(auth, req);
+        const labelOptions = reservedLabelOptionsOf(auth, req);
         // `scheduledAt` arrives as an ISO string on the wire and the
         // service works in `Date` (the column is a timestamptz). The
         // three states are distinct: absent = untouched, null = clear
@@ -741,7 +754,7 @@ export class TasksController {
             this.scopeContext.getScope(),
             // The service re-checks the labels against the row it writes,
             // closing the read-then-write window above.
-            restrictReservedLabels ? { restrictReservedLabels } : {},
+            ...labelOptions,
         ).catch((error: unknown) => rethrowReservedLabelRefusal(error, auth, req));
     }
 
