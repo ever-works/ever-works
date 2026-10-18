@@ -977,7 +977,11 @@
                 "bulkApprovedExcluded": "Approved {approved} actions, {excluded} still need a decision one at a time",
                 "error": "Something went wrong. Please try again."
             },
-            "seeAll": "See all decisions"
+            "seeAll": "See all decisions",
+            "proposal": {
+                "fileEdit": "Proposed new {file} ({bytes} bytes) — written exactly as shown if you approve",
+                "escalation": "Closes escalation {id}. Approving does not restart the work that was waiting on it."
+            }
         },
         "inbox": {
             "title": "Inbox",

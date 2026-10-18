@@ -115,8 +115,11 @@ import {
 	type AppRunnerJobKind
 } from './app-jobs.renderer.js';
 import {
+	classifyJobPodFailure,
 	classifyPodFailure,
 	isComponentRolledOut,
+	podFailureAdvice,
+	type AppPodFailure,
 	type AppRolloutComponent,
 	type AppRolloutDeployment,
 	type AppRolloutPod,
@@ -469,8 +472,8 @@ function ingressAddressOf(ingress: unknown): { ip?: string; hostname?: string } 
 }
 
 /** §5.4's "for ≥ 180 s" needs a first observation; this is where the deployer records it. */
-function recordWaitingSince(observation: Observation, since: Record<string, Instant>, now: number): void {
-	for (const pod of observation.pods) {
+function recordWaitingSince(pods: readonly AppRolloutPod[], since: Record<string, Instant>, now: number): void {
+	for (const pod of pods) {
 		const podName = String(pod?.metadata?.name ?? '');
 		for (const container of pod?.status?.containerStatuses ?? []) {
 			if (!container?.state?.waiting) {
@@ -1077,11 +1080,16 @@ export class AppDeployer {
 				return null;
 			}
 			if (waited.result.status !== 'succeeded') {
-				const message = jobFailureMessage(entry, waited.result);
+				// A pod that never started is reported with the rollout's own code
+				// (`managed_root_forbidden`, `image_pull`, …), not as a generic `job_failed`.
+				const podFailure = waited.podFailure ?? null;
+				const message = podFailure
+					? jobPodFailureMessage(entry, podFailure)
+					: jobFailureMessage(entry, waited.result);
 				if (!warnOnly) {
 					return {
 						phase: state.phase,
-						code: 'job_failed',
+						code: podFailure?.code ?? 'job_failed',
 						message,
 						...(waited.result.logRef ? { logRef: waited.result.logRef } : {})
 					};
@@ -1141,18 +1149,27 @@ export class AppDeployer {
 		}
 	}
 
-	/** Apply a Job (and its runner ConfigMap) and wait for its verdict. */
+	/**
+	 * Apply a Job (and its runner ConfigMap) and wait for its verdict.
+	 *
+	 * While the Job is active its pods are classified as well ({@link classifyJobPodFailure}): a
+	 * container that can never start — the kubelet's "image will run as root" on a `restricted`
+	 * namespace, an image that cannot be pulled — leaves the Job active until its own
+	 * `activeDeadlineSeconds`, so without this the Deployment sat in `pre-deploy-jobs` for the whole
+	 * job timeout (prod `cal-e2e`, 2026-10-18) instead of failing with the rollout's own code.
+	 */
 	private async waitForJob(
 		state: RunState,
 		entry: AppJobPlanEntry,
 		plan: { objects: AppRenderedObject[] }
-	): Promise<{ result: AppJobResult; stop: WaitStop }> {
+	): Promise<{ result: AppJobResult; stop: WaitStop; podFailure?: AppPodFailure }> {
 		const appliedAt = this.now();
 		const name = String(entry.name ?? '');
 		const timeoutMs = jobTimeoutMs(plan, entry);
 		const startedAt = new Date(appliedAt).toISOString();
 		let status: AppJobResult['status'] = 'running';
 		let stop: WaitStop = 'ok';
+		let podFailure: AppPodFailure | null = null;
 
 		while (status === 'running') {
 			const observed = await this.api.readObject<JobLike>(
@@ -1165,6 +1182,11 @@ export class AppDeployer {
 			);
 			status = jobVerdict(observed, appliedAt, timeoutMs, this.now());
 			if (status !== 'running') {
+				break;
+			}
+			podFailure = await this.classifyJobPods(state, entry);
+			if (podFailure) {
+				status = 'failed';
 				break;
 			}
 			if (await this.cancelled(state)) {
@@ -1193,7 +1215,41 @@ export class AppDeployer {
 			...('logRef' in read && read.logRef ? { logRef: read.logRef } : {})
 		};
 
-		return { result, stop };
+		return { result, stop, ...(podFailure ? { podFailure } : {}) };
+	}
+
+	/**
+	 * The "never started" verdict for one active Job's pods — the rollout's own classifier, with
+	 * §4.4's two kubelet user messages reported on first sight (they are deterministic) and every
+	 * waiting reason on §5.4's 180 s window, measured from this run's first observation.
+	 *
+	 * The pods are found by the label the Job's pod template carries (`ever-works.io/job: <name>`,
+	 * §4.1) and narrowed to **this** run's Job, because a kept run of an earlier Deployment has pods
+	 * with the same label. A failed list is not a verdict: the Job's own status still decides.
+	 */
+	private async classifyJobPods(state: RunState, entry: AppJobPlanEntry): Promise<AppPodFailure | null> {
+		let pods: AppRolloutPod[];
+		try {
+			pods = await this.api.listObjects<AppRolloutPod>(
+				state.kubeconfig,
+				'v1',
+				'Pod',
+				state.namespace,
+				`${APP_LABEL_JOB}=${String(entry.name ?? '')}`,
+				state.context
+			);
+		} catch {
+			return null;
+		}
+
+		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
+		recordWaitingSince(own, state.podWaitingSince, this.now());
+		return classifyJobPodFailure(own, {
+			now: this.now(),
+			podWaitingSince: state.podWaitingSince,
+			userMessageSeconds: 0,
+			...(this.options.stuckPodSeconds !== undefined ? { stuckPodSeconds: this.options.stuckPodSeconds } : {})
+		});
 	}
 
 	/* --------------------------------------------------------------------- *
@@ -1248,7 +1304,7 @@ export class AppDeployer {
 		while (pending.size > 0) {
 			for (const descriptor of [...pending.values()]) {
 				const observation = await this.readComponent(state, descriptor);
-				recordWaitingSince(observation, state.podWaitingSince, this.now());
+				recordWaitingSince(observation.pods, state.podWaitingSince, this.now());
 
 				if (
 					isComponentRolledOut(
@@ -2103,10 +2159,39 @@ function jobFailureMessage(entry: AppJobPlanEntry, result: AppJobResult): string
 	return `Job '${entry.name}' ended ${result.status}${expectation}${found}.`;
 }
 
+/** A Job whose pod never started: the code, the fix when there is one, and what the kubelet said. */
+function jobPodFailureMessage(entry: AppJobPlanEntry, failure: AppPodFailure): string {
+	return podFailureMessage(`Job '${entry.name}' could not start its container`, failure);
+}
+
 function rolloutFailureMessage(
 	objectName: string,
 	failure: { code: AppFailureCode; reason?: string; message?: string }
 ): string {
+	return podFailureMessage(`Component '${objectName}' failed to roll out`, failure);
+}
+
+/**
+ * `<head>: <detail> (<code>).` — or, for a code with a fix ({@link podFailureAdvice}), the code and
+ * the fix **before** the kubelet's text: the Deployment's `lastError` keeps 500 characters, and the
+ * kubelet message (pod name, namespace, uid) is the part that can afford to be cut.
+ */
+function podFailureMessage(head: string, failure: { code: AppFailureCode; reason?: string; message?: string }): string {
 	const detail = failure.message ?? failure.reason ?? failure.code;
-	return `Component '${objectName}' failed to roll out: ${detail} (${failure.code}).`;
+	const advice = podFailureAdvice(failure.code);
+	return advice ? `${head} (${failure.code}). ${advice} Kubelet: ${detail}` : `${head}: ${detail} (${failure.code}).`;
+}
+
+/**
+ * Whether a pod is one of this Job's: by owner reference, else by the `job-name` labels the Job
+ * controller stamps (`batch.kubernetes.io/job-name` since 1.27, the legacy `job-name` before). A pod
+ * that carries neither is not claimed — a kept run of an earlier Deployment shares `ever-works.io/job`.
+ */
+function podBelongsToJob(pod: AppRolloutPod, jobName: string): boolean {
+	const references = pod?.metadata?.ownerReferences;
+	if (references && references.length > 0) {
+		return references.some((reference) => reference?.kind === 'Job' && reference?.name === jobName);
+	}
+	const labels = pod?.metadata?.labels ?? {};
+	return labels['batch.kubernetes.io/job-name'] === jobName || labels['job-name'] === jobName;
 }

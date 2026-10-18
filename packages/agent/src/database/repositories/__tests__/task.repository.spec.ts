@@ -6,7 +6,7 @@ import {
     TENANT,
 } from '../../../domain-events/__tests__/domain-events.test-helpers';
 import { ExternalRecordLink } from '../../../entities/external-record-link.entity';
-import { Task, TaskStatus } from '../../../entities/task.entity';
+import { Task, TaskPriority, TaskStatus } from '../../../entities/task.entity';
 import { TaskRepository } from '../task.repository';
 
 describe('TaskRepository ownership scope', () => {
@@ -90,6 +90,22 @@ describe('TaskRepository.findFanoutCandidates', () => {
         expect(clauses).toContain('task.latestRunId IS NULL');
     });
 
+    it("never returns a Task waiting for its owner (the binding 'awaiting-owner' label)", async () => {
+        const qb = makeQb();
+        qb.getMany.mockResolvedValue([
+            { id: 't-1', labels: ['inbound-email'] },
+            { id: 't-2', labels: ['inbound-email', 'awaiting-owner'] },
+            { id: 't-3', labels: null },
+        ]);
+        const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
+
+        const rows = await tasks.findFanoutCandidates(50);
+
+        // Prompt-injection hardening (review of #2769): a Task filed from an
+        // untrusted email is started by a person, never by the fan-out.
+        expect(rows.map((row) => row.id)).toEqual(['t-1', 't-3']);
+    });
+
     it('keeps the scan deterministic and bounded', async () => {
         const qb = makeQb();
         const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
@@ -151,6 +167,19 @@ describe('TaskRepository.findFanoutCandidates — integration Tasks (SQLite)', (
 
         const ids = (await tasks.findFanoutCandidates(50)).map((task) => task.id);
         expect(ids).toEqual([human.id]);
+    });
+
+    // CodeRabbit on #2769: Tasks waiting for their owner are excluded IN the
+    // query, so they never use up the scan limit ahead of eligible ones.
+    it('never lets awaiting-owner Tasks use up the scan limit', async () => {
+        await dataSource.getRepository(Task).clear();
+        // Older and higher priority than the eligible Task: first in the order.
+        await makeTask({ priority: TaskPriority.P0, labels: ['inbound-email', 'awaiting-owner'] });
+        await makeTask({ priority: TaskPriority.P0, labels: ['awaiting-owner'] });
+        const eligible = await makeTask({ labels: ['inbound-email'] });
+
+        const ids = (await tasks.findFanoutCandidates(1)).map((task) => task.id);
+        expect(ids).toEqual([eligible.id]);
     });
 });
 

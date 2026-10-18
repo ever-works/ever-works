@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MeetingsModule as AgentMeetingsModule } from '@ever-works/agent/meetings';
+import { WorkModule } from '@ever-works/agent/services';
 import { MeetingsController } from './meetings.controller';
 
 /**
@@ -16,7 +17,9 @@ import { MeetingsController } from './meetings.controller';
  * rows with zero extra cron wiring.
  */
 @Module({
-    imports: [AgentMeetingsModule],
+    // `WorkModule` provides `WorkOwnershipService` — the edit-access check on a
+    // meeting's `workId` (a meeting attached to a Work feeds its memory).
+    imports: [AgentMeetingsModule, WorkModule],
     controllers: [MeetingsController],
     exports: [AgentMeetingsModule],
 })

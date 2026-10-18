@@ -1,3 +1,9 @@
+// The controller injects WorkOwnershipService; stub the barrel so the spec
+// never drags the services graph (and its ESM-only auth deps) in.
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class WorkOwnershipService {},
+}));
+
 import { MeetingsController } from './meetings.controller';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
@@ -32,8 +38,10 @@ describe('MeetingsController', () => {
         ingestTranscriptForUser: jest.Mock;
     };
     let controller: MeetingsController;
+    let ownership: { ensureCanEdit: jest.Mock };
 
     beforeEach(() => {
+        ownership = { ensureCanEdit: jest.fn(async () => ({ work: { id: 'work-9' } })) };
         service = {
             listForUser: jest.fn(async () => [meeting()]),
             createForUser: jest.fn(async () => meeting()),
@@ -47,7 +55,7 @@ describe('MeetingsController', () => {
                 envelopeEmitted: true,
             })),
         };
-        controller = new MeetingsController(service as never);
+        controller = new MeetingsController(service as never, ownership as never);
     });
 
     it('list is owner-scoped, passes safe filters through and OMITS the transcript body', async () => {
@@ -96,6 +104,66 @@ describe('MeetingsController', () => {
             envelopeEmitted: true,
         });
         expect(result.meeting.hasTranscript).toBe(true);
+    });
+
+    describe('workId needs EDIT access to the Work', () => {
+        const body = { title: 'Sync', startedAt: '2026-07-24T10:00:00.000Z', workId: 'work-9' };
+
+        it('create checks edit access before anything is written', async () => {
+            await controller.create(auth, body as never);
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-9', 'user-1');
+            expect(service.createForUser).toHaveBeenCalled();
+        });
+
+        it('create refuses a Work the caller cannot edit, writing nothing', async () => {
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('forbidden'));
+            await expect(controller.create(auth, body as never)).rejects.toThrow('forbidden');
+            expect(service.createForUser).not.toHaveBeenCalled();
+        });
+
+        it('update refuses moving a meeting onto a Work the caller cannot edit', async () => {
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('forbidden'));
+            await expect(
+                controller.update(auth, 'meeting-1', { workId: 'foreign-work' } as never),
+            ).rejects.toThrow('forbidden');
+            expect(service.updateForUser).not.toHaveBeenCalled();
+        });
+
+        it('no workId (an org-wide meeting, or detaching) needs no Work check', async () => {
+            await controller.create(auth, { title: 'Sync', startedAt: body.startedAt } as never);
+            await controller.update(auth, 'meeting-1', { workId: null } as never);
+            service.getForUser.mockResolvedValueOnce(meeting({ workId: null }));
+            await controller.update(auth, 'meeting-1', { title: 'Renamed' } as never);
+            expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
+        });
+
+        // CodeRabbit on #2769: a patch that leaves `workId` out keeps the
+        // meeting on its CURRENT Work — checked against that Work.
+        it("update without workId is checked against the meeting's current Work", async () => {
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('forbidden'));
+            await expect(
+                controller.update(auth, 'meeting-1', { title: 'Renamed' } as never),
+            ).rejects.toThrow('forbidden');
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-9', 'user-1');
+            expect(service.updateForUser).not.toHaveBeenCalled();
+        });
+
+        it("a transcript needs edit access to the meeting's Work (it feeds its memory)", async () => {
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('forbidden'));
+            await expect(
+                controller.ingestTranscript(auth, 'meeting-1', { transcriptText: 'x' }),
+            ).rejects.toThrow('forbidden');
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-9', 'user-1');
+            expect(service.ingestTranscriptForUser).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when the ownership service is not bound', async () => {
+            const bare = new MeetingsController(service as never);
+            await expect(bare.create(auth, body as never)).rejects.toThrow(
+                'Work access cannot be verified here.',
+            );
+            expect(service.createForUser).not.toHaveBeenCalled();
+        });
     });
 
     it('delete routes through the owner-scoped service path', async () => {

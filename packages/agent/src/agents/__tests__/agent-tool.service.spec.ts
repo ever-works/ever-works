@@ -107,70 +107,117 @@ describe('AgentToolService.resolveAllowedTools', () => {
         expect(withPerm.map((t) => t.name)).toContain('createSubAgent');
     });
 
-    describe('editAgentFile tool — once-per-file-per-run cap', () => {
-        it('rejects a second edit of the same file in the same run', async () => {
-            files.write.mockResolvedValue({ newHash: 'h' });
-            const tools = svc.resolveAllowedTools(
-                makeAgent({
-                    permissions: { ...makeAgent().permissions, canEditAgentFiles: true },
+    describe('editAgentFile tool — proposes for owner approval, never writes', () => {
+        let proposals: { propose: jest.Mock };
+
+        beforeEach(() => {
+            files = {
+                write: jest.fn(),
+                validateProposedWrite: jest.fn().mockResolvedValue({
+                    baseHash: 'h0',
+                    agentSlug: 'ceo',
+                    previousChars: 6,
+                    addedChars: 0,
+                    removedChars: 0,
+                    changed: true,
                 }),
-                { runId: 'r1', editsThisRunByFile: new Set() },
+            };
+            proposals = { propose: jest.fn().mockResolvedValue({ id: 'p-1', status: 'pending' }) };
+            svc = new AgentToolService(
+                agents,
+                agentsService,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                { proposals } as never,
             );
-            const tool = tools.find((t) => t.name === 'editAgentFile')!;
-            const first = (await tool.invoke({ name: 'SOUL.md', body: '# v1' })) as Record<
-                string,
-                unknown
-            >;
-            expect('newHash' in first && first.newHash).toBe('h');
-            const second = (await tool.invoke({ name: 'SOUL.md', body: '# v2' })) as Record<
-                string,
-                unknown
-            >;
-            expect('error' in second).toBe(true);
-            expect((second as any).error).toMatch(/already edited once in this run/);
         });
 
-        it('saves as the agent itself, inside its run', async () => {
-            files.write.mockResolvedValue({ newHash: 'h' });
-            const tools = svc.resolveAllowedTools(
-                makeAgent({
-                    permissions: { ...makeAgent().permissions, canEditAgentFiles: true },
-                }),
-                { runId: 'r1', editsThisRunByFile: new Set() },
-            );
-            const tool = tools.find((t) => t.name === 'editAgentFile')!;
-            await tool.invoke({ name: 'SOUL.md', body: '# v1', expectedHash: 'h0' });
-            expect(files.write).toHaveBeenCalledWith({
+        const toolFor = (ctx = { runId: 'r1', editsThisRunByFile: new Set<string>() }) =>
+            svc
+                .resolveAllowedTools(
+                    makeAgent({
+                        permissions: { ...makeAgent().permissions, canEditAgentFiles: true },
+                    }),
+                    ctx,
+                )
+                .find((t) => t.name === 'editAgentFile')!;
+
+        it('files the full proposed body as a pending proposal and writes NOTHING', async () => {
+            const result = (await toolFor().invoke({
+                name: 'SOUL.md',
+                body: '# v1',
+                expectedHash: 'h0',
+            })) as Record<string, unknown>;
+
+            expect(files.write).not.toHaveBeenCalled();
+            expect(files.validateProposedWrite).toHaveBeenCalledWith({
                 userId: 'u1',
                 agentId: 'a1',
                 name: 'SOUL.md',
                 body: '# v1',
                 expectedHash: 'h0',
-                actor: 'agent',
-                runId: 'r1',
             });
+            expect(proposals.propose).toHaveBeenCalledWith('u1', {
+                agentId: 'a1',
+                runId: 'r1',
+                title: 'Edit SOUL.md of agent ceo',
+                payload: expect.objectContaining({
+                    kind: 'agent-file-edit',
+                    fileName: 'SOUL.md',
+                    body: '# v1',
+                    baseHash: 'h0',
+                    runId: 'r1',
+                }),
+            });
+            expect(result).toMatchObject({ proposed: true, pendingApproval: true, proposalId: 'p-1' });
+        });
+
+        it('rejects a second edit of the same file in the same run', async () => {
+            const tool = toolFor();
+            await tool.invoke({ name: 'SOUL.md', body: '# v1' });
+            const second = (await tool.invoke({ name: 'SOUL.md', body: '# v2' })) as Record<
+                string,
+                unknown
+            >;
+            expect((second as any).error).toMatch(/already edited once in this run/);
+            expect(proposals.propose).toHaveBeenCalledTimes(1);
         });
 
         it('allows edits to DIFFERENT files in the same run', async () => {
-            files.write.mockResolvedValue({ newHash: 'h' });
-            const ctx = { runId: 'r1', editsThisRunByFile: new Set<string>() };
-            const tools = svc.resolveAllowedTools(
-                makeAgent({
-                    permissions: { ...makeAgent().permissions, canEditAgentFiles: true },
-                }),
-                ctx,
-            );
-            const tool = tools.find((t) => t.name === 'editAgentFile')!;
-            const first = (await tool.invoke({ name: 'SOUL.md', body: '# soul' })) as Record<
-                string,
-                unknown
-            >;
-            const second = (await tool.invoke({ name: 'TOOLS.md', body: '# tools' })) as Record<
-                string,
-                unknown
-            >;
-            expect('newHash' in first).toBe(true);
-            expect('newHash' in second).toBe(true);
+            const tool = toolFor();
+            const first = (await tool.invoke({ name: 'SOUL.md', body: '# soul' })) as any;
+            const second = (await tool.invoke({ name: 'TOOLS.md', body: '# tools' })) as any;
+            expect(first.proposed).toBe(true);
+            expect(second.proposed).toBe(true);
+        });
+
+        it('surfaces a failed check (a secret in the body, an etag mismatch) and proposes nothing', async () => {
+            files.validateProposedWrite.mockRejectedValueOnce(new Error('secret detected'));
+            const result = (await toolFor().invoke({ name: 'SOUL.md', body: 'AKIA…' })) as any;
+            expect(result.error).toBe('secret detected');
+            expect(proposals.propose).not.toHaveBeenCalled();
+        });
+
+        it('reports a guardrail block and does not count it against the per-run cap', async () => {
+            proposals.propose.mockResolvedValueOnce({ id: 'p-2', status: 'rejected' });
+            const tool = toolFor();
+            const blocked = (await tool.invoke({ name: 'SOUL.md', body: '# v1' })) as any;
+            expect(blocked.error).toMatch(/guardrails/);
+            const retry = (await tool.invoke({ name: 'SOUL.md', body: '# v1' })) as any;
+            expect(retry.proposed).toBe(true);
+        });
+
+        it('fails CLOSED without an approval queue: nothing is written or proposed', async () => {
+            svc = new AgentToolService(agents, agentsService, skills, bindings, files);
+            const result = (await toolFor().invoke({ name: 'SOUL.md', body: '# v1' })) as any;
+            expect(result.error).toMatch(/need the owner's approval/);
+            expect(files.write).not.toHaveBeenCalled();
+            expect(files.validateProposedWrite).not.toHaveBeenCalled();
         });
     });
 

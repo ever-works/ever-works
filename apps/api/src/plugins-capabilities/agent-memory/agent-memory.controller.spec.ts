@@ -53,8 +53,12 @@ describe('AgentMemoryController', () => {
             deleteEntry: jest.fn().mockResolvedValue(undefined),
         };
         ownership = {
-            ensureCanView: jest.fn().mockResolvedValue(undefined),
-            ensureCanEdit: jest.fn().mockResolvedValue(undefined),
+            ensureCanView: jest.fn().mockImplementation(async (workId: string) => ({
+                work: { id: workId, slug: `slug-of-${workId}` },
+            })),
+            ensureCanEdit: jest.fn().mockImplementation(async (workId: string) => ({
+                work: { id: workId, slug: `slug-of-${workId}` },
+            })),
         };
         controller = new AgentMemoryController(
             agentMemory as unknown as AgentMemoryFacadeService,
@@ -78,34 +82,40 @@ describe('AgentMemoryController', () => {
     });
 
     describe('ownership enforcement', () => {
-        it('calls WorkOwnershipService.ensureCanView when a workId is supplied on save', async () => {
+        it('requires EDIT access (not view) when a workId is supplied on save', async () => {
             await controller.save(auth, {
                 content: 'x',
                 workId: 'work-1' as any,
             });
-            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
-        });
-
-        it('skips ownership when workId is not supplied (platform-wide reads)', async () => {
-            await controller.save(auth, { content: 'x' });
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
             expect(ownership.ensureCanView).not.toHaveBeenCalled();
         });
 
-        it('lets ownership errors bubble (e.g. 403 from the underlying guard)', async () => {
-            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+        it('a save without a workId needs no Work access and keeps the configured/default project', async () => {
+            await controller.save(auth, { content: 'x' });
+            expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
+            // No projectId ⇒ the plugin resolves `settings.project` (else its
+            // default), exactly as an install without a workId did before.
+            expect(agentMemory.saveMemory.mock.calls[0][0].projectId).toBeUndefined();
+        });
+
+        it('lets ownership errors bubble (e.g. a viewer is refused with 403)', async () => {
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('not your work'));
             await expect(
                 controller.save(auth, { content: 'x', workId: 'work-1' as any }),
             ).rejects.toThrow('not your work');
+            expect(agentMemory.saveMemory).not.toHaveBeenCalled();
         });
     });
 
     describe('save', () => {
-        it('forwards content + tags + metadata + sessionId + projectId to the facade', async () => {
+        it('forwards content + tags + metadata + sessionId to the facade, in the Work’s project', async () => {
             await controller.save(auth, {
                 content: 'remember this',
                 tags: ['bug'],
                 metadata: { file: 'a.ts' },
                 sessionId: 'sess-9',
+                workId: 'work-1' as any,
                 projectId: 'proj-A',
             });
             expect(agentMemory.saveMemory).toHaveBeenCalledWith(
@@ -115,10 +125,105 @@ describe('AgentMemoryController', () => {
                     // Security (EW-711 #29): owner stamp folded into record metadata.
                     metadata: { file: 'a.ts', ownerUserId: 'user-1' },
                     sessionId: 'sess-9',
-                    projectId: 'proj-A',
+                    // Server-derived: the Work's id, never the caller's projectId.
+                    projectId: 'work-1',
                 }),
-                expect.objectContaining({ userId: 'user-1' }),
+                expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
             );
+        });
+
+        it('never lets the caller name the project (a name falls back to the configured project)', async () => {
+            await controller.save(auth, { content: 'x', projectId: 'someone-elses-project' });
+            expect(agentMemory.saveMemory.mock.calls[0][0].projectId).toBeUndefined();
+        });
+
+        it('honours a caller projectId only when it is the id of a Work the caller may edit', async () => {
+            const workId = '0b6c1d2e-3f40-4a5b-8c6d-7e8f9a0b1c2d';
+            await controller.save(auth, { content: 'x', projectId: workId });
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith(workId, 'user-1');
+            expect(agentMemory.saveMemory).toHaveBeenLastCalledWith(
+                expect.objectContaining({ projectId: workId }),
+                expect.anything(),
+            );
+
+            ownership.ensureCanEdit.mockRejectedValueOnce(new ForbiddenException('viewer only'));
+            await controller.save(auth, { content: 'y', projectId: workId });
+            expect(agentMemory.saveMemory.mock.calls.at(-1)![0].projectId).toBeUndefined();
+
+            ownership.ensureCanEdit.mockRejectedValueOnce(new NotFoundException('no such Work'));
+            await controller.save(auth, { content: 'z', projectId: workId });
+            expect(agentMemory.saveMemory.mock.calls.at(-1)![0].projectId).toBeUndefined();
+        });
+
+        // CodeRabbit on #2769: a Work named only by `projectId` also picks
+        // that Work's provider and settings (the facade options carry it).
+        it('carries a Work resolved from projectId into the facade options', async () => {
+            const workId = '0b6c1d2e-3f40-4a5b-8c6d-7e8f9a0b1c2d';
+            await controller.save(auth, { content: 'x', projectId: workId });
+            expect(agentMemory.saveMemory).toHaveBeenLastCalledWith(
+                expect.objectContaining({ projectId: workId }),
+                { userId: 'user-1', workId },
+            );
+            await controller.search(auth, { query: 'q', projectId: workId } as any);
+            expect(agentMemory.searchMemory.mock.calls.at(-1)![1]).toEqual({
+                userId: 'user-1',
+                workId,
+            });
+            // A refused or non-Work project carries no Work into the options.
+            await controller.save(auth, { content: 'y', projectId: 'not-a-work' });
+            expect(agentMemory.saveMemory.mock.calls.at(-1)![1]).toEqual({ userId: 'user-1' });
+        });
+
+        // CodeRabbit on #2769: an ownership-service FAILURE is not "no such
+        // Work" — it propagates instead of saving into the default project.
+        it('propagates an unexpected ownership failure instead of falling back', async () => {
+            const workId = '0b6c1d2e-3f40-4a5b-8c6d-7e8f9a0b1c2d';
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('connection refused'));
+            await expect(
+                controller.save(auth, { content: 'x', projectId: workId }),
+            ).rejects.toThrow('connection refused');
+            expect(agentMemory.saveMemory).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('reads resolve the project exactly like writes (round trip)', () => {
+        it('a memory saved for a Work is searched, listed and given as context in the SAME project', async () => {
+            await controller.save(auth, { content: 'remember', workId: 'work-1' as any });
+            await controller.search(auth, { query: 'remember', workId: 'work-1' as any });
+            await controller.context(auth, { query: 'remember', workId: 'work-1' as any });
+            await controller.listSessions(auth, { workId: 'work-1' as any });
+
+            const saved = agentMemory.saveMemory.mock.calls[0][0].projectId;
+            expect(saved).toBe('work-1');
+            expect(agentMemory.searchMemory.mock.calls[0][0].projectId).toBe(saved);
+            expect(agentMemory.buildContext.mock.calls[0][0].projectId).toBe(saved);
+            expect(agentMemory.listSessions.mock.calls[0][0].projectId).toBe(saved);
+        });
+
+        it('reads need VIEW access with a workId; a caller projectId never redirects them', async () => {
+            await controller.search(auth, {
+                query: 'q',
+                workId: 'work-1' as any,
+                projectId: 'other',
+            } as any);
+            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
+            expect(agentMemory.searchMemory.mock.calls[0][0].projectId).toBe('work-1');
+        });
+
+        it('without a workId, reads and writes both use the configured/default project', async () => {
+            await controller.save(auth, { content: 'x' });
+            await controller.search(auth, { query: 'x' });
+            expect(agentMemory.saveMemory.mock.calls[0][0].projectId).toBeUndefined();
+            expect(agentMemory.searchMemory.mock.calls[0][0].projectId).toBeUndefined();
+        });
+
+        it('a read refused for a Work surfaces the ownership error and reads nothing', async () => {
+            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+            await expect(
+                controller.search(auth, { query: 'q', workId: 'foreign' as any }),
+            ).rejects.toThrow('not your work');
+            expect(agentMemory.searchMemory).not.toHaveBeenCalled();
         });
     });
 
@@ -153,6 +258,19 @@ describe('AgentMemoryController', () => {
             expect(agentMemory.openSession).toHaveBeenCalledWith(
                 { from: 'web', ownerUserId: 'user-1' },
                 expect.objectContaining({ userId: 'user-1' }),
+            );
+        });
+
+        it('openSession requires EDIT access and scopes to the Work’s project, ignoring a caller projectId', async () => {
+            await controller.openSession(auth, {
+                workId: 'work-1' as any,
+                projectId: 'someone-elses-project',
+                metadata: { projectId: 'forged' },
+            } as any);
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(agentMemory.openSession).toHaveBeenCalledWith(
+                { projectId: 'work-1', ownerUserId: 'user-1' },
+                expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
             );
         });
 
@@ -223,10 +341,10 @@ describe('AgentMemoryController', () => {
             expect(agentMemory.closeSession).toHaveBeenCalledWith('sess-1', expect.any(Object));
         });
 
-        it('listSessions forwards limit + projectId', async () => {
+        it('listSessions forwards limit, and a project only when it is a reachable Work', async () => {
             await controller.listSessions(auth, { limit: 5, projectId: 'p' });
             expect(agentMemory.listSessions).toHaveBeenCalledWith(
-                expect.objectContaining({ limit: 5, projectId: 'p' }),
+                expect.objectContaining({ limit: 5, projectId: undefined }),
                 expect.any(Object),
             );
         });

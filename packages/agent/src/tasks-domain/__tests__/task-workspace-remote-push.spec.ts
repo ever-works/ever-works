@@ -89,6 +89,98 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
         gateStatus: 'green' as const,
     });
 
+    describe('the always-protected-path floor on a node-pushed branch (review of #2769)', () => {
+        afterEach(() => {
+            delete process.env.AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS;
+        });
+
+        it('opens NO pull request for a branch whose diff touches a workflow file, and records why', async () => {
+            Object.assign(gitFacade, {
+                getCompareDiff: jest.fn().mockResolvedValue({
+                    files: [
+                        { path: 'src/login.ts', status: 'modified' },
+                        { path: '.github/workflows/release.yml', status: 'added' },
+                    ],
+                    truncated: false,
+                }),
+            });
+            const outcome = await build().finalizeRemotePush(input());
+
+            expect(outcome.outcome).toBe('blocked-by-guard');
+            expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                'task-1',
+                expect.objectContaining({
+                    branchGuardRefusal: expect.stringContaining('.github/workflows/release.yml'),
+                }),
+            );
+        });
+
+        // CodeRabbit on #2769: a push onto a branch that already has a pull
+        // request lands in it — the floor runs on that path too, every kind.
+        it('blocks the Task when a push onto an EXISTING pull request touches a workflow file', async () => {
+            const getCompareDiff = jest.fn().mockResolvedValue({
+                files: [{ path: '.github/workflows/release.yml', status: 'modified' }],
+                truncated: false,
+            });
+            Object.assign(gitFacade, { getCompareDiff });
+            const withPr = makeTask({
+                prNumber: 5,
+                prUrl: 'https://github.com/acme/site-data/pull/5',
+            });
+            tasks.findById.mockResolvedValue(withPr);
+            const outcome = await build().finalizeRemotePush({ ...input(), task: withPr });
+
+            expect(outcome).toEqual({
+                outcome: 'blocked-by-guard',
+                prNumber: 5,
+                prUrl: 'https://github.com/acme/site-data/pull/5',
+            });
+            expect(getCompareDiff).toHaveBeenCalledWith(
+                'acme',
+                'site-data',
+                'main',
+                'task/tsk-9-task1',
+                { maxFiles: 300 },
+                { userId: 'user-1', providerId: 'github', workId: 'work-1' },
+            );
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                'task-1',
+                expect.objectContaining({
+                    branchGuardRefusal: expect.stringContaining('pull request #5'),
+                }),
+            );
+            expect(transitions.transition).toHaveBeenCalledWith(
+                expect.anything(),
+                TaskStatus.BLOCKED,
+                expect.anything(),
+            );
+        });
+
+        it('refuses a diff too large to check', async () => {
+            Object.assign(gitFacade, {
+                getCompareDiff: jest.fn().mockResolvedValue({ files: [], truncated: true }),
+            });
+            const outcome = await build().finalizeRemotePush(input());
+            expect(outcome.outcome).toBe('blocked-by-guard');
+            expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('opens the pull request for a clean diff, or for a Work the operator allowed', async () => {
+            const getCompareDiff = jest.fn().mockResolvedValue({
+                files: [{ path: '.github/actions/x/action.yml', status: 'added' }],
+                truncated: false,
+            });
+            Object.assign(gitFacade, { getCompareDiff });
+            process.env.AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS = 'work-1';
+
+            const outcome = await build().finalizeRemotePush(input());
+
+            expect(outcome.outcome).toBe('pr-opened');
+            expect(getCompareDiff).not.toHaveBeenCalled();
+        });
+    });
+
     it('records the pushed branch, opens the PR against the default branch and moves the Task to review', async () => {
         const outcome = await build().finalizeRemotePush(input());
         expect(runs.updateTelemetry).toHaveBeenCalledWith('run-1', { changedFilesCount: 3 });

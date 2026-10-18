@@ -179,6 +179,8 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	readonly category: PluginCategory = 'utility';
 	readonly capabilities: readonly string[] = ['workspace'];
 	readonly providerName = 'Local (persistent worktree pool)';
+	/** `finalize` with `publishSha` pushes exactly that verified commit, never HEAD. */
+	readonly publishesJudgedCommit = true as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',

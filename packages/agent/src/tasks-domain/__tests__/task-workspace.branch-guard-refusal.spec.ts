@@ -61,6 +61,7 @@ function mocks() {
             }),
         ),
         branchChanges: jest.fn(async () => ({ paths: ['src/app.ts'], contents: {} })),
+        supportsJudgedPublish: jest.fn(async () => true),
         createPullRequest: jest.fn(async () => ({ number: 7, url: 'https://example.test/pr/7' })),
         evaluate: jest.fn(
             async (_input: AppWorkChangeGateInput): Promise<AppWorkChangeGateVerdict> => ({
@@ -123,6 +124,7 @@ function service(m: Mocks, opts: { bound?: boolean; kind?: string } = {}) {
             finalize: m.finalize,
             simulateMerge: m.simulateMerge,
             branchChanges: m.branchChanges,
+            supportsJudgedPublish: m.supportsJudgedPublish,
         } as never, // workspaceFacade
         {
             getRepository: m.getRepository,

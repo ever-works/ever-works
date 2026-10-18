@@ -63,6 +63,16 @@ export interface InboxEscalationResolvedInput {
     /** The human who resolved it (recorded in the activity trail). */
     resolvedByUserId: string;
     note?: string | null;
+    /**
+     * Who actually wrote the resolution. `'human'` (the default, and every
+     * door a person uses) closes the mirror AND hands the note to the parked
+     * run as the owner's answer. `'agent'` — a resolution an Agent proposed
+     * through the `resolve_escalation` chat tool, even once the owner approved
+     * closing it — closes the mirror but NEVER steers or resumes the linked
+     * run: the note was written by a model, and a resumed fleet run renders
+     * the message under `# OWNER ANSWER`. Prompt-injection hardening.
+     */
+    resolvedBy?: 'human' | 'agent';
 }
 
 /**

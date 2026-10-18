@@ -1,6 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+    OrganizationMemberRepository,
+    OrganizationRepository,
+    TenantRepository,
+    UserRepository,
+} from '@ever-works/agent/database';
 import type { Organization } from '@ever-works/agent/entities';
+
+/**
+ * Opt-in switch for a REAL org-admin check behind {@link
+ * OrganizationMembershipService.ensureAdmin}: `ORG_ADMIN_ROLE_ENFORCED=true`.
+ *
+ * Off by default on purpose. The roster `role` was shipped DISPLAY-ONLY
+ * (`organization-member.entity.ts`) and every Tenant member has been allowed
+ * to write org KB / org memory / digests / email policy / model routing; a
+ * tenant user who predates the roster has no row at all. Turning the check on
+ * unconditionally would lock those people out — so the security audit's
+ * "ensureAdmin is just membership" finding is gated, not forced: an operator
+ * who wants admin-only org writes turns this on.
+ */
+export function orgAdminRoleEnforced(): boolean {
+    return (process.env.ORG_ADMIN_ROLE_ENFORCED ?? '').trim().toLowerCase() === 'true';
+}
 
 /**
  * Reusable object-level authorization for raw
@@ -43,12 +64,23 @@ import type { Organization } from '@ever-works/agent/entities';
  * can express intent and so the future role model has a single seam to
  * tighten without touching every caller. Do NOT add a role column here
  * without that product decision.
+ *
+ * **Opt-in admin check (security audit, 2026-10-18).** With
+ * `ORG_ADMIN_ROLE_ENFORCED=true`, `ensureAdmin` additionally requires the
+ * Tenant owner or a roster role of `admin` — reusing the existing
+ * `organization_members.role` column, no schema change. Off by default so
+ * nothing that works today is locked out (see {@link orgAdminRoleEnforced}).
  */
 @Injectable()
 export class OrganizationMembershipService {
     constructor(
         private readonly organizationRepository: OrganizationRepository,
         private readonly userRepository: UserRepository,
+        // The opt-in admin check (`ORG_ADMIN_ROLE_ENFORCED`). @Optional() and
+        // appended LAST (positional-spec arity): unbound, an enforced check
+        // fails CLOSED rather than falling back to membership.
+        @Optional() private readonly tenantRepository?: TenantRepository,
+        @Optional() private readonly memberRepository?: OrganizationMemberRepository,
     ) {}
 
     /**
@@ -84,6 +116,19 @@ export class OrganizationMembershipService {
      * write route. Do not collapse it into `ensureMember` at call sites.
      */
     async ensureAdmin(orgId: string, userId: string): Promise<Organization> {
-        return this.ensureMember(orgId, userId);
+        const org = await this.ensureMember(orgId, userId);
+        if (!orgAdminRoleEnforced()) return org;
+        // Enforced: the Tenant owner, or a roster member whose role is
+        // `admin` (or `owner`). A same-Tenant caller already knows the org
+        // exists, so this refusal is a 403, not the 404 of `ensureMember`.
+        if (!this.tenantRepository || !this.memberRepository) {
+            throw new ForbiddenException('Organization admin access cannot be verified here.');
+        }
+        const tenant = await this.tenantRepository.findById(org.tenantId);
+        if (tenant?.ownerUserId && tenant.ownerUserId === userId) return org;
+        const member = await this.memberRepository.findByOrgAndUser(orgId, userId);
+        const role = (member?.role ?? '') as string;
+        if (role === 'admin' || role === 'owner') return org;
+        throw new ForbiddenException('Only an organization admin can change this.');
     }
 }

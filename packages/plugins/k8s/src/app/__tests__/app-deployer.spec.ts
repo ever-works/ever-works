@@ -1611,3 +1611,105 @@ function jobObject(name: string, label: string, creationTimestamp: string): Json
 		}
 	};
 }
+
+/* ------------------------------------------------------------------------- *
+ * A Job whose pod can never start fails fast (prod `cal-e2e`, 2026-10-18)
+ * ------------------------------------------------------------------------- */
+
+describe('a Job whose pod can never start fails with the rollout’s own code (2026-10-18)', () => {
+	const MIGRATE_JOB = `job-migrate-${DEPLOYMENT_SHORT}`;
+	const ROOT_KUBELET_MESSAGE = `Error: container has runAsNonRoot and image will run as root (pod: "${MIGRATE_JOB}-x7k2p_${NAMESPACE}(0a1b2c3d-1111-4a2b-9c3d-4e5f60718293)", container: migrate)`;
+
+	/** The Job controller's pod for `jobName`, its one container waiting the way kubelet left it. */
+	const waitingJobPod = (manifest: Json, waiting: Json, owner = String(manifest.metadata?.name)): Json => ({
+		apiVersion: 'v1',
+		kind: 'Pod',
+		metadata: {
+			name: `${owner}-x7k2p`,
+			namespace: NAMESPACE,
+			labels: { ...(manifest.spec?.template?.metadata?.labels ?? {}), 'batch.kubernetes.io/job-name': owner },
+			creationTimestamp: '2026-09-17T10:00:00.000Z',
+			ownerReferences: [{ apiVersion: 'batch/v1', kind: 'Job', name: owner }]
+		},
+		status: {
+			phase: 'Pending',
+			containerStatuses: [{ name: 'migrate', ready: false, restartCount: 0, state: { waiting } }]
+		}
+	});
+
+	/** A pre-deploy `migrate` job with prod's 1800 s timeout whose pod sits in `waiting`. */
+	function stuckMigrate(waiting: Json, owner?: string): Harness {
+		const h = harness({
+			change: (draft) => {
+				draft.jobs.unshift(preDeployJob({ timeoutSeconds: 1800 }));
+			}
+		});
+		h.cluster.jobStatus.set(MIGRATE_JOB, 'never');
+		h.cluster.onApply = (manifest) => {
+			if (manifest.kind === 'Job' && manifest.metadata?.name === MIGRATE_JOB) {
+				h.cluster.seed(waitingJobPod(manifest, waiting, owner));
+			}
+		};
+		return h;
+	}
+
+	it('ends `managed_root_forbidden` on the first poll — not after the 1800 s job timeout — and says how to fix it', async () => {
+		const h = stuckMigrate({ reason: 'CreateContainerConfigError', message: ROOT_KUBELET_MESSAGE });
+		const startedAt = h.clock.millis;
+
+		const result = await h.deploy();
+
+		expect(result.outcome).toBe('failed');
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'managed_root_forbidden' });
+		expect(result.failure?.message).toContain("Job 'migrate'");
+		expect(result.failure?.message).toContain('image will run as root');
+		expect(result.failure?.message).toContain('USER');
+		expect(result.failure?.message).toContain('components[].runAsUser');
+		// The code and the fix come first, so `lastError`'s 500 characters never cut them off.
+		const message = result.failure?.message ?? '';
+		expect(message.indexOf('works.yml')).toBeLessThan(500);
+		expect(message.indexOf('works.yml')).toBeLessThan(message.indexOf('Kubelet:'));
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'failed' });
+		expect(h.clock.millis - startedAt).toBeLessThan(60_000);
+		// ACC-06-09 still holds: a pre-deploy failure leaves the running app untouched.
+		expect(h.cluster.appliedNames().filter((name) => name.startsWith('Deployment/'))).toEqual([]);
+		expect(phaseAttrs(h)).toEqual(['prepare', 'pre-deploy-jobs']);
+	});
+
+	it('ends `image_user_unverifiable` for an image whose USER is a name', async () => {
+		const h = stuckMigrate({
+			reason: 'CreateContainerConfigError',
+			message: 'Error: image has non-numeric user (nextjs), cannot verify user is non-root'
+		});
+
+		const result = await h.deploy();
+
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'image_user_unverifiable' });
+		expect(result.failure?.message).toContain('numeric');
+	});
+
+	it('ends `image_pull` after §5.4’s 180 s window, long before the job timeout', async () => {
+		const h = stuckMigrate({ reason: 'ImagePullBackOff', message: 'Back-off pulling image' });
+		const startedAt = h.clock.millis;
+
+		const result = await h.deploy();
+
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'image_pull' });
+		const elapsed = h.clock.millis - startedAt;
+		expect(elapsed).toBeGreaterThanOrEqual(180_000);
+		expect(elapsed).toBeLessThan(300_000);
+	});
+
+	it('does not judge this run’s Job by a pod of another Job that shares its `ever-works.io/job` label', async () => {
+		const h = stuckMigrate(
+			{ reason: 'CreateContainerConfigError', message: ROOT_KUBELET_MESSAGE },
+			'job-migrate-00000000'
+		);
+
+		const result = await h.deploy();
+
+		// The kept run's pod is not this Job's: the wait runs to the Job's own timeout, as before.
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'job_failed' });
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'timeout' });
+	});
+});

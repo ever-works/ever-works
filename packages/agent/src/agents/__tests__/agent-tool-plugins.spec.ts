@@ -1,3 +1,14 @@
+// The URL tools resolve the host before dispatch (SSRF guard). Resolution is
+// stubbed so the suite never touches the network: `*.internal-ip.test` names
+// answer a private address, everything else a public one.
+jest.mock('node:dns/promises', () => ({
+    lookup: jest.fn(async (host: string) =>
+        host.endsWith('.internal-ip.test')
+            ? [{ address: '10.0.0.7', family: 4 }]
+            : [{ address: '93.184.216.34', family: 4 }],
+    ),
+}));
+
 import { AgentToolService } from '../agent-tool.service';
 import {
     AgentScope,
@@ -236,6 +247,27 @@ describe('AgentToolService plugin pass-through tools (Phase 16.10)', () => {
 
         const noUrl = await tool.invoke({ url: '   ' } as any);
         expect(noUrl).toEqual({ error: 'url is required.' });
+    });
+
+    it.each([
+        'http://localhost:6379/',
+        'http://169.254.169.254/latest/meta-data/',
+        'http://metadata.google.internal/',
+        'http://redis.default.svc.cluster.local/',
+        'http://intranet/',
+        'https://rebind.internal-ip.test/page',
+    ])('extractContent and screenshot refuse %s before anything is fetched', async (url) => {
+        const tools = svc.resolveAllowedTools(
+            makeAgent({ permissions: makePerms({ canCallExternalTools: true }) }),
+        );
+        for (const name of ['extractContent', 'screenshot']) {
+            const result = (await tools.find((t) => t.name === name)!.invoke({ url } as any)) as {
+                error?: string;
+            };
+            expect(result.error).toMatch(/^url is not allowed/);
+        }
+        expect(pluginTools.extractContent).not.toHaveBeenCalled();
+        expect(pluginTools.screenshot).not.toHaveBeenCalled();
     });
 
     it('extractContent wraps facade exceptions into `{error}`', async () => {

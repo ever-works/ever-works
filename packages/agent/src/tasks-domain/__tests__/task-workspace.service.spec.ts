@@ -254,6 +254,8 @@ describe('TaskWorkspaceService', () => {
             provision: jest.Mock;
             finalize: jest.Mock;
             simulateMerge: jest.Mock;
+            branchChanges?: jest.Mock;
+            supportsJudgedPublish?: jest.Mock;
         };
 
         const buildFull = () =>
@@ -298,6 +300,10 @@ describe('TaskWorkspaceService', () => {
                     .fn()
                     .mockResolvedValue({ pushed: true, headSha: 'cafe42', empty: false }),
                 simulateMerge: jest.fn().mockResolvedValue({ clean: true, conflictPaths: [] }),
+                // Prompt-injection hardening: every finalize reads its commit's changes
+                // before the push (always-protected-path floor).
+                branchChanges: jest.fn().mockResolvedValue({ paths: ['src/x.ts'], contents: {} }),
+                supportsJudgedPublish: jest.fn().mockResolvedValue(true),
             };
         });
 
@@ -329,6 +335,72 @@ describe('TaskWorkspaceService', () => {
             // itself agent-driven so a red gate can never enter review here.
             expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review', {
                 actorType: 'agent',
+            });
+        });
+
+        // Review of #2769 (CodeRabbit, outside the diff): a check-first push needs
+        // a provider that reports the commit's changes AND promises to publish
+        // exactly that commit — asked BEFORE anything is committed or pushed.
+        describe('a workspace provider that cannot publish a checked commit', () => {
+            afterEach(() => {
+                delete process.env.AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS;
+            });
+
+            it('is refused before any finalize: nothing committed, nothing pushed, Task blocked', async () => {
+                facadeExt.supportsJudgedPublish!.mockResolvedValue(false);
+
+                const result = await buildFull().finalizeRun(finalizeInput());
+
+                expect(result).toEqual({ outcome: 'blocked-by-guard' });
+                expect(facadeExt.finalize).not.toHaveBeenCalled();
+                expect(facadeExt.branchChanges).not.toHaveBeenCalled();
+                expect(taskChat.post).toHaveBeenCalledWith(
+                    'user-1',
+                    expect.objectContaining({
+                        body: expect.stringContaining('AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS'),
+                    }),
+                );
+                expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
+                    actorType: 'agent',
+                });
+                // Nothing reached the remote, so no branch-guard marker is written.
+                expect(tasks.updateById).not.toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ branchGuardRefusal: expect.anything() }),
+                );
+            });
+
+            it('is refused when the facade cannot even be asked (fail closed)', async () => {
+                delete facadeExt.supportsJudgedPublish;
+                const result = await buildFull().finalizeRun(finalizeInput());
+                expect(result.outcome).toBe('blocked-by-guard');
+                expect(facadeExt.finalize).not.toHaveBeenCalled();
+            });
+
+            it('an allowlisted non-App Work keeps the one-step push exactly as before', async () => {
+                facadeExt.supportsJudgedPublish!.mockResolvedValue(false);
+                process.env.AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS = 'work-1';
+
+                const result = await buildFull().finalizeRun(finalizeInput());
+
+                expect(result).toEqual(expect.objectContaining({ outcome: 'pr-opened' }));
+                expect(facadeExt.finalize).toHaveBeenCalledTimes(1);
+                expect(facadeExt.finalize.mock.calls[0][1]).toEqual(
+                    expect.objectContaining({ push: true }),
+                );
+                expect(facadeExt.finalize.mock.calls[0][1].publishSha).toBeUndefined();
+                expect(facadeExt.supportsJudgedPublish).not.toHaveBeenCalled();
+            });
+
+            it('a provider that supports it is unchanged: commit, check, publish the checked sha', async () => {
+                const result = await buildFull().finalizeRun(finalizeInput());
+                expect(result).toEqual(expect.objectContaining({ outcome: 'pr-opened' }));
+                expect(facadeExt.finalize.mock.calls[0][1]).toEqual(
+                    expect.objectContaining({ push: false }),
+                );
+                expect(facadeExt.finalize.mock.calls[1][1]).toEqual(
+                    expect.objectContaining({ push: true, publishSha: 'cafe42' }),
+                );
             });
         });
 

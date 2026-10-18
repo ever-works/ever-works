@@ -80,6 +80,14 @@ export interface AppChangeAccepted {
     readonly agentSource: AppWorkAgentSource | 'explicit';
     readonly dispatched: boolean;
     readonly parked: boolean;
+    /**
+     * Prompt-injection hardening — `true` when a member who is NOT the Work owner asked:
+     * the Task was filed (assigned, in the backlog) but NOT started, because starting it
+     * runs the OWNER's committing Agent. The caller tells the owner (the evolve route files
+     * an Inbox notice); the owner starts it from the Task (Run). Absent for an owner's own
+     * request, which starts as before.
+     */
+    readonly awaitingOwner?: boolean;
     readonly queuedReason?: string;
     readonly dispatchError?: string;
     /** The repository the change lands in (the fork). */
@@ -272,6 +280,32 @@ export class AppChangeRequestService {
                 'taskCreateFailed',
                 `The change Task could not be created: ${errorText(error)}`,
             );
+        }
+
+        // ── a member who is not the owner: file it, never start it ────────────
+        // Prompt-injection hardening. Starting the Task runs the OWNER's committing Agent
+        // with the owner's credentials (on the owner's machine for a Fleet run), so a
+        // request from anyone else — a Work Editor, or an Editor's Agent steered by
+        // injected text — is held for the owner: the Task exists, is assigned and sits
+        // in the backlog, and the owner is told. Pressing Run on it is the owner's call.
+        // The caller (the evolve route) tells the owner, from `awaitingOwner`.
+        const requestedByOwner = !input.actorUserId || input.actorUserId === ownerId;
+        if (!requestedByOwner) {
+            return {
+                status: 'accepted',
+                httpStatus: 202,
+                taskId: task.id,
+                taskSlug: task.slug,
+                taskUrl: taskUrlOf(task.id),
+                runId: null,
+                agentId,
+                agentSource,
+                dispatched: false,
+                parked: false,
+                awaitingOwner: true,
+                repository: target,
+                warnings: ['awaitingOwner'],
+            };
         }
 
         // ── start it, through THE dispatch path ───────────────────────────────

@@ -72,7 +72,13 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
     let works: { findById: jest.Mock };
     let tasks: { updateById: jest.Mock; findById: jest.Mock; recordMergeRefusal: jest.Mock };
     let runs: { setWorkspaceMeta: jest.Mock };
-    let workspaceFacade: { finalize: jest.Mock; simulateMerge: jest.Mock; provision: jest.Mock };
+    let workspaceFacade: {
+        finalize: jest.Mock;
+        simulateMerge: jest.Mock;
+        provision: jest.Mock;
+        branchChanges?: jest.Mock;
+        supportsJudgedPublish?: jest.Mock;
+    };
     let gitFacade: {
         getRepository: jest.Mock;
         createPullRequest: jest.Mock;
@@ -129,6 +135,10 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
                 .fn()
                 .mockResolvedValue({ pushed: true, headSha: 'cafe42', empty: false }),
             simulateMerge: jest.fn().mockResolvedValue({ clean: true, conflictPaths: [] }),
+            // Prompt-injection hardening: every finalize reads its commit's changes
+            // before the push (always-protected-path floor).
+            branchChanges: jest.fn().mockResolvedValue({ paths: ['src/x.ts'], contents: {} }),
+            supportsJudgedPublish: jest.fn().mockResolvedValue(true),
         };
         gitFacade = {
             getRepository: jest.fn().mockResolvedValue({

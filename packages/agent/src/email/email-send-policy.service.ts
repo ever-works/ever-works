@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import {
@@ -31,6 +31,7 @@ import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import type { AgentInbox } from '../entities/agent-inbox.entity';
 import { Organization } from '../entities/organization.entity';
 import { AgentInboxRepository } from '../database/repositories/agent-inbox.repository';
+import { TenantEmailAddressRepository } from '../database/repositories/tenant-email-address.repository';
 import {
     EmailMessageRepository,
     type EmailSendAdmissionLockKeys,
@@ -137,7 +138,94 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
         @InjectRepository(Organization) private readonly organizations: Repository<Organization>,
         @InjectRepository(AgentActionProposal)
         private readonly proposals: Repository<AgentActionProposal>,
+        // Prompt-injection hardening — the owner's own addresses count as known
+        // recipients (agent-to-agent mail through `messageAgent`). @Optional()
+        // and appended LAST (positional-spec arity); unbound, they are simply
+        // not known, which holds more mail for review, never less.
+        @Optional() private readonly addresses?: TenantEmailAddressRepository,
     ) {}
+
+    /**
+     * Prompt-injection hardening — the mode for ONE agent send, given who it
+     * goes to.
+     *
+     * The effective mode decides as before, with one narrowing: when it is
+     * `auto-send` only because nothing set a mode (the platform default — no
+     * inbox row, no organization policy, no explicit
+     * `EMAIL_DEFAULT_AGENT_SEND_MODE=auto-send`), a message to anyone who is
+     * not a known correspondent is held for review (`draft-review`) instead of
+     * sent. An injected agent could otherwise mail any address on the
+     * internet: data out, or phishing from the owner's domain. Known =
+     * already corresponded with this agent, one of the owner's own addresses,
+     * or on `EMAIL_AGENT_AUTO_SEND_ALLOWLIST`. An explicit owner/organization
+     * `auto-send`, or `EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE=auto-send`, keeps the
+     * old behaviour.
+     */
+    async resolveAgentSendMode(
+        userId: string,
+        agentId: string,
+        recipients: { to?: readonly string[]; cc?: readonly string[]; bcc?: readonly string[] },
+    ): Promise<{ mode: AgentInboxMode; unknownRecipients?: string[] }> {
+        const policy = await this.resolvePolicy(userId, agentId);
+        const unknownRecipients = await this.unknownRecipientsUnderDefault(
+            policy,
+            userId,
+            agentId,
+            recipients,
+        );
+        if (unknownRecipients.length > 0) return { mode: 'draft-review', unknownRecipients };
+        return { mode: policy.mode };
+    }
+
+    /**
+     * The recipients that make an agent send need review under the platform
+     * default, or `[]` when it does not (another mode applies, the operator
+     * restored auto-send, or every recipient is known). Never throws: a lookup
+     * that fails treats the recipients as unknown (held, not sent).
+     */
+    private async unknownRecipientsUnderDefault(
+        policy: EffectiveEmailSendPolicy,
+        userId: string,
+        agentId: string,
+        recipients: { to?: readonly string[]; cc?: readonly string[]; bcc?: readonly string[] },
+    ): Promise<string[]> {
+        if (policy.mode !== 'auto-send' || policy.modeSource !== 'platform') return [];
+        if (config.email.isDefaultAgentModeExplicitAutoSend()) return [];
+        if (config.email.getUnknownRecipientMode() === 'auto-send') return [];
+        const wanted = distinctEmailRecipients(
+            recipients.to ? [...recipients.to] : [],
+            recipients.cc ? [...recipients.cc] : undefined,
+            recipients.bcc ? [...recipients.bcc] : undefined,
+        )
+            .map(bareEmailAddress)
+            .filter((address) => address.length > 0);
+        if (wanted.length === 0) return [];
+        const allowlist = config.email.getAgentAutoSendAllowlist();
+        const known = new Set<string>();
+        try {
+            for (const address of await this.messages.listCorrespondentAddresses(userId, agentId)) {
+                const bare = bareEmailAddress(address);
+                if (bare) known.add(bare);
+            }
+            if (this.addresses) {
+                for (const own of await this.addresses.findAllByUser(userId)) {
+                    const bare = bareEmailAddress(own.address);
+                    if (bare) known.add(bare);
+                }
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Known-recipient lookup failed for agent ${agentId}; holding the message for review: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return wanted.filter((address) => {
+            if (known.has(address)) return false;
+            const domain = address.slice(address.lastIndexOf('@'));
+            return !allowlist.some((entry) => entry === address || entry === domain);
+        });
+    }
 
     /** Overridable clock — tests freeze it. */
     protected now(): Date {
@@ -184,6 +272,19 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
             if (attempt.draftMessageId) {
                 await this.assertApprovedDraft(userId, agentId, attempt);
             } else if (policy.mode === 'draft-review') {
+                throw new EmailApprovalRequiredException('awaiting-approval', agentId);
+            } else if (
+                (
+                    await this.unknownRecipientsUnderDefault(policy, userId, agentId, {
+                        to: attempt.to,
+                        cc: attempt.cc,
+                        bcc: attempt.bcc,
+                    })
+                ).length > 0
+            ) {
+                // Same rule as `resolveAgentSendMode`, enforced where every
+                // send converges: an agent on the platform default never mails
+                // a stranger without a person's approval.
                 throw new EmailApprovalRequiredException('awaiting-approval', agentId);
             }
         }
@@ -620,4 +721,17 @@ export function normalizeOrganizationPolicy(raw: unknown): EmailSendPolicyOverri
     const caps = normalizeEmailSendCapsOverride(source.caps);
     if (Object.keys(caps).length > 0) out.caps = caps;
     return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * The bare, lower-cased mailbox of an address as written in a header:
+ * `"Ada" <Ada@Example.com>` → `ada@example.com`. `''` when there is none.
+ */
+export function bareEmailAddress(raw: unknown): string {
+    if (typeof raw !== 'string') return '';
+    const text = raw.trim();
+    const open = text.lastIndexOf('<');
+    const close = text.lastIndexOf('>');
+    const bare = open >= 0 && close > open ? text.slice(open + 1, close) : text;
+    return bare.trim().toLowerCase();
 }
