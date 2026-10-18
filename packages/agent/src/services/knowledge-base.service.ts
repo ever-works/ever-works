@@ -192,6 +192,15 @@ interface UpdateDocumentInput {
     language?: string;
     status?: KbDocumentStatus;
     class?: KbDocumentClass;
+    /**
+     * Works-security lane 3a — set ONLY by callers that write on behalf of a
+     * machine principal (a fleet-run token, an integration key). An edit such
+     * a caller makes re-enters the M7 review gate (`proposed`: out of context
+     * injection until a person accepts it again), so a prompt-injected run
+     * cannot rewrite an accepted document straight into every later prompt.
+     * Never read from a request body.
+     */
+    reviewState?: KbReviewState;
 }
 
 interface ListOptions {
@@ -2439,7 +2448,12 @@ export class KnowledgeBaseService {
         // user drops on the Memory page into every Work repository in the
         // organization. Overlay membership is a property of the CLASS, so
         // that is what decides.
-        if (isInheritable) {
+        //
+        // Works-security lane 3a — and only an ACCEPTED document is copied
+        // into every Work repository: a `proposed` one (machine-written,
+        // review-gated) is materialized when a person accepts it
+        // (`acceptOrgDocument` runs the same fanout).
+        if (isInheritable && doc.reviewState !== KbReviewState.PROPOSED) {
             await this.enqueueOrgOverlayFanout(
                 organizationId,
                 doc.id,
@@ -2497,7 +2511,14 @@ export class KnowledgeBaseService {
         const isInheritable = (
             KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>
         ).includes(updated.kbDocumentClass);
-        if (isInheritable && updated.status !== KbDocumentStatus.ARCHIVED) {
+        // Works-security lane 3a — an edit that left the document `proposed`
+        // (review-gated) is not copied into the Work repositories; the last
+        // accepted copy stays until a person accepts the new one.
+        if (
+            isInheritable &&
+            updated.status !== KbDocumentStatus.ARCHIVED &&
+            updated.reviewState !== KbReviewState.PROPOSED
+        ) {
             await this.enqueueOrgOverlayFanout(
                 organizationId,
                 updated.id,
@@ -4244,6 +4265,7 @@ export class KnowledgeBaseService {
         if (input.language !== undefined) patch.language = input.language;
         if (input.status !== undefined) patch.status = input.status;
         if (input.class !== undefined) patch.kbDocumentClass = input.class;
+        if (input.reviewState !== undefined) patch.reviewState = input.reviewState;
 
         if (input.body !== undefined) {
             patch.wordCount = this.countWords(input.body);

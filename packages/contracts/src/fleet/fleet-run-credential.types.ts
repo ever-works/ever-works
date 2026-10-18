@@ -161,213 +161,315 @@ export interface FleetRunTokenRoute {
 }
 
 /**
- * Every route a fleet-run token may reach, expressed as PREFIX families.
+ * Every route a fleet-run token may reach, as EXACT method + path templates
+ * (works-security lane 3a, 2026-10-18). It used to be nine whole PREFIX
+ * families (`/api/agents`, `/api/tasks`, `/api/works`, …) for any method,
+ * minus a few carved-out segments, and a family grants everything mounted
+ * under it — the computer-use driver token, Agent file and instruction
+ * writes, the run steer/resume routes, KB accept, deploy runtime env, the
+ * DoD replace/tick routes and every other controller that merely shares a
+ * prefix with the MCP surface. An explicit list grants exactly what is
+ * written here and nothing that is added later.
  *
- * Read this as: "the MCP whitelist, minus anything that could be turned
- * against the run itself". Concretely excluded, permanently:
+ * Read this as: "the MCP whitelist, minus everything that could be turned
+ * against the owner by a prompt-injected run". Concretely NOT granted:
  *
- *   - `/api/auth/**` — a run token must never mint another credential,
- *     list the owner's `ew_live_` keys, or touch a session.
- *   - `/api/fleet/jobs/**` — the lease protocol. A model that could
- *     complete its own job could report a verdict it did not earn.
- *   - fleet MUTATIONS (`PUT`/`DELETE` node-affinity, `POST …/drain`) —
- *     the model would be able to drain the very machine it runs on, or
- *     repoint another Agent's scheduling. Reads are granted; writes are
- *     not.
- *   - node enrolment / rotation / pause / unenroll, tool grants,
- *     platform-admin routes, organizations, billing — none of them are
- *     on the MCP surface, and omission is what refuses them.
+ *   - anything that STARTS autonomous work or spends: running a Task, a
+ *     batch, an Agent or a Mission; resuming an Agent or a Mission;
+ *     activating or evaluating a Goal; generation, comparison, schedule,
+ *     deploy and Idea build routes (the integrations rule, plan decision D9,
+ *     applied to run tokens: a machine principal never starts a run);
+ *   - configuration that changes what later runs do: plugin enable / disable
+ *     / settings (a plugin's base URL can redirect model traffic), Agent
+ *     updates (instructions, permissions, files, skills), Goal limits;
+ *   - writes outside the task branch: the Work item routes commit straight
+ *     to the Work's data repository, so they are a merge-gate bypass;
+ *   - destructive or hiding writes: deleting a Work, a Task, a comparison,
+ *     a Mission; discarding a branch; archiving, deleting or marking read an
+ *     Inbox item (it would hide a notice from the owner);
+ *   - recording a reviewer rejection (it is replayed into the next run as
+ *     instructions and the fix loop starts that run);
+ *   - every human-in-the-loop gate (inbox reply, escalation resolve, DoD
+ *     approve) and every credential route (`/api/auth`, `/api/fleet/jobs`).
  *
- * The check is prefix-based on purpose: `{id}` placeholders never match
- * literally, and enumerating 128 concrete templates would be one edit
- * away from a hole. A family grants the family — MINUS the sub-resources
- * carved back out by {@link FLEET_RUN_TOKEN_DENIED_SEGMENTS}, which is
- * where the routes that merely share a prefix with the MCP surface
- * (the run terminal, connection bindings, Composio OAuth) are refused.
+ * Several granted routes still carry BODY fields a run token may not set —
+ * a Work's merge policy and check commands, a Task's acceptance checks,
+ * `scheduledAt`, `force`, an agent assignee wider than the run's own Agent,
+ * a Goal's `outcome` / `constraints`. A path list cannot see a body, so
+ * those refusals live in the controllers (see `machine-principal.ts` in
+ * `apps/api`).
+ *
+ * Deny-by-omission: a new route, or a new MCP tool, is refused for run
+ * tokens until it is written here. `apps/mcp/test/whitelist-fleet-run-surface.spec.ts`
+ * walks the real MCP whitelist (and the hand-written `kb.*` tools) and
+ * requires every tool to be either granted here or named as deliberately
+ * refused, so the two lists cannot drift apart silently.
  */
-export const FLEET_RUN_TOKEN_ALLOWED_PREFIXES: readonly string[] = [
-	'/api/agent-plugins',
-	'/api/agents',
-	'/api/deploy',
-	'/api/extract-item-details',
-	'/api/inbox',
-	'/api/me',
-	'/api/plugins',
-	'/api/tasks',
-	'/api/works'
-];
+export const FLEET_RUN_TOKEN_ROUTES: readonly FleetRunTokenRoute[] = Object.freeze([
+	// Works — reads, plus the settings update (its merge / check / command
+	// fields are refused for run tokens by the Works controller).
+	{ method: 'GET', pathPattern: '/api/works' },
+	{ method: 'GET', pathPattern: '/api/works/{id}' },
+	{ method: 'PUT', pathPattern: '/api/works/{id}' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/config' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/items' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/categories-tags' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/history' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/generator-form' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/schedule' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/comparisons' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/comparisons/{slug}' },
+
+	// Knowledge Base (`apps/mcp/src/tools/kb`). A document a run token writes
+	// lands `proposed` (review-gated), see the KB controller. No unlock.
+	{ method: 'GET', pathPattern: '/api/works/{id}/kb/documents' },
+	{ method: 'POST', pathPattern: '/api/works/{id}/kb/documents' },
+	{ method: 'GET', pathPattern: '/api/works/{id}/kb/documents/{docIdOrPath}' },
+	{ method: 'PATCH', pathPattern: '/api/works/{id}/kb/documents/{docId}' },
+	{ method: 'POST', pathPattern: '/api/works/{id}/kb/documents/{docId}/lock' },
+
+	// Deploy — reads and the capability check only.
+	{ method: 'GET', pathPattern: '/api/deploy/works/{id}/domains' },
+	{ method: 'GET', pathPattern: '/api/deploy/providers' },
+	{ method: 'POST', pathPattern: '/api/deploy/works/{id}/check' },
+
+	// Plugins — read only.
+	{ method: 'GET', pathPattern: '/api/plugins' },
+	{ method: 'GET', pathPattern: '/api/plugins/{pluginId}' },
+
+	// Missions — reads, plus pause (the safe direction).
+	{ method: 'GET', pathPattern: '/api/me/missions' },
+	{ method: 'GET', pathPattern: '/api/me/missions/{id}' },
+	{ method: 'GET', pathPattern: '/api/me/missions/{id}/budget' },
+	{ method: 'GET', pathPattern: '/api/me/missions/{id}/works' },
+	{ method: 'POST', pathPattern: '/api/me/missions/{id}/pause' },
+
+	// Ideas — reads, plus filing a new Idea (a proposal a person builds).
+	{ method: 'POST', pathPattern: '/api/me/work-proposals' },
+	{ method: 'GET', pathPattern: '/api/me/work-proposals' },
+	{ method: 'GET', pathPattern: '/api/me/work-proposals/status' },
+	{ method: 'GET', pathPattern: '/api/me/work-proposals/preferences' },
+	{ method: 'GET', pathPattern: '/api/me/work-proposals/{id}' },
+	{ method: 'GET', pathPattern: '/api/me/work-proposals/{id}/budget' },
+
+	// Account-wide usage.
+	{ method: 'GET', pathPattern: '/api/me/usage/account-wide' },
+
+	// Tasks — reads and collaboration writes. Create / update / transition /
+	// assign / chat carry body refusals for run tokens in the Tasks
+	// controller (no checks, no schedule, no force, no dispatch, no @agent).
+	{ method: 'GET', pathPattern: '/api/tasks' },
+	{ method: 'POST', pathPattern: '/api/tasks' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}' },
+	{ method: 'PATCH', pathPattern: '/api/tasks/{id}' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/subtasks' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/activity' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/transition' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/run-candidates' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/pr-status' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/diff' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/assignees' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/reviewers' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/approvers' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/relations' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/escalations' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/chat' },
+	{ method: 'POST', pathPattern: '/api/tasks/{id}/chat' },
+	{ method: 'GET', pathPattern: '/api/tasks/{id}/spend' },
+
+	// Inbox — read only (no reply, no archive / delete / mark-read).
+	{ method: 'GET', pathPattern: '/api/inbox' },
+	{ method: 'GET', pathPattern: '/api/inbox/unread-count' },
+	{ method: 'GET', pathPattern: '/api/inbox/{id}' },
+
+	// Goals — reads, a draft create, field-limited update, pause, and the
+	// ASKING side of the definition of done (propose, never approve).
+	{ method: 'GET', pathPattern: '/api/me/goals' },
+	{ method: 'POST', pathPattern: '/api/me/goals' },
+	{ method: 'GET', pathPattern: '/api/me/goals/{id}' },
+	{ method: 'PATCH', pathPattern: '/api/me/goals/{id}' },
+	{ method: 'GET', pathPattern: '/api/me/goals/{id}/samples' },
+	{ method: 'POST', pathPattern: '/api/me/goals/{id}/pause' },
+	{ method: 'POST', pathPattern: '/api/me/goals/{id}/dod/propose' },
+
+	// Fleet — reads only.
+	{ method: 'GET', pathPattern: '/api/fleet/nodes' },
+	{ method: 'GET', pathPattern: '/api/fleet/nodes/{id}' },
+	{ method: 'GET', pathPattern: '/api/fleet/runner-status' },
+	{ method: 'GET', pathPattern: '/api/fleet/execution-preferences' },
+	{ method: 'GET', pathPattern: '/api/fleet/agents/{agentId}/node-affinity' },
+
+	// Agents — reads, plus cancel and pause (the safe direction).
+	{ method: 'GET', pathPattern: '/api/agents' },
+	{ method: 'GET', pathPattern: '/api/agents/{id}' },
+	{ method: 'GET', pathPattern: '/api/agents/{id}/runs' },
+	{ method: 'GET', pathPattern: '/api/agents/{id}/runs/{runId}' },
+	{ method: 'POST', pathPattern: '/api/agents/{id}/runs/{runId}/cancel' },
+	{ method: 'POST', pathPattern: '/api/agents/{id}/pause' },
+	{ method: 'GET', pathPattern: '/api/agents/{id}/budget' },
+
+	// Agent Plugins — read only (installing a package installs instructions).
+	{ method: 'GET', pathPattern: '/api/agent-plugins' },
+	{ method: 'GET', pathPattern: '/api/agent-plugins/findings' },
+	{ method: 'GET', pathPattern: '/api/agent-plugins/catalog' },
+	{ method: 'GET', pathPattern: '/api/agent-plugins/updates' }
+] as FleetRunTokenRoute[]) as readonly FleetRunTokenRoute[];
 
 /**
- * Fleet routes a run token may READ, matched exactly by prefix but only
- * for safe methods. Kept apart from the list above because `/api/fleet`
- * as a family would include the lease protocol and the drain mutation.
+ * The ONLY Work settings a machine principal — a fleet-run token or an
+ * integration key — may set through `PUT` / `PATCH /api/works/:id`
+ * (works-security lane 3a, 2026-10-18): descriptive text. Everything else on
+ * that route decides what the platform later does without a person — the
+ * merge gate, the commands a node runs, where task branches come from and
+ * land, community-PR processing, who owns the Work, its template, deploy
+ * target, committer identity, external references — and is refused for them.
+ * The MCP `update_work` tool exposes exactly these body arguments.
  */
-export const FLEET_RUN_TOKEN_ALLOWED_FLEET_READ_PREFIXES: readonly string[] = [
-	'/api/fleet/nodes',
-	'/api/fleet/runner-status',
-	'/api/fleet/execution-preferences',
-	'/api/fleet/agents'
-];
-
-/** Methods that never mutate — the only ones the fleet READ family admits. */
-const SAFE_METHODS = new Set(['GET', 'HEAD']);
+export const MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS: readonly string[] = Object.freeze(['name', 'description']);
 
 /**
- * Paths that are refused even though a prefix above would admit them.
+ * Path SEGMENTS that veto a request whatever the list above says.
  *
- * Only one entry today: `POST /api/fleet/nodes/{id}/drain` sits under the
- * `/api/fleet/nodes` read family. It is already refused by the method
- * check, and it is named here as well so the intent survives a future
- * edit that widens the methods.
- */
-const FLEET_RUN_TOKEN_DENIED_SUFFIXES: readonly string[] = ['/drain'];
-
-/**
- * Path SEGMENTS that veto a request no matter which prefix admitted it.
+ * Kept from the prefix era as a second, independent layer: no granted
+ * template contains any of these, so with the explicit list they refuse
+ * nothing extra today — but a future edit that adds a route under one of
+ * these sub-resources is still refused until this list is reconciled too.
  *
- * The prefix families above are deliberately coarse — `/api/agents`
- * grants the agent family — and that coarseness is what makes them
- * survive a new tool being whitelisted. But a family is only safe while
- * every route mounted under it belongs on the MCP surface, and several
- * do not: they are separate controllers that merely happen to hang off
- * the same first two segments, and none of them is a whitelisted tool.
- *
- *   - `terminal`      `/api/agents/{id}/runs/{runId}/terminal/**` —
- *     `POST …/attach-token` MINTS a signed WebSocket credential and
- *     `POST …/start` opens the owner's worker shell. A run token that
- *     could mint another credential breaks the one invariant this whole
- *     design rests on, and a model that could open a shell would not
- *     need the tools at all.
- *   - `mcp-servers`   `/api/agents/{id}/mcp-servers/**` — the owner's
- *     third-party MCP connection bindings. Reading and re-binding other
- *     people's integrations is not a fleet run's business.
- *   - `repos`         `/api/agents/{id}/repos/**` — repository
- *     connection bindings; the run already has the checkout it needs.
- *   - `collaborators` `/api/agents/{id}/collaborators/**` — the agent
- *     roster, i.e. who else may drive this Agent.
- *   - `composio`      `/api/plugins/composio/**` — lists the owner's
- *     connected accounts and initiates OAuth connections.
+ *   - `terminal`      the run terminal (`attach-token` mints a WebSocket
+ *     credential, `start` opens the owner's worker shell);
+ *   - `computer`      computer-use sessions (`attach-token` mints a driver
+ *     WebSocket credential);
+ *   - `mcp-servers`   the owner's third-party MCP connection bindings;
+ *   - `repos`         repository connection bindings;
+ *   - `collaborators` the agent roster;
+ *   - `composio`      the owner's connected accounts and OAuth initiation;
+ *   - `members` / `invitations` who may act on a Work.
  *
  * Segment-wise rather than suffix-wise because every one of them sits in
- * the MIDDLE of a path with an id after it, and a suffix rule would miss
- * `…/terminal/attach-token` while catching only `…/terminal`.
- *
- * Cross-checked against the real MCP whitelist by
- * `apps/mcp/test/whitelist-fleet-run-surface.spec.ts`: no whitelisted
- * tool path contains any of these segments, so nothing a fleet run is
- * meant to call is caught by this list.
+ * the MIDDLE of a path with an id after it.
  */
 const FLEET_RUN_TOKEN_DENIED_SEGMENTS: ReadonlySet<string> = new Set([
 	'terminal',
+	'computer',
 	'mcp-servers',
 	'repos',
 	'collaborators',
-	'composio'
+	'composio',
+	'members',
+	'invitations'
 ]);
 
 /**
- * Human-in-the-loop GATE routes, refused for a run token whatever family
- * admits them. Matched by exact shape, one `*` per id segment.
+ * Human-in-the-loop GATE routes, refused for a run token whatever the list
+ * says. Matched by exact shape, one `*` per id segment.
  *
- * These are the routes the MCP whitelist withholds on purpose
- * (`apps/mcp/src/openapi-tools/whitelist.ts`, "Human-in-the-loop gates are
- * deliberately NOT exposed"), because the API cannot tell a caller holding
- * the owner's credential from the owner — so any verb that ANSWERS a gate
- * lets the agent answer its own. A fleet-run token resolves `request.user`
- * to the OWNER, which makes that literal:
+ * None of them is in {@link FLEET_RUN_TOKEN_ROUTES}; they are pinned here as
+ * well so the intent survives a future edit of the list. The API cannot tell
+ * a caller holding the owner's credential from the owner, so any verb that
+ * ANSWERS a gate would let the agent answer its own:
  *
- *   - `…/inbox/{id}/reply` — reaches `AgentApprovalsService.decide`,
- *     which stamps `decidedVia: 'user'` and the owner as `decidedById`. On
- *     a `merge_pull_request` proposal that is EXACTLY what
- *     `MergeApprovalService.verifyMergeApproval` accepts as the human
- *     merge approval, so a model on a fleet node could approve its own
- *     merge with no human ever deciding.
- *   - `…/tasks/{id}/escalations/{escalationId}/resolve` — resolve its own
- *     escalation.
- *   - `…/me/goals/{id}/dod/approve` — sign off its own definition of done.
+ *   - `…/inbox/{id}/reply` — decides a `merge_pull_request` proposal as the
+ *     owner (`decidedVia: 'user'`), which the merge verifier accepts;
+ *   - `…/tasks/{id}/escalations/{escalationId}/resolve`, `…/escalations/{id}/resolve`;
+ *   - `…/me/goals/{id}/dod/approve` (the DoD replace / tick routes,
+ *     `PUT …/dod` and `PATCH …/dod/{criterionId}`, mark criteria met without
+ *     it; they are refused by omission from the list, and the shape
+ *     `…/dod/*` cannot be pinned here without also catching `…/dod/propose`);
+ *   - `…/agent-approvals/{id}/approve|reject`, `…/agent-approvals/approve-all`.
  *
- * (`force` on `POST /api/tasks/{id}/transition`, the approver-gate
- * override, and `requireAllApprovers` on `POST /api/tasks` /
- * `PATCH /api/tasks/{id}`, the approver POLICY, are BODY fields this path
- * check cannot see; the tasks controller refuses both for a run token.)
- *
- * The prefix families were described as "the MCP whitelist, minus
- * anything that could be turned against the run itself", but the coarse
- * `/api/inbox`, `/api/tasks` and `/api/me` families admitted all three —
- * strictly broader than the whitelist, on the routes that matter most.
- * Refused for EVERY method: the gate is the path, and no safe verb lives
- * at any of these shapes.
+ * (`force` on a transition and `requireAllApprovers` on a Task are BODY
+ * fields this path check cannot see; the Tasks controller refuses both.)
  */
 const FLEET_RUN_TOKEN_DENIED_GATE_ROUTES: readonly (readonly string[])[] = [
 	['api', 'inbox', '*', 'reply'],
 	['api', 'tasks', '*', 'escalations', '*', 'resolve'],
-	['api', 'me', 'goals', '*', 'dod', 'approve']
+	['api', 'escalations', '*', 'resolve'],
+	['api', 'me', 'goals', '*', 'dod', 'approve'],
+	['api', 'agent-approvals', '*', 'approve'],
+	['api', 'agent-approvals', '*', 'reject'],
+	['api', 'agent-approvals', 'approve-all']
 ];
 
-function isDeniedGateRoute(normalizedPath: string): boolean {
-	const segments = normalizedPath.split('/').filter((segment) => segment.length > 0);
-	return FLEET_RUN_TOKEN_DENIED_GATE_ROUTES.some(
-		(shape) =>
-			shape.length === segments.length &&
-			shape.every((part, index) => part === '*' || part === segments[index]?.toLowerCase())
+/** Paths refused outright, even for a safe method. */
+const FLEET_RUN_TOKEN_DENIED_PREFIXES: readonly string[] = ['/api/auth', '/api/fleet/jobs'];
+
+function splitSegments(normalizedPath: string): string[] {
+	return normalizedPath.split('/').filter((segment) => segment.length > 0);
+}
+
+function matchesShape(shape: readonly string[], segments: readonly string[]): boolean {
+	return (
+		shape.length === segments.length &&
+		shape.every((part, index) => part === '*' || part === segments[index]?.toLowerCase())
 	);
 }
+
+function isDeniedGateRoute(segments: readonly string[]): boolean {
+	return FLEET_RUN_TOKEN_DENIED_GATE_ROUTES.some((shape) => matchesShape(shape, segments));
+}
+
+/** `/api/tasks/{id}` → `['api', 'tasks', '*']`, computed once. */
+const FLEET_RUN_TOKEN_ROUTE_SHAPES: readonly { method: string; shape: readonly string[] }[] =
+	FLEET_RUN_TOKEN_ROUTES.map((route) => ({
+		method: route.method.toUpperCase(),
+		shape: splitSegments(route.pathPattern).map((part) => (/^\{[^}]+\}$/.test(part) ? '*' : part.toLowerCase()))
+	}));
 
 /**
  * Whether a fleet-run token may be used on this request.
  *
- * Fail-closed on every axis: a malformed method or path is refused, a
- * path that is not under an allowed prefix is refused, and the fleet
- * family additionally refuses every non-safe method. Query strings and
- * trailing slashes are normalised away before matching so
- * `/api/tasks/x?y=1` and `/api/tasks/x/` are judged as `/api/tasks/x`.
+ * Fail-closed on every axis: a malformed method or path is refused, and a
+ * request is admitted only when its method AND every path segment match one
+ * {@link FLEET_RUN_TOKEN_ROUTES} entry (`{param}` matches exactly one
+ * non-empty segment; literal segments compare case-insensitively, like the
+ * router). `HEAD` is judged as `GET`. Query strings and a trailing slash are
+ * normalised away before matching, so `/api/tasks/x?y=1` and `/api/tasks/x/`
+ * are judged as `/api/tasks/x`.
  *
- * `..` is refused outright rather than resolved: a path that needs
- * resolving to be judged is a path the caller should not be sending, and
- * resolving it here would be a second, subtly different normaliser
- * sitting in front of the router's own.
+ * A `..` (or `.`) SEGMENT is refused outright rather than resolved: a path
+ * that needs resolving to be judged is a path the caller should not be
+ * sending, and resolving it here would be a second, subtly different
+ * normaliser sitting in front of the router's own. Dots inside a segment
+ * (a KB path such as `notes..md`) are ordinary characters.
  */
 export function isFleetRunTokenRouteAllowed(method: unknown, path: unknown): boolean {
 	if (typeof method !== 'string' || typeof path !== 'string') return false;
-	const verb = method.trim().toUpperCase();
+	let verb = method.trim().toUpperCase();
 	if (!verb) return false;
+	if (verb === 'HEAD') verb = 'GET';
 
 	const normalized = normalizeRoutePath(path);
 	if (normalized === null) return false;
 
-	for (const suffix of FLEET_RUN_TOKEN_DENIED_SUFFIXES) {
-		if (normalized.endsWith(suffix)) return false;
+	for (const prefix of FLEET_RUN_TOKEN_DENIED_PREFIXES) {
+		if (underPrefix(normalized.toLowerCase(), prefix)) return false;
 	}
-	// The segment veto runs BEFORE any prefix can admit the path, so a
-	// family grant can never reach a sub-resource that was carved out of
-	// it. Splitting on `/` means the match is exact per segment: a route
-	// named `/api/works/{id}/terminal-history` would not be caught by a
-	// substring test, and must not be.
-	for (const segment of normalized.split('/')) {
-		if (segment && FLEET_RUN_TOKEN_DENIED_SEGMENTS.has(segment.toLowerCase())) return false;
+	const segments = splitSegments(normalized);
+	// The segment veto and the gate routes run BEFORE the list can admit the
+	// path, so a list entry can never reach a sub-resource carved out here.
+	// Splitting on `/` means the match is exact per segment: a route named
+	// `/api/works/{id}/terminal-history` is not caught by a substring test.
+	for (const segment of segments) {
+		if (FLEET_RUN_TOKEN_DENIED_SEGMENTS.has(segment.toLowerCase())) return false;
 	}
-	// The gate routes, likewise BEFORE any family can admit them.
-	if (isDeniedGateRoute(normalized)) return false;
+	if (isDeniedGateRoute(segments)) return false;
 
-	if (FLEET_RUN_TOKEN_ALLOWED_PREFIXES.some((prefix) => underPrefix(normalized, prefix))) {
-		return true;
-	}
-	if (
-		SAFE_METHODS.has(verb) &&
-		FLEET_RUN_TOKEN_ALLOWED_FLEET_READ_PREFIXES.some((prefix) => underPrefix(normalized, prefix))
-	) {
-		return true;
-	}
-	return false;
+	return FLEET_RUN_TOKEN_ROUTE_SHAPES.some((route) => route.method === verb && matchesShape(route.shape, segments));
 }
 
 /**
- * `/api/tasks` matches `/api/tasks` and `/api/tasks/…` but NOT
- * `/api/tasks-admin`: a prefix that could straddle a path segment
- * boundary would grant a neighbouring route nobody reviewed.
+ * `/api/auth` matches `/api/auth` and `/api/auth/…` but NOT
+ * `/api/authors`: a prefix that could straddle a path segment boundary
+ * would refuse (or, worse, admit) a neighbouring route nobody reviewed.
  */
 function underPrefix(path: string, prefix: string): boolean {
 	return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/** `.` / `..`, literal or percent-encoded (`%2e`), as one whole path segment. */
+function isDotSegment(segment: string): boolean {
+	const decoded = segment.replace(/%2e/gi, '.');
+	return decoded === '.' || decoded === '..';
 }
 
 /** Strip query/hash, collapse a trailing slash; `null` when unusable. */
@@ -376,7 +478,10 @@ function normalizeRoutePath(path: string): string | null {
 	if (!trimmed.startsWith('/')) return null;
 	const withoutQuery = trimmed.split('?')[0]?.split('#')[0] ?? '';
 	if (!withoutQuery.startsWith('/')) return null;
-	if (withoutQuery.includes('..')) return null;
+	if (withoutQuery.includes('//')) return null;
+	// A dot SEGMENT (`..` or `.`, also percent-encoded) is refused outright;
+	// dots inside a segment (`notes..md`, `v1.2`) are ordinary characters.
+	if (withoutQuery.split('/').some(isDotSegment)) return null;
 	if (withoutQuery.length > 1 && withoutQuery.endsWith('/')) {
 		return withoutQuery.slice(0, -1);
 	}

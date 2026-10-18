@@ -10,6 +10,7 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import type {
     KbDocumentClass as KbDocumentClassEnum,
     KbDocumentSource as KbDocumentSourceEnum,
+    KbReviewState as KbReviewStateEnum,
     KbDocumentStatus as KbDocumentStatusEnum,
     KbLockMode as KbLockModeEnum,
 } from '../entities/kb-types';
@@ -166,6 +167,12 @@ export class KbAgentToolsService {
                 if (input.tags !== undefined) patch.tags = input.tags;
                 if (input.categories !== undefined) patch.categories = input.categories;
                 if (input.language !== undefined) patch.language = input.language;
+                // Works-security lane 3a — an agent's edit of an existing
+                // document re-enters the M7 review gate, exactly like a
+                // document it creates: otherwise a prompt-injected run could
+                // rewrite an accepted (human) document straight into every
+                // later prompt. A person accepts the edit to restore it.
+                patch.reviewState = 'proposed' as KbReviewStateEnum;
                 const updated = await this.knowledgeBaseService.updateDocument(
                     workId,
                     existing.id,
@@ -232,12 +239,18 @@ export class KbAgentToolsService {
         userId: string,
         docId: string,
     ): Promise<KbToolResult<KbDocumentBodyDto>> {
-        try {
-            const updated = await this.knowledgeBaseService.unlockDocument(workId, docId, userId);
-            return { ok: true, data: updated };
-        } catch (err) {
-            return this.toErrorResult(err, 'kb_unlock');
-        }
+        // Works-security lane 3a — every caller of this service is an agent
+        // run, and a lock is how the owner keeps agents OFF a document. An
+        // agent that could lift it would undo exactly that, so unlocking is
+        // refused here (the server side of the agent pipeline's `kb_unlock`
+        // tool); a person unlocks in the app or through the API.
+        this.logger.warn(
+            `kb_unlock refused for an agent run (work ${workId}, doc ${docId}): a person unlocks KB documents.`,
+        );
+        return {
+            ok: false,
+            error: 'Unlocking a Knowledge Base document is a person’s decision; ask the owner to unlock it in Ever Works.',
+        };
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────

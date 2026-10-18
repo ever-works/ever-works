@@ -14,6 +14,9 @@ import * as policy from '../index.js';
 
 const FUNCTION_EXPORTS = [
 	'sanitizeMergePolicyOverride',
+	// Works-security lane 3a — the protected-branch floor predicate.
+	'mergeTargetNeedsFloorApproval',
+	'sameMergeBranch',
 	'sanitizeToolGrantOverride',
 	'matchesToolPattern',
 	'matchesAnyToolPattern',
@@ -31,6 +34,8 @@ const VALUE_EXPORTS = [
 	'MERGE_METHODS',
 	'MERGE_POLICY_SCOPE_PRECEDENCE',
 	'PLATFORM_DEFAULT_MERGE_POLICY',
+	'MERGE_POLICY_PROTECTED_BRANCH_FLOOR',
+	'MERGE_POLICY_ALWAYS_APPROVED_BRANCHES',
 	'MERGE_POLICY_FIELDS',
 	'TOOL_GRANT_SCOPE_PRECEDENCE',
 	'PLATFORM_DEFAULT_TOOL_GRANT',
@@ -57,12 +62,12 @@ describe('policy barrel', () => {
 		expect((policy as Record<string, unknown>)[name]).toBeInstanceOf(RegExp);
 	});
 
-	it('exposes exactly these 22 runtime symbols', () => {
+	it('exposes exactly these 26 runtime symbols', () => {
 		// Regression guard in BOTH directions: a re-export accidentally deleted
 		// from index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — forcing the author back to cover it.
 		expect(Object.keys(policy).sort()).toEqual([...FUNCTION_EXPORTS, ...VALUE_EXPORTS].sort());
-		expect(Object.keys(policy)).toHaveLength(22);
+		expect(Object.keys(policy)).toHaveLength(26);
 	});
 
 	it('names each of the six source modules in the barrel', () => {

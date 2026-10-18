@@ -23,7 +23,9 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
  *     controller declared as `@Controller('inbox')` would be unreachable
  *     in production behind an ingress that only routes `/api/*`.
  */
-const auth = { userId: 'u1' } as AuthenticatedUser;
+// A person in an interactive session (works-security lane 3a gates approval /
+// escalation replies on one; a question reply stays open to personal keys).
+const auth = { userId: 'u1', authMethod: 'session' } as AuthenticatedUser;
 
 function makeService() {
     return {
@@ -277,6 +279,37 @@ describe('InboxController', () => {
             expect(service.delete).toHaveBeenCalledWith('i1', 'u1');
         });
     });
+
+    // Works-security lane 3a — answering an approval decides the proposal (the
+    // merge verifier accepts it as THE human approval) and answering an
+    // escalation resolves it, so both need a person's session. A question's
+    // answer steers the run and stays open to a personal API key (the CLI).
+    describe('POST /api/inbox/:id/reply — human gates', () => {
+        const personalKey = { userId: 'u1', authMethod: 'api-key' } as AuthenticatedUser;
+
+        it.each([['approval'], ['escalation']])(
+            'refuses a personal API key answering an %s, and never reaches the service',
+            async (kind) => {
+                service.getForUser.mockResolvedValue({ id: 'i1', kind } as never);
+                await expect(
+                    controller.reply(personalKey, 'i1', { optionId: 'approve' }),
+                ).rejects.toMatchObject({ status: 403 });
+                expect(service.reply).not.toHaveBeenCalled();
+            },
+        );
+
+        it('lets a personal API key answer a question', async () => {
+            service.getForUser.mockResolvedValue({ id: 'i1', kind: 'question' } as never);
+            await controller.reply(personalKey, 'i1', { text: 'Use Postgres' });
+            expect(service.reply).toHaveBeenCalled();
+        });
+
+        it('lets a session answer an approval without an extra lookup', async () => {
+            await controller.reply(auth, 'i1', { optionId: 'approve' });
+            expect(service.getForUser).not.toHaveBeenCalled();
+            expect(service.reply).toHaveBeenCalled();
+        });
+    });
 });
 
 describe('inbox DTO validation', () => {
@@ -395,4 +428,5 @@ describe('inbox DTO validation', () => {
         expect(await errorsFor(SetInboxReadStateDto, { unread: 'yes' })).toEqual(['unread']);
         expect(await errorsFor(SetInboxReadStateDto, { unread: true })).toEqual([]);
     });
+
 });

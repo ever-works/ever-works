@@ -206,6 +206,54 @@ describe('ToolRegistrationService', () => {
 		});
 	});
 
+	// Works-security lane 3a — `bodyArgs`, the allowlist twin of `omitArgs`
+	// (update_work forwards a Work's name and description only).
+	describe('bodyArgs (only the listed body arguments reach the tool)', () => {
+		const operation = {
+			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
+			queryParams: [{ name: 'dryRun', required: false, schema: { type: 'boolean' } }]
+		};
+		const internals = () =>
+			service as unknown as {
+				withoutOmittedArgs: (
+					p: z.ZodObject<Record<string, z.ZodTypeAny>>,
+					e: Record<string, unknown>,
+					o?: typeof operation
+				) => z.ZodObject<Record<string, z.ZodTypeAny>>;
+				createHandler: (
+					e: Record<string, unknown>,
+					o: unknown
+				) => (a: Record<string, unknown>) => Promise<unknown>;
+			};
+
+		it('keeps path and query parameters plus the listed body arguments, and cuts every other one', () => {
+			const schema = z.object({
+				id: z.string(),
+				dryRun: z.boolean().optional(),
+				name: z.string().optional(),
+				description: z.string().optional(),
+				mergePolicy: z.object({}).optional(),
+				communityPrEnabled: z.boolean().optional()
+			});
+			const result = internals().withoutOmittedArgs(
+				schema,
+				{ method: 'PUT', path: '/api/works/{id}', bodyArgs: ['name', 'description'] },
+				operation
+			);
+			expect(Object.keys(result.shape).sort()).toEqual(['description', 'dryRun', 'id', 'name']);
+		});
+
+		it('never forwards an unlisted body argument, even when handed raw arguments', async () => {
+			const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'w1' });
+			const handler = internals().createHandler(
+				{ method: 'PUT', path: '/api/works/{id}', toolName: 'update_work', bodyArgs: ['name', 'description'] },
+				{ ...operation, method: 'PUT', path: '/api/works/{id}' }
+			);
+			await handler({ id: 'w1', name: 'New', mergePolicy: { allowAgentMerge: true }, communityPrEnabled: true });
+			expect(requestSpy).toHaveBeenCalledWith('PUT', '/works/w1', { name: 'New' });
+		});
+	});
+
 	it('creates handler that calls API with correct path', async () => {
 		const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: '123' });
 		service.registerTools();

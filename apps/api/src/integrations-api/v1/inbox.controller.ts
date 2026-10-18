@@ -31,6 +31,7 @@ import {
     INBOX_ITEM_STATUSES,
     INBOX_MAX_OPTION_ID_CHARS,
     INBOX_MAX_REPLY_CHARS,
+    INTEGRATION_MERGE_DECISION_SCOPE,
     type IntegrationInboxItemDto,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
@@ -195,12 +196,43 @@ export class IntegrationInboxController {
     ): Promise<unknown> {
         const principal = principalOf(user);
         const organizationId = this.organizationId();
-        const recipient = recipientOf(user, await this.inbox.get(organizationId, id));
+        // Works-security lane 3a — approval and escalation replies stay open
+        // here on purpose: the reply is the RECIPIENT's own decision relayed by
+        // the integration (Ever Gauzy forwards what the person answered in the
+        // Gauzy Inbox), and `recipientOf` refuses any other identity. The
+        // decision routes that no integration relays stay session-only.
+        const current = await this.inbox.get(organizationId, id);
+        const recipient = recipientOf(user, current);
+        // …except a MERGE decision (an agent's pull request landing on a real
+        // branch, a release promotion or revert): relaying one needs the
+        // separate, opt-in `merges:decide` scope. Without it the approval is
+        // untouched and stays pending for a decision in Ever Works.
+        const proposalId = current.dto.proposalId ?? null;
+        if (
+            !principal.scopes.includes(INTEGRATION_MERGE_DECISION_SCOPE) &&
+            (await this.inbox.isMergeApproval(current.dto))
+        ) {
+            throw new IntegrationHttpException(
+                403,
+                'scope_missing',
+                `Deciding a merge approval needs the '${INTEGRATION_MERGE_DECISION_SCOPE}' scope on the integration key. The approval stays pending: decide it in Ever Works, or ask the tenant owner to grant '${INTEGRATION_MERGE_DECISION_SCOPE}' to this key.`,
+                { missing: [INTEGRATION_MERGE_DECISION_SCOPE], reason: 'merge_decision' },
+            );
+        }
         const work = async (): Promise<{ status: number; body: IntegrationInboxReplyResult }> => {
             const outcome = await this.items.reply(recipient, id, {
                 text: dto.text ?? null,
                 optionId: dto.optionId ?? null,
             });
+            // Record on the decided proposal that an integration relayed it
+            // (best-effort; never fails the reply that already landed).
+            if (proposalId && (outcome.routed === 'approved' || outcome.routed === 'rejected')) {
+                await this.inbox.recordRelayedDecision(proposalId, {
+                    recipientUserId: recipient,
+                    integrationKeyId: principal.keyId,
+                    integrationKind: principal.integrationKind,
+                });
+            }
             const fresh = await this.inbox.get(organizationId, id);
             const body: IntegrationInboxReplyResult = {
                 item: fresh.dto,

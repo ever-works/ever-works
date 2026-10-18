@@ -468,8 +468,9 @@ export const APP_PRECONDITION_MESSAGE_LEAVES = {
 
 /**
  * `AppFailureCode` — the eighteen members plan §3.1:370-374 collects from
- * §5.4, §11 and §10.3, in that order. T1's `APP_FAILURE_CODES` "pins exactly
- * this list" (tasks.md:47, plan §3.1:374).
+ * §5.4, §11 and §10.3, in that order, plus the two apply rejections
+ * (`manifest_invalid`, `apply_forbidden`) added 2026-10-18. T1's
+ * `APP_FAILURE_CODES` "pins exactly this list" (tasks.md:47, plan §3.1:374).
  *
  * Sources, member by member: §5.4's classifier produces `crash_loop`,
  * `oom_killed`, `image_pull` (from `ImagePullBackOff` / `ErrImagePull`),
@@ -500,7 +501,13 @@ export const APP_FAILURE_CODES = [
 	'deadline_exceeded',
 	'image_not_found',
 	'image_private_unsupported',
-	'image_unresolvable'
+	'image_unresolvable',
+	// An apply the API server REJECTED, which is not an unreachable cluster (2026-10-18, prod
+	// Deployment e4b65cbd: a Job's 422 `volumeMounts[0].name: Not found: "tmp"` read
+	// `cluster_unreachable`). 400/422 — the object is invalid; 401/403 — the credential or an
+	// admission policy (RBAC, Pod Security, a ValidatingAdmissionPolicy) refused it.
+	'manifest_invalid',
+	'apply_forbidden'
 ] as const;
 
 /** Union derived from {@link APP_FAILURE_CODES} — `AppFailureCode` (plan §3.1:370). */
@@ -543,7 +550,9 @@ export const APP_FAILURE_MESSAGE_LEAVES = {
 	deadline_exceeded: null,
 	image_not_found: 'imageNotFound',
 	image_private_unsupported: 'imagePrivateUnsupported',
-	image_unresolvable: 'imageUnresolvable'
+	image_unresolvable: 'imageUnresolvable',
+	manifest_invalid: null,
+	apply_forbidden: null
 } as const satisfies Record<AppFailureCode, string | null>;
 
 /**
@@ -561,7 +570,9 @@ export const APP_FAILURE_CODES_WITHOUT_MESSAGE_LEAF: readonly AppFailureCode[] =
 	'cluster_unreachable',
 	'worker_failed',
 	'isolation_not_enforced',
-	'deadline_exceeded'
+	'deadline_exceeded',
+	'manifest_invalid',
+	'apply_forbidden'
 ];
 
 /**

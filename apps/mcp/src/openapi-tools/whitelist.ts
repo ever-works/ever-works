@@ -1,3 +1,5 @@
+import { MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS } from '@ever-works/contracts';
+
 export interface WhitelistEntry {
 	method: string;
 	path: string;
@@ -18,6 +20,13 @@ export interface WhitelistEntry {
 	 * whole route.
 	 */
 	omitArgs?: string[];
+	/**
+	 * When set, the ONLY body arguments the tool exposes and forwards; path and
+	 * query parameters are kept. The allowlist twin of {@link omitArgs}, for a
+	 * route whose safe body is small and whose new fields must stay off the
+	 * tool until someone lists them (works-security lane 3a).
+	 */
+	bodyArgs?: readonly string[];
 }
 
 /**
@@ -43,7 +52,23 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'get_work',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'PUT', path: '/api/works/{id}', toolName: 'update_work' },
+	// Works-security lane 3a (2026-10-18): the tool edits a Work's descriptive
+	// text ONLY (`MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS`, the same allowlist
+	// the API applies to fleet-run tokens and integration keys). Every other
+	// setting on the route decides what the platform later does without a
+	// person — a Work-level `mergePolicy` overrides every broader scope and the
+	// merge gate auto-merges on green CI when it allows; `checkDefaults` /
+	// `repoDeclaredCommands` are shell commands a node executes; the
+	// `taskIsolation*`, community-PR, ownership, template, deploy and committer
+	// fields route and attribute later work. An agent bound to this server
+	// could otherwise loosen its own merge gate or plant the commands its next
+	// run executes. A person changes them in the Work settings.
+	{
+		method: 'PUT',
+		path: '/api/works/{id}',
+		toolName: 'update_work',
+		bodyArgs: MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS
+	},
 	{
 		method: 'POST',
 		path: '/api/works/{id}/delete',
@@ -54,7 +79,20 @@ export const WHITELIST: WhitelistEntry[] = [
 		// `confirm_slug`. Neither is advertised as a tool argument and neither is
 		// forwarded, so no agent can destroy stored data through MCP; the route stays
 		// useful without them (deleting the Work keeps the data).
-		omitArgs: ['delete_stored_data', 'confirm_slug'],
+		//
+		// Works-security lane 3a: the same goes for the owner's GitHub
+		// repositories — `delete_data_repository`, `delete_website_repository`,
+		// `delete_markdown_repository` — and `force_delete`. Deleting a Work
+		// through a tool keeps its repositories; the API refuses the flags for
+		// fleet-run tokens and integration keys as well.
+		omitArgs: [
+			'delete_stored_data',
+			'confirm_slug',
+			'delete_data_repository',
+			'delete_website_repository',
+			'delete_markdown_repository',
+			'force_delete'
+		],
 		annotations: { destructiveHint: true }
 	},
 	{
@@ -330,7 +368,19 @@ export const WHITELIST: WhitelistEntry[] = [
 	// the gate off and move to done without it. Both tools lose the field; a
 	// machine-created Task keeps the API default (`true`) and a person changes
 	// the policy in the app.
-	{ method: 'POST', path: '/api/tasks', toolName: 'create_task', omitArgs: ['requireAllApprovers'] },
+	//
+	// `acceptanceChecks` (works-security lane 3a) are shell commands a fleet
+	// node runs — `phase: 'setup'` entries before the model, the rest as the
+	// quality gate — and the planner treats them as owner-authored. A tool
+	// caller could plant the command the next run executes, so both tools lose
+	// the field too; the API refuses it for fleet-run tokens and integration
+	// keys, and a person adds checks in the app.
+	{
+		method: 'POST',
+		path: '/api/tasks',
+		toolName: 'create_task',
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+	},
 	{ method: 'POST', path: '/api/tasks/run-batch', toolName: 'run_tasks_batch' },
 	{
 		method: 'GET',
@@ -338,7 +388,12 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'get_task',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'PATCH', path: '/api/tasks/{id}', toolName: 'update_task', omitArgs: ['requireAllApprovers'] },
+	{
+		method: 'PATCH',
+		path: '/api/tasks/{id}',
+		toolName: 'update_task',
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+	},
 	{
 		method: 'DELETE',
 		path: '/api/tasks/{id}',
@@ -360,7 +415,15 @@ export const WHITELIST: WhitelistEntry[] = [
 	// `force` skips the approver gate on `→ done` (and the quality-gate
 	// refusal on `→ in_review`); that override belongs to a person, so the
 	// tool keeps the ordinary state-machine move and loses the flag.
-	{ method: 'POST', path: '/api/tasks/{id}/transition', toolName: 'transition_task', omitArgs: ['force'] },
+	// `mode` (works-security lane 3a): `sync` is the integrations' mirror walk,
+	// which starts no agent work at all — for an agent's move that would also
+	// cancel the reviewer stage. The tool moves one status at a time.
+	{
+		method: 'POST',
+		path: '/api/tasks/{id}/transition',
+		toolName: 'transition_task',
+		omitArgs: ['force', 'mode']
+	},
 	{
 		method: 'GET',
 		path: '/api/tasks/{id}/run-candidates',

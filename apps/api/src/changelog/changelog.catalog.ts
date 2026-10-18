@@ -31,6 +31,15 @@ import type { ChangelogSourceEntry } from '@ever-works/contracts/api';
  */
 export const CHANGELOG_ENTRIES: readonly ChangelogSourceEntry[] = [
     {
+        slug: 'main-branch-merges-always-ask-you',
+        title: 'Agent merges into main always ask you first',
+        body: 'An agent can no longer land a pull request on main or master without your approval in the Inbox, whatever the merge policy of a Work or an agent says. For develop and stage the same holds unless your organization policy turns approvals off.\n\nAutomated credentials, such as the token a run on your own machine uses, can no longer change merge settings, add commands that runs execute, or start other runs.',
+        category: 'decisions',
+        kind: 'security',
+        publishedAt: '2026-10-18T12:00:00.000Z',
+        cta: { label: 'Open Inbox', href: '/inbox' },
+    },
+    {
         slug: 'security-update-web-and-api-2026-09',
         title: 'Security update for the web app and API',
         body: 'We updated the web framework and several server libraries to close critical and high-severity security advisories.\n\nNo action is needed on your side.',

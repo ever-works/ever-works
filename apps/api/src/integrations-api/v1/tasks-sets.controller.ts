@@ -22,6 +22,7 @@ import { assertIfMatch, IntegrationResourcesService } from '@ever-works/agent/in
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
+import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { ScopeContextService } from '../../scope/scope-context.service';
 import { IntegrationOnlyGuard } from './integration-only.guard';
 import { IntegrationExceptionFilter } from './integration-exception.filter';
@@ -114,9 +115,36 @@ export class IntegrationTaskSetsController {
         @Headers('if-match') ifMatch?: string,
     ) {
         const { organizationId, scope, expected } = await this.context(user, id, ifMatch);
+        const key = (type: string, actorId: string) => `${type}:${actorId}`;
+        // Works-security lane 3a — the AGENT assignees of a recurring template
+        // are who runs at every future fire, with no person in between: an
+        // integration may not change them (user assignees stay open). Checked
+        // before the If-Match claim, so a refusal does not move the version.
+        const current = await this.assigneeRows.findByTaskId(id);
+        const agentsBefore = current
+            .filter((row) => row.assigneeType === 'agent')
+            .map((row) => key('agent', row.assigneeId))
+            .sort();
+        const agentsAfter = [
+            ...new Set(
+                dto.assignees
+                    .filter((ref) => ref.type === 'agent')
+                    .map((ref) => key('agent', ref.id)),
+            ),
+        ].sort();
+        if (agentsBefore.join(',') !== agentsAfter.join(',')) {
+            const task = await this.tasks.getOne(user.userId, id, scope);
+            if (task.isRecurring) {
+                throw new IntegrationHttpException(
+                    422,
+                    'domain_rule',
+                    "An integration cannot change a recurring Task template's agent assignees: every run it starts goes to them. A person changes them in Ever Works.",
+                    { field: 'assignees', reason: 'recurring_template' },
+                );
+            }
+        }
         await withExpectedVersion('task', id, expected, async () => {
             const rows = await this.assigneeRows.findByTaskId(id);
-            const key = (type: string, actorId: string) => `${type}:${actorId}`;
             const wanted = new Set(dto.assignees.map((ref) => key(ref.type, ref.id)));
             for (const row of rows) {
                 if (!wanted.has(key(row.assigneeType, row.assigneeId))) {

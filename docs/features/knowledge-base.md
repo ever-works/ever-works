@@ -159,7 +159,7 @@ How this differs from file storage — and why one never implies the other — i
 - **Query-driven retrieval** — `research`, `freeform`, and `output` documents are retrieved by semantic similarity for the task at hand, and every use is recorded as a **citation** so you can audit exactly what context produced a given output.
 - **Agents write back** — research notes and generated artifacts land in the KB as `output`-class documents, under the same governance (locks, audit trail, Git history) as your own documents.
 
-In-platform Agents reach the KB through their own tool names — `kb_search`, `kb_read`, `kb_write`, `kb_lock`, `kb_unlock` — which are separate from the MCP `kb.*` tools below. `kb_write` upserts by path, so an Agent creating and then updating the same document is one idempotent call.
+In-platform Agents reach the KB through their own tool names — `kb_search`, `kb_read`, `kb_write`, `kb_lock`, `kb_unlock` — which are separate from the MCP `kb.*` tools below. `kb_unlock` always refuses: unlocking is a person's decision (works-security lane 3a, 2026-10-18). A `kb_write` that edits an existing document puts it back to `proposed`, out of agent context until a person accepts it. `kb_write` upserts by path, so an Agent creating and then updating the same document is one idempotent call.
 
 ## Locks, inheritance, and audit
 
@@ -184,7 +184,7 @@ The KB is exposed over REST, the [MCP server](./mcp-server.md), and the [CLI](..
 | Create a doc  | `POST /api/works/:id/kb/documents`               | `kb.create` | —                                  |
 | Update a doc  | `PATCH /api/works/:id/kb/documents/:docId`       | `kb.update` | —                                  |
 | Lock a doc    | `POST /api/works/:id/kb/documents/:docId/lock`   | `kb.lock`   | `ever-works kb lock --mode <mode>` |
-| Unlock a doc  | `POST /api/works/:id/kb/documents/:docId/unlock` | `kb.unlock` | `ever-works kb unlock`             |
+| Unlock a doc  | `POST /api/works/:id/kb/documents/:docId/unlock` | —           | `ever-works kb unlock`             |
 | Upload source | `POST /api/works/:id/kb/uploads` (multipart)     | —           | `ever-works kb upload`             |
 
 `kb.list` and `kb.get` are annotated read-only. Every tool takes a `workId` UUID; the document-scoped tools take an `idOrPath` that resolves either a document UUID or a slash-separated KB path such as `brand/voice` — the tool resolves a path to an id before issuing a mutation, so you never have to look one up by hand.
@@ -199,7 +199,7 @@ The API and the `kb.lock` MCP tool accept exactly two modes, `full` and `additio
 2. Call `kb.list` with the Work's UUID to see what is there; narrow with `class`, `status`, `tag`, `q`, `limit` and `offset`.
 3. Call `kb.get` with an `idOrPath` such as `brand/voice` to read the full body, its metadata, and linked asset summaries.
 4. Call `kb.create` with `path`, `title`, `body` and `class` to file something new, or `kb.update` with a `patch` object to amend only the fields you name.
-5. Call `kb.lock` with `lockMode: "full"` once the wording is final, and `kb.unlock` to reopen it.
+5. Call `kb.lock` with `lockMode: "full"` once the wording is final, and unlock it in the app or with `ever-works kb unlock` to reopen it (there is no MCP unlock tool).
 
 ### How to script the KB from the CLI
 

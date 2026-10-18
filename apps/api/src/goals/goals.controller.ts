@@ -14,6 +14,7 @@ import {
     Post,
     Put,
     Query,
+    Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -30,6 +31,13 @@ import {
 } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import {
+    machinePrincipalKind,
+    refuseMachinePrincipalAction,
+    refuseMachinePrincipalFields,
+    requireHumanSession,
+    type MachinePrincipalRequest,
+} from '../auth/machine-principal';
 import { ScopeContextService } from '../scope';
 import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
 import {
@@ -138,7 +146,22 @@ export class GoalsController {
     async create(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateGoalDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — a machine principal's criteria are born
+        // PROPOSALS: open, `proposed: true`, `source: 'planner'`. Otherwise a
+        // fleet run could create a Goal whose definition of done is already
+        // approved (or already met / waived) — the sign-off a person owns.
+        // A delivery Goal then needs a person to approve one criterion first.
+        if (machinePrincipalKind(auth, req) && Array.isArray(body.dodCriteria)) {
+            body.dodCriteria = body.dodCriteria.map((criterion) => ({
+                ...criterion,
+                status: 'open' as typeof criterion.status,
+                proposed: true,
+                source: 'planner' as typeof criterion.source,
+            }));
+        }
         return this.service.create(
             auth.userId,
             {
@@ -208,7 +231,21 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateGoalDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — a non-null `outcome` is the HUMAN override
+        // that completes the Goal, and `constraints` bound what its agents may
+        // do. A fleet run (or an integration key) may refine a Goal, not close
+        // it or loosen its constraints.
+        refuseMachinePrincipalFields(
+            auth,
+            req,
+            body as unknown as Record<string, unknown>,
+            ['outcome', 'constraints'],
+            'a Goal',
+            "completing a Goal and changing its constraints are the owner's decisions; a person does it in the app.",
+        );
         return this.service.update(
             auth.userId,
             id,
@@ -295,7 +332,21 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateGoalLimitsDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — the spend cap and the Agent that works the
+        // Goal are budget and authority, not progress: a fleet run may not
+        // raise the one or swap in a wider Agent. (The route itself is off
+        // the run-token allowlist; this is the body-aware second layer.)
+        refuseMachinePrincipalFields(
+            auth,
+            req,
+            body as unknown as Record<string, unknown>,
+            ['spendCapCents', 'assignedAgentId'],
+            "a Goal's limits",
+            'the budget and the assigned Agent are set by a person in the app.',
+        );
         // Every field is forwarded explicitly, and `undefined` (leave
         // alone) is preserved as distinct from `null` (clear) — a mapping
         // that collapsed the two would silently make "remove this cap"
@@ -332,7 +383,18 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: SetGoalDodDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — replacing the checklist can carry criteria
+        // already marked met, i.e. sign off the definition of done without
+        // the approve route. A machine principal proposes (`/dod/propose`).
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            "replace a Goal's definition of done",
+            'propose criteria with /dod/propose; a person approves them.',
+        );
         await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.setDodCriteria(auth.userId, id, body.criteria ?? null);
     }
@@ -362,6 +424,9 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ApproveGoalDodDto,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — approving the definition of done is a
+        // human gate: a person's interactive session only.
+        requireHumanSession(auth, "approve a Goal's definition of done");
         await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.approveDodCriteria(auth.userId, id, body.criterionIds ?? null);
     }
@@ -375,7 +440,17 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('criterionId') criterionId: string,
         @Body() body: PatchGoalDodCriterionDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<GoalDto> {
+        // Works-security lane 3a — ticking or waiving a criterion is signing
+        // off part of the definition of done.
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'tick or waive a definition-of-done criterion',
+            'a person signs criteria off in the app.',
+        );
         await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.patchDodCriterion(auth.userId, id, criterionId, {
             status: body.status,

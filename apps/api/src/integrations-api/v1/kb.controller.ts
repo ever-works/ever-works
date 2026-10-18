@@ -455,8 +455,17 @@ export class IntegrationKbController {
                 language: dto.language,
                 status: dto.status as never,
                 // A person writing through the integration authors it; the key
-                // itself imports it. Both land `accepted` (never review-gated).
+                // itself imports it.
                 source: (principal.actAsUserId ? 'user' : 'imported') as never,
+                // Works-security lane 3a — a document with NO person behind it
+                // (the key writing as itself) lands `proposed`: an `accepted`
+                // document feeds every later agent prompt, so the M7 review
+                // gate applies until a person accepts it (in Ever Works, or in
+                // the integration's own review queue, relayed through
+                // `POST /kb/documents/:id/accept`). A person's write relayed
+                // with X-Act-As-User stays `accepted`, as their own edit in Ever
+                // Works would be.
+                ...(principal.actAsUserId ? {} : { reviewState: 'proposed' as never }),
             };
             // Before the create: filing afterwards would leave the document
             // behind (one more per retry) when the folder is not one of this
@@ -560,6 +569,20 @@ export class IntegrationKbController {
         if (Object.keys(patch).length === 0) {
             throw validationFailed('body', 'must change at least one field');
         }
+        // Works-security lane 3a — a content edit with NO person behind it (the
+        // key writing as itself) puts the document back to `proposed`, exactly
+        // like a key-only create: otherwise a key could rewrite an accepted
+        // document straight into every later prompt. A person's edit relayed
+        // with X-Act-As-User leaves the review state alone.
+        if (
+            !principalOf(user).actAsUserId &&
+            (patch.title !== undefined ||
+                patch.body !== undefined ||
+                patch.description !== undefined ||
+                patch.class !== undefined)
+        ) {
+            patch.reviewState = 'proposed' as KbDocumentPatch['reviewState'];
+        }
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
         // Malformed or stale If-Match first (400 / 412), before any other rule.
@@ -627,6 +650,11 @@ export class IntegrationKbController {
         @Param('id', ParseUUIDPipe) id: string,
         @Res({ passthrough: true }) res: Response,
     ): Promise<IntegrationKbDocumentDto> {
+        // Works-security lane 3a — kept open to integration keys on purpose:
+        // this is how an integration RELAYS a person's review decision (Ever
+        // Gauzy calls it when a reviewer approves the page in Gauzy's own
+        // review queue). A document an integration creates lands `proposed`,
+        // so the review happens there and this route records its outcome.
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
         await asDomainRule(async () => {

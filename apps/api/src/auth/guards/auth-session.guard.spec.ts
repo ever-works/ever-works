@@ -420,7 +420,19 @@ describe('AuthSessionGuard — fleet-run credential (ew_run_)', () => {
             nodeId: 'node-1',
             runId: 'run-1',
             organizationId: 'org-1',
+            agentId: null,
         });
+    });
+
+    it("carries the bound job's Agent onto the stash (works-security lane 3a)", async () => {
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue({ ...binding, agentId: 'agent-7' });
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+        const req = request();
+
+        await expect(guard.canActivate(createContext(req))).resolves.toBe(true);
+
+        expect(req.fleetRunCredential).toMatchObject({ jobId: 'job-1', agentId: 'agent-7' });
     });
 
     it('stamps a run token as a machine credential, not as a person', async () => {

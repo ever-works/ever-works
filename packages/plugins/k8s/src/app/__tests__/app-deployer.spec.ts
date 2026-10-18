@@ -34,6 +34,7 @@ import {
 	APP_PUBLISH_DEADLINE_MS,
 	APP_CRON_DEADLINE_MS,
 	AppDeployer,
+	httpStatusOf,
 	type AppDeployerApi,
 	type AppDeployerOptions
 } from '../app-deployer';
@@ -1306,6 +1307,60 @@ describe('T12 — rollback, first-Deployment handling, the deadline and the veri
 /* ------------------------------------------------------------------------- *
  * FR-26's phase table, one `it` per row (spec.md:372-382)
  * ------------------------------------------------------------------------- */
+
+describe('apply failures are classified by what the API server answered (2026-10-18)', () => {
+	// Prod Deployment e4b65cbd: a Job the API server REJECTED (422 Invalid) read
+	// `cluster_unreachable`, as if the network were down. A rejection is the object's or the
+	// policy's fault; only a call that never got an HTTP answer is an unreachable cluster.
+	const invalid = () =>
+		new K8sPluginError(
+			'UNKNOWN',
+			'HTTP-Code: 422 Message: Job.batch "job-migrate-e4b65cbd" is invalid: spec.template.spec.containers[0].volumeMounts[0].name: Not found: "tmp"',
+			Object.assign(new Error('Unprocessable Entity'), { code: 422 })
+		);
+
+	it.each([
+		['a 422 Invalid', 'manifest_invalid', invalid],
+		[
+			'a 400 BadRequest',
+			'manifest_invalid',
+			() => new K8sPluginError('UNKNOWN', 'HTTP-Code: 400 Message: the server rejected our request')
+		],
+		[
+			'a 403 from an admission policy',
+			'apply_forbidden',
+			() =>
+				new K8sPluginError(
+					'UNAUTHORIZED',
+					'secrets is forbidden: ValidatingAdmissionPolicy denied request',
+					Object.assign(new Error('Forbidden'), { code: 403 })
+				)
+		],
+		[
+			'a refused socket',
+			'cluster_unreachable',
+			() => new K8sPluginError('CLUSTER_UNREACHABLE', 'connect ECONNREFUSED 192.0.2.1:6443')
+		],
+		['a 503', 'cluster_unreachable', () => Object.assign(new Error('Service Unavailable'), { code: 503 })]
+	] as const)('%s → %s', async (_label, code, error) => {
+		const h = harness();
+		h.cluster.applyFails.set('Secret', error());
+
+		const result = await h.deploy();
+
+		expect(result.outcome).toBe('failed');
+		expect(result.failure).toMatchObject({ phase: 'prepare', code });
+	});
+
+	it("reads the status from the error, its `cause`, or the client's `HTTP-Code:` message", () => {
+		expect(httpStatusOf(invalid())).toBe(422);
+		expect(httpStatusOf(Object.assign(new Error('x'), { statusCode: 403 }))).toBe(403);
+		expect(httpStatusOf(new Error('HTTP 400 Bad Request'))).toBe(400);
+		expect(httpStatusOf(new Error('connect ECONNREFUSED'))).toBeNull();
+		// A string code (a socket's `ECONNRESET`) is not a status.
+		expect(httpStatusOf(Object.assign(new Error('x'), { code: 'ECONNRESET' }))).toBeNull();
+	});
+});
 
 describe('FR-26 — the phase table', () => {
 	it('1 · Prepare namespace, policies, secrets, volumes — 120 s; a failure leaves the running app untouched', async () => {

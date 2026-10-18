@@ -3,6 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { ApiClientService } from '../../api-client/api-client.service.js';
 import { toMcpError } from '../../api-client/api-error.js';
+import { fenceUntrustedToolResult } from '../../api-client/fence-untrusted.js';
 import { KB_DOCUMENT_CLASSES, KB_DOCUMENT_STATUSES } from '@ever-works/contracts';
 
 /**
@@ -53,7 +54,7 @@ export class KbListTool {
 			const result = await this.apiClient.request('GET', path);
 
 			return {
-				content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }]
+				content: [{ type: 'text' as const, text: fenceUntrustedToolResult(JSON.stringify(result, null, 2)) }]
 			};
 		} catch (err) {
 			return toMcpError(err);

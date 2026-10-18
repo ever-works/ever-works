@@ -215,7 +215,8 @@ regeneration or autonomous runs. Two modes:
 
 Lock / unlock is exposed in the workbench (the padlock icon), via the
 CLI (`ever works kb lock <workId> <idOrPath> --mode=full`), and via
-the MCP `kb.lock` / `kb.unlock` tools. Every lock change is recorded
+the MCP `kb.lock` tool (there is no MCP unlock: unlocking is a person's
+decision, in the workbench, the CLI or the API). Every lock change is recorded
 as a `kb-document-locked` / `kb-document-unlocked` activity-log event
 with the actor, the mode, and the previous state, so you can audit
 when content went read-only and who did it.

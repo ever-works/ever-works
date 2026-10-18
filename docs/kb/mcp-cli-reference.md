@@ -147,16 +147,16 @@ mode.
 
 **Output:** the updated `KbDocumentDto` with `locked=true`.
 
-### `kb.unlock`
+### No `kb.unlock`
 
-Symmetric to `kb.lock` — emits `kb-document-unlocked`.
-
-| Field      | Type            | Required |
-| ---------- | --------------- | -------- |
-| `workId`   | `string` (UUID) | yes      |
-| `idOrPath` | `string`        | yes      |
-
-**Output:** the updated `KbDocumentDto` with `locked=false`.
+There is deliberately no MCP unlock tool (works-security lane 3a,
+2026-10-18). A lock is how the owner keeps agents off a document, and an
+MCP caller can be an agent reading hostile content, so unlocking is a
+person's decision: use the workbench padlock, `ever works kb unlock`, or
+`POST /api/works/:id/kb/documents/:docId/unlock` (which also refuses
+fleet-run tokens and integration keys). A document written through
+`kb.create` / `kb.update` by a fleet run lands `proposed` and waits for a
+person's review before it feeds agent context.
 
 ### Errors
 
@@ -282,7 +282,7 @@ endpoints:
 | Create doc    | `POST /api/works/:id/kb/documents`               | `kb.create` | —                               |
 | Update doc    | `PATCH /api/works/:id/kb/documents/:docId`       | `kb.update` | —                               |
 | Lock doc      | `POST /api/works/:id/kb/documents/:docId/lock`   | `kb.lock`   | `ever works kb lock --mode <m>` |
-| Unlock doc    | `POST /api/works/:id/kb/documents/:docId/unlock` | `kb.unlock` | `ever works kb unlock`          |
+| Unlock doc    | `POST /api/works/:id/kb/documents/:docId/unlock` | —           | `ever works kb unlock`          |
 | Upload source | `POST /api/works/:id/kb/uploads` (multipart)     | —           | `ever works kb upload`          |
 
 The two omissions are deliberate:

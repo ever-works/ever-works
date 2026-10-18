@@ -302,7 +302,7 @@ The per-Work Knowledge Base — the substrate Memory aggregates — is available
 | Update         | `kb.update` | —                                                                  |
 | Upload a file  | —           | `ever works kb upload <workId> <filePath> [--title --class]`       |
 | Lock           | `kb.lock`   | `ever works kb lock <workId> <idOrPath> --mode <full\|content>`    |
-| Unlock         | `kb.unlock` | `ever works kb unlock <workId> <idOrPath>`                         |
+| Unlock         | —           | `ever works kb unlock <workId> <idOrPath>`                         |
 
 The org-wide surfaces — the aggregation, the review queue, consolidation and Files — are REST-only today. Full argument reference: [KB over MCP & CLI](../kb/mcp-cli-reference.md).
 

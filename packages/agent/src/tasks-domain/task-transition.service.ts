@@ -171,6 +171,17 @@ export interface TransitionOptions {
      * auto-unblock of dependents still run.
      */
     suppressAgentDispatch?: boolean;
+    /**
+     * Works-security lane 3a — suppress ONLY the `→ in_progress` agent
+     * fan-out, and nothing else. Set for a fleet-run token (the model on a
+     * fleet node, reached through the MCP bridge): moving a Task into
+     * `in_progress` must not start another Agent's run on text an injected
+     * run may have written. Unlike {@link suppressAgentDispatch} it leaves the
+     * `→ in_review` reviewer stage (a review still has to happen before a
+     * merge) and the dispatch-on-done cascade of dependents exactly as they
+     * are.
+     */
+    suppressAgentFanOut?: boolean;
 }
 
 /** Result of a sync walk: the Task after the last hop and the hops taken. */
@@ -418,7 +429,8 @@ export class TaskTransitionService {
             to === TaskStatus.IN_PROGRESS &&
             this.dispatcher &&
             this.assignees &&
-            !opts.suppressAgentDispatch
+            !opts.suppressAgentDispatch &&
+            !opts.suppressAgentFanOut
         ) {
             void this.fanOutAgentExecutions(refreshed).catch((err) =>
                 this.logger.warn(`Agent fan-out failed for task ${refreshed.id}: ${err}`),
@@ -461,9 +473,13 @@ export class TaskTransitionService {
         // down the cascade (review of EW-P1-6): a dependent restored to
         // `in_progress` because a mirrored blocker resolved must not start a
         // paid run either (D9). The status restore and notifications still run.
+        // A fleet run's move (`suppressAgentFanOut`, works-security lane 3a)
+        // carries its no-fan-out choice down the same cascade: otherwise a
+        // run could block B on A, complete A, and have B's agents start.
         if (to === TaskStatus.DONE || to === TaskStatus.CANCELLED) {
             void this.autoUnblockResolvedTasks(refreshed.id, {
                 suppressAgentDispatch: opts.suppressAgentDispatch === true,
+                suppressAgentFanOut: opts.suppressAgentFanOut === true,
             }).catch((err) =>
                 this.logger.warn(`autoUnblock cascade failed for task ${refreshed.id}: ${err}`),
             );
@@ -557,10 +573,17 @@ export class TaskTransitionService {
         const walked: TaskStatus[] = [];
         for (const hop of path) {
             try {
-                current = await this.transition(current, hop, {
-                    ...opts,
-                    suppressAgentDispatch: true,
-                });
+                // A sync hop starts no agent work (D9) — except that a caller
+                // which asked only for `suppressAgentFanOut` (a fleet run,
+                // works-security lane 3a) keeps exactly that: no fan-out, but
+                // the reviewer stage and its plan memory are left alone.
+                current = await this.transition(
+                    current,
+                    hop,
+                    opts.suppressAgentFanOut
+                        ? { ...opts, suppressAgentFanOut: true }
+                        : { ...opts, suppressAgentDispatch: true },
+                );
             } catch (err) {
                 if (
                     err instanceof ConflictException &&
@@ -1557,8 +1580,10 @@ export class TaskTransitionService {
     async autoUnblockResolvedTasks(
         blockerTaskId: string,
         // EW-P1-6 — set when the resolving move was a sync (mirrored) one: the
-        // restores it causes then start no agent work either.
-        cascade: { suppressAgentDispatch?: boolean } = {},
+        // restores it causes then start no agent work either. Works-security
+        // lane 3a — `suppressAgentFanOut` when it was a fleet run's move: the
+        // restores start no `→ in_progress` fan-out.
+        cascade: { suppressAgentDispatch?: boolean; suppressAgentFanOut?: boolean } = {},
     ): Promise<{ unblocked: string[] }> {
         // Find every Task that was blocked BY this Task and is still in `blocked` status.
         const blockedTaskIds = await this.blocks.findTasksBlockedBy(blockerTaskId).catch(() => []);
@@ -1599,7 +1624,7 @@ export class TaskTransitionService {
      */
     private async tryUnblockSingleTask(
         taskId: string,
-        cascade: { suppressAgentDispatch?: boolean } = {},
+        cascade: { suppressAgentDispatch?: boolean; suppressAgentFanOut?: boolean } = {},
     ): Promise<boolean> {
         const blocked = await this.tasks.findById(taskId).catch(() => null);
         if (!blocked || blocked.status !== TaskStatus.BLOCKED) return false;
@@ -1613,6 +1638,7 @@ export class TaskTransitionService {
             await this.transition(blocked, restoreTo, {
                 force: false,
                 suppressAgentDispatch: cascade.suppressAgentDispatch === true,
+                suppressAgentFanOut: cascade.suppressAgentFanOut === true,
             });
             return true;
         } catch (err) {

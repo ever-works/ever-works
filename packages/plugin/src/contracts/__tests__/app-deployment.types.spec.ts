@@ -489,6 +489,8 @@ describe('app-deployment.types — the shape APW-04 / APW-10 / APW-13 compile ag
 			| 'image_not_found'
 			| 'image_private_unsupported'
 			| 'image_unresolvable'
+			| 'manifest_invalid'
+			| 'apply_forbidden'
 		>();
 	});
 
