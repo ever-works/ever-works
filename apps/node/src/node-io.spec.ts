@@ -41,8 +41,18 @@ describe('planProbeSpawn — Windows', () => {
 	it('finds nvidia-smi only at the driver install locations, and never searches for it', () => {
 		const dch = 'C:\\Windows\\System32\\nvidia-smi.exe';
 		const legacy = 'C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvidia-smi.exe';
-		expect(planProbeSpawn('nvidia-smi', win((p) => p === dch))).toMatchObject({ file: dch, shell: false });
-		expect(planProbeSpawn('nvidia-smi', win((p) => p === legacy))).toMatchObject({ file: legacy, shell: false });
+		expect(
+			planProbeSpawn(
+				'nvidia-smi',
+				win((p) => p === dch)
+			)
+		).toMatchObject({ file: dch, shell: false });
+		expect(
+			planProbeSpawn(
+				'nvidia-smi',
+				win((p) => p === legacy)
+			)
+		).toMatchObject({ file: legacy, shell: false });
 		// Not installed: nothing to spawn — the runner reports ENOENT.
 		expect(planProbeSpawn('nvidia-smi', win())).toBeNull();
 	});

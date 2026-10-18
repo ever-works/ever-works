@@ -277,7 +277,9 @@ describe('redactConfig', () => {
 		expect(parseConfig(junk)?.executionPolicy?.allowMcpBridge).toBe(true);
 		// A config written before the field existed keeps today's behaviour.
 		const legacy = JSON.stringify(
-			config({ executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: true } })
+			config({
+				executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: true }
+			})
 		);
 		expect(parseConfig(legacy)?.executionPolicy?.allowMcpBridge).toBe(true);
 	});

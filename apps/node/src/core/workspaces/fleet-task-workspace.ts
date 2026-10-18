@@ -2157,7 +2157,8 @@ export async function assertLinkedWorktreePointer(worktreePath: string): Promise
 	try {
 		const back = (await fs.readFile(join(gitDir, 'gitdir'), 'utf8')).trim();
 		const backTarget = await fs.realpath(resolve(gitDir, back));
-		if (!samePath(backTarget, join(canonicalWorktree, '.git'))) return refuse('its gitdir belongs to another worktree');
+		if (!samePath(backTarget, join(canonicalWorktree, '.git')))
+			return refuse('its gitdir belongs to another worktree');
 	} catch (error) {
 		if (error instanceof FleetTaskWorkspaceError) throw error;
 		return refuse('its gitdir has no back-pointer');

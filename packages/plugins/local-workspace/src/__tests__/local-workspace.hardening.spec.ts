@@ -72,11 +72,9 @@ beforeAll(async () => {
 	const pool = poolDir();
 	const hooks = join(root, 'planted-hooks');
 	mkdirSync(hooks, { recursive: true });
-	writeFileSync(
-		join(hooks, 'post-checkout'),
-		`#!/bin/sh\necho ran >> '${shPath(marker('post-checkout'))}'\n`,
-		{ mode: 0o755 }
-	);
+	writeFileSync(join(hooks, 'post-checkout'), `#!/bin/sh\necho ran >> '${shPath(marker('post-checkout'))}'\n`, {
+		mode: 0o755
+	});
 	git(pool, 'config', 'core.hooksPath', shPath(hooks));
 	git(pool, 'config', 'filter.evil.smudge', `echo ran >> '${shPath(marker('smudge'))}'; cat`);
 	git(pool, 'config', 'filter.evil.clean', `echo ran >> '${shPath(marker('clean'))}'; cat`);

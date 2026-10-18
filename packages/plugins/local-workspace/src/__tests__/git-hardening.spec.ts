@@ -29,7 +29,12 @@ const PROBE = [
 describe('parseFilterDriverConfig', () => {
 	it('reads scope, driver (dots included), key and value; skips what Git would not use', () => {
 		const entries = parseFilterDriverConfig(PROBE);
-		expect(entries).toContainEqual({ scope: 'local', driver: 'evil', key: 'smudge', value: 'sh -c "touch pwned"; cat' });
+		expect(entries).toContainEqual({
+			scope: 'local',
+			driver: 'evil',
+			key: 'smudge',
+			value: 'sh -c "touch pwned"; cat'
+		});
 		expect(entries).toContainEqual({ scope: 'local', driver: 'evil', key: 'required', value: '' });
 		expect(entries).toContainEqual({ scope: 'global', driver: 'dotted.name', key: 'clean', value: 'cat' });
 		expect(entries.some((entry) => entry.key === 'textconv')).toBe(false);
