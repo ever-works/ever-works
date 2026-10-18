@@ -42,7 +42,7 @@ import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.enti
 import type { RepoConnectionProvider } from '../entities/repo-connection.entity';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
-import { TaskTransitionService } from './task-transition.service';
+import { TASK_STATUS_TRANSITIONS, TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -2674,7 +2674,24 @@ export class TaskWorkspaceService {
                 // worker only reaches finalize on a passing/off/warn gate);
                 // it exists so a red gate can never be smuggled into the
                 // review column through this path either.
-                await this.transitions.transition(fresh, to, { actorType: 'agent' });
+                if (
+                    (fresh.status === TaskStatus.BACKLOG || fresh.status === TaskStatus.TODO) &&
+                    !TASK_STATUS_TRANSITIONS[fresh.status]?.includes(to) &&
+                    typeof this.transitions.transitionSync === 'function'
+                ) {
+                    // Live e2e 2026-10-18 (T-40): a Task started through `runTask` (the
+                    // board's Run, an App change request, a provisioning Task) is never
+                    // moved out of `backlog`/`todo` by the dispatch, so its finalize
+                    // could not reach `in_review` (or `blocked`) — the direct move is
+                    // illegal and was only logged. Walk the shortest legal path instead
+                    // (`backlog → todo → in_progress → in_review`), every hop with its
+                    // own gates and WITHOUT a second agent dispatch. Only from the two
+                    // not-started columns: a Task a person already closed is not
+                    // re-opened by a late finalize.
+                    await this.transitions.transitionSync(fresh, to, { actorType: 'agent' });
+                } else {
+                    await this.transitions.transition(fresh, to, { actorType: 'agent' });
+                }
             }
         } catch (error) {
             this.logger.warn(

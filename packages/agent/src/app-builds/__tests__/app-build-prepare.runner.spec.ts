@@ -24,6 +24,7 @@ import {
     appBuildPrepareLockKey,
     declaredBuildMemoryGiB,
     mapPluginBlockedReason,
+    requestedBuildCommit,
     selectBuildRunner,
     unionMinusRemoved,
     type AppBuildPrepareInput,
@@ -549,6 +550,61 @@ describe('unionMinusRemoved (§4.7, FR-18)', () => {
 /* -------------------------------------------------------------------------- *
  * Plan §7.2 step 2 — the strategy gate
  * -------------------------------------------------------------------------- */
+
+describe('the spec is judged at the Build’s OWN commit (live e2e 2026-10-18)', () => {
+    const OLD = '9'.repeat(40);
+    const NEW = '8'.repeat(40);
+
+    it('requestedBuildCommit: the named Build first, else the newest requested, else null', () => {
+        const builds = [
+            { id: 'build-1', commitSha: OLD },
+            { id: 'build-2', commitSha: NEW },
+        ];
+        expect(requestedBuildCommit({ buildId: 'build-1' }, builds)).toBe(OLD);
+        expect(requestedBuildCommit({}, builds)).toBe(NEW);
+        expect(requestedBuildCommit({ buildId: 'gone' }, builds)).toBe(NEW);
+        expect(requestedBuildCommit({}, [{ id: 'build-3', commitSha: null }])).toBeNull();
+        expect(requestedBuildCommit({}, [])).toBeNull();
+    });
+
+    it('refreshes the stored state, then reads the spec at the requested Build’s commit', async () => {
+        const harness = createHarness();
+        const order: string[] = [];
+        (harness.specs as unknown as { refresh: jest.Mock }).refresh = jest.fn(async () => {
+            order.push('refresh');
+        });
+        harness.specs.read.mockImplementation(async (_workId: string, sha: string | null) => {
+            order.push(`read:${sha}`);
+            return { spec: SPEC, commitSha: sha ?? SHA, specHash: 'f'.repeat(64), valid: true };
+        });
+        harness.store.builds = [buildRow({ number: 2, status: 'queued', commitSha: NEW })];
+
+        await harness.runner.run(payload('rebuild', 'build-2'));
+
+        // Before 2026-10-18 this read `null` — the stored head — and a Build requested
+        // for a merged setup PR's commit was blocked `specInvalid` at the OLD commit.
+        expect(order.slice(0, 2)).toEqual(['refresh', `read:${NEW}`]);
+    });
+
+    it('blocks specInvalid naming the commit it actually read', async () => {
+        const harness = createHarness();
+        harness.specs.read.mockImplementation(async (_workId: string, sha: string | null) => ({
+            spec: null,
+            commitSha: sha,
+            specHash: null,
+            valid: false,
+        }));
+        harness.store.builds = [buildRow({ number: 2, status: 'queued', commitSha: NEW })];
+
+        await harness.runner.run(payload('rebuild', 'build-2'));
+
+        expect(harness.store.builds[0]).toMatchObject({
+            status: 'blocked',
+            blockedReason: 'specInvalid',
+            blockedDetail: { commitSha: NEW },
+        });
+    });
+});
 
 describe('the strategy gate (plan §7.2 step 2)', () => {
     it.each([

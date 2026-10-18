@@ -10,6 +10,7 @@ import {
     extractYaml,
 } from '../app-provisioning.service';
 import { PROVISION_LABEL } from '../app-change-guard';
+import { AppSpecUnreadableError } from '../app-work-rules.service';
 
 /** APW-08 T25 (`POST /api/works/:id/evolve`) and APW-04 (`start`) over the Task machinery. */
 
@@ -161,6 +162,84 @@ describe('AppChangeRequestService (APW-08 T25)', () => {
 
     it('titles are short', () => {
         expect(changeTitle('x'.repeat(300))).toHaveLength('Change: '.length + 120);
+    });
+
+    describe('the App spec preflight (live e2e 2026-10-18, T-40)', () => {
+        const resolver = {
+            resolve: jest.fn(async () => ({ agentId: 'a1', source: 'pinned' as const })),
+        };
+        function git() {
+            return {
+                getRepository: jest.fn(async () => ({ defaultBranch: 'main' })),
+                getLatestCommit: jest.fn(async () => ({ sha: 'b'.repeat(40) })),
+            };
+        }
+
+        it('refuses 409 appSpecMissing — and creates no Task — when the base branch has no App spec', async () => {
+            const tasks = tasksDouble();
+            const gitFacade = git();
+            const rules = {
+                resolve: jest.fn(async () => {
+                    throw new AppSpecUnreadableError('w1', 'main', 'missing');
+                }),
+            };
+            const service = new AppChangeRequestService(
+                tasks as never,
+                undefined,
+                undefined,
+                resolver,
+                undefined,
+                rules as never,
+                gitFacade as never,
+            );
+
+            const result = await service.request({
+                work: appWork(),
+                actorUserId: 'owner',
+                request: 'Change the README',
+            });
+
+            expect(result).toMatchObject({
+                status: 'refused',
+                httpStatus: 409,
+                code: 'appSpecMissing',
+            });
+            expect(result.status === 'refused' && result.message).toContain('setup pull request');
+            expect(gitFacade.getLatestCommit).toHaveBeenCalledWith('me', 'helpdesk', 'main', {
+                userId: 'owner',
+                providerId: 'github',
+                workId: 'w1',
+            });
+            expect(rules.resolve).toHaveBeenCalledWith(expect.anything(), 'b'.repeat(40));
+            expect(tasks.create).not.toHaveBeenCalled();
+        });
+
+        it('lets the request through when the spec is there (control) or the check cannot decide', async () => {
+            for (const resolve of [
+                jest.fn(async () => ({})),
+                jest.fn(async () => {
+                    throw new Error('502 from the provider');
+                }),
+            ]) {
+                const tasks = tasksDouble();
+                const service = new AppChangeRequestService(
+                    tasks as never,
+                    undefined,
+                    undefined,
+                    resolver,
+                    undefined,
+                    { resolve } as never,
+                    git() as never,
+                );
+                const result = await service.request({
+                    work: appWork(),
+                    actorUserId: 'owner',
+                    request: 'Change the README',
+                });
+                expect(result.status).toBe('accepted');
+                expect(tasks.create).toHaveBeenCalledTimes(1);
+            }
+        });
     });
 });
 

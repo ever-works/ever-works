@@ -3,6 +3,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
 import { WorkMemberRepository } from '@src/database/repositories/work-member.repository';
 import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { workHasDirectoryDataCache } from '@src/generators/data-generator/data-cache-kind';
 import { User } from '@src/entities/user.entity';
 import { Work } from '@src/entities/work.entity';
 import { WorkMemberRole, GenerateStatusType, WorkScheduleStatus } from '@src/entities/types';
@@ -516,7 +517,10 @@ export class WorkQueryService {
      * re-cloning the repo on every page load.
      */
     private shouldBackfillDataCache(work: Work): boolean {
-        return work.configCache == null;
+        // An App / Repository / Project Work has no directory corpus to read the
+        // cache from, so its `configCache` stays NULL by design — without this
+        // gate EVERY read of one re-tried (and 404'd) the clone.
+        return work.configCache == null && workHasDirectoryDataCache(work);
     }
 
     async workExists(slug: string, user: User) {

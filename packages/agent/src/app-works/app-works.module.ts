@@ -1,4 +1,5 @@
 import { Module, type FactoryProvider } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -44,6 +45,11 @@ import {
     JOB_RUNTIME_PROVIDER_REGISTRY,
     type JobRuntimeProviderRegistry,
 } from '../tasks/job-runtime.providers';
+import { APP_PROMPTED_VALUES_PORT, type AppPromptedValuesPort } from './app-prompted-values.port';
+import { AppEnvPromptedValuesAdapter } from '../app-env/app-env-prompted-values.adapter';
+import { AppEnvService } from '../app-env/app-env.service';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 
 /**
  * APW-02 App Works (Fork lifecycle) — the agent-side module.
@@ -335,6 +341,33 @@ export function buildAppUpstreamSyncDispatcherProvider(): FactoryProvider {
     };
 }
 
+/**
+ * APW-01 FR-55 — `APP_PROMPTED_VALUES_PORT`, bound HERE because its one consumer
+ * (`AppWorkCreateService`) is declared here (the C10 visibility rule above).
+ *
+ * Until 2026-10-18 it was unbound on purpose and every `appEnv` answer given at
+ * create was dropped (the live e2e's `… were dropped.` WARN). The adapter applies
+ * the answers through `AppEnvService.apply` with `allowWithoutSpec` + origin
+ * `prompted` (see its docstring for the actor and the missing-spec decisions).
+ * Both of its collaborators are resolved lazily through `ModuleRef`
+ * (`strict: false`), so this module still compiles bare (its specs shell
+ * `DatabaseModule` and never import `AppEnvModule`) and a graph without them drops
+ * the values with a named log line — the previous behaviour, never a crash.
+ */
+export function buildAppPromptedValuesProvider(): FactoryProvider {
+    return {
+        provide: APP_PROMPTED_VALUES_PORT,
+        useFactory: (ref: ModuleRef): AppPromptedValuesPort =>
+            new AppEnvPromptedValuesAdapter({
+                // Bare class identifiers, so the DI reachability spec's lazy-lookup
+                // check can prove both targets are in the API graph.
+                env: () => getOptionalProvider<AppEnvService>(ref, AppEnvService),
+                works: () => getOptionalProvider<WorkRepository>(ref, WorkRepository),
+            }),
+        inject: [ModuleRef],
+    };
+}
+
 @Module({
     imports: [
         // The epic's own table. `forFeature` is what registers the entity with
@@ -441,6 +474,10 @@ export function buildAppUpstreamSyncDispatcherProvider(): FactoryProvider {
         // APW-04 — the feedback loop: build / deploy / smoke outcomes back to the
         // provisioning Task as bounded follow-up iterations (`@OnEvent` listeners).
         AppProvisioningFeedbackService,
+        // APW-01 FR-55 → APW-07 (2026-10-18) — the create path's `appEnv` answers,
+        // stored encrypted instead of dropped. Not exported: only the create
+        // service declared here consumes it. See the builder's docstring.
+        buildAppPromptedValuesProvider(),
     ],
     exports: [
         WorkUpstreamStateRepository,

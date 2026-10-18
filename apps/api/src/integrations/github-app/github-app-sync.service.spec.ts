@@ -5,6 +5,8 @@ jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/import', () => ({}));
 jest.mock('@ever-works/agent/services', () => ({}));
+// A DI token only — the refresh itself is pinned in app-spec.service.spec.ts.
+jest.mock('@ever-works/agent/app-spec', () => ({ AppSpecService: class AppSpecService {} }));
 // Only a DI token here — the claim rules are pinned in its own spec.
 jest.mock('./github-app-onboarding.service', () => ({
     GitHubAppOnboardingService: class {},
@@ -382,6 +384,74 @@ describe('GitHubAppSyncService', () => {
     // EW-628 G6 — `push` handler now resolves the data-repo full_name to
     // matching Works and stamps `pendingSyncRequestedAt` on each one.
     // The dispatcher's debounce window collapses bursts into a single sync.
+    describe('handleWebhook — push to an App Work refreshes its App spec (live e2e 2026-10-18)', () => {
+        const { AppSpecService } = jest.requireMock('@ever-works/agent/app-spec') as {
+            AppSpecService: new () => unknown;
+        };
+        const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+        function withSpecs(refreshIfHeadMoved: jest.Mock) {
+            const built = createService();
+            const moduleRef = {
+                get: jest.fn((token: unknown) => {
+                    if (token === AppSpecService) return { refreshIfHeadMoved };
+                    throw new Error('unknown');
+                }),
+            };
+            const service = new GitHubAppSyncService(
+                built.gitHubAppService as any,
+                built.gitHubAppInstallationRepository as any,
+                built.gitHubAppInstallationRepoRepository as any,
+                {} as any,
+                {} as any,
+                built.workRepository as any,
+                built.onboardingService as any,
+                moduleRef as any,
+            );
+            (built.workRepository as any).findAppWorksByDataRepoFullName = jest
+                .fn()
+                .mockResolvedValue([{ id: 'app-1' }]);
+            built.gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue({
+                installationId: '77',
+                organizationId: 'org-1',
+                createdByUserId: 'user-1',
+            });
+            return { ...built, service };
+        }
+
+        it('re-evaluates each App Work of the pushed repository, scoped by the installation', async () => {
+            const refresh = jest.fn().mockResolvedValue({ refreshed: true, headCommitSha: 'f9f' });
+            const { service, workRepository } = withSpecs(refresh);
+
+            await service.handleWebhook(
+                'push',
+                { repository: { full_name: 'ever-works/app' }, installation: { id: 77 } } as any,
+                { appSecretVerified: true },
+            );
+            await flush();
+
+            expect((workRepository as any).findAppWorksByDataRepoFullName).toHaveBeenCalledWith(
+                'ever-works/app',
+                { organizationId: 'org-1' },
+            );
+            expect(refresh).toHaveBeenCalledWith('app-1');
+        });
+
+        it('does nothing for a delivery whose HMAC did not verify against the App secret', async () => {
+            const refresh = jest.fn();
+            const { service, workRepository } = withSpecs(refresh);
+
+            await service.handleWebhook('push', {
+                repository: { full_name: 'ever-works/app' },
+                installation: { id: 77 },
+            } as any);
+            await flush();
+
+            expect((workRepository as any).findAppWorksByDataRepoFullName).not.toHaveBeenCalled();
+            expect(refresh).not.toHaveBeenCalled();
+        });
+    });
+
     describe('handleWebhook — push event (EW-628 G6)', () => {
         it('does NOT touch the installation upsert path on push (routing is isolated)', async () => {
             const { service, gitHubAppInstallationRepository, workRepository } = createService();

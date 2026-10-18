@@ -102,6 +102,7 @@ which now live folded into `tasks.md`).
 | [`data-generator`](features/data-generator/spec.md)                           | Retrospective | Data repository management and item persistence                                               |
 | [`data-management`](features/data-management/spec.md)                         | Retrospective | Export / Import / GitHub Sync with secret hygiene                                             |
 | [`dynamic-plugin-distribution`](features/dynamic-plugin-distribution/spec.md) | Draft         | Dual-mode plugins: bundle all, or core-only + runtime npm install                             |
+| [`fleet`](features/fleet/README.md) (program, 20 epics)                       | Draft         | Run the machines, not just the Works: a Fleet hub, sessions on computers, desktop, logs, services, Docker, ports, files, commands, schedules, checkouts, VMs, cloud computers, Actions runners, agent/MCP/CLI parity |
 | [`work-changelog`](features/work-changelog/spec.md)                           | Retrospective | Audit trail of all work mutations                                                             |
 | [`work-import`](features/work-import/spec.md)                                 | Retrospective | Bootstrap from existing repo or Awesome List                                                  |
 | [`work-members`](features/work-members/spec.md)                               | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)                                  |

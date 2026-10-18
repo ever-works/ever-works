@@ -6,7 +6,9 @@ import {
 import { GitHubAppInstallation, User } from '@ever-works/agent/entities';
 import { SourceRepoAnalyzerService } from '@ever-works/agent/import';
 import { WorkImportService } from '@ever-works/agent/services';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { AppSpecService } from '@ever-works/agent/app-spec';
 import { config } from '@src/config/constants';
 import { config as agentConfig } from '@ever-works/agent/config';
 import { GitHubAppOnboardingService } from './github-app-onboarding.service';
@@ -67,6 +69,11 @@ export class GitHubAppSyncService {
         // platform user behind its recorded installer (prod 2026-10-17: App
         // installs made from github.com never reached the setup-URL claim).
         private readonly gitHubAppOnboardingService: GitHubAppOnboardingService,
+        // Live e2e 2026-10-18 — a verified `push` to an App Work's repository brings
+        // its stored App spec state up to the new head (`AppSpecService
+        // .refreshIfHeadMoved`), looked up lazily so this module does not import
+        // `AppSpecModule`. Appended LAST and optional: absent, pushes do what they did.
+        @Optional() private readonly moduleRef?: ModuleRef,
     ) {}
 
     async listInstallationsForUser(userId: string) {
@@ -294,6 +301,7 @@ export class GitHubAppSyncService {
         // structured handler stub. The body — Work resolution + UPDATE —
         // arrives in the Phase 5 follow-up alongside the flag wiring.
         if (eventName === 'push') {
+            this.refreshAppWorkSpecs(payload as PushWebhookPayload, context);
             return this.handlePushEvent(payload as PushWebhookPayload);
         }
     }
@@ -326,6 +334,66 @@ export class GitHubAppSyncService {
             );
             return installation;
         }
+    }
+
+    /**
+     * Live e2e 2026-10-18 — a `push` to an App Work's repository re-evaluates its App
+     * spec when the tracked branch's head moved, in this process.
+     *
+     * Before, nothing reacted to a push on an App Work: a Link's merged setup pull
+     * request left the stored state on the pre-merge commit and every Build was
+     * judged there. Independent of `subscriptions.dataSync.webhookEnabled` (that flag
+     * ramps the DIRECTORY data sync, not this), but only for a delivery whose HMAC
+     * verified against the App secret, and only for the App Works the installation's
+     * own scope (organization, else its claiming user) can see — never a Work the
+     * installation does not belong to. Fire-and-forget: the webhook's 200 never waits
+     * on GitHub reads, and every failure is a log line.
+     */
+    private refreshAppWorkSpecs(
+        payload: PushWebhookPayload,
+        context: GitHubAppWebhookContext,
+    ): void {
+        const repoFullName = payload?.repository?.full_name;
+        const installationId = payload?.installation?.id;
+        if (!context?.appSecretVerified || !repoFullName || !installationId || !this.moduleRef) {
+            return;
+        }
+        void (async () => {
+            try {
+                let specs: AppSpecService | undefined;
+                try {
+                    specs = this.moduleRef!.get(AppSpecService, { strict: false });
+                } catch {
+                    specs = undefined; // not in this graph: pushes do what they did
+                }
+                if (!specs || typeof specs.refreshIfHeadMoved !== 'function') return;
+                const installation = await this.gitHubAppInstallationRepository
+                    .findByInstallationId(String(installationId))
+                    .catch(() => null);
+                const organizationId = installation?.organizationId ?? undefined;
+                const userId = installation?.createdByUserId ?? undefined;
+                if (!organizationId && !userId) return;
+                const works = await this.workRepository.findAppWorksByDataRepoFullName(
+                    repoFullName,
+                    organizationId ? { organizationId } : { userId },
+                );
+                for (const work of works) {
+                    const outcome = await specs.refreshIfHeadMoved(work.id);
+                    if (outcome.refreshed) {
+                        this.logger.log(
+                            `GitHub push: App Work ${work.id} re-evaluated at ${outcome.headCommitSha} ` +
+                                `(${outcome.evaluationStatus ?? 'unknown'}).`,
+                        );
+                    }
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `GitHub push: refreshing the App spec of App Works on ${repoFullName} failed: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        })();
     }
 
     /**
@@ -403,5 +471,9 @@ export class GitHubAppSyncService {
 interface PushWebhookPayload {
     repository?: {
         full_name?: string;
+    };
+    /** The delivering installation — scopes the App Work lookup (2026-10-18). */
+    installation?: {
+        id?: number;
     };
 }

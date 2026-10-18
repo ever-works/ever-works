@@ -656,7 +656,7 @@ export class AppWorkCreateService {
 
         // Write-only prompted values (FR-55): handed over as soon as the transaction
         // committed, never persisted here and never echoed by a read.
-        await this.storePromptedValues(work.id, dto.appEnv);
+        await this.storePromptedValues(work.id, dto.appEnv, user.id);
 
         // ── Step 12 — the create event, exactly as `createWork` emits it ─────
         // `emitAsync` awaits every listener, exactly as `createWork` does, so the
@@ -1421,6 +1421,7 @@ export class AppWorkCreateService {
     private async storePromptedValues(
         workId: string,
         appEnv: Record<string, string> | undefined,
+        userId?: string,
     ): Promise<void> {
         const values = appEnv && typeof appEnv === 'object' ? appEnv : undefined;
         if (!values || !Object.keys(values).length) {
@@ -1434,7 +1435,7 @@ export class AppWorkCreateService {
             return;
         }
         try {
-            await this.promptedValues.storePrompted(workId, values);
+            await this.promptedValues.storePrompted(workId, values, { userId: userId ?? null });
         } catch (error) {
             this.logger.warn(
                 `App Work create: the prompted values for work ${workId} could not be stored ` +

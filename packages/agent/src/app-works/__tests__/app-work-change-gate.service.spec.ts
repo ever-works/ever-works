@@ -158,6 +158,23 @@ describe('nothing escapes — every failure is a refusal that says so', () => {
         expect(verdict.allowed === false && verdict.message).toContain('could not be read');
     });
 
+    it('names a MISSING spec and the setup pull request (live e2e 2026-10-18, T-40)', async () => {
+        const { gate, m } = harness();
+        // The rules service names `the base branch` when the Work sets none; the gate
+        // knows the real ref it judged against and names that instead.
+        m.resolve.mockRejectedValue(
+            new AppSpecUnreadableError('w-1', 'the base branch', 'missing'),
+        );
+
+        const verdict = await gate.evaluate(input());
+
+        expect(verdict).toMatchObject({ allowed: false });
+        const message = verdict.allowed === false ? verdict.message : '';
+        expect(message).toContain('no App spec');
+        expect(message).toContain('`production`');
+        expect(message).toContain('setup pull request');
+    });
+
     it('turns a provider that cannot diff into a refusal', async () => {
         const { gate, m } = harness();
         m.getCompareDiff.mockRejectedValue(new Error('getCompareDiff is not supported'));

@@ -7,6 +7,7 @@ import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
 import { workKindHasRepository } from '@ever-works/contracts';
+import { workHasDirectoryDataCache } from './data-cache-kind';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -1111,6 +1112,14 @@ export class DataGeneratorService {
      * outage). Returns `null` in that case.
      */
     async refreshDataCache(work: Work, user: User): Promise<RefreshedDataCache | null> {
+        // An App, Repository or Project Work has no directory data repository: its
+        // Work Repository is a code repository (or none at all), so cloning it as a
+        // directory corpus can only 404 or misread a human's source tree. Answer the
+        // documented "no cache" value without a clone and without the WARN line that
+        // every `GET /api/works/:id` of such a Work used to log (live e2e, 2026-10-18).
+        if (!workHasDirectoryDataCache(work)) {
+            return null;
+        }
         try {
             const data = await this.repositoryData(work, user);
 

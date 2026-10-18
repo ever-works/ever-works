@@ -300,11 +300,25 @@ export interface AppBuildSpecRead {
     readonly specHash: string | null;
     /** `valid` / `valid_with_warnings` are true; every other status is not valid here. */
     readonly valid: boolean;
+    /**
+     * APW-03's own status (`valid`, `invalid`, `missing`, `unreadable`, …) — additive
+     * and optional (2026-10-18), so a Build request can tell "there is no App spec" from
+     * "the App spec is invalid": the first is refused `specMissing`, the second is
+     * queued and blocked `specInvalid` with its issues, as before.
+     */
+    readonly status?: string | null;
 }
 
 /** The effective-spec reader. */
 export interface AppBuildSpecSource {
     read(workId: string, sha?: string | null): Promise<AppBuildSpecRead | null>;
+    /**
+     * Bring the stored App spec state up to the tracked branch's head when it has
+     * moved, in this process (`AppSpecService.refreshIfHeadMoved`). Optional and
+     * never throwing: a source without it reads the stored state as before (live
+     * e2e 2026-10-18 — a merged setup pull request was invisible to every Build).
+     */
+    refresh?(workId: string): Promise<void>;
 }
 
 /** DI token for {@link AppBuildSpecSource} — owned by APW-03's module. */
@@ -794,7 +808,11 @@ export type AppBuildRebuildRefusal =
     | 'rebuildRateLimited'
     | 'commitNotReachable'
     | 'nothingToBuild'
-    | 'buildProviderUnavailable';
+    | 'buildProviderUnavailable'
+    // Live e2e 2026-10-18: a request with no commit for an App Work whose tracked
+    // branch holds no usable App spec yet (a Link's setup pull request still open).
+    // Before, this answered `commitNotReachable`, which names a different problem.
+    | 'specMissing';
 
 /** What `requestRebuild` answers. */
 export type AppBuildRebuildResult =
@@ -1654,6 +1672,15 @@ export class AppBuildsService {
             return { ok: false, code: 'buildProviderUnavailable' };
         }
 
+        // No commit named ⇒ "the tracked branch's head" (the route's documented
+        // default). The stored App spec state is that head only if something
+        // refreshed it, and nothing did after a Link's setup pull request merged
+        // (live e2e 2026-10-18), so it is brought up to date here first — in this
+        // process, never through a worker.
+        if (!options.commitSha) {
+            await this.refreshSpec(workId);
+        }
+
         const spec = await this.readSpec(workId, options.commitSha ?? null);
         const strategy = spec?.spec?.build?.strategy ?? 'dockerfile';
         if (strategy === 'image' || strategy === 'none' || strategy === 'auto') {
@@ -1661,8 +1688,11 @@ export class AppBuildsService {
         }
 
         const commitSha = options.commitSha ?? spec?.commitSha ?? null;
-        if (!commitSha) {
-            return { ok: false, code: 'commitNotReachable' };
+        if (!options.commitSha && (!commitSha || spec?.status === 'missing')) {
+            // Nothing named and no App spec on the tracked branch (or no evaluated
+            // commit at all): there is nothing to build from yet — not an unreachable
+            // commit, which is what this answered before.
+            return { ok: false, code: 'specMissing' };
         }
 
         // Plan §5 — a caller-named commit must be in the tracked branch's history
@@ -2956,6 +2986,20 @@ export class AppBuildsService {
                 }).`,
             );
             return null;
+        }
+    }
+
+    /** {@link AppBuildSpecSource.refresh}, when the bound source has it. Never throws. */
+    private async refreshSpec(workId: string): Promise<void> {
+        if (!this.specs || typeof this.specs.refresh !== 'function') return;
+        try {
+            await this.specs.refresh(workId);
+        } catch (error) {
+            this.logger.warn(
+                `App builds: refreshing the App spec state of ${workId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the stored state is read as it is.`,
+            );
         }
     }
 

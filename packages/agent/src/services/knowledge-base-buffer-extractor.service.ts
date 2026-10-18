@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import TurndownService from 'turndown';
-import mammoth from 'mammoth';
-import * as ExcelJS from 'exceljs';
+import type * as ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import Papa from 'papaparse';
+// `mammoth` / `exceljs` load lazily — see `lazy-office-libs.ts` for why.
+import { loadExcelJs, loadMammoth } from '../utils/lazy-office-libs';
 // `pdf-parse`'s index.js runs a debug self-test against a bundled PDF
 // when imported as the default. Import the lib entry directly so we
 // avoid the side-effect — `pdf-parse/lib/pdf-parse.js` exposes the same
@@ -285,6 +286,7 @@ export class KnowledgeBaseBufferExtractorService {
         // the Turndown configuration already set up for HTML uploads.
         let result: { value: string };
         try {
+            const mammoth = await loadMammoth();
             result = await mammoth.convertToHtml({ buffer });
         } catch (error) {
             throw new Error(`KB DOCX extraction failed: ${(error as Error).message}`);
@@ -306,7 +308,8 @@ export class KnowledgeBaseBufferExtractorService {
     }
 
     private async extractXlsx(buffer: Buffer): Promise<string> {
-        const workbook = new ExcelJS.Workbook();
+        const { Workbook } = await loadExcelJs();
+        const workbook = new Workbook();
         try {
             await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
         } catch (error) {

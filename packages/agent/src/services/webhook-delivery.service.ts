@@ -140,6 +140,46 @@ export interface HttpClientResponse {
     readonly redirected?: boolean;
 }
 
+/**
+ * `EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK=true` — **local development only**: lets
+ * webhook deliveries reach a receiver on the same machine (for example a local
+ * Gauzy at `http://127.0.0.1:3000`, the Gauzy ↔ Ever Works end-to-end run).
+ * The SSRF guard refuses loopback targets everywhere, so without it a local
+ * pair could never receive a webhook. Honoured only for the exact value
+ * `true` in a `NODE_ENV` of `development` or `test` (a deployed environment
+ * ignores it), and it admits only `localhost`, `127.0.0.1` and `[::1]`: every
+ * other private, link-local or metadata address stays refused. Read per call.
+ */
+export function webhookLoopbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+    return (
+        env.EVER_WORKS_WEBHOOK_ALLOW_LOOPBACK === 'true' &&
+        (env.NODE_ENV === 'development' || env.NODE_ENV === 'test')
+    );
+}
+
+const LOOPBACK_WEBHOOK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** A loopback receiver URL (`http(s)://localhost|127.0.0.1|[::1]`, no credentials). */
+export function isLoopbackWebhookUrl(rawUrl: string): boolean {
+    let url: URL;
+    try {
+        url = new URL(rawUrl);
+    } catch {
+        return false;
+    }
+    return (
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        !url.username &&
+        !url.password &&
+        LOOPBACK_WEBHOOK_HOSTS.has(url.hostname.toLowerCase())
+    );
+}
+
+/** A loopback URL the development switch admits right now. */
+function isAllowedLoopbackWebhookUrl(rawUrl: string): boolean {
+    return webhookLoopbackAllowed() && isLoopbackWebhookUrl(rawUrl);
+}
+
 /** Per-delivery body cap, before any compression. */
 export const WEBHOOK_MAX_BODY_BYTES = 1024 * 1024; // 1 MiB
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -165,13 +205,18 @@ export class FetchWebhookHttpClient implements WebhookHttpClient {
             // `redirect: 'manual'` means a 3xx response surfaces with
             // `response.status` in [300, 400) and `response.type === 'opaqueredirect'`.
             // The delivery worker treats any 3xx as `redirect_refused`.
-            const response = await safeFetchWithDnsPin(args.url, {
+            const init = {
                 method: 'POST',
                 body: args.body,
                 headers: args.headers,
                 signal: controller.signal,
-                redirect: 'manual',
-            });
+                redirect: 'manual' as const,
+            };
+            // The development-only loopback switch: a local receiver, sent
+            // directly (the DNS-pinned fetch refuses loopback by design).
+            const response = isAllowedLoopbackWebhookUrl(args.url)
+                ? await fetch(args.url, init)
+                : await safeFetchWithDnsPin(args.url, init);
             return { status: response.status, redirected: response.redirected };
         } finally {
             clearTimeout(timer);
@@ -270,7 +315,7 @@ export class WebhookDeliveryService {
     async deliver(request: WebhookDeliveryRequest): Promise<DeliveryResult> {
         const deliveryId = request.deliveryId ?? randomUUID();
 
-        if (!isSafeWebhookUrl(request.url)) {
+        if (!isSafeWebhookUrl(request.url) && !isAllowedLoopbackWebhookUrl(request.url)) {
             this.logger.warn(`webhook.ssrf_blocked url=${redactUrl(request.url)}`);
             return {
                 ok: false,

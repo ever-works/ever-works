@@ -969,6 +969,8 @@ export const APP_BUILD_API_ERROR_CODES = [
 	'rebuildRateLimited',
 	'commitNotReachable',
 	'nothingToBuild',
+	// 2026-10-18 — no App spec on the tracked branch yet (a Link's setup PR still open).
+	'specMissing',
 	'notCancellable',
 	'buildProviderUnavailable',
 	'appWorksDisabled',

@@ -11,7 +11,7 @@ import type {
     AppWorkChangePathsInput,
 } from '../tasks-domain/app-work-change-gate.port';
 import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from './app-change-guard';
-import { AppWorkRulesService } from './app-work-rules.service';
+import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
 
 /**
  * APW-08 T17 — the change gate the shared finalize path asks through
@@ -111,6 +111,17 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
             this.logger.warn(
                 `App change gate for Work ${input.work.id} on ${input.branch} could not decide: ${reason}`,
             );
+            if (error instanceof AppSpecUnreadableError && error.status === 'missing') {
+                // Live e2e 2026-10-18 (T-40): a Link's base branch had no
+                // `.works/works.yml` yet because its setup pull request was still
+                // open. Still a refusal (no rules ⇒ no protected paths), but one the
+                // member can act on instead of "could not be read".
+                return refusal(
+                    `This App Work has no App spec (\`.works/works.yml\`) on \`${input.baseRef || error.branch}\` yet, so ` +
+                        'its protected paths are unknown and the change was not checked. Merge the ' +
+                        "App Work's setup pull request (or add the App spec), then run the change again.",
+                );
+            }
             return refusal(
                 "This Work's rules could not be read, so the change was not checked against its " +
                     'protected paths.',

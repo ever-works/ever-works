@@ -676,17 +676,29 @@ describe('AppUpstreamSyncDispatcherService', () => {
             for (const row of [
                 makeRow({ readinessState: 'ready', setupPullRequestNumber: 12 }),
                 makeRow({ readinessState: 'waiting_for_setup_pr', setupPullRequestNumber: null }),
-                makeRow({
-                    readinessState: 'waiting_for_setup_pr',
-                    setupPullRequestNumber: 12,
-                    relation: 'link',
-                }),
             ]) {
                 const h = build({ row });
                 const result = await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
                 expect(result).toBeNull();
                 expect(h.states.checkSetupPullRequest).not.toHaveBeenCalled();
             }
+        });
+
+        it('checks a LINK waiting on its setup pull request too (live e2e 2026-10-18)', async () => {
+            // A Link's App source lands through one setup PR (APW-01 #2683); before this
+            // the on-view door skipped `link`, and a merged setup PR left it waiting.
+            const h = build({
+                row: makeRow({
+                    readinessState: 'waiting_for_setup_pr',
+                    setupPullRequestNumber: 1,
+                    relation: 'link',
+                    setupCheckedAt: null,
+                }),
+            });
+
+            await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
+
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledWith(WORK_ID);
         });
 
         it('answers null for a blank id and never reaches the repository', async () => {

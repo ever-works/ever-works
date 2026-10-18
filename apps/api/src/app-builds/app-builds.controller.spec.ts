@@ -276,6 +276,8 @@ describe('AppBuildsController — Rebuild (ACC-05-08)', () => {
     it.each([
         ['nothingToBuild', HttpStatus.UNPROCESSABLE_ENTITY],
         ['commitNotReachable', HttpStatus.UNPROCESSABLE_ENTITY],
+        // Live e2e 2026-10-18 — no App spec on the tracked branch yet.
+        ['specMissing', HttpStatus.UNPROCESSABLE_ENTITY],
         ['buildProviderUnavailable', HttpStatus.SERVICE_UNAVAILABLE],
     ])('%s answers %d', async (code, expected) => {
         const builds = buildsService({

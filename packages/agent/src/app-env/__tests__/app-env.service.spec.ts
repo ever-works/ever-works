@@ -1143,6 +1143,47 @@ describe('AppEnvService (T13, plan §4.2:361-370)', () => {
             expect(await empty()).toBe(true);
         });
 
+        it('stores create-time prompted answers WITHOUT a spec when asked to (FR-55, live e2e 2026-10-18)', async () => {
+            const service = makeService({ spec: { read: async () => null } });
+
+            const applied = await service.apply(
+                WORK,
+                actor(),
+                {
+                    set: [
+                        { name: 'FIXTURE_MARKER', value: 'marker-1' },
+                        { name: 'FIXTURE_MAIL_TO', value: 'ops@example.com' },
+                    ],
+                },
+                { allowWithoutSpec: true, origin: 'prompted' },
+            );
+
+            expect(applied.reason).toBeUndefined();
+            expect(applied.changed).toEqual(['FIXTURE_MARKER', 'FIXTURE_MAIL_TO']);
+            // No spec ⇒ every name is undeclared (FR-1 allows it, with the warning).
+            expect(applied.warnings).toEqual([
+                { code: 'undeclared', names: ['FIXTURE_MARKER', 'FIXTURE_MAIL_TO'] },
+            ]);
+            const row = await stored('FIXTURE_MARKER');
+            expect(row).toMatchObject({ origin: 'prompted', setByUserId: USER });
+            // Encrypted at rest — the plaintext never reaches the row.
+            expect(JSON.stringify(row)).not.toContain('marker-1');
+        });
+
+        it('keeps refusing a spec-less apply that did not opt in (control)', async () => {
+            const service = makeService({ spec: { read: async () => null } });
+
+            const applied = await service.apply(
+                WORK,
+                actor(),
+                { set: [{ name: 'FIXTURE_MARKER', value: 'marker-1' }] },
+                { origin: 'prompted' },
+            );
+
+            expect(applied).toMatchObject({ reason: 'specUnavailable', changed: [] });
+            expect(await empty()).toBe(true);
+        });
+
         it('reports storeUnavailable when the value store is not bound', async () => {
             const service = makeService({ values: null, rows: null });
 

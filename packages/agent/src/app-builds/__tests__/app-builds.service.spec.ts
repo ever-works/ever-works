@@ -214,6 +214,12 @@ interface HarnessOptions {
     readonly runnerRecipe?: AppBuildsServiceDeps['runnerRecipe'];
     readonly spec?: AppSpec | null;
     readonly specValid?: boolean;
+    /** APW-03's own status on the read (2026-10-18); absent keeps the old shape. */
+    readonly specStatus?: string;
+    /** The read's commit; `undefined` keeps `SHA`. */
+    readonly specCommitSha?: string | null;
+    /** The source's in-process refresh (2026-10-18); absent ⇒ a source without one. */
+    readonly specRefresh?: (workId: string) => Promise<void>;
     readonly fingerprints?: Record<string, string> | null;
     readonly onStartBuild?: (input: Record<string, unknown>) => void;
     /**
@@ -560,11 +566,13 @@ function makeHarness(options: HarnessOptions = {}): Harness {
         async read() {
             return {
                 spec: options.spec === undefined ? SPEC_FIXTURE : options.spec,
-                commitSha: SHA,
+                commitSha: options.specCommitSha === undefined ? SHA : options.specCommitSha,
                 specHash: 'b'.repeat(64),
                 valid: options.specValid ?? true,
+                ...(options.specStatus ? { status: options.specStatus } : {}),
             };
         },
+        ...(options.specRefresh ? { refresh: options.specRefresh } : {}),
     };
 
     const runnerRecipe =
@@ -944,6 +952,62 @@ describe('AppBuildsService (APW-05 T17)', () => {
             expect(refusal.code).toBe('rebuildRateLimited');
             expect(refusal.retryAfterMinutes).toBeGreaterThanOrEqual(1);
             expect(refusal.retryAfterMinutes).toBeLessThanOrEqual(60);
+        });
+
+        describe('no commit named, no App spec on the tracked branch (live e2e 2026-10-18)', () => {
+            it('refreshes the stored state in-process BEFORE it reads the spec', async () => {
+                const order: string[] = [];
+                const harness = makeHarness({
+                    specRefresh: async () => {
+                        order.push('refresh');
+                    },
+                });
+
+                const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
+
+                expect(result.ok).toBe(true);
+                expect(order).toEqual(['refresh']);
+            });
+
+            it('answers specMissing — not commitNotReachable — when the head has no App spec', async () => {
+                const harness = makeHarness({
+                    spec: null,
+                    specValid: false,
+                    specStatus: 'missing',
+                });
+
+                expect(await harness.service.requestRebuild(WORK_ID, USER_ID)).toEqual({
+                    ok: false,
+                    code: 'specMissing',
+                });
+                expect(harness.store.size).toBe(0);
+            });
+
+            it('answers specMissing when there is no evaluated commit at all', async () => {
+                const harness = makeHarness({ spec: null, specValid: false, specCommitSha: null });
+
+                expect(await harness.service.requestRebuild(WORK_ID, USER_ID)).toEqual({
+                    ok: false,
+                    code: 'specMissing',
+                });
+            });
+
+            it('still queues an INVALID head, so the Build shows its issues (control)', async () => {
+                const harness = makeHarness({ specValid: false, specStatus: 'invalid' });
+
+                const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
+
+                expect(result.ok).toBe(true);
+            });
+
+            it('never refreshes when the caller named a commit', async () => {
+                const refresh = jest.fn(async () => undefined);
+                const harness = makeHarness({ specRefresh: refresh });
+
+                await harness.service.requestRebuild(WORK_ID, USER_ID, { commitSha: SHA });
+
+                expect(refresh).not.toHaveBeenCalled();
+            });
         });
 
         it('refuses a Work whose strategy is `image`/`none`/`auto` with nothingToBuild', async () => {

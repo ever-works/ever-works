@@ -532,6 +532,15 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
         }
 
         if (minimal.outcome === 'waiting_for_setup_pr') {
+            // Live e2e, 2026-10-18: a Link rests here until its setup pull request is
+            // merged, and until then `GET /app-license` answered `spdx: null` with the
+            // UNKNOWN-licence attestation text — for an MIT repository the inspection had
+            // just classified green. The licence of what is on the default branch is
+            // already a fact, so classify it now (the repository's detected licence; the
+            // post-merge re-invocation re-classifies from the merged spec's declaration).
+            // Provisioning is NOT started here: the setup pull request carries the spec
+            // (a Blueprint's, or `spec.source` for step 8 to judge after the merge).
+            await this.requestLicense(context);
             return {
                 result: 'waiting_for_setup_pr',
                 ...(minimal.setupPullRequestUrl
@@ -1310,25 +1319,7 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
      * the member may start by hand.
      */
     private async runFollowUps(context: InitializerContext, sha: string | null): Promise<void> {
-        if (this.license) {
-            try {
-                // No reason argument: APW-03 plan `:380` spells APW-01's call
-                // `AppLicenseService.request(workId)` — the initial classification, which is
-                // not one of `APP_LICENSE_EVALUATION_REASONS` (those are the re-evaluation
-                // triggers APW-02 and APW-03 own).
-                await this.license.request(context.work.id);
-            } catch (error) {
-                this.logger.warn(
-                    `App source initializer: the licence request for work ${context.work.id} failed ` +
-                        `(${errorText(error)}).`,
-                );
-            }
-        } else {
-            this.logger.warn(
-                `App source initializer: no AppLicenseService is bound, so the initial licence ` +
-                    `classification of work ${context.work.id} was not requested.`,
-            );
-        }
+        await this.requestLicense(context);
 
         if (!context.autoProvision) {
             this.logger.log(
@@ -1375,6 +1366,33 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
             // and never fails the hand-off: the source IS on the branch.
             this.logger.warn(
                 `App source initializer: starting provisioning for work ${context.work.id} failed ` +
+                    `(${errorText(error)}).`,
+            );
+        }
+    }
+
+    /**
+     * `AppLicenseService.request(workId)` — the initial classification. Never throws:
+     * a licence request must not fail the hand-off. Called by step 8 and, since
+     * 2026-10-18, also when the hand-off rests on a setup pull request (see `run`).
+     */
+    private async requestLicense(context: InitializerContext): Promise<void> {
+        if (!this.license) {
+            this.logger.warn(
+                `App source initializer: no AppLicenseService is bound, so the initial licence ` +
+                    `classification of work ${context.work.id} was not requested.`,
+            );
+            return;
+        }
+        try {
+            // No reason argument: APW-03 plan `:380` spells APW-01's call
+            // `AppLicenseService.request(workId)` — the initial classification, which is
+            // not one of `APP_LICENSE_EVALUATION_REASONS` (those are the re-evaluation
+            // triggers APW-02 and APW-03 own).
+            await this.license.request(context.work.id);
+        } catch (error) {
+            this.logger.warn(
+                `App source initializer: the licence request for work ${context.work.id} failed ` +
                     `(${errorText(error)}).`,
             );
         }

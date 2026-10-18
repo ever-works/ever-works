@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as ExcelJS from 'exceljs';
+import type * as ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import type { ItemData } from '@ever-works/contracts';
 import {
@@ -16,6 +16,8 @@ import {
     parseIntegerCell,
 } from './column-mapping';
 import { slugifyText } from '../utils/text.utils';
+// `exceljs` loads lazily — see `lazy-office-libs.ts` for why.
+import { loadExcelJs } from '../utils/lazy-office-libs';
 import type {
     ColumnMapping,
     ImportDuplicateMatch,
@@ -85,7 +87,8 @@ export class ItemImportService {
      * types so the per-field parsers can decide what to do with them).
      */
     async parseXLSX(buffer: Buffer): Promise<ParsedFile> {
-        const workbook = new ExcelJS.Workbook();
+        const { Workbook } = await loadExcelJs();
+        const workbook = new Workbook();
         await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
         const sheet = workbook.worksheets[0];
         if (!sheet) {

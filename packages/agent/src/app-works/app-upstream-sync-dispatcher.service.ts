@@ -333,8 +333,9 @@ export class AppUpstreamSyncDispatcherService {
      * row untouched in that case, so the Work is never harmed by the distinction — only the
      * counter is honest about it.
      *
-     * A `link` row is never claimed by the query (it has no upstream to have a setup pull request
-     * on), so unlike the other legs there is no `link` skip to write here.
+     * A `link` row IS claimed (corrected 2026-10-18): a Link's App source lands through one
+     * setup pull request (APW-01 #2683), so it waits on one like a fork; the query has never
+     * excluded it and this leg has no `link` skip, deliberately.
      */
     private async checkSetupPullRequests(
         now: number,
@@ -451,8 +452,13 @@ export class AppUpstreamSyncDispatcherService {
             return null;
         }
 
+        // A `link` IS checked (live e2e 2026-10-18). Since APW-01 #2683 a Link's
+        // `.works/works.yml` lands through ONE setup pull request, so a Link rests in
+        // `waiting_for_setup_pr` exactly like a fork that could not commit — and with
+        // this door closed to it, and the dispatcher cron not yet on the worker, a
+        // merged setup PR left the Link waiting forever (prod: 47 min and counting).
         const row = await this.readRow(id);
-        if (!row || row.relation === 'link') {
+        if (!row) {
             return null;
         }
 

@@ -331,6 +331,23 @@ export interface AppSpecLazyCheckOutcome {
     readonly reason: string | null;
 }
 
+/**
+ * What {@link AppSpecService.refreshIfHeadMoved} did (live e2e 2026-10-18). Never a
+ * silent no-op: `reason` names why nothing ran.
+ */
+export interface AppSpecHeadRefreshOutcome {
+    /** `true` when the head had moved and an evaluation ran in this process. */
+    readonly refreshed: boolean;
+    /** The tracked branch's head as read now, or `null` when it could not be read. */
+    readonly headCommitSha: string | null;
+    /** The stored head BEFORE the refresh. */
+    readonly previousHeadCommitSha: string | null;
+    /** The evaluation's own status when one ran (`evaluated`, `locked`, …). */
+    readonly evaluationStatus: string | null;
+    /** `no_state` · `worksUnavailable` · `headUnreadable` · `unchanged` · `null` (it ran). */
+    readonly reason: string | null;
+}
+
 /** The Work's repository coordinates and the facade options every read uses. */
 export interface AppSpecWorkContext {
     readonly workId: string;
@@ -1308,6 +1325,74 @@ export class AppSpecService {
             evaluationPending: Number(fresh.requestedSeq) > Number(fresh.evaluatedSeq),
             lazyCheck,
         };
+    }
+
+    /**
+     * Re-evaluate **in this process** when the tracked branch's head has moved past
+     * the stored head (live e2e 2026-10-18).
+     *
+     * The stored state is otherwise refreshed only by a dispatched `app-spec-evaluate`
+     * job (the Trigger worker), the ≤ 1-per-60-s lazy check on `GET app-spec` (which
+     * also only DISPATCHES), a manual Re-check, or the ready handler — and no push
+     * webhook reaches an App Work. On prod a Link's setup pull request merged, `main`
+     * moved to a commit with a valid `.works/works.yml`, and every Build kept being
+     * judged against the pre-merge head (`specInvalid` at the old commit). APW-05 calls
+     * this before it decides what to build, so a Build request never depends on a
+     * worker it cannot see.
+     *
+     * One head read when nothing moved. When it moved: the same `requestEvaluation`
+     * bump the in-process fallback makes, then {@link evaluate} — the per-Work lock,
+     * the sequence guard and the `app.spec.applied` publish all apply unchanged, so a
+     * worker run racing this one is serialised (one of them answers `locked`). Never
+     * throws.
+     */
+    async refreshIfHeadMoved(
+        workId: string,
+        deps: AppSpecServiceDeps = {},
+    ): Promise<AppSpecHeadRefreshOutcome> {
+        const none = (
+            reason: string,
+            headCommitSha: string | null = null,
+            previousHeadCommitSha: string | null = null,
+        ): AppSpecHeadRefreshOutcome => ({
+            refreshed: false,
+            headCommitSha,
+            previousHeadCommitSha,
+            evaluationStatus: null,
+            reason,
+        });
+        try {
+            const state = await this.states.findByWorkId(workId);
+            if (!state) return none('no_state');
+            const previous = state.headCommitSha ?? null;
+
+            const context = await this.loadContext(workId, state);
+            if (!context) return none('worksUnavailable', null, previous);
+
+            const head = await this.readHead(context, state);
+            if (head.status !== 'ok' || !head.commitSha) {
+                return none('headUnreadable', null, previous);
+            }
+            if (head.commitSha === previous) {
+                return none('unchanged', head.commitSha, previous);
+            }
+
+            const now = deps.now ?? Date.now;
+            await this.states.requestEvaluation(workId, now());
+            const evaluation = await this.evaluate(workId, deps);
+            return {
+                refreshed: true,
+                headCommitSha: head.commitSha,
+                previousHeadCommitSha: previous,
+                evaluationStatus: evaluation?.status ?? null,
+                reason: null,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `App spec: refreshing the stored state of work ${workId} failed (${errorText(error)}).`,
+            );
+            return none('headUnreadable');
+        }
     }
 
     /** The ≤ 1-per-60-s head check of FR-19(d). See {@link AppSpecService.getState}. */

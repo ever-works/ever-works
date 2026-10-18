@@ -629,6 +629,27 @@ interface PassOutcome {
     readonly blocked: number;
 }
 
+/**
+ * The commit a prepare pass judges the App spec at (live e2e 2026-10-18): the Build
+ * this dispatch names when it is among the requested ones and carries a commit, else
+ * the newest requested Build that does, else `null` (the effective spec). `requested`
+ * is in Build-number order (`readRequestedBuilds`).
+ */
+export function requestedBuildCommit(
+    payload: Pick<AppBuildPrepareJobPayload, 'buildId'>,
+    requested: readonly Pick<WorkBuild, 'id' | 'commitSha'>[],
+): string | null {
+    const named = payload?.buildId
+        ? requested.find((build) => build.id === payload.buildId && build.commitSha)
+        : undefined;
+    if (named?.commitSha) return named.commitSha;
+    for (let index = requested.length - 1; index >= 0; index -= 1) {
+        const sha = requested[index]?.commitSha;
+        if (sha) return sha;
+    }
+    return null;
+}
+
 /** A pass that did nothing, with the reason it did nothing. */
 function skipped(reason: AppBuildPrepareSkipReason): PassOutcome {
     return {
@@ -999,9 +1020,24 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         // (`plan.md:1352-1355`): the Provisioner verifies a proposal before any
         // App spec has been applied, so "no spec" is the normal state there and is
         // what §4.6 step 0's bootstrap exists for.
+        //
+        // Live e2e 2026-10-18 — a requested (non-verification) Build is judged AT ITS
+        // OWN COMMIT, not at the stored head. On prod a Link's setup pull request
+        // merged (`main` → a commit with a valid `.works/works.yml`), nothing refreshed
+        // the stored state, and Build #2 — requested FOR the new commit — was blocked
+        // `specInvalid` with the pre-merge commit in its detail. So: bring the stored
+        // state up to the tracked head first (in-process, `AppSpecService
+        // .refreshIfHeadMoved`), then read the spec at the commit being built — the
+        // Build this dispatch names, else the newest requested one. A Build with no
+        // commit falls back to the effective spec, exactly as before.
+        if (!verification && nonVerification.length > 0) {
+            await this.refreshSpec(workId);
+        }
         const specRead = await this.readSpec(
             workId,
-            verification ? verificationBuild?.commitSha : null,
+            verification
+                ? verificationBuild?.commitSha
+                : requestedBuildCommit(payload, nonVerification),
         );
         if (!specRead && !verification) {
             return skipped('specUnavailable');
@@ -1555,6 +1591,20 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
                 }).`,
             );
             return null;
+        }
+    }
+
+    /** `AppBuildSpecSource.refresh`, when the bound source has it. Never throws. */
+    private async refreshSpec(workId: string): Promise<void> {
+        if (!this.specs || typeof this.specs.refresh !== 'function') return;
+        try {
+            await this.specs.refresh(workId);
+        } catch (error) {
+            this.logger.warn(
+                `App builds: refreshing the App spec state of ${workId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the stored state is read as it is.`,
+            );
         }
     }
 

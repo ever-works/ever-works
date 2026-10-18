@@ -241,7 +241,32 @@ export class WorkEvolveController {
             updatedAt: task.updatedAt ?? null,
         }));
         const active = recent.find((task) => !['done', 'cancelled'].includes(task.status)) ?? null;
-        return { active, recent, canEdit: access.role !== 'viewer' };
+        // Live e2e 2026-10-18 — an empty list is now explained instead of looking like a
+        // provisioner that never ran: a Blueprint Work's App spec comes from the Blueprint
+        // (its setup pull request or commit), so the AI Provisioner is deliberately not
+        // started (`AppSourceInitializerService` step 8 skips a commit that already holds a
+        // valid spec); `autoProvision: false` is the member's own choice. Additive.
+        const source = (work.sourceRepository ?? {}) as {
+            blueprintId?: string | null;
+            autoProvision?: boolean;
+        };
+        const notStartedReason =
+            recent.length > 0
+                ? null
+                : source.blueprintId
+                  ? 'blueprintSpec'
+                  : source.autoProvision === false
+                    ? 'autoProvisionOff'
+                    : null;
+        return {
+            active,
+            recent,
+            canEdit: access.role !== 'viewer',
+            notStartedReason,
+            ...(notStartedReason === 'blueprintSpec'
+                ? { blueprintId: source.blueprintId ?? null }
+                : {}),
+        };
     }
 
     @Post(':id/upstream-pr')

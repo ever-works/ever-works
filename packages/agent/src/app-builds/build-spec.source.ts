@@ -51,6 +51,7 @@ export class AppBuildSpecReadSource implements AppBuildSpecSource {
             commitSha: effective.commitSha ?? null,
             specHash: effective.specHash ?? null,
             valid: isUsableStatus(effective.status),
+            status: typeof effective.status === 'string' ? effective.status : null,
         };
     }
 }
