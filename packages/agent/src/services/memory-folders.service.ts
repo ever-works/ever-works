@@ -588,11 +588,14 @@ export class MemoryFoldersService {
         folderId: string,
         unfile: (folderIds: string[], manager?: EntityManager) => Promise<number>,
     ): Promise<{ deletedFolders: number; unfiledDocuments: number }> {
-        // EW-P3-2 — `kb.folder.deleted` tombstones (version bump + last
-        // snapshot) for the subtree are taken BEFORE the delete, each in a
-        // transaction of its own (best-effort; a failed delete leaves only a
-        // version gap), and recorded once the folders are gone.
-        const tombstones = await this.kbFolderTombstones(organizationId, folderId);
+        // EW-P3-2 — one `kb.folder.deleted` per folder of the subtree: its tombstone
+        // (version bump + last snapshot) is taken right before the delete, and the
+        // event recorded right after it. Review 2026-10-17 F31: both run under the tree
+        // lock and in the delete's own transaction, for exactly the folders it removes.
+        // Taken earlier (unlocked), a folder created or moved into the subtree in
+        // between was deleted with no event, and a racing edit could out-version the
+        // tombstone.
+        const publisher = this.domainEvents;
         const { folder, subtree, unfiledDocuments } = await this.folders.withOrganizationTree(
             organizationId,
             async (tree, manager) => {
@@ -603,8 +606,22 @@ export class MemoryFoldersService {
                 );
                 const rows = await tree.listOrganizationSubtree(organizationId, found.path);
                 const subtreeIds = rows.map((f) => f.id);
+                const tombstones: AggregateTombstone[] = [];
+                if (publisher) {
+                    for (const row of rows) {
+                        const tombstone = await publisher.beforeDelete(
+                            manager,
+                            'kb_folder',
+                            row.id,
+                        );
+                        if (tombstone) tombstones.push(tombstone);
+                    }
+                }
                 const unfiled = await unfile(subtreeIds, manager);
                 await tree.deleteOrganizationFoldersByIds(organizationId, subtreeIds);
+                for (const tombstone of tombstones) {
+                    await publisher!.deleted(manager, tombstone, 'kb.folder.deleted');
+                }
                 return { folder: found, subtree: rows, unfiledDocuments: unfiled };
             },
         );
@@ -621,16 +638,6 @@ export class MemoryFoldersService {
                 organizationId,
             },
         );
-        const deletedIds = new Set(subtree.map((row) => row.id));
-        for (const tombstone of tombstones) {
-            if (!deletedIds.has(tombstone.id)) continue;
-            await recordAfterWrite(
-                this.domainEvents,
-                (publisher, manager) => publisher.deleted(manager, tombstone, 'kb.folder.deleted'),
-                (message) => this.logger.warn(message),
-                `kb.folder.deleted for ${tombstone.id}`,
-            );
-        }
         return { deletedFolders: subtree.length, unfiledDocuments };
     }
 
@@ -747,33 +754,6 @@ export class MemoryFoldersService {
             await this.recordKbFolder('kb.folder.updated', row.id, ['path'], {
                 path: `${before.path}${row.path.slice(newPath.length)}`,
             });
-        }
-    }
-
-    /** The `kb.folder.deleted` tombstones of a folder and its subtree (best-effort). */
-    private async kbFolderTombstones(
-        organizationId: string,
-        folderId: string,
-    ): Promise<AggregateTombstone[]> {
-        if (!this.domainEvents) return [];
-        const publisher = this.domainEvents;
-        try {
-            const folder = await this.folders.findOrganizationFolder(organizationId, folderId);
-            if (!folder) return [];
-            const rows = await this.folders.listOrganizationSubtree(organizationId, folder.path);
-            const tombstones: AggregateTombstone[] = [];
-            for (const row of rows) {
-                const tombstone = await publisher.transaction((manager) =>
-                    publisher.beforeDelete(manager, 'kb_folder', row.id),
-                );
-                if (tombstone) tombstones.push(tombstone);
-            }
-            return tombstones;
-        } catch (error) {
-            this.logger.warn(
-                `Could not take the kb.folder.deleted tombstones under ${folderId}: ${(error as Error).message}`,
-            );
-            return [];
         }
     }
 

@@ -5,7 +5,7 @@
 
 **Epic ID:** `FL-03-computer-health`
 **Spec:** [`./spec.md`](./spec.md) · **Tasks:** [`./tasks.md`](./tasks.md)
-**Status:** `Draft`
+**Status:** `Draft` · implementation `In progress` (P1 in `feat/fl-03-computer-health-p1`)
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
 

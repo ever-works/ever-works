@@ -84,7 +84,10 @@ export class KnowledgeBaseGitMirrorService {
      * validates at the input boundary; this method validates again before
      * any fs write/unlink so a manually-inserted DB row can't bypass it.
      */
-    static validateRelativeKbPath(relativePath: string): void {
+    static validateRelativeKbPath(
+        relativePath: string,
+        options: { requireClassFolder?: boolean } = {},
+    ): void {
         if (typeof relativePath !== 'string' || relativePath.length === 0) {
             throw new BadRequestException('KB document path must be a non-empty string');
         }
@@ -118,9 +121,15 @@ export class KnowledgeBaseGitMirrorService {
             );
         }
         // First segment must be a known class folder — same as the on-disk
-        // skeleton — so a stray top-level write is rejected.
+        // skeleton — so a stray top-level write is rejected. Review 2026-10-17 U3
+        // (F114): not for an organization overlay path, which lives under the
+        // platform-owned `.org/` prefix (no stray top-level write is possible) and keeps
+        // the organization document's own path (`terms.md`, `policies/privacy.md`): with
+        // the rule, every inheritable organization document created through the
+        // integration API failed to reach every Work.
         const firstSegment = normalized.split('/')[0];
         if (
+            options.requireClassFolder !== false &&
             !(KnowledgeBaseGitMirrorService.CLASS_FOLDERS as ReadonlyArray<string>).includes(
                 firstSegment,
             )
@@ -691,7 +700,9 @@ export class KnowledgeBaseGitMirrorService {
         repoDir: string,
         doc: WorkKnowledgeDocument,
     ): Promise<void> {
-        KnowledgeBaseGitMirrorService.validateRelativeKbPath(doc.path);
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(doc.path, {
+            requireClassFolder: false,
+        });
 
         const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
         const orgRoot = path.join(kbRoot, KnowledgeBaseGitMirrorService.ORG_OVERLAY_DIR);
@@ -734,7 +745,9 @@ export class KnowledgeBaseGitMirrorService {
      * idempotent rerun.
      */
     private async removeOrgDocumentFiles(repoDir: string, relativePath: string): Promise<boolean> {
-        KnowledgeBaseGitMirrorService.validateRelativeKbPath(relativePath);
+        KnowledgeBaseGitMirrorService.validateRelativeKbPath(relativePath, {
+            requireClassFolder: false,
+        });
 
         const kbRoot = path.join(repoDir, KnowledgeBaseGitMirrorService.KB_ROOT);
         const sidecarPath = this.resolveInsideKbRoot(

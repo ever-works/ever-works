@@ -296,6 +296,22 @@ export async function buildTeamSnapshot(
     // its id never goes to an integration (nor can a full-set PUT detach it).
     const hidden = await privateTeamResources(manager, linked);
     const resources = linked.filter((row) => !hidden.has(`${row.resourceType}:${row.resourceId}`));
+    // Review 2026-10-17 F38: a private agent's membership likewise (and a full-set PUT of
+    // the members never removes what the integration cannot see).
+    const agentIds = members.filter((row) => row.memberType === 'agent').map((row) => row.memberId);
+    const privateAgents = new Set(
+        agentIds.length === 0
+            ? []
+            : (
+                  await manager.getRepository(Agent).find({
+                      where: { id: In(agentIds), visibility: 'private' as Agent['visibility'] },
+                      select: { id: true },
+                  })
+              ).map((row) => row.id),
+    );
+    const visibleMembers = members.filter(
+        (row) => row.memberType !== 'agent' || !privateAgents.has(row.memberId),
+    );
     const dto: IntegrationTeamDto = {
         id: team.id,
         organizationId: team.organizationId ?? '',
@@ -313,7 +329,7 @@ export async function buildTeamSnapshot(
         parentTeamId: team.parentTeamId ?? null,
         managerAgentId: team.managerAgentId ?? null,
         avatarIcon: team.avatarIcon ?? null,
-        members: members.map((row) => ({
+        members: visibleMembers.map((row) => ({
             memberType: row.memberType as 'user' | 'agent',
             memberId: row.memberId,
             role: row.role as 'lead' | 'member',
@@ -529,7 +545,21 @@ export async function buildMissionSnapshot(
             .find({ where: { missionId }, order: { createdAt: 'ASC' } }),
     ]);
     const teamIds = unique(resourceTeams);
+    // Review 2026-10-17 F51: a private Goal's id never reaches an integration, nor
+    // through the Missions it is linked to (`GET /goals/:id` answers 404 for it).
+    const goalIds = goalLinks.map((link) => link.goalId);
+    const privateGoals = new Set(
+        goalIds.length === 0
+            ? []
+            : (
+                  await manager.getRepository(Goal).find({
+                      where: { id: In(goalIds), visibility: 'private' as Goal['visibility'] },
+                      select: { id: true },
+                  })
+              ).map((row) => row.id),
+    );
     const goals = [...goalLinks]
+        .filter((link) => !privateGoals.has(link.goalId))
         .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))
         .map((link) => ({ goalId: link.goalId, isPrimary: link.isPrimary === true }));
     const dto: IntegrationMissionDto = {

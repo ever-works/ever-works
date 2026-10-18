@@ -136,6 +136,9 @@ export class IntegrationOrganizationsWriteController {
             // left without its pin, and concurrent creates through one key keep theirs.
             const organizationId = randomUUID();
             await this.keys.addPin(principal.keyId, organizationId);
+            // Review 2026-10-17 F52: an admin's key makes its creator an admin of what it
+            // creates in the SAME transaction as the create (see `initialAdmin`).
+            const byAdmin = principal.ownerUserId !== tenant.ownerUserId;
             let organization: Awaited<ReturnType<OrganizationService['createOrganization']>>;
             try {
                 organization = await this.organizations.createOrganization(
@@ -146,6 +149,14 @@ export class IntegrationOrganizationsWriteController {
                         legalName: dto.legalName ?? null,
                         countryCode: dto.countryCode ? dto.countryCode.toUpperCase() : null,
                         id: organizationId,
+                        ...(byAdmin
+                            ? {
+                                  initialAdmin: {
+                                      userId: principal.ownerUserId,
+                                      invitedById: tenant.ownerUserId,
+                                  },
+                              }
+                            : {}),
                     },
                 );
             } catch (error) {
@@ -159,8 +170,10 @@ export class IntegrationOrganizationsWriteController {
                     );
                 throw error;
             }
-            if (principal.ownerUserId !== tenant.ownerUserId) {
-                // An admin's key: make its creator an admin of what it just created.
+            if (byAdmin) {
+                // An admin's key: make its creator an admin of what it just created. The
+                // create already wrote the row in its transaction (F52); this only fills it
+                // in for an Organization service that did not (nothing is written twice).
                 const existing = await this.members.findByOrgAndUser(
                     organization.id,
                     principal.ownerUserId,

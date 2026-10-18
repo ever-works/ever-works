@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-01-fleet-hub`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1a merged (#2734); P1b hub + computer page shell (T-09…T-15, T-22, T-25; T-24 editor) in the second PR
+**Status:** `In progress` — P1a merged (#2734), P1b merged (#2741); PR 3 roles in use (T-20, T-21, T-23, T-24, T-26)
 **Last updated:** 2026-10-18
 
 ---
@@ -140,7 +140,7 @@
       `GET /nodes`, `GET /nodes/:id`, `/needs-a-look` in `fleet.controller.ts` use it and 404 strangers.
       **Test**: extend `fleet.controller.spec.ts` — member of bound org sees the node; member of another
       org gets `[]` / 404; runner pill's `listForUser` unchanged.
-- [ ] **T-20**. PATCH widening: `UpdateFleetNodeDto` (`apps/api/src/fleet/dto/fleet.dto.ts:97`) gains
+- [x] **T-20**. PATCH widening: `UpdateFleetNodeDto` (`apps/api/src/fleet/dto/fleet.dto.ts:97`) gains
       `isFavorite?`, `controlPolicyFamilies?` (custom validator), `DELETE /nodes/:id` gains an
       **optional** `confirmName` (existing callers without it keep working — Constitution X);
       `PATCH` routes `name/paused/disabled` through `assertFamily('machines')`, favourite/policy
@@ -149,7 +149,7 @@
       **Test**: extend `fleet.controller.spec.ts` — 403 non-owner favourite; invalid family key → 400;
       audit row `node.policy.change { family, from, to }`; wrong `confirmName` → `invalid`; no
       `confirmName` → 204 as today.
-- [ ] **T-21**. AW-11 compatibility: `packages/agent/src/computer/control-arbiter.service.ts:166,224,657`
+- [x] **T-21**. AW-11 compatibility: `packages/agent/src/computer/control-arbiter.service.ts:166,224,657`
       use `FleetAccessService.roleFor` and `effectiveControlPolicy(node).desktop`; keep
       `viewerRoleForNode` exported (deprecated comment) for callers outside the arbiter.
       **Test**: extend `packages/agent/src/computer/__tests__/control-policy.spec.ts` and the arbiter
@@ -165,22 +165,26 @@
       Register `overview` and `settings` tabs in `registry.ts`.
       **Test**: `ComputerTabPlaceholder.unit.spec.tsx` (four variants, copyable `--manage` command);
       `ComputerHeader.unit.spec.tsx` (state word always present).
-- [ ] **T-23**. `computer/ComputerActionsMenu.tsx` — rename (inline), favourite (`setFavorite`),
+- [x] **T-23**. `computer/ComputerActionsMenu.tsx` — rename (inline), favourite (`setFavorite`),
       pause/resume (`updateNode { paused }`), drain (`drainFleetNodeAction`, confirm with job count),
       remove (typed name, `deleteNode` with `confirmName`); disabled-with-tooltip when the family
       excludes the viewer.
       **Test**: `ComputerActionsMenu.unit.spec.tsx` — gating by role, typed remove, no dialog for
       rename/favourite.
-- [ ] **T-24**. `computer/PolicyFamiliesEditor.tsx` mounted in `SettingsTab.tsx` with the drawer's
+- [x] **T-24**. `computer/PolicyFamiliesEditor.tsx` mounted in `SettingsTab.tsx` with the drawer's
       capability / limits / cost / lifecycle sections reused from `fleet/computers/FleetNodeDrawer.tsx`.
       **Test**: `PolicyFamiliesEditor.unit.spec.tsx` — thirteen selects (CONTRACTS §2.1), defaults,
       `desktop` read through from legacy.
 - [x] **T-25**. Favourite ordering in `ComputerCards.tsx` and `FleetComputersTable.tsx`; star column
       writes through `setFavorite`.
       **Test**: extend `fleet-hub.shared.unit.spec.ts` — favourites first, then online by last check.
-- [ ] **T-26**. Playwright `apps/web/e2e/flow-fleet-computer-page.spec.ts` (header, twelve tabs,
+- [x] **T-26**. Playwright `apps/web/e2e/flow-fleet-computer-page.spec.ts` (header, twelve tabs,
       placeholders, menu acts, favourite survives reload) and
       `apps/web/e2e/flow-fleet-roles-contract.spec.ts` (visibility by role; policy change audited).
+      _As built:_ the roles walk covers the stranger (every read and act 404s), the
+      `node.policy.change` rows and the typed name over HTTP; `org-admin` / `org-member` need a
+      computer bound to an Organization, which nothing can do yet (OWNER-QUESTIONS A17) — they are
+      pinned by `fleet-hub.controller.spec.ts`, `fleet-hub.service.spec.ts` and the arbiter spec.
       **Test**: itself.
 
 ## P3 — Polish and docs

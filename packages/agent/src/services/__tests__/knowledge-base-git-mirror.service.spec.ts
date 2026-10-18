@@ -401,6 +401,28 @@ describe('KnowledgeBaseGitMirrorService', () => {
             expect(gitFacade.commit).not.toHaveBeenCalled();
         });
 
+        // Review 2026-10-17 U3 (F114): an organization document keeps its own path (the
+        // integration API takes `terms.md`, `policies/privacy.md`); the platform-owned `.org/`
+        // prefix keeps it inside the overlay, so no class folder is required there.
+        it('writes an organization path that has no class folder under .content/kb/.org/', async () => {
+            documentRepository.findOrgById = jest.fn().mockResolvedValue(
+                buildOrgDoc({
+                    path: 'policies/privacy.md',
+                    kbDocumentClass: 'legal' as KbDocumentClass,
+                }),
+            );
+            await service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID);
+            const body = await fs.readFile(
+                path.join(tempDir, '.content/kb/.org/policies/privacy.md'),
+                'utf-8',
+            );
+            expect(body).toContain('Org brand voice');
+            // A Work path still needs its class folder.
+            expect(() =>
+                KnowledgeBaseGitMirrorService.validateRelativeKbPath('policies/privacy.md'),
+            ).toThrow(BadRequestException);
+        });
+
         it('does NOT touch the source doc lastCommitSha (one row → many commits)', async () => {
             documentRepository.update.mockClear();
             await service.materializeOrgDocument(WORK_ID, ORG_ID, ORG_DOC_ID);

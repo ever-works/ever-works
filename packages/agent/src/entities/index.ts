@@ -165,6 +165,8 @@ export * from './stripe-relay-dead-letter.entity';
 export * from './credit-meter-event.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';
+// Computer health (FL-03) — raw and hourly health history per node.
+export * from './fleet-node-health-sample.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';

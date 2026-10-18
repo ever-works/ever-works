@@ -13,6 +13,7 @@ import {
 } from '@/components/fleet/registry';
 import { readNodeConsents } from '@/components/fleet/fleet-consents.shared';
 import { ComputerHeader } from '@/components/fleet/computer/ComputerHeader';
+import { ComputerActionsMenu } from '@/components/fleet/computer/ComputerActionsMenu';
 import { ComputerTabs } from '@/components/fleet/computer/ComputerTabs';
 import { ComputerTabPlaceholder } from '@/components/fleet/computer/ComputerTabPlaceholder';
 import { FleetTelemetryOnMount } from '@/components/fleet/FleetTelemetryOnMount';
@@ -84,7 +85,11 @@ export default async function FleetComputerPage({
     return (
         <div className="w-full" data-testid="fleet-computer-page" data-tab={tab}>
             <FleetTelemetryOnMount event={{ name: 'fleet_computer_opened', properties: { tab } }} />
-            <ComputerHeader node={node} flags={flags} />
+            <ComputerHeader
+                node={node}
+                flags={flags}
+                menu={<ComputerActionsMenu node={node} flags={flags} />}
+            />
             <ComputerTabs nodeId={node.id} active={tab} />
             <div
                 id="fleet-computer-panel"

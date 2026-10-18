@@ -53,6 +53,10 @@ describe('FleetController', () => {
         listVisibleForUser: jest.Mock;
         setFavoriteForUser: jest.Mock;
         setControlPolicyFamiliesForUser: jest.Mock;
+        // Fleet hub (FL-01, FR-22) — who a machines-family act runs as. The
+        // caller owns the node here; fleet-hub.controller.spec.ts covers the
+        // organisation roles.
+        resolveMachinesActor: jest.Mock;
     };
     let jobs: {
         loadByNodeForUser: jest.Mock;
@@ -129,6 +133,12 @@ describe('FleetController', () => {
             ]),
             setFavoriteForUser: jest.fn(async () => ({ ...nodeView, isFavorite: true })),
             setControlPolicyFamiliesForUser: jest.fn(async () => nodeView),
+            resolveMachinesActor: jest.fn(async (userId: string) => ({
+                ownerUserId: userId,
+                role: 'owner',
+                nodeName: nodeView.name,
+                ctx: {},
+            })),
         };
         jobs = {
             loadByNodeForUser: jest.fn(async () => ({})),
@@ -355,6 +365,27 @@ describe('FleetController', () => {
         expect(service.deleteForUser).toHaveBeenCalledWith('user-1', nodeView.id);
     });
 
+    // Fleet hub (FL-01, T-20, CONTRACTS §2.2) — the optional typed name.
+    it('remove forwards a typed name to the confirm-destructive check', async () => {
+        await controller.remove(auth, nodeView.id, 'build-01');
+        expect(service.resolveMachinesActor).toHaveBeenCalledWith('user-1', nodeView.id);
+        expect(service.deleteForUser).toHaveBeenCalledWith(
+            'user-1',
+            nodeView.id,
+            {},
+            { confirmName: 'build-01' },
+        );
+    });
+
+    it('remove passes a wrong typed name to the service and answers its invalid refusal', async () => {
+        service.deleteForUser.mockRejectedValueOnce(
+            new BadRequestException({ error: { code: 'invalid' } }),
+        );
+        await expect(controller.remove(auth, nodeView.id, 'wrong')).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+    });
+
     describe('detail — the node drawer payload (EW-776)', () => {
         const RUN_ID = '99999999-9999-4999-8999-999999999999';
         const TASK_ID = '88888888-8888-4888-8888-888888888888';
@@ -503,6 +534,8 @@ describe('FleetController', () => {
                 maxConcurrentJobs: undefined,
                 maxCpuPercent: undefined,
                 maxMemoryMb: undefined,
+                // Computer health (FL-03).
+                health: undefined,
             });
             // …and the KEY SET, because the assertion above does not check
             // it (review AO-12). `toHaveBeenCalledWith` uses the same
@@ -531,6 +564,7 @@ describe('FleetController', () => {
                     'maxConcurrentJobs',
                     'maxCpuPercent',
                     'maxMemoryMb',
+                    'health',
                     // Fleet node link (FL-02).
                     'consents',
                 ].sort(),

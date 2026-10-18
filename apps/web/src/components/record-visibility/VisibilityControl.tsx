@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Building2, Lock, Users } from 'lucide-react';
 import {
     getRecordVisibilityAction,
-    setRecordVisibilityAction,
+    setRecordVisibilityResultAction,
 } from '@/app/actions/record-visibility';
 import {
     VISIBILITY_CHOICES,
@@ -77,12 +77,17 @@ export function VisibilityControl({
     const change = (next: VisibilityChoice) => {
         setError(null);
         startTransition(async () => {
+            // Review 2026-10-17 U9: a refusal comes back as a value (its reason shows).
             try {
-                const updated = await setRecordVisibilityAction(aggregate, id, next);
-                setView((previous) => ({ ...previous, ...updated }) as RecordVisibilityView);
-                onChange?.(updated);
-            } catch (err) {
-                setError(err instanceof Error && err.message ? err.message : t('error'));
+                const result = await setRecordVisibilityResultAction(aggregate, id, next);
+                if (!result.ok) {
+                    setError(result.message || t('error'));
+                    return;
+                }
+                setView((previous) => ({ ...previous, ...result.view }) as RecordVisibilityView);
+                onChange?.(result.view);
+            } catch {
+                setError(t('error'));
             }
         });
     };
@@ -109,8 +114,15 @@ export function VisibilityControl({
                         >
                             {VISIBILITY_CHOICES.map((option) => (
                                 <option key={option} value={option}>
+                                    {/* Review 2026-10-17 U4: "Automatic (Private)" on a record set to
+                                        Private by hand promised what choosing it does not do (an
+                                        organization record's automatic value is Team or Organization).
+                                        The current value is the automatic one only while nobody
+                                        picked one by hand. */}
                                     {option === 'automatic'
-                                        ? t('automaticWith', { value: t(view.visibility) })
+                                        ? view.visibilityExplicit
+                                            ? t('automatic')
+                                            : t('automaticWith', { value: t(view.visibility) })
                                         : t(option)}
                                 </option>
                             ))}

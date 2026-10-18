@@ -10,6 +10,7 @@
  * Tabs and the session page are rendered on the server: register those in a
  * file imported by `./server.ts` instead.
  *
- * Registered today: nothing (FL-01 renders its own blocks directly).
+ * Registered today: FL-03's health metrics block and its "Clear limit now"
+ * command (`./fl-03-health`).
  */
-export {};
+import './fl-03-health';

@@ -8,7 +8,10 @@ export type ComputerControlLockRow = Pick<
     FleetNode,
     | 'id'
     | 'userId'
+    | 'organizationId'
+    | 'name'
     | 'controlPolicy'
+    | 'controlPolicyFamilies'
     | 'controlHolderUserId'
     | 'controlHolderSessionId'
     | 'controlHeldSince'
@@ -85,7 +88,14 @@ export class ComputerControlRepository {
             select: {
                 id: true,
                 userId: true,
+                // Fleet hub (FL-01): the Organization binding and the family map,
+                // so the arbiter can derive the caller's role and read the
+                // `desktop` family (the legacy column read through when the map
+                // has no entry for it).
+                organizationId: true,
+                name: true,
                 controlPolicy: true,
+                controlPolicyFamilies: true,
                 controlHolderUserId: true,
                 controlHolderSessionId: true,
                 controlHeldSince: true,

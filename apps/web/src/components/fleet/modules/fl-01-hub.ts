@@ -7,4 +7,7 @@ import { registerComputerTab } from '../registry';
  * is filled by its own epic's module file beside this one.
  */
 registerComputerTab({ id: 'overview', load: () => import('../computer/tabs/OverviewTab') });
-registerComputerTab({ id: 'settings', load: () => import('../computer/tabs/SettingsTab') });
+registerComputerTab({
+    id: 'settings',
+    load: () => import('../computer/tabs/SettingsTabServer'),
+});

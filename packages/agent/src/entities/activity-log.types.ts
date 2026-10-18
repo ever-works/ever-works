@@ -504,6 +504,13 @@ export enum ActivityActionType {
     // verbs only — never a value, a length or a hash (FR-8, FR-5). Additive member — `actionType` is a
     // plain varchar, so no migration is needed.
     APP_ENV = 'app_env',
+    // APW-07 (lane aw-deps-api, 2026-10-18) — the Dependencies card's family (plan §7:887, R-2):
+    // one row per owner action on `/api/works/:id/app-dependencies/:kind` — `app.dependency.configured`,
+    // `app.dependency.retried`, `app.dependency.data_delete_requested` — and one per Deploy request
+    // that retried transient failures (`app.dependency.retried`, `trigger: 'deploy'`). `metadata`
+    // carries the kind, the provider id and counts only — never a config value or an output (FR-5).
+    // Additive member — `actionType` is a plain varchar, so no migration is needed.
+    APP_DEPENDENCY = 'app_dependency',
     // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
     //   - INTEGRATION_WRITE: one row per successful write an integration key
     //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy

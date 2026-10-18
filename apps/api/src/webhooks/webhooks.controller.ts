@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -29,6 +30,7 @@ import {
 import { AuthSessionGuard } from '../auth/guards/auth-session.guard';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { IntegrationKeyService } from '../auth/services/integration-key.service';
 import { WebhooksService, WebhookSubscriptionView } from './webhooks.service';
 import { WebhooksDeliveriesService, WebhookDeliveryView } from './webhooks-deliveries.service';
 
@@ -154,6 +156,8 @@ export class WebhooksController {
     constructor(
         private readonly webhooks: WebhooksService,
         private readonly deliveries: WebhooksDeliveriesService,
+        // Review 2026-10-17 F47: which integration keys the caller manages. Optional + last.
+        @Optional() private readonly integrationKeys?: IntegrationKeyService,
     ) {}
 
     /**
@@ -196,6 +200,25 @@ export class WebhooksController {
         @Param('deliveryId', ParseUUIDPipe) deliveryId: string,
     ) {
         return this.deliveries.redeliver(auth.userId, deliveryId);
+    }
+
+    /**
+     * Review 2026-10-17 F47: the subscriptions of every integration key the caller
+     * manages — all of the Tenant's for its owner, an Organization admin's own — wherever
+     * they are held (a key's subscriptions sit in its creator's account). Settings →
+     * Integrations → Ever Gauzy showed "no webhooks" for a key an admin created.
+     */
+    @Get('integration-keys')
+    @ApiOperation({
+        summary: 'List the webhook subscriptions of the integration keys I manage',
+    })
+    @ApiResponse({ status: 200, description: 'Array of subscription views (no secret material)' })
+    async listForIntegrationKeys(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<{ subscriptions: WebhookSubscriptionView[] }> {
+        const keys = this.integrationKeys ? await this.integrationKeys.list(auth.userId) : [];
+        const subscriptions = await this.webhooks.listForIntegrationKeys(keys.map((key) => key.id));
+        return { subscriptions };
     }
 
     @Get()

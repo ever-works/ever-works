@@ -1,7 +1,7 @@
 # Feature Specification: Integration API v1
 
 **Feature ID**: `integrations-api-v1`
-**Status**: `Draft` — contract `v1-draft.15`; P1 resources live, P2 Ideas (EW-P2-1), Goals (EW-P2-2), Project Works (EW-P2-4), Missions (EW-P2-5) and organization create (EW-P2-6), P3 inbox, P4 email
+**Status**: `Draft` — contract `v1-draft.16`; P1 resources live, P2 Ideas (EW-P2-1), Goals (EW-P2-2), Project Works (EW-P2-4), Missions (EW-P2-5) and organization create (EW-P2-6), P3 inbox, P4 email
 **Created**: 2026-10-15
 **Last updated**: 2026-10-16
 **Owner**: Product (Ruslan); contract owner: the Ever Works integration lane
@@ -28,14 +28,14 @@ relative to it. The plan's shorthand `GET /integrations/whoami` and `GET /integr
 
 ### 1.1 Request headers
 
-| Header                                            | Requirement                                                                                                                         |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `Authorization: Bearer ew_int_…` (or `x-api-key`) | required                                                                                                                            |
-| `X-Scope-Slug: <ewOrgSlug>`                       | required on org resources; must name a pinned org (`403 org_not_pinned`)                                                            |
-| `X-Act-As-User: <ewUserId>`                       | optional, writes only; the user must be active, in the key's tenant and on the target org's roster (`403 act_as_forbidden`)         |
-| `X-Sync-Origin: gauzy:<connectionId>`             | sent on every write; persisted as `domain_events.originTag` and echoed as `origin.tag`                                              |
-| `Idempotency-Key: <≤128 chars>`                   | required on every POST that creates something; the response is stored for 24 h per `(keyId, key)` and replayed                      |
-| `If-Match: "<version>"`                           | optional on PATCH/PUT/DELETE of a versioned aggregate; a mismatch answers `412 version_mismatch` with `details {expected, current}` |
+| Header                                            | Requirement                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization: Bearer ew_int_…` (or `x-api-key`) | required                                                                                                                                                                                                                                        |
+| `X-Scope-Slug: <ewOrgSlug>`                       | required on org resources; must name a pinned org (`403 org_not_pinned`)                                                                                                                                                                        |
+| `X-Act-As-User: <ewUserId>`                       | optional, writes only; the user must be active, in the key's tenant and on the target org's roster (`403 act_as_forbidden`)                                                                                                                     |
+| `X-Sync-Origin: gauzy:<connectionId>`             | sent on every write; persisted as `domain_events.originTag` and echoed as `origin.tag`                                                                                                                                                          |
+| `Idempotency-Key: <≤128 chars>`                   | required on every POST that creates something; the response is stored for 24 h per `(keyId, key)` and replayed for the same request (method, path, body, organization and act-as user; another one answers `409 request_mismatch`, v1-draft.16) |
+| `If-Match: "<version>"`                           | optional on PATCH/PUT/DELETE of a versioned aggregate (the PUT-set routes included, v1-draft.16); a mismatch answers `412 version_mismatch` with `details {expected, current}`                                                                  |
 
 ### 1.2 Responses
 
@@ -195,7 +195,7 @@ visibility is derived (`team` when it sits on a team).
 | Teams         | `GET`/`POST /teams`, `GET`/`PATCH`/`DELETE /teams/:id`, `PUT /teams/:id/members` (full set), `PUT /teams/:id/resources`                                                                                                                                                                                                | `teams:*`               | [team](./contract/schemas/resources/team.schema.json)                                                                                            |
 | Works         | `GET /works`, `GET /works/:id` (members, `repoUrls[]`, `website`, `kind`, `status`, `webUrl`); P2: `POST /works` with `kind:'project'` (§6.7)                                                                                                                                                                          | `works:*`               | [work](./contract/schemas/resources/work.schema.json), [requests](./contract/schemas/requests.schema.json) `CreateWork`                          |
 | Tasks         | `GET`/`POST /tasks`, `GET`/`PATCH`/`DELETE /tasks/:id`; `POST /tasks/:id/transition {to, mode:'sync'}` (shortest legal path; gates → `409 transition_blocked`); `PUT /tasks/:id/assignees`, `/watchers`, `/blocks`, `/relations`; comments `GET`/`POST /tasks/:id/comments`, `PATCH`/`DELETE /tasks/:id/comments/:cid` | `tasks:*`               | [task](./contract/schemas/resources/task.schema.json), [comment](./contract/schemas/resources/task-comment.schema.json)                          |
-| Links         | `GET /links?entityType=&externalId=`, `PUT /links/:entityType/:entityId {externalId, externalUrl}`, `DELETE /links/:entityType/:entityId`                                                                                                                                                                              | `links:write`           | [link](./contract/schemas/resources/link.schema.json)                                                                                            |
+| Links         | `GET /links?entityType=&externalId=&cursor=&limit=` (a keyset list, v1-draft.16), `PUT /links/:entityType/:entityId {externalId, externalUrl}`, `DELETE /links/:entityType/:entityId`                                                                                                                                  | `links:write`           | [link](./contract/schemas/resources/link.schema.json)                                                                                            |
 | Batch         | `POST /batch {operations:[{method, path, headers?, body?}]}` — ≤100 operations, in order, not atomic; per-operation `{status, body}`; each counts against limits                                                                                                                                                       | per operation           | [requests](./contract/schemas/requests.schema.json) `Batch`                                                                                      |
 | Missions (P2) | `GET`/`POST /missions` (POST forces `status='paused'`), `GET`/`PATCH`/`DELETE /missions/:id` (PATCH cannot set `active`), `PUT /missions/:id/goals`, `PUT /missions/:id/works` (§6.5)                                                                                                                                  | `missions:*`            | [mission](./contract/schemas/resources/mission.schema.json), [requests](./contract/schemas/requests.schema.json) `CreateMission`                 |
 | Goals (P2)    | `GET`/`POST /goals` (POST forces `status='draft'`), `GET`/`PATCH`/`DELETE /goals/:id` (PATCH cannot activate or resume), `PUT /goals/:id/criteria`, `PUT /goals/:id/dod`, `POST /goals/:id/samples {criterionId?, value, sampledAt}` (§6.4)                                                                            | `goals:*`               | [goal](./contract/schemas/resources/goal.schema.json), [requests](./contract/schemas/requests.schema.json) `CreateGoal`                          |
@@ -631,3 +631,26 @@ the app (§6.6). It is **idempotent per email** and answers
 also when a concurrent call won the race), `200 already_member` (the Tenant owner counts as a member of every
 Organization), `201 added` (a person already in the Tenant joins this roster directly, with no email, and
 `organization.member.added` is recorded). The token never appears in a response.
+
+## 18. Changes in `v1-draft.16` (CR-14, review fixes)
+
+From the 2026-10-17 post-merge review of the Ever Works side (findings F32/F37, F36, F39, F40, F41, F42). Behaviour
+the contract already implied, made true; one list gains its paging.
+
+- **Idempotency-Key** (§1.1): "the same request" is the method, path and body **and** the organization the request is
+  scoped to (`X-Scope-Slug` / `X-Organization-Id`) and the resolved `X-Act-As-User`. The same key reused for another
+  organization or another act-as user answers `409 request_mismatch` instead of replaying the first one's result.
+- **`If-Match` on the PUT-set routes**: `PUT /tasks/:id/assignees`, `/watchers`, `/blocks`, `/relations`,
+  `PUT /teams/:id/members` and `/resources` check it against the current version (`412`), and again at the first
+  version bump of the set's changes, as `PATCH` does.
+- **`null` in a PATCH body**: a field whose schema is not nullable (`title`, `priority`, `labels`, `teamIds`,
+  `visibility`, a team `name`, KB `title`/`body`/`class`/…, webhook `url`/`events`/…) answers `400 validation_failed`
+  for `null` (it answered `500`). Nullable fields keep taking `null`.
+- **Comment `body` ≤ 16384** is counted in characters (code points), as JSON Schema `maxLength` counts; a body of
+  emoji within the limit is accepted.
+- **Cursors**: a cursor this API did not issue (its id is not a uuid, for instance) answers `400 validation_failed`
+  on every list (it could answer `500` on Postgres).
+- **`GET /links`** is a list like the others (§1.2): `?entityType=&externalId=&updatedSince=&cursor=&limit=` (≤ 500,
+  default 200), ordered by `(updatedAt, id)`, answering `{data, nextCursor, hasMore}`. It answered the first 500 links
+  as `{data}` with no way to read the rest. A link to a private record is still left out of `data`, so a page may hold
+  fewer than `limit` links while `hasMore` is true.

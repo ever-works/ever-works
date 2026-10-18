@@ -70,6 +70,7 @@ describe('DefaultInboundEmailDispatcher', () => {
             updateDeliveryStatus: jest.fn().mockResolvedValue(undefined),
             findByMessageIdHeaders: jest.fn().mockResolvedValue([]),
             linkTask: jest.fn().mockResolvedValue(true),
+            findByProviderMessageId: jest.fn().mockResolvedValue(null),
         };
         conversations = {
             findById: jest.fn().mockResolvedValue(null),
@@ -104,6 +105,35 @@ describe('DefaultInboundEmailDispatcher', () => {
         const moduleRef = await Test.createTestingModule({ providers }).compile();
         return moduleRef.get(DefaultInboundEmailDispatcher);
     }
+
+    // Review 2026-10-17 U2 (F113): a provider retry of a message already delivered is
+    // acknowledged before anything is stored again (no second upload, no unique-row 500).
+    it('acknowledges a provider retry of a delivered message without storing anything again', async () => {
+        const svc = await build(true, true);
+        addresses.findById.mockResolvedValue(inboundAddress);
+        assignments.findByEmailAddress.mockResolvedValue([
+            { agentId: 'agent-1', dispatchMode: 'task-spawn' },
+        ]);
+        messages.findByProviderMessageId.mockResolvedValue({
+            id: 'msg-first',
+            agentId: 'agent-1',
+            taskId: 'task-first',
+            conversationId: null,
+        });
+        const result = await svc.dispatch({
+            ...basePayload,
+            attachments: [{ filename: 'a.pdf', mimeType: 'application/pdf', content: 'JVBERi0x' }],
+        } as never);
+        expect(result).toMatchObject({
+            handled: true,
+            emailMessageId: 'msg-first',
+            taskId: 'task-first',
+            reason: 'duplicate',
+        });
+        expect(attachmentStore.store).not.toHaveBeenCalled();
+        expect(messages.save).not.toHaveBeenCalled();
+        expect(taskSpawner.spawnTaskForInboundEmail).not.toHaveBeenCalled();
+    });
 
     it('returns handled:false when no inbound address matches', async () => {
         const svc = await build(false);

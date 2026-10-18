@@ -135,10 +135,15 @@ function postmarkWebhook(to: string[], secret: string) {
     };
 }
 
-/** Mailgun signs `timestamp + token` with HMAC-SHA256 of the signing key. */
+/**
+ * Mailgun signs `timestamp + token` with HMAC-SHA256 of the signing key. Review F56: the
+ * plugin accepts only a fresh timestamp and each token once, so every webhook is signed now
+ * with a token of its own.
+ */
+let mailgunTokens = 0;
 function mailgunWebhook(fields: Record<string, string>, signingKey: string) {
-    const timestamp = '1790000000';
-    const token = 'token-1';
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const token = `token-${++mailgunTokens}`;
     const signature = createHmac('sha256', signingKey).update(`${timestamp}${token}`).digest('hex');
     return {
         rawBody: Buffer.from(
@@ -209,6 +214,7 @@ function world(rows: AddressRow[]) {
             ...message,
         })),
         updateDeliveryStatus: jest.fn(async () => undefined),
+        findByProviderMessageId: jest.fn(async () => null),
     };
     const spawned: Array<{ agentId: string; userId: string }> = [];
     const spawner = {
@@ -370,7 +376,9 @@ describe('EmailFacadeService + DefaultInboundEmailDispatcher — a webhook reach
         await expect(
             facade.parseInbound('mailgun', webhook.rawBody, webhook.headers),
         ).resolves.toMatchObject({ authenticatedRecipient: null });
-        await expect(deliver('mailgun', webhook)).resolves.toMatchObject({ handled: false });
+        // A second webhook: the same signed one would be a replay (F56).
+        const again = mailgunWebhook({ recipient: 'nobody@n.test' }, 'mg-admin');
+        await expect(deliver('mailgun', again)).resolves.toMatchObject({ handled: false });
         expect(spawned).toEqual([]);
     });
 

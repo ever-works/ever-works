@@ -161,14 +161,16 @@ describe('fleet node contract — the wire a deployed node actually speaks', () 
         // shrinking the contract has to be done in two places, one of which a
         // reviewer is looking at.
         expect(routeKeys).toHaveLength(7);
-        expect(requestCases).toHaveLength(16);
+        // 16 → 17 with computer health (FL-03): `heartbeat.withHealth`, a beat
+        // carrying the health snapshot.
+        expect(requestCases).toHaveLength(17);
 
         const variantsPerRoute = Object.fromEntries(
             routeKeys.map((key) => [key, Object.keys(baseline.routes[key].requests).length]),
         );
         expect(variantsPerRoute).toEqual({
             enroll: 3,
-            heartbeat: 3,
+            heartbeat: 4,
             pause: 2,
             unenroll: 1,
             'jobs-lease': 2,

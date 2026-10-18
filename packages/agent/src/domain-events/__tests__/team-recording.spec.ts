@@ -372,6 +372,74 @@ describe('team recording points', () => {
         });
     });
 
+    // Review 2026-10-17 F34: a record's `teamIds` written through RecordVisibilityService
+    // moves the Teams' resources too, so each Team records it and its version moves.
+    it("setTeams records the Teams' side: team.resource.added / removed with a team version bump (F34)", async () => {
+        const visibility = new RecordVisibilityService(dataSource, new DomainEventRecorder());
+        const first = await newTeam('First');
+        const second = await newTeam('Second');
+        await visibility.setTeams('task', TASK, [first.id, second.id], OWNER);
+        // `teamId` (the first) is a task column; the second is a `team_resources` row.
+        const added = (await events()).filter((event) => event.type === 'team.resource.added');
+        expect(added.map((event) => [event.aggregateId, event.aggregateVersion])).toEqual([
+            [second.id, 2],
+        ]);
+        expect(added[0].data).toMatchObject({
+            teamId: second.id,
+            resourceType: 'task',
+            resourceId: TASK,
+        });
+        expectValid(added[0]);
+        expect(await versionOf(Team, second.id)).toBe(2);
+
+        await visibility.setTeams('task', TASK, [first.id], OWNER);
+        const removed = (await events()).filter((event) => event.type === 'team.resource.removed');
+        expect(removed.map((event) => [event.aggregateId, event.aggregateVersion])).toEqual([
+            [second.id, 3],
+        ]);
+        expect(removed[0].data).toMatchObject({ resourceId: TASK, deleted: true });
+        expectValid(removed[0]);
+    });
+
+    // Review 2026-10-17 F35: the DTO carries `visibilityExplicit`, so a change of only that
+    // flag moves the version and reaches the feed.
+    it('a change of only visibilityExplicit records <aggregate>.updated and bumps the version (F35)', async () => {
+        const visibility = new RecordVisibilityService(dataSource, new DomainEventRecorder());
+        await dataSource
+            .getRepository(Task)
+            .update({ id: TASK }, { visibility: 'organization', visibilityExplicit: false });
+        const before = await versionOf(Task, TASK);
+        await visibility.setVisibility('task', TASK, 'organization');
+        const updated = (await events()).filter((event) => event.type === 'task.updated');
+        expect(updated).toHaveLength(1);
+        expect(updated[0]).toMatchObject({
+            aggregateVersion: before + 1,
+            changedFields: ['visibilityExplicit'],
+            previous: { visibilityExplicit: false },
+        });
+        expect(updated[0].data).toMatchObject({ visibilityExplicit: true });
+        expect(await versionOf(Task, TASK)).toBe(before + 1);
+        // Back to automatic with the same value: the flag moves again.
+        await visibility.setVisibility('task', TASK, 'automatic');
+        expect((await events()).filter((event) => event.type === 'task.updated')).toHaveLength(2);
+    });
+
+    // Review 2026-10-17 F38: a private agent's membership is never served either.
+    it('keeps a private agent out of the Team DTO members and its membership events off the feed (F38)', async () => {
+        const team = await newTeam();
+        await dataSource
+            .getRepository(Agent)
+            .update({ id: AGENT }, { visibility: 'private', visibilityExplicit: true } as never);
+        await teams.addMember(OWNER, ORG_A, team.id, { memberType: 'agent', memberId: AGENT });
+        const added = (await events()).find((event) => event.type === 'team.member.added');
+        expect(added?.visibility).toBe('private');
+        const snapshot = await buildTeamSnapshot(dataSource.manager, team.id);
+        expect(snapshot?.dto.members).toEqual([]);
+        await teams.removeMember(ORG_A, team.id, 'agent', AGENT);
+        const removed = (await events()).find((event) => event.type === 'team.member.removed');
+        expect(removed?.visibility).toBe('private');
+    });
+
     it('delete records a team.deleted tombstone at a version claimed before the delete', async () => {
         const team = await newTeam();
         await teams.remove(ORG_A, team.id);

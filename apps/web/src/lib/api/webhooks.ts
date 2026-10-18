@@ -82,6 +82,17 @@ export const webhooksAPI = {
         const data = await serverFetch<{ subscriptions: WebhookSubscription[] }>('/webhooks');
         return data.subscriptions;
     },
+    /**
+     * Review 2026-10-17 F47: the subscriptions of every integration key the viewer
+     * manages (the Tenant owner: all of the Tenant's), wherever they are held. `list`
+     * answers only the viewer's own account's.
+     */
+    listForIntegrationKeys: async (): Promise<WebhookSubscription[]> => {
+        const data = await serverFetch<{ subscriptions: WebhookSubscription[] }>(
+            '/webhooks/integration-keys',
+        );
+        return data.subscriptions;
+    },
     create: async (input: CreateWebhookInput): Promise<WebhookWithSecret> =>
         serverMutation<WebhookWithSecret>({
             method: 'POST',

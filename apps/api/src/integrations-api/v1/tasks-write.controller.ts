@@ -65,6 +65,7 @@ import {
     principalOf,
     validationFailed,
     withExpectedVersion,
+    IsOptionalNonNull,
 } from './integration-request';
 
 const PRIORITIES = ['p0', 'p1', 'p2', 'p3', 'p4'] as const;
@@ -258,7 +259,7 @@ export class IntegrationTransitionTaskDto {
 /** Contract v1 `requests.schema.json#/$defs/UpdateTask` (no `status`: use /transition). */
 export class IntegrationUpdateTaskDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 200)
     title?: string;
@@ -270,12 +271,12 @@ export class IntegrationUpdateTaskDto {
     description?: string | null;
 
     @ApiProperty({ required: false, enum: ['p0', 'p1', 'p2', 'p3', 'p4'] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(PRIORITIES)
     priority?: (typeof PRIORITIES)[number];
 
     @ApiProperty({ required: false, type: [String], maxItems: 50 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsString({ each: true })
@@ -289,7 +290,7 @@ export class IntegrationUpdateTaskDto {
         description:
             'teamId plus the team_resources rows, as one set. Writable on POST/PATCH; the first id is stored as teamId where the entity has that column. Non-empty means visibility `team` unless visibilityExplicit (D11).',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsUUID('all', { each: true })
@@ -301,7 +302,7 @@ export class IntegrationUpdateTaskDto {
         description:
             'Integrations may set team or organization only; `private` answers 422 domain_rule. Setting it marks visibilityExplicit=true.',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     visibility?: string;
 

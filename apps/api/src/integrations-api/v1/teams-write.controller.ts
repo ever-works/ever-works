@@ -58,6 +58,7 @@ import {
     principalOf,
     validationFailed,
     withExpectedVersion,
+    IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
 
@@ -100,7 +101,7 @@ export class IntegrationCreateTeamDto {
 /** `UpdateTeam` (contract v1 requests.schema.json). */
 export class IntegrationUpdateTeamDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 200)
     name?: string;
@@ -365,26 +366,33 @@ export class IntegrationTeamsWriteController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: PutTeamMembersDto,
         @Res({ passthrough: true }) res: Response,
+        // Last, so a direct call without it keeps its arguments.
+        @Headers('if-match') ifMatch?: string,
     ): Promise<Record<string, unknown>> {
         const organizationId = this.organizationId();
         const source = linkSourceOf(principalOf(user));
         const current = await this.resources.get('team', organizationId, id, source);
+        // Review 2026-10-17 F36: `If-Match` on the full-set PUT, as on PATCH (`412`).
+        const expected = expectedVersion(ifMatch);
+        assertIfMatch(expected, Number(current.dto.version));
         const key = (ref: TeamMemberRef) => `${ref.memberType}:${ref.memberId}:${ref.role}`;
         const have = (current.dto.members as TeamMemberRef[] | undefined) ?? [];
         const wanted = new Map(dto.members.map((ref) => [key(ref), ref]));
-        // A role change is a remove and an add (the roster has no role update).
-        for (const ref of have.filter((existing) => !wanted.has(key(existing)))) {
-            await this.teams.removeMember(organizationId, id, ref.memberType, ref.memberId);
-        }
-        const kept = new Set(have.map(key));
-        for (const ref of wanted.values()) {
-            if (kept.has(key(ref))) continue;
-            await this.teams.addMember(user.userId, organizationId, id, {
-                memberType: ref.memberType,
-                memberId: ref.memberId,
-                role: ref.role,
-            });
-        }
+        await withExpectedVersion('team', id, expected, async () => {
+            // A role change is a remove and an add (the roster has no role update).
+            for (const ref of have.filter((existing) => !wanted.has(key(existing)))) {
+                await this.teams.removeMember(organizationId, id, ref.memberType, ref.memberId);
+            }
+            const kept = new Set(have.map(key));
+            for (const ref of wanted.values()) {
+                if (kept.has(key(ref))) continue;
+                await this.teams.addMember(user.userId, organizationId, id, {
+                    memberType: ref.memberType,
+                    memberId: ref.memberId,
+                    role: ref.role,
+                });
+            }
+        });
         return this.answer(organizationId, id, source, res);
     }
 
@@ -396,6 +404,8 @@ export class IntegrationTeamsWriteController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: PutTeamResourcesDto,
         @Res({ passthrough: true }) res: Response,
+        // Last, so a direct call without it keeps its arguments.
+        @Headers('if-match') ifMatch?: string,
     ): Promise<Record<string, unknown>> {
         const organizationId = this.organizationId();
         const source = linkSourceOf(principalOf(user));
@@ -408,32 +418,37 @@ export class IntegrationTeamsWriteController {
             }
         });
         const current = await this.resources.get('team', organizationId, id, source);
+        // Review 2026-10-17 F36: `If-Match` on the full-set PUT, as on PATCH (`412`).
+        const expected = expectedVersion(ifMatch);
+        assertIfMatch(expected, Number(current.dto.version));
         const key = (ref: TeamResourceRef) => `${ref.resourceType}:${ref.resourceId}`;
         const have = (current.dto.resources as TeamResourceRef[] | undefined) ?? [];
         const wanted = new Map(dto.resources.map((ref) => [key(ref), ref]));
-        for (const ref of have.filter((existing) => !wanted.has(key(existing)))) {
-            await this.teamResources.detach(
-                organizationId,
-                id,
-                ref.resourceType as TeamResourceType,
-                ref.resourceId,
-            );
-        }
-        const kept = new Set(have.map(key));
-        for (const ref of wanted.values()) {
-            if (kept.has(key(ref))) continue;
-            // Review 2026-10-17 F4: a private record answers 404 to an integration.
-            await this.teamResources.attach(
-                user.userId,
-                organizationId,
-                id,
-                {
-                    resourceType: ref.resourceType as TeamResourceType,
-                    resourceId: ref.resourceId,
-                },
-                { viewer: { kind: 'integration' } },
-            );
-        }
+        await withExpectedVersion('team', id, expected, async () => {
+            for (const ref of have.filter((existing) => !wanted.has(key(existing)))) {
+                await this.teamResources.detach(
+                    organizationId,
+                    id,
+                    ref.resourceType as TeamResourceType,
+                    ref.resourceId,
+                );
+            }
+            const kept = new Set(have.map(key));
+            for (const ref of wanted.values()) {
+                if (kept.has(key(ref))) continue;
+                // Review 2026-10-17 F4: a private record answers 404 to an integration.
+                await this.teamResources.attach(
+                    user.userId,
+                    organizationId,
+                    id,
+                    {
+                        resourceType: ref.resourceType as TeamResourceType,
+                        resourceId: ref.resourceId,
+                    },
+                    { viewer: { kind: 'integration' } },
+                );
+            }
+        });
         return this.answer(organizationId, id, source, res);
     }
 

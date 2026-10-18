@@ -3,7 +3,9 @@ import {
     VersionMismatchError,
 } from '@ever-works/agent/integrations-api';
 import { IntegrationHttpException } from '../../../auth/integration/integration-http.exception';
-import { IntegrationIdeasController } from '../ideas.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { IntegrationIdeasController, IntegrationUpdateIdeaDto } from '../ideas.controller';
 
 /**
  * Ideas of `/api/integrations/v1` (EW-P2-1): creates always external + pending
@@ -281,5 +283,27 @@ describe('IntegrationIdeasController', () => {
             expect.objectContaining({ limit: 50, cursor: null }),
             'gauzy',
         );
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateIdeaDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateIdeaDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['title', 'description', 'teamIds', 'visibility']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of []) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

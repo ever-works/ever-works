@@ -7482,6 +7482,38 @@
                         "specUnavailable": "Cette app n'a pas encore de spécification utilisable.",
                         "failed": "La valeur n'a pas pu être enregistrée. Réessayez."
                     }
+                },
+                "dependencies": {
+                    "title": "Dépendances",
+                    "description": "Les bases de données, caches, stockages et services de messagerie dont cette app a besoin. Ils sont provisionnés sur sa cible de déploiement avant son démarrage.",
+                    "loading": "Lecture des dépendances…",
+                    "unavailable": "Les dépendances ne peuvent pas encore être gérées sur cette instance.",
+                    "error": "Impossible de lire les dépendances. Rechargez la page pour réessayer.",
+                    "empty": "La spécification de cette app ne déclare aucune dépendance.",
+                    "provider": "Fournisseur : {label}",
+                    "size": "{size} Gio",
+                    "attempts": "{count, plural, one {# tentative} other {# tentatives}}",
+                    "noReason": "Aucune raison n'a été enregistrée.",
+                    "deployRetries": "Un nouveau déploiement réessaie automatiquement — ou cliquez sur Réessayer maintenant.",
+                    "retry": "Réessayer",
+                    "retryAria": "Réessayer {kind}",
+                    "retried": "{kind} : une nouvelle tentative est planifiée.",
+                    "retryQueued": "{kind} : une nouvelle tentative démarrera dès que le worker sera disponible.",
+                    "leaseHeld": "{kind} est en cours de provisionnement. Réessayez dans un instant.",
+                    "retryFailed": "Impossible de réessayer {kind}. Réessayez.",
+                    "deleteData": "Supprimer les données",
+                    "deleteDataAria": "Supprimer les données de {kind}",
+                    "deleteDialog": {
+                        "title": "Supprimer les données de {kind} ?",
+                        "description": "Cette action détruit les volumes, bases de données et buckets de cette dépendance. Elle est irréversible.",
+                        "resources": "Sera supprimé :",
+                        "noResources": "Aucune ressource n'est enregistrée pour cette dépendance.",
+                        "confirmLabel": "Saisissez {slug} pour confirmer",
+                        "cancel": "Annuler",
+                        "confirm": "Supprimer les données",
+                        "requested": "Suppression des données de {kind} en cours.",
+                        "failed": "Les données n'ont pas pu être supprimées. {reason}"
+                    }
                 }
             },
             "appEnv": {

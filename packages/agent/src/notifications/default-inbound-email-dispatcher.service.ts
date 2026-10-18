@@ -235,6 +235,29 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
         const agentId = assignment.agentId;
         const mode = assignment.dispatchMode === 'conversation' ? 'conversation' : 'task-spawn';
 
+        // Review 2026-10-17 U2 (F113): a provider retries a webhook with the same message
+        // id when its first try timed out or failed after the row was written. That
+        // message is handled already: answer so (the route acknowledges, the provider
+        // stops) before storing its attachments again, instead of uploading them once more
+        // and failing on the unique `(pluginId, providerMessageId)` row with a 500.
+        if (payload.providerMessageId) {
+            const delivered = await this.messages.findByProviderMessageId(
+                payload.pluginId,
+                payload.providerMessageId,
+            );
+            if (delivered) {
+                return {
+                    handled: true,
+                    agentId: delivered.agentId ?? agentId,
+                    mode,
+                    emailMessageId: delivered.id,
+                    taskId: delivered.taskId ?? undefined,
+                    conversationId: delivered.conversationId ?? undefined,
+                    reason: 'duplicate',
+                };
+            }
+        }
+
         // EW-P4-3 — attachments are stored (for the address owner, in the
         // address's scope) before the row is written, so the row lists them.
         const attachments = await this.storeAttachments(payload, address);

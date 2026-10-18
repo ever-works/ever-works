@@ -228,6 +228,72 @@ describe('ComputerControlArbiter', () => {
         });
     });
 
+    /**
+     * Fleet hub (FL-01, T-21, ACC-FL01-15) — the arbiter derives the caller's
+     * Organization role through FleetAccessService and reads the `desktop`
+     * family (the legacy column when the map has no entry). Owner-only machines
+     * behave exactly as before (every case above runs without the service).
+     */
+    describe('organisation roles (Fleet hub)', () => {
+        const MEMBER = '44444444-4444-4444-8444-444444444444';
+        const shared = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+        function withRole(role: 'org-admin' | 'org-member' | 'stranger') {
+            const internals = arbiter as unknown as {
+                sessions: ComputerSessionRepository & { findForOwner: jest.Mock };
+                events: unknown;
+            };
+            const access = { roleFor: jest.fn(async () => role) };
+            const roled = new ComputerControlArbiter(
+                new ComputerControlRepository(nodes),
+                internals.sessions,
+                audit as never,
+                internals.events as never,
+                access as never,
+            );
+            roled.clock = () => now;
+            addSession(shared, { userId: OWNER, openedByUserId: MEMBER });
+            internals.sessions.findForOwner.mockImplementation(async () => sessions.get(shared));
+            return { roled, access };
+        }
+
+        it('lets an org admin take control of a machine whose desktop family admits org admins', async () => {
+            await nodes.update({ id: NODE }, { controlPolicy: 'org-admins' });
+            const { roled, access } = withRole('org-admin');
+            const outcome = await roled.take(actor(shared, MEMBER));
+            expect(outcome).toMatchObject({ state: { mode: 'controlling', canControl: true } });
+            expect(access.roleFor).toHaveBeenCalledWith(
+                expect.objectContaining({ id: NODE, userId: OWNER }),
+                MEMBER,
+            );
+        });
+
+        it('refuses an org member when the desktop family admits admins only', async () => {
+            await nodes.update({ id: NODE }, { controlPolicy: 'org-admins' });
+            const { roled } = withRole('org-member');
+            expect(await roled.take(actor(shared, MEMBER))).toMatchObject({
+                refused: 'policy',
+                state: { canControl: false, policy: 'org-admins' },
+            });
+        });
+
+        it('keeps an owner-only machine owner-only for an org admin', async () => {
+            const { roled } = withRole('org-admin');
+            expect(await roled.take(actor(shared, MEMBER))).toMatchObject({ refused: 'policy' });
+        });
+
+        it('reads the family map’s desktop entry over the legacy column', async () => {
+            await nodes.update(
+                { id: NODE },
+                { controlPolicy: 'owner', controlPolicyFamilies: { desktop: 'org-members' } },
+            );
+            const { roled } = withRole('org-member');
+            expect(await roled.take(actor(shared, MEMBER))).toMatchObject({
+                state: { canControl: true, policy: 'org-members' },
+            });
+        });
+    });
+
     describe('give back and automatic release', () => {
         it('gives control back with its reason, closing the span and publishing the release', async () => {
             await arbiter.take(actor(VIEW_A));

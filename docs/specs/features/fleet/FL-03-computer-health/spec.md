@@ -6,7 +6,7 @@
 **Epic ID:** `FL-03-computer-health`
 **Program:** [Fleet](../README.md) · Wave 0 (foundations)
 **Branch:** `feat/fl-03-computer-health`
-**Status:** `Draft`
+**Status:** `Draft` · implementation `In progress` (P1 in `feat/fl-03-computer-health-p1`)
 **Created:** 2026-10-18
 **Last updated:** 2026-10-18
 **Size:** M · **Blocked by:** — (renders into FL-01's slots; `health.now` and wake ride FL-02's link when present) · **Related:** FL-01 (cards, "needs a look" renderer), FL-02 (`machine` channel, `wake` tag), FL-07 (helper trust producer), FL-17 (cloud idle), FL-20 (Usage)

@@ -349,4 +349,32 @@ describe('Knowledge Base recording points', () => {
         );
         for (const event of await events()) expectValid(event);
     });
+
+    it('a folder that joins the subtree just before the delete is deleted WITH its event (review F31)', async () => {
+        const parent = await folders.createOrganizationFolder(ORG_A, OWNER, { name: 'Specs' });
+        await folders.createOrganizationFolder(ORG_A, OWNER, { name: 'Q1', parentId: parent.id });
+        // Another admin creates /Specs/Q2 right before the delete takes the tree lock.
+        const repository = (folders as unknown as { folders: MemoryFolderRepository }).folders;
+        const original = repository.withOrganizationTree.bind(repository);
+        let late: { id: string } | null = null;
+        jest.spyOn(repository, 'withOrganizationTree').mockImplementationOnce(
+            async (organizationId, fn) => {
+                late = await folders.createOrganizationFolder(ORG_A, OWNER, {
+                    name: 'Q2',
+                    parentId: parent.id,
+                });
+                return original(organizationId, fn);
+            },
+        );
+        const result = await folders.deleteOrganizationFolder(
+            ORG_A,
+            OWNER,
+            parent.id,
+            async () => 0,
+        );
+        expect(result.deletedFolders).toBe(3);
+        const deleted = (await events()).filter((event) => event.type === 'kb.folder.deleted');
+        expect(deleted.map((event) => event.aggregateId)).toContain(late!.id);
+        expect(deleted).toHaveLength(3);
+    });
 });

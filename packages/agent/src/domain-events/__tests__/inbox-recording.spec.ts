@@ -314,6 +314,30 @@ describe('inbox recording points', () => {
         expect(await dataSource.getRepository(InboxItem).count()).toBe(0);
     });
 
+    it('a delete whose tombstone an edit overtook records above that edit (review F30)', async () => {
+        await fileNotice();
+        const { id } = await onlyItem();
+        const publisher = new DomainEventPublisher(new DomainEventRecorder(), dataSource);
+        // The tombstone commits on its own (v2), then an edit lands before the row goes
+        // and records v3: a consumer that applied v3 must not skip the delete.
+        const tombstone = await publisher.transaction((manager) =>
+            publisher.beforeDelete(manager, 'inbox_item', id),
+        );
+        await inbox.setUnread(id, RECIPIENT, false);
+        await dataSource.getRepository(InboxItem).delete({ id });
+        await publisher.transaction((manager) =>
+            publisher.deleted(manager, tombstone, 'inbox.item.deleted'),
+        );
+        const recorded = await events();
+        expect(recorded.map((event) => [event.type, event.aggregateVersion])).toEqual([
+            ['inbox.item.created', 1],
+            ['inbox.item.state_changed', 3],
+            ['inbox.item.deleted', 4],
+        ]);
+        expect(recorded[2].data).toMatchObject({ id, version: 4, deleted: true });
+        expectValid(recorded[2]);
+    });
+
     it("a foreign user's state change / delete is refused and records nothing", async () => {
         await fileNotice();
         const { id } = await onlyItem();

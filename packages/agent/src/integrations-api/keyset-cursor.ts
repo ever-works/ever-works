@@ -40,6 +40,12 @@ export interface KeysetPage<T> {
 
 const VERSION = 1;
 const STAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
+/**
+ * Review 2026-10-17 F41: every keyset-paged table has a uuid primary key, so a cursor
+ * id is a uuid. Anything else is a forged or corrupted cursor (400), and must never
+ * reach a uuid comparison (Postgres answers 22P02, a 500).
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function encodeKeysetCursor(position: KeysetPosition): string {
     return Buffer.from(
@@ -63,7 +69,8 @@ export function decodeKeysetCursor(cursor: string): KeysetPosition {
         !STAMP.test(parsed.u) ||
         typeof parsed.i !== 'string' ||
         parsed.i.length === 0 ||
-        parsed.i.length > 64
+        parsed.i.length > 64 ||
+        !UUID.test(parsed.i)
     ) {
         throw new InvalidCursorError();
     }

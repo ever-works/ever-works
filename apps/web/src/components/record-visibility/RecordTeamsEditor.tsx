@@ -3,7 +3,10 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { getRecordVisibilityAction, setRecordTeamsAction } from '@/app/actions/record-visibility';
+import {
+    getRecordVisibilityAction,
+    setRecordTeamsResultAction,
+} from '@/app/actions/record-visibility';
 import type { RecordAggregate, RecordVisibilityView } from '@/lib/record-visibility';
 
 /**
@@ -62,17 +65,20 @@ export function RecordTeamsEditor({
 
     const save = () => {
         startTransition(async () => {
+            // Review 2026-10-17 U9: a refusal comes back as a value (its reason shows).
             try {
-                const updated = await setRecordTeamsAction(aggregate, id, selected);
+                const result = await setRecordTeamsResultAction(aggregate, id, selected);
+                if (!result.ok) {
+                    setMessage({ kind: 'error', text: result.message || t('error') });
+                    return;
+                }
+                const updated = result.view;
                 setView((previous) => ({ ...previous, ...updated }) as RecordVisibilityView);
                 setSelected(updated.teamIds);
                 setMessage({ kind: 'ok', text: t('saved') });
                 onChange?.(updated);
-            } catch (err) {
-                setMessage({
-                    kind: 'error',
-                    text: err instanceof Error && err.message ? err.message : t('error'),
-                });
+            } catch {
+                setMessage({ kind: 'error', text: t('error') });
             }
         });
     };

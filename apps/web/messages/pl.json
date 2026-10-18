@@ -7414,6 +7414,38 @@
                         "specUnavailable": "Ta aplikacja nie ma jeszcze użytecznej specyfikacji.",
                         "failed": "Nie udało się zapisać wartości. Spróbuj ponownie."
                     }
+                },
+                "dependencies": {
+                    "title": "Zależności",
+                    "description": "Bazy danych, pamięci podręczne, magazyny danych i poczta, których potrzebuje ta aplikacja. Są przygotowywane w jej celu wdrożenia, zanim się uruchomi.",
+                    "loading": "Odczytywanie zależności…",
+                    "unavailable": "Na tej instancji nie można jeszcze zarządzać zależnościami.",
+                    "error": "Nie udało się odczytać zależności. Odśwież stronę, aby spróbować ponownie.",
+                    "empty": "Specyfikacja tej aplikacji nie deklaruje żadnych zależności.",
+                    "provider": "Dostawca: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# próba} few {# próby} many {# prób} other {# próby}}",
+                    "noReason": "Nie zapisano przyczyny.",
+                    "deployRetries": "Ponowne wdrożenie automatycznie ponawia próbę — możesz też kliknąć teraz „Ponów”.",
+                    "retry": "Ponów",
+                    "retryAria": "Ponów {kind}",
+                    "retried": "{kind}: zaplanowano nową próbę.",
+                    "retryQueued": "{kind}: nowa próba rozpocznie się, gdy tylko worker będzie dostępny.",
+                    "leaseHeld": "{kind} jest właśnie przygotowywany. Spróbuj ponownie za chwilę.",
+                    "retryFailed": "Nie udało się ponowić {kind}. Spróbuj ponownie.",
+                    "deleteData": "Usuń dane",
+                    "deleteDataAria": "Usuń dane: {kind}",
+                    "deleteDialog": {
+                        "title": "Usunąć dane: {kind}?",
+                        "description": "Spowoduje to zniszczenie wolumenów, baz danych i bucketów tej zależności. Tej operacji nie można cofnąć.",
+                        "resources": "Zostanie usunięte:",
+                        "noResources": "Dla tej zależności nie zapisano żadnych zasobów.",
+                        "confirmLabel": "Wpisz {slug}, aby potwierdzić",
+                        "cancel": "Anuluj",
+                        "confirm": "Usuń dane",
+                        "requested": "Usuwanie danych: {kind}.",
+                        "failed": "Nie udało się usunąć danych. {reason}"
+                    }
                 }
             },
             "appEnv": {

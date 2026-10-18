@@ -16,6 +16,9 @@
 export {
     AppDependenciesService,
     AppDependencyRefusalError,
+    // Lane aw-deps-api — the reasons an explicit Deploy request retries (`retryTransientFailures`).
+    APP_DEPENDENCY_TRANSIENT_FAILURE_REASONS,
+    type AppDependencyTransientRetryResult,
     APP_DEPENDENCY_CLUSTER_ACCESS,
     APP_DEPENDENCY_CONFIG_CIPHER,
     APP_DEPENDENCY_PROVISION_DISPATCHER,

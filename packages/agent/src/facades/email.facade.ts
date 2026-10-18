@@ -256,7 +256,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 // so a concurrent burst cannot overshoot a hard stop.
                 const admission = await this.sendPolicy.admitSend(
                     attempt,
-                    await this.reservationFor(input, options, threading),
+                    await this.reservationFor(input, options, threading, sender),
                 );
                 reservedMessageId = admission?.reservedMessageId ?? null;
             } else {
@@ -330,6 +330,30 @@ export class EmailFacadeService extends BaseFacadeService {
      * EW-P4-3 — `providerSettings.fromName` of the sending address, when one
      * was saved. Best-effort: a lookup failure sends without a name, as before.
      */
+    /**
+     * Review 2026-10-17 U1 (F112): the Tenant and Organization of the address a message
+     * is sent from, for its `email_messages` row. Without them an agent's mail sent
+     * outside a request (Trigger runs, timers: empty scope) was stored with no
+     * Organization, so it was missing from `GET /email/messages` and recorded no
+     * `email.message.*` event; a person's mail took the request's Organization, which
+     * can differ from the address's. `{}` (the request scope applies, as before) for a
+     * personal address, or when it cannot be read.
+     */
+    async ownershipOfAddress(
+        addressId: string | null | undefined,
+        loaded?: TenantEmailAddress | null,
+    ): Promise<{ tenantId?: string | null; organizationId?: string | null }> {
+        if (!addressId || !this.emailAddresses) return {};
+        try {
+            const address =
+                loaded !== undefined ? loaded : await this.emailAddresses.findById(addressId);
+            if (!address?.organizationId) return {};
+            return { tenantId: address.tenantId ?? null, organizationId: address.organizationId };
+        } catch {
+            return {};
+        }
+    }
+
     private async savedFromName(
         addressId: string | undefined,
         loaded?: TenantEmailAddress | null,
@@ -354,6 +378,7 @@ export class EmailFacadeService extends BaseFacadeService {
         input: EmailFacadeSendInput,
         options: EmailFacadeSendOptions,
         threading: EmailThreadingFields,
+        sender?: TenantEmailAddress | null,
     ): Promise<EmailSendReservation | null> {
         if (!this.emailMessages || !options.userId || !options.addressId) return null;
         if (options.draftMessageId) return { kind: 'draft' };
@@ -379,6 +404,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 metadata: input.metadata ? { ...input.metadata } : null,
                 messageRef: input.messageRef ?? null,
                 ...threading,
+                ...(await this.ownershipOfAddress(options.addressId, sender)),
             },
         };
     }
@@ -913,6 +939,7 @@ export class EmailFacadeService extends BaseFacadeService {
             metadata: input.metadata ? { ...input.metadata } : null,
             messageRef: input.messageRef ?? null,
             ...threading,
+            ...(await this.ownershipOfAddress(options.addressId)),
             sentAt: new Date(),
             deliveryStatus: 'accepted',
             status: 'sent',

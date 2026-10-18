@@ -7414,6 +7414,38 @@
                         "specUnavailable": "Deze app heeft nog geen bruikbare app-specificatie.",
                         "failed": "De waarde kon niet worden opgeslagen. Probeer het opnieuw."
                     }
+                },
+                "dependencies": {
+                    "title": "Afhankelijkheden",
+                    "description": "De databases, caches, opslag en e-mail die deze app nodig heeft. Ze worden op het deploydoel ingericht voordat de app start.",
+                    "loading": "Afhankelijkheden worden gelezen…",
+                    "unavailable": "Afhankelijkheden kunnen op deze instantie nog niet worden beheerd.",
+                    "error": "Kon de afhankelijkheden niet lezen. Laad de pagina opnieuw om het nog eens te proberen.",
+                    "empty": "De App-spec van deze app declareert geen afhankelijkheden.",
+                    "provider": "Provider: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# poging} other {# pogingen}}",
+                    "noReason": "Er is geen reden vastgelegd.",
+                    "deployRetries": "Opnieuw deployen probeert het automatisch opnieuw — of klik nu op Opnieuw proberen.",
+                    "retry": "Opnieuw proberen",
+                    "retryAria": "{kind} opnieuw proberen",
+                    "retried": "{kind}: er is een nieuwe poging gepland.",
+                    "retryQueued": "{kind}: een nieuwe poging start zodra de worker beschikbaar is.",
+                    "leaseHeld": "{kind} wordt nu ingericht. Probeer het zo meteen opnieuw.",
+                    "retryFailed": "Kon {kind} niet opnieuw proberen. Probeer het nog eens.",
+                    "deleteData": "Gegevens verwijderen",
+                    "deleteDataAria": "Gegevens van {kind} verwijderen",
+                    "deleteDialog": {
+                        "title": "Gegevens van {kind} verwijderen?",
+                        "description": "Hiermee worden de volumes, databases en buckets van deze afhankelijkheid vernietigd. Dit kan niet ongedaan worden gemaakt.",
+                        "resources": "Wordt verwijderd:",
+                        "noResources": "Voor deze afhankelijkheid zijn geen resources vastgelegd.",
+                        "confirmLabel": "Typ {slug} om te bevestigen",
+                        "cancel": "Annuleren",
+                        "confirm": "Gegevens verwijderen",
+                        "requested": "De gegevens van {kind} worden verwijderd.",
+                        "failed": "De gegevens konden niet worden verwijderd. {reason}"
+                    }
                 }
             },
             "appEnv": {

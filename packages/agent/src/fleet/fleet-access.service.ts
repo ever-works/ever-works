@@ -223,6 +223,11 @@ export class FleetAccessService {
     ): Promise<FleetNodeAccess> {
         const node = await this.nodes.findById(nodeId);
         if (!node) throw notFound(nodeId);
+        // An `enrolling` row is an outstanding one-time token, not a computer:
+        // the owner's business alone, exactly as `listSharedWith` leaves it out.
+        if (node.status === 'enrolling' && node.userId !== callerId(caller)) {
+            throw notFound(nodeId);
+        }
         const role = await this.assertFamily(node, caller, family);
         return { node, role };
     }

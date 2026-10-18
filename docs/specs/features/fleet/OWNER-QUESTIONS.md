@@ -7,7 +7,7 @@ epic is blocked by this list. Markers that CONTRACTS already answers were closed
 "**Resolved** by CONTRACTS …"; the few still open in an epic although CONTRACTS answers them are
 listed at the end as auditor follow-up.
 
-**Count:** 41 open markers — 18 in group A, 22 in group B, 1 answered by CONTRACTS (auditor
+**Count:** 42 open markers — 19 in group A, 22 in group B, 1 answered by CONTRACTS (auditor
 follow-up). Line numbers are those of the marker in the epic's `spec.md`.
 
 ## A — Decide before that epic ships (security, credentials, data, money, other people)
@@ -32,6 +32,7 @@ follow-up). Line numbers are those of the marker in the epic's `spec.md`.
 | A16 | `FL-18-actions-runners/spec.md:468`         | Should the Ever Works GitHub App manifest gain "Self-hosted runners" and repository "Administration" now, accepting the re-authorisation prompt every existing installation will see? | Manifest unchanged; an installation that already has the permission works, and every missing permission is named with **Grant access** |
 | A17 | `docs/internal/fleet/lanes/FL-01.md` (Q1) | Nothing binds a computer to an Organization today (`fleet_nodes.organizationId` is never written), so no one but the owner can see one. Should the computer's Settings tab offer "Share with an Organization" (owner picks one of their Organizations)? | Not built: every computer stays unbound and owner-only; the role derivation and the per-family policy are in place and take effect the day a binding exists |
 | A18 | `docs/internal/fleet/lanes/FL-01.md` (Q2) | Does a member of the Tenant WITHOUT a roster row in the computer's Organization count as an `org-member`? (Organization access elsewhere is tenant-wide.) | No — only the Tenant owner (`org-admin`) and roster rows (`admin` → `org-admin`, `member` → `org-member`) derive a role; everyone else is a `stranger` |
+| A19 | `docs/internal/fleet/lanes/FL-01.md` (Q4) | Rename, pause, drain and remove follow the `machines` (Lifecycle) family. Should an org admin that family admits also change a computer's capability tags, cost ceiling and resource limits? | No — those three stay owner-only; a non-owner sending one beside a lifecycle field is refused before anything is written |
 
 ## B — Product behaviour and copy
 

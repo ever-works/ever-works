@@ -20,6 +20,7 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ENTITIES } from '@ever-works/agent/database';
 import { ComputerControlArbiter, ComputerSessionService } from '@ever-works/agent/computer';
+import { FleetAccessService } from '@ever-works/agent/fleet';
 import {
     PluginRegistryService,
     PluginSettingsService,
@@ -132,6 +133,11 @@ describe('ComputerApiModule — taking control is wired', () => {
 
         const arbiter = moduleRef.get(ComputerControlArbiter, { strict: false });
         expect(arbiter).toBeInstanceOf(ComputerControlArbiter);
+        // Fleet hub (FL-01, T-21): the take-over derives Organization roles through
+        // the access service — bound, not left to the owner-or-stranger fallback.
+        expect((arbiter as unknown as { access?: unknown }).access).toBeInstanceOf(
+            FleetAccessService,
+        );
         const controller = moduleRef.get(ComputerController, { strict: false });
         expect((controller as unknown as { control?: unknown }).control).toBe(arbiter);
         const gateway = moduleRef.get(ComputerWsService, { strict: false });

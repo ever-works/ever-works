@@ -191,7 +191,7 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_DEPENDENCY_CLUSTER_ACCESS',
         reason: 'Worker-only by design: its swap, `AppRuntimeFacadeService`, refuses outside the isolated worker and no dependency provider is dialled from the API (FR-5); unbound, a cluster call reports `mayRemain`.',
-        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:308-329; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
+        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:310-331; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
     },
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_RUNTIME_EVENT_SINK',
@@ -410,6 +410,10 @@ const APP_WORKS_API_FILES = [
     'telemetry/app-works-telemetry-binding.module.ts',
     TRIGGER_INTERNAL_CONTROLLER_FILE,
     'trigger/trigger-internal.module.ts',
+    // Lane aw-deps-api (APW-07 T25) — the Dependencies routes. Every constructor parameter is
+    // checked, not only the App Works ones: its `@Optional()` spec source and Activity writer
+    // degrade silently (`deployTarget: null`, no Activity row) when `WorksModule` cannot see them.
+    'works/work-app-dependencies.controller.ts',
 ];
 
 /** The App Works Trigger tasks whose `withWorkerContext` roots the worker check walks. */

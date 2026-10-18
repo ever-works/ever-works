@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager, type EntityTarget, In, type ObjectLiteral } from 'typeorm';
+import { type KeysetPage, type KeysetQuery, readKeysetPage } from './keyset-cursor';
 import { Agent } from '../entities/agent.entity';
 import { Goal } from '../entities/goal.entity';
 import { InboxItem } from '../entities/inbox-item.entity';
@@ -171,6 +172,31 @@ export class ExternalRecordLinksService {
             .getRepository(entity)
             .count({ where: { id: link.entityId } });
         return found > 0;
+    }
+
+    /**
+     * Review 2026-10-17 F42: `GET /links` as a keyset page (`(updatedAt, id)`, the
+     * contract's list rule `{data, nextCursor, hasMore}`), with the {@link list} filters.
+     * Before, the route answered the first 500 links with no way to read the rest.
+     */
+    listPage(
+        scope: Pick<LinkScope, 'organizationId' | 'source'>,
+        filter: { entityType?: ExternalLinkEntityType; externalId?: string },
+        query: KeysetQuery,
+    ): Promise<KeysetPage<ExternalRecordLink>> {
+        const qb = this.repo()
+            .createQueryBuilder('row')
+            .where('row.organizationId = :organizationId', {
+                organizationId: scope.organizationId,
+            })
+            .andWhere('row.source = :source', { source: scope.source });
+        if (filter.entityType) {
+            qb.andWhere('row.entityType = :entityType', { entityType: filter.entityType });
+        }
+        if (filter.externalId) {
+            qb.andWhere('row.externalId = :externalId', { externalId: filter.externalId });
+        }
+        return readKeysetPage(qb, 'row', query);
     }
 
     /** `GET /links?entityType=&externalId=` — this source's links in the organization. */

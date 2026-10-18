@@ -143,6 +143,57 @@ describe('WebhooksSettings', () => {
         expect(screen.queryByTestId('webhook-secret')).toBeNull();
     });
 
+    // Review 2026-10-17 U6: Rotate and Delete ask first, and the secret names its subscription.
+    it('asks before Rotate and Delete, warns for v1 and integration-owned ones, and labels the secret', async () => {
+        const confirm = vi.spyOn(window, 'confirm');
+        actions.rotateWebhookSecret.mockResolvedValue({
+            success: true,
+            signingSecret: 'rotated-1',
+        });
+        actions.deleteWebhook.mockResolvedValue({ success: true });
+        render(
+            <WebhooksSettings
+                initialSubscriptions={[
+                    sub({ id: 'wh-1', version: 1, ownerType: 'integration_key', ownerId: 'key-1' }),
+                    sub({ id: 'wh-2', url: 'https://second.example.com/hook' }),
+                ]}
+                organizations={[ORG]}
+            />,
+        );
+        confirm.mockReturnValueOnce(false);
+        await act(async () => {
+            fireEvent.click(screen.getAllByText('Rotate secret')[0]);
+        });
+        expect(actions.rotateWebhookSecret).not.toHaveBeenCalled();
+        const question = confirm.mock.calls[0][0] as string;
+        expect(question).toContain('https://hooks.example.com/ever');
+        expect(question).toContain('v1 subscription');
+        expect(question).toContain('Ever Gauzy');
+
+        confirm.mockReturnValueOnce(true);
+        await act(async () => {
+            fireEvent.click(screen.getAllByText('Rotate secret')[0]);
+        });
+        expect(actions.rotateWebhookSecret).toHaveBeenCalledWith('wh-1');
+        expect(screen.getByTestId('webhook-secret-for').textContent).toContain(
+            'https://hooks.example.com/ever',
+        );
+        // One secret on screen at a time: another row's Rotate waits for Done.
+        expect((screen.getAllByText('Rotate secret')[1] as HTMLButtonElement).disabled).toBe(true);
+
+        confirm.mockReturnValueOnce(false);
+        await act(async () => {
+            fireEvent.click(screen.getAllByText('Delete')[1]);
+        });
+        expect(actions.deleteWebhook).not.toHaveBeenCalled();
+        confirm.mockReturnValueOnce(true);
+        await act(async () => {
+            fireEvent.click(screen.getAllByText('Delete')[1]);
+        });
+        expect(actions.deleteWebhook).toHaveBeenCalledWith('wh-2');
+        confirm.mockRestore();
+    });
+
     it('refuses to submit without an organization', async () => {
         render(
             <WebhooksSettings

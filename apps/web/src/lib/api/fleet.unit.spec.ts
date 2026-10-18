@@ -190,3 +190,41 @@ describe('fleetAPI hub reads and writes — endpoint shape', () => {
         });
     });
 });
+
+describe('fleetAPI node acts — Fleet hub (FL-01)', () => {
+    it('removes with no body field when no typed name is sent (exactly as before)', async () => {
+        const { fleetAPI } = await importApi();
+        serverMutationMock.mockResolvedValue(undefined);
+        await fleetAPI.deleteNode('node-1');
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                endpoint: '/fleet/nodes/node-1',
+                data: {},
+                method: 'DELETE',
+            }),
+        );
+    });
+
+    it('sends the typed name as confirmName (CONTRACTS §2.2)', async () => {
+        const { fleetAPI } = await importApi();
+        serverMutationMock.mockResolvedValue(undefined);
+        await fleetAPI.deleteNode('node-1', { confirmName: 'build-01' });
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { confirmName: 'build-01' }, method: 'DELETE' }),
+        );
+    });
+
+    it('encodes the node id as one path segment on read, update and remove', async () => {
+        const { fleetAPI } = await importApi();
+        serverMutationMock.mockResolvedValue(undefined);
+        await fleetAPI.nodeDetail('../kill-switch');
+        await fleetAPI.updateNode('../kill-switch', { name: 'x' });
+        await fleetAPI.deleteNode('../kill-switch');
+        expect(serverFetchMock).toHaveBeenCalledWith('/fleet/nodes/..%2Fkill-switch');
+        for (const call of serverMutationMock.mock.calls) {
+            expect((call[0] as { endpoint: string }).endpoint).toBe(
+                '/fleet/nodes/..%2Fkill-switch',
+            );
+        }
+    });
+});

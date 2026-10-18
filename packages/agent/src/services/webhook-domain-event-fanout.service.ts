@@ -45,6 +45,22 @@ export interface WebhookV2Enqueuer {
 /** DI token for {@link WebhookV2Enqueuer}. Unbound → deliveries are created but not enqueued. */
 export const WEBHOOK_V2_ENQUEUER = Symbol.for('WebhookV2Enqueuer');
 
+/**
+ * The in-process retry ladder (F45): 30 s after the first failed attempt, then x6 per
+ * attempt (3 min, 18 min, 1.8 h, 10.8 h), at most 24 h — the curve the Trigger.dev
+ * `webhook-delivery` task uses (`minTimeoutInMs: 30_000, factor: 6`).
+ */
+export function webhookRetryDelayMs(attempts: number): number {
+    const step = Math.max(1, Math.trunc(attempts));
+    return Math.min(30_000 * 6 ** (step - 1), 24 * 60 * 60 * 1000);
+}
+
+/** The attempt budget (`WEBHOOK_MAX_CONSECUTIVE_FAILURES`, default 10), as the Trigger.dev task. */
+function webhookMaxAttempts(): number {
+    const n = Number.parseInt(process.env.WEBHOOK_MAX_CONSECUTIVE_FAILURES ?? '', 10);
+    return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
 /** The fan-out's cursor row in `plugin_event_cursors` (one global position, anchor tenant). */
 export const WEBHOOKS_V2_CURSOR_ID = 'core:webhooks-v2';
 
@@ -116,9 +132,13 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
         this.relay.registerConsumer({
             name: 'webhooks-v2',
             // The batch itself is not needed: the pass reads from the cursor, so it
-            // also covers anything an earlier pass missed.
+            // also covers anything an earlier pass missed. Review 2026-10-17 F44: never
+            // awaited — a long pass (thousands of deliveries) held every relay batch for
+            // the listener timeout; started here, it loses nothing (own cursor).
             consume: async () => {
-                await this.catchUp();
+                void this.catchUp().catch((error) =>
+                    this.logger.warn(`webhooks v2 fan-out failed: ${describe(error)}`),
+                );
             },
         });
         if (process.env.NODE_ENV === 'test') return;
@@ -161,6 +181,11 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
     }
 
     private async pass(): Promise<number> {
+        // Review 2026-10-17 F43: the head BEFORE the subscriptions are listed is this
+        // pass's ceiling. A subscription created or changed after the list was read
+        // starts at (or matches from) a later head, so events above the ceiling are left
+        // to the next pass, which reads the list again.
+        const ceiling = await this.feed.head();
         const subscriptions = (await this.subscriptions.listActiveV2()).filter(
             (sub) => (sub.organizationIds?.length ?? 0) > 0 && (sub.events?.length ?? 0) > 0,
         );
@@ -168,7 +193,7 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
         if (subscriptions.length === 0) {
             // Nobody listens: keep the cursor at the head so a new subscription
             // starts from now, not from the whole retained history.
-            await this.moveCursor(cursor, await this.feed.head());
+            await this.moveCursor(cursor, ceiling);
             return 0;
         }
 
@@ -187,6 +212,7 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
                 result = await this.feed.readPage({
                     organizationIds,
                     after,
+                    upTo: ceiling,
                     limit: PAGE_SIZE,
                     types: patterns,
                     // Read the recipient-scoped domains too; each subscription is
@@ -238,6 +264,9 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
             this.logger.warn(
                 `webhooks v2 recovery of unsent deliveries failed: ${describe(error)}`,
             ),
+        );
+        await this.retryInProcess().catch((error) =>
+            this.logger.warn(`webhooks v2 in-process retries failed: ${describe(error)}`),
         );
         return created;
     }
@@ -316,6 +345,42 @@ export class WebhookDomainEventFanoutService implements OnApplicationBootstrap, 
             });
         }
         return this.enqueuer ? rows.length : 0;
+    }
+
+    /**
+     * Review 2026-10-17 F45: without Trigger.dev, a delivery runs in process once and
+     * nothing re-runs it after a 5xx or a timeout (Trigger.dev's retry policy is the
+     * ladder there). A v2 delivery the in-process path left `retrying` (no Trigger run
+     * id) is enqueued again once its step of the 30 s → 24 h ladder has passed, within
+     * the attempt budget. The claim moves `lastAttemptAt` first, so a second pass (or
+     * another replica) does not send it twice; a send that dies is retried a step later.
+     */
+    private async retryInProcess(): Promise<number> {
+        if (!this.enqueuer) return 0;
+        const now = Date.now();
+        const budget = webhookMaxAttempts();
+        let sent = 0;
+        // One query per ladder step, each returning only rows already due at that step:
+        // a row that waits on a long step (or is past the budget) never crowds out a due one.
+        for (let attempts = 1; attempts < budget && sent < UNSENT_BATCH; attempts++) {
+            const dueBefore = new Date(now - webhookRetryDelayMs(attempts));
+            const rows = await this.deliveries.listRetryingFanout(
+                attempts,
+                dueBefore,
+                UNSENT_BATCH - sent,
+            );
+            for (const row of rows) {
+                if (!(await this.deliveries.claimRetry(row.id, dueBefore))) continue;
+                await this.enqueuer.enqueueDelivery({
+                    deliveryId: row.id,
+                    subscriptionId: row.subscriptionId,
+                    eventName: row.event,
+                    payload: row.payload,
+                });
+                sent += 1;
+            }
+        }
+        return sent;
     }
 
     /** Create the pending delivery (idempotent) and enqueue it. */

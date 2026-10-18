@@ -1,6 +1,7 @@
 import {
     COMPUTER_CONTROL_POLICIES,
     COMPUTER_VIEWER_ROLES,
+    effectiveControlPolicy,
     type ComputerControlPolicy,
     type ComputerViewerRole,
 } from '@ever-works/contracts';
@@ -52,6 +53,41 @@ describe('canControl — policy × role', () => {
     it('resolves the owner of a machine as its owner, and anyone else as a stranger', () => {
         expect(viewerRoleForNode({ userId: 'u1' }, { userId: 'u1' })).toBe('owner');
         expect(viewerRoleForNode({ userId: 'u1' }, { userId: 'u2' })).toBe('stranger');
+    });
+});
+
+/**
+ * Fleet hub (FL-01, ACC-FL01-15) — the take-over reads the `desktop` family:
+ * the family map's entry when there is one, the single legacy value
+ * otherwise, so a row written before the map existed decides exactly as it
+ * did.
+ */
+describe('canControl on the desktop family', () => {
+    const desktop = (
+        controlPolicy: ComputerControlPolicy,
+        controlPolicyFamilies: Record<string, string> | null = null,
+    ) => effectiveControlPolicy({ controlPolicy, controlPolicyFamilies }).desktop;
+
+    it('reads a legacy row as desktop = its single value', () => {
+        for (const policy of COMPUTER_CONTROL_POLICIES) {
+            for (const role of COMPUTER_VIEWER_ROLES) {
+                expect(canControl(desktop(policy), role)).toBe(canControl(policy, role));
+            }
+        }
+    });
+
+    it('lets an org admin take control when the desktop family admits org admins', () => {
+        expect(canControl(desktop('org-admins'), 'org-admin')).toBe(true);
+        expect(canControl(desktop('org-admins'), 'org-member')).toBe(false);
+    });
+
+    it('reads the map’s desktop entry over the legacy value', () => {
+        expect(canControl(desktop('owner', { desktop: 'org-members' }), 'org-member')).toBe(true);
+        expect(canControl(desktop('org-members', { desktop: 'owner' }), 'org-admin')).toBe(false);
+    });
+
+    it('never widens past the owner on a family other than desktop', () => {
+        expect(canControl(desktop('owner', { machines: 'org-members' }), 'org-member')).toBe(false);
     });
 });
 

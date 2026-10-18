@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { CommandRunner } from './capabilities';
-import { classifyGpuVendor, detectGpu, firstAdapterLine, gpuProbesFor } from './gpu-probe';
+import {
+	classifyGpuVendor,
+	detectGpu,
+	detectGpuWithEvidence,
+	firstAdapterLine,
+	gpuProbesFor,
+	parseIoregGpuUtil,
+	parseNvidiaSmiHealth,
+	parseRocmSmiHealth
+} from './gpu-probe';
 
 /** Runner that answers exactly one command and 127s the rest. */
 function answering(command: string, stdout: string, code = 0): CommandRunner {
@@ -108,5 +117,57 @@ describe('detectGpu', () => {
 			}
 		};
 		await expect(detectGpu(runner, 'linux')).resolves.toBeNull();
+	});
+});
+
+describe('detectGpuWithEvidence (computer health, FL-03)', () => {
+	it('tells "no GPU" (a listing tool answered without one) from "could not ask"', async () => {
+		expect(await detectGpuWithEvidence(answering('lspci', '00:1f.3 Audio device: Intel\n'), 'linux')).toEqual({
+			gpu: null,
+			answered: true
+		});
+		expect(await detectGpuWithEvidence(silent, 'linux')).toEqual({ gpu: null, answered: false });
+	});
+
+	it('keeps detectGpu’s answer unchanged', async () => {
+		const runner = answering('lspci', '01:00.0 VGA compatible controller: NVIDIA GeForce RTX 3060\n');
+		expect((await detectGpuWithEvidence(runner, 'linux')).gpu).toEqual(await detectGpu(runner, 'linux'));
+	});
+});
+
+describe('GPU usage parsers (computer health, FL-03)', () => {
+	it('parseNvidiaSmiHealth reads every GPU line, numbers from the end, so a comma in a name survives', () => {
+		expect(parseNvidiaSmiHealth('NVIDIA GeForce RTX 4070, 12, 2048, 8188\nTesla, Inc. X1, 3, 1, 16\n')).toEqual([
+			{ name: 'NVIDIA GeForce RTX 4070', utilPercent: 12, memUsedMiB: 2048, memTotalMiB: 8188 },
+			{ name: 'Tesla, Inc. X1', utilPercent: 3, memUsedMiB: 1, memTotalMiB: 16 }
+		]);
+	});
+
+	it('parseNvidiaSmiHealth reads [N/A] as "not readable", never as zero, and skips junk lines', () => {
+		expect(parseNvidiaSmiHealth('NVIDIA T4, [N/A], [Not Supported], 15360\nnot a gpu line\n')).toEqual([
+			{ name: 'NVIDIA T4', memTotalMiB: 15360 }
+		]);
+		expect(parseNvidiaSmiHealth('')).toEqual([]);
+	});
+
+	it('parseRocmSmiHealth reads the first card’s use and VRAM in MiB', () => {
+		const stdout = JSON.stringify({
+			card0: {
+				'GPU use (%)': '7',
+				'VRAM Total Memory (B)': String(16 * 1024 ** 3),
+				'VRAM Total Used Memory (B)': String(1024 ** 3)
+			},
+			card1: { 'GPU use (%)': '99' }
+		});
+		expect(parseRocmSmiHealth(stdout)).toEqual({ utilPercent: 7, memUsedMiB: 1024, memTotalMiB: 16 * 1024 });
+		expect(parseRocmSmiHealth('not json')).toBeNull();
+		expect(parseRocmSmiHealth(JSON.stringify({ system: {} }))).toBeNull();
+	});
+
+	it('parseIoregGpuUtil reads Device Utilization %, and null when the key is absent', () => {
+		expect(
+			parseIoregGpuUtil('"PerformanceStatistics" = {"Device Utilization %"=37,"Renderer Utilization %"=30}')
+		).toBe(37);
+		expect(parseIoregGpuUtil('"PerformanceStatistics" = {}')).toBeNull();
 	});
 });
