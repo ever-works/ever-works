@@ -96,19 +96,37 @@ export enum UsageOutcome {
  */
 export function timestampToEpochMillis(value: unknown): unknown {
     if (value === undefined || value === null || value === '') return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'number') {
+        // Unchanged contract: a non-finite number is "no timestamp".
+        return Number.isFinite(value) ? inDateRange(value, value) : null;
+    }
     if (typeof value === 'string') {
         const numeric = /^-?\d+$/.test(value.trim()) ? Number(value) : Date.parse(value);
-        if (Number.isFinite(numeric)) return numeric;
+        if (Number.isFinite(numeric)) return inDateRange(numeric, value);
         throw new TypeError(
             `TimestampColumn: "${value}" is not a date, an ISO-8601 string or epoch milliseconds.`,
         );
     }
-    if (typeof (value as { getTime?: unknown }).getTime === 'function') {
-        return (value as { getTime: () => number }).getTime();
+    if (value instanceof Date || typeof (value as { getTime?: unknown }).getTime === 'function') {
+        const millis = (value as { getTime: () => number }).getTime();
+        if (!Number.isFinite(millis)) {
+            throw new TypeError('TimestampColumn: refusing to store an Invalid Date.');
+        }
+        return inDateRange(millis, value);
     }
     return value;
+}
+
+/** ECMAScript's Date range (±8.64e15 ms): outside it the read half would produce an Invalid Date. */
+const MAX_DATE_MILLIS = 8.64e15;
+
+function inDateRange(millis: number, original: unknown): number {
+    if (Math.abs(millis) > MAX_DATE_MILLIS) {
+        throw new TypeError(
+            `TimestampColumn: ${String(original)} is outside the representable date range.`,
+        );
+    }
+    return millis;
 }
 
 export const TimestampColumn = ({

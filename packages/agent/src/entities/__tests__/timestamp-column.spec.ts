@@ -1,4 +1,7 @@
+import { getMetadataArgsStorage } from 'typeorm';
+
 import { timestampToEpochMillis } from '../_types';
+import { WorkAppRuntimeState } from '../work-app-runtime-state.entity';
 
 /**
  * `TimestampColumn`'s write half (2026-10-18). Rows written through the isolated Trigger
@@ -22,11 +25,12 @@ describe('timestampToEpochMillis', () => {
         expect(timestampToEpochMillis(String(ms))).toBe(ms);
     });
 
-    it('maps absent values to null', () => {
+    it('maps absent values and non-finite numbers to null', () => {
         expect(timestampToEpochMillis(undefined)).toBeNull();
         expect(timestampToEpochMillis(null)).toBeNull();
         expect(timestampToEpochMillis('')).toBeNull();
         expect(timestampToEpochMillis(Number.NaN)).toBeNull();
+        expect(timestampToEpochMillis(Number.POSITIVE_INFINITY)).toBeNull();
     });
 
     it('refuses an unparseable string with a TypeError that names it', () => {
@@ -34,8 +38,42 @@ describe('timestampToEpochMillis', () => {
         expect(() => timestampToEpochMillis('not-a-date')).toThrow(/not-a-date/);
     });
 
+    it('refuses an Invalid Date and epochs outside the Date range (the read half would answer Invalid Date)', () => {
+        expect(() => timestampToEpochMillis(new Date(Number.NaN))).toThrow(/Invalid Date/);
+        expect(() => timestampToEpochMillis(8.64e15 + 1)).toThrow(/range/);
+        expect(() => timestampToEpochMillis(String(-8.64e15 - 1))).toThrow(/range/);
+        expect(timestampToEpochMillis(8.64e15)).toBe(8.64e15);
+    });
+
     it('passes any other object (e.g. a TypeORM FindOperator) through untouched', () => {
         const operator = { _type: 'lessThan', _value: new Date(ms) };
         expect(timestampToEpochMillis(operator)).toBe(operator);
+    });
+});
+
+describe('the registered TimestampColumn transformer (WorkAppRuntimeState)', () => {
+    const transformer = getMetadataArgsStorage().columns.find(
+        (column) =>
+            column.target === WorkAppRuntimeState &&
+            column.propertyName === 'firstDeployJobsCompletedAt',
+    )?.options.transformer as {
+        to: (value: unknown) => unknown;
+        from: (value: unknown) => unknown;
+    };
+
+    it('writes the ISO string the RPC proxy delivers, and reads it back as the same instant', () => {
+        const iso = '2026-10-18T20:06:01.844Z';
+        const stored = transformer.to(iso);
+
+        expect(stored).toBe(Date.parse(iso));
+        expect((transformer.from(String(stored)) as Date).toISOString()).toBe(iso);
+    });
+
+    it('still writes a Date and nullish values as before', () => {
+        const at = new Date('2026-10-18T20:06:01.844Z');
+
+        expect(transformer.to(at)).toBe(at.getTime());
+        expect(transformer.to(undefined)).toBeNull();
+        expect(transformer.to(null)).toBeNull();
     });
 });
