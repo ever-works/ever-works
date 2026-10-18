@@ -1,4 +1,11 @@
-import { Injectable, Module, OnModuleInit } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    Module,
+    OnApplicationBootstrap,
+    OnModuleInit,
+    Optional,
+} from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
 import {
     APP_DEPLOY_BUILD_SOURCE,
@@ -86,6 +93,7 @@ import { TriggerRemoteCacheModule } from './trigger-remote-cache.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerInternalModule } from './trigger-internal.module';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrator.service';
 import { createRemoteProxy } from '../remote-proxy';
 
 /**
@@ -144,6 +152,12 @@ import { createRemoteProxy } from '../remote-proxy';
  * scanning for a second caller rather than by trusting this docstring. Until it runs,
  * `AppRuntimeFacadeService`'s every method throws `APP_CLUSTER_IO_IN_API` — which is exactly what
  * keeps a cluster dial out of the API process.
+ *
+ * ## The plugin registry's bootstrap
+ *
+ * {@link AppRuntimePluginRegistryBootstrap} fills the registry (`onApplicationBootstrap`) that the
+ * facade resolves every App target's plugin from. Without it the registry is empty and every
+ * target is `target_unavailable` — see that class.
  *
  * ## What is local, and what is proxied
  *
@@ -265,6 +279,54 @@ export class AppClusterWorkerContextBootstrap implements OnModuleInit {
     }
 }
 
+/**
+ * **The plugin registry, filled** — once per context, before any task code runs.
+ *
+ * `TriggerPluginsModule` binds `PluginRegistryService`, but a registry is only populated by
+ * `PluginBootstrapService.bootstrap()` (the loader's disk discovery). The KB / workflow / terminal
+ * tasks call `TriggerPluginHydratorService.initialize()` themselves; none of the `app-cluster-io`
+ * tasks did, so every context this module built had an EMPTY registry: the runtime facade found
+ * no `k8s` plugin for `your-cluster` and no `apps-tier` plugin for `ever-works-apps`
+ * (`No enabled deployment plugin declares the 'apps-tier' capability …`, prod run
+ * `run_cmvdl1xd81sut2y47j7sqnvo5`, worker 20261018.4), so `prepareDependencyTarget` answered
+ * `target_unavailable` and every dependency row read `clusterUnreachable` without a cluster ever
+ * being dialled.
+ *
+ * Here rather than in each task because the registry is this module's dependency: every task that
+ * boots it (`app-deploy`, `app-cluster-op`, `app-smoke`, `app-health-poll`,
+ * `app-dependency-provision`, the local worker) resolves plugins through `AppRuntimeFacadeService`.
+ * `onApplicationBootstrap`, so the internal client and every module above it are initialised first.
+ *
+ * Lazy mode (the default) registers manifests only — no plugin module is imported until first
+ * use. A failed bootstrap does not fail the context: the facade then answers its own named
+ * refusal (`target_unavailable`), which is logged with the reason below.
+ */
+@Injectable()
+export class AppRuntimePluginRegistryBootstrap implements OnApplicationBootstrap {
+    private readonly logger = new Logger(AppRuntimePluginRegistryBootstrap.name);
+
+    constructor(@Optional() private readonly hydrator?: TriggerPluginHydratorService) {}
+
+    async onApplicationBootstrap(): Promise<void> {
+        if (!this.hydrator || typeof this.hydrator.initialize !== 'function') {
+            this.logger.warn(
+                'No plugin hydrator is bound: the App runtime plugin registry stays empty, so no ' +
+                    'App target can be resolved in this context.',
+            );
+            return;
+        }
+        try {
+            await this.hydrator.initialize();
+        } catch (error) {
+            this.logger.warn(
+                `The App runtime plugin registry could not be bootstrapped: ${
+                    error instanceof Error ? `${error.name}: ${error.message}` : typeof error
+                }`,
+            );
+        }
+    }
+}
+
 /** The remote name each proxied provider dials on `TriggerInternalController.remoteMap`. */
 export const APP_RUNTIME_REMOTE_PROXIES = [
     'WorkRepository',
@@ -371,6 +433,8 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
     providers: [
         // ---- the flag, armed by this module's own bootstrap and by nothing else --------
         AppClusterWorkerContextBootstrap,
+        // ---- the plugin registry, populated before any task resolves a plugin ------------
+        AppRuntimePluginRegistryBootstrap,
 
         // ---- proxied: the worker owns no `DataSource` -----------------------------------
         {

@@ -707,6 +707,25 @@
 			},
 			"additionalProperties": false
 		},
+		"InviteMember": {
+			"description": "POST /members/invite (CR-13, scope members:write — in the Ever Gauzy preset; Idempotency-Key required): invites a person into the pinned organization with the app's own invitation (email-bound token, the normal invitation email, the seat check), sent by the act-as user, else the key's owner. Idempotent per email; answers resources/member-invite-result.schema.json: 201 invited | added, 200 pending | already_member.",
+			"type": "object",
+			"required": ["email"],
+			"properties": {
+				"email": { "type": "string", "format": "email", "maxLength": 320 },
+				"role": {
+					"description": "The role the invitation grants; `member` only (promotion stays the tenant owner's step in the app, EW-P2-6).",
+					"type": "string",
+					"enum": ["member"]
+				},
+				"invitedName": {
+					"description": "Display name for the email copy only; never used for identity.",
+					"type": "string",
+					"maxLength": 200
+				}
+			},
+			"additionalProperties": false
+		},
 		"CreateWork": {
 			"description": "POST /works (Gauzy CR-6, EW-P2-4; scope works:write; Idempotency-Key required; a repeated externalRef answers 200 with the existing work). Only kind 'project': a repo-less Project Work with no repositories, deploy or generator (nothing is provisioned, D9). Owner = the act-as user, else the key's owner; the slug is derived from name (`<slug>-N` when taken). teamIds become team_resources rows (type work); a work's visibility is derived from them (CR-1), so `visibility` is only validated (private -> 422 domain_rule). While EVER_WORKS_PROJECT_WORKS_ENABLED is off: 422 domain_rule with details.reason 'project_works_disabled'. Answers 201 with the work DTO and records work.created.",
 			"type": "object",

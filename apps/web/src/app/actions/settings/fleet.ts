@@ -545,6 +545,23 @@ export async function fetchFleetNeedsALookAction(): Promise<
     }
 }
 
+/** Fleet hub (FL-01) — what needs a look on ONE computer, for its page's Try again. */
+export async function fetchFleetNodeNeedsALookAction(
+    nodeId: string,
+): Promise<FleetActionResult<FleetNeedsALookResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.nodeNeedsALook(nodeId);
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Could not load what needs a look'),
+        };
+    }
+}
+
 /** Fleet hub (FL-01) — every computer the caller may see (own + shared), for a client refresh. */
 export async function listVisibleFleetNodesAction(): Promise<FleetActionResult<FleetNodeView[]>> {
     await ensureAuth();

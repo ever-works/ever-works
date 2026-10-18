@@ -46,6 +46,7 @@ import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/devi
 import type { ApiVersion } from '@/lib/api/version';
 import { JobRuntimeDegradedBanner } from '@/components/dashboard/JobRuntimeDegradedBanner';
 import { ScrollTopOnNavigate } from '@/components/dashboard/ScrollTopOnNavigate';
+import { FleetHubFlagProvider } from '@/components/fleet/FleetHubFlagProvider';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -81,6 +82,12 @@ interface DashboardLayoutClientProps {
      * feature.
      */
     appLauncherEnabled?: boolean;
+    /**
+     * Fleet hub (FL-01) — `FLEET_ENABLED` and `FLEET_HUB_ENABLED`, read once in
+     * the server layout. Drives the sidebar's Fleet entry, the runner pill's
+     * Manage link and the palette's hub screens; false = today's shell.
+     */
+    fleetHubEnabled?: boolean;
 }
 
 /**
@@ -119,6 +126,7 @@ export function DashboardLayoutClient({
     jobRuntimeConfigured = null,
     changelogUnreadCount = null,
     appLauncherEnabled = false,
+    fleetHubEnabled = false,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -477,8 +485,9 @@ export function DashboardLayoutClient({
     return (
         <BackgroundActivityProvider>
             <ChatProvider>
-                <CommandPaletteProvider>
-                    {/*
+                <FleetHubFlagProvider enabled={fleetHubEnabled}>
+                    <CommandPaletteProvider>
+                        {/*
                       APW-11 T14/T15 — one App Launcher per dashboard shell. The
                       provider is what lets the palette's `openAppLauncher` command
                       and the header's control act on the SAME element: the button
@@ -487,231 +496,244 @@ export function DashboardLayoutClient({
                       launcher is switched off — the button renders nothing and the
                       opener stays undefined, so the command is unavailable.
                     */}
-                    <AppLauncherProvider>
-                        <DashboardKeyboardShortcuts onOpenHelp={openHelpFromShortcut} />
-                        <PostHogIdentify userId={user.id} email={user.email} name={user.username} />
-                        <EverWorksOnboardingWizard
-                            open={isOnboardingOpen}
-                            initialState={onboardingState}
-                            catalog={initialOnboardingCatalog}
-                            plugins={onboardingPlugins}
-                            initialConnections={initialOnboardingConnections}
-                            initialDeviceAuthStatuses={initialOnboardingDeviceAuthStatuses}
-                            onClose={closeOnboarding}
-                        />
-
-                        <Suspense fallback={null}>
-                            <DashboardToasts />
-                        </Suspense>
-                        <ConnectGithubModal
-                            userId={user.id}
-                            hasGithubConnected={hasGithubConnected}
-                        />
-
-                        <div className="flex h-screen bg-surface dark:bg-surface-dark overflow-hidden">
-                            {/* Mobile overlay */}
-                            {sidebarOpen && (
-                                <div
-                                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                                    onClick={() => setSidebarOpen(false)}
-                                />
-                            )}
-
-                            {/* Navigation sidebar */}
-                            <DashboardSidebar
-                                user={user}
-                                isOpen={sidebarOpen}
-                                onToggle={() => setSidebarOpen(!sidebarOpen)}
-                                isCollapsed={sidebarCollapsed}
-                                onCollapsedChange={handleSidebarCollapsedChange}
-                                onOpenHelp={openHelpFromSidebar}
-                                onOpenHelpTab={openHelpTabFromSidebar}
-                                chatOpen={chatOpen}
-                                onOpenChat={toggleChat}
-                                onInteraction={ensureResizableMode}
+                        <AppLauncherProvider>
+                            <DashboardKeyboardShortcuts onOpenHelp={openHelpFromShortcut} />
+                            <PostHogIdentify
+                                userId={user.id}
+                                email={user.email}
+                                name={user.username}
+                            />
+                            <EverWorksOnboardingWizard
+                                open={isOnboardingOpen}
+                                initialState={onboardingState}
+                                catalog={initialOnboardingCatalog}
+                                plugins={onboardingPlugins}
+                                initialConnections={initialOnboardingConnections}
+                                initialDeviceAuthStatuses={initialOnboardingDeviceAuthStatuses}
+                                onClose={closeOnboarding}
                             />
 
-                            {/* AI Chat panel — side panel on desktop, full-screen overlay on mobile */}
-                            {!isMobile ? (
-                                <div
-                                    ref={chatRef}
-                                    className="relative h-full"
-                                    style={{
-                                        width: chatOpen ? chatWidth : 0,
-                                        transition: 'width 200ms ease',
-                                    }}
-                                >
-                                    <ChatPanel
-                                        open={chatOpen}
-                                        onClose={toggleChat}
-                                        style={{ width: '100%' }}
+                            <Suspense fallback={null}>
+                                <DashboardToasts />
+                            </Suspense>
+                            <ConnectGithubModal
+                                userId={user.id}
+                                hasGithubConnected={hasGithubConnected}
+                            />
+
+                            <div className="flex h-screen bg-surface dark:bg-surface-dark overflow-hidden">
+                                {/* Mobile overlay */}
+                                {sidebarOpen && (
+                                    <div
+                                        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                                        onClick={() => setSidebarOpen(false)}
                                     />
-                                </div>
-                            ) : (
-                                chatOpen && (
-                                    <div className="fixed inset-0 z-50 flex">
-                                        <div
-                                            className="absolute inset-0 bg-black/40"
-                                            onClick={() => setChatOpen(false)}
+                                )}
+
+                                {/* Navigation sidebar */}
+                                <DashboardSidebar
+                                    user={user}
+                                    isOpen={sidebarOpen}
+                                    onToggle={() => setSidebarOpen(!sidebarOpen)}
+                                    isCollapsed={sidebarCollapsed}
+                                    onCollapsedChange={handleSidebarCollapsedChange}
+                                    onOpenHelp={openHelpFromSidebar}
+                                    onOpenHelpTab={openHelpTabFromSidebar}
+                                    chatOpen={chatOpen}
+                                    onOpenChat={toggleChat}
+                                    onInteraction={ensureResizableMode}
+                                />
+
+                                {/* AI Chat panel — side panel on desktop, full-screen overlay on mobile */}
+                                {!isMobile ? (
+                                    <div
+                                        ref={chatRef}
+                                        className="relative h-full"
+                                        style={{
+                                            width: chatOpen ? chatWidth : 0,
+                                            transition: 'width 200ms ease',
+                                        }}
+                                    >
+                                        <ChatPanel
+                                            open={chatOpen}
+                                            onClose={toggleChat}
+                                            style={{ width: '100%' }}
                                         />
-                                        <div className="relative w-full h-full bg-transparent">
-                                            <div className="h-full bg-white dark:bg-surface-dark shadow-lg">
-                                                <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                                                    <div className="text-sm font-medium">
-                                                        {tChat('panelTitle')}
+                                    </div>
+                                ) : (
+                                    chatOpen && (
+                                        <div className="fixed inset-0 z-50 flex">
+                                            <div
+                                                className="absolute inset-0 bg-black/40"
+                                                onClick={() => setChatOpen(false)}
+                                            />
+                                            <div className="relative w-full h-full bg-transparent">
+                                                <div className="h-full bg-white dark:bg-surface-dark shadow-lg">
+                                                    <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                                                        <div className="text-sm font-medium">
+                                                            {tChat('panelTitle')}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                aria-label={tChat('closeChat')}
+                                                                onClick={() => setChatOpen(false)}
+                                                                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary"
+                                                            >
+                                                                <ChevronRight className="w-4 h-4 rotate-180" />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            aria-label={tChat('closeChat')}
-                                                            onClick={() => setChatOpen(false)}
-                                                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-secondary"
-                                                        >
-                                                            <ChevronRight className="w-4 h-4 rotate-180" />
-                                                        </button>
+                                                    <div className="h-[calc(100%-48px)]">
+                                                        <ChatPanel
+                                                            open={chatOpen}
+                                                            onClose={toggleChat}
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '100%',
+                                                            }}
+                                                        />
                                                     </div>
-                                                </div>
-                                                <div className="h-[calc(100%-48px)]">
-                                                    <ChatPanel
-                                                        open={chatOpen}
-                                                        onClose={toggleChat}
-                                                        style={{ width: '100%', height: '100%' }}
-                                                    />
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )
-                            )}
+                                    )
+                                )}
 
-                            {/* Resize controls: collapse / drag handle / expand (only when chat is open) */}
-                            {chatOpen && !isMobile && (
-                                <div className="relative">
-                                    <div className="flex flex-col items-center w-5 -ml-3.5 absolute -right-3 top-1/2 -translate-y-1/2 z-10">
-                                        <button
-                                            aria-label={tChat('collapseChat')}
-                                            onClick={handleCollapse}
-                                            className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
-                                        >
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </button>
-                                        <div
-                                            onPointerDown={startDrag}
-                                            onDoubleClick={resetChatWidth}
-                                            onKeyDown={handleResizeKey}
-                                            tabIndex={0}
-                                            role="separator"
-                                            aria-orientation="vertical"
-                                            aria-label={tChat('resizeChat')}
-                                            aria-describedby="chat-panel-resize-hint"
-                                            aria-valuenow={chatWidth}
-                                            aria-valuemin={CHAT_PANEL_MIN_WIDTH}
-                                            data-testid="chat-panel-resize-handle"
-                                            className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize bg-white dark:bg-surface-dark rounded focus-visible:outline-2 focus-visible:outline-primary"
-                                            title={tChat('resizeChat')}
-                                        >
-                                            <GripVertical className="w-full h-4 text-text-muted/70" />
-                                            <span id="chat-panel-resize-hint" className="sr-only">
-                                                {tChat('panel.resizeHint')}
-                                            </span>
-                                        </div>
-                                        <button
-                                            aria-label={tChat('expandChat')}
-                                            onClick={handleExpand}
-                                            className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
-                                        >
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Main content — uses @container so children respond to available space, not viewport */}
-                            <div
-                                className={'flex-1 flex flex-col overflow-hidden @container/main'}
-                                style={isChatExpanded ? mainStyle : undefined}
-                                aria-hidden={isChatExpanded}
-                            >
-                                <DashboardHeader
-                                    user={user}
-                                    onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-                                    isSidebarOpen={sidebarOpen}
-                                    onHelpClick={openHelpFromHeader}
-                                    appLauncherEnabled={appLauncherEnabled}
-                                    onboardingBadge={
-                                        showOnboardingBadge
-                                            ? {
-                                                  currentStep: onboardingCurrentStep,
-                                                  totalSteps: onboardingTotalSteps,
-                                                  onOpen: openOnboarding,
-                                                  onDismiss: dismissOnboardingBadge,
-                                              }
-                                            : undefined
-                                    }
-                                    whatsNew={{
-                                        unreadCount: whatsNewUnread,
-                                        onOpen: openWhatsNew,
-                                        isOpen: whatsNewOpen,
-                                    }}
-                                />
-
-                                <main
-                                    className="relative flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
-                                    id="main-content"
-                                >
-                                    {/* Help links (AW-25) anywhere in the page open the
-                                Help drawer in place through the same state as `?`. */}
-                                    <HelpCenterProvider onOpenTarget={openHelpArticle}>
-                                        <JobRuntimeDegradedBanner
-                                            configured={jobRuntimeConfigured}
-                                        />
-                                        <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
-                                            <ChatPanelProvider
-                                                open={chatOpen}
-                                                setOpen={setChatOpen}
+                                {/* Resize controls: collapse / drag handle / expand (only when chat is open) */}
+                                {chatOpen && !isMobile && (
+                                    <div className="relative">
+                                        <div className="flex flex-col items-center w-5 -ml-3.5 absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                                            <button
+                                                aria-label={tChat('collapseChat')}
+                                                onClick={handleCollapse}
+                                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
                                             >
-                                                {children}
-                                            </ChatPanelProvider>
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </button>
+                                            <div
+                                                onPointerDown={startDrag}
+                                                onDoubleClick={resetChatWidth}
+                                                onKeyDown={handleResizeKey}
+                                                tabIndex={0}
+                                                role="separator"
+                                                aria-orientation="vertical"
+                                                aria-label={tChat('resizeChat')}
+                                                aria-describedby="chat-panel-resize-hint"
+                                                aria-valuenow={chatWidth}
+                                                aria-valuemin={CHAT_PANEL_MIN_WIDTH}
+                                                data-testid="chat-panel-resize-handle"
+                                                className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize bg-white dark:bg-surface-dark rounded focus-visible:outline-2 focus-visible:outline-primary"
+                                                title={tChat('resizeChat')}
+                                            >
+                                                <GripVertical className="w-full h-4 text-text-muted/70" />
+                                                <span
+                                                    id="chat-panel-resize-hint"
+                                                    className="sr-only"
+                                                >
+                                                    {tChat('panel.resizeHint')}
+                                                </span>
+                                            </div>
+                                            <button
+                                                aria-label={tChat('expandChat')}
+                                                onClick={handleExpand}
+                                                className="w-5 h-5 flex -ml-1.5 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white cursor-pointer items-center border rounded-full p-1 justify-center bg-white dark:bg-surface-dark"
+                                            >
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
                                         </div>
-                                    </HelpCenterProvider>
+                                    </div>
+                                )}
 
-                                    <Footer apiVersion={apiVersion} />
+                                {/* Main content — uses @container so children respond to available space, not viewport */}
+                                <div
+                                    className={
+                                        'flex-1 flex flex-col overflow-hidden @container/main'
+                                    }
+                                    style={isChatExpanded ? mainStyle : undefined}
+                                    aria-hidden={isChatExpanded}
+                                >
+                                    <DashboardHeader
+                                        user={user}
+                                        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+                                        isSidebarOpen={sidebarOpen}
+                                        onHelpClick={openHelpFromHeader}
+                                        appLauncherEnabled={appLauncherEnabled}
+                                        onboardingBadge={
+                                            showOnboardingBadge
+                                                ? {
+                                                      currentStep: onboardingCurrentStep,
+                                                      totalSteps: onboardingTotalSteps,
+                                                      onOpen: openOnboarding,
+                                                      onDismiss: dismissOnboardingBadge,
+                                                  }
+                                                : undefined
+                                        }
+                                        whatsNew={{
+                                            unreadCount: whatsNewUnread,
+                                            onOpen: openWhatsNew,
+                                            isOpen: whatsNewOpen,
+                                        }}
+                                    />
 
-                                    {/* Must stay the last child of <main>: its layout
+                                    <main
+                                        className="relative flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
+                                        id="main-content"
+                                    >
+                                        {/* Help links (AW-25) anywhere in the page open the
+                                Help drawer in place through the same state as `?`. */}
+                                        <HelpCenterProvider onOpenTarget={openHelpArticle}>
+                                            <JobRuntimeDegradedBanner
+                                                configured={jobRuntimeConfigured}
+                                            />
+                                            <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
+                                                <ChatPanelProvider
+                                                    open={chatOpen}
+                                                    setOpen={setChatOpen}
+                                                >
+                                                    {children}
+                                                </ChatPanelProvider>
+                                            </div>
+                                        </HelpCenterProvider>
+
+                                        <Footer apiVersion={apiVersion} />
+
+                                        {/* Must stay the last child of <main>: its layout
                                 effect has to run after the App Router's own
                                 per-segment scroll handler in the same commit. */}
-                                    <ScrollTopOnNavigate />
-                                </main>
+                                        <ScrollTopOnNavigate />
+                                    </main>
+                                </div>
                             </div>
-                        </div>
 
-                        <HelpDrawer
-                            open={helpOpen}
-                            onClose={closeHelp}
-                            initialTab={helpTab}
-                            initialTarget={helpTarget}
-                            onboarding={{
-                                currentStep: onboardingCurrentStep,
-                                totalSteps: onboardingTotalSteps,
-                                onOpen: openOnboarding,
-                            }}
-                        />
-                        <WhatsNewPanel
-                            open={whatsNewOpen}
-                            onClose={closeWhatsNew}
-                            unreadCount={whatsNewUnread}
-                            onUnreadCountChange={setWhatsNewUnread}
-                        />
+                            <HelpDrawer
+                                open={helpOpen}
+                                onClose={closeHelp}
+                                initialTab={helpTab}
+                                initialTarget={helpTarget}
+                                onboarding={{
+                                    currentStep: onboardingCurrentStep,
+                                    totalSteps: onboardingTotalSteps,
+                                    onOpen: openOnboarding,
+                                }}
+                            />
+                            <WhatsNewPanel
+                                open={whatsNewOpen}
+                                onClose={closeWhatsNew}
+                                unreadCount={whatsNewUnread}
+                                onUnreadCountChange={setWhatsNewUnread}
+                            />
 
-                        <CommandPalette
-                            userId={user.id}
-                            onOpenHelp={openHelpFromPalette}
-                            sidebarCollapsed={sidebarCollapsed}
-                            onSidebarCollapsedChange={handleSidebarCollapsedChange}
-                            chatOpen={chatOpen}
-                            onChatOpenChange={setChatOpen}
-                        />
-                    </AppLauncherProvider>
-                </CommandPaletteProvider>
+                            <CommandPalette
+                                userId={user.id}
+                                onOpenHelp={openHelpFromPalette}
+                                sidebarCollapsed={sidebarCollapsed}
+                                onSidebarCollapsedChange={handleSidebarCollapsedChange}
+                                chatOpen={chatOpen}
+                                onChatOpenChange={setChatOpen}
+                            />
+                        </AppLauncherProvider>
+                    </CommandPaletteProvider>
+                </FleetHubFlagProvider>
             </ChatProvider>
         </BackgroundActivityProvider>
     );

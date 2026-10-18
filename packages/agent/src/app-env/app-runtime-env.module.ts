@@ -81,6 +81,7 @@ import { AppDependenciesService } from '../app-dependencies/app-dependencies.ser
 import { APP_RUNTIME_ENV_SOURCE } from '../app-runtime/ports';
 import { APP_ENV_DEPLOY_READINESS, AppEnvRuntimeSource } from './app-env-runtime.source';
 import { AppEnvListener } from './app-env.listener';
+import { AppEnvSmtpBridgeListener } from './app-env-smtp-bridge.listener';
 import { AppEnvModule } from './app-env.module';
 
 @Module({
@@ -88,6 +89,10 @@ import { AppEnvModule } from './app-env.module';
     providers: [
         AppEnvRuntimeSource,
         AppEnvListener,
+        // Lane aw-env-smtp (GAP-22) — an owner's own `SMTP_*` App env values become the `smtp`
+        // dependency's configuration. Here, and only here, because it needs both modules (the same
+        // reason `AppEnvListener` is here).
+        AppEnvSmtpBridgeListener,
         // The readiness pass, and the reason it is an alias rather than a
         // narrowed wrapper: `ensureReadyForDeploy` also DISPATCHES provisioning
         // for the `pending` kinds (GAP-05), and a wrapper that forwarded only

@@ -686,6 +686,35 @@ export const config = {
                 FLEET_DEFAULT_MIN_NODE_VERSION
             );
         },
+        /**
+         * Fleet node link (FL-02, CONTRACTS §1.1) — the daemon version this
+         * deployment RECOMMENDS (`FLEET_RECOMMENDED_NODE_VERSION`), carried on
+         * every accepted beat as `recommendedNodeVersion`. A value, not a
+         * feature flag; null (the field is omitted) when unset or not a version.
+         */
+        getRecommendedNodeVersion(): string | null {
+            return normalizeFleetNodeVersionFloor(process.env.FLEET_RECOMMENDED_NODE_VERSION);
+        },
+        /**
+         * Fleet node link (FL-02, CONTRACTS §9) — whether this deployment
+         * accepts node links (`FLEET_NODE_LINK_ENABLED`). Off unless set to
+         * `true`: with it off the link-token route answers 404 and the link
+         * gateway refuses every upgrade, so a node retries every 5 minutes and
+         * everything that works today keeps working. Read per call, so
+         * flipping it needs no restart.
+         */
+        isNodeLinkEnabled(): boolean {
+            return process.env.FLEET_NODE_LINK_ENABLED === 'true';
+        },
+        /**
+         * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
+         * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
+         * error. Every multi-replica deployment sets it; without it a single
+         * API process is assumed and relays run in-process.
+         */
+        isRelayBusRequired(): boolean {
+            return process.env.FLEET_RELAY_REQUIRE_BUS === 'true';
+        },
         /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
         getMaxCapabilityTags(): number {
             return clampedIntEnv(

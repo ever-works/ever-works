@@ -287,6 +287,8 @@
             "signIn": "Ever ID ile oturum aç",
             "signUp": "Ever ID ile kaydol",
             "redirecting": "Ever ID açılıyor…",
+            "signInWith": "<wordmark>Ever ID</wordmark> ile oturum aç",
+            "signUpWith": "<wordmark>Ever ID</wordmark> ile kaydol",
             "consentRequired": "Devam etmek için yukarıdaki şartları kabul edin.",
             "createAccount": {
                 "title": "Ever Works hesabınızı oluşturun",
@@ -7354,6 +7356,63 @@
                         "resume": "Sürdürme istendi.",
                         "remove": "Kaldırma istendi.",
                         "cancelDeploy": "İptal istendi."
+                    }
+                },
+                "environment": {
+                    "title": "Ortam",
+                    "description": "Bu uygulamanın çalışırken kullandığı değerler. Gizli değerler asla gösterilmez — yalnızca ayarlanıp ayarlanmadıkları.",
+                    "summary": "{total} değerden {set} tanesi ayarlı",
+                    "missingRequired": "{count, plural, one {# zorunlu değer eksik} other {# zorunlu değer eksik}}",
+                    "loading": "Ortam okunuyor…",
+                    "unavailable": "Ortam değerleri bu kurulumda henüz düzenlenemiyor.",
+                    "error": "Ortam okunamadı. Tekrar denemek için sayfayı yenileyin.",
+                    "empty": "Bu uygulamanın uygulama belirtimi hiçbir ortam değeri bildirmiyor.",
+                    "secureStorageOff": "Bu kurulumda güvenli depolama yapılandırılmamış; bu yüzden değerler kaydedilemiyor.",
+                    "edit": "Düzenle",
+                    "setValue": "Değer ayarla",
+                    "editAria": "{name} düzenle",
+                    "saved": "{name} kaydedildi",
+                    "removed": "{name} kaldırıldı",
+                    "states": {
+                        "set": "Ayarlı",
+                        "unset": "Ayarlı değil",
+                        "missing": "Zorunlu — ayarlı değil",
+                        "fromSpec": "Uygulama belirtiminden",
+                        "fromDependency": "{kind} tarafından sağlanır",
+                        "generated": "Oluşturuldu"
+                    },
+                    "badges": {
+                        "secret": "Gizli",
+                        "required": "Zorunlu"
+                    },
+                    "phases": {
+                        "build": "Derleme",
+                        "runtime": "Çalışma zamanı",
+                        "both": "Derleme + çalışma zamanı"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Nesne depolama",
+                        "smtp": "SMTP e-postası"
+                    },
+                    "dialog": {
+                        "title": "{name} düzenle",
+                        "valueLabel": "Değer",
+                        "secretHint": "Bu değer gizlidir. Şifrelenmiş olarak saklanır ve bir daha asla gösterilmez.",
+                        "secretStored": "Kayıtlı bir değer var. Değiştirmek için yenisini yazın.",
+                        "dependencyHint": "Normalde {kind} tarafından sağlanır. Burada ayarladığınız değer önceliklidir — örneğin kendi SMTP sunucunuz.",
+                        "redeployHint": "Uygulamanın bu değeri kullandığı yerlerde, yeni değerle yeniden derlenir veya yeniden dağıtılır.",
+                        "empty": "Bir değer girin veya kayıtlı olanı kaldırın.",
+                        "save": "Kaydet",
+                        "saving": "Kaydediliyor…",
+                        "remove": "Değeri kaldır",
+                        "cancel": "İptal"
+                    },
+                    "errors": {
+                        "undeclaredName": "Uygulama belirtimi bu adı bildirmiyor.",
+                        "specUnavailable": "Bu uygulamanın henüz kullanılabilir bir uygulama belirtimi yok.",
+                        "failed": "Değer kaydedilemedi. Tekrar deneyin."
                     }
                 }
             },

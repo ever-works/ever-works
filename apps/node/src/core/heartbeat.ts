@@ -1,3 +1,4 @@
+import { FLEET_LEGACY_MAX_CAPABILITY_TAGS } from '@ever-works/contracts';
 import { FleetClientError, type FleetErrorKind, type HeartbeatResponse } from './fleet-client';
 import type { Logger } from './logger';
 import {
@@ -70,7 +71,11 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Node lifecycle + remote node limits (self-build slices
+	// NEWEST first. Fleet node link (FL-02): the consents. A platform that
+	// predates them answers 400; the node strips this tier, keeps beating with
+	// everything else, and does not open the link (spec U11).
+	['consents'],
+	// Then Node lifecycle + remote node limits (self-build slices
 	// AR, AS). Tiered (review): `cliVersions` goes out on EVERY beat of a
 	// node with a pinned CLI, so an upgraded node talking to a platform that
 	// predates it would otherwise drop the worker state and housekeeping
@@ -179,6 +184,12 @@ export class HeartbeatLoop {
 	 * will never accept them.
 	 */
 	private strippedTiers = 0;
+	/**
+	 * Fleet node link (FL-02): the platform refused more than the legacy
+	 * {@link FLEET_LEGACY_MAX_CAPABILITY_TAGS} tags; beats carry the first
+	 * sixteen from then on. Process-scoped for the same reason as the tiers.
+	 */
+	private legacyTagCap = false;
 	private state: HeartbeatState = {
 		state: 'idle',
 		lastHeartbeatAt: null,
@@ -202,6 +213,18 @@ export class HeartbeatLoop {
 
 	getState(): HeartbeatState {
 		return { ...this.state };
+	}
+
+	/**
+	 * Whether the platform has NOT proven it predates `field` — i.e. the beat
+	 * still carries it. The node link opens only while `consents` is still
+	 * accepted: a platform that rejected the field cannot authorise a channel
+	 * by consent, so this node does not ask it to (spec U11).
+	 */
+	acceptsField(field: keyof NodeSelfDescription): boolean {
+		return !OPTIONAL_DESCRIPTION_FIELD_TIERS.slice(0, this.strippedTiers).some((tier) =>
+			(tier as readonly string[]).includes(field)
+		);
 	}
 
 	onChange(listener: (state: HeartbeatState) => void): () => void {
@@ -289,27 +312,42 @@ export class HeartbeatLoop {
 	 */
 	private async beat(description: NodeSelfDescription): Promise<HeartbeatResponse> {
 		const credential = { nodeId: this.options.nodeId, secret: this.options.secret };
-		let sent = stripTiers(description, this.strippedTiers);
+		const shape = (tiers: number) => capTags(stripTiers(description, tiers), this.legacyTagCap);
+		let sent = shape(this.strippedTiers);
 		try {
 			return await this.options.client.heartbeat({ ...credential, ...sent });
 		} catch (error) {
 			if (!isFieldRejection(error)) throw error;
+			// Fleet node link (FL-02): a platform capped at the legacy 16 tags (an
+			// older build, or an operator's explicit cap) refuses a longer list.
+			// Trim the tags FIRST — the optional fields it may well accept stay.
+			let lastError: unknown = error;
+			if (!this.legacyTagCap && (description.capabilities?.length ?? 0) > FLEET_LEGACY_MAX_CAPABILITY_TAGS) {
+				sent = capTags(stripTiers(description, this.strippedTiers), true);
+				try {
+					const result = await this.options.client.heartbeat({ ...credential, ...sent });
+					this.legacyTagCap = true;
+					this.options.logger?.warn(
+						`Platform refused more than ${FLEET_LEGACY_MAX_CAPABILITY_TAGS} capability tags; reporting the first ${FLEET_LEGACY_MAX_CAPABILITY_TAGS} until this node restarts.`
+					);
+					return result;
+				} catch (retryError) {
+					if (!isFieldRejection(retryError)) throw retryError;
+					lastError = retryError;
+					this.legacyTagCap = true;
+				}
+			}
 			// Peel the optional fields off one tier at a time, NEWEST first, and
 			// latch at the first shape the platform accepts. A tier this beat
 			// does not carry changes nothing and is skipped without a request.
-			let lastError: unknown = error;
 			for (let tiers = this.strippedTiers + 1; tiers <= OPTIONAL_DESCRIPTION_FIELD_TIERS.length; tiers += 1) {
-				const candidate = stripTiers(description, tiers);
+				const candidate = shape(tiers);
 				if (Object.keys(candidate).length === Object.keys(sent).length) continue;
 				sent = candidate;
 				try {
 					const result = await this.options.client.heartbeat({ ...credential, ...candidate });
 					this.strippedTiers = tiers;
-					this.options.logger?.warn(
-						tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length
-							? 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.'
-							: 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.'
-					);
+					this.options.logger?.warn(describeStrippedTiers(tiers));
 					return result;
 				} catch (retryError) {
 					if (!isFieldRejection(retryError)) throw retryError;
@@ -386,6 +424,24 @@ export class HeartbeatLoop {
 			listener(snapshot);
 		}
 	}
+}
+
+/** The description with its tag list cut to the legacy cap when `cap` is set. */
+function capTags(description: NodeSelfDescription, cap: boolean): NodeSelfDescription {
+	if (!cap || !Array.isArray(description.capabilities)) return description;
+	if (description.capabilities.length <= FLEET_LEGACY_MAX_CAPABILITY_TAGS) return description;
+	return { ...description, capabilities: description.capabilities.slice(0, FLEET_LEGACY_MAX_CAPABILITY_TAGS) };
+}
+
+/** The one warning a latch writes, naming what this node still reports. */
+function describeStrippedTiers(tiers: number): string {
+	if (tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length) {
+		return 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.';
+	}
+	if (tiers >= 2) {
+		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
+	}
+	return 'Platform rejected the consents field; it predates the node link. Still reporting everything else; the node link stays closed until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */

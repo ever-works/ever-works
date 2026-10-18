@@ -39,6 +39,7 @@ import { useWorkspaceSearch } from './hooks/use-workspace-search';
 import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
 import { screensFor } from './registry/screens';
+import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import {
     buildPaletteSections,
     filterLabel,
@@ -246,7 +247,12 @@ export function CommandPalette({
                 ?.hits.map((hit) => ({ id: hit.sourceId, title: hit.title })) ?? [];
         return [...commandsFor(commandContext), ...workSwitchCommands(commandContext, works)];
     }, [commandContext, response]);
-    const screens = useMemo(() => screensFor(appPath), [appPath]);
+    // Fleet hub (FL-01, FR-13): the hub's screens exist only while it is on.
+    const fleetHubEnabled = useFleetHubEnabled();
+    const screens = useMemo(
+        () => screensFor(appPath, { fleetHubEnabled }),
+        [appPath, fleetHubEnabled],
+    );
 
     const sections = useMemo(
         () =>

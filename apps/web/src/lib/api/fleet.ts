@@ -245,7 +245,7 @@ export const fleetAPI = {
 
     updateNode: async (nodeId: string, payload: UpdateFleetNodePayload) => {
         return serverMutation<FleetNodeView>({
-            endpoint: `${BASE}/nodes/${nodeId}`,
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
             data: payload,
             method: 'PATCH',
             wrapInData: false,
@@ -254,7 +254,7 @@ export const fleetAPI = {
 
     deleteNode: async (nodeId: string) => {
         return serverMutation<void>({
-            endpoint: `${BASE}/nodes/${nodeId}`,
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
             data: {},
             method: 'DELETE',
             wrapInData: false,
@@ -262,7 +262,7 @@ export const fleetAPI = {
     },
 
     nodeDetail: async (nodeId: string) => {
-        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${nodeId}`);
+        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${encodeURIComponent(nodeId)}`);
     },
 
     listOutstandingTokens: async () => {

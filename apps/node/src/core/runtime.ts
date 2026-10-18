@@ -43,6 +43,12 @@ import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
+import type { FleetConsents } from '@ever-works/contracts';
+import { createNodeLink, type NodeLink } from './link/link-client';
+import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
+import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
+import { composeNodeLinkModules } from './link/modules';
+import type { NodeModule } from './link/modules/registry';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -374,6 +380,16 @@ export interface NodeRuntime {
 	 * a machine can be watchable without taking work, and a long agent task
 	 * never delays the owner's "Waking up the view…".
 	 */
+	/**
+	 * Fleet node link (FL-02) — this machine's one outbound multiplexed
+	 * socket, present when the shell asked for it (`nodeLink`). It starts on
+	 * the first accepted heartbeat that still carries `consents`, and only
+	 * when this process holds `--work`, `--attend` or `--manage`; otherwise it
+	 * reports why it is not open. The shell closes it at shutdown.
+	 */
+	link?: NodeLink;
+	/** The consents this process was started with (CONTRACTS §1.1). */
+	consents: FleetConsents;
 	attended?: {
 		worker: WorkerLoop;
 		cadence: AttendedPollCadence;
@@ -494,6 +510,26 @@ export interface CreateNodeRuntimeOptions {
 	restrictProfileDir?: (path: string) => Promise<void> | void;
 	/** Test seam for the live-view socket leg and the capture backend's debugging connection. */
 	webSocketFactory?: WebSocketFactory | null;
+
+	/**
+	 * Fleet node link (FL-02) — allow machine management from the dashboard
+	 * (`start --manage`): owner sessions, logs, services, Docker, processes,
+	 * ports, files, commands, schedules, checkout discovery, wake. Off by
+	 * default and independent of `--work` and `--attend`: a fourth consent.
+	 */
+	manageEnabled?: boolean;
+	/**
+	 * Fleet node link (FL-02) — build the node link. Off by default so an
+	 * embedder that has not adopted it yet (the desktop shell, until its
+	 * consent parity ships) behaves exactly as before; the CLI turns it on.
+	 */
+	nodeLink?: boolean;
+	/** Extra link modules after the compile-time list (tests and embedders). */
+	linkModules?: readonly NodeModule[];
+	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
+	linkSocketFactory?: LinkSocketFactory | null;
+	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
+	persistLinkState?: (record: NodeLinkRecord) => Promise<void> | void;
 }
 
 /**
@@ -557,13 +593,44 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// probe and the live-view lane: `screen` is advertised exactly when the
 	// lane has a backend that can serve it, never from a separate guess.
 	const attendedCapture = options.attendEnabled ? selectAttendedCapture(io.environment, options) : null;
-	const environment: CapabilityEnvironment = attendedCapture
-		? {
-				...io.environment,
-				attended: true,
-				captureBackends: attendedCapture.captureBackend ? [attendedCapture.captureBackend] : []
-			}
-		: io.environment;
+	// Fleet node link (FL-02): the four consents this process holds. Process-
+	// scoped like `--attend`, so they ride the environment and the heartbeat,
+	// never the stored config. `usageScan` stays false until FL-20 adds its flag.
+	const consents: FleetConsents = {
+		work: options.workerEnabled === true,
+		attend: attendedCapture !== null,
+		manage: options.manageEnabled === true,
+		usageScan: false
+	};
+	// Composed whether or not the link is built: the module tags (`managed`
+	// under `--manage`, …) describe this process's consents, not the socket.
+	const linkModules = composeNodeLinkModules({
+		...(options.linkModules ? { extra: options.linkModules } : {}),
+		...(io.scheduler
+			? {
+					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
+					clearTimer: (handle: unknown) => io.scheduler!.clearTimeout(handle)
+				}
+			: {})
+	});
+	const linkModuleTags = linkModules.tags({ consents, platform: io.environment.platform, nodeVersion: io.version });
+	const environment: CapabilityEnvironment = {
+		...io.environment,
+		...(attendedCapture
+			? {
+					attended: true,
+					captureBackends: attendedCapture.captureBackend ? [attendedCapture.captureBackend] : []
+				}
+			: {}),
+		...(consents.manage ? { managed: true } : {}),
+		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
+	};
+	telemetry.consents = () => consents;
+	// What the last beat advertised: the link's hello carries the same list,
+	// so the two can never disagree and the hello costs no second probe.
+	let lastDescribedCapabilities: readonly string[] = [];
+	// The link exists once the runtime below does; the heartbeat starts it.
+	let startLink: (() => void) | null = null;
 	// Set once the attended lane exists (below); the heartbeat hint wakes it.
 	let attendedWake: ((pending: readonly string[] | undefined) => void) | null = null;
 	// Node lifecycle (slice AR): the lanes the version floor holds. Filled in
@@ -590,7 +657,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// Re-probed on EVERY beat, like the capability tags: installing an
 		// agent CLI or filling a disk is exactly the kind of change an
 		// operator needs to see without restarting the node.
-		describe: () => describeSelf(io.runner, environment, io.version, selection, telemetry),
+		describe: async () => {
+			const description = await describeSelf(io.runner, environment, io.version, selection, telemetry);
+			lastDescribedCapabilities = description.capabilities;
+			return description;
+		},
 		intervalMs: clampHeartbeatInterval(config.heartbeatIntervalMs),
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),
@@ -605,10 +676,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
 			throttleTarget?.(response.node?.modelThrottles);
+			// Fleet node link (FL-02): the first accepted beat opens it (FR-1).
+			startLink?.();
 		}
 	};
 
-	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions), lifecycle, cliCompat };
+	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions), lifecycle, cliCompat, consents };
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.
@@ -622,6 +695,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			userAgent
 		}));
+
+	// Fleet node link (FL-02). Built here, started by the first accepted beat
+	// that still carries `consents` (a platform that rejected the field cannot
+	// authorise channels by consent, so the link stays closed — spec U11).
+	if (options.nodeLink) {
+		const link = createNodeLink({
+			apiUrl: apiBase.url,
+			nodeId: config.nodeId,
+			...(config.name ? { nodeName: config.name } : {}),
+			nodeVersion: io.version,
+			consents,
+			capabilities: () => lastDescribedCapabilities,
+			mintToken: () => jobClientFor().mintLinkToken(),
+			factory: options.linkSocketFactory === undefined ? defaultLinkSocketFactory() : options.linkSocketFactory,
+			modules: linkModules,
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		runtime.link = link;
+		let predatesLogged = false;
+		startLink = () => {
+			if (runtime.loop.acceptsField('consents')) {
+				link.start();
+			} else if (!predatesLogged) {
+				predatesLogged = true;
+				io.logger.warn('Node link not opened: the platform predates consents in the heartbeat.');
+			}
+		};
+		if (options.persistLinkState) {
+			const persist = options.persistLinkState;
+			let lastKey = '';
+			link.onChange((state) => {
+				// One write per phase or generation change, not per byte counted.
+				const key = `${state.phase}|${state.linkGeneration ?? ''}|${state.detail ?? ''}`;
+				if (key === lastKey) return;
+				lastKey = key;
+				void Promise.resolve()
+					.then(() => persist(toNodeLinkRecord(consents, state, io.now ? io.now() : Date.now())))
+					.catch((error: unknown) =>
+						io.logger.warn(
+							`Could not record the node link state: ${error instanceof Error ? error.message : String(error)}`
+						)
+					);
+			});
+		}
+	}
 
 	if (options.workerEnabled) {
 		const jobClient = jobClientFor();

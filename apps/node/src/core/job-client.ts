@@ -483,6 +483,28 @@ export class FleetJobClient {
 		};
 	}
 
+	/**
+	 * Fleet node link (FL-02) — a single-use, five-minute token for this
+	 * machine's one outbound link socket, minted through the node credential.
+	 * Never logged. A platform that does not accept links answers 404, which
+	 * reaches the caller as an `invalid-request` error with `status: 404`.
+	 */
+	async mintLinkToken(): Promise<{ token: string; wsPath: string; expiresInSec: number }> {
+		const payload = (await this.post('api/fleet/link-token', 'link-token', {
+			nodeId: this.nodeId,
+			secret: this.secret
+		})) as { token?: unknown; wsPath?: unknown; expiresInSec?: unknown } | null;
+		if (typeof payload?.token !== 'string' || !payload.token || typeof payload.wsPath !== 'string') {
+			throw new FleetClientError('malformed', 'Link token response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return {
+			token: payload.token,
+			wsPath: payload.wsPath,
+			expiresInSec: typeof payload.expiresInSec === 'number' ? payload.expiresInSec : 300
+		};
+	}
+
 	/** Report what the watched Agent's profile holds here (counts only — never a path, never a cookie). */
 	async reportComputerProfile(
 		sessionId: string,

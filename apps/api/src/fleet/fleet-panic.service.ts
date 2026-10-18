@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AgentRunRepository } from '@ever-works/agent/database';
 import { FleetAuditService, FleetJobService, FleetService } from '@ever-works/agent/fleet';
 import type {
@@ -10,7 +10,15 @@ import type {
     FleetNodeDrainResult,
     FleetNodeView,
 } from '@ever-works/contracts';
-import { FLEET_CANCEL_IN_FLIGHT_MAX_IDS, FLEET_JOB_CANCEL_STATES } from '@ever-works/contracts';
+import {
+    FLEET_CANCEL_IN_FLIGHT_MAX_IDS,
+    FLEET_JOB_CANCEL_STATES,
+    FLEET_LINK_DRAIN_GRACE_SEC,
+} from '@ever-works/contracts';
+import {
+    FLEET_LINK_DRAIN_NOTIFIER,
+    type FleetLinkDrainNotifier,
+} from '../fleet-link/fleet-link.types';
 import { correlateAgentTaskJob } from './fleet-agent-task.correlation';
 
 /** How one per-node drain should be recorded (EW-799). */
@@ -70,6 +78,12 @@ export class FleetPanicService {
         private readonly jobs: FleetJobService,
         private readonly agentRuns: AgentRunRepository,
         private readonly audit: FleetAuditService,
+        // Fleet node link (FL-02, CONTRACTS R-24): drain-all warns every owner
+        // session on the drained nodes and ends it after the grace. Appended
+        // LAST + @Optional(): unbound, drain-all is exactly what it was.
+        @Optional()
+        @Inject(FLEET_LINK_DRAIN_NOTIFIER)
+        private readonly linkDrain?: FleetLinkDrainNotifier,
     ) {}
 
     /**
@@ -175,6 +189,25 @@ export class FleetPanicService {
         this.logger.warn(
             `drain-all by ${userId}: drained ${drainedIds.length} node(s), skipped ${skippedNodes}, requeued ${releasedJobs} job(s)`,
         );
+        // Owner sessions get their 60-second warning over the link; Agent
+        // sessions end as their Runs end. EVERY enrolled node is told, not
+        // only the ones drained just now: a node disabled earlier still runs
+        // its owner sessions (disabling drains jobs, not sessions), and one
+        // whose job drain failed should still stop. Never able to fail the drain.
+        const linkNodeIds = nodes
+            .filter((node) => node.status !== 'enrolling')
+            .map((node) => node.id);
+        if (this.linkDrain && linkNodeIds.length > 0) {
+            try {
+                this.linkDrain.drainNodes(linkNodeIds, FLEET_LINK_DRAIN_GRACE_SEC);
+            } catch (error) {
+                this.logger.warn(
+                    `drain-all: the link drain notice could not be sent: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
         const auditFailed = !(await this.tryAudit('drain-all', userId, {
             drainedNodes: drainedIds.length,
             skippedNodes,

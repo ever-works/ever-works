@@ -130,6 +130,7 @@ describe('integration contract v1 (published schemas)', () => {
             ['mission.json', 'resources/mission.schema.json'],
             ['comment.json', 'resources/task-comment.schema.json'],
             ['member.json', 'resources/member.schema.json'],
+            ['member-invite-result.json', 'resources/member-invite-result.schema.json'],
             ['organization.json', 'resources/organization.schema.json'],
             ['inbox-item.json', 'resources/inbox-item.schema.json'],
             ['email-message.json', 'resources/email-message.schema.json'],

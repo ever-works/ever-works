@@ -421,6 +421,9 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.APP_DEPLOY]: 'deliveryWhenCompleted',
     [ActivityActionType.APP_JOB]: 'work',
     [ActivityActionType.APP_SMOKE]: 'work',
+    // APW-07 T26 (lane aw-env-smtp) — an env change is configuration work on the App Work, never a
+    // delivery: the Deployment it leads to has its own `app_deploy` row.
+    [ActivityActionType.APP_ENV]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

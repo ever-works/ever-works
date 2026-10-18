@@ -265,3 +265,46 @@ describe('record kinds', () => {
         expect(statusBadge(t, 'agent', null)).toBeNull();
     });
 });
+
+/**
+ * Fleet hub (FL-01, FR-13, FR-15, ACC-FL01-07) — "Fleet" and the six hub tabs
+ * are palette screens only while the hub is on; with it off the palette lists
+ * exactly what it did.
+ */
+describe('screens registry — Fleet hub', () => {
+    it('adds nothing while the hub is off', () => {
+        expect(screensFor('/tasks').map((screen) => screen.id)).not.toContain('fleet');
+        expect(screensFor('/tasks', { fleetHubEnabled: false })).toHaveLength(
+            DASHBOARD_SCREENS.length,
+        );
+    });
+
+    it('offers Fleet and its six tabs right after Teams when the hub is on', () => {
+        const ids = screensFor('/tasks', { fleetHubEnabled: true }).map((screen) => screen.id);
+        const fleet = [
+            'fleet',
+            'fleet.overview',
+            'fleet.computers',
+            'fleet.sessions',
+            'fleet.checkouts',
+            'fleet.commands',
+            'fleet.usage',
+        ];
+        const at = ids.indexOf('teams') + 1;
+        expect(ids.slice(at, at + fleet.length)).toEqual(fleet);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('builds every Fleet href from ROUTES and resolves every title', () => {
+        const t = createEnTranslator();
+        const byId = new Map(
+            screensFor('/tasks', { fleetHubEnabled: true }).map((screen) => [screen.id, screen]),
+        );
+        expect(byId.get('fleet')?.href).toBe(ROUTES.DASHBOARD_FLEET);
+        expect(byId.get('fleet')?.title(t)).toBe('Fleet');
+        expect(byId.get('fleet.computers')?.href).toBe(ROUTES.DASHBOARD_FLEET_COMPUTERS);
+        expect(byId.get('fleet.computers')?.title(t)).toBe('Computers');
+        expect(byId.get('fleet.computers')?.breadcrumb?.(t)).toEqual(['Fleet']);
+        expect(byId.get('fleet.usage')?.href).toBe(ROUTES.DASHBOARD_FLEET_USAGE);
+    });
+});

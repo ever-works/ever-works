@@ -113,6 +113,18 @@ export type FleetAuditAction =
 	/** One Agent's logins and files on one node were reset. */
 	| 'computer.profile-reset'
 	/**
+	 * Fleet node link (FL-02, CONTRACTS §7) — the consents a node reports
+	 * changed between two heartbeats (actor: the node). `details.before` /
+	 * `details.after` carry the two consent sets.
+	 */
+	| 'node.consent.change'
+	/** A node's link was accepted (actor: the node; informational). */
+	| 'node.link.connect'
+	/** A node's link closed, with its reason (actor: the node; informational). */
+	| 'node.link.disconnect'
+	/** A channel in a state-changing family was opened on a node's link (family, target, requestedBy). */
+	| 'node.link.channel-open'
+	/**
 	 * Fleet hub (FL-01) — the owner changed one action family's audience on a
 	 * node's control policy (CONTRACTS §2.1, §7). One row per family changed;
 	 * details carry `family`, `from`, `to` — never a member's name.
@@ -152,6 +164,10 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'computer.teach-start',
 	'computer.teach-finish',
 	'computer.profile-reset',
+	'node.consent.change',
+	'node.link.connect',
+	'node.link.disconnect',
+	'node.link.channel-open',
 	'node.policy.change'
 ];
 

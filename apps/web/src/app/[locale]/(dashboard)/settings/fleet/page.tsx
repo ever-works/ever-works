@@ -9,8 +9,10 @@ import {
     type FleetNodeView,
 } from '@/lib/api/fleet';
 import { FleetSettings } from '@/components/settings/FleetSettings';
+import { FleetSettingsLinkCard } from '@/components/fleet/FleetSettingsLinkCard';
 import {
     isFleetEnabled,
+    isFleetHubEnabled,
     resolveFleetDownloadUrls,
     resolvePublicApiBaseUrl,
 } from '@/lib/fleet-flags';
@@ -101,6 +103,10 @@ export default async function FleetSettingsPage() {
     }
 
     const downloads = resolveFleetDownloadUrls();
+    // Fleet hub (FL-01, FR-11): with the hub on, the machine table, the Add
+    // flow and the drawer live under Fleet → Computers; this page keeps every
+    // policy and shows where the computers went. Off = exactly as before.
+    const hubEnabled = isFleetHubEnabled();
 
     return (
         <FleetSettings
@@ -115,6 +121,8 @@ export default async function FleetSettingsPage() {
             preferencesError={preferencesError}
             initialKillSwitch={initialKillSwitch}
             killSwitchError={killSwitchError}
+            view={hubEnabled ? 'policies' : 'all'}
+            hubLinkCard={hubEnabled ? <FleetSettingsLinkCard /> : undefined}
         />
     );
 }

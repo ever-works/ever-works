@@ -521,7 +521,8 @@
 			"lastReclaimFreedBytes",
 			"maxConcurrentJobs",
 			"maxCpuPercent",
-			"maxMemoryMb"
+			"maxMemoryMb",
+			"consents"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -535,7 +536,8 @@
 			"lastReclaimFreedBytes",
 			"maxConcurrentJobs",
 			"maxCpuPercent",
-			"maxMemoryMb"
+			"maxMemoryMb",
+			"consents"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -555,7 +557,8 @@
 				"lastReclaimFreedBytes",
 				"maxConcurrentJobs",
 				"maxCpuPercent",
-				"maxMemoryMb"
+				"maxMemoryMb",
+				"consents"
 			],
 			"heartbeat": [
 				"platform",
@@ -574,7 +577,8 @@
 				"lastReclaimFreedBytes",
 				"maxConcurrentJobs",
 				"maxCpuPercent",
-				"maxMemoryMb"
+				"maxMemoryMb",
+				"consents"
 			]
 		}
 	},

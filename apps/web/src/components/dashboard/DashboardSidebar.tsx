@@ -41,6 +41,7 @@ import {
     Video,
     Inbox,
     BookOpen,
+    Server,
     type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -62,6 +63,7 @@ import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 import { SidebarInboxBadge } from './SidebarInboxBadge';
 import { RunnerStatusPill } from './RunnerStatusPill';
+import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import type { HelpDrawerTab } from './HelpDrawer';
 
@@ -118,6 +120,9 @@ export function DashboardSidebar({
     const [avatarError, setAvatarError] = useState(false);
     const mounted = useMounted();
     const t = useTranslations('dashboard.sidebar');
+    const tFleet = useTranslations('fleet');
+    // Fleet hub (FL-01): the one sidebar entry the program adds, below Teams.
+    const fleetHubEnabled = useFleetHubEnabled();
     const { config } = useWorkDetail();
 
     const handleCollapsedChange = (v: boolean) => {
@@ -195,6 +200,22 @@ export function DashboardSidebar({
                 ROUTES.DASHBOARD_SKILLS,
             ],
         },
+        // Fleet hub (FL-01, README D1) — ONE entry for the computers the
+        // owner runs Ever Works on, directly below Teams, behind
+        // FLEET_ENABLED + FLEET_HUB_ENABLED (absent otherwise: the sidebar is
+        // then exactly what it was). Lit on every /fleet/* route (FR-2). No
+        // badge: badges belong to Inbox alone. Machines and sessions are
+        // never sidebar rows of their own.
+        ...(fleetHubEnabled
+            ? [
+                  {
+                      name: tFleet('nav.label'),
+                      href: ROUTES.DASHBOARD_FLEET,
+                      icon: Server,
+                      matchPrefixes: [ROUTES.DASHBOARD_FLEET],
+                  },
+              ]
+            : []),
         // Org-wide Memory (Cortex P1) — one place to search everything the
         // active Organization knows, aggregated across all its Works' KB.
         // Sits directly below the Teams hub per spec §4.1.

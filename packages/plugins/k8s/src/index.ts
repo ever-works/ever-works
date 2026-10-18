@@ -64,6 +64,8 @@ export * from './app/app-kubeconfig.guard.js';
 export { POSTGRES_PROVIDER_DESCRIPTOR } from './app-dependencies/postgres.provider.js';
 export { REDIS_PROVIDER_DESCRIPTOR } from './app-dependencies/redis.provider.js';
 export { OBJECT_STORAGE_PROVIDER_DESCRIPTOR } from './app-dependencies/object-storage.provider.js';
+// Lane aw-env-smtp (GAP-22) — the `smtp` provider, published by both plugins like the three above.
+export { SMTP_PROVIDER_DESCRIPTOR, SMTP_PROVIDER_ID } from './app-dependencies/smtp.provider.js';
 // The deployer (APW-06 T12, plan §5.5–§5.7) — the phase machine and the rollback,
 // applying what the renderers above produce. Its `deployApp` is
 // `IDeploymentPlugin.deployApp`'s exact signature, and `AppDeployerApi` is the

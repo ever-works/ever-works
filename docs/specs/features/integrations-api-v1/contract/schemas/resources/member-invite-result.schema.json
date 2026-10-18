@@ -1,0 +1,35 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/integrations/v1/resources/member-invite-result.schema.json",
+	"title": "Member invite result (CR-13, POST /members/invite)",
+	"description": "What inviting a person into the pinned organization did. `invited` (201): a new invitation was issued and emailed. `pending` (200): an invitation for that email was still pending and is answered again; nothing is sent twice. `already_member` (200): the person is a member (the tenant owner is a member of every organization). `added` (201): the person already belonged to the tenant and joined this roster directly, with no email (records organization.member.added). The invitation token never appears here: it exists only inside the email.",
+	"type": "object",
+	"required": ["status", "invitation", "userId"],
+	"properties": {
+		"status": { "type": "string", "enum": ["invited", "pending", "already_member", "added"] },
+		"invitation": {
+			"description": "The invitation (`invited`, `pending`), else null.",
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"required": ["id", "email", "role", "status", "expiresAt", "createdAt"],
+					"properties": {
+						"id": { "$ref": "../common.schema.json#/$defs/Uuid" },
+						"email": { "type": "string", "maxLength": 320 },
+						"role": { "type": "string", "maxLength": 32, "examples": ["member"] },
+						"status": { "type": "string", "examples": ["pending"] },
+						"expiresAt": { "$ref": "../common.schema.json#/$defs/DateTime" },
+						"createdAt": { "$ref": "../common.schema.json#/$defs/DateTime" }
+					},
+					"additionalProperties": false
+				}
+			]
+		},
+		"userId": {
+			"description": "The member's user id (`already_member`, `added`), else null. The member DTO itself comes from GET /members and organization.member.* events.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		}
+	},
+	"additionalProperties": false
+}

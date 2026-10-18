@@ -331,6 +331,12 @@ export function isAppDependencyReason(value: string): value is AppDependencyReas
  * `managed-postgres`, `managed-redis`, `managed-object-storage`,
  * `managed-smtp` (the last added by GAP-22 so a `smtp: { required: true }`
  * App Work can reach `ready` on the tier).
+ *
+ * `k8s-inline-mailpit` (lane aw-env-smtp, 2026-10-18, GAP-22) is the `k8s`
+ * plugin's in-namespace mail sink — the default `smtp` provider on Your cluster
+ * and, through `k8s-apps-tier`, on Ever Works Apps — which also answers for a
+ * bring-your-own SMTP server when the dependency's configuration names one.
+ * Appended, so every existing index keeps its member.
  */
 export const APP_DEPENDENCY_PROVIDER_IDS = [
 	'k8s-inline-postgres',
@@ -342,7 +348,8 @@ export const APP_DEPENDENCY_PROVIDER_IDS = [
 	'managed-postgres',
 	'managed-redis',
 	'managed-object-storage',
-	'managed-smtp'
+	'managed-smtp',
+	'k8s-inline-mailpit'
 ] as const;
 
 /** A dependency provider id — CONTRACTS §3:369. */

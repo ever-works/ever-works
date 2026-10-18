@@ -208,11 +208,9 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         reason: "APW-05's rebuild requester is unwritten (the hosts service is provided in the API since C43, lane aw-deploy-2).",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
     },
-    {
-        key: 'AppEnvModule | AppEnvService | APP_ENV_ACTIVITY',
-        reason: 'Provisional: T26 owns `app-env.activity.ts` and the `ActivityActionType.APP_ENV` member it writes with.',
-        source: 'packages/agent/src/app-env/app-env.service.ts:331-341,373 (APW-07 T26)',
-    },
+    // `AppEnvModule | AppEnvService | APP_ENV_ACTIVITY` left this list on 2026-10-18 (lane
+    // aw-env-smtp): `AppEnvModule` binds it to `AppEnvActivityService` (APW-07 T26), so every env
+    // change through `PUT /api/works/:id/app-env` writes its `app_env` Activity row.
     {
         key: 'AppEnvModule | AppEnvService | APP_ENV_ACTOR_NAMES',
         reason: 'Provisional: the swap is `useExisting: WorkMemberService`, which has no `nameOf` yet.',

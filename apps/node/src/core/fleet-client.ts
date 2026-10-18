@@ -444,6 +444,16 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.maxMemoryMb !== undefined) {
 		out.maxMemoryMb = source.maxMemoryMb;
 	}
+	// Fleet node link (FL-02): the four consents, rebuilt key by key so only
+	// literal booleans ever reach a `forbidNonWhitelisted` pipe.
+	if (source.consents !== undefined) {
+		out.consents = {
+			work: source.consents.work === true,
+			attend: source.consents.attend === true,
+			manage: source.consents.manage === true,
+			usageScan: source.consents.usageScan === true
+		};
+	}
 	return out;
 }
 

@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Inject,
     Injectable,
@@ -21,7 +22,12 @@ import {
     TenantRepository,
     UserRepository,
 } from '@ever-works/agent/database';
-import type { OrganizationInvitation, OrganizationMember } from '@ever-works/agent/entities';
+import type {
+    Organization,
+    OrganizationInvitation,
+    OrganizationInvitationRole,
+    OrganizationMember,
+} from '@ever-works/agent/entities';
 // Token + interface only. Importing `SeatsService` itself would pull the whole
 // `@ever-works/agent/subscriptions` barrel — and through it NotificationsModule
 // → AuthModule — into this module's load graph, which crashes the invitation
@@ -57,6 +63,23 @@ export type OrganizationMemberView = {
      */
     isOwner: boolean;
 };
+
+/**
+ * What `inviteForIntegration` did (contract v1 `POST /members/invite`, CR-13):
+ *
+ *  - `invited`: a new invitation was issued and emailed;
+ *  - `pending`: an invitation for that email was still pending, so it is
+ *    answered again and nothing is sent twice;
+ *  - `already_member`: the person is already a member (the Tenant owner is a
+ *    member of every Organization of the Tenant);
+ *  - `added`: the person already belongs to the Tenant, so they joined this
+ *    roster directly, exactly as `invite()` adopts them, and got no email.
+ *
+ * The invitation never carries its token (it exists only inside the email).
+ */
+export type IntegrationInviteOutcome =
+    | { status: 'invited' | 'pending'; invitation: OrganizationInvitation; userId: null }
+    | { status: 'already_member' | 'added'; invitation: null; userId: string };
 
 export type AcceptOutcome = {
     organizationId: string;
@@ -172,7 +195,125 @@ export class OrganizationInvitationFlowService {
             email,
             invitedName,
         });
+        await this.mailInvitation(organization, actorUserId, issued);
+        return issued;
+    }
 
+    /**
+     * Invite on behalf of an integration (contract v1 `POST /members/invite`,
+     * CR-13: Gauzy's "invite to Ever Works"). The same invitation as `invite()`
+     * — the email-bound token, the normal email, the seat check, the act-as
+     * user (else the key's owner) as the inviter, who must belong to the
+     * Organization's Tenant — but **idempotent per email** instead of failing
+     * on a repeat, because an integration retries:
+     *
+     *  - a member (or the Tenant owner) is answered as `already_member`;
+     *  - an invitation still pending for the email is answered again
+     *    (`pending`), even when a concurrent call won the race to issue it;
+     *  - a person already in the Tenant joins the roster directly (`added`),
+     *    the same adoption `invite()` performs, and gets no email.
+     *
+     * Only the `member` role is issued: invitations carry no other role yet,
+     * and promotion stays the Tenant owner's step in the app (EW-P2-6).
+     */
+    async inviteForIntegration(
+        orgId: string,
+        actorUserId: string,
+        email: string,
+        options: { role?: OrganizationInvitationRole; invitedName?: string } = {},
+    ): Promise<IntegrationInviteOutcome> {
+        const organization = await this.membership.ensureMember(orgId, actorUserId);
+        if (!organization.tenantId) {
+            throw new BadRequestException('organization_has_no_tenant');
+        }
+        const tenantId = organization.tenantId;
+        const normalized = OrganizationInvitationService.normaliseEmail(email);
+
+        const existing = await this.users.findByEmail(normalized).catch(() => null);
+        const inTenant = !!existing?.tenantId && existing.tenantId === tenantId;
+        if (existing && inTenant) {
+            const tenant = await this.tenants.findById(tenantId).catch(() => null);
+            if (
+                tenant?.ownerUserId === existing.id ||
+                (await this.members.findByOrgAndUser(organization.id, existing.id))
+            ) {
+                return { status: 'already_member', invitation: null, userId: existing.id };
+            }
+        }
+
+        const pending = await this.pendingInvitation(organization.id, normalized);
+        if (pending) return { status: 'pending', invitation: pending, userId: null };
+
+        await this.assertSeatForTenant(tenantId);
+
+        if (existing && inTenant) {
+            try {
+                await this.recordMembership(organization.id, tenantId, existing.id, {
+                    invitedById: actorUserId,
+                });
+            } catch (error) {
+                // A concurrent call added them first (the roster's unique (organizationId,
+                // userId) index refused this insert): they are a member now, so say so
+                // rather than fail. Any other error still surfaces.
+                const added = await this.members
+                    .findByOrgAndUser(organization.id, existing.id)
+                    .catch(() => null);
+                if (added)
+                    return { status: 'already_member', invitation: null, userId: existing.id };
+                throw error;
+            }
+            return { status: 'added', invitation: null, userId: existing.id };
+        }
+
+        let issued: IssuedOrganizationInvitation;
+        try {
+            issued = await this.invitations.issue({
+                organizationId: organization.id,
+                tenantId,
+                invitedById: actorUserId,
+                email,
+                role: options.role ?? 'member',
+                invitedName: options.invitedName,
+            });
+        } catch (error) {
+            // A concurrent call issued it first (the partial unique index is the
+            // authority on "already invited"): answer the invitation that won.
+            if (error instanceof ConflictException) {
+                const winner = await this.pendingInvitation(organization.id, normalized);
+                if (winner) return { status: 'pending', invitation: winner, userId: null };
+            }
+            throw error;
+        }
+        await this.mailInvitation(organization, actorUserId, issued);
+        return { status: 'invited', invitation: issued.invitation, userId: null };
+    }
+
+    /** The live (pending, unexpired) invitation of `emailNormalized` in an Organization, or `null`. */
+    private async pendingInvitation(
+        organizationId: string,
+        emailNormalized: string,
+    ): Promise<OrganizationInvitation | null> {
+        const now = Date.now();
+        const rows = await this.invitations.listPending(organizationId);
+        return (
+            rows.find(
+                (row) =>
+                    OrganizationInvitationService.normaliseEmail(
+                        row.emailNormalized ?? row.email,
+                    ) === emailNormalized && new Date(row.tokenExpiresAt).getTime() > now,
+            ) ?? null
+        );
+    }
+
+    /**
+     * Email a just-issued invitation; when the email cannot be sent, revoke it
+     * and rethrow (see the comment inside).
+     */
+    private async mailInvitation(
+        organization: Organization,
+        actorUserId: string,
+        issued: IssuedOrganizationInvitation,
+    ): Promise<void> {
         // 🛑 The raw token leaves this method exactly once, into the email
         // body. It is not returned to the caller by the controller, not
         // logged, and not stored — the row holds only sha256(token).
@@ -208,8 +349,6 @@ export class OrganizationInvitationFlowService {
             );
             throw error;
         }
-
-        return issued;
     }
 
     /**

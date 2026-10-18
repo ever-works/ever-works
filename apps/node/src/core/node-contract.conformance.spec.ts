@@ -140,7 +140,9 @@ describe('what the node actually puts on the wire', () => {
 		// versions, sent only by a node whose telemetry has a compat probe.
 		// 8 → 11 with remote node limits (slice AS): the limits the worker
 		// enforces, sent only by a node that HAS a worker.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(11);
+		// 11 → 12 with the node link (FL-02): the consents, sent by a runtime
+		// that knows them (every start since the field) and never at enroll.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(12);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -241,7 +243,9 @@ describe('what the node actually puts on the wire', () => {
 			// the projection: it means "no ceiling in force", not "said nothing".
 			maxConcurrentJobs: 2,
 			maxCpuPercent: 70,
-			maxMemoryMb: null
+			maxMemoryMb: null,
+			// Fleet node link (FL-02).
+			consents: { work: true, attend: false, manage: true, usageScan: false }
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(

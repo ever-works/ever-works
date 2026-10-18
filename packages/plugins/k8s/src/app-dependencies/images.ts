@@ -63,12 +63,19 @@ export const OBJECT_STORAGE_REPOSITORY = 'quay.io/minio/minio';
 /** The matching S3 client — the init Job's `mc`. */
 export const OBJECT_STORAGE_CLIENT_REPOSITORY = 'quay.io/minio/mc';
 
+/**
+ * The in-namespace mail sink (lane aw-env-smtp, GAP-22): Mailpit — an SMTP server that keeps every
+ * message it receives and shows them in a web UI, delivering nothing onwards.
+ */
+export const MAILPIT_REPOSITORY = 'docker.io/axllent/mailpit';
+
 /** The tag each pinned digest was read from, recorded so a re-pin is a lookup rather than a guess. */
 export const DEPENDENCY_IMAGE_TAGS = {
 	postgres: '14|15|16|17',
 	redis: '7',
 	objectStorage: 'latest',
-	objectStorageClient: 'latest'
+	objectStorageClient: 'latest',
+	mailpit: 'v1.31.6'
 } as const;
 
 /**
@@ -111,6 +118,13 @@ export const OBJECT_STORAGE_IMAGE_DIGEST = 'sha256:14cea493d9a34af32f524e538b834
 /** The pinned S3 client digest — the bucket-init Job's `mc`. */
 export const OBJECT_STORAGE_CLIENT_IMAGE_DIGEST =
 	'sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727';
+
+/**
+ * The pinned Mailpit digest — the multi-arch OCI index of `axllent/mailpit:v1.31.6`
+ * (`hub.docker.com/v2/repositories/axllent/mailpit/tags`, read 2026-10-18; `latest` and `v1` named the
+ * same index that day).
+ */
+export const MAILPIT_IMAGE_DIGEST = 'sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387';
 
 /** `sha256:` + 64 lowercase hex — the only shape a pinned image reference may carry. */
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -246,6 +260,14 @@ export function objectStorageClientImage(override?: unknown): string {
 	);
 }
 
+/** The mail sink image, honouring an admin override (lane aw-env-smtp). */
+export function mailpitImage(override?: unknown): string {
+	return (
+		dependencyImageOverride(override, MAILPIT_REPOSITORY) ??
+		digestPinnedImage(MAILPIT_REPOSITORY, MAILPIT_IMAGE_DIGEST)
+	);
+}
+
 /** The override keys the `appDependencyImages` admin setting may carry. */
 export interface AppDependencyImageOverrides {
 	readonly postgres: Readonly<Partial<Record<PostgresMajorVersion, string>>>;
@@ -253,6 +275,7 @@ export interface AppDependencyImageOverrides {
 	readonly redis?: string;
 	readonly objectStorage?: string;
 	readonly objectStorageClient?: string;
+	readonly smtp?: string;
 }
 
 /** Read one value out of an unknown record without ever trusting its type. */
@@ -292,6 +315,7 @@ export function dependencyImageOverrides(settings: Record<string, unknown> | und
 		redis?: string;
 		objectStorage?: string;
 		objectStorageClient?: string;
+		smtp?: string;
 	} = { postgres, postgresClient };
 
 	const redis = dependencyImageOverride(readOverride(raw, 'redis'), REDIS_REPOSITORY);
@@ -303,6 +327,8 @@ export function dependencyImageOverrides(settings: Record<string, unknown> | und
 		OBJECT_STORAGE_CLIENT_REPOSITORY
 	);
 	if (objectStorageClient) overrides.objectStorageClient = objectStorageClient;
+	const smtp = dependencyImageOverride(readOverride(raw, 'smtp'), MAILPIT_REPOSITORY);
+	if (smtp) overrides.smtp = smtp;
 
 	return overrides;
 }
@@ -336,6 +362,11 @@ export function objectStorageClientImageFor(settings: Record<string, unknown> | 
 	return objectStorageClientImage(dependencyImageOverrides(settings).objectStorageClient);
 }
 
+/** The mail sink image, resolved through the plugin's settings in one call. */
+export function mailpitImageFor(settings: Record<string, unknown> | undefined): string {
+	return mailpitImage(dependencyImageOverrides(settings).smtp);
+}
+
 /**
  * Every image this module can emit, in a stable order, for the two settings shapes that matter: the built-in
  * pins and a settings blob that overrides all of them.
@@ -348,6 +379,6 @@ export function everyDependencyImage(): string[] {
 	for (const major of POSTGRES_VERSIONS) {
 		images.push(postgresImage(major), postgresClientImage(major));
 	}
-	images.push(redisImage(), objectStorageImage(), objectStorageClientImage());
+	images.push(redisImage(), objectStorageImage(), objectStorageClientImage(), mailpitImage());
 	return images;
 }

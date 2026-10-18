@@ -50,6 +50,7 @@ import type {
     FleetExecutionScopeType,
 } from '@ever-works/contracts';
 import {
+    IsFleetConsentsShape,
     MaxConfiguredCapabilityTagLength,
     MaxConfiguredCapabilityTags,
 } from './fleet-capability.validators';
@@ -342,7 +343,7 @@ export class FleetNodeSelfDescriptionDto {
         required: false,
         type: [String],
         description:
-            "Capability tags, e.g. ['terminal', 'workspace', 'docker']. Count and per-tag length are operator-configurable (FLEET_MAX_CAPABILITY_TAGS / FLEET_MAX_CAPABILITY_TAG_LENGTH; defaults 16 / 32).",
+            "Capability tags, e.g. ['terminal', 'workspace', 'docker']. Count and per-tag length are operator-configurable (FLEET_MAX_CAPABILITY_TAGS / FLEET_MAX_CAPABILITY_TAG_LENGTH; defaults 32 / 32).",
     })
     @IsOptional()
     @IsArray()
@@ -604,6 +605,29 @@ export class FleetNodeSelfDescriptionDto {
     @Min(0)
     @Max(FLEET_MAX_REPORTED_LIMIT_VALUE)
     maxMemoryMb?: number | null;
+
+    /**
+     * Fleet node link (FL-02, CONTRACTS §1.1) — the consents the node was
+     * started with: `{ work, attend, manage, usageScan }`.
+     *
+     * Validated as a small object of BOOLEANS, not as a nested whitelisted
+     * class, on purpose: under `whitelist + forbidNonWhitelisted` a nested
+     * class would 400 the whole beat the day a newer node reports a fifth
+     * consent, and the node would then strip the field and keep its link
+     * closed. Unknown keys are accepted here and dropped by the service,
+     * which takes the four it knows (only a literal `true` grants).
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        additionalProperties: { type: 'boolean' },
+        example: { work: true, attend: false, manage: true, usageScan: false },
+        description:
+            'The consents this node runs with (--work, --attend, --manage, usage scan). Booleans only; at most 16 keys.',
+    })
+    @IsOptional()
+    @IsFleetConsentsShape()
+    consents?: Record<string, boolean>;
 }
 
 /**

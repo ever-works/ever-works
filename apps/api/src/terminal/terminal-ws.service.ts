@@ -42,11 +42,11 @@ const WS_PATH_PATTERN = /^\/ws\/terminal\/([0-9a-f-]{36})$/i;
 
 /**
  * Upgrade paths owned by ANOTHER gateway on the same HTTP server (the
- * Agent computer live view). This gateway leaves them untouched instead
+ * Agent computer live view; the Fleet node link and its viewer bridge, FL-02). This gateway leaves them untouched instead
  * of destroying the socket, so both gateways can share one `upgrade`
  * event; every other unknown path is still destroyed here.
  */
-export const TERMINAL_WS_FOREIGN_PATH_PREFIXES: readonly string[] = ['/ws/computer/'];
+export const TERMINAL_WS_FOREIGN_PATH_PREFIXES: readonly string[] = ['/ws/computer/', '/ws/fleet/'];
 
 interface SocketState {
     authenticated: boolean;

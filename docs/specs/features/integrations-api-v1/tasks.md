@@ -96,6 +96,10 @@
 - [x] **T39** Project Works (EW-P2-4, Gauzy CR-6): `POST /works` (`kind: 'project'` only, behind
       `EVER_WORKS_PROJECT_WORKS_ENABLED`; slug derived from `name`; Teams checked first, then attached; `externalRef`
       de-duplicates); request schema `CreateWork`; contract `v1-draft.14` (CR-6).
+- [x] **T40** Member invitations (Gauzy CR-13): `POST /members/invite` (`members:write`, `Idempotency-Key`), the app's
+      own invitation sent by the act-as user (else the key's owner), `member` role only, idempotent per email
+      (`invited` / `pending` / `already_member` / `added`); `OrganizationInvitationFlowService.inviteForIntegration`;
+      schemas `InviteMember`, `member-invite-result.schema.json`; contract `v1-draft.15` (CR-13).
 
 ## Phase 3 — Webhooks v2 (EW-P1-5)
 

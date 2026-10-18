@@ -524,3 +524,58 @@ describe('FleetJobClient lease kind filters (attended live-view lane)', () => {
 		expect(bodies[1]).toMatchObject({ excludeKinds: ['computer-session'] });
 	});
 });
+
+describe('FleetJobClient node link token (FL-02)', () => {
+	it('mints through the node credential and keeps the token out of every log line', async () => {
+		const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+		const entries: LogEntry[] = [];
+		const logger = createLogger({ sink: (entry) => entries.push(entry) });
+		const token = 'eyJsaW5rIjoidG9rZW4tZm9yLXRlc3RzIn0.c2lnbmF0dXJl';
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			logger,
+			timeoutMs: 0,
+			fetchFn: async (url, init) => {
+				calls.push({ url, body: JSON.parse(init.body) as Record<string, unknown> });
+				return {
+					ok: true,
+					status: 201,
+					text: async () => JSON.stringify({ token, wsPath: '/ws/fleet/link', expiresInSec: 300 })
+				};
+			}
+		});
+
+		await expect(client.mintLinkToken()).resolves.toEqual({ token, wsPath: '/ws/fleet/link', expiresInSec: 300 });
+		expect(calls).toEqual([
+			{ url: 'https://api.ever.works/api/fleet/link-token', body: { nodeId: NODE_ID, secret: SECRET } }
+		]);
+		logger.info(`about to send ${token}`);
+		expect(entries.at(-1)?.message).toBe(`about to send ${REDACTED}`);
+	});
+
+	it('answers a platform without links as a 404 the link client recognises', async () => {
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn: response(404, { message: 'Not Found' }),
+			timeoutMs: 0
+		});
+		const error = await client.mintLinkToken().catch((caught: unknown) => caught);
+		expect(error).toBeInstanceOf(FleetClientError);
+		expect((error as FleetClientError).status).toBe(404);
+	});
+
+	it('refuses a response without a token', async () => {
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn: response(201, { wsPath: '/ws/fleet/link' }),
+			timeoutMs: 0
+		});
+		await expect(client.mintLinkToken()).rejects.toMatchObject({ kind: 'malformed' });
+	});
+});

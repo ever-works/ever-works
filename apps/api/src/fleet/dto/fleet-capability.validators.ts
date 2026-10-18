@@ -77,3 +77,41 @@ export function MaxConfiguredCapabilityTagLength(validationOptions?: ValidationO
         });
     };
 }
+
+/** Most keys a reported consents object may carry (four today; room for later consents). */
+export const FLEET_CONSENTS_MAX_KEYS = 16;
+const CONSENT_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9]{0,31}$/;
+
+/**
+ * Fleet node link (FL-02) — a heartbeat's `consents`: a plain object of at
+ * most {@link FLEET_CONSENTS_MAX_KEYS} camel-case keys, every value a boolean.
+ * Unknown keys pass (a newer node's fifth consent must not fail its beat);
+ * the service keeps only the four it knows.
+ */
+@ValidatorConstraint({ name: 'fleetConsentsShape', async: false })
+export class FleetConsentsShapeConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+        const entries = Object.entries(value as Record<string, unknown>);
+        if (entries.length > FLEET_CONSENTS_MAX_KEYS) return false;
+        return entries.every(
+            ([key, flag]) => CONSENT_KEY_PATTERN.test(key) && typeof flag === 'boolean',
+        );
+    }
+
+    defaultMessage(args: ValidationArguments): string {
+        return `${args.property} must be an object of at most ${FLEET_CONSENTS_MAX_KEYS} boolean consents`;
+    }
+}
+
+export function IsFleetConsentsShape(validationOptions?: ValidationOptions) {
+    return function (object: object, propertyName: string): void {
+        registerDecorator({
+            target: object.constructor,
+            propertyName,
+            options: validationOptions,
+            constraints: [],
+            validator: FleetConsentsShapeConstraint,
+        });
+    };
+}

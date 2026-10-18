@@ -7,7 +7,7 @@ epic is blocked by this list. Markers that CONTRACTS already answers were closed
 "**Resolved** by CONTRACTS …"; the few still open in an epic although CONTRACTS answers them are
 listed at the end as auditor follow-up.
 
-**Count:** 39 open markers — 16 in group A, 22 in group B, 1 answered by CONTRACTS (auditor
+**Count:** 41 open markers — 18 in group A, 22 in group B, 1 answered by CONTRACTS (auditor
 follow-up). Line numbers are those of the marker in the epic's `spec.md`.
 
 ## A — Decide before that epic ships (security, credentials, data, money, other people)
@@ -30,6 +30,8 @@ follow-up). Line numbers are those of the marker in the epic's `spec.md`.
 | A14 | `FL-17-cloud-computers/spec.md:522`         | Who registers the operator OAuth application for the first cloud provider, and where do its client id and secret live? | Admin-scope plugin settings (`x-adminOnly`, `x-scope: global`) with env fallbacks; "Sign in with the provider" hidden until both are set; the token path always works |
 | A15 | `FL-17-cloud-computers/spec.md:523`         | May the overlay-VPN auth key be saved as a user-scope secret for repeat use?                                          | Create-time only — passed into the bootstrap once, never stored, echoed or audited                                                                         |
 | A16 | `FL-18-actions-runners/spec.md:468`         | Should the Ever Works GitHub App manifest gain "Self-hosted runners" and repository "Administration" now, accepting the re-authorisation prompt every existing installation will see? | Manifest unchanged; an installation that already has the permission works, and every missing permission is named with **Grant access** |
+| A17 | `docs/internal/fleet/lanes/FL-01.md` (Q1) | Nothing binds a computer to an Organization today (`fleet_nodes.organizationId` is never written), so no one but the owner can see one. Should the computer's Settings tab offer "Share with an Organization" (owner picks one of their Organizations)? | Not built: every computer stays unbound and owner-only; the role derivation and the per-family policy are in place and take effect the day a binding exists |
+| A18 | `docs/internal/fleet/lanes/FL-01.md` (Q2) | Does a member of the Tenant WITHOUT a roster row in the computer's Organization count as an `org-member`? (Organization access elsewhere is tenant-wide.) | No — only the Tenant owner (`org-admin`) and roster rows (`admin` → `org-admin`, `member` → `org-member`) derive a role; everyone else is a `stranger` |
 
 ## B — Product behaviour and copy
 

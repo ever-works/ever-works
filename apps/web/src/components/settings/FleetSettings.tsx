@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
+    // Activity / Info / Laptop / Pause / Pencil / Play / Trash2 moved with the
+    // table into `FleetComputersTable`; kept here per the no-removal rule (an
+    // unused import costs nothing and re-splitting needs no import hunt).
     Activity,
     AlertTriangle,
     Info,
@@ -49,6 +52,10 @@ import {
     clearFleetNodeModelThrottleAction,
 } from '@/app/actions/settings/fleet';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
+import {
+    FleetComputersTable,
+    type FleetComputersTableFavorites,
+} from '@/components/fleet/computers/FleetComputersTable';
 import { FleetCostCeiling } from './FleetCostCeiling';
 import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
@@ -57,6 +64,7 @@ import { FleetNodeDrawer } from './FleetNodeDrawer';
 import { isEmptyLimitCeiling, keepIfStillOpen } from './fleet-node-limits.shared';
 import type { FleetNodeLimitCeiling } from '@ever-works/contracts';
 import { describeFleetModelProvider } from '@ever-works/contracts';
+import type { FleetEnrollableNodeKind } from '@ever-works/contracts';
 import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
 
@@ -76,6 +84,32 @@ interface FleetSettingsProps {
     /** Panic controls (EW-778) — the stop flag's first paint; polled afterwards. */
     initialKillSwitch?: FleetKillSwitchState | null;
     killSwitchError?: string | null;
+    /**
+     * Fleet hub (FL-01, README D1) — which part of the page renders:
+     *
+     *   - `all` (default) — today's Settings → Fleet, byte for byte;
+     *   - `policies` — Settings → Fleet with the hub on: the kill switch, panic
+     *     controls, execution preferences, cost ceiling and enrolment tokens,
+     *     and the "Computers are under Fleet" card where the table was;
+     *   - `computers` — the hub's Computers tab: the machine table (with the
+     *     star column), the Add computer flow, the node drawer and the cluster
+     *     list. The hub's own header and kill-switch banner frame it.
+     */
+    view?: 'all' | 'policies' | 'computers';
+    /** `computers` view: open the Add flow for this kind on arrival (`?add=`). */
+    openAddKind?: FleetEnrollableNodeKind | null;
+    /** `computers` view: called once the Add flow opened, so the page can drop `?add=`. */
+    onAddOpened?: () => void;
+    /** `computers` view: the star column (the hub supplies it; Settings never does). */
+    favorites?: FleetComputersTableFavorites;
+    /**
+     * `computers` view: the order of the machine rows (the hub's favourites
+     * first, applied to the rows this component keeps, so a star re-sorts at
+     * once). Without it the rows keep the order they arrived in.
+     */
+    orderNodes?: (nodes: FleetNodeView[]) => FleetNodeView[];
+    /** `policies` view: the card that points at the hub. */
+    hubLinkCard?: ReactNode;
 }
 
 const ENROLLABLE_KINDS: Exclude<FleetNodeKind, 'k8s'>[] = ['desktop-node', 'node'];
@@ -123,12 +157,23 @@ export function FleetSettings({
     preferencesError,
     initialKillSwitch = null,
     killSwitchError = null,
+    view = 'all',
+    openAddKind = null,
+    onAddOpened,
+    favorites,
+    orderNodes,
+    hubLinkCard,
 }: FleetSettingsProps) {
+    const showMachines = view !== 'policies';
+    const showPolicies = view !== 'computers';
     const t = useTranslations('dashboard.settings.fleet');
     const [nodes, setNodes] = useState<FleetNodeView[]>(initialNodes);
     const [isPending, startTransition] = useTransition();
 
-    const enrolledNodes = useMemo(() => nodes.filter((node) => node.persisted), [nodes]);
+    const enrolledNodes = useMemo(() => {
+        const persisted = nodes.filter((node) => node.persisted);
+        return orderNodes ? orderNodes(persisted) : persisted;
+    }, [nodes, orderNodes]);
     const clusterNodes = useMemo(
         () => nodes.filter((node) => !node.persisted && node.kind === 'k8s'),
         [nodes],
@@ -161,6 +206,23 @@ export function FleetSettings({
 
     // Remove confirm dialog.
     const [removeTarget, setRemoveTarget] = useState<FleetNodeView | null>(null);
+
+    // Fleet hub (FL-01): "Add computer ▾" in the hub header lands here with
+    // `?add=<kind>`; open the same Add flow, preset to that kind. Adjusted
+    // while rendering (not in an effect) the first time each `?add=` arrives;
+    // the page is then told so it can drop the parameter from the URL.
+    const [handledAddKind, setHandledAddKind] = useState<FleetEnrollableNodeKind | null>(null);
+    const pendingAddKind = view === 'computers' ? openAddKind : null;
+    if (pendingAddKind && pendingAddKind !== handledAddKind) {
+        setHandledAddKind(pendingAddKind);
+        setAddKind(pendingAddKind);
+        setAddOpen(true);
+    } else if (!pendingAddKind && handledAddKind) {
+        setHandledAddKind(null);
+    }
+    useEffect(() => {
+        if (handledAddKind) onAddOpened?.();
+    }, [handledAddKind, onAddOpened]);
 
     const kindLabel = (kind: FleetNodeKind): string => t(`kinds.${kind}` as never);
 
@@ -444,25 +506,41 @@ export function FleetSettings({
     };
 
     return (
-        <div className="space-y-8" data-testid="fleet-settings">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                        {t('title')}
-                    </h2>
-                    <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                        {t('subtitle')}
-                    </p>
+        <div
+            className="space-y-8"
+            data-testid="fleet-settings"
+            data-view={view === 'all' ? undefined : view}
+        >
+            {view !== 'computers' && (
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                            {t('title')}
+                        </h2>
+                        <p className="text-text-muted dark:text-text-muted-dark text-sm">
+                            {t('subtitle')}
+                        </p>
+                    </div>
+                    {showMachines && (
+                        <Button onClick={() => setAddOpen(true)} data-testid="fleet-add-node">
+                            <Plus className="w-4 h-4" />
+                            {t('add.button')}
+                        </Button>
+                    )}
                 </div>
-                <Button onClick={() => setAddOpen(true)} data-testid="fleet-add-node">
-                    <Plus className="w-4 h-4" />
-                    {t('add.button')}
-                </Button>
-            </div>
+            )}
 
-            {/* Panic controls (EW-778) — visible the moment an operator stops the platform. */}
-            <FleetKillSwitchBanner initial={initialKillSwitch} initialError={killSwitchError} />
+            {/* Panic controls (EW-778) — visible the moment an operator stops the platform.
+                On the hub's Computers tab the hub layout shows it instead. */}
+            {view !== 'computers' && (
+                <FleetKillSwitchBanner initial={initialKillSwitch} initialError={killSwitchError} />
+            )}
 
+            {/* Fleet hub (FL-01, FR-11): where the table was, a card that says where it went. */}
+            {view === 'policies' && hubLinkCard}
+
+            {/* Every view: the panic controls read these nodes too, so a failed read
+                must never pass for "nothing to drain". */}
             {loadError && (
                 <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -470,7 +548,7 @@ export function FleetSettings({
                 </div>
             )}
 
-            {enrolledNodes.length === 0 ? (
+            {!showMachines ? null : enrolledNodes.length === 0 ? (
                 <div
                     className="p-8 rounded-lg border border-dashed border-border dark:border-border-dark text-center space-y-2"
                     data-testid="fleet-empty-state"
@@ -484,344 +562,136 @@ export function FleetSettings({
                     </p>
                 </div>
             ) : (
-                <div className="overflow-x-auto rounded-lg border border-border dark:border-border-dark">
-                    <table className="w-full text-sm" data-testid="fleet-nodes-table">
-                        <thead>
-                            <tr className="border-b border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 text-left">
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.name')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.kind')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.status')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.platform')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.cliVersion')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.billingIdentity')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.diskFree')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.load')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.capabilities')}
-                                </th>
-                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                    {t('table.lastSeen')}
-                                </th>
-                                <th className="px-4 py-2.5" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {enrolledNodes.map((node) => (
-                                <tr
-                                    key={node.id}
-                                    className="border-b last:border-b-0 border-border dark:border-border-dark"
-                                    data-testid={`fleet-node-row-${node.id}`}
-                                >
-                                    <td className="px-4 py-3 font-medium text-text dark:text-text-dark">
-                                        {node.name}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark">
-                                            {node.kind === 'desktop-node' ? (
-                                                <Laptop className="w-3 h-3" />
-                                            ) : (
-                                                <Server className="w-3 h-3" />
-                                            )}
-                                            {kindLabel(node.kind)}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span
-                                            className="inline-flex items-center gap-1.5 text-xs font-medium text-text dark:text-text-dark"
-                                            data-testid={`fleet-node-status-${node.id}`}
-                                        >
-                                            <span
-                                                className={`w-1.5 h-1.5 rounded-full ${statusDotClass(node.status)}`}
-                                            />
-                                            {t(`statuses.${node.status}` as never)}
-                                        </span>
-                                        {/* Fleet usage limits: "online" alone hid a
-                                            machine whose model CLI is out of quota. */}
-                                        {(node.modelThrottles ?? []).map((throttle) => (
-                                            <span
-                                                key={throttle.provider}
-                                                className="mt-1 flex w-fit items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-warning/10 text-warning whitespace-nowrap"
-                                                title={throttle.reason}
-                                                data-testid={`fleet-node-throttle-${node.id}-${throttle.provider}`}
-                                            >
-                                                {t('modelThrottles.entry', {
-                                                    cli: describeFleetModelProvider(
-                                                        throttle.provider,
-                                                    ),
-                                                    window: t(
-                                                        `modelThrottles.windows.${throttle.window}` as never,
-                                                    ),
-                                                    until: new Date(
-                                                        throttle.until,
-                                                    ).toLocaleString(),
-                                                })}
-                                            </span>
-                                        ))}
-                                    </td>
-                                    <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
-                                        {node.platform ?? '-'}
-                                    </td>
-                                    {/* Same two telemetry fields the sidebar
-                                        runner popover shows, so the pill and
-                                        this table can never tell different
-                                        stories about the same machine. */}
-                                    <td
-                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
-                                        data-testid={`fleet-node-cli-${node.id}`}
-                                    >
-                                        {node.cliVersion ?? t('table.cliNotInstalled')}
-                                    </td>
-                                    {/* Fleet cost accounting (EW-777): which
-                                        seat this machine's spend is billed
-                                        to — observed and shown here; which
-                                        seat it SHOULD be is the founder's
-                                        call, not the table's. */}
-                                    <td
-                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
-                                        data-testid={`fleet-node-identity-${node.id}`}
-                                        title={node.modelIdentity ?? undefined}
-                                    >
-                                        {node.modelIdentity ?? t('table.identityUnknown')}
-                                    </td>
-                                    <td
-                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
-                                        data-testid={`fleet-node-disk-${node.id}`}
-                                    >
-                                        {formatBytes(node.diskFreeBytes) ?? '-'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {(() => {
-                                            const activeJobs = node.load?.activeJobCount ?? 0;
-                                            return (
-                                                <span
-                                                    className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                                                        activeJobs > 0
-                                                            ? 'text-info'
-                                                            : 'text-text-muted dark:text-text-muted-dark'
-                                                    }`}
-                                                    data-testid={`fleet-node-load-${node.id}`}
-                                                    title={
-                                                        node.load?.currentJobKind
-                                                            ? t('load.currentJob', {
-                                                                  kind: node.load.currentJobKind,
-                                                              })
-                                                            : undefined
-                                                    }
-                                                >
-                                                    {activeJobs > 0 ? (
-                                                        <>
-                                                            <Activity className="w-3 h-3" />
-                                                            {t('load.busy', { count: activeJobs })}
-                                                        </>
-                                                    ) : (
-                                                        t('load.idle')
-                                                    )}
-                                                </span>
-                                            );
-                                        })()}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex flex-wrap gap-1">
-                                            {node.capabilities.length === 0 ? (
-                                                <span className="text-text-muted dark:text-text-muted-dark">
-                                                    -
-                                                </span>
-                                            ) : (
-                                                node.capabilities.map((capability) => (
-                                                    <span
-                                                        key={capability}
-                                                        className="px-1.5 py-0.5 rounded text-xs bg-info/10 text-info"
-                                                    >
-                                                        {capability}
-                                                    </span>
-                                                ))
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap">
-                                        {formatLastSeen(node.lastHeartbeatAt)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-end gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => openDrawer(node)}
-                                                disabled={isPending}
-                                                data-testid={`fleet-node-details-${node.id}`}
-                                                title={t('actions.details')}
-                                            >
-                                                <Info className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    setRenameTarget(node);
-                                                    setRenameValue(node.name);
-                                                }}
-                                                disabled={isPending}
-                                                data-testid={`fleet-node-rename-${node.id}`}
-                                                title={t('actions.rename')}
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => handleToggleDisabled(node)}
-                                                disabled={isPending}
-                                                data-testid={`fleet-node-disable-${node.id}`}
-                                                title={
-                                                    node.status === 'disabled'
-                                                        ? t('actions.enable')
-                                                        : t('actions.disable')
-                                                }
-                                            >
-                                                {node.status === 'disabled' ? (
-                                                    <Play className="w-4 h-4" />
-                                                ) : (
-                                                    <Pause className="w-4 h-4" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => setRemoveTarget(node)}
-                                                disabled={isPending}
-                                                data-testid={`fleet-node-remove-${node.id}`}
-                                                title={t('actions.remove')}
-                                            >
-                                                <Trash2 className="w-4 h-4 text-danger" />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <FleetComputersTable
+                    nodes={enrolledNodes}
+                    isPending={isPending}
+                    onDetails={openDrawer}
+                    onRename={(node) => {
+                        setRenameTarget(node);
+                        setRenameValue(node.name);
+                    }}
+                    onToggleDisabled={handleToggleDisabled}
+                    onRemove={setRemoveTarget}
+                    favorites={favorites}
+                />
             )}
 
-            {/* Panic controls (EW-778) — drain everything; cancel running work as a separate step. */}
-            <FleetPanicControls
-                nodes={nodes}
-                onNodesDrained={(drained) =>
-                    setNodes((prev) =>
-                        prev.map((entry) => drained.find((node) => node.id === entry.id) ?? entry),
-                    )
-                }
-            />
+            {showPolicies && (
+                <>
+                    {/* Panic controls (EW-778) — drain everything; cancel running work as a separate step. */}
+                    <FleetPanicControls
+                        nodes={nodes}
+                        onNodesDrained={(drained) =>
+                            setNodes((prev) =>
+                                prev.map(
+                                    (entry) =>
+                                        drained.find((node) => node.id === entry.id) ?? entry,
+                                ),
+                            )
+                        }
+                    />
 
-            <FleetExecutionPreferences
-                initialPreferences={initialPreferences}
-                error={preferencesError}
-            />
+                    <FleetExecutionPreferences
+                        initialPreferences={initialPreferences}
+                        error={preferencesError}
+                    />
 
-            <FleetCostCeiling />
+                    <FleetCostCeiling />
 
-            <FleetTokensSection
-                tokens={tokens}
-                loading={tokensLoading}
-                error={tokensLoadError}
-                isPending={isPending}
-                onRefresh={refreshTokens}
-                onRevoke={setRevokeTarget}
-            />
+                    <FleetTokensSection
+                        tokens={tokens}
+                        loading={tokensLoading}
+                        error={tokensLoadError}
+                        isPending={isPending}
+                        onRefresh={refreshTokens}
+                        onRevoke={setRevokeTarget}
+                    />
+                </>
+            )}
 
-            <div className="space-y-3" data-testid="fleet-cluster-section">
-                <div className="flex items-center gap-2">
-                    <Boxes className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                    <h3 className="text-sm font-semibold text-text dark:text-text-dark">
-                        {t('cluster.title')}
-                    </h3>
-                </div>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('cluster.description')}
-                </p>
-                {clusterNodes.length === 0 ? (
-                    <p
-                        className="text-sm text-text-muted dark:text-text-muted-dark"
-                        data-testid="fleet-cluster-empty"
-                    >
-                        {t('cluster.empty')}
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto rounded-lg border border-border dark:border-border-dark">
-                        <table className="w-full text-sm" data-testid="fleet-cluster-table">
-                            <thead>
-                                <tr className="border-b border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 text-left">
-                                    <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('table.name')}
-                                    </th>
-                                    <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('table.status')}
-                                    </th>
-                                    <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('table.platform')}
-                                    </th>
-                                    <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('cluster.roles')}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {clusterNodes.map((node) => (
-                                    <tr
-                                        key={node.id}
-                                        className="border-b last:border-b-0 border-border dark:border-border-dark"
-                                    >
-                                        <td className="px-4 py-3 font-medium text-text dark:text-text-dark">
-                                            {node.name}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text dark:text-text-dark">
-                                                <span
-                                                    className={`w-1.5 h-1.5 rounded-full ${statusDotClass(node.status)}`}
-                                                />
-                                                {t(`statuses.${node.status}` as never)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
-                                            {node.platform ?? '-'}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex flex-wrap gap-1">
-                                                {node.capabilities.length === 0 ? (
-                                                    <span className="text-text-muted dark:text-text-muted-dark">
-                                                        -
-                                                    </span>
-                                                ) : (
-                                                    node.capabilities.map((role) => (
-                                                        <span
-                                                            key={role}
-                                                            className="px-1.5 py-0.5 rounded text-xs bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark"
-                                                        >
-                                                            {role}
-                                                        </span>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            {showMachines && (
+                <div className="space-y-3" data-testid="fleet-cluster-section">
+                    <div className="flex items-center gap-2">
+                        <Boxes className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h3 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('cluster.title')}
+                        </h3>
                     </div>
-                )}
-            </div>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('cluster.description')}
+                    </p>
+                    {clusterNodes.length === 0 ? (
+                        <p
+                            className="text-sm text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-cluster-empty"
+                        >
+                            {t('cluster.empty')}
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto rounded-lg border border-border dark:border-border-dark">
+                            <table className="w-full text-sm" data-testid="fleet-cluster-table">
+                                <thead>
+                                    <tr className="border-b border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 text-left">
+                                        <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                            {t('table.name')}
+                                        </th>
+                                        <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                            {t('table.status')}
+                                        </th>
+                                        <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                            {t('table.platform')}
+                                        </th>
+                                        <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                            {t('cluster.roles')}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {clusterNodes.map((node) => (
+                                        <tr
+                                            key={node.id}
+                                            className="border-b last:border-b-0 border-border dark:border-border-dark"
+                                        >
+                                            <td className="px-4 py-3 font-medium text-text dark:text-text-dark">
+                                                {node.name}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-text dark:text-text-dark">
+                                                    <span
+                                                        className={`w-1.5 h-1.5 rounded-full ${statusDotClass(node.status)}`}
+                                                    />
+                                                    {t(`statuses.${node.status}` as never)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
+                                                {node.platform ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {node.capabilities.length === 0 ? (
+                                                        <span className="text-text-muted dark:text-text-muted-dark">
+                                                            -
+                                                        </span>
+                                                    ) : (
+                                                        node.capabilities.map((role) => (
+                                                            <span
+                                                                key={role}
+                                                                className="px-1.5 py-0.5 rounded text-xs bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark"
+                                                            >
+                                                                {role}
+                                                            </span>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Add node — form phase, then the one-time-token handoff. */}
             <Dialog

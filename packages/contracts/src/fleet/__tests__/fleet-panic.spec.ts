@@ -56,7 +56,12 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'computer.teach-start',
 	'computer.teach-finish',
 	'computer.profile-reset',
-	'node.policy.change'
+	'node.policy.change',
+	// Fleet node link (FL-02, CONTRACTS §7).
+	'node.consent.change',
+	'node.link.connect',
+	'node.link.disconnect',
+	'node.link.channel-open'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

@@ -6,6 +6,7 @@ import {
 	type ComputerInputFrame,
 	type ComputerMode
 } from '@ever-works/contracts';
+import { isSecureLinkOrigin, toLinkWsUrl } from '../link/link-socket';
 import type { Logger } from '../logger';
 import type { WebSocketFactory, WebSocketLike } from './cdp-connection';
 
@@ -64,28 +65,22 @@ export interface NodeLeg {
 	close(): void;
 }
 
-const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-
-/** `https://api.example.com[/api]` + `/ws/computer/<id>` → `wss://api.example.com/ws/computer/<id>`. */
+/**
+ * `https://api.example.com[/api]` + `/ws/computer/<id>` → `wss://api.example.com/ws/computer/<id>`.
+ * The same builder the node link uses (`link/link-socket.ts`).
+ */
 export function toComputerWsUrl(apiUrl: string, wsPath: string): string {
-	const origin = new URL(apiUrl).origin;
-	return `${origin.replace(/^http/, 'ws')}${wsPath.startsWith('/') ? wsPath : `/${wsPath}`}`;
+	return toLinkWsUrl(apiUrl, wsPath);
 }
 
 /**
  * True when a leg to this platform origin may carry a token: `https:`
  * anywhere, plain `http:` only to a loopback host. Anything unparseable or
- * of another scheme is refused.
+ * of another scheme is refused. The one rule the node link applies too
+ * (`link/link-socket.ts`).
  */
 export function isSecureLegOrigin(apiUrl: string): boolean {
-	let parsed: URL;
-	try {
-		parsed = new URL(apiUrl);
-	} catch {
-		return false;
-	}
-	if (parsed.protocol === 'https:') return true;
-	return parsed.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(parsed.hostname);
+	return isSecureLinkOrigin(apiUrl);
 }
 
 export function openNodeLeg(options: NodeLegOptions): NodeLeg {

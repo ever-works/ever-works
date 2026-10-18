@@ -287,6 +287,8 @@
             "signIn": "Sign in with Ever ID",
             "signUp": "Sign up with Ever ID",
             "redirecting": "Opening Ever ID…",
+            "signInWith": "Sign in with <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Sign up with <wordmark>Ever ID</wordmark>",
             "consentRequired": "Accept the terms above to continue.",
             "createAccount": {
                 "title": "Create your Ever Works account",
@@ -9474,6 +9476,63 @@
                         "remove": "Removal requested.",
                         "cancelDeploy": "Cancellation requested."
                     }
+                },
+                "environment": {
+                    "title": "Environment",
+                    "description": "The values this app runs with. Secret values are never shown — only whether they are set.",
+                    "summary": "{set} of {total} set",
+                    "missingRequired": "{count, plural, one {# required value is missing} other {# required values are missing}}",
+                    "loading": "Reading the environment…",
+                    "unavailable": "Environment values can't be edited on this instance yet.",
+                    "error": "Couldn't read the environment. Reload the page to try again.",
+                    "empty": "This app's App spec declares no environment values.",
+                    "secureStorageOff": "Secure storage isn't configured on this installation, so values can't be saved.",
+                    "edit": "Edit",
+                    "setValue": "Set value",
+                    "editAria": "Edit {name}",
+                    "saved": "{name} saved",
+                    "removed": "{name} removed",
+                    "states": {
+                        "set": "Set",
+                        "unset": "Not set",
+                        "missing": "Required — not set",
+                        "fromSpec": "From the App spec",
+                        "fromDependency": "Injected by {kind}",
+                        "generated": "Generated"
+                    },
+                    "badges": {
+                        "secret": "Secret",
+                        "required": "Required"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Object storage",
+                        "smtp": "SMTP mail"
+                    },
+                    "dialog": {
+                        "title": "Edit {name}",
+                        "valueLabel": "Value",
+                        "secretHint": "This value is secret. It is stored encrypted and never shown again.",
+                        "secretStored": "A value is stored. Type a new one to replace it.",
+                        "dependencyHint": "Normally injected by {kind}. A value you set here overrides it — for example, your own SMTP server.",
+                        "redeployHint": "Where the app uses this value, it is rebuilt or redeployed with the new one.",
+                        "empty": "Enter a value, or remove the stored one.",
+                        "save": "Save",
+                        "saving": "Saving…",
+                        "remove": "Remove value",
+                        "cancel": "Cancel"
+                    },
+                    "errors": {
+                        "undeclaredName": "The App spec doesn't declare this name.",
+                        "specUnavailable": "This app has no usable App spec yet.",
+                        "failed": "The value couldn't be saved. Try again."
+                    }
                 }
             }
         },
@@ -12708,6 +12767,273 @@
             "save": "Save Teams",
             "saved": "Teams saved.",
             "error": "Could not save the Teams."
+        }
+    },
+    "fleet": {
+        "nav": {
+            "label": "Fleet"
+        },
+        "hub": {
+            "title": "Fleet",
+            "subtitle": "The computers you run Ever Works on — which are up, and which need a look.",
+            "addComputer": "Add computer",
+            "addComputerMenuLabel": "Add computer: choose a kind",
+            "addKinds": {
+                "node": "Computer (command-line node)",
+                "desktopNode": "Desktop app"
+            },
+            "settings": "Fleet settings",
+            "tabsLabel": "Fleet",
+            "tabs": {
+                "overview": "Overview",
+                "computers": "Computers",
+                "sessions": "Sessions",
+                "checkouts": "Checkouts",
+                "commands": "Commands",
+                "usage": "Usage"
+            },
+            "killSwitchNote": "Renaming, favourites, pausing, draining and removing computers still work; live actions on computers are refused until the switch is cleared."
+        },
+        "placeholder": {
+            "tracker": "Program tracker",
+            "sessions": {
+                "title": "Sessions arrive with {epic}.",
+                "body": "Sessions on your computers — start an agent or a shell and come back to it from anywhere.",
+                "switchedOff": "Sessions are switched off on this deployment."
+            },
+            "checkouts": {
+                "title": "Checkouts arrive with {epic}.",
+                "body": "The clones and worktrees on your computers, what changed in each, and the ones you can tidy up.",
+                "switchedOff": "Checkouts are switched off on this deployment."
+            },
+            "commands": {
+                "title": "Commands arrive with {epic}.",
+                "body": "Run one command on one computer or many, and read every computer's output side by side.",
+                "switchedOff": "Commands are switched off on this deployment."
+            },
+            "usage": {
+                "title": "Usage arrives with {epic}.",
+                "body": "What your computers spend — tokens and cost per session and per computer — will be shown here. The Fleet hub itself spends no tokens or credits.",
+                "switchedOff": "Usage is switched off on this deployment."
+            },
+            "session": {
+                "title": "Session pages arrive with {epic}.",
+                "body": "One session on one computer, live: its terminal, its state and what it needs from you."
+            }
+        },
+        "overview": {
+            "needsALook": {
+                "heading": "Needs a look",
+                "regionLabel": "Needs a look: {count, plural, =0 {nothing} one {# item} other {# items}}",
+                "regionLabelPartial": "Needs a look: {count, plural, =0 {nothing found} one {# item found} other {# items found}}, but some checks could not run",
+                "commandFailed": "That did not work. Try again in a moment.",
+                "empty": "Nothing needs a look.",
+                "failed": "Could not load what needs a look.",
+                "tryAgain": "Try again",
+                "partial": "Some checks could not run, so this list may be incomplete.",
+                "unknownComputer": "A computer",
+                "severities": {
+                    "critical": "Critical",
+                    "warn": "Warning",
+                    "info": "Note"
+                },
+                "since": "since {time}"
+            },
+            "computers": {
+                "heading": "Computers",
+                "count": "{total, plural, one {# computer} other {# computers}} · {online} online",
+                "spendsNothing": "Spends no tokens or credits",
+                "checked": "checked {time}",
+                "lastSeen": "last seen {time}",
+                "neverChecked": "never checked in",
+                "nestedVm": "VM on {host}",
+                "nestedContainer": "Container on {host}",
+                "nestedUnknownHost": "another computer",
+                "cpu": "cpu",
+                "memory": "mem",
+                "disk": "disk",
+                "noValue": "—",
+                "healthUnavailable": "No health reading yet",
+                "staleHealth": "Reading from {time} — older than the last check",
+                "sharedWithYou": "Shared with you",
+                "favourite": "Favourite",
+                "listLabel": "Computers",
+                "loadFailed": "Could not load your computers."
+            },
+            "blockLoading": "Loading…",
+            "blockFailed": "This part of the page could not be shown."
+        },
+        "empty": {
+            "title": "No computers yet",
+            "body": "Enrol a computer and Ever Works can run agents on it, show you its screen and keep an eye on its health.",
+            "add": "Add computer",
+            "howItWorks": "How this works"
+        },
+        "states": {
+            "online": "Online",
+            "busy": "Busy",
+            "offline": "Offline",
+            "offlineSince": "Offline · last seen {time}",
+            "enrolling": "Enrolling",
+            "paused": "Paused",
+            "disabled": "Disabled",
+            "draining": "Draining",
+            "quarantined": "Quarantined",
+            "throttled": "Throttled",
+            "upgradeRequired": "Upgrade required",
+            "unknown": "Unknown"
+        },
+        "os": {
+            "linux": "Linux",
+            "darwin": "macOS",
+            "win32": "Windows",
+            "other": "{platform}",
+            "unknown": "Unknown OS"
+        },
+        "computers": {
+            "heading": "Computers",
+            "favourite": "Favourite",
+            "addFavourite": "Add {name} to favourites",
+            "removeFavourite": "Remove {name} from favourites",
+            "favouriteFailed": "Could not change the favourite.",
+            "openPage": "Open page",
+            "openPageFor": "Open the page of {name}"
+        },
+        "settingsLink": {
+            "title": "Computers are under Fleet",
+            "body": "Enrolment, the machine list and each computer's page moved to the Fleet hub. Policies stay here.",
+            "cta": "Open Fleet"
+        },
+        "computer": {
+            "tabsLabel": "Computer",
+            "tabs": {
+                "overview": "Overview",
+                "sessions": "Sessions",
+                "desktop": "Desktop",
+                "logs": "Logs",
+                "services": "Services",
+                "docker": "Docker",
+                "processes": "Processes",
+                "ports": "Ports",
+                "files": "Files",
+                "schedules": "Schedules",
+                "checkouts": "Checkouts",
+                "settings": "Settings"
+            },
+            "header": {
+                "newSession": "New session",
+                "newSessionArrives": "New session arrives with {epic}",
+                "desktop": "Desktop",
+                "desktopArrives": "Desktop arrives with {epic}",
+                "uptime": "up {duration}"
+            },
+            "placeholder": {
+                "notShipped": "{tabId, select, desktop {{tab} arrives} docker {{tab} arrives} other {{tab} arrive}} with {epic}.",
+                "switchedOff": "{tabId, select, desktop {{tab} is} docker {{tab} is} other {{tab} are}} switched off on this deployment.",
+                "consentMissing": "Start the node with {flag} on {node} to use {tab}.",
+                "kindCannot": "Not available on this kind of computer yet.",
+                "copy": "Copy",
+                "copied": "Copied",
+                "copyCommand": "Copy the command",
+                "tracker": "Program tracker"
+            },
+            "overview": {
+                "facts": {
+                    "heading": "About this computer",
+                    "kind": "Kind",
+                    "platform": "Platform",
+                    "version": "Node version",
+                    "cli": "Agent CLI",
+                    "diskFree": "Disk free",
+                    "capabilities": "Capabilities",
+                    "enrolled": "Enrolled",
+                    "unknown": "—",
+                    "none": "None"
+                },
+                "kinds": {
+                    "desktopNode": "Desktop app",
+                    "node": "Command-line node",
+                    "k8s": "Cluster node"
+                }
+            },
+            "settings": {
+                "moreSettings": "Capability tags, limits, the cost ceiling and credential rotation are under",
+                "moreSettingsLink": "Computers → Details",
+                "policy": {
+                    "heading": "Who can do what on {name}",
+                    "intro": "{name} belongs to you. Anything you do not allow here stays yours alone.",
+                    "introShared": "{name} belongs to someone in your Organization. Only its owner can change who can do what.",
+                    "agentsNote": "Agents act in a family only when their own permissions allow the tool and the family includes the Agent's owner.",
+                    "save": "Save",
+                    "reset": "Discard changes",
+                    "saved": "Saved.",
+                    "failed": "Could not change who can do what.",
+                    "audiences": {
+                        "owner": "Only me",
+                        "orgAdmins": "Organization admins",
+                        "orgMembers": "Organization members"
+                    },
+                    "families": {
+                        "view": {
+                            "label": "View",
+                            "hint": "See this computer in the hub and open its page"
+                        },
+                        "sessions": {
+                            "label": "Sessions",
+                            "hint": "Start, watch and end sessions on it"
+                        },
+                        "desktop": {
+                            "label": "Desktop",
+                            "hint": "Watch and take control of its screen"
+                        },
+                        "logs": {
+                            "label": "Logs",
+                            "hint": "Read its logs"
+                        },
+                        "services": {
+                            "label": "Services",
+                            "hint": "Start, stop and restart its services"
+                        },
+                        "docker": {
+                            "label": "Docker",
+                            "hint": "Manage its containers, images and Compose projects"
+                        },
+                        "processes": {
+                            "label": "Processes",
+                            "hint": "See and signal its processes"
+                        },
+                        "ports": {
+                            "label": "Ports",
+                            "hint": "Open the web servers it runs"
+                        },
+                        "files": {
+                            "label": "Files",
+                            "hint": "Browse and move files in its allowed folders"
+                        },
+                        "commands": {
+                            "label": "Commands",
+                            "hint": "Run commands on it"
+                        },
+                        "schedules": {
+                            "label": "Schedules",
+                            "hint": "Create and run schedules on it"
+                        },
+                        "checkouts": {
+                            "label": "Checkouts",
+                            "hint": "Clone, sync and tidy its checkouts"
+                        },
+                        "machines": {
+                            "label": "Lifecycle",
+                            "hint": "Rename, pause, drain, remove, wake, VMs, cloud computers, Actions runners"
+                        }
+                    }
+                }
+            },
+            "notFound": {
+                "title": "This computer is not here",
+                "body": "It was removed from Fleet, or it is not shared with you.",
+                "back": "Back to Fleet"
+            }
         }
     }
 }

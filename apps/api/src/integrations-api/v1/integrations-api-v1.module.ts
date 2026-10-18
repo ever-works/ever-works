@@ -30,6 +30,7 @@ import { IntegrationIdeasController } from './ideas.controller';
 import { IntegrationGoalsController } from './goals.controller';
 import { IntegrationMissionsController } from './missions.controller';
 import { IntegrationOrganizationsWriteController } from './organizations-write.controller';
+import { IntegrationMembersWriteController } from './members-write.controller';
 import { IntegrationWorksWriteController } from './works-write.controller';
 import { WebhooksModule } from '../../webhooks/webhooks.module';
 import { AuthModule } from '../../auth/auth.module';
@@ -102,6 +103,8 @@ import { INTEGRATION_FEED_HEAD, type IntegrationFeedHead } from './integration-f
         IntegrationMissionsController,
         IntegrationOrganizationsWriteController,
         IntegrationWorksWriteController,
+        // CR-13 — `POST /members/invite` (Gauzy "invite to Ever Works", `members:write`).
+        IntegrationMembersWriteController,
         // EW-P3-1 — the Inbox (`inbox:*`).
         IntegrationInboxController,
         // EW-P3-2 — the Knowledge Base (`kb:*`).

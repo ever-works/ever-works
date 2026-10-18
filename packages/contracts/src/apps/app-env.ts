@@ -634,3 +634,97 @@ export const APP_ENV_BUILD_SERVICE_SMTP_FROM = 'build@example.invalid' as const;
 
 /** The build-service flag APW-05's `BuildValue` carries so a value is excluded from `EW_SECRET_NAMES`. */
 export const APP_ENV_BUILD_SERVICE_VALUE_FLAG = 'fromBuildService' as const;
+
+/* ------------------------------------------------------------------------- *
+ * The Environment routes (lane aw-env-smtp, 2026-10-18 — plan §5:784-786)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The dependency output an entry is injected from — `from: deps.<kind>.<output>`
+ * read back out of the App spec. Public by construction (it is the reference
+ * TEXT, never the output's value).
+ */
+export interface AppEnvDependencyRef {
+	kind: string;
+	output: string;
+}
+
+/**
+ * One row of `GET /api/works/:id/app-env` — the table view plus the three facts
+ * the Deploy tab's Environment card needs.
+ *
+ * `masked` is true for every secret entry: the route never returns a value of
+ * one, only whether it is `set` (FR-5). `editable` is false for the entries a
+ * member may not type a value for (a generated value, a keypair public half).
+ */
+export interface AppEnvVariableView extends AppEnvEntryView {
+	masked: boolean;
+	dependency: AppEnvDependencyRef | null;
+	editable: boolean;
+}
+
+/** `GET /api/works/:id/app-env`'s body. */
+export interface AppEnvListResponse {
+	workId: string;
+	/** False when the installation has no encryption key: nothing can be stored (S21). */
+	secureStorage: boolean;
+	/** The caller's own access — the card hides **Edit** for a viewer. */
+	canEdit: boolean;
+	summary: { total: number; set: number; missingRequired: number; missingRequiredBuild: number };
+	entries: AppEnvVariableView[];
+}
+
+/**
+ * `PUT /api/works/:id/app-env`'s body — a merge patch: a string sets the name, `null` removes the
+ * stored value (an entry that follows the App spec goes back to it). Every name must be one the
+ * effective App spec declares; an unknown one refuses the whole request (`400 undeclaredName`).
+ */
+export interface AppEnvPatchRequest {
+	values: Record<string, string | null>;
+}
+
+/** The most names one `PUT /api/works/:id/app-env` may carry. */
+export const APP_ENV_PATCH_MAX_NAMES = 100 as const;
+
+/** One name's outcome in a `PUT` answer — never a value (FR-19). */
+export interface AppEnvPatchResultItem {
+	name: string | null;
+	action: 'set' | 'created' | 'unset' | 'reset' | 'skipped' | 'refused';
+	code: string | null;
+	message: string | null;
+	version: number | null;
+}
+
+/** `PUT /api/works/:id/app-env`'s body: what changed, per name, and the refreshed table. */
+export interface AppEnvPatchResponse {
+	workId: string;
+	changed: string[];
+	results: AppEnvPatchResultItem[];
+	warnings: Array<{ code: string; names: string[] }>;
+	activityRecorded: boolean;
+	entries: AppEnvVariableView[];
+}
+
+/**
+ * The whole-request refusals of the Environment routes (beyond {@link APP_ENV_ERROR_CODES}, which
+ * stay per item): a body that is not a `{ values }` map, a name the App spec does not declare, too
+ * many names, and an App Work whose App spec cannot be read yet.
+ */
+export const APP_ENV_PATCH_REFUSAL_CODES = [
+	'invalidBody',
+	'undeclaredName',
+	'tooManyNames',
+	'specUnavailable',
+	'storeUnavailable'
+] as const;
+
+/** One whole-request refusal of `PUT /api/works/:id/app-env`. */
+export type AppEnvPatchRefusalCode = (typeof APP_ENV_PATCH_REFUSAL_CODES)[number];
+
+/** Parse `deps.<kind>.<output>` out of an entry's reference text, or `null`. */
+export function appEnvDependencyRefOf(reference: string | null | undefined): AppEnvDependencyRef | null {
+	if (typeof reference !== 'string') return null;
+	const match = /^\s*deps\.([A-Za-z]+)\.([A-Za-z0-9_.-]+)\s*$/.exec(reference);
+	if (!match) return null;
+	return { kind: match[1], output: match[2] };
+}

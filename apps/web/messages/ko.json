@@ -287,6 +287,8 @@
             "signIn": "Ever ID로 로그인",
             "signUp": "Ever ID로 가입",
             "redirecting": "Ever ID를 여는 중…",
+            "signInWith": "<wordmark>Ever ID</wordmark>로 로그인",
+            "signUpWith": "<wordmark>Ever ID</wordmark>로 가입",
             "consentRequired": "계속하려면 위의 약관에 동의하세요.",
             "createAccount": {
                 "title": "Ever Works 계정 만들기",
@@ -7354,6 +7356,63 @@
                         "resume": "재개를 요청했습니다.",
                         "remove": "제거를 요청했습니다.",
                         "cancelDeploy": "취소를 요청했습니다."
+                    }
+                },
+                "environment": {
+                    "title": "환경",
+                    "description": "이 앱이 실행될 때 사용하는 값입니다. 비밀 값은 절대 표시되지 않으며 설정 여부만 표시됩니다.",
+                    "summary": "{total}개 중 {set}개 설정됨",
+                    "missingRequired": "{count, plural, other {필수 값 #개가 설정되지 않았습니다}}",
+                    "loading": "환경을 읽는 중…",
+                    "unavailable": "이 인스턴스에서는 아직 환경 값을 편집할 수 없습니다.",
+                    "error": "환경을 읽을 수 없습니다. 페이지를 새로 고쳐 다시 시도하세요.",
+                    "empty": "이 앱의 App spec은 환경 값을 선언하지 않습니다.",
+                    "secureStorageOff": "이 설치에는 보안 저장소가 구성되어 있지 않아 값을 저장할 수 없습니다.",
+                    "edit": "편집",
+                    "setValue": "값 설정",
+                    "editAria": "{name} 편집",
+                    "saved": "{name} 저장됨",
+                    "removed": "{name} 제거됨",
+                    "states": {
+                        "set": "설정됨",
+                        "unset": "설정 안 됨",
+                        "missing": "필수 — 설정 안 됨",
+                        "fromSpec": "App spec에서",
+                        "fromDependency": "{kind}에서 주입",
+                        "generated": "자동 생성"
+                    },
+                    "badges": {
+                        "secret": "비밀",
+                        "required": "필수"
+                    },
+                    "phases": {
+                        "build": "빌드",
+                        "runtime": "런타임",
+                        "both": "빌드 + 런타임"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "객체 스토리지",
+                        "smtp": "SMTP 메일"
+                    },
+                    "dialog": {
+                        "title": "{name} 편집",
+                        "valueLabel": "값",
+                        "secretHint": "이 값은 비밀입니다. 암호화되어 저장되며 다시 표시되지 않습니다.",
+                        "secretStored": "저장된 값이 있습니다. 바꾸려면 새 값을 입력하세요.",
+                        "dependencyHint": "보통 {kind}에서 주입됩니다. 여기에서 설정한 값이 우선합니다. 예: 직접 운영하는 SMTP 서버.",
+                        "redeployHint": "앱이 이 값을 사용하는 곳에서는 새 값으로 다시 빌드하거나 다시 배포합니다.",
+                        "empty": "값을 입력하거나 저장된 값을 제거하세요.",
+                        "save": "저장",
+                        "saving": "저장 중…",
+                        "remove": "값 제거",
+                        "cancel": "취소"
+                    },
+                    "errors": {
+                        "undeclaredName": "App spec이 이 이름을 선언하지 않습니다.",
+                        "specUnavailable": "이 앱에는 아직 사용할 수 있는 App spec이 없습니다.",
+                        "failed": "값을 저장할 수 없습니다. 다시 시도하세요."
                     }
                 }
             },

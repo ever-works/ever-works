@@ -287,6 +287,8 @@
             "signIn": "Entrar com o Ever ID",
             "signUp": "Cadastrar-se com o Ever ID",
             "redirecting": "Abrindo o Ever ID…",
+            "signInWith": "Entrar com o <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Cadastrar-se com o <wordmark>Ever ID</wordmark>",
             "consentRequired": "Aceite os termos acima para continuar.",
             "createAccount": {
                 "title": "Crie sua conta do Ever Works",
@@ -7354,6 +7356,63 @@
                         "resume": "Retomada solicitada.",
                         "remove": "Remoção solicitada.",
                         "cancelDeploy": "Cancelamento solicitado."
+                    }
+                },
+                "environment": {
+                    "title": "Ambiente",
+                    "description": "Os valores com que esta app é executada. Valores secretos nunca são mostrados — apenas se estão definidos.",
+                    "summary": "{set} de {total} definidos",
+                    "missingRequired": "{count, plural, one {Falta # valor obrigatório} other {Faltam # valores obrigatórios}}",
+                    "loading": "Lendo o ambiente…",
+                    "unavailable": "Os valores de ambiente ainda não podem ser editados nesta instância.",
+                    "error": "Não foi possível ler o ambiente. Recarregue a página para tentar novamente.",
+                    "empty": "A especificação desta app não declara valores de ambiente.",
+                    "secureStorageOff": "O armazenamento seguro não está configurado nesta instalação, por isso os valores não podem ser salvos.",
+                    "edit": "Editar",
+                    "setValue": "Definir valor",
+                    "editAria": "Editar {name}",
+                    "saved": "{name} salvo",
+                    "removed": "{name} removido",
+                    "states": {
+                        "set": "Definido",
+                        "unset": "Não definido",
+                        "missing": "Obrigatório — não definido",
+                        "fromSpec": "Da especificação da app",
+                        "fromDependency": "Injetado por {kind}",
+                        "generated": "Gerado"
+                    },
+                    "badges": {
+                        "secret": "Secreto",
+                        "required": "Obrigatório"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Execução",
+                        "both": "Build + execução"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Armazenamento de objetos",
+                        "smtp": "E-mail SMTP"
+                    },
+                    "dialog": {
+                        "title": "Editar {name}",
+                        "valueLabel": "Valor",
+                        "secretHint": "Este valor é secreto. Ele é armazenado criptografado e nunca mais é mostrado.",
+                        "secretStored": "Há um valor armazenado. Digite um novo para substituí-lo.",
+                        "dependencyHint": "Normalmente injetado por {kind}. Um valor definido aqui tem prioridade — por exemplo, seu próprio servidor SMTP.",
+                        "redeployHint": "Onde a app usa este valor, ela é recompilada ou reimplantada com o novo.",
+                        "empty": "Digite um valor ou remova o armazenado.",
+                        "save": "Salvar",
+                        "saving": "Salvando…",
+                        "remove": "Remover valor",
+                        "cancel": "Cancelar"
+                    },
+                    "errors": {
+                        "undeclaredName": "A especificação da app não declara este nome.",
+                        "specUnavailable": "Esta app ainda não tem uma especificação utilizável.",
+                        "failed": "Não foi possível salvar o valor. Tente novamente."
                     }
                 }
             },

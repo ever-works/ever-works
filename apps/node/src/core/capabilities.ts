@@ -4,9 +4,11 @@ import {
 	FLEET_GPU_CAPABILITY,
 	FLEET_PUSH_CAPABILITY,
 	FLEET_PUSH_MIN_GIT_VERSION,
-	FLEET_SCREEN_CAPABILITY
+	FLEET_SCREEN_CAPABILITY,
+	type FleetConsents
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
+import { FLEET_MANAGED_CAPABILITY } from './link/modules/control';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
 import type { NodeHousekeepingReport } from './housekeeping-report';
@@ -93,6 +95,20 @@ export interface CapabilityEnvironment {
 	 * apply.
 	 */
 	captureBackends?: readonly CaptureBackendAvailability[];
+	/**
+	 * Fleet node link (FL-02) — the owner switched machine management on for
+	 * this machine (`ever-works-node start --manage`). Process-scoped consent,
+	 * like `--attend`: it is what the link's `managed` tag stands on.
+	 */
+	managed?: boolean;
+	/**
+	 * Fleet node link (FL-02) — the tags the link's node modules contribute for
+	 * this process's consents (`managed` under `--manage`, and each later
+	 * module's own). Computed once by the runtime from the composed module
+	 * list and appended after the detected tags; absent on a runtime with no
+	 * link, which advertises exactly what it did before.
+	 */
+	linkModuleTags?: readonly string[];
 }
 
 /**
@@ -323,7 +339,10 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		environment.attended === true ? FLEET_ATTENDED_CAPABILITY : null,
 		environment.attended === true && isScreenCaptureAvailable(environment, environment.captureBackends)
 			? FLEET_SCREEN_CAPABILITY
-			: null
+			: null,
+		// Fleet node link (FL-02): the module tags, LAST, so a node that already
+		// advertised everything above keeps advertising exactly that.
+		...(environment.linkModuleTags ?? [])
 	]);
 }
 
@@ -358,7 +377,10 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	// A capability selection written before these tags existed must not
 	// silently withhold a live view its owner just switched on.
 	FLEET_ATTENDED_CAPABILITY,
-	FLEET_SCREEN_CAPABILITY
+	FLEET_SCREEN_CAPABILITY,
+	// Fleet node link (FL-02): `managed` exists only under `--manage`, which IS
+	// the opt-in — a selection written before the tag existed must not withhold it.
+	FLEET_MANAGED_CAPABILITY
 ]);
 
 /**
@@ -476,6 +498,12 @@ export interface SelfDescriptionTelemetry {
 		| Promise<{ maxConcurrentJobs: number; maxCpuPercent: number | null; maxMemoryMb: number | null } | null>
 		| { maxConcurrentJobs: number; maxCpuPercent: number | null; maxMemoryMb: number | null }
 		| null;
+	/**
+	 * Fleet node link (FL-02, CONTRACTS §1.1) — the consents this process was
+	 * started with. Absent on an embedder that predates the field; the beat
+	 * then carries no `consents`, exactly as before.
+	 */
+	consents?: () => FleetConsents | null;
 }
 
 /**
@@ -578,6 +606,17 @@ export async function describeSelf(
 		description.maxConcurrentJobs = limits.maxConcurrentJobs;
 		description.maxCpuPercent = typeof limits.maxCpuPercent === 'number' ? limits.maxCpuPercent : null;
 		description.maxMemoryMb = typeof limits.maxMemoryMb === 'number' ? limits.maxMemoryMb : null;
+	}
+	// Fleet node link (FL-02). All four keys, each a literal boolean, copied
+	// field by field for the reason above.
+	const consents = await resolveTelemetry(telemetry.consents);
+	if (consents) {
+		description.consents = {
+			work: consents.work === true,
+			attend: consents.attend === true,
+			manage: consents.manage === true,
+			usageScan: consents.usageScan === true
+		};
 	}
 	return description;
 }

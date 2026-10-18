@@ -33,10 +33,36 @@ export interface TerminalAttachClaims {
      * one channel can never open the other.
      */
     channel?: TerminalAttachChannel;
+    /**
+     * Fleet node link (FL-02) — a unique id, present on tokens that are
+     * single-use: the gateway that accepts one records its `jti` and refuses
+     * it the second time. Absent on every terminal and computer token.
+     */
+    jti?: string;
 }
 
-/** Socket families that share this signer. Only the non-default one is ever stamped. */
-export type TerminalAttachChannel = 'computer';
+/**
+ * Socket families that share this signer. Only the non-default ones are ever
+ * stamped:
+ *
+ *   `computer`           an Agent computer live view (`runId` = the view)
+ *   `fleet-link`         a node's own link socket (`runId` = the node id,
+ *                        role `worker`, five minutes, single use — FL-02)
+ *   `fleet-link-viewer`  a browser bridged to one node-link channel (FL-02)
+ *
+ * The terminal gateway refuses every stamped token and the computer gateway
+ * every token not stamped `computer`, so no token opens another family's socket.
+ */
+export type TerminalAttachChannel = 'computer' | 'fleet-link' | 'fleet-link-viewer';
+
+const TERMINAL_ATTACH_CHANNELS: ReadonlySet<string> = new Set([
+    'computer',
+    'fleet-link',
+    'fleet-link-viewer',
+]);
+
+/** Longest lifetime a caller may ask for (the node link token's five minutes). */
+export const TERMINAL_ATTACH_TOKEN_MAX_TTL_SECONDS = 300;
 
 export const TERMINAL_ATTACH_TOKEN_TTL_SECONDS = 60;
 
@@ -73,7 +99,10 @@ export class TerminalAttachService {
         return Buffer.from(raw, 'utf8');
     }
 
-    mint(claims: Omit<TerminalAttachClaims, 'exp'>): { token: string; expiresInSec: number } {
+    mint(
+        claims: Omit<TerminalAttachClaims, 'exp'>,
+        options: { ttlSec?: number } = {},
+    ): { token: string; expiresInSec: number } {
         const key = this.secret();
         if (!key) {
             throw new ServiceUnavailableException(
@@ -81,18 +110,30 @@ export class TerminalAttachService {
                     '(set TERMINAL_ATTACH_SECRET or BETTER_AUTH_SECRET).',
             );
         }
+        // The default lifetime unless a caller names a shorter or longer one,
+        // never beyond the five-minute ceiling.
+        const ttlSec =
+            options.ttlSec === undefined
+                ? TERMINAL_ATTACH_TOKEN_TTL_SECONDS
+                : Math.min(
+                      Math.max(Math.floor(options.ttlSec), 1),
+                      TERMINAL_ATTACH_TOKEN_MAX_TTL_SECONDS,
+                  );
         const payload: TerminalAttachClaims = {
             ...claims,
-            exp: Date.now() + TERMINAL_ATTACH_TOKEN_TTL_SECONDS * 1000,
+            exp: Date.now() + ttlSec * 1000,
         };
         // A terminal token stays byte-for-byte what it always was: the
-        // channel claim is written only when a caller names one.
+        // channel and jti claims are written only when a caller names them.
         if (payload.channel === undefined) {
             delete payload.channel;
         }
+        if (payload.jti === undefined) {
+            delete payload.jti;
+        }
         const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
         const mac = createHmac('sha256', key).update(body).digest('base64url');
-        return { token: `${body}.${mac}`, expiresInSec: TERMINAL_ATTACH_TOKEN_TTL_SECONDS };
+        return { token: `${body}.${mac}`, expiresInSec: ttlSec };
     }
 
     /**
@@ -125,7 +166,11 @@ export class TerminalAttachService {
                     claims.role !== 'viewer' &&
                     claims.role !== 'worker') ||
                 typeof claims.exp !== 'number' ||
-                (claims.channel !== undefined && claims.channel !== 'computer')
+                (claims.channel !== undefined && !TERMINAL_ATTACH_CHANNELS.has(claims.channel)) ||
+                (claims.jti !== undefined &&
+                    (typeof claims.jti !== 'string' ||
+                        claims.jti.length === 0 ||
+                        claims.jti.length > 128))
             ) {
                 return null;
             }

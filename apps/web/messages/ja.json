@@ -287,6 +287,8 @@
             "signIn": "Ever ID でサインイン",
             "signUp": "Ever ID で登録",
             "redirecting": "Ever ID を開いています…",
+            "signInWith": "<wordmark>Ever ID</wordmark> でサインイン",
+            "signUpWith": "<wordmark>Ever ID</wordmark> で登録",
             "consentRequired": "続行するには、上の規約に同意してください。",
             "createAccount": {
                 "title": "Ever Works アカウントを作成",
@@ -7354,6 +7356,63 @@
                         "resume": "再開をリクエストしました。",
                         "remove": "削除をリクエストしました。",
                         "cancelDeploy": "キャンセルをリクエストしました。"
+                    }
+                },
+                "environment": {
+                    "title": "環境",
+                    "description": "このアプリが実行時に使う値です。シークレットの値は表示されず、設定済みかどうかだけが表示されます。",
+                    "summary": "{total} 件中 {set} 件設定済み",
+                    "missingRequired": "{count, plural, other {必須の値が # 件未設定です}}",
+                    "loading": "環境を読み込んでいます…",
+                    "unavailable": "このインスタンスではまだ環境の値を編集できません。",
+                    "error": "環境を読み込めませんでした。ページを再読み込みしてもう一度お試しください。",
+                    "empty": "このアプリの App spec は環境の値を宣言していません。",
+                    "secureStorageOff": "このインストールではセキュアストレージが設定されていないため、値を保存できません。",
+                    "edit": "編集",
+                    "setValue": "値を設定",
+                    "editAria": "{name} を編集",
+                    "saved": "{name} を保存しました",
+                    "removed": "{name} を削除しました",
+                    "states": {
+                        "set": "設定済み",
+                        "unset": "未設定",
+                        "missing": "必須 — 未設定",
+                        "fromSpec": "App spec から",
+                        "fromDependency": "{kind} から注入",
+                        "generated": "自動生成"
+                    },
+                    "badges": {
+                        "secret": "シークレット",
+                        "required": "必須"
+                    },
+                    "phases": {
+                        "build": "ビルド",
+                        "runtime": "ランタイム",
+                        "both": "ビルド + ランタイム"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "オブジェクトストレージ",
+                        "smtp": "SMTP メール"
+                    },
+                    "dialog": {
+                        "title": "{name} を編集",
+                        "valueLabel": "値",
+                        "secretHint": "この値はシークレットです。暗号化して保存され、再び表示されることはありません。",
+                        "secretStored": "値が保存されています。置き換えるには新しい値を入力してください。",
+                        "dependencyHint": "通常は {kind} から注入されます。ここで設定した値が優先されます（例: 独自の SMTP サーバー）。",
+                        "redeployHint": "アプリがこの値を使う箇所では、新しい値で再ビルドまたは再デプロイされます。",
+                        "empty": "値を入力するか、保存済みの値を削除してください。",
+                        "save": "保存",
+                        "saving": "保存中…",
+                        "remove": "値を削除",
+                        "cancel": "キャンセル"
+                    },
+                    "errors": {
+                        "undeclaredName": "App spec はこの名前を宣言していません。",
+                        "specUnavailable": "このアプリにはまだ使用可能な App spec がありません。",
+                        "failed": "値を保存できませんでした。もう一度お試しください。"
                     }
                 }
             },

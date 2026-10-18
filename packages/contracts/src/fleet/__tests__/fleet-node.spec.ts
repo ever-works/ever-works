@@ -7,6 +7,7 @@ import {
 	FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
 	FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
 	FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+	FLEET_LEGACY_MAX_CAPABILITY_TAGS,
 	FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
 	FLEET_ENROLLABLE_NODE_KINDS,
 	FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
@@ -274,7 +275,11 @@ describe('operator-tunable defaults and ceilings', () => {
 	const TUNABLES: Array<[string, number, number]> = [
 		['FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS', FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS, 900000],
 		['FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS', FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS, 300000],
-		['FLEET_DEFAULT_MAX_CAPABILITY_TAGS', FLEET_DEFAULT_MAX_CAPABILITY_TAGS, 16],
+		// 16 → 32 with the Fleet node link (FL-02): a platform ACCEPTING more
+		// tags desynchronises no daemon, and a newer daemon facing a 16-tag
+		// platform falls back to the legacy cap below on its 400.
+		['FLEET_DEFAULT_MAX_CAPABILITY_TAGS', FLEET_DEFAULT_MAX_CAPABILITY_TAGS, 32],
+		['FLEET_LEGACY_MAX_CAPABILITY_TAGS', FLEET_LEGACY_MAX_CAPABILITY_TAGS, 16],
 		['FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH', FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH, 32],
 		['FLEET_MAX_CAPABILITY_TAGS_CEILING', FLEET_MAX_CAPABILITY_TAGS_CEILING, 64],
 		['FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING', FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING, 128],
@@ -322,6 +327,10 @@ describe('relational invariants a careless retune would break silently', () => {
 
 	it('keeps the capability-tag default under its ceiling', () => {
 		expect(FLEET_DEFAULT_MAX_CAPABILITY_TAGS).toBeLessThanOrEqual(FLEET_MAX_CAPABILITY_TAGS_CEILING);
+	});
+
+	it('keeps the legacy fallback at or under the default (FL-02)', () => {
+		expect(FLEET_LEGACY_MAX_CAPABILITY_TAGS).toBeLessThanOrEqual(FLEET_DEFAULT_MAX_CAPABILITY_TAGS);
 	});
 
 	it('keeps the tag-length default under its ceiling', () => {

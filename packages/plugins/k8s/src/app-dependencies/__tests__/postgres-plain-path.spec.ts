@@ -1012,10 +1012,10 @@ describe('T19 plain path — deprovision (plan §4.9:624-628)', () => {
  * ------------------------------------------------------------------------- */
 
 describe('T19 — images.ts (T19: "digest-pinned images")', () => {
-	it('emits a digest-pinned reference for every Postgres version 14–17, its client, Redis 7 and the S3 pair', () => {
+	it('emits a digest-pinned reference for every Postgres version 14–17, its client, Redis 7, the S3 pair and the mail sink', () => {
 		const images = everyDependencyImage();
 
-		expect(images.length).toBe(11);
+		expect(images.length).toBe(12);
 		for (const image of images) {
 			expect(isDigestPinned(image), image).toBe(true);
 		}
@@ -1023,6 +1023,7 @@ describe('T19 — images.ts (T19: "digest-pinned images")', () => {
 		expect(images.some((image) => image.includes('redis@'))).toBe(true);
 		expect(images.some((image) => image.includes('minio/minio@'))).toBe(true);
 		expect(images.some((image) => image.includes('minio/mc@'))).toBe(true);
+		expect(images.some((image) => image.includes('axllent/mailpit@'))).toBe(true);
 	});
 
 	it('reduces a declared version to a supported major, or the pinned default 16', async () => {
@@ -1118,11 +1119,11 @@ describe('T19 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			supported: false,
 			reason: 'providerNotSupported'
 		});
-		// `redis` and `objectStorage` are served by this plugin too since T20/T21 (each has its own spec);
-		// `smtp` is `app-dependencies-external`'s, so this plugin answers for nothing there.
+		// `redis`, `objectStorage` and — since lane aw-env-smtp (GAP-22) — `smtp` are served by this plugin
+		// too (each has its own spec); `smtp` answers through the mail sink's own id, never Postgres's.
 		expect(await plugin.supports('smtp', 'your-cluster', context())).toEqual({
-			supported: false,
-			reason: 'providerNotSupported'
+			supported: true,
+			providerId: 'k8s-inline-mailpit'
 		});
 	});
 
@@ -1173,7 +1174,8 @@ describe('T19 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			'objectStorageClient',
 			'postgres',
 			'postgresClient',
-			'redis'
+			'redis',
+			'smtp'
 		]);
 	});
 });

@@ -59,11 +59,18 @@ import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../
 import {
 	compareFleetNodeVersions,
 	FLEET_NODE_UPGRADE_COMMAND,
+	isFleetLinkEligible,
 	isFleetNodeVersionBelowFloor
 } from '@ever-works/contracts';
 import { isModelCliCompatible, ModelCliCompatibilityProbe, type ModelCliCompatibility } from '../core/model-cli-compat';
 import type { ModelCliPaths } from '../core/executors/model-cli';
 import { readNodeLifecycleRecord, writeNodeLifecycleRecord, type NodeLifecycleRecord } from '../core/node-lifecycle';
+import {
+	describeConsents,
+	describeLinkRecord,
+	readNodeLinkRecord,
+	writeNodeLinkRecord
+} from '../core/link/link-record';
 import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
 
 /**
@@ -377,6 +384,13 @@ export interface StartCommandOptions {
 	 * taking platform work, and vice versa.
 	 */
 	attend?: boolean;
+	/**
+	 * Fleet node link (FL-02) — allow managing this machine from the
+	 * dashboard: owner sessions, logs, services, Docker, processes, ports,
+	 * files, commands, schedules, checkout discovery, wake. A fourth consent,
+	 * independent of `--work` and `--attend`.
+	 */
+	manage?: boolean;
 }
 
 /**
@@ -462,6 +476,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 
 	const workerEnabled = options.work === true;
 	const attendEnabled = options.attend === true;
+	const manageEnabled = options.manage === true;
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
@@ -531,7 +546,13 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// daemon's version, recorded beside the config for `status`/`doctor`.
 		persistLifecycle: (record) => writeNodeLifecycleRecord(deps.fs, deps.configPath, record),
 		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {}),
-		attendEnabled
+		attendEnabled,
+		// Fleet node link (FL-02): the fourth consent, and the link itself. The
+		// link opens on the first accepted heartbeat when any of --work,
+		// --attend, --manage is on; its state is recorded for `status`.
+		manageEnabled,
+		nodeLink: true,
+		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record)
 	});
 	if (workerEnabled) {
 		// Node lifecycle (slice AR): say at startup what each pinned CLI is
@@ -676,6 +697,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// work should not have to infer it from an absence of log lines.
 		deps.out('Worker host disabled — reporting liveness only (pass --work to execute platform work)');
 	}
+	// Fleet node link (FL-02): which consents this process holds, in one line.
+	deps.out(
+		isFleetLinkEligible(runtime.consents)
+			? `Consents — ${describeConsents(runtime.consents)}; the node link opens after the first accepted heartbeat`
+			: 'Consents — none: the node link stays closed and this computer only reports health (pass --work, --attend or --manage)'
+	);
 
 	// Block until shutdown is requested: the injected hook (tests) or a signal
 	// (the real service). With neither wired there is nothing that could ever
@@ -684,6 +711,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 
 	reaper?.stop();
 	shuttingDown = true;
+	// The link first: channels end `normal` and nothing reconnects while the
+	// lanes below drain.
+	runtime.link?.close();
 	loop.stop();
 	await loop.settled();
 	// A start that was waiting for an accepted beat ends here (the loop is
@@ -970,6 +1000,13 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 	// service last heard it from the platform.
 	const lifecycleRecord = await readNodeLifecycleRecord(deps.fs, deps.configPath);
 	deps.out(`daemon       ${describeDaemonLifecycle(deps, lifecycleRecord)}`);
+	// Fleet node link (FL-02): the consents the running service holds and
+	// its link, as the service last recorded them.
+	const linkRecord = await readNodeLinkRecord(deps.fs, deps.configPath);
+	deps.out(
+		`consents     ${linkRecord ? describeConsents(linkRecord.consents) : 'unknown (the service has not reported them yet)'}`
+	);
+	deps.out(`link         ${describeLinkRecord(linkRecord, (deps.now ?? (() => Date.now()))())}`);
 	deps.out(
 		`offering     ${view.capabilitySelection ? view.capabilitySelection.join(', ') || '(identity only)' : '(everything detected)'}`
 	);
@@ -1419,6 +1456,12 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	}
 	printHousekeepingHeader(deps, report, now);
 	printLifecycle(deps, lifecycle);
+	// Fleet node link (FL-02): consents and link, as the service last recorded them.
+	const linkRecord = await readNodeLinkRecord(deps.fs, deps.configPath);
+	deps.out(
+		`consents     ${linkRecord ? describeConsents(linkRecord.consents) : 'unknown (the service has not reported them yet)'}`
+	);
+	deps.out(`link         ${describeLinkRecord(linkRecord, now)}`);
 	printPlan(deps, report.plan, now);
 }
 
@@ -1549,6 +1592,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--attend',
 			'Allow live viewing of this machine from the dashboard (off by default; independent of --work)'
+		)
+		.option(
+			'--manage',
+			'Allow managing this machine from the dashboard — owner sessions, logs, services, Docker, processes, ports, files, commands, schedules (off by default; independent of --work and --attend)'
 		)
 		.option(
 			'-c, --concurrency <count>',

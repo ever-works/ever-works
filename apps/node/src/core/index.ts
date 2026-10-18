@@ -51,3 +51,10 @@ export * from './screen/headless-browser-backend';
 export * from './screen/input-injector';
 export * from './screen/node-leg';
 export * from './screen/terminal-channel';
+// Fleet node link (FL-02) — the one outbound multiplexed socket, its channel
+// table, the compile-time module registry and the record `status` reads.
+export * from './link/channel-mux';
+export * from './link/link-client';
+export * from './link/link-record';
+export * from './link/link-socket';
+export * from './link/modules';
