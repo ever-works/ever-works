@@ -22,6 +22,8 @@
   otherwise (identical text to FL-16 T-13 — land once).
 - The provider's name appears only inside `packages/plugins/digitalocean-machines/`, its doc
   section and user copy; no core file names it (tested in T-09).
+- Confirmation is the request fields `confirm` / `confirmName` with a 409 `confirmation_required`
+  preview (CONTRACTS §2.2) — never a token. The Remove guard is CONTRACTS R-36.
 - Commit style: `feat(fleet-cloud): …`, `feat(plugin-digitalocean-machines): …`, `chore(i18n): …`.
 
 ---
@@ -55,13 +57,14 @@
       `node.cloud.create|power|destroy`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-cloud.spec.ts` (idle policy clamp
       1–72; name pattern); extend `fleet-panic.spec.ts`; the node contract fixture still validates.
-- [ ] **T-05**. Add `origin` (IF NOT EXISTS semantics documented), `providerPluginId`,
+- [ ] **T-05**. Add `origin` (owned by FL-16's slot; declared here too so either lands first — R-35), `providerPluginId`,
       `providerMachineRef`, `providerMeta` to `packages/agent/src/entities/fleet-node.entity.ts`
       (after `kind`, L115) with doc comments; partial unique index on `(providerPluginId,
       providerMachineRef)`.
       **Test**: `pnpm --filter @ever-works/agent build` clean; entities inventory spec unchanged.
 - [ ] **T-06**. Author `apps/api/src/migrations/1796170000000-AddFleetNodeProviderFields.ts` from
-      `apps/api/`; hand-edit `origin` to `ADD COLUMN IF NOT EXISTS`; `down` per plan §4.2.
+      `apps/api/`; hand-edit every `ADD COLUMN` (incl. `origin`) to be guarded with `findColumnByName`
+      (CONTRACTS R-35); `down` per plan §4.2.
       **Test**: applies on an empty DB and on one where FL-16's migration ran first; re-generate
       yields an empty diff.
 
@@ -129,15 +132,19 @@
 
 - [ ] **T-16**. Add `apps/web/src/components/fleet/cloud/cloud.shared.ts` (pure: price formatting,
       Create label, remove availability by origin/state, idle labels) and register the
-      `computers.addMenu`, `computer.overview.cloudBlock`, `computer.actions` (hide Remove)
-      contributions in `apps/web/src/components/fleet/registry.ts`.
-      **Test**: `cloud.shared.unit.spec.ts` — Remove hidden for cloud+running, shown for gone.
+      Cloud block with `registerOverviewBlock` in `apps/web/src/components/fleet/registry.ts`; add **New
+      cloud computer…** to FL-01's `apps/web/src/components/fleet/FleetHubHeader.tsx` menu and the cloud
+      actions (Remove disabled with the reason) to FL-01's `computer/ComputerActionsMenu.tsx`, behind
+      `FLEET_CLOUD_ENABLED` (plan §8).
+      **Test**: `cloud.shared.unit.spec.ts` — Remove disabled with the reason for cloud+running, enabled for
+      gone and failed-before-create.
 - [ ] **T-17**. Add `NewCloudComputerDialog.tsx`, `CloudProviderPicker.tsx`, `CloudSizeRadioGroup.tsx`,
       `CloudPriceSentence.tsx`, `CloudBlock.tsx`, `CloudPowerDialog.tsx`, `DestroyCloudDialog.tsx`
       under `apps/web/src/components/fleet/cloud/`; BFF routes under
-      `apps/web/src/app/api/fleet/{providers,cloud}/**` (plan §8); hide Remove in
-      `apps/web/src/components/settings/FleetSettings.tsx` and `FleetNodeDrawer.tsx` for cloud rows
-      with the explanatory line.
+      `apps/web/src/app/api/fleet/{providers,cloud}/**` (plan §8); disable Remove in
+      FL-01's moved `FleetComputersTable.tsx` and `FleetNodeDrawer.tsx` (`apps/web/src/components/fleet/computers/`)
+      for cloud rows with the explanatory line. Dialogs render the 409 `confirmation_required` preview
+      and repeat with `confirm` / `confirmName`.
       **Test**: `NewCloudComputerDialog.unit.spec.tsx` (price sentence present; Create carries the
       price; stale-price state), `CloudBlock.unit.spec.tsx`, `DestroyCloudDialog.unit.spec.tsx`
       (cost so far rendered).
@@ -152,7 +159,8 @@
       minute; `enrolling` cloud rows > 10 min → needs-a-look item with hourly cost) and
       `fleet-cloud-reconcile.task.ts` (hourly; `getMachine` → `gone`); dispatchers in
       `packages/agent/src/fleet/cloud/`; register in `packages/tasks/src/tasks/trigger/index.ts`
-      (beside L25). Register the `cloud-idle` producer variants with FL-03's producer registry.
+      (beside L25). Register the `cloud-idle` producer (title/detail carry the never-online variant —
+      CONTRACTS §4.6 has one cloud kind) with FL-01's needs-a-look producer registry.
       **Test**: `packages/tasks/src/__tests__/fleet-cloud-bootstrap-watch.task.spec.ts`,
       `fleet-cloud-reconcile.task.spec.ts` — gone stops accrual; items deduped.
 - [ ] **T-20**. Add `packages/agent/src/fleet/agent-fleet-cloud-tools.ts` (P1 tools: list, options,
@@ -162,7 +170,7 @@
       requires `acknowledgedPriceCents`, confirmation text states size and price; read-only flags.
 - [ ] **T-21**. Add `apps/web/e2e/flow-fleet-cloud-computers.spec.ts` (fake provider API + node
       contract fixture): empty state without a provider; create → row → online; power off copy;
-      destroy shows cost and requires the name; Remove absent.
+      destroy shows cost and requires the name; Remove disabled with the reason.
       **Test**: green locally and in CI on a cold DB.
 - [ ] **T-22**. Docs: `docs/features/fleet-cloud-computers.md` (P1 sections), sidebar entry in
       `apps/docs/sidebarsPlatform.ts` after `features/fleet` (L183); tracker row.
@@ -180,7 +188,8 @@
 - [ ] **T-24**. Add `idle-policy.ts` (pure: idle over window from samples, sessions, jobs; off/enrolling
       never idle) and `fleet-cloud-idle.task.ts` (every 10 min, offset 5): `tell-me` → one `cloud-idle`
       item + Inbox item per window; `power-off` → `facade.power(off)` + audit `node.cloud.power`
-      (`requestedBy` per CONTRACTS decision) + item.
+      (`requestedBy: system:idle-policy`, CONTRACTS §2.3) + item; the policy change itself audits
+      `node.policy.change`.
       **Test**: `idle-policy.spec.ts` truth table; `fleet-cloud-idle.task.spec.ts` — exactly one item
       per window; never destroys.
 - [ ] **T-25**. API: `GET /cloud/:id/usage`, `PUT /cloud/:id/idle-policy`; `FleetCloudService.usageSummary`
@@ -224,11 +233,15 @@
 # Docs & rollout
 
 - [ ] **T-33**. Finish `docs/features/fleet-cloud-computers.md` (price statement, what is installed,
-      power/destroy semantics, why Remove is unavailable, idle policy, estimates disclaimer).
+      power/destroy semantics, why Remove is refused while the machine exists (R-36), idle policy,
+      estimates disclaimer).
+      **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
 - [ ] **T-34**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count stays in
       `docs/plugin-system/built-in-plugins.md` only.
+      **Test**: the FL-17 TRACKER row shows `FLEET_CLOUD_ENABLED` and slot `1796170000000`; no other doc's plugin count changed (grep).
 - [ ] **T-35**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; banned-terms grep over
       this folder, the plugin and the docs prints nothing.
+      **Test**: every command exits 0 and the grep prints nothing.
 
 ## Definition of done
 

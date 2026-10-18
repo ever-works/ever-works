@@ -33,15 +33,18 @@ flowchart LR
     end
     subgraph NODE1[apps/node · source]
         L1[Node link (FL-02)\nfamily: files]
-        M1[files module\nroots · path guard · pack/unpack · delete]
+        M1[link/modules/files.ts\npath guard · pack/unpack · delete]
+        AR1[link/allowed-roots.ts (R-39, shared)]
         L1 <--> M1
+        M1 --> AR1
     end
     subgraph NODE2[apps/node · destination]
         L2[Node link (FL-02)\nfamily: files · clip]
-        M2[files module]
+        M2[link/modules/files.ts]
+        C2[link/modules/clip.ts]
         D2[desktop-host.pasteText (FL-07)]
         L2 <--> M2
-        L2 --> D2
+        L2 --> C2 --> D2
     end
     F -- "list/stat/download/upload/copy/delete" --> C
     O <-- "operation.progress" --> R
@@ -67,25 +70,26 @@ control and the view's paste opt-in is on.
 
 | Piece                                                                         | Where (verified at HEAD)                                                                                                                                                    | Reused as                                                                                                                       |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace root default and flag parsing                                       | `apps/node/src/core/workspaces/fleet-task-workspace.ts:523-528` (`~/.ever-works/fleet-workspaces`); `apps/node/src/cli/program.ts:371, 1576`; `program.workspace-root.spec.ts` | The workspace root is the second allowed root; `--files-root` parses with the same absolute-path rule.                           |
-| Node core layout (no files module)                                            | `apps/node/src/core/{executors,model-execution,packaging,screen,windows-job-launcher,workspaces}/`                                                                            | `apps/node/src/core/files/` _(new)_ sits beside them.                                                                           |
+| Workspace root default and flag parsing                                       | `apps/node/src/core/workspaces/fleet-task-workspace.ts:523-528` (`~/.ever-works/fleet-workspaces`); `apps/node/src/cli/program.ts:383` (`--workspace-root` parser), `:1574-1577`; `program.workspace-root.spec.ts` | The workspace root is the second allowed root; `--files-root` parses with the same absolute-path rule.                           |
+| Node core layout (no files module)                                            | `apps/node/src/core/{executors,model-execution,packaging,screen,windows-job-launcher,workspaces}/` (EXISTING-SUBSTRATE §1.14)                                                  | The `files` and `clip` modules live under FL-02's registry, `apps/node/src/core/link/modules/` (CONTRACTS R-40).                  |
+| Allowed-roots resolver (R-18 rules)                                           | _(FL-08 / FL-11 / FL-14 — CONTRACTS R-39)_ `apps/node/src/core/link/allowed-roots.ts` (`resolveAllowedRoots`, `isUnderAllowedRoot`)                                         | Imported, never redefined; whichever of FL-08, FL-11, FL-14 lands first creates it.                                             |
 | Owner-only ACL helper (`icacls`) and 0600 file posture                        | `apps/node/src/node-io.ts`; used by `apps/node/src/core/screen/agent-profile.ts`                                                                                            | Uploaded files inherit the destination folder's ACL; no new ACL code.                                                           |
 | Blocked clipboard shortcuts and the injector's refusal of clipboard payloads  | `packages/contracts/src/computer/computer-control.types.ts:140-191`; `apps/node/src/core/screen/input-injector.ts:20-22`                                                   | Untouched: paste is a separate `clip` channel, not an input frame.                                                               |
 | Control arbiter (who holds control of a view)                                 | `packages/agent/src/computer/control-arbiter.service.ts:1-80`                                                                                                                | `FleetClipService` asks it whether the caller's view holds control before admitting a paste.                                     |
 | Desktop host hooks `openUrl` / `pasteText`                                    | `apps/node/src/core/screen/desktop-host.ts` _(FL-07)_                                                                                                                       | `pasteText` is the node-side target of the `clip` channel.                                                                      |
 | Secret scanner (values)                                                       | `packages/contracts/src/secret/secret-patterns.ts:1-47`                                                                                                                     | Used for the non-blocking paste warning only; names use the new pattern list.                                                   |
 | Fleet audit writer and its key redactor                                       | `packages/agent/src/fleet/fleet-audit.service.ts:38-58`                                                                                                                     | One writer; details keys `root`, `path`, `bytes`, `entries`, `peerNodeId`, `confirmed` — none matches the redactor.             |
-| Audit action union                                                            | `packages/contracts/src/fleet/fleet-panic.types.ts:60-148`                                                                                                                  | Extended with `node.files.list|read|write|copy|delete` (CONTRACTS §7) and `node.clip.paste` (§8b).                              |
+| Audit action union                                                            | `packages/contracts/src/fleet/fleet-panic.types.ts:60-148`                                                                                                                  | Extended with `node.files.list|read|write|copy|delete` and `node.clip.paste` (CONTRACTS §7).                                    |
 | Capability tag constants                                                      | `packages/contracts/src/fleet/fleet-jobs.types.ts:132-152`                                                                                                                  | `FLEET_FILES_CAPABILITY = 'files'` added beside them.                                                                           |
 | Fleet guard and node-auth guard                                               | `apps/api/src/fleet/guards/fleet-enabled.guard.ts`, `fleet-node-auth.guard.ts`                                                                                              | `FleetEnabledGuard` on the new controllers; no node-facing HTTP is added (everything rides the link).                            |
 | Error-with-reason posture on the computer controller                          | `apps/api/src/computer/computer.controller.ts:62-86`                                                                                                                        | Same shape, program codes from CONTRACTS §8.                                                                                    |
-| Agent fleet tools (one read-only tool), MCP whitelist, CLI                    | `packages/agent/src/fleet/agent-fleet-tools.ts:32-60`; `apps/mcp/src/openapi-tools/whitelist.ts:475-530`; `apps/cli/src/main.ts`                                            | Files tools added beside; whitelist entries; CLI with FL-19.                                                                    |
+| Agent fleet tools (one read-only tool), MCP whitelist, CLI                    | `packages/agent/src/fleet/agent-fleet-tools.ts:32-60`; `apps/mcp/src/openapi-tools/whitelist.ts:475-530`; `apps/cli/src/main.ts:22-25` (groups `auth`, `kb`, `plugins`, `work`) | Files tools added beside; whitelist entries; CLI with FL-19.                                                                    |
 | Existing e2e naming                                                           | `apps/web/e2e/flow-fleet-*.spec.ts`                                                                                                                                         | New specs follow the name.                                                                                                      |
 
-**Missing at HEAD (what this plan builds):** the node files module (roots, path guard, pack/unpack,
-delete), the `--files-root` flag, the `files` tag, the `files` and `clip` link channels, the
-platform transfer bridge and zip conversion, the files API, the Files tab and dialogs, the paste
-dialog and clip API, the tools. No schema change.
+**Missing at HEAD (what this plan builds):** the node `files` module (path guard, pack/unpack,
+delete), the `--files-root` option (unless FL-08 landed it with the shared resolver), the `files`
+tag, the `files` and `clip` link modules, the platform transfer bridge and zip conversion, the
+files API, the Files tab and dialogs, the paste dialog and clip API, the tools. No schema change.
 
 ---
 
@@ -97,12 +101,13 @@ dialog and clip API, the tools. No schema change.
 | Browser download shape         | Single file → raw body; several/folder → zip built on the platform from the tar stream with `archiver` 7.x (`store` by default)         | Browsers open zip; building it on the platform keeps the node simple; `store` keeps CPU low (compression is a later option).                          |
 | Browser upload shape           | Multipart (`@fastify/multipart` or the Nest file interceptor in use) → platform tars entries with `webkitRelativePath` → `files.unpack` | Folder uploads keep their relative paths; the node never sees multipart.                                                                              |
 | Credits                        | `ACK(30)` frames carrying bytes consumed; sender window 8 MiB; chunk 64 KiB (CONTRACTS §10)                                             | Backpressure both ends; the platform holds at most one window per operation.                                                                         |
-| Path canonicalisation (node)   | `fs.realpath` of the root once; per request: `path.resolve(root, rel)` + `realpath` of the longest existing prefix; `lstat` each component; a symlink whose `realpath` leaves the root → refuse | Catches `..`, absolute paths, drive letters, and link escapes; stays correct on Windows (case-insensitive compare after `realpath`).                   |
+| Path canonicalisation (node)   | The shared R-39 resolver (`apps/node/src/core/link/allowed-roots.ts`) owns `realpath`, case folding and escape refusal; `link/modules/files/path-guard.ts` adds only the per-request part: `path.resolve(root, rel)`, `lstat` of each component, a link whose target leaves the root → refuse | Catches `..`, absolute paths, drive letters, and link escapes with one definition of "inside a root" for logs, files and checkouts.                   |
 | Credential-shaped names        | Fixed list in contracts `FLEET_CREDENTIAL_FILE_PATTERNS` (globs): `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.kdbx`, `id_rsa*`, `id_ed25519*`, `*.ppk`, `.netrc`, `.npmrc`, `.pypirc`, `credentials`, `credentials.json`, `service-account*.json`, `.aws/credentials`, `*.gpg`, `*.asc`, `.docker/config.json`, `kubeconfig`, `.kube/config` | Names, not contents; conservative; one definition used by node, API and tools.                                                                      |
 | Partial-write safety (node)    | Unpack writes to `<dest>/.ever-works-partial-<opId>/` then renames per entry on `END`; cancel/interrupt/failure removes the partial dir | FR-15 by construction; rename is atomic on the same volume.                                                                                           |
 | Delete                         | `fs.rm({ recursive: true })` after the canonical check, never following links out of root                                             | No shell-out; link targets untouched.                                                                                                                 |
 | Paste on the machine           | FL-07 `desktop-host.pasteText(text)` → helper sets the clipboard, sends `Ctrl/⌘+V` to the focused window                                | Reuses the admitted helper; the node never reads the clipboard.                                                                                       |
-| Operation records              | FL-02 `operation.*` on channel 0 + `GET /api/fleet/operations/:id`; cancel via FL-02 (§8b)                                             | One operations tray for every long action.                                                                                                            |
+| Operation records              | FL-02 `operation.*` on channel 0 + `GET /api/fleet/operations/:id`; cancel with `operation.cancel` / `DELETE /api/fleet/operations/:id` (CONTRACTS §3.2, §11.2) | One operations tray for every long action.                                                                                                            |
+| Storage                        | No column; the only structured values are in `fleet_audit.details` (existing `simple-json`, CONTRACTS §4 storage types)                | Nothing new to migrate.                                                                                                                               |
 | Web grid                       | `role="grid"` table with the existing `@/components/ui/*` primitives; no new dependency                                                 | Keyboard model (FR-41) by construction.                                                                                                               |
 
 ---
@@ -110,9 +115,10 @@ dialog and clip API, the tools. No schema change.
 ## 4. Data model
 
 **No schema change.** CONTRACTS §13 reserves no FL-11 slot; files are never rows. What exists and
-is used: `fleet_audit` (new action values), FL-02's operation records, `FleetNode.controlPolicy.files`
-(FL-01 shape), `computer_sessions` (FL-07; the paste opt-in is in-memory relay state keyed by view
-id, reset on view end, never persisted).
+is used: `fleet_audit` (new action values), FL-02's operation records,
+`FleetNode.controlPolicyFamilies.files` (CONTRACTS §2.1, FL-01's column), `computer_sessions`
+(FL-07; the paste opt-in is in-memory relay state keyed by view id, reset on view end, never
+persisted).
 
 Contracts (`packages/contracts/src/fleet/`, additive):
 
@@ -125,8 +131,8 @@ Contracts (`packages/contracts/src/fleet/`, additive):
   `FLEET_FILES_LIMITS = { chunkBytes: 65536, windowBytes: 8 MiB, maxOpBytes: 2 GiB, maxEntries: 5000 }`;
   `FLEET_CREDENTIAL_FILE_PATTERNS` + `isCredentialShapedName(name)`.
 - `fleet-clip.types.ts` _(new)_: `FLEET_CLIP_MAX_BYTES = 262144`; `FleetClipPasteRequest { text }`;
-  `FleetClipPasteResult { bytes, pastedAt }`.
-- `fleet-panic.types.ts`: `node.files.list|read|write|copy|delete`, `node.clip.paste`.
+  `FleetClipPasteResult { bytes, pastedAt }`; the channel open params `{ viewId }` (CONTRACTS R-27).
+- `fleet-panic.types.ts`: `node.files.list|read|write|copy|delete`, `node.clip.paste` (CONTRACTS §7).
 
 ---
 
@@ -140,18 +146,22 @@ family `files` via FL-01 role derivation; errors `{ error: { code, hint, details
 | GET    | `/roots`                       | —                                                                            | `FleetFileRootView[]`                      | `unreachable`, `consent_missing`, `permission_denied`                                    | 60/min  |
 | GET    | `/list`                        | `?root&path&hidden`                                                          | `FleetFileListView`                        | + `invalid` (escape), `limit_exceeded` never (truncates)                                 | 120/min |
 | GET    | `/stat`                        | `?root&path`                                                                 | `FleetFileEntryView`                       | `not_found`, `invalid`                                                                   | 120/min |
-| GET    | `/download`                    | `?root&path&entries[]&confirm=<token>`                                       | stream (`attachment`, `nosniff`; zip or raw) + `X-Fleet-Operation-Id` | `confirmation_required` (credential-shaped, class `confirm`), `limit_exceeded`, `kill_switch` | 10/min  |
+| GET    | `/download`                    | `?root&path&entries[]&confirm=true`                                          | stream (`attachment`, `nosniff`; zip or raw) + `X-Fleet-Operation-Id` | `confirmation_required` (credential-shaped, class `confirm`), `limit_exceeded`, `kill_switch` | 10/min  |
 | POST   | `/conflicts`                   | `{ root, path, names[] }`                                                    | `FleetFileConflictView[]`                  | —                                                                                        | 60/min  |
 | POST   | `/upload`                      | multipart: `root`, `path`, `policy` (per-name map or `replace-all`), files   | `202 { operationId }`                      | `limit_exceeded`, `operation_failed`, `invalid`                                          | 10/min  |
 | POST   | `/copy`                        | `{ from: { root, path, entries[] }, to: { nodeId, root, path }, policy }`    | `202 { operationId }`                      | `invalid` (same folder), `consent_missing`/`permission_denied` naming which Node, `unreachable` | 10/min  |
-| POST   | `/delete`                      | `{ root, path, entries[], confirmationToken }`                               | `202 { operationId }`                      | `confirmation_required` (class `confirm-destructive`)                                    | 10/min  |
+| POST   | `/delete`                      | `{ root, path, entries[], confirmName }`                                     | `202 { operationId }`                      | `confirmation_required` (class `confirm-destructive`)                                    | 10/min  |
 | GET    | `/api/fleet/operations/:id`    | _(FL-02)_                                                                    | `FleetFilesOperationView`                  |                                                                                          |         |
-| DELETE | `/api/fleet/operations/:id`    | _(FL-02, §8b)_                                                               | `204`                                      |                                                                                          |         |
+| DELETE | `/api/fleet/operations/:id`    | _(FL-02, CONTRACTS §3.2 / §11.2)_                                            | `204`                                      |                                                                                          |         |
 | POST   | `/api/fleet/nodes/:id/desktop/views/:viewId/clip` | `{ text }` (≤ 256 KiB, UTF-8)                              | `FleetClipPasteResult`                     | `permission_denied` (not holder / opt-in off), `limit_exceeded`, `consent_missing` (attend), `unsupported_on_node` | 30/min  |
-| PATCH  | `/api/fleet/nodes/:id/desktop/views/:viewId` _(FL-07 route)_ | `{ pasteAllowed: boolean }`                     | view                                       | holder only                                                                              | 30/min  |
+| PATCH  | `/api/fleet/nodes/:id/desktop/views/:viewId` _(FL-07 route)_ | `{ pasteAllowed: boolean }` — FL-11 adds this optional field to FL-07's `UpdateDesktopViewDto { quality?, displayId? }` | view                                       | holder only                                                                              | 30/min  |
 
-Confirmation tokens: `POST /api/fleet/confirmations` _(FL-01/FL-02 shared helper, assumed)_ returns
-a 2-minute single-use token bound to `{ action, target }`; the typed name is checked server-side.
+Confirmations follow CONTRACTS §2.2 for every caller, the web included: a request without the
+field answers `409 confirmation_required` with the class (and, for delete, `details: { entries,
+bytes }` for the dialog); the dialog re-sends with `confirm: true` (credential-shaped download) or
+`confirmName: "<entry or parent folder name>"` (delete), which the server compares with the target.
+No confirmation-token route is added. The Tier column is a proposed CONTRACTS §10.1 addition
+(spec §8b); until it lands these are the values the controller enforces.
 
 DTOs in `apps/api/src/fleet/files/dto/fleet-files.dto.ts` (`class-validator`; `entries` ≤ 5 000;
 names without path separators; `text` ≤ 262 144 bytes measured after UTF-8 encoding).
@@ -162,20 +172,23 @@ names without path separators; `text` ≤ 262 144 bytes measured after UTF-8 enc
 
 ### 6.1 Modules
 
+Layout per CONTRACTS R-39 / R-40: one shared resolver, one module file per family registered in
+FL-02's `apps/node/src/core/link/modules/index.ts`, helpers beside the module. No `core/files/`,
+`core/modules/` or `link/channels/` directory is created.
+
 | Unit                                                                  | Responsibility                                                                                                                                                                                                                    |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/node/src/core/files/allowed-roots.ts` _(new)_                   | Builds the root list: FL-14 checkouts (from the node's checkout inventory; until FL-14 lands, the worktree pool entries under the workspace root), the workspace root, `--files-root` entries; `realpath` each once; refuses a root that does not exist. |
-| `apps/node/src/core/files/path-guard.ts` _(new)_                      | Pure + IO: `resolveInsideRoot(root, rel)` → canonical absolute path or a typed refusal (`escape`, `link-escape`, `not-found`); `lstat` walk; Windows case-insensitive compare.                                                      |
-| `apps/node/src/core/files/credential-shaped.ts` _(new)_               | Re-exports `isCredentialShapedName` from contracts (one definition).                                                                                                                                                              |
-| `apps/node/src/core/files/list.ts` _(new)_                            | `files.list` / `files.stat`: `readdir` with `withFileTypes`, `lstat` per entry, 5 000 cap, hidden filter, flags.                                                                                                                  |
-| `apps/node/src/core/files/pack.ts` _(new)_                            | `files.pack`: walks the selection, `tar-stream` pack, in-set links as links, out-of-set links skipped and counted, emits `DATA` ≤ 64 KiB honouring the 8 MiB window from `ACK`s, `END` with `{ entries, bytes, skippedLinks }`.    |
-| `apps/node/src/core/files/unpack.ts` _(new)_                          | `files.unpack`: `tar-stream` extract into `<dest>/.ever-works-partial-<opId>/`, per-entry conflict policy, rename on `END`, remove partial dir on cancel/close/failure; sends `ACK` as it consumes.                                  |
-| `apps/node/src/core/files/delete.ts` _(new)_                          | `files.delete`: canonical check per entry, `fs.rm` recursive, never follows links out of root.                                                                                                                                    |
-| `apps/node/src/core/files/files-module.ts` _(new)_                    | The node module (D8): wires the above; advertises `files` iff `--manage` and roots non-empty; exposes `FilesHost` for the link channel.                                                                                           |
-| `apps/node/src/core/link/channels/files-channel.ts` _(FL-02 dir, new file)_ | Message table in §6.3; one channel per operation; applies limits before the first byte.                                                                                                                                   |
-| `apps/node/src/core/link/channels/clip-channel.ts` _(FL-02 dir, new file)_ | Opens with `{ sessionId }` (the desktop view id); accepts one `CLIP` ≤ 256 KiB; calls FL-07 `desktop-host.pasteText`; replies `{ ok, bytes }`.                                                                           |
-| `apps/node/src/cli/program.ts`                                        | `start --files-root <dir>` (repeatable, absolute, same parser as `--workspace-root`); `doctor` prints roots.                                                                                                                       |
-| `apps/node/src/core/capabilities.ts`                                  | `files` tag.                                                                                                                                                                                                                      |
+| `apps/node/src/core/link/allowed-roots.ts` _(R-39, shared)_           | The one resolver (`resolveAllowedRoots({ checkouts, workspaceRoot, extraRoots })`, `isUnderAllowedRoot(path)`): Checkout paths (FL-14 registry; until FL-14 lands, the worktree pool entries under the workspace root), the workspace root, `--files-root` extras; `realpath` once per root; refuses a root that does not exist. FL-11 imports it; it creates it only if neither FL-08 nor FL-14 has. |
+| `apps/node/src/core/link/modules/files/path-guard.ts` _(new)_         | Per request over the resolver: `resolveInsideRoot(root, rel)` → canonical absolute path or a typed refusal (`escape`, `link-escape`, `not-found`); `lstat` walk; never a second definition of "inside a root".                     |
+| `apps/node/src/core/link/modules/files/credential-shaped.ts` _(new)_  | Re-exports `isCredentialShapedName` from contracts (one definition).                                                                                                                                                              |
+| `apps/node/src/core/link/modules/files/list.ts` _(new)_               | `files.list` / `files.stat`: `readdir` with `withFileTypes`, `lstat` per entry, 5 000 cap, hidden filter, flags.                                                                                                                  |
+| `apps/node/src/core/link/modules/files/pack.ts` _(new)_               | `files.pack`: walks the selection, `tar-stream` pack, in-set links as links, out-of-set links skipped and counted, emits `DATA` ≤ 64 KiB honouring the 8 MiB window from `ACK`s, `END` with `{ entries, bytes, skippedLinks }`.    |
+| `apps/node/src/core/link/modules/files/unpack.ts` _(new)_             | `files.unpack`: `tar-stream` extract into `<dest>/.ever-works-partial-<opId>/`, per-entry conflict policy, rename on `END`, remove partial dir on cancel/close/failure; sends `ACK` as it consumes.                                  |
+| `apps/node/src/core/link/modules/files/delete.ts` _(new)_             | `files.delete`: canonical check per entry, `fs.rm` recursive, never follows links out of root.                                                                                                                                    |
+| `apps/node/src/core/link/modules/files.ts` _(new)_                    | The `files` `NodeModule` (D8, FL-02 registry): advertises `files` iff `--manage` and roots non-empty; handles the `files` channel per the message table in §6.3 (one channel per operation; limits before the first byte); closes in-flight operations on `link.pause`. One entry in `link/modules/index.ts`. |
+| `apps/node/src/core/link/modules/clip.ts` _(new)_                     | The `clip` `NodeModule`: opens with `{ viewId }` (CONTRACTS R-27); accepts one `CLIP` ≤ 256 KiB; calls FL-07 `desktop-host.pasteText`; replies `{ ok, bytes }`. One entry in `link/modules/index.ts`.                             |
+| `apps/node/src/cli/program.ts`                                        | `start --files-root <dir>` (repeatable, absolute, same parser as `--workspace-root`) unless FL-08 already added it with the resolver; `doctor` prints roots.                                                                      |
+| `apps/node/src/core/capabilities.ts`                                  | `files` tag (from the module's `tags(env)`).                                                                                                                                                                                      |
 
 ### 6.2 OS matrix
 
@@ -210,7 +223,7 @@ platform → node  JSON { type: 'files.delete', requestId, entries[], confirmati
 node → platform  JSON { requestId, ok, removed } | error
 either          CLOSE(11) reason: cancelled | kill_switch | node-unavailable   (node removes any partial dir)
 
-platform → node  channel.open { channel, family: 'clip', params: { sessionId: <desktop view id> } }
+platform → node  channel.open { channel, family: 'clip', params: { viewId } }        (CONTRACTS R-27)
 node → platform  channel.ready | channel.refused { code: 'consent_missing'|'unsupported_on_node' }
 platform → node  CLIP(40) UTF-8 text ≤ 256 KiB
 node → platform  JSON { type: 'clip.pasted', bytes } | error operation_failed
@@ -268,14 +281,16 @@ None. No capability, no plugin, no change to `docs/plugin-system/built-in-plugin
 | `fleet_files_list`   | `readOnly: true`                                                           | Entries of `{ nodeId, root, path, hidden? }` with flags                                | `files` · manage      | P1    |
 | `fleet_files_stat`   | `readOnly: true`                                                           | One entry                                                                              | `files` · manage      | P1    |
 | `fleet_files_copy`   | `destructive: true`, `confirmationClass: 'confirm'`                        | Lists conflicts first; writes only with `replace: true`; runs under the Run             | `files` on both Nodes · manage | P2 |
-| `fleet_files_delete` | `destructive: true`, `confirmationClass: 'confirm-destructive'` → approval | Raises a Decision (AW-03) carrying the entries; executes on the owner's approval        | `files` · manage      | P2    |
-| `fleet_clip_paste`   | `destructive: true`, denied unless granted (AW-15)                         | Pastes into a desktop view the Agent controls (FL-07 grant), opt-in respected           | `desktop` · attend    | P2    |
+| `fleet_files_delete` | `destructive: true`, `confirmationClass: 'confirm-destructive'` → held      | Held as an `agent_action_proposals` row (CONTRACTS R-33) carrying the entries, shown in My Decisions; executes on the owner's approval, never on the Agent's own `confirmName` | `files` · manage      | P2    |
+| `fleet_desktop_paste` | `destructive: true`, denied unless granted (AW-15)                        | Pastes into a desktop view the Agent controls (FL-07 grant), opt-in respected; permission family `desktop` (R-25) | `desktop` · attend    | P2    |
 
 No tool downloads a credential-shaped file. Implemented in
 `packages/agent/src/fleet/agent-fleet-files-tools.ts` _(new)_; MCP entries in
-`apps/mcp/src/openapi-tools/whitelist.ts` with annotations; CLI
-`ever-works fleet files ls|stat|get|put|cp|rm [--json]` and `ever-works fleet clip paste` in
-`apps/cli/src/commands/fleet/files.ts` _(with FL-19)_, exit `0/1/2`.
+`apps/mcp/src/openapi-tools/whitelist.ts` with the same names (CONTRACTS §11.3) and annotations; CLI
+`ever-works fleet files ls|stat|get|put|cp|rm [--json]` in `apps/cli/src/commands/fleet/files.ts` and
+`ever-works fleet desktop paste` beside FL-07's desktop verbs _(with FL-19)_, exit `0/1/2`. FL-19's
+catalogue rows `fleet_files_read` / `fleet_files_write` map to this epic's download and upload
+routes; FL-19 adds `fleet_desktop_paste` to its desktop row.
 
 ---
 
@@ -299,8 +314,8 @@ and the kill switch cover cleanup. No retention: nothing is stored.
   the platform did not bind to a view the caller controls (the node trusts the platform's binding
   but still enforces size and consent).
 - **What the platform refuses:** callers outside the `files` audience of **each** Node involved;
-  a credential-shaped download without a `confirm` token (people) or at all (Agents); delete without
-  a `confirm-destructive` token whose typed name matches; a paste from a caller who does not hold
+  a credential-shaped download without `confirm: true` (people) or at all (Agents); delete without
+  a `confirmName` that matches the target (CONTRACTS §2.2); a paste from a caller who does not hold
   control of that view or whose view has paste off; a copy to the same folder.
 - **Redaction:** no file names beyond the requested path, and no file contents, in logs; audit
   details hold `root`, `path`, `entries`, `bytes`, `peerNodeId`, `confirmed`; pasted text is never
@@ -308,8 +323,9 @@ and the kill switch cover cleanup. No retention: nothing is stored.
 - **Audit:** `node.files.list` (first list per root per tab visit), `node.files.read` (download),
   `node.files.write` (upload), `node.files.copy` (both Nodes), `node.files.delete`, `node.clip.paste`;
   `requestedBy` = `user:<id>` | `agent:<id>`; `confirmationClass` recorded.
-- **Kill switch (R-24):** `channel.open` refused `kill_switch`; in-flight operations closed within
-  5 s; partial dirs removed by the node's `CLOSE` handler.
+- **Kill switch (R-24):** `channel.open` refused `kill_switch`; FL-02 sends `link.pause` (CONTRACTS
+  §3.2) and the `files` and `clip` modules close in-flight operations within 5 s; partial dirs
+  removed by the node's `CLOSE` handler; `link.resume` lets new requests through again.
 - **Consent hints:** `start the node with --manage on <node>`; `add --files-root <dir> on <node>`;
   `start the node with --attend on <node>` (paste).
 
@@ -346,18 +362,21 @@ Runners: contracts, node, web unit → **Vitest**; agent, api → **Jest**; e2e 
 - **Contracts** `packages/contracts/src/fleet/__tests__/fleet-files.types.spec.ts` — guards,
   limits constants, `isCredentialShapedName` truth table (positives from the list; `env.ts`,
   `keyboard.ts`, `README.md` negative); `fleet-clip.types.spec.ts`.
-- **Node** `apps/node/src/core/files/path-guard.spec.ts` (`..`, absolute, drive letter, UNC, link
-  escape, in-root link, case on Windows via injected platform), `allowed-roots.spec.ts` (home never
-  default; missing root refused; checkouts + workspace + listed), `list.spec.ts` (cap, hidden,
-  flags), `pack.spec.ts` (tar contents, in-set links, out-of-set skipped and counted, window
+- **Node** `apps/node/src/core/link/modules/files/path-guard.spec.ts` (`..`, absolute, drive
+  letter, UNC, link escape, in-root link, case on Windows via injected platform),
+  `apps/node/src/core/link/allowed-roots.spec.ts` (shared with FL-08/FL-14: home never default;
+  missing root refused; checkouts + workspace + listed), `link/modules/files/list.spec.ts` (cap,
+  hidden, flags), `pack.spec.ts` (tar contents, in-set links, out-of-set skipped and counted, window
   respected with a slow ACK), `unpack.spec.ts` (partial dir, conflict policies, rename on END,
-  removal on CLOSE/cancel), `delete.spec.ts`, `apps/node/src/core/link/channels/files-channel.spec.ts`
-  (message table; limits before first byte), `clip-channel.spec.ts` (size cap; consent),
+  removal on CLOSE/cancel), `delete.spec.ts`, `apps/node/src/core/link/modules/files.spec.ts`
+  (message table; limits before first byte; `link.pause` closes operations),
+  `apps/node/src/core/link/modules/clip.spec.ts` (opens with `{ viewId }`; size cap; consent),
   `apps/node/src/cli/program.files-root.spec.ts`, `capabilities.spec.ts` (`files` iff roots).
 - **Agent** `packages/agent/src/fleet/files/__tests__/fleet-files.service.spec.ts` (audience on
   each Node; credential gate for people vs Agents; same-folder refusal; every code with hint),
   `fleet-clip.service.spec.ts` (holder + opt-in required; reset on view end; cap),
-  `agent-fleet-files-tools.spec.ts` (annotations; delete raises an approval; paste default denied).
+  `agent-fleet-files-tools.spec.ts` (annotations; delete held as an R-33 proposal; paste default
+  denied).
 - **API** `apps/api/src/fleet/files/fleet-files.controller.spec.ts`, `fleet-files-transfer.service.spec.ts`
   (raw vs zip; platform buffer ≤ 8 MiB with a slow client; cancel closes the channel; copy pipes
   and forwards credits; kill switch cancels within 5 s), `fleet-clip.controller.spec.ts`.
@@ -375,11 +394,11 @@ Runners: contracts, node, web unit → **Vitest**; agent, api → **Jest**; e2e 
 | Risk                                                                    | L   | I   | Mitigation                                                                                                    |
 | ----------------------------------------------------------------------- | --- | --- | ------------------------------------------------------------------------------------------------------------- |
 | Browser-side zip expectations vs tar on the wire                        | M   | L   | Platform converts; single files stay raw; format is an internal detail.                                       |
-| Platform memory under many concurrent transfers                         | M   | M   | One 8 MiB window per operation; per-owner concurrent-operation cap of 4 (hint names it); metrics on stalls.    |
+| Platform memory under many concurrent transfers                         | M   | M   | One 8 MiB window per operation bounds each; a concurrency cap is a proposed CONTRACTS §10 row (spec §8b); metrics on stalls. |
 | Windows path semantics (case, junctions, long paths)                    | M   | M   | Dedicated guard tests with injected platform; junctions treated as links; UNC refused.                         |
 | Credential-shaped list misses a name                                    | M   | M   | Conservative fixed list, reviewable in one file; §8b asks whether owners may extend it.                        |
 | Paste lands in the wrong window                                         | L   | M   | Only while controlling; the dialog says where focus is; the viewer sees the desktop as it pastes.              |
-| FL-02 operations cancel not available                                   | M   | M   | §8b flags; fallback is `CLOSE(cancelled)` on the channel, which the node already handles.                      |
+| FL-02's operation view has no `cancelled` / `interrupted` state         | M   | L   | Derive both from a `failed` operation's error code until FL-02 adds them (spec §8b); `CLOSE(cancelled)` is already handled. |
 | FL-14 checkouts land after FL-11                                        | M   | L   | Roots fall back to the worktree pool under the workspace root until FL-14's inventory exists.                   |
 
 ---

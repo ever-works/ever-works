@@ -17,10 +17,14 @@
   `packages/tasks` **Jest**; `packages/plugin`, `packages/plugins/*`, `packages/contracts`,
   `apps/node`, `apps/web` unit **Vitest**; `apps/web` e2e **Playwright**.
 - Migration slot `1796180000000`; authored from `apps/api/`; re-stamp only if `develop` moved.
-- Prerequisites: FL-09 (`apps/node/src/core/services/` module), FL-02 (link, operations, `machine`
-  channel), FL-08 (log source registry), FL-01 (registry, roles), FL-03 (producer registry).
-- The spec's open questions on the `FleetActionsRunner` table (CONTRACTS §4) and the two extra audit
-  names (§7) must be answered before T-05 and T-11 merge.
+- Prerequisites: FL-09 (`apps/node/src/core/link/modules/services/` module), FL-02 (link, operations,
+  `machine` channel, the module registry `apps/node/src/core/link/modules/index.ts`), FL-08 (log
+  source registry), FL-01 (registry, roles, needs-a-look producer registry).
+- CONTRACTS §4.11 fixes the table's contract columns and `state` values and §7 the audit names
+  (`node.runner.restart`, `node.runner.job.cancel` included); nothing here waits on a clarification.
+- Node modules live under `apps/node/src/core/link/modules/<family>/` (CONTRACTS R-40); job
+  executors stay in `apps/node/src/core/executors/`. Confirmation is the request fields `confirm` /
+  `confirmName` with a 409 `confirmation_required` preview (CONTRACTS §2.2) — never a token.
 - Commit style: `feat(fleet-runners): …`, `feat(plugin-github-actions-runners): …`, `chore(i18n): …`.
 
 ---
@@ -39,14 +43,16 @@
       `packages/contracts/src/fleet/index.ts`; extend `fleet-jobs.types.ts` with `'runner-install' |
       'runner-control'` (L117, L120) and max-age entries (L239: 3600 / 600) and
       `FLEET_ACTIONS_RUNNER_CAPABILITY`; extend `fleet-panic.types.ts` with
-      `node.runner.install|start|stop|remove`.
+      `node.runner.install|start|stop|restart|remove` and `node.runner.job.cancel` (CONTRACTS §7).
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-runners.spec.ts` (count clamp 1–16;
       diagnosis union closed); extend `fleet-jobs.spec.ts`, `fleet-panic.spec.ts`.
 
 ## P1.B — Schema
 
 - [ ] **T-03**. Add `packages/agent/src/entities/fleet-actions-runner.entity.ts` (columns per plan
-      §4.1; raw uuid columns, `PortableDateColumn`, varchar unions); register in
+      §4.1 — the CONTRACTS §4.11 columns with their exact names and `state` values, plus the
+      epic-local ones; raw uuid columns, `PortableDateColumn`, varchar unions, `simple-json` text for
+      `labels`); register in
       `packages/agent/src/entities/index.ts` and the fleet TypeORM feature array.
       **Test**: `pnpm --filter @ever-works/agent build`; entities inventory spec updated.
 - [ ] **T-04**. Author `apps/api/src/migrations/1796180000000-CreateFleetActionsRunners.ts` from
@@ -85,7 +91,8 @@
       ['actions-runner']` through the node job-runtime plugin as `fleet-agent-task.dispatcher.ts`
       does; audit per runner), `control` (`runner-control`; `stoppedByOwner`; remove busy guard),
       `onAwaitingToken(runnerId)` (mint register/remove token → `runner.token` over the link via
-      FL-02's link service), `mergeState`; `fleet-runners.module.ts`; register in
+      FL-02's link service; never while `link.pause` holds), `mergeState` (writes only C §4.11
+      `state` values); `fleet-runners.module.ts`; register in
       `apps/api/src/fleet/fleet.module.ts`.
       **Test**: `packages/agent/src/fleet/runners/__tests__/fleet-runners.service.spec.ts` — token
       never in the job payload; limit; busy guard; kill switch; audit `extra` has no token.
@@ -97,14 +104,15 @@
       plan §5; 404 when the flag is off.
 - [ ] **T-11**. Register the `runner.token` / `runner.list` / `runner.status` vocabulary on the
       `machine` channel (platform side `apps/api/src/fleet/link/machine-channel.handlers.ts`, node side
-      `apps/node/src/core/link/machine-channel.ts`) and the `awaiting-token` progress handler that
-      calls `onAwaitingToken`.
+      `apps/node/src/core/link/modules/runners/index.ts`, registered once in
+      `apps/node/src/core/link/modules/index.ts` — CONTRACTS R-40) and the `awaiting-token` progress
+      handler that calls `onAwaitingToken`.
       **Test**: extend both channel specs — token sent once per request; never logged; resend on
       reconnect when the node re-reports `awaiting-token`.
 
 ## P1.E — Node
 
-- [ ] **T-12**. Add `apps/node/src/core/runners/runner-download.ts`, `runner-state.ts`,
+- [ ] **T-12**. Add `apps/node/src/core/link/modules/runners/runner-download.ts`, `runner-state.ts`,
       `runner-logs.ts` (FL-08 source `runner:<name>`).
       **Test**: `runner-download.spec.ts` — mismatch deletes and extracts nothing; foreign host
       refused; `runner-logs.spec.ts` — newest `_diag` file chosen.
@@ -115,8 +123,9 @@
       **Test**: `runner-config.spec.ts` — argv never contains the token under any input;
       `runner-service.spec.ts` — refusal text per OS.
 - [ ] **T-14**. Add `apps/node/src/core/executors/runner-install.ts` and `runner-control.ts`; register
-      on the work lane in `apps/node/src/core/runtime.ts` (beside L739) only when `actions-runner` is
-      advertised; advertise `actions-runner` in `apps/node/src/core/capabilities.ts` (`--work` + FL-09
+      them on the management lane in `apps/node/src/core/runtime.ts` (CONTRACTS R-34 — append to FL-02's
+      `createManagementLane`; runner kinds only with `--work`; never on the
+      work lane) only when `actions-runner` is advertised; advertise `actions-runner` in `apps/node/src/core/capabilities.ts` (`--work` + FL-09
       service manager detected).
       **Test**: `executors/runner-install.spec.ts` (phases; waits at `awaiting-token`; resumes after
       a link drop), `runner-control.spec.ts` (remove = stop → config remove → uninstall → delete
@@ -124,9 +133,10 @@
 
 ## P1.F — Web, tools, poll, e2e
 
-- [ ] **T-15**. Add `apps/web/src/components/fleet/runners/runners.shared.ts` and register
-      `computer.overview.runnersBlock`, `computer.actions.installRunners` in
-      `apps/web/src/components/fleet/registry.ts`.
+- [ ] **T-15**. Add `apps/web/src/components/fleet/runners/runners.shared.ts` and register the
+      computer Overview **Actions runners** block with `registerOverviewBlock` in
+      `apps/web/src/components/fleet/registry.ts` (its **Install runners** button lives in the block;
+      FL-01's registry has no header-action entry point).
       **Test**: `runners.shared.unit.spec.ts` — Windows offers Service only; default names
       `<computer>-<n>`.
 - [ ] **T-16**. Add `InstallRunnersDialog.tsx`, `RunnersBlock.tsx`, `RunnerRow.tsx`,
@@ -163,7 +173,8 @@
 
 - [ ] **T-22**. Service: `jobs(userId, targets)` (facade `listJobs` per watched target with ETags;
       `diagnoseJob` from the plugin; busy count), `setWatched`, `cancelRun` (permission `actions:
-      write`; audit `node.runner.job.cancel` per CONTRACTS decision), `checkPermission` (org).
+      write`; requires `confirm: true`; audit `node.runner.job.cancel`, CONTRACTS §7),
+      `checkPermission` (org).
       **Test**: extend `fleet-runners.service.spec.ts` — diagnosis per job; cancel refused outside
       `machines`; watched targets must be App-covered.
 - [ ] **T-23**. API: `GET /runners/jobs` (30 s cache), `PUT /runners/jobs/watched`,
@@ -173,7 +184,8 @@
       rate-limit back-off.
       **Test**: extend `fleet-runners-poll.task.spec.ts`.
 - [ ] **T-25**. Web: `ActionsJobsPanel.tsx`, `ActionsJobRow.tsx`, `WatchedTargetsEditor.tsx`,
-      `GrantAccessCard.tsx`; register `hub.overview.actionsJobs`; org scope in the install dialog with
+      `GrantAccessCard.tsx`; register the Actions jobs panel on the hub Overview with FL-01's
+      `registerOverviewBlock` (CONTRACTS R-37 — no seventh tab, no route); org scope in the install dialog with
       the permission check and **Grant access**; BFF under `apps/web/src/app/api/fleet/runners/jobs/**`.
       **Test**: `ActionsJobsPanel.unit.spec.tsx` (diagnosis strings; Cancel hidden outside
       `machines`; rate-limited copy), `GrantAccessCard.unit.spec.tsx`.
@@ -201,9 +213,12 @@
 
 - [ ] **T-30**. Finish `docs/features/fleet-actions-runners.md` (what is installed where, token
       handling, permissions needed, diagnosis meanings, Windows service-only, Docker mode caveats).
+      **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
 - [ ] **T-31**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count only in the canonical doc.
+      **Test**: the FL-18 TRACKER row shows `FLEET_ACTIONS_RUNNERS_ENABLED` and slot `1796180000000`.
 - [ ] **T-32**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; banned-terms grep over
       this folder, the plugin and the docs prints nothing.
+      **Test**: every command exits 0 and the grep prints nothing.
 
 ## Definition of done
 

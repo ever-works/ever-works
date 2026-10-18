@@ -43,7 +43,7 @@ leaves one audit row per machine. Nothing is a sandbox and the surface says so b
 
 | Phase  | Ships                                                                                                                   |
 | ------ | ----------------------------------------------------------------------------------------------------------------------- |
-| **P1** | The Command and its runs; the hub Commands tab with live output cards; audit; errors; kill switch; CLI `fleet command run` |
+| **P1** | The Command and its runs; the hub Commands tab with live output cards; audit; errors; kill switch; CLI `fleet commands run` |
 | **P2** | Agent tool `fleet_commands_run`; "Run a command…" from a computer page; full output as an operation; cancel              |
 | **P3** | Folder picker from Checkouts (FL-14) and a Command re-run from history; a Command with a cadence hands over to FL-13     |
 
@@ -135,7 +135,7 @@ live view. "Command" is the program's canonical noun (README §1): never "run", 
 
 - **S6 — From the CLI (P1).**
   **Given** the owner is signed in to the CLI,
-  **when** they run `ever-works fleet command run --on build-01,build-02 -- uptime`,
+  **when** they run `ever-works fleet commands run --on build-01,build-02 -- uptime`,
   **then** each machine's output streams to the terminal prefixed by its name, the process exits
   `1` if any machine failed, `124` if any timed out, and `--json` emits one object per machine
   with the same shape the web uses.
@@ -152,23 +152,25 @@ live view. "Command" is the program's canonical noun (README §1): never "run", 
 - **U3 — Kill switch.** When the fleet kill switch is on, **Run** is disabled with the kill-switch
   banner and reason; a run attempted anyway is refused with `kill_switch`. Commands in flight are
   stopped on the machine within 10 seconds, each card reading _"Stopped by the fleet kill switch"_,
-  and an audit row `node.command.cancel` is written with that reason.
+  each run ends `failed` with reason `kill-switch`, and an audit row `node.command.cancel` is
+  written with that reason.
 - **U4 — Permission denied server-side.** A caller outside the `commands` audience who calls the
   API directly is refused with `permission_denied` and the hint _"ask the owner of build-01 to allow
   org admins: commands"_; the UI never shows a tickable machine the server would refuse.
-- **U5 — Over the limit.** A timeout above 3 600 s, a command longer than 8 KiB, more than 50
-  machines, or a 9th concurrent Command for one owner is refused with `limit_exceeded` naming the
-  limit.
+- **U5 — Over the limit.** A timeout above 3 600 s (CONTRACTS §10), a command longer than 8 KiB,
+  more than 50 machines, or a 9th concurrent Command for one owner (the last three proposed in §8b)
+  is refused with `limit_exceeded` naming the limit.
 - **U6 — Output flood.** A command printing faster than the machine can send is capped at 10 MiB
   per run on the machine; the card says _"Output capped at 10 MiB"_ and the exit code is still
   reported.
 - **U7 — Shell could not start.** When the login shell cannot be spawned, that machine's run is
-  `failed` with `operation_failed` and the first line of the error as the hint.
+  `failed` with reason `shell-failed`, the error `operation_failed` and the first line of the error
+  as the hint.
 - **U8 — Consent missing on one machine of many.** A multi-machine run is accepted; the machine
   without `--manage` fails its own run immediately as `consent_missing` with the hint, the other
   machines run normally, and the summary counts the refused machine as a failure.
-- **U9 — Drain all.** "Drain all" ends in-flight Commands like it ends Runs today; cards read
-  _"Stopped — the fleet is draining"_.
+- **U9 — Drain all.** "Drain all" ends in-flight Commands like it ends Runs today; each run ends
+  `failed` with reason `drain` and its card reads _"Stopped — the fleet is draining"_.
 - **U10 — The node restarts.** A node restart mid-run ends that machine's run `failed` with reason
   `node-restart`; the stored tail is whatever arrived.
 
@@ -178,16 +180,17 @@ live view. "Command" is the program's canonical noun (README §1): never "run", 
 
 ### 4.1 The Command (P1)
 
-- **FR-1** A Command MUST carry one command line (≤ 8 KiB), a set of 1–50 target computers, an
-  optional folder (default: the machine owner's home), and a timeout (default 600 s, clamp
-  1–3 600 s).
+- **FR-1** A Command MUST carry one command line (≤ 8 KiB), a set of 1–50 target computers (both
+  bounds proposed for CONTRACTS §10, see §8b), an optional folder (default: the machine owner's
+  home), and a timeout (default 600 s, clamp 1–3 600 s, CONTRACTS §10).
 - **FR-2** The system MUST run a Command in the machine owner's **login shell** as that user —
   PowerShell on Windows, the account's login shell elsewhere — with no stdin attached.
 - **FR-3** A Command MUST be delivered only over the node link and MUST fail `unreachable` for a
   computer that is offline or whose link is down; it MUST NOT be queued or retried.
 - **FR-4** A Command MUST produce one run per target computer, each with a start time, an end
-  time, an exit code or a reason, and a status from `running · done · failed · timeout ·
-  cancelled`.
+  time, an exit code or a reason, a status from `running · done · failed · timeout` (CONTRACTS
+  §4.4; the two `skipped-*` statuses belong to Schedules, FL-13) and, for `failed`, a reason from
+  `link-lost · node-restart · kill-switch · drain · shell-failed`.
 - **FR-5** Output MUST stream to the viewer as it arrives, MUST be capped at 10 MiB per run on
   the machine, and the platform MUST store the first and last 64 KiB of each run with a truncation
   marker.
@@ -228,7 +231,7 @@ live view. "Command" is the program's canonical noun (README §1): never "run", 
 
 ### 4.4 Agent, MCP and CLI (P1 CLI, P2 Agent)
 
-- **FR-19** The CLI MUST offer `ever-works fleet command run --on <a,b> [--timeout <s>] [--cwd
+- **FR-19** The CLI MUST offer `ever-works fleet commands run --on <a,b> [--timeout <s>] [--cwd
   <dir>] [--json] -- <cmd>` exiting `0` when every machine succeeded, `1` when any failed, `2` on
   usage error and `124` when any timed out.
 - **FR-20** The Agent tool `fleet_commands_run` MUST be annotated destructive with
@@ -329,12 +332,14 @@ the decision card in My Decisions is the §5.1 dialog rendered for a human. The 
 ## 8b. Open questions
 
 - `[NEEDS CLARIFICATION: Should the owner be able to choose the Agent's isolated environment as the
-  shell context for a Command ("run as Nina would")? Default here: no — Commands are owner-level.]`
+  shell context for a Command ("run as Nina would")? Default until answered: no — Commands are
+  owner-level and run in the machine owner's login shell.]`
 - `[NEEDS CLARIFICATION: Recent is per owner today. Should Organization admins see the owner's
-  Recent on a shared computer, or only their own? Default: their own.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §4.4 fleet_command_runs.status lacks a reason for
-  "link lost"; propose adding `failedReason` text (`link-lost · node-restart · kill-switch · drain ·
-  shell-failed`) rather than widening the status enum.]`
+  Recent on a shared computer, or only their own? Default until answered: each caller sees only
+  the Commands they ran.]`
+- **Resolved** by CONTRACTS §4.4: `fleet_command_runs.failedReason` is the enum `link-lost ·
+  node-restart · kill-switch · drain · shell-failed`; the status enum is not widened.
+- **Resolved** by CONTRACTS rev 5: `failedReason` `cancelled-by-user` (§4.4); `command.output|truncated|timeout` (§3.3); `/commands/:id/cancel` and `/commands/:id/runs/:runId/output` (§11.2); limits 8 KiB / 50 computers / 8 concurrent (§10); 10 runs per minute (§10.1).
 
 ---
 
@@ -350,12 +355,15 @@ the decision card in My Decisions is the §5.1 dialog rendered for a human. The 
 - [ ] **ACC-FL12-08** (FR-10, S4) An org member outside the audience is refused server-side with `permission_denied`; the UI never offers that machine.
 - [ ] **ACC-FL12-09** (FR-11) The confirm dialog contains the sandbox sentence verbatim and names shell and user.
 - [ ] **ACC-FL12-10** (FR-12, FR-13) One audit row per computer with the required fields; a command containing a token-shaped string is stored redacted.
-- [ ] **ACC-FL12-11** (FR-14, U3) Kill switch on: new runs refused `kill_switch`; an in-flight `sleep 60` is stopped within 10 s and audited as cancelled.
+- [ ] **ACC-FL12-11** (FR-14, U3) Kill switch on: new runs refused `kill_switch`; an in-flight `sleep 60` is stopped within 10 s, ends `failed` with reason `kill-switch`, and writes `node.command.cancel`.
 - [ ] **ACC-FL12-12** (FR-17) Recent holds exactly the last 8 Commands and re-run opens the dialog.
 - [ ] **ACC-FL12-13** (FR-19, S6) The CLI exits 0/1/2/124 as specified and `--json` matches the web shape.
 - [ ] **ACC-FL12-14** (FR-20, S5) The Agent tool is refused for an Agent outside the audience, and runs with `requestedBy: agent:<id>` when allowed.
 - [ ] **ACC-FL12-15** (FR-22) The tab states that Commands spend no tokens or credits.
 - [ ] **ACC-FL12-16** Every user-visible string is an i18n key under `fleet.commands.*` / `fleet.errors.*`.
+- [ ] **ACC-FL12-17** (FR-8) No cadence, name or enabled control is shown or accepted on a one-off Command; a request carrying `cadence` is left to FL-13's validation.
+- [ ] **ACC-FL12-18** (FR-18) Each card offers Expand, Copy and Open full output; Open full output is disabled with the offline reason when the machine is offline.
+- [ ] **ACC-FL12-19** (FR-21) Every tool and CLI refusal carries the CONTRACTS §8 code and the same hint as the web.
 
 ---
 
@@ -376,7 +384,7 @@ the decision card in My Decisions is the §5.1 dialog rendered for a human. The 
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) · [CONTRACTS](../CONTRACTS.md) §0 R-11, R-24; §1; §2; §3.3 `command`; §4.4; §7; §8; §9; §10; §11 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) D "Run a command on N machines"
+- Program: [Fleet README](../README.md) · [CONTRACTS](../CONTRACTS.md) §0 R-11, R-24, R-33, R-39, R-40; §1; §2; §3.2 link controls; §3.3 `command`; §4.4; §7; §8; §9; §10; §11 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) D "Run a command on N machines"
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Related epics: [FL-02 Node link](../FL-02-node-link/), [FL-13 Schedules on computers](../FL-13-schedules-on-computers/), [FL-19 Agent, MCP & CLI](../FL-19-agent-mcp-cli/)
 - Constitution: `.specify/memory/constitution.md`

@@ -43,11 +43,11 @@
 
 ## P1.B — Node module
 
-- [ ] **T-03**. Write the roots resolver at `apps/node/src/core/link/modules/shared/allowed-roots.ts`:
+- [ ] **T-03**. Write the roots resolver at `apps/node/src/core/link/allowed-roots.ts`:
       `resolveAllowedRoots({ checkouts, workspaceRoot, extraRoots })`, `isUnderAllowedRoot(path)`
       with `realpath` canonicalisation and win32 case folding, following the lookup rule in
       `apps/node/src/core/executors/command-roots.ts`. Export a `standardLogDirs(platform, env)`.
-    - **Test**: `apps/node/src/core/link/modules/shared/allowed-roots.spec.ts` — symlink escape refused,
+    - **Test**: `apps/node/src/core/link/allowed-roots.spec.ts` — symlink escape refused,
       `..` refused, sibling-root cousin refused, win32 case, standard dirs per OS.
 - [ ] **T-04**. Write the four readers under `apps/node/src/core/link/modules/logs/`:
       `journal-source.ts` (JSON, `__CURSOR` resume, kernel, user units, group-membership hint

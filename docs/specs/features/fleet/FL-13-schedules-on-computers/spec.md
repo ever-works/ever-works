@@ -45,7 +45,7 @@ runs when it is. Times are the computer's own; the view shows both the computer'
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | Command schedules: `node_schedule` source, dialog, node-side cache and timer loop, overlap/cap/history, Run now/Pause/Resume/Delete, computer Schedules tab, Activity → Schedules rows, audit, "needs a look" producer, CLI |
 | **P2** | Agent-session schedules (recurring Task pinned to a computer), unattended-credential note, cost attribution, NEVER RUNS reasons and repairs, circuit breaker scope "this computer", Agent tools |
-| **P3** | Per-OS native-scheduler fallback for nodes not installed as a service; missed-run policy editor; failure-streak auto-pause threshold editor       |
+| **P3** | Per-OS native-scheduler fallback for nodes not installed as a service; missed-run grace and failure-threshold editors only if CONTRACTS §6 makes them per schedule (§8b) |
 
 ---
 
@@ -88,7 +88,7 @@ scope (one computer), a run-history drawer, and a "needs a look" producer for sc
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "Schedule something on that machine."            | Edit the machine's crontab, launchd or Task Scheduler by hand.                                                       | The unified Schedules read model has exactly seven sources (`packages/agent/src/schedules/schedule-view.types.ts:17-24`; `schedules.service.ts:85-93`) and no field names a computer; the schedules spec declares a new source type out of scope (`docs/specs/features/schedules/spec.md:355`).                   |
 | "Have Nina do it there every morning."           | Make a recurring Task and hope the Agent's affinity sends it to the right machine.                                  | A recurring Task fires through the Task recurrence dispatcher (`packages/agent/src/entities/task.entity.ts:24-25`) and lands on a machine only indirectly, via Agent affinity (`packages/agent/src/fleet/fleet-agent-node-affinity.service.ts:22-25`), which is Organization-scoped and never shown on the schedule row. |
-| "Did it run while my laptop was closed?"         | Nothing — the platform's cron fires; if the machine is offline the job waits or ages out.                            | No definition lives on a machine; the node has no timer or schedule module (`apps/node/src/core/` has no such file); every run depends on the platform being reachable at fire time.                                                                                                                         |
+| "Did it run while my laptop was closed?"         | Nothing — the platform's cron fires; if the machine is offline the job waits or ages out.                            | No definition lives on a machine; the node has no scheduler or schedule cache (EXISTING-SUBSTRATE §4: `rg -n -w 'cron|crontab|RRULE|cronExpression' apps/node/src` → no match); every run depends on the platform being reachable at fire time.                                                                                                                         |
 | "Why did it stop running?"                       | Read the Agent's error count, or notice the machine is off.                                                          | NEVER RUNS knows seven reasons (`schedule-view.types.ts:116-123`), none about a machine; "needs a look" has a `schedule-failed` kind reserved (CONTRACTS §4.6) with no producer.                                                                                                                             |
 
 ### 2.3 Why this epic is additive only
@@ -159,9 +159,9 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
 
 - **S8 — From the CLI.**
   **Given** the owner is signed in to the CLI,
-  **when** they run `ever-works fleet schedule create --on build-01 --name "Pull all" --every 30m --command "git pull --ff-only"`,
+  **when** they run `ever-works fleet schedules create --on build-01 --name "Pull all" --every 30m --command "git pull --ff-only"`,
   **then** the schedule is created, printed as a row, and `--json` returns the same shape the web
-  uses; `fleet schedule list --on build-01`, `run <id>`, `pause <id>`, `resume <id>`, `runs <id>`
+  uses; `fleet schedules list --on build-01`, `run <id>`, `pause <id>`, `resume <id>`, `runs <id>`
   and `delete <id>` all exist.
 
 ### 3.2 Edge cases and failures
@@ -176,15 +176,15 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
 - **U4 — Six hours.** A run reaching 6 h is terminated on the machine and recorded `timeout` with
   its tail; the schedule stays active.
 - **U5 — Asleep at fire time.** A fire missed while the machine slept runs once if the machine
-  wakes within 60 minutes of it (clamp 0–360), otherwise it is recorded `skipped-offline`; two
+  wakes within 60 minutes of it (CONTRACTS §6), otherwise it is recorded `skipped-offline`; two
   missed fires never produce two catch-up runs.
-- **U6 — Failure streak.** Five consecutive failures (clamp 1–20) pause the schedule with reason
+- **U6 — Failure streak.** Five consecutive failures (CONTRACTS §6) pause the schedule with reason
   _"paused after 5 failures in a row"_, an Inbox item, and a Needs-a-look item; resume is one
   click and clears the streak.
 - **U7 — Kill switch.** New schedules cannot be created, Run now is refused with `kill_switch`,
-  the node stops its timer loop within 10 seconds and terminates in-flight runs
-  (`cancelled`, reason `kill-switch`); clearing the switch resumes the loop without re-running
-  missed fires older than the grace window.
+  the node stops its timer loop within 10 seconds and terminates in-flight runs (`failed`, reason
+  `kill-switch`); clearing the switch resumes the loop without re-running missed fires older than
+  the grace window.
 - **U8 — Permission denied.** An Organization member outside the computer's `schedules` audience
   sees the tab read-only with _"the owner of build-01 allows only the owner to manage schedules"_
   and is refused server-side with `permission_denied`.
@@ -192,8 +192,8 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
   not pinned to build-01 — pin her on her Capabilities tab, or choose a pinned Agent"_ with a
   link; the dialog never pins an Agent as a side effect.
 - **U10 — Agent-session schedule, machine offline at fire.** The Run waits in the queue for the
-  grace window; past it the fire is `skipped-offline` and the Task instance is cancelled with that
-  reason.
+  grace window; past it the Run and its Task instance are cancelled with the reason _"build-01 was
+  offline past the grace window"_, and the history shows the fire as skipped — offline.
 - **U11 — Node too old.** A node that does not understand `schedule.sync` leaves the schedule
   flagged **NEVER RUNS · update the node on build-01**.
 - **U12 — Link drops mid-run.** The node finishes the run on its own and reconciles it on
@@ -222,15 +222,17 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
   source and MUST carry a computer chip naming that computer.
 - **FR-3** Every `node_schedule` row MUST show the cadence in the computer's time zone and the
   viewer's, the next fire, the last run's outcome and when it ran, the normalised status, health
-  and controls — the same thirteen fields every other source shows.
+  and controls — the same thirteen required fields every other source shows.
 - **FR-4** The flat list, the paged workspace list, the health summary and the per-source counts
   MUST include `node_schedule` rows without changing the shape of any other row.
 
 ### 4.2 The definition (P1 commands, P2 Agent sessions)
 
 - **FR-5** A schedule MUST have a name (1–80 characters), one computer, one of two bodies — a
-  command line (≤ 8 KiB) or an Agent with a prompt (≤ 4 KiB) — a folder (default: the machine
-  owner's home for commands; a checkout for Agent sessions), and a cadence.
+  command line (≤ 8 KiB) or an Agent with a prompt (≤ 4 KiB) (the three bounds proposed for
+  CONTRACTS §10, §8b) — a folder (default: the machine owner's home for commands; a checkout for
+  Agent sessions), and a cadence. A computer MUST hold at most 50 schedules (CONTRACTS §10); a
+  51st MUST be refused `limit_exceeded`.
 - **FR-6** The cadence MUST be one of: every N minutes (1–59), hourly, daily at HH:MM, weekdays at
   HH:MM, specific weekdays at HH:MM, or a 5-field cron expression; it MUST be interpreted in the
   computer's time zone.
@@ -258,10 +260,10 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
   each run's first and last 64 KiB, exit code, start and end to the platform when the link is up,
   reconciling any run that completed while the link was down.
 - **FR-16** A fire missed while the node was not running MUST run once if the node starts within
-  the grace window (default 60 min, clamp 0–360) and MUST otherwise be recorded `skipped-offline`;
+  the 60-minute grace window (CONTRACTS §6) and MUST otherwise be recorded `skipped-offline`;
   several missed fires MUST produce at most one catch-up run.
 - **FR-17** When the kill switch is on the node MUST stop firing within 10 seconds and MUST end
-  in-flight runs; when it clears, the loop MUST resume without replaying fires older than the grace
+  in-flight runs as `failed` with reason `kill-switch`; when it clears, the loop MUST resume without replaying fires older than the grace
   window.
 
 ### 4.4 Controls, history, safety (P1 / P2)
@@ -277,7 +279,7 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
   the update); existing reasons MUST keep their classes.
 - **FR-22** The circuit breaker MUST gain a scope **one computer** that pauses every schedule on
   it, with the same confirmation, 500 cap, undo window and audit as the existing scopes.
-- **FR-23** Five consecutive failed runs (clamp 1–20) MUST pause the schedule with reason
+- **FR-23** Five consecutive failed runs (CONTRACTS §6) MUST pause the schedule with reason
   `failure-streak`, write an Inbox item, and raise a Needs-a-look item; a successful run MUST
   reset the streak.
 - **FR-24** The Needs-a-look producer `schedule-failed` MUST raise one item per schedule after two
@@ -299,7 +301,7 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
   schedule:<commandId>` when reconciled.
 - **FR-28** Every refusal MUST carry a CONTRACTS §8 code and hint: `unreachable` (Run now),
   `consent_missing`, `permission_denied`, `invalid` (cadence), `busy`, `kill_switch`,
-  `unsupported_on_node`, `confirmation_required`.
+  `unsupported_on_node`, `confirmation_required`, `limit_exceeded` (the 51st schedule).
 
 ### 4.6 Cost (P2)
 
@@ -310,10 +312,11 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
 
 ### 4.7 Agent, MCP, CLI (P1 CLI, P2 tools)
 
-- **FR-31** The CLI MUST offer `ever-works fleet schedule create|list|get|run|pause|resume|update|delete|runs`
+- **FR-31** The CLI MUST offer `ever-works fleet schedules create|list|get|run|pause|resume|update|delete|runs`
   with `--json`, exit `0/1/2`.
-- **FR-32** Agent tools `fleet_schedules_create|update|delete|run|pause|resume` MUST be annotated
-  destructive (`confirmationClass: confirm`), gated by the Agent's grants and ladder and the
+- **FR-32** Agent tools `fleet_schedules_create|update|delete|run` MUST be annotated destructive
+  with `confirmationClass: confirm`, `fleet_schedules_pause|resume` MUST be `destructive: false`
+  with `confirmationClass: plain` (FR-25), all gated by the Agent's grants and ladder and the
   computer's `schedules` audience; `fleet_schedules_list|get|runs` MUST be read-only.
 
 ---
@@ -404,8 +407,8 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 | Entity / concept               | New?      | Description                                                                                                   |
 | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------- |
 | **Schedule** (`node_schedule`) | Extended  | The unified read model gains one source; a row is a Command with a cadence.                                   |
-| **Command** (with cadence)     | FL-12     | Gains a cadence, a name, enabled state, time zone snapshot, missed-run grace, failure streak, pause reason.   |
-| **Command run**                | FL-12     | Gains the scheduled fire time and the skip reasons `skipped-overlap`, `skipped-offline`.                      |
+| **Command** (with cadence)     | FL-12     | Gains a cadence, a name and an enabled state (CONTRACTS §4.4), plus the pause reason, sync generation and soft delete proposed in §8b; its times are the computer's (`FleetNode.timeZone`). |
+| **Command run**                | FL-12     | Uses the skip statuses `skipped-overlap`, `skipped-offline` (CONTRACTS §4.4) and gains the scheduled fire time proposed in §8b. |
 | **Recurring Task**             | Existing  | Pinned to a computer through its Agent's affinity; gains a computer chip in the view.                         |
 | **Agent session**              | FL-04     | What one fire of an Agent-session schedule becomes on the machine.                                            |
 | **Needs a look** item          | FL-01/03  | `schedule-failed` producer.                                                                                   |
@@ -419,26 +422,24 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 - Dependency graphs, retries with backoff, or chaining schedules.
 - Running a schedule as another user or with elevation.
 - Node-side execution of Agent-session schedules while the platform is unreachable (they need the
-  platform to create the Run; see §8b).
-- A schedule count limit per computer (none is fixed in CONTRACTS §10; see §8b).
+  platform to create the Run; CONTRACTS R-29).
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — the view must show the computer's time zone, but
-  CONTRACTS §4.1 adds no time-zone column to FleetNode and §4.5 fixes the health sample shape.
-  Proposed: heartbeat gains `timeZone` (IANA) and FleetNode gains `timeZone text null`, added in
-  FL-13's slot 1796130000000 together with the cadence fields.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — pinning a Task to a computer today means pinning its
-  Agent (Organization-scoped affinity), which moves ALL that Agent's work. Should a recurring Task
-  carry its own `fleetNodeId` honoured by the planner as `targetNodeId`? That needs a slot and a
-  planner change; this spec assumes Agent affinity and refuses unpinned Agents (U9).]`
+- **Resolved** by CONTRACTS §4.1 / §1.1 and §13: the heartbeat carries `timeZone` (IANA) and
+  `FleetNode.timeZone` is added in FL-13's slot 01, `1796130100000-AddFleetNodeTimeZone`.
+- **Resolved** by CONTRACTS R-29: scheduled Agent work is a recurring Task pinned through Agent
+  node affinity; there is no per-Task node column, and the dialog refuses unpinned Agents (U9).
 - `[NEEDS CLARIFICATION: Agent-session schedules on a personal (non-Organization) scope cannot be
-  pinned because affinity requires an Organization. Accept, or allow owner-scope affinity?]`
-- `[NEEDS CLARIFICATION: Should a Command schedule be allowed to run while the kill switch is on
-  but the platform is unreachable (the node cannot learn the switch flipped)? This spec: the node
-  keeps the last known switch state and stops on reconnect.]`
-- `[NEEDS CLARIFICATION: A per-computer schedule count limit (proposed 100) is not in CONTRACTS
-  §10; add it, or leave unlimited?]`
+  pinned because affinity requires an Organization. Accept, or allow owner-scope affinity? Default
+  until answered: accept — only Organization-scoped Agents with a node affinity are offered; a
+  personal-scope Agent is listed disabled with "pinning needs an Organization".]`
+- `[NEEDS CLARIFICATION: Should a Command schedule keep running while the kill switch is on but
+  the platform is unreachable (the node cannot learn the switch flipped)? Default until answered:
+  the node keeps the last kill-switch state it was told, keeps firing while it has heard nothing
+  new, and stops within 10 s of the next `link.pause` it receives on reconnect.]`
+- **Resolved** by CONTRACTS §10: at most 50 schedules per computer (FR-5).
+- **Resolved** by CONTRACTS rev 5: schedule-state columns `pausedAt`, `pausedReason`, `syncGeneration`, `syncedGeneration`, `deletedAt` and `runs.scheduledFor` in FL-13 slot 00, cadence columns in FL-12's table (§4.4); `schedule.sync { generation }` (§3.3); name/command/prompt bounds (§10); 30 writes per minute (§10.1); `/nodes/:id/schedules/agent-session` (§11.2). Grace and failure threshold stay fixed (§6).
 
 ---
 
@@ -452,7 +453,7 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 - [ ] **ACC-FL13-06** (FR-14, U4) A `sleep 7h` is ended at 6 h as `timeout` with its tail.
 - [ ] **ACC-FL13-07** (FR-15) After 31 runs the node holds 30 output files; every reconciled run has head and tail ≤ 64 KiB.
 - [ ] **ACC-FL13-08** (FR-16, U5) A node stopped across two fires and restarted within the grace runs exactly once; restarted after it records `skipped-offline`.
-- [ ] **ACC-FL13-09** (FR-17, U7) Kill switch on: the loop stops within 10 s and an in-flight run ends `cancelled`; clearing resumes without replaying old fires.
+- [ ] **ACC-FL13-09** (FR-17, U7) Kill switch on: the loop stops within 10 s and an in-flight run ends `failed` with reason `kill-switch`; clearing resumes without replaying old fires.
 - [ ] **ACC-FL13-10** (FR-18, FR-19, S4, S5) Run now, Pause, Resume, Edit, Duplicate, Move, Delete behave as specified; Run now during a run is `busy`.
 - [ ] **ACC-FL13-11** (FR-20, S6) History lists 30 runs with the required columns and the skip reasons verbatim.
 - [ ] **ACC-FL13-12** (FR-21, U2, U11, U16) The three new NEVER RUNS reasons render with their repair class and hint; existing reasons unchanged.
@@ -460,11 +461,15 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 - [ ] **ACC-FL13-14** (FR-23, FR-24, S7, U6) Two failures raise the Needs-a-look item and Inbox item; five pause the schedule; a success clears both.
 - [ ] **ACC-FL13-15** (FR-25, FR-26, S3) The confirm dialogs carry the sandbox sentence; the Agent-session dialog carries the credential sentence verbatim.
 - [ ] **ACC-FL13-16** (FR-27) Every change writes its audit row; reconciled runs carry `requestedBy: schedule:<commandId>`.
-- [ ] **ACC-FL13-17** (FR-28, U1, U8, U9) Each refusal code and hint is produced by a test; saving on an offline computer succeeds and shows the sync-pending chip.
+- [ ] **ACC-FL13-17** (FR-5, FR-28, U1, U8, U9) Each refusal code and hint is produced by a test, including `limit_exceeded` for a 51st schedule on one computer; saving on an offline computer succeeds and shows the sync-pending chip.
 - [ ] **ACC-FL13-18** (FR-8, FR-30, S3) An Agent-session fire creates a Task instance and a Run executed as an Agent session on the pinned computer, and the row shows the Run's cost.
 - [ ] **ACC-FL13-19** (FR-31, S8) The CLI verbs exist with `--json` and exit codes.
 - [ ] **ACC-FL13-20** (FR-32) Agent tools are refused outside the audience and run with `requestedBy: agent:<id>`.
 - [ ] **ACC-FL13-21** Every string is an i18n key under `fleet.schedules.*`; the unattended-credential sentence is one key.
+- [ ] **ACC-FL13-22** (FR-7) A Command schedule runs in the machine owner's login shell from the chosen folder with stdin closed, exactly as a one-off Command (FL-12 ACC-FL12-02).
+- [ ] **ACC-FL13-23** (FR-9) Saving needs the `schedules` audience; on a computer without the needed consent the definition saves and shows NEVER RUNS with the consent named.
+- [ ] **ACC-FL13-24** (FR-10) Every field but the kind is editable; Move re-syncs the definition to the new computer and removes it from the old one.
+- [ ] **ACC-FL13-25** (FR-29) A Command schedule's row and dialog state that it spends no model tokens or credits.
 
 ---
 
@@ -474,7 +479,7 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 - [x] **II — Capability-driven.** No provider named.
 - [x] **III — Source-of-truth repos.** Definitions are metadata; outputs are bounded artefacts.
 - [x] **IV — Job runtime.** Agent-session fires ride the existing recurring-Task dispatcher task; Command schedules run on the machine by contract (CONTRACTS §6), not in the API process.
-- [x] **V — Forward-only migrations.** One additive migration in slot `1796130000000`.
+- [x] **V — Forward-only migrations.** Two additive migrations in FL-13's slots, `1796130000000-AddFleetCommandCadence` and `1796130100000-AddFleetNodeTimeZone`.
 - [x] **VI — Tests.** Named per package in the plan and tasks.
 - [x] **VII — Secrets.** The platform stores no model credential (D6); outputs and audit are redacted.
 - [x] **VIII — Plugin counts.** Not applicable.
@@ -485,7 +490,7 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 
 ## 11. References
 
-- Program: [Fleet README](../README.md) D6, D12, §1 · [CONTRACTS](../CONTRACTS.md) R-2, R-11, R-13, R-23, R-24; §2; §3.3 `schedule`; §4.4; §4.6; §6; §7; §8; §10; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) E
+- Program: [Fleet README](../README.md) D6, D12, §1 · [CONTRACTS](../CONTRACTS.md) R-2, R-11, R-13, R-23, R-24, R-29, R-39, R-40; §1.1; §2; §3.2 link controls; §3.3 `schedule`; §4.1; §4.4; §4.6; §6; §7; §8; §10; §13 · [CAPABILITY-MAP](../CAPABILITY-MAP.md) E
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Related: [FL-12 Commands](../FL-12-commands/spec.md), [FL-04 Sessions](../FL-04-sessions-on-computers/), [AW-10 Schedules workspace](../../agent-workspace/AW-10-schedules-calendar/spec.md) §4.6–4.7, [Schedules read model spec](../../schedules/spec.md)
 - Constitution: `.specify/memory/constitution.md`

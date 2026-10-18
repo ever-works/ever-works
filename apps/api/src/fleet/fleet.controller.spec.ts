@@ -45,6 +45,13 @@ describe('FleetController', () => {
         // ownership with, and the node-initiated rotation.
         getForUser: jest.Mock;
         rotateCredentialByCredential: jest.Mock;
+        // Fleet hub (FL-01) — the visibility-aware read the detail route
+        // settles with (owner here: it delegates to getForUser), the widened
+        // list, and the two owner-only registry writes.
+        getVisibleForUser: jest.Mock;
+        listVisibleForUser: jest.Mock;
+        setFavoriteForUser: jest.Mock;
+        setControlPolicyFamiliesForUser: jest.Mock;
     };
     let jobs: {
         loadByNodeForUser: jest.Mock;
@@ -106,6 +113,21 @@ describe('FleetController', () => {
             heartbeat: jest.fn(async () => null),
             getForUser: jest.fn(async () => nodeView),
             rotateCredentialByCredential: jest.fn(async () => null),
+            getVisibleForUser: jest.fn(async (userId: string, id: string) => ({
+                view: await service.getForUser(userId, id),
+                role: 'owner',
+            })),
+            listVisibleForUser: jest.fn(async () => [
+                { ...nodeView, viewerRole: 'owner' },
+                {
+                    ...nodeView,
+                    id: '22222222-2222-4222-8222-222222222222',
+                    name: 'design-mac',
+                    viewerRole: 'org-member',
+                },
+            ]),
+            setFavoriteForUser: jest.fn(async () => ({ ...nodeView, isFavorite: true })),
+            setControlPolicyFamiliesForUser: jest.fn(async () => nodeView),
         };
         jobs = {
             loadByNodeForUser: jest.fn(async () => ({})),

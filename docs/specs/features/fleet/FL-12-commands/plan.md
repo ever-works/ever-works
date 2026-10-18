@@ -46,14 +46,14 @@ node for `command.output { runId }`, streamed as `DATA` and served to the browse
 | Audit row shape                                           | `packages/agent/src/entities/fleet-audit.entity.ts:33-65`                                                                 | `details` carries `family`, `target`, `requestedBy`, `confirmationClass`, `outcome` (CONTRACTS §2.3) |
 | Node shell resolution (PowerShell on win32, `$SHELL` else) | `apps/node/src/core/screen/terminal-channel.ts:27-34` (`resolveNodeShell`)                                                | Lifted into a shared helper; the login-shell flag added                            |
 | Scrubbed child environment                                | `apps/node/src/core/executors/acceptance-checks.ts` (`buildNodeCheckEnv`, imported by `terminal-channel.ts:3`)             | The command's environment; `FLEET_*` / `EVER_WORKS_*` never granted                |
-| Canonical-path `cwd` containment                          | `apps/node/src/core/executors/command-roots.ts:29-48`                                                                      | Pattern for validating the optional folder (must be the owner's home or under an allowed root, R-18) |
+| Canonical-path `cwd` containment                          | `apps/node/src/core/executors/command-roots.ts` (the lookup rule); shared resolver `apps/node/src/core/link/allowed-roots.ts` _(FL-08/11/14, CONTRACTS R-39)_ | The optional folder must be the owner's home or `isUnderAllowedRoot` (R-18); no second resolver |
 | Node config dir                                           | `apps/node/src/core/config-store.ts:39-45`                                                                                 | Output retention dir `commands/<runId>.log` under the same config dir               |
 | Secret scanner shared with the node                       | `packages/contracts/src/secret/` (used by `apps/node/src/core/executors/model-transcript.ts:8`)                            | Output and command-line redaction                                                  |
-| Node link, channel framing, relay bus, operations         | FL-02 (`channel.open`, `DATA`/`EXIT`, `GET /api/fleet/operations/:id`)                                                     | The transport. FL-12 adds no socket of its own                                     |
+| Node link, channel framing, relay bus, operations         | FL-02 (`channel.open`, `DATA`/`EXIT`, `link.pause|resume|drain`, `GET /api/fleet/operations/:id`); node module registry `apps/node/src/core/link/modules/index.ts` (R-40) | The transport and the module slot. FL-12 adds no socket of its own                 |
 | Role derivation `owner · org-admin · org-member · stranger` | FL-01 (CONTRACTS §2.1)                                                                                                     | Family check `commands`                                                            |
 | Agent tool assembly                                       | `packages/agent/src/agents/agent-tool.service.ts:524-527` (`add('fleet', …)`), descriptor `:128-137`                        | The `fleet_commands_*` tools join `buildFleetTools`                                |
-| CLI command groups                                        | `apps/cli/src/main.ts:22-26`; command shape `apps/cli/src/commands/kb/list.ts`                                             | New `fleet` group (FL-19 owns the group; FL-12 ships its first verb)               |
-| Hub tab registry                                          | FL-01 `apps/web/src/components/fleet/registry.ts`                                                                          | `commands` hub panel registration                                                  |
+| CLI command groups                                        | `apps/cli/src/main.ts:22-25`; command shape `apps/cli/src/commands/kb/list.ts`                                             | New `fleet` group (FL-19 owns the group; FL-12 ships its first verb)               |
+| Hub route, `ROUTES` constant, tab registry                | FL-01 creates `/fleet/commands` and `DASHBOARD_FLEET_COMMANDS` (CONTRACTS §11.1); `apps/web/src/components/fleet/registry.ts` `registerHubTab` | FL-12 fills the tab through the registry; it creates no route file or constant     |
 
 What does not exist: any command job kind (`packages/contracts/src/fleet/fleet-jobs.types.ts:117`),
 any `fleet_commands` table, any fleet CLI group, any command tool in `apps/mcp/src/openapi-tools/whitelist.ts:475-530`.
@@ -66,27 +66,30 @@ any `fleet_commands` table, any fleet CLI group, any command tool in `apps/mcp/s
 | Process spawn on the node  | Node `child_process.spawn` with `stdio: ['ignore', 'pipe', 'pipe']`, login shell `-l -c` / `powershell -NoLogo -NonInteractive -Command` | No stdin by construction; PTY is not needed (no interactivity) so `node-pty` is not pulled in            |
 | Process tree termination   | POSIX: `detached` process group + `SIGTERM` → `SIGKILL` after 10 s; Windows: `taskkill /T /F`    | A timeout must end children too                                                                          |
 | Output bounding            | Streaming byte counter; 10 MiB cap on the machine; 64 KiB head ring + 64 KiB tail ring in the API | CONTRACTS §10                                                                                            |
-| Persistence                | TypeORM entities `FleetCommand`, `FleetCommandRun`; raw uuid columns, no `@ManyToOne` (house rule, see `fleet-audit.entity.ts:26-27`) | Existing pattern                                                                                         |
+| Persistence                | TypeORM entities `FleetCommand`, `FleetCommandRun`; raw uuid columns, no `@ManyToOne` (house rule, see `fleet-audit.entity.ts:26-27`); structured values `simple-json` text, enums `varchar` validated in code (CONTRACTS §4 storage types) | Existing pattern; one migration for SQLite and Postgres                                                  |
 | Live view                  | Viewer WS `wss://<api>/ws/fleet/command/:commandId`, attach token 60 s single-use (§3.4)         | Same posture as the computer and terminal gateways                                                       |
-| Confirmation               | `confirmationToken` minted by `POST /api/fleet/commands/confirm` (TTL 5 min, bound to the payload hash) | Non-interactive callers (CLI, tools) can satisfy `confirm` class without a browser                        |
+| Confirmation               | CONTRACTS §2.2 for every caller: `POST /commands` without `confirm: true` answers `409 confirmation_required` with `details: { class: 'confirm', summary[] }` (per node: shell, user, folder, runnable or the refusal); the dialog renders the summary and re-sends with `confirm: true` | One mechanism for web, CLI, MCP and tools; no confirmation-token route                                    |
 | i18n                       | `fleet.commands.*`, `fleet.errors.*` in `apps/web/messages/en.json`                              | CONTRACTS §11.4                                                                                          |
 
 ## 4. Data model
 
 ### 4.1 Entities (`packages/agent/src/entities/`)
 
-`fleet-command.entity.ts` → `fleet_commands` — columns exactly as CONTRACTS §4.4: `id`, `userId`,
-`organizationId?`, `nodeIds uuid[]` (stored `simple-json` for sqlite parity, as `fleet_audit.details` is), `command text`,
-`cwd text?`, `timeoutSec int default 600`, `cadence simple-json?` (null in FL-12), `name text?`,
-`enabled boolean default true`, `requestedBy varchar(8)` (`user · agent`), `requestedByAgentId uuid?`,
-`state varchar(16)` (`queued · running · done · failed · cancelled`), `lastRunAt?`, `nextRunAt?`,
-`createdAt`, `updatedAt`. Indexes `(userId, createdAt)`, `(userId, cadence)` (FL-13 reads it).
+`fleet-command.entity.ts` → `fleet_commands` — columns exactly as CONTRACTS §4.4 plus the house
+conventions: `id`, `userId`, `nodeIds` (`simple-json` text, CONTRACTS §4 storage types), `command
+text`, `cwd text?`, `timeoutSec int default 600`, `cadence simple-json?` (null in FL-12), `name
+text?`, `enabled boolean default true`, `requestedBy varchar(8)` (`user · agent`, validated in
+code), `state varchar(16)` (`queued · running · done · failed · cancelled`), `lastRunAt?`,
+`nextRunAt?`, `createdAt`, `updatedAt`. Indexes `(userId, createdAt)`, `(userId, cadence)` (FL-13
+reads it). Which Agent asked is recorded in the audit row (`requestedBy: agent:<id>`, CONTRACTS
+§2.3), not in a column; an Organization column is not added (§4.4 has none).
 
 `fleet-command-run.entity.ts` → `fleet_command_runs` — `id`, `commandId`, `nodeId`, `startedAt`,
 `endedAt?`, `exitCode int?`, `status varchar(16)` (`running · done · failed · timeout ·
-skipped-overlap · skipped-offline`), `failedReason varchar(24)?` (see spec §8b), `outputHead text?`,
-`outputTail text?`, `outputBytes bigint`, `truncated boolean`, `outputRef text?` (the node's run id
-for full-output fetch). Unique `(commandId, nodeId, startedAt)`; index `(nodeId, startedAt)`.
+skipped-overlap · skipped-offline`), `failedReason varchar(24)?` (`link-lost · node-restart ·
+kill-switch · drain · shell-failed`, CONTRACTS §4.4), `outputHead text?`, `outputTail text?`,
+`truncated boolean`, `outputRef text?` (the node's run id for full-output fetch). Unique
+`(commandId, nodeId, startedAt)`; index `(nodeId, startedAt)`.
 
 ### 4.2 Migrations (`apps/api/src/migrations/`)
 
@@ -102,9 +105,11 @@ Forward-only; `down` drops exactly what `up` added. Re-stamp before merge if `de
 - `fleet-commands.types.ts` (new): `FleetCommandView`, `FleetCommandRunView`, `FLEET_COMMAND_RUN_STATUSES`,
   `FLEET_COMMAND_DEFAULT_TIMEOUT_SEC = 600`, `FLEET_COMMAND_MAX_TIMEOUT_SEC = 3600`,
   `FLEET_COMMAND_MAX_OUTPUT_BYTES = 10 * 1024 * 1024`, `FLEET_COMMAND_STORED_EDGE_BYTES = 64 * 1024`,
-  `FLEET_COMMAND_RECENT = 8`, `FLEET_COMMAND_MAX_NODES = 50`, `FLEET_COMMAND_MAX_LENGTH = 8192`,
-  link messages `command.run { commandId, runId, command, cwd, timeoutSec }`, `command.cancel { runId }`,
-  `command.output { runId }`.
+  `FLEET_COMMAND_RECENT = 8` (all CONTRACTS §10), and the proposed limits `FLEET_COMMAND_MAX_NODES =
+  50`, `FLEET_COMMAND_MAX_LENGTH = 8192`, `FLEET_COMMAND_MAX_CONCURRENT_PER_OWNER = 8` (spec §8b);
+  link messages `command.run { commandId, runId, command, cwd, timeoutSec }`, `command.cancel
+  { runId }` (CONTRACTS §3.3) and the proposed `command.output { runId }`, `command.truncated`,
+  `command.timeout` (spec §8b).
 - `fleet-panic.types.ts`: add `node.command.run`, `node.command.cancel` to the union and array.
 - Export from `packages/contracts/src/fleet/index.ts`.
 
@@ -114,8 +119,7 @@ All under `api/fleet`, `FleetEnabledGuard` + new `FleetFlagGuard('FLEET_COMMANDS
 
 | Method | Path                                   | DTO (class-validator)                                          | Auth / family             | Rate   | Errors                                                                                  |
 | ------ | -------------------------------------- | -------------------------------------------------------------- | ------------------------- | ------ | --------------------------------------------------------------------------------------- |
-| POST   | `/commands/confirm`                    | `ConfirmCommandDto { command, nodeIds, cwd?, timeoutSec? }` → `{ confirmationToken, expiresAt, summary[] }` | caller in `commands` audience per node | 30/min | `invalid`, `permission_denied`, `consent_missing`, `unreachable` (reported per node in `summary`, not fatal) |
-| POST   | `/commands`                            | `RunCommandDto { …same, confirmationToken }` → `202 FleetCommandView` | same                       | 10/min | `confirmation_required` (409), `kill_switch` (423), `limit_exceeded` (429), `permission_denied`, `consent_missing` |
+| POST   | `/commands`                            | `RunCommandDto { command, nodeIds, cwd?, timeoutSec?, confirm? }` → `202 FleetCommandView`; without `confirm: true` → `409 confirmation_required` with `details: { class: 'confirm', summary[] }` (per node: shell, user, folder, or `permission_denied` / `consent_missing` / `unreachable` — not fatal) | caller in `commands` audience per node | 10/min | `confirmation_required` (409), `kill_switch` (423), `limit_exceeded` (429), `permission_denied`, `consent_missing`, `invalid` |
 | GET    | `/commands?limit=8`                    | → `FleetCommandView[]` (one-off only: `cadence IS NULL`)       | owner / audience           | 60/min | —                                                                                       |
 | GET    | `/commands/:id`                        | → `FleetCommandView` with runs                                 | owner / audience           | 60/min | `not_found`                                                                             |
 | GET    | `/commands/:id/runs`                   | → `FleetCommandRunView[]`                                      | owner / audience           | 60/min | `not_found`                                                                             |
@@ -124,15 +128,18 @@ All under `api/fleet`, `FleetEnabledGuard` + new `FleetFlagGuard('FLEET_COMMANDS
 | POST   | `/commands/:id/runs/:runId/output`     | → `202 { operationId }` (FL-02 operation; result is a download URL) | owner / audience      | 10/min | `unreachable` (hint names last-seen), `not_found`                                        |
 
 Every error body is `{ error: { code, hint, details } }` (CONTRACTS §8). A cross-user id 404s
-identically to an unknown one.
+identically to an unknown one. The attach-token rate is CONTRACTS §10.1's (30/min per user); the
+other rates, and the `/cancel` and `/runs/:runId/output` sub-routes, are proposed CONTRACTS §10.1 /
+§11.2 additions (spec §8b) built as written until CONTRACTS lists them.
 
 ## 6. Node side
 
-**Module:** `apps/node/src/core/commands/` — `command-runner.ts` (spawn, bound, kill),
-`command-output-store.ts` (last 30 runs under `<configDir>/commands/`), `command-channel.ts`
-(link channel handler). Registered in `apps/node/src/core/runtime.ts` beside the `computer-session`
-registration (`:1062`) **only when `--manage` is on**; advertises nothing new (the `managed` tag
-from FL-02 is the gate).
+**Module (CONTRACTS R-40):** `apps/node/src/core/link/modules/command.ts` — the `command`
+`NodeModule` and its channel handler, one entry in `apps/node/src/core/link/modules/index.ts`,
+active **only when `--manage` is on**; helpers `apps/node/src/core/link/modules/command/command-runner.ts`
+(spawn, bound, kill) and `command-output-store.ts` (last 30 runs under `<configDir>/commands/`).
+It advertises nothing new (the `managed` tag from FL-02 is the gate). FL-13's schedule loop reuses
+`command-runner.ts`.
 
 | OS      | Shell                                                   | Termination                         | Notes                                                       |
 | ------- | ------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
@@ -145,8 +152,8 @@ Channel protocol (one channel per run):
 1. Platform `channel.open { channel, family: 'command', params: { commandId, nodeId } }` → node
    `channel.ready` or `channel.refused { code: 'consent_missing' | 'unsupported_on_node' }`.
 2. Platform `JSON command.run { requestId, runId, command, cwd, timeoutSec }` → node validates
-   `cwd` (home, or canonical path under an allowed root — R-18, pattern of `command-roots.ts`),
-   spawns, replies `{ requestId, result: { pid, startedAt, shell } }`.
+   `cwd` (home, or `isUnderAllowedRoot` from the shared resolver — R-18, R-39), spawns, replies
+   `{ requestId, result: { pid, startedAt, shell } }`.
 3. Node streams `DATA` (stdout and stderr interleaved as emitted, each chunk ≤ 64 KiB) until the
    10 MiB cap, then one `JSON command.truncated { runId, bytes }`.
 4. Node sends `EXIT [code]` then `channel.close`; on timeout `JSON command.timeout { runId }`
@@ -156,9 +163,12 @@ Channel protocol (one channel per run):
 6. `command.output { requestId, runId }` (separate channel, operation-backed) streams the stored
    file as `DATA` + `END`.
 
-Consent: `manage`. Kill switch: the node receives `link.killSwitch { on: true }` from FL-02 and
-terminates every running command (`EXIT 137`, reason `kill-switch`). Environment: `buildNodeCheckEnv`
-allow-list; `FLEET_*`, `EVER_WORKS_*` never granted.
+Steps 3, 4 and 6 use the proposed `command.truncated`, `command.timeout` and `command.output`
+messages (spec §8b). Consent: `manage`. Kill switch and drain (R-24, CONTRACTS §3.2): on FL-02's
+`link.pause` the module terminates every running one-off command (`EXIT 137`, run `failed` with
+`failedReason: kill-switch`) and refuses new `command.run` until `link.resume`; on `link.drain`
+it terminates them with `failedReason: drain`. Environment: `buildNodeCheckEnv` allow-list;
+`FLEET_*`, `EVER_WORKS_*` never granted.
 
 ## 7. Plugin surface
 
@@ -166,15 +176,16 @@ None. Commands are OS facts executed by a node module (README D8).
 
 ## 8. Web surface
 
-- Route: `/fleet/commands` — `apps/web/src/app/[locale]/(dashboard)/fleet/commands/page.tsx`;
-  constant `DASHBOARD_FLEET_COMMANDS` in `apps/web/src/lib/constants.ts` (beside `DASHBOARD_SETTINGS_FLEET`, `:339`).
-- Registry: `apps/web/src/components/fleet/registry.ts` gains the `commands` hub panel entry (FL-01's registry), code-split.
+- Route: `/fleet/commands` and `DASHBOARD_FLEET_COMMANDS` are created by FL-01 (CONTRACTS §11.1,
+  rendering "arrives with FL-12" behind `FLEET_COMMANDS_ENABLED`); this epic creates no route file
+  or constant.
+- Registry: `registerHubTab({ id: 'commands', … })` in `apps/web/src/components/fleet/registry.ts` (FL-01's registry), code-split.
 - Components under `apps/web/src/components/fleet/commands/`: `CommandsPanel.tsx` (composer,
   machine picker, cards, summary, recent), `CommandComposer.tsx`, `CommandNodePicker.tsx`
   (reasons from FL-01's shared node-state strings), `CommandConfirmDialog.tsx`, `CommandRunCard.tsx`
   (renders `DATA` with the existing terminal renderer factory `apps/web/src/components/terminal/create-terminal-renderer.ts`, R-21), `CommandSummaryLine.tsx`,
   `RecentCommands.tsx`, `use-command-attach.ts` (mirrors `apps/web/src/components/computer/use-computer-attach.ts`), `commands.shared.ts` (pure: preselection, reasons, summary).
-- BFF: `apps/web/src/app/api/fleet/commands/{confirm,route,[id]/attach-token}/route.ts` — attach token minted server-side.
+- BFF: `apps/web/src/app/api/fleet/commands/route.ts`, `apps/web/src/app/api/fleet/commands/[id]/attach-token/route.ts` — attach token minted server-side; the `409 confirmation_required` body passes through to the dialog.
 - i18n groups: `fleet.commands.{composer,picker,confirm,card,summary,recent,empty,errors}`.
 - Playwright: `apps/web/e2e/flow-fleet-commands.spec.ts`, `apps/web/e2e/flow-fleet-commands-contract.spec.ts`.
 
@@ -184,8 +195,9 @@ None. Commands are OS facts executed by a node module (README D8).
 | ------- | ------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
 | Agent   | `fleet_commands_run`                              | `destructive: true`, `confirmationClass: confirm`, AW-24 category `machine.run` | Gated by tool grants + ladder + node `commands` audience (FL-19 gate helper) |
 | Agent   | `fleet_commands_get`, `fleet_commands_list`       | `readOnly: true`                               |                                                                            |
-| MCP     | `run_fleet_command` → `POST /api/fleet/commands`; `get_fleet_command`, `list_fleet_commands` | `destructiveHint` / `readOnlyHint` | Whitelist entries in `apps/mcp/src/openapi-tools/whitelist.ts` (FL-19 documents the full set) |
-| CLI     | `ever-works fleet command run --on a,b [--timeout] [--cwd] [--json] -- <cmd>` | exit `0/1/2/124`       | `apps/cli/src/commands/fleet/command.ts`; streams via the viewer WS         |
+| Agent   | `fleet_commands_cancel` (P2)                      | `destructive: false`, `confirmationClass: plain` | FL-19 catalogue row                                                        |
+| MCP     | `fleet_commands_run` → `POST /api/fleet/commands`; `fleet_commands_get`, `fleet_commands_list`, `fleet_commands_cancel` | `destructiveHint` / `readOnlyHint` | Same names as the Agent tools (CONTRACTS §11.3); whitelist entries in `apps/mcp/src/openapi-tools/whitelist.ts` (FL-19 documents the full set) |
+| CLI     | `ever-works fleet commands run --on a,b [--timeout] [--cwd] [--json] -- <cmd>` | exit `0/1/2/124`       | `apps/cli/src/commands/fleet/command.ts` (FL-19 §9.3); streams via the viewer WS |
 
 ## 10. Background jobs
 
@@ -196,11 +208,11 @@ with a `fleet_command_runs` sweep (bodies nulled after 30 days, rows kept).
 ## 11. Security & permissions
 
 - Threats: command injection is by design (the owner types a shell line) — the risk is **who** may
-  type it, so the family audience, consent, confirm token and audit are the controls; the node
+  type it, so the family audience, consent, the `confirm` field and audit are the controls; the node
   refuses a `cwd` outside the owner's home or allowed roots; no stdin means no credential prompt
   can be answered; the environment is the allow-listed one, never the node process's.
 - The node refuses: channel without `manage`; `cwd` escaping roots; a second `command.run` on an
-  open channel; `timeoutSec > 3600`; `command` > 8 KiB.
+  open channel; `timeoutSec > 3600`; `command` > 8 KiB (proposed limit, spec §8b).
 - Redaction: `redactSecrets` on the command line before storage, on head/tail before storage, on
   every `details` blob (writer-side, `fleet-audit.service.ts:55`). Field names avoid the redaction
   key words (`commandRef`, not `commandHash`).
@@ -227,7 +239,7 @@ with a `fleet_command_runs` sweep (bodies nulled after 30 days, rows kept).
 | `packages/contracts` | Vitest     | `src/fleet/__tests__/fleet-commands.spec.ts` (constants, guards); `fleet-panic.spec.ts` extended for the two actions                              |
 | `packages/agent`     | Jest       | `src/fleet/__tests__/fleet-command.service.spec.ts` (limits, audience, consent, kill switch, head/tail accumulator, state machine); `fleet-audit.service.spec.ts` extended |
 | `apps/api`           | Jest       | `src/fleet/fleet-commands.controller.spec.ts` (every refusal code + hint; 404-never-403); `src/fleet/fleet-command-ws.service.spec.ts`            |
-| `apps/node`          | Vitest     | `src/core/commands/command-runner.spec.ts` (shell per OS, no stdin, timeout kills tree, 10 MiB cap); `command-output-store.spec.ts` (30-run ring); `command-channel.spec.ts` (refusals, cancel, kill switch) |
+| `apps/node`          | Vitest     | `src/core/link/modules/command/command-runner.spec.ts` (shell per OS, no stdin, timeout kills tree, 10 MiB cap); `command-output-store.spec.ts` (30-run ring); `src/core/link/modules/command.spec.ts` (refusals, cancel, `link.pause` / `link.drain`) |
 | `apps/cli`           | Vitest     | `src/commands/fleet/__tests__/command.spec.ts` (exit codes, `--json` shape)                                                                      |
 | `apps/web`           | Vitest     | `components/fleet/commands/commands.shared.unit.spec.ts`; `CommandConfirmDialog.unit.spec.tsx`                                                   |
 | `apps/web`           | Playwright | `e2e/flow-fleet-commands.spec.ts` (golden path, greyed reasons, recent); `e2e/flow-fleet-commands-contract.spec.ts` (API refusals)              |

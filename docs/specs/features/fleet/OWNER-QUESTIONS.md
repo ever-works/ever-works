@@ -1,0 +1,85 @@
+# Fleet — open owner questions
+
+Every `[NEEDS CLARIFICATION: …]` still open across the twenty epics after the 2026-10-18 audit
+against [CONTRACTS.md](./CONTRACTS.md) revision 5. Each one is genuinely the owner's call — CONTRACTS
+does not answer it — and each states the default the builder implements until it is answered, so no
+epic is blocked by this list. Markers that CONTRACTS already answers were closed in the epics as
+"**Resolved** by CONTRACTS …"; the few still open in an epic although CONTRACTS answers them are
+listed at the end as auditor follow-up.
+
+**Count:** 39 open markers — 16 in group A, 22 in group B, 1 answered by CONTRACTS (auditor
+follow-up). Line numbers are those of the marker in the epic's `spec.md`.
+
+## A — Decide before that epic ships (security, credentials, data, money, other people)
+
+| #   | Where                                       | Question                                                                                                              | Default built until answered                                                                                                                               |
+| --- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | `FL-02-node-link/spec.md:538`               | Should the node be able to update itself at all?                                                                      | `--auto-update` is a per-machine opt-in, off unless the machine owner passes it; it installs only from the registry the node came from; without it the node only shows the upgrade hint |
+| A2  | `FL-13-schedules-on-computers/spec.md:437`  | Should a Command schedule keep firing while the kill switch is on but the node cannot reach the platform to learn it? | The node keeps the last kill-switch state it was told, keeps firing while it has heard nothing new, and stops within 10 s of the next `link.pause` on reconnect |
+| A3  | `FL-14-checkouts/spec.md:448`               | May fetch / pull / push on a discovered checkout use the machine's own git credential helper?                          | Yes for discovered checkouts (the owner's own clone, D14); platform-created checkouts never use it and always use a platform-minted credential            |
+| A4  | `FL-09-services-docker/spec.md:636`         | May an Agent run a new container by default?                                                                          | Only with an explicit per-Agent grant (AW-15), `destructive: false`, class `confirm`, held as an Approval (R-33) below trust level "trusted"                |
+| A5  | `FL-09-services-docker/spec.md:639`         | What happens when an Agent runs Compose **Down** on a project that contains a container which is itself a Node?        | The node computes a `blast-radius` warning ("this stops <child>, a computer in your Fleet"), so an Agent below the allowing trust level is held for approval |
+| A6  | `FL-12-commands/spec.md:334`                | May the owner run a Command in an Agent's isolated environment ("run as Nina would")?                                  | No — Commands are owner-level and run in the machine owner's login shell                                                                                    |
+| A7  | `FL-04-sessions-on-computers/spec.md:539`   | Should owner sessions be recorded by default, and may an Organization make recording mandatory?                       | Off for owner sessions (on via the Node's watch-recording opt-in or per session); Agent sessions record by default; no Organization mandate                 |
+| A8  | `FL-04-sessions-on-computers/spec.md:540`   | May several people drive one terminal session at once?                                                                | Yes — several drivers, every driver span audited, no exclusive lock (the AW-11 arbiter stays the Desktop's)                                                |
+| A9  | `FL-19-agent-mcp-cli/spec.md:394`           | How long may a held Agent fleet action wait for approval?                                                             | 24 h, checked at approval time like merge approvals (`merge-approval.service.ts:97,210-221`); an older approval re-asks with a fresh summary; no new status, no sweep |
+| A10 | `FL-20-usage-and-cost/spec.md:327`          | May Organization members see the "other" sessions (started outside Ever Works) on a computer they can view?            | Owner only; members see that total as "not shown"                                                                                                          |
+| A11 | `FL-11-files/spec.md:504`                   | Is the credential-shaped file pattern list fixed in contracts, or extendable by the owner per Node?                    | One fixed list in contracts; not extendable                                                                                                                 |
+| A12 | `FL-16-virtual-computers/spec.md:543`       | Who may reveal a Windows VM's generated password — the host's owner only, or everyone in its `machines` audience?      | Owner only, even when the `machines` audience includes Organization admins                                                                                 |
+| A13 | `FL-16-virtual-computers/spec.md:545`       | May Ever Works document a community KVM-backed Windows installer image that fetches Microsoft media and leaves Windows unactivated? | Containers (P1) ship; the Windows systems stay hidden behind P2 with the image digest-pinned and operator-overridable                              |
+| A14 | `FL-17-cloud-computers/spec.md:522`         | Who registers the operator OAuth application for the first cloud provider, and where do its client id and secret live? | Admin-scope plugin settings (`x-adminOnly`, `x-scope: global`) with env fallbacks; "Sign in with the provider" hidden until both are set; the token path always works |
+| A15 | `FL-17-cloud-computers/spec.md:523`         | May the overlay-VPN auth key be saved as a user-scope secret for repeat use?                                          | Create-time only — passed into the bootstrap once, never stored, echoed or audited                                                                         |
+| A16 | `FL-18-actions-runners/spec.md:468`         | Should the Ever Works GitHub App manifest gain "Self-hosted runners" and repository "Administration" now, accepting the re-authorisation prompt every existing installation will see? | Manifest unchanged; an installation that already has the permission works, and every missing permission is named with **Grant access** |
+
+## B — Product behaviour and copy
+
+| #   | Where                                       | Question                                                                                                              | Default built until answered                                                                                                    |
+| --- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | `FL-03-computer-health/spec.md:436`         | May the UI use the new state word "Limited" (model usage limit) beside "Throttled" (resource ceiling)?                  | Ship both words; both map to the one `node-throttled` "needs a look" kind                                                        |
+| B2  | `FL-03-computer-health/spec.md:437`         | Which disk-low rule applies when the owner switched the node's disk floor off?                                        | Percentage rule only — `warn` below 10 % free, no `critical`                                                                     |
+| B3  | `FL-04-sessions-on-computers/spec.md:545`   | Which shell does a Windows owner session open?                                                                        | PowerShell 7 (`pwsh`) when on PATH, else Windows PowerShell; no node setting                                                     |
+| B4  | `FL-05-session-status-board/spec.md:497`    | May the status rules file update between node releases?                                                               | No — rules ship inside the node package only; a stale rule is fixed by a node release                                            |
+| B5  | `FL-06-session-git-actions/spec.md:481`     | Should there be Organization-wide session action templates?                                                           | No — templates come from the platform defaults and the Agent's own `agent.yml` only (no table, no migration)                     |
+| B6  | `FL-06-session-git-actions/spec.md:484`     | May a person override the branch prefix used for their owner-session worktrees?                                        | No — the prefix is the account handle; nothing is stored                                                                         |
+| B7  | `FL-06-session-git-actions/spec.md:487`     | Should Codex Agent sessions in a worktree get a writable root for the parent repository's git directory?               | No — Task-run isolation unchanged (R-5); the Commit templates tell the agent to say so and ask when a write is refused           |
+| B8  | `FL-06-session-git-actions/spec.md:491`     | Should "Commit and push" be offered on a protected branch in an owner session?                                        | Shown with the amber "This pushes straight to main" note; Agent sessions never see it                                            |
+| B9  | `FL-07-desktop/spec.md:780`                 | Should a hash-pinned (reduced-trust) screen helper raise a "needs a look" item?                                        | No item — the "Reduced trust" label suffices; `helper-untrusted` is raised only when verification fails                         |
+| B10 | `FL-07-desktop/spec.md:783`                 | How is the native screen helper distributed?                                                                          | `ever-works-node helper install` downloads it from the platform's release channel and verifies it against the manifest in the node package; no npm or air-gapped path |
+| B11 | `FL-07-desktop/spec.md:787`                 | May an Agent take a desktop screenshot while a person holds control?                                                  | Yes — read-only, no control grant, audited as `node.desktop.view` with `agent:<id>`                                              |
+| B12 | `FL-08-logs/spec.md:593`                    | Which Windows directories count as "standard log directories"?                                                        | Only the node's own log directory plus the allowed roots; `C:\Windows\Logs` is not listed                                        |
+| B13 | `FL-10-ports/spec.md:498`                   | Should the hub Usage tab list open preview tunnels?                                                                   | No — tunnels are listed and closed on the Ports tab and through the tools (FL-20 spec §8 now says the same)                      |
+| B14 | `FL-11-files/spec.md:506`                   | Is the "bytes moved today" footer per owner, per Node or per Organization?                                            | Per Node — the sum of its `node.files.read`, `.write` and `.copy` audit rows since midnight in the viewer's time zone                       |
+| B15 | `FL-12-commands/spec.md:337`                | May Organization admins see the owner's Recent commands on a shared computer?                                         | No — each caller sees only the Commands they ran                                                                                 |
+| B16 | `FL-13-schedules-on-computers/spec.md:433`  | May a personal-scope (non-Organization) Agent be pinned to a computer for a schedule?                                 | No — only Organization-scoped Agents with node affinity are offered; a personal-scope Agent is listed disabled with the reason   |
+| B17 | `FL-14-checkouts/spec.md:460`               | Should archived checkouts in the bin be purged after 30 days?                                                         | Yes — P3 purges rows (never folders) older than 30 days whose folder is already gone                                             |
+| B18 | `FL-14-checkouts/spec.md:462`               | Is the container image for isolated checkouts one Fleet setting, or set per Work?                                     | One default image under Settings → Fleet (P3); no per-Work override                                                              |
+| B19 | `FL-15-tasks-and-github/spec.md:411`        | For a fork pull request, should the dialog push to the fork when maintainer edits are allowed, or propose a same-repo branch? | Push to the fork's branch only when the fork allows maintainer edits, else read-only; no same-repo branch proposed       |
+| B20 | `FL-15-tasks-and-github/spec.md:415`        | Should the "for me" Trigger preset auto-start the assigned Agent on review requests?                                   | No — always park in Backlog; auto-start stays an explicit preset choice                                                          |
+| B21 | `FL-16-virtual-computers/spec.md:544`       | Should Windows VMs start with `--attend` so their desktop can be watched at once?                                      | No — every child runs `--work --manage` with `--attend` off; the owner turns it on inside the guest                              |
+| B22 | `FL-16-virtual-computers/spec.md:546`       | Should a per-Container disk ceiling be enforced?                                                                      | No quota; Runs here and the child's page show its data-directory usage; only Windows VMs get the 30 GB precheck                  |
+
+## Auditor follow-up — markers CONTRACTS already answers
+
+These are still written as open questions in their epics although CONTRACTS revision 5 answers
+them; the owning epic's auditor should close them as "**Resolved** by …".
+
+| Where                              | Answered by                                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `FL-14-checkouts/spec.md:456`      | **R-41** — code folders are set on the machine only (`--code-folder <path>`, repeatable); the computer page shows them and the command to change them |
+
+Related clean-ups found while checking the twenty epics (not owner questions):
+
+- `FL-02-node-link/spec.md:538` — the marker's parenthetical says `selfUpdateFailedAt` is "a
+  heartbeat field CONTRACTS §1.1 does not yet list"; §1.1 lists it since revision 3. The question
+  itself (A1) stays open.
+- `FL-10-ports/spec.md:498` — FL-20 spec §8 now states that the Usage tab carries no tunnels block,
+  so FL-10 can close B13 from its side if the owner accepts the default.
+- `FL-09-services-docker/plan.md:283` — "approval expiry for held Agent actions follows the existing
+  approvals sweep": no such sweep exists (`agent_action_proposals` statuses are `pending · approved ·
+  rejected`; only merge approvals check staleness, at read time). Align with A9's default.
+- `FL-01-fleet-hub/plan.md:202` — the computer Overview slot list attributes **Runs here** to FL-16;
+  FL-09 owns that block (FL-09 FR-30) and FL-16 adds its rows to it.
+- CLI file layout — FL-04 plan §9 names `apps/cli/src/commands/fleet/session/list.ts` and
+  `session/attach.ts`, FL-06 plan §9 names `commands/fleet/sessions.ts`; FL-19 plan §9.3 (the CLI
+  owner) uses `session.ts` + `session-attach.ts`, as FL-15 does. Command groups are the plural
+  families with singular aliases, so the commands themselves already agree.

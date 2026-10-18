@@ -33,7 +33,7 @@ flowchart LR
         PL[GitHubActionsRunnersPlugin] --> GH[(GitHub REST<br/>runners · downloads · runs · jobs)]
     end
     subgraph node [apps/node]
-        WL[work lane --work] --> EX[runner-install / runner-control]
+        WL[management lane R-34<br/>runner-* kinds on --work] --> EX[runner-install / runner-control]
         EX --> DL[download + sha256 verify]
         EX --> CFG[runner config<br/>token via env input]
         EX --> SVC[FL-09 service module<br/>systemd · launchd · Windows]
@@ -67,7 +67,7 @@ jobs) are platform → plugin → GitHub. Nothing connects into the machine (REA
 | Job kinds union + queued-max-age record                                        | `packages/contracts/src/fleet/fleet-jobs.types.ts:117-125,239-248`                                                          | `runner-install`, `runner-control` appended                        |
 | Capability detection                                                           | `apps/node/src/core/capabilities.ts:277-328`                                                                                 | `actions-runner` tag (`--work` + FL-09 service manager)            |
 | Node's own service packaging (systemd template, Windows installer that refuses built-in accounts) | `apps/node/packaging/systemd/ever-works-node@.service`; `apps/node/packaging/windows/install-service.ps1`; `packaging/README.md:8-14,58-101` | FL-09's service module generalises these; FL-18 calls it |
-| Work lane executor registration                                                | `apps/node/src/core/runtime.ts:739-953`                                                                                      | executors registered when `actions-runner` is advertised           |
+| Executor registration; attended lane (the management lane's model)            | `apps/node/src/core/runtime.ts:739-953`, `1026-1070`                                                                         | executors on the management lane (R-34) when `actions-runner` is advertised |
 | Needs-a-look producers, Inbox                                                  | FL-03 registry; C §4.6                                                                                                       | `runner-stopped`, `job-unassignable`                               |
 | Facade base                                                                    | `packages/agent/src/facades/base.facade.ts:57-110`                                                                           | `ActionsRunnersFacadeService`                                      |
 | MCP whitelist, Agent tool factory                                              | `apps/mcp/src/openapi-tools/whitelist.ts:475-530`; `packages/agent/src/fleet/agent-fleet-tools.ts:32-80`                      | new tools                                                          |
@@ -86,34 +86,41 @@ Does not exist: any runner concept, the plugin, the capability, the table, the j
 | Service install         | FL-09 service module: Linux `svc.sh install/start` under `sudo -n`; macOS `svc.sh` (launchd, no sudo); Windows `config.cmd --runasservice` (runs as service) | Per-OS rule; Windows service-only (spec FR-9)                               |
 | Diagnosis               | Pure function over job labels × runner labels/scope/state                                                               | Testable truth table                                                        |
 | Polling                 | Job-runtime task every 5 min; the web asks the API every 30 s while a page is open (API caches 30 s, conditional requests to GitHub) | Rate-limit friendly                                                         |
-| Storage                 | `fleet_actions_runners` table (proposed shape §4.1; CONTRACTS §4 addition)                                               | Runners outlive sessions and need audit targets                             |
+| Storage                 | `fleet_actions_runners` table (CONTRACTS §4.11 shape + the epic-local columns in §4.1)                                   | Runners outlive sessions and need audit targets                             |
+| Confirmation            | C §2.2 request fields (`confirm`, `confirmName`); 409 `confirmation_required` with `details: { class, summary, preview? }`; no tokens | One mechanism for the web, tools, MCP and CLI                               |
 
 ## 4. Data model
 
-### 4.1 `FleetActionsRunner` (new, table `fleet_actions_runners`) — proposed; **CONTRACTS §4 needs this table added**
+### 4.1 `FleetActionsRunner` (new, table `fleet_actions_runners`) — CONTRACTS §4.11
+
+Contract columns (C §4.11) are marked **C**; the rest are epic-local, additive to that shape, read
+only by this epic, and listed for the CONTRACTS maintainer in the audit report. Structured values
+are `simple-json` text and enums `varchar` validated in code (C §4 preamble).
 
 | Column                  | Type                                                                            | Notes                                                 |
 | ----------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `id`                    | uuid PK                                                                         |                                                       |
-| `nodeId`                | uuid → `FleetNode` (raw column, index)                                           |                                                       |
+| `nodeId` **C**          | uuid → `FleetNode` (raw column, index)                                           |                                                       |
 | `userId`, `organizationId` | uuid, uuid null                                                              | owner scope as every fleet row                        |
 | `installationEntityId`  | uuid → `github_app_installations.id`                                            | which installation registered it                      |
-| `scope`                 | `varchar(8)` `repo · org`                                                        |                                                       |
-| `target`                | `varchar(200)`                                                                   | `owner/repo` or `org`                                 |
-| `name`                  | `varchar(64)`                                                                    | unique `(nodeId, name)`                               |
-| `labels`                | `simple-json string[]`                                                           | extra labels only                                     |
-| `mode`                  | `varchar(16)` `service · docker`                                                 |                                                       |
-| `githubRunnerId`        | `bigint` null                                                                    | set after registration                                |
+| `scope` **C**           | `varchar(8)` `org · repo`                                                        |                                                       |
+| `target` **C**          | `varchar(200)`                                                                   | `owner/repo` or `org`                                 |
+| `name` **C**            | `varchar(64)`                                                                    | unique `(nodeId, name)`                               |
+| `labels` **C**          | `simple-json` text (`text[]` in C §4.11, stored per its §4 preamble)            | extra labels only                                     |
+| `mode` **C**            | `varchar(16)` `service · docker`                                                 |                                                       |
+| `githubRunnerId` **C**  | `bigint` null                                                                    | set after registration                                |
+| `lastSeenAt` **C**      | PortableDate null                                                               | last time GitHub or the node reported it online       |
+| `installedAt` **C**     | PortableDate                                                                    | when registration completed                           |
 | `runnerVersion`         | `varchar(32)` null                                                               |                                                       |
 | `serviceUnit`           | `varchar(200)` null                                                              | unit/label/service name on the node                   |
 | `installDir`            | `varchar(400)`                                                                   | relative to the node data dir                         |
-| `state`                 | `varchar(16)` `installing · idle · working · offline · stopped · removing · failed · unknown` |                                            |
+| `state` **C**           | `varchar(16)` `installing · idle · working · offline · removed · unknown` (C §4.11 exactly) | shown "stopped (by you)" = `offline` + `stoppedByOwner`; "failed" = `installing` + `lastError`; `removed` = soft-removed |
 | `stateSource`           | `varchar(8)` `github · node`                                                     |                                                       |
 | `stoppedByOwner`        | boolean default false                                                            | suppresses `runner-stopped`                           |
 | `lastCheckAt`, `lastJobAt` | PortableDate null                                                             |                                                       |
 | `currentJob`            | `simple-json` null `{ runId, jobId, name, url }`                                 |                                                       |
 | `lastError`             | `varchar(512)` null                                                              | hint text only                                        |
-| `createdAt`, `updatedAt`, `removedAt` | PortableDate                                                       | soft-removed rows kept 30 days                        |
+| `createdAt`, `updatedAt`, `removedAt` | PortableDate                                                       | `removedAt` set with `state: removed`; kept 30 days   |
 
 Indexes: `(nodeId)`, `(userId, state)`, `(installationEntityId)`.
 
@@ -146,8 +153,8 @@ indexes, one unique index; `down` drops the table. Authored from `apps/api/`.
   `FLEET_RUNNER_STOPPED_AFTER_MIN = 5`, `FLEET_JOB_UNASSIGNABLE_AFTER_MIN = 5`.
 - `fleet-jobs.types.ts`: `'runner-install' | 'runner-control'` in the union/list and the max-age
   record (`runner-install` 3600, `runner-control` 600); `FLEET_ACTIONS_RUNNER_CAPABILITY = 'actions-runner'`.
-- `fleet-panic.types.ts`: `node.runner.install|start|stop|remove` (+ `restart`, `job.cancel` on
-  CONTRACTS §7 confirmation).
+- `fleet-panic.types.ts`: `node.runner.install|start|stop|restart|remove` and `node.runner.job.cancel`
+  (C §7).
 
 ## 5. API surface
 
@@ -158,32 +165,39 @@ New `apps/api/src/fleet/fleet-runners.controller.ts`, authenticated, `FleetEnabl
 | ------ | ------------------------------------------------ | -------------------------------- | --------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
 | GET    | `/api/fleet/nodes/:id/runners`                   | —                                | `{ runners: FleetActionsRunnerView[] }` | `view`; 60/min      | `not_found`                                                                   |
 | GET    | `/api/fleet/nodes/:id/runners/options`           | —                                | `{ targets[], canHost, reason?, modes[] }` | `view`; 30/min   | `not_found`, `operation_failed` (GitHub)                                      |
-| POST   | `/api/fleet/nodes/:id/runners`                   | `FleetRunnerInstallRequest`      | `202 FleetRunnerInstallResponse`        | `machines`; 10/min  | `invalid`, `limit_exceeded`, `unreachable`, `consent_missing`, `unsupported_on_node`, `permission_denied` (App/permission), `kill_switch` |
-| POST   | `/api/fleet/nodes/:id/runners/:runnerId/:action` | `{ confirmName? , confirmationToken? }` (`action ∈ start|stop|restart|remove`) | `202 { operationId }` | `machines`; 30/min | `confirmation_required`, `busy` (remove while working), `unreachable`, `kill_switch` |
+| POST   | `/api/fleet/nodes/:id/runners`                   | `FleetRunnerInstallRequest`      | `202 FleetRunnerInstallResponse`        | `machines`; 10/min  | `invalid`, `limit_exceeded`, `unreachable`, `consent_missing`, `unsupported_on_node`, `root_required`, `permission_denied` (App/permission), `kill_switch` |
+| POST   | `/api/fleet/nodes/:id/runners/:runnerId/:action` | `{ confirm?, confirmName? }` (`action ∈ start|stop|restart|remove`; stop/restart need `confirm: true`, remove needs `confirmName`) | `202 { operationId }` | `machines`; 30/min | `confirmation_required`, `busy` (remove while working), `unreachable`, `kill_switch` |
 | GET    | `/api/fleet/runners/jobs`                        | `?targets=`                      | `FleetActionsJobsView`                  | `view`; 60/min (API caches 30 s) | `operation_failed`                                               |
 | PUT    | `/api/fleet/runners/jobs/watched`                | `{ targets: [{ scope, target }] }` | `200`                                 | authed; 30/min      | `invalid`, `permission_denied` (App not covering)                             |
-| POST   | `/api/fleet/runners/jobs/cancel`                 | `{ repository, runId, confirmationToken }` | `202`                         | `machines`; 10/min  | `confirmation_required`, `permission_denied`, `kill_switch`                   |
+| POST   | `/api/fleet/runners/jobs/cancel`                 | `{ repository, runId, confirm: true }` | `202`                             | `machines`; 10/min  | `confirmation_required`, `permission_denied`, `kill_switch`                   |
 | GET    | `/api/fleet/runners/jobs/permission`             | `?scope=org&target=acme`         | `ActionsRunnersPermissionCheck`         | authed; 30/min      | —                                                                             |
 
 `/runners/jobs/*` are sub-resources of the C §11.2 root `/runners/jobs`; options is a sub-resource
-of `/nodes/:id/runners`. Node-facing: no new HTTPS endpoint — the token rides the link (§6.4).
+of `/nodes/:id/runners`. Node-facing: no new HTTPS endpoint — the token rides the link (§6.4). A
+call without its class field answers 409 `confirmation_required` with the preview (C §2.2);
+operation states are C §3.3's `running · done · failed · cancelled · interrupted`.
 
 ## 6. Node side
 
-### 6.1 Modules — `apps/node/src/core/runners/`
+### 6.1 Modules — `apps/node/src/core/link/modules/runners/` (R-40)
+
+The module lives under FL-02's registry with one entry in `apps/node/src/core/link/modules/index.ts`
+(its `runner.*` verbs); the two durable executors stay in `apps/node/src/core/executors/`.
 
 | File                        | Responsibility                                                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `runner-download.ts`        | pick the download for `os/arch` from the payload, stream to `<dataDir>/actions-runners/<name>/.download`, SHA-256 verify, extract (tar / zip), delete on mismatch |
 | `runner-config.ts`          | spawn `config.sh` / `config.cmd` with `--unattended --url <https://github.com/owner/repo|org> --name --labels --work _work` (+ `--replace` only when GitHub lists the name for this node, + `--runasservice` on Windows), token via `ACTIONS_RUNNER_INPUT_TOKEN` in the child env only; refuse if the runner build rejects env input rather than fall back to argv |
-| `runner-service.ts`         | FL-09 service module adapters: Linux `sudo -n ./svc.sh install <user> && sudo -n ./svc.sh start` (refuse with the exact command when `sudo -n true` fails); macOS `./svc.sh install && ./svc.sh start`; Windows: the runner registers its own service during `config.cmd --runasservice` (needs elevation → refuse with the exact command) |
+| `runner-service.ts`         | FL-09 service module (`apps/node/src/core/link/modules/services/`) adapters: Linux `sudo -n ./svc.sh install <user> && sudo -n ./svc.sh start` (refuse with the exact command when `sudo -n true` fails); macOS `./svc.sh install && ./svc.sh start`; Windows: the runner registers its own service during `config.cmd --runasservice` (needs elevation → refuse with the exact command) |
 | `runner-state.ts`           | `<installDir>/ever-works.json` (name, target, labels, mode, version, serviceUnit); `.runner` file read for the GitHub id             |
 | `runner-logs.ts`            | FL-08 source `runner:<name>` → newest `_diag/Runner_*.log`                                                                          |
-| `executors/runner-install.ts` | phases `downloading · verifying · registering (awaiting-token) · installing service · starting`; progress via FL-02 operations      |
-| `executors/runner-control.ts` | `start|stop|restart` via the service module; `remove` = stop → `config remove` with a remove token (received like the registration token) or platform-side `deleteRunner` fallback → uninstall service → delete folder |
+| `apps/node/src/core/executors/runner-install.ts` | phases `downloading · verifying · registering (awaiting-token) · installing service · starting`; progress via FL-02 operations      |
+| `apps/node/src/core/executors/runner-control.ts` | `start|stop|restart` via the service module; `remove` = stop → `config remove` with a remove token (received like the registration token) or platform-side `deleteRunner` fallback → uninstall service → delete folder |
 
-Both executors register on the **work lane** (`runtime.ts:739-953`) only when the node advertises
-`actions-runner`.
+Both executors register on the **management lane** (CONTRACTS R-34: it leases `runner-install` /
+`runner-control` on nodes started with `--work` and never competes with Agent work for
+`--concurrency`; created by the first of FL-20 → FL-16 → FL-18 to land, FL-16 plan §6.2) only when
+the node advertises `actions-runner`.
 
 ### 6.2 OS matrix
 
@@ -199,7 +213,7 @@ Both executors register on the **work lane** (`runtime.ts:739-953`) only when th
 Runner jobs are **work** (C §1.1) → `--work`. `capabilities.ts` advertises `actions-runner` when
 `--work` is on and FL-09 detected a service manager (or, P3, `docker` on Linux).
 
-### 6.4 Link usage (C §3.3 `machine` family, `runner.*`)
+### 6.4 Link usage (C §3.3 `machine` family, `runner.*`; handlers in `link/modules/runners/index.ts`)
 
 | Message                                   | Direction        | Purpose                                                                |
 | ----------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
@@ -230,8 +244,9 @@ for the first time; count +1).
 
 ## 8. Web surface
 
-- Registry contributions (FL-01): `computer.overview.runnersBlock`, `computer.actions.installRunners`,
-  `hub.overview.actionsJobs`.
+- Registry contributions (FL-01 `registerOverviewBlock`, C §11.1): the computer Overview **Actions
+  runners** block (with its **Install runners** button — FL-01 has no header-action entry point) and
+  the hub Overview **Actions jobs** panel (R-37: a panel, not a tab or route).
 - Components `apps/web/src/components/fleet/runners/`: `InstallRunnersDialog.tsx`,
   `RunnersBlock.tsx`, `RunnerRow.tsx`, `RunnerActionsMenu.tsx`, `RemoveRunnerDialog.tsx`,
   `ActionsJobsPanel.tsx`, `ActionsJobRow.tsx`, `WatchedTargetsEditor.tsx`, `GrantAccessCard.tsx`,
@@ -267,8 +282,9 @@ page is open. Dispatcher `FLEET_RUNNERS_POLL_DISPATCHER` in `packages/agent/src/
 
 ## 11. Security & permissions
 
-- **Who**: `view` reads; `machines` installs/controls/removes/cancels (spec §8b on the family).
-  Agents need the AW-15 grant and an Approval for destructive tools.
+- **Who**: `view` reads; `machines` installs/controls/removes/cancels (C §2.1). Agents pass FL-19's
+  gate (C §2.1): Ask/Draft holds the call as an `agent_action_proposals` row (R-33); Auto needs the
+  C §2.2 fields.
 - **Tokens**: installation tokens minted per operation with the narrowest permission and, for
   repositories, `repositoryIds` from the platform's own snapshot (never a caller-supplied name);
   registration/remove tokens exist in memory for one link message and one child env; never in
@@ -276,12 +292,14 @@ page is open. Dispatcher `FLEET_RUNNERS_POLL_DISPATCHER` in `packages/agent/src/
 - **Downloads**: URL and checksum come from GitHub's download list fetched server-side and pinned in
   the payload; the node refuses any other host; verification before extraction; owner-only folders;
   Windows ACL restricted to the runner account.
-- **Node refusals**: no `--work` → `consent_missing`; no service manager / no sudo / not elevated →
-  `unsupported_on_node` with the exact command; a name GitHub lists for another machine → `invalid`.
+- **Node refusals**: no `--work` → `consent_missing`; no service manager → `unsupported_on_node`; no
+  passwordless sudo / not elevated → `root_required` (C §8) with the exact command; a name GitHub
+  lists for another machine → `invalid`.
 - **Threats**: token on argv (prevented by env input; refused when unsupported); poisoned download
   (checksum); runner folder tampering (ACL); cancelling someone else's run (installation ownership
   filter + `machines` audience); runaway installs (10/min, 16 per node).
-- **Kill switch**: install/control/cancel refuse `kill_switch`; lease answers `[]`; running runners
+- **Kill switch**: install/control/cancel refuse `kill_switch`; lease answers `[]`; the node's link
+  gets `link.pause` (C §3.2), so no `runner.token` is sent while it holds; running runners
   untouched.
 
 ## 12. Observability
@@ -308,7 +326,7 @@ page is open. Dispatcher `FLEET_RUNNERS_POLL_DISPATCHER` in `packages/agent/src/
 | `packages/plugins/github-actions-runners` | Vitest     | `src/__tests__/github-actions-runners.plugin.spec.ts` (download list mapping incl. sha256; token endpoints per scope; 403 → permission check with grant URL; conditional requests; cancel); `diagnose.spec.ts` (truth table: offline-matching, missing-label, wrong-scope, all-busy, assignable) |
 | `packages/agent`                          | Jest       | `src/facades/__tests__/actions-runners.facade.spec.ts` (narrowest permission per operation; `repositoryIds` from snapshot only; ownership filter; no plugin id in core); `src/fleet/runners/__tests__/fleet-runners.service.spec.ts` (limit 16; row-first; token never in payload; busy guard; stoppedByOwner suppresses the item; kill switch); `agent-fleet-runners-tools.spec.ts` |
 | `apps/api`                                | Jest       | `src/fleet/fleet-runners.controller.spec.ts` (every status in §5; cancel hidden outside `machines`; watched targets validation)                                                                                       |
-| `apps/node`                               | Vitest     | `src/core/runners/runner-download.spec.ts` (mismatch deletes, nothing extracted; foreign host refused), `runner-config.spec.ts` (argv never contains the token; env input; `--replace` only when owned; `--runasservice` on win32), `runner-service.spec.ts` (sudo -n refusal text; launchd no sudo; Windows elevation refusal), `runner-logs.spec.ts`, `executors/runner-install.spec.ts` (phases; awaiting-token wait; resume after link drop), `executors/runner-control.spec.ts`; extend `capabilities.spec.ts` (`actions-runner` only with `--work` + service manager), `runtime.spec.ts` (executors only when advertised) |
+| `apps/node`                               | Vitest     | `src/core/link/modules/runners/runner-download.spec.ts` (mismatch deletes, nothing extracted; foreign host refused), `runner-config.spec.ts` (argv never contains the token; env input; `--replace` only when owned; `--runasservice` on win32), `runner-service.spec.ts` (sudo -n refusal text; launchd no sudo; Windows elevation refusal), `runner-logs.spec.ts`, `src/core/executors/runner-install.spec.ts` (phases; awaiting-token wait; resume after link drop), `runner-control.spec.ts`; extend `capabilities.spec.ts` (`actions-runner` only with `--work` + service manager), `runtime.spec.ts` (runner kinds on the management lane only with `--work`; never on the work lane) |
 | `packages/tasks`                          | Jest       | `src/__tests__/fleet-runners-poll.task.spec.ts` (state merge GitHub-wins-when-fresh; `runner-stopped` after 5 min, cleared on recovery; `job-unassignable` after 5 min; rate-limit back-off; idempotent items)          |
 | `apps/web`                                | Vitest     | `components/fleet/runners/runners.shared.unit.spec.ts` (mode availability per OS; diagnosis strings), `InstallRunnersDialog.unit.spec.tsx` (count clamp; default names; Windows service-only; cost sentence), `ActionsJobsPanel.unit.spec.tsx` |
 | `apps/web` e2e                            | Playwright | `e2e/flow-fleet-actions-runners.spec.ts` (fake GitHub API + node contract fixture: install 2 → rows → idle; stop → stopped (by you), no item; remove typed name; P2: panel with an unassignable job and Cancel workflow run; Grant access card) |
@@ -318,7 +336,7 @@ page is open. Dispatcher `FLEET_RUNNERS_POLL_DISPATCHER` in `packages/agent/src/
 | Risk                                                    | Likelihood | Impact | Mitigation                                                                              |
 | ------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------- |
 | Runner build stops honouring env input for the token    | low        | high   | node refuses rather than falling back to argv; test pins the behaviour                  |
-| GitHub App lacks the runners permission on existing installs | high  | medium | permission check + Grant access card; manifest update tracked in spec §8b               |
+| GitHub App lacks the runners permission on existing installs | high  | medium | permission check + Grant access card; manifest update is the owner question in spec §8b |
 | Linux hosts without passwordless sudo                   | high       | medium | exact one-time command shown; macOS and Windows paths unaffected                        |
 | GitHub rate limits with many watched targets            | medium     | low    | conditional requests; 5-min off-page cadence; back-off to reset                         |
 | State disagreement GitHub vs node                       | medium     | low    | `unknown` with the reason; GitHub wins only when fresh                                  |
@@ -335,6 +353,6 @@ page is open. Dispatcher `FLEET_RUNNERS_POLL_DISPATCHER` in `packages/agent/src/
 ## 17. References
 
 - Spec: [`./spec.md`](./spec.md) · Tasks: [`./tasks.md`](./tasks.md)
-- [CONTRACTS](../CONTRACTS.md) R-14, R-23, R-24, §1, §2, §3.3, §4.6, §7, §8, §9, §10, §11, §12, §13
+- [CONTRACTS](../CONTRACTS.md) R-14, R-23, R-24, R-33, R-34, R-37, R-40, §1, §2, §3.2–3.3, §4, §4.6, §4.11, §7, §8, §9, §10, §11, §12, §13
 - Sibling plans: FL-02 (link, operations), FL-08 (log sources), FL-09 (service module), FL-01 (registry), FL-03 (producers)
 - Code: paths in §2; `docs/plugin-system/creating-a-plugin.md` for the plugin shape

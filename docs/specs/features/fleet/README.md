@@ -27,7 +27,7 @@ sidebar tree of machines, no second "sessions" concept, no second scheduler, not
 | The owner's question                                             | Today                                                                                                     | What this program adds                                                                                         |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | "Which of my machines are up, and which need a look?"            | A table under Settings → Fleet; a footer pill that counts online nodes                                    | A **Fleet** hub: overview, health, "needs a look", one page per computer                                       |
-| "Start Claude Code on that machine and let it run while I'm out" | Only headless, Task-driven runs (`claude -p`); the Terminal tab is the cloud worker's shell               | **Sessions on computers**: persistent, attachable, visible from anywhere, with a board of what needs you       |
+| "Start Claude Code on that machine and let it run while I'm out" | Only headless, Task-driven runs (`claude -p`, `codex exec`); the Terminal tab is the cloud worker's shell | **Sessions on computers**: persistent, attachable, visible from anywhere, with a board of what needs you       |
 | "Show me the machine's screen, not just the Agent's browser"     | Screen channel captures the Agent's Chromium window only                                                  | **Desktop** source on the screen channel, with take-over, multi-monitor, and the AW-11 control rules unchanged |
 | "What is running on it? Logs? Docker? Ports?"                    | Nothing — a `docker` tag and a disk-free number                                                           | Logs, services, Docker/Compose, processes, ports, files — each a tab on the computer page and an agent tool    |
 | "Run the tests there every night"                                | Schedules exist but cannot name a machine                                                                 | **Schedules on computers**: a new schedule source, run on the machine, history kept                            |
@@ -57,6 +57,7 @@ inherited whole. This program adds the rows below. Every epic spec must honour b
 | A recurring definition that runs on a Node                                                                       | **Schedule** — a new schedule _source_ (`node_schedule`) read from a **Command with a cadence** or a **recurring Task pinned to a Node**; no new table | "cron job", "automation"                                                                   |
 | The live picture of a Node                                                                                       | the **screen** channel, with a **source**: the Agent's browser (today) or the Node's **Desktop** (this program)                                         | "remote desktop", "VNC"                                                                    |
 | A GitHub Actions self-hosted runner installed on a Node                                                          | **Actions runner**                                                                                                                                      | "runner" alone (taken: the Fleet runner pill)                                              |
+| A queued or running GitHub Actions job, and the workflow run it belongs to                                       | **Actions job**, **workflow run** — GitHub's own nouns, shown as-is; the act is **Cancel workflow run** (CONTRACTS R-37)                                | "run" or "Run" alone (taken: `AgentRun`), "cancel run"                                     |
 | The state of a Session that needs a human                                                                        | **Needs you** — surfaces as a **Decision** (AW-03) and an Inbox item                                                                                    | "blocked" as the user-facing word, "attention item"                                        |
 | A machine's facts: services, containers, processes, ports, logs, files                                           | plain words, no entities — they are read from the Node, never stored as rows (except what audit and history require)                                    | —                                                                                          |
 
@@ -174,7 +175,9 @@ Changing one of these is a README change in the same PR as the epic that needs i
   lease jobs, `--attend` = allow live viewing): it allows machine management — logs, services,
   Docker, processes, ports, files, commands, schedules, checkouts and owner sessions. The link
   opens only when at least one of `--work`, `--attend`, `--manage` is on; a node that is merely
-  enrolled never opens it, and every computer-page tab says which consent it is missing.
+  enrolled never opens it, and every computer-page tab says which consent it is missing. A fifth
+  consent, `--usage-scan`, allows only the read-only count of CLI transcript records (FL-20) and does
+  not open the link (CONTRACTS §1.1).
   Platform-side relays become **replica-independent** through Valkey when `REDIS_URL` is set;
   without it the API runs single-replica relays and reports that in its health output (today's
   per-process registries are a known gap). Channel framing, auth, reconnection and limits are
@@ -230,11 +233,13 @@ Changing one of these is a README change in the same PR as the epic that needs i
   actions as tools, gated by Agent permissions and by the same policy, with read-only tools always
   allowed and state-changing tools marked so.
 - **D8 — Plugin-first for providers; node modules for machine facts.** Anything that talks to an
-  external service is a plugin: cloud machine providers (`machine-provider` category), VM images,
-  Actions runner registration. Reading or acting on the machine itself (logs, services, Docker,
-  processes, ports, files) is a **node module** inside the node runtime, each advertising capability
-  tags, because these are OS facts, not integrations, and the node has no runtime plugin system
-  today. A node-side plugin runtime is a separate program; this one must not block on it.
+  external service is a plugin: cloud machine providers (`machine-provider` category, CONTRACTS
+  R-15) and Actions runner registration (`github-actions-runners`, R-14). VM and Container images are
+  not a plugin: the host's own Docker pulls them from a digest-pinned, operator-overridable catalogue
+  shipped with the node (FL-16 plan §7). Reading or acting on the machine itself (logs, services, Docker,
+  processes, ports, files) is a **node module** inside the node runtime under one registry
+  (`apps/node/src/core/link/modules/`, CONTRACTS R-40), each advertising capability tags, because
+  these are OS facts, not integrations, and the node has no runtime plugin system today. A node-side plugin runtime is a separate program; this one must not block on it.
 - **D9 — Fleet UI is an internal module registry.** The computer page's tabs and the hub's panels
   register from one place, code-split per module, so an epic ships its own tab without touching
   another's. Plugin-contributed web UI does not exist and is not introduced here.
@@ -260,9 +265,12 @@ Changing one of these is a README change in the same PR as the epic that needs i
   their own machine through Ever Works: it runs as them, in their login, with their CLI
   configuration, MCP servers and memory — exactly as if they sat at the keyboard — and only the
   per-session hook overlay is added. An **Agent session** runs under the isolation Task runs
-  already enforce on the node (relocated CLI config and home directories, strict MCP configuration,
-  scrubbed environment, per-Agent browser profile); it never inherits the owner's MCP servers or
-  plugins. The start dialog makes the kind explicit; the computer page labels each session with
+  already enforce on the node — a per-run home for every home anchor, Claude Code's config relocated
+  only where that is proven harmless, `--mcp-config … --strict-mcp-config` for Claude Code, and
+  (shipped 2026-10-16) `codex exec --ignore-user-config` for Codex so the owner's `config.toml`, MCP
+  servers, plugins and `notify` never load; plus the scrubbed environment and the per-Agent browser
+  profile (EXISTING-SUBSTRATE §1.7, §9 gap 17 — reused, not re-specified); it never inherits the
+  owner's MCP servers or plugins. The start dialog makes the kind explicit; the computer page labels each session with
   it.
 - **D15 — Fleet ownership is unchanged.** A Node belongs to the person who enrolled it (as today);
   what an Organization can see and do on it is granted by that person through the Node's control
@@ -272,39 +280,44 @@ Changing one of these is a README change in the same PR as the epic that needs i
 ## 5. Epics
 
 Each epic is a Spec Kit feature folder (`spec.md` + `plan.md` + `tasks.md`) under this directory.
-`S` = size (S/M/L/XL), `Dep` = blocking dependencies. Migration slots: `1796` + epic + slot + `00000`.
+`S` = size (S/M/L/XL), `Dep` = blocking dependencies exactly as each spec's **Blocked by** line
+states them (FL-01's shell and registry are implicit for every epic that adds a tab; they are named
+where a spec names them). Migration slots: `1796` + epic + slot + `00000`; flags and slots per
+epic are in [TRACKER.md](./TRACKER.md).
 
-| ID                                       | Epic                                                                                       | Extends (existing Ever Works)                                     | S   | Dep           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | --- | ------------- |
-| [FL-01](./FL-01-fleet-hub/)              | Fleet hub & navigation — sidebar entry, overview, computer page shell, roles               | `DashboardSidebar`, Settings → Fleet, runner pill, palette        | M   | —             |
-| [FL-02](./FL-02-node-link/)              | Node link & runtime foundations — multiplexed channel, `--manage`, relay bus, node modules | computer-session WS leg, `apps/node` core, Valkey                 | L   | —             |
-| [FL-03](./FL-03-computer-health/)        | Computer health & inventory — metrics, states, "needs a look", wake                        | heartbeat, `FleetNode`, node drawer                               | M   | —             |
-| [FL-04](./FL-04-sessions-on-computers/)  | Sessions on computers — daemon, start dialog, attach, terminal, recording                  | `FleetJob`, `AgentRun`, `pty-local`, Terminal tab                 | XL  | FL-02         |
-| [FL-05](./FL-05-session-status-board/)   | Session status, attention & board — hooks, states, Needs-you, Activity → Sessions          | `AgentRun`, Inbox, My Decisions, Activity → Runs                  | L   | FL-04         |
-| [FL-06](./FL-06-session-git-actions/)    | Session git & actions — worktree, git line, PR, actions menu                               | fleet task workspace, GitHub App, merge policy                    | L   | FL-04, FL-14  |
-| [FL-07](./FL-07-desktop/)                | Desktop view & control — OS capture, input, monitors, native helper, re-watch              | AW-11 screen channel, capture backend seam, control arbiter       | XL  | FL-02         |
-| [FL-08](./FL-08-logs/)                   | Logs — system, files, containers, services; tail, filter, pause                            | node link                                                         | M   | FL-02         |
-| [FL-09](./FL-09-services-docker/)        | Services, Docker, Compose & processes                                                      | `docker` capability tag                                           | L   | FL-02         |
-| [FL-10](./FL-10-ports/)                  | Servers & ports — discovery, open on the machine, preview tunnel                           | screen channel                                                    | M   | FL-02, FL-07  |
-| [FL-11](./FL-11-files/)                  | Files & clipboard — browse allowed roots, transfer, paste to desktop                       | workspace roots, desktop source                                   | M   | FL-02         |
-| [FL-12](./FL-12-commands/)               | Commands on computers — fan-out, output cards, audit                                       | `fleet_audit`                                                     | S   | FL-02         |
-| [FL-13](./FL-13-schedules-on-computers/) | Schedules on computers — `node_schedule` source, node-side cache, history                  | Schedules read model, AW-10, recurring Tasks                      | L   | FL-04, FL-12  |
-| [FL-14](./FL-14-checkouts/)              | Checkouts on computers — discovery, clone, worktree, bin                                   | fleet task workspace pool, repo Works                             | M   | FL-02         |
-| [FL-15](./FL-15-tasks-and-github/)       | Tasks & GitHub on the fleet — fix-on-this-computer, Triggers, identity                     | Tasks, Triggers, GitHub App, repo Works                           | M   | FL-04, 06, 14 |
-| [FL-16](./FL-16-virtual-computers/)      | Virtual computers — Windows VMs and Linux containers on a host Node                        | `FleetNode`, Docker module                                        | L   | FL-09         |
-| [FL-17](./FL-17-cloud-computers/)        | Cloud computers — `machine-provider` plugins, cost, idle policy                            | plugin system, enrolment tokens                                   | L   | FL-03         |
-| [FL-18](./FL-18-actions-runners/)        | Actions runners on computers — install, status, jobs                                       | GitHub App, services module                                       | M   | FL-09         |
-| [FL-19](./FL-19-agent-mcp-cli/)          | Agent, MCP & CLI surface — tool parity, typed errors, permissions                          | `agent-fleet-tools`, `apps/mcp`, `apps/cli`                       | M   | FL-04 … FL-18 |
-| [FL-20](./FL-20-usage-and-cost/)         | Usage & cost on the fleet — transcript scan, attribution, Usage tab                        | Budgets, AW-17, `costCents`                                       | M   | FL-04         |
+| ID                                       | Epic                                                                                       | Extends (existing Ever Works)                                     | S   | Dep                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | --- | ------------------------------------- |
+| [FL-01](./FL-01-fleet-hub/)              | Fleet hub & navigation — sidebar entry, overview, computer page shell, roles               | `DashboardSidebar`, Settings → Fleet, runner pill, palette        | M   | —                                     |
+| [FL-02](./FL-02-node-link/)              | Node link & runtime foundations — multiplexed channel, `--manage`, relay bus, node modules | computer-session WS leg, `apps/node` core, Valkey                 | L   | —                                     |
+| [FL-03](./FL-03-computer-health/)        | Computer health & inventory — metrics, states, "needs a look", wake                        | heartbeat, `FleetNode`, node drawer                               | M   | —                                     |
+| [FL-04](./FL-04-sessions-on-computers/)  | Sessions on computers — daemon, start dialog, attach, terminal, recording                  | `FleetJob`, `AgentRun`, `pty-local`, Terminal tab                 | XL  | FL-02                                 |
+| [FL-05](./FL-05-session-status-board/)   | Session status, attention & board — hooks, states, Needs-you, Activity → Sessions          | `AgentRun`, Inbox, My Decisions, Activity → Runs                  | L   | FL-04                                 |
+| [FL-06](./FL-06-session-git-actions/)    | Session git & actions — worktree, git line, PR, actions menu                               | fleet task workspace, GitHub App, merge policy                    | L   | FL-04, FL-14                          |
+| [FL-07](./FL-07-desktop/)                | Desktop view & control — OS capture, input, monitors, native helper, re-watch              | AW-11 screen channel, capture backend seam, control arbiter       | XL  | FL-02                                 |
+| [FL-08](./FL-08-logs/)                   | Logs — system, files, containers, services; tail, filter, pause                            | node link                                                         | M   | FL-01, FL-02                          |
+| [FL-09](./FL-09-services-docker/)        | Services, Docker, Compose & processes                                                      | `docker` capability tag                                           | L   | FL-01, FL-02                          |
+| [FL-10](./FL-10-ports/)                  | Servers & ports — discovery, open on the machine, preview tunnel                           | screen channel                                                    | M   | FL-01, FL-02, FL-07                   |
+| [FL-11](./FL-11-files/)                  | Files & clipboard — browse allowed roots, transfer, paste to desktop                       | workspace roots, desktop source                                   | M   | FL-02                                 |
+| [FL-12](./FL-12-commands/)               | Commands on computers — fan-out, output cards, audit                                       | `fleet_audit`                                                     | S   | FL-02                                 |
+| [FL-13](./FL-13-schedules-on-computers/) | Schedules on computers — `node_schedule` source, node-side cache, history                  | Schedules read model, AW-10, recurring Tasks                      | L   | FL-04, FL-12                          |
+| [FL-14](./FL-14-checkouts/)              | Checkouts on computers — discovery, clone, worktree, bin                                   | fleet task workspace pool, repo Works                             | M   | FL-02                                 |
+| [FL-15](./FL-15-tasks-and-github/)       | Tasks & GitHub on the fleet — fix-on-this-computer, Triggers, identity                     | Tasks, Triggers, GitHub App, repo Works                           | M   | FL-04, FL-06, FL-14                   |
+| [FL-16](./FL-16-virtual-computers/)      | Virtual computers — Windows VMs and Linux containers on a host Node                        | `FleetNode`, Docker module, Runs here block                       | L   | FL-01, FL-02, FL-09 (+ FL-10 for P2)  |
+| [FL-17](./FL-17-cloud-computers/)        | Cloud computers — `machine-provider` plugins, cost, idle policy                            | plugin system, enrolment tokens                                   | L   | FL-01, FL-03                          |
+| [FL-18](./FL-18-actions-runners/)        | Actions runners on computers — install, status, jobs                                       | GitHub App, services module, log sources                          | M   | FL-01, FL-02, FL-08, FL-09            |
+| [FL-19](./FL-19-agent-mcp-cli/)          | Agent, MCP & CLI surface — tool parity, typed errors, permissions                          | `agent-fleet-tools`, `apps/mcp`, `apps/cli`                       | M   | FL-01, FL-02, FL-04 (+ each family's epic for its rows; FL-16/17/18 for P3) |
+| [FL-20](./FL-20-usage-and-cost/)         | Usage & cost on the fleet — transcript scan, attribution, Usage tab                        | Budgets, AW-17, `costCents`, headless-run cost settlement         | M   | FL-04 (+ FL-01 for P2)                |
 
 ## 6. Waves
+
+Every epic's blocking dependencies sit in an earlier wave or its own (checked against §5).
 
 | Wave | Epics                                                         | Why this order                                                                                                           |
 | ---- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | 0    | FL-01, FL-02, FL-03                                           | The hub is where everything lands; the link is what everything rides; health is the first useful content                |
 | 1    | FL-04, FL-05, FL-14, FL-12, FL-08                             | The flagship: sessions you can start, watch, attach to and be told about — plus the two cheapest machine views          |
-| 2    | FL-06, FL-07, FL-09, FL-10, FL-11, FL-13, FL-15, FL-19, FL-20 | Depth on every machine tab, desktop, schedules, GitHub, and the agent surface once the nouns are stable                 |
-| 3    | FL-16, FL-17, FL-18                                           | Creating machines; each is a plugin or a Docker-hosted build on top of Wave 2                                            |
+| 2    | FL-06, FL-07, FL-09, FL-10, FL-11, FL-13, FL-15, FL-19, FL-20 | Depth on every machine tab, desktop, schedules, GitHub, and the agent surface once the nouns are stable (FL-19 ships each family's tools as that family lands; its P3 follows Wave 3). FL-20 lands first of the three management-lane epics, so it creates the lane (CONTRACTS R-34) |
+| 3    | FL-16, FL-17, FL-18                                           | Machines and CI on top of Wave 2: virtual computers on FL-09's Docker module, cloud computers through a provider plugin, Actions runners on FL-09's service module and FL-08's log sources |
 
 ## 7. Rules every epic spec in this program must follow
 
@@ -359,6 +372,8 @@ block — here `1796xx`). In addition:
   so no epic re-specifies it.
 - **[CONTRACTS.md](./CONTRACTS.md)** — the cross-epic resolutions (entity shapes, channel kinds,
   capability tags, consents, flags, limits, error codes, routes) that win over epic text.
+- **[OWNER-QUESTIONS.md](./OWNER-QUESTIONS.md)** — every question still open across the twenty
+  epics, grouped by importance, each with the default being built until it is answered.
 
 ## 10. Research
 

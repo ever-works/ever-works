@@ -20,6 +20,15 @@ const { serverFetchMock, serverMutationMock } = vi.hoisted(() => ({
 vi.mock('./server-api', () => ({
     serverFetch: serverFetchMock,
     serverMutation: serverMutationMock,
+    // Fleet hub (FL-01): the needs-a-look reader throws the API tier's error type.
+    ApiResponseError: class ApiResponseError extends Error {
+        constructor(
+            message: string,
+            public readonly statusCode: number,
+        ) {
+            super(message);
+        }
+    },
 }));
 
 async function importApi() {
@@ -99,5 +108,85 @@ describe('fleetAPI agent affinity — endpoint shape', () => {
         expect(serverMutationMock).toHaveBeenLastCalledWith(
             expect.objectContaining({ endpoint: expected, method: 'DELETE' }),
         );
+    });
+});
+
+/**
+ * Fleet hub (FL-01) — the visible-node list, the needs-a-look reads (with
+ * the partial marker the API sets when a producer was skipped, spec U11)
+ * and the two owner-only PATCH writes.
+ */
+describe('fleetAPI hub reads and writes — endpoint shape', () => {
+    const response = (body: unknown, init: { status?: number; partial?: boolean } = {}) =>
+        new Response(JSON.stringify(body), {
+            status: init.status ?? 200,
+            headers: init.partial ? { 'X-Fleet-Partial': 'true' } : {},
+        });
+
+    it('listVisibleNodes asks for scope=visible; listNodes stays owner-only', async () => {
+        const { fleetAPI } = await importApi();
+        serverFetchMock.mockResolvedValue([]);
+        await fleetAPI.listVisibleNodes();
+        expect(serverFetchMock).toHaveBeenLastCalledWith('/fleet/nodes?scope=visible');
+        await fleetAPI.listNodes();
+        expect(serverFetchMock).toHaveBeenLastCalledWith('/fleet/nodes');
+    });
+
+    it('needsALook reads the list and the partial marker off the raw response', async () => {
+        const { fleetAPI } = await importApi();
+        serverFetchMock.mockResolvedValueOnce(response([{ id: 'a' }], { partial: true }));
+        await expect(fleetAPI.needsALook()).resolves.toEqual({
+            items: [{ id: 'a' }],
+            partial: true,
+        });
+        expect(serverFetchMock).toHaveBeenLastCalledWith('/fleet/needs-a-look', {
+            rawResponse: true,
+            cache: 'no-store',
+        });
+
+        serverFetchMock.mockResolvedValueOnce(response([]));
+        await expect(fleetAPI.needsALook()).resolves.toEqual({ items: [], partial: false });
+    });
+
+    it('needsALook reports an unreadable 2xx body as partial, never as a complete empty list', async () => {
+        const { fleetAPI } = await importApi();
+        serverFetchMock.mockResolvedValueOnce(new Response('not json', { status: 200 }));
+        await expect(fleetAPI.needsALook()).resolves.toEqual({ items: [], partial: true });
+        serverFetchMock.mockResolvedValueOnce(response({ items: [] }));
+        await expect(fleetAPI.needsALook()).resolves.toEqual({ items: [], partial: true });
+    });
+
+    it('needsALook throws on a failed read so the block can say so (U11)', async () => {
+        const { fleetAPI } = await importApi();
+        serverFetchMock.mockResolvedValueOnce(response({ message: 'boom' }, { status: 500 }));
+        await expect(fleetAPI.needsALook()).rejects.toThrow(/Could not load what needs a look/);
+    });
+
+    it('nodeNeedsALook encodes the node id as one path segment', async () => {
+        const { fleetAPI } = await importApi();
+        serverFetchMock.mockResolvedValueOnce(response([]));
+        await fleetAPI.nodeNeedsALook('x/../../nodes');
+        expect(serverFetchMock).toHaveBeenLastCalledWith(
+            `/fleet/nodes/${encodeURIComponent('x/../../nodes')}/needs-a-look`,
+            { rawResponse: true, cache: 'no-store' },
+        );
+    });
+
+    it('setFavorite and setPolicyFamilies PATCH the node with one field each', async () => {
+        const { fleetAPI } = await importApi();
+        await fleetAPI.setFavorite('node-1', true);
+        expect(serverMutationMock).toHaveBeenLastCalledWith({
+            endpoint: '/fleet/nodes/node-1',
+            data: { isFavorite: true },
+            method: 'PATCH',
+            wrapInData: false,
+        });
+        await fleetAPI.setPolicyFamilies('node-1', { sessions: 'org-admins' });
+        expect(serverMutationMock).toHaveBeenLastCalledWith({
+            endpoint: '/fleet/nodes/node-1',
+            data: { controlPolicyFamilies: { sessions: 'org-admins' } },
+            method: 'PATCH',
+            wrapInData: false,
+        });
     });
 });

@@ -26,6 +26,7 @@ import {
 import { WorkLifecycleService, WorkQueryService } from '@ever-works/agent/services';
 import { TeamResourcesService } from '@ever-works/agent/teams';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
+import { writeAttribution } from '../../auth/integration/integration-attribution';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
 import { ScopeContextService } from '../../scope/scope-context.service';
@@ -215,6 +216,7 @@ export class IntegrationWorksWriteController {
                 });
             }
             const externalRef = dto.externalRef;
+            const createdBy = writeAttribution(user);
             let work: Awaited<ReturnType<WorkLifecycleService['createProjectWork']>>;
             try {
                 work = await this.lifecycle.createProjectWork(
@@ -225,11 +227,14 @@ export class IntegrationWorksWriteController {
                         description: dto.description?.trim() || undefined,
                         website: dto.website ?? null,
                     },
+                    // EW-P1-2 — attributed to the integration key (the DTO's `createdBy`), or to
+                    // the act-as person, as for tasks, ideas, goals and missions.
                     // T17a pattern — the Project Work, its `work.created` event and its
                     // externalRef link commit together (one transaction): a lost race rolls
                     // the Work back instead of leaving a stray bare Project Work behind.
                     linkScope && externalRef
                         ? {
+                              createdBy,
                               withinCreate: async (row, manager) => {
                                   await this.links.create(
                                       linkScope,
@@ -243,7 +248,7 @@ export class IntegrationWorksWriteController {
                                   );
                               },
                           }
-                        : {},
+                        : { createdBy },
                 );
             } catch (error) {
                 // A concurrent create with the same externalRef won (ours rolled back with

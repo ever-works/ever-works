@@ -30,12 +30,12 @@ flowchart LR
     CS -->|schedule.sync {definitions}| RL[Node link relay (FL-02)]
     RL --> NS[Node: schedules module]
     NS -->|schedules/<id>.json| FS[(node config dir)]
-    NS -->|timer loop → command-runner (FL-12)| OS[login shell]
+    NS -->|timer loop → link/modules/command/command-runner.ts (FL-12)| OS[login shell]
     NS -->|schedule.runs {since} on link open / every 5 min| RL
     RL -->|head/tail, exit, scheduledFor| CS
     CS -->|fleet_command_runs| DB
     CS -->|node.schedule.* · node.command.run| AU[(fleet_audit)]
-    CS -->|schedule-failed| NL[Needs-a-look registry (FL-01)]
+    CS -->|schedule-failed| NL[NeedsALookProducer (FL-01)]
     subgraph Agent-session schedules
         RT[task-recurrence-dispatcher task] -->|Task instance + Run| RR[FleetRunRouter]
         RR -->|agent-session job (FL-04), targetNodeId from affinity| NODE2[Node: session daemon]
@@ -60,15 +60,15 @@ the existing router.
 | AW-10 breaker, repair, editor components (planned)                 | AW-10 plan §5 table (`DisableAllDialog.tsx`, `BreakerUndoBanner.tsx`, `FixAllDialog.tsx`, `CadencePicker.tsx`, `ScheduleEditorDialog.tsx`), `POST /api/schedules/disable-all` (AW-10 plan §4.6) | Breaker scope `node`; cadence picker reused inside the new dialog                            |
 | Recurring Tasks                                                    | `packages/agent/src/entities/task.entity.ts:596-606` (`isRecurring`, `recurrenceRule` XOR cron), `:24-25` (dispatcher clones instances); `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts` | Agent-session schedules are recurring Tasks                                                 |
 | Agent ↔ Node affinity (Organization-scoped)                        | `packages/agent/src/fleet/fleet-agent-node-affinity.service.ts:22-25, 39-50`                                                                                   | "Pinned to a computer" = affinity; dialog lists pinned Agents only                          |
-| Commands, runs, runner, output store, confirm token                | FL-12 plan §4–§6 (`fleet_commands` with `cadence`, `name`, `enabled`, `lastRunAt`, `nextRunAt`; `apps/node/src/core/commands/command-runner.ts`)               | The body of every Command schedule                                                          |
+| Commands, runs, runner, output store                               | FL-12 plan §4–§6 (`fleet_commands` with `cadence`, `name`, `enabled`, `lastRunAt`, `nextRunAt`; `apps/node/src/core/link/modules/command/command-runner.ts`)    | The body of every Command schedule                                                          |
 | Node config dir and owner-only files                               | `apps/node/src/core/config-store.ts:39-45`                                                                                                                      | `<configDir>/schedules/`                                                                    |
-| Node runtime registrations                                         | `apps/node/src/core/runtime.ts:739,749,947,1062`                                                                                                                | The schedules module starts with `--manage`                                                 |
+| Node runtime registrations; link module registry                   | `apps/node/src/core/runtime.ts:739,749,947,1062` (executors); FL-02 `apps/node/src/core/link/modules/index.ts` (CONTRACTS R-40); shared resolver `apps/node/src/core/link/allowed-roots.ts` (R-39) | The `schedule` module registers there and starts its loop with `--manage`; `cwd` is checked with the shared resolver |
 | Zero-dependency time-zone handling in contracts                    | `packages/contracts/src/fleet/fleet-model-usage-limit.types.ts:25` (`Intl` only)                                                                                | Pattern for the shared next-fire helper                                                     |
-| Needs-a-look shape and producer registry                           | CONTRACTS §4.6; FL-01 plan (`packages/agent/src/fleet/needs-a-look.registry.ts`)                                                                                | `schedule-failed` producer                                                                  |
+| Needs-a-look shape and producer registry                           | CONTRACTS §4.6, R-23; FL-01 plan §3 (`NeedsALookProducer` interface, Nest multi-provider token)                                                               | `schedule-failed` producer                                                                  |
 | Audit action union                                                 | `packages/contracts/src/fleet/fleet-panic.types.ts:60-148`                                                                                                     | Six `node.schedule.*` values                                                                |
 
 Missing today: any source that names a machine (`schedules.service.ts:85-93`), any node-side timer
-or schedule cache (`apps/node/src/core/` listing), any `schedule-failed` producer, any time-zone
+or schedule cache (EXISTING-SUBSTRATE §4), any `schedule-failed` producer, any time-zone
 fact about a node (`packages/contracts/src/fleet/fleet-node.types.ts:329-368` has none).
 
 ## 3. Tech choices
@@ -79,8 +79,9 @@ fact about a node (`packages/contracts/src/fleet/fleet-node.types.ts:329-368` ha
 | Cadence shape                   | CONTRACTS §4.4 `{ kind: 'interval'|'cron'|'daily'|'weekdays', expr, at, timezone: 'node' }`; "specific days" → `cron`; "hourly" → `interval 60` | Fixed by contract                                                                                               |
 | Next-fire computation           | `packages/contracts/src/fleet/fleet-schedule-cadence.ts` (new, pure, `Intl.DateTimeFormat` only) shared by API, node and web    | One algorithm, three consumers; no `cron-parser` on the node (bundle size, parity)                              |
 | Node timer                      | Single `setTimeout` to the earliest next fire (re-armed after each fire/sync), not a 1 s tick                                  | Low wake-ups on laptops; drift-free (recomputed from the wall clock)                                            |
-| Missed-run policy               | `lastFireAt` persisted per schedule in the cache; on start, fires due since then within the grace window collapse to one run     | Spec FR-16                                                                                                      |
-| Run execution                   | FL-12 `command-runner.ts` with `timeoutSec = 21600` and a per-schedule mutex                                                     | Reuse; one process model                                                                                        |
+| Missed-run policy               | `lastFireAt` persisted per schedule in the cache; on start, fires due since then within the fixed 60-min grace collapse to one run | Spec FR-16; CONTRACTS §6                                                                                        |
+| Storage                         | New columns `simple-json` text / `varchar` enums validated in code (CONTRACTS §4 storage types)                                  | One migration for SQLite (CI, e2e) and Postgres                                                                 |
+| Run execution                   | FL-12 `link/modules/command/command-runner.ts` with `timeoutSec = 21600` and a per-schedule mutex                               | Reuse; one process model                                                                                        |
 | History on the node             | `<configDir>/schedules/<id>/runs.jsonl` (index) + `<id>/<runId>.log` (output), ring of 30                                        | Same ring pattern as FL-12 output store                                                                         |
 | Reconciliation                  | `schedule.runs { since }` returns runs newer than the platform's watermark; idempotent by `runId`                                | Link may drop; platform may lag                                                                                 |
 | Agent-session fires             | Existing recurring-Task dispatcher → `FleetRunRouter` → FL-04 `agent-session` job with `targetNodeId` from affinity              | No second scheduler (README §3 refusal)                                                                         |
@@ -91,33 +92,44 @@ fact about a node (`packages/contracts/src/fleet/fleet-node.types.ts:329-368` ha
 
 ### 4.1 Columns (additive) — `packages/agent/src/entities/`
 
-`fleet-command.entity.ts` (FL-12) gains: `timeZone varchar(64)?` (IANA zone of the computer at save,
-for display when the node is offline), `missedRunGraceSec int default 3600`, `failureStreak int default 0`,
-`pauseAfterFailures int default 5`, `pausedAt timestamptz?`, `pausedReason varchar(24)?`
-(`user · failure-streak · breaker · kill-switch`), `lastRunStatus varchar(16)?`, `syncGeneration int default 0`,
-`syncedGeneration int default 0` (what the node acknowledged), `deletedAt timestamptz?`.
+CONTRACTS §4.4 already gives `fleet_commands` its cadence fields (`cadence`, `name`, `enabled`,
+`lastRunAt`, `nextRunAt`, created by FL-12's table). The grace (60 min) and the failure pause
+(five in a row) are fixed by CONTRACTS §6, so they are constants, not columns; the computer's time
+zone is `FleetNode.timeZone`, not a per-schedule copy; the failure streak and the last run's
+status are read from `fleet_command_runs` (index `(commandId, startedAt)`).
 
-`fleet-command-run.entity.ts` gains `scheduledFor timestamptz?` (the fire the run belongs to) and
-`source varchar(8)` (`manual · schedule`). Status values `skipped-overlap`, `skipped-offline` are
-already in the FL-12 union.
+**Proposed CONTRACTS §4.4 additions** (spec §8b; the implementing PR amends CONTRACTS):
+`fleet-command.entity.ts` gains `pausedAt` (date, null), `pausedReason varchar(24)?` (`user ·
+failure-streak · breaker`, validated in code), `syncGeneration int default 0`, `syncedGeneration int
+default 0` (what the node acknowledged) and `deletedAt` (date, null; soft delete keeps history 30
+days, U13); `fleet-command-run.entity.ts` gains `scheduledFor` (date, null — the fire a run belongs
+to; null for Run now). Status values `skipped-overlap`, `skipped-offline` are already in the
+FL-12 union (CONTRACTS §4.4).
 
-`fleet-node.entity.ts` gains `timeZone varchar(64)?` — **CONTRACTS change** (spec §8b), reported
-in the heartbeat `FleetNodeSelfDescription`.
+`fleet-node.entity.ts` gains `timeZone varchar(64)?` (CONTRACTS §4.1), reported in the heartbeat
+`FleetNodeSelfDescription` (CONTRACTS §1.1).
 
-### 4.2 Migration
+### 4.2 Migrations
 
-`apps/api/src/migrations/1796130000000-AddFleetCommandCadence.ts` — the columns above on
-`fleet_commands`, `fleet_command_runs`, `fleet_nodes`; index `idx_fleet_commands_schedule (userId, enabled) WHERE cadence IS NOT NULL`
-and `idx_fleet_command_runs_scheduled (commandId, scheduledFor)`. Additive, forward-only.
+| Slot                                                         | Contents                                                                                                                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/migrations/1796130000000-AddFleetCommandCadence.ts` | The §4.1 columns on `fleet_commands` and `fleet_command_runs`; index `idx_fleet_commands_schedule (userId, enabled) WHERE cadence IS NOT NULL` and `idx_fleet_command_runs_scheduled (commandId, scheduledFor)` |
+| `apps/api/src/migrations/1796130100000-AddFleetNodeTimeZone.ts`   | `fleet_nodes.timeZone`                                                                                                        |
+
+Additive, forward-only; `down` drops exactly what `up` added.
 
 ### 4.3 Contracts
 
 - `packages/contracts/src/fleet/fleet-schedule-cadence.ts` (new): `FleetScheduleCadence` type,
   `nextFire(cadence, zone, after)`, `describeCadence(cadence, locale)`, `isValidCadence`,
-  `FLEET_SCHEDULE_RUN_CAP_SEC = 21600`, `FLEET_SCHEDULE_HISTORY = 30`, `FLEET_SCHEDULE_MISSED_GRACE_DEFAULT_SEC = 3600`.
-- `fleet-commands.types.ts` (FL-12): link messages `schedule.sync { generation, definitions: FleetScheduleDefinition[] }`,
-  `schedule.synced { generation, held: string[] }`, `schedule.runs { since }` → `{ runs: FleetScheduleRunReport[] }`,
-  `schedule.runNow { id }`, `schedule.pause { id }`, `schedule.resume { id }`.
+  `FLEET_SCHEDULE_RUN_CAP_SEC = 21600`, `FLEET_SCHEDULE_HISTORY = 30`, `FLEET_SCHEDULES_PER_NODE = 50`
+  (CONTRACTS §10), `FLEET_SCHEDULE_MISSED_GRACE_SEC = 3600`, `FLEET_SCHEDULE_FAILURE_PAUSE = 5`
+  (CONTRACTS §6).
+- `fleet-commands.types.ts` (FL-12): link messages `schedule.sync { generation, definitions:
+  FleetScheduleDefinition[] }` answered `{ requestId, result: { generation, held: string[] } }`
+  (`generation` proposed, spec §8b), `schedule.runs { since }` → `{ runs: FleetScheduleRunReport[] }`,
+  `schedule.runNow { id }` — exactly CONTRACTS §3.3's three verbs; pause, resume, edits and deletes
+  re-send the full set through `schedule.sync`.
 - `fleet-node.types.ts`: optional `timeZone` on `FleetNodeSelfDescription` and `FleetNodeView`.
 - `fleet-panic.types.ts`: `node.schedule.create|update|delete|run|pause|resume`.
 - `packages/agent/src/schedules/schedule-view.types.ts`: `'node_schedule'` in `ScheduleSourceType`;
@@ -126,27 +138,35 @@ and `idx_fleet_command_runs_scheduled (commandId, scheduledFor)`. Additive, forw
 
 ## 5. API surface
 
+Run now, Pause and Resume go through the **existing** Schedules routes with a `node_schedule:<id>`
+id (the schedule-control service delegates to `FleetScheduleService`), so there is one control
+path for every source; the computer tab lists through the existing `GET /api/schedules?node=<id>`.
+Confirmations follow CONTRACTS §2.2 (`confirm: true`; without it `409 confirmation_required`).
+
 | Method | Path                                             | DTO / shape                                                                                        | Auth / family                        | Rate   | Errors                                                                     |
 | ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------ | ------ | -------------------------------------------------------------------------- |
-| POST   | `/api/fleet/commands` (FL-12) with `cadence`, `name` | `RunCommandDto` + `cadence`, `name`, `missedRunGraceSec?` → `201 FleetCommandView`               | `schedules` audience, `manage`       | 20/min | `invalid` (cadence), `permission_denied`, `kill_switch`, `confirmation_required` |
-| PATCH  | `/api/fleet/commands/:id`                        | `UpdateScheduleDto` (any field but kind; `nodeId` = move)                                          | same                                 | 20/min | `not_found`, `invalid`, `permission_denied`                                |
-| DELETE | `/api/fleet/commands/:id`                        | → `204` (soft: `deletedAt`)                                                                        | same, `confirm`                      | 20/min | `not_found`, `confirmation_required`                                       |
-| POST   | `/api/fleet/commands/:id/run-now`                | → `202 { runId }`                                                                                  | same, `confirm`                      | 20/min | `unreachable`, `busy`, `kill_switch`, `consent_missing`                     |
-| POST   | `/api/fleet/commands/:id/pause` · `/resume`      | → `FleetCommandView`                                                                               | same, `plain`                        | 30/min | `not_found`                                                                |
+| POST   | `/api/fleet/commands` (FL-12) with `cadence`, `name` | `RunCommandDto` + `cadence`, `name`, `confirm` → `201 FleetCommandView`                            | `schedules` audience, `manage`       | 20/min | `invalid` (cadence), `permission_denied`, `kill_switch`, `confirmation_required`, `limit_exceeded` (50 per computer) |
+| PATCH  | `/api/fleet/commands/:id`                        | `UpdateScheduleDto` (any field but kind; `nodeId` = move, needs `confirm`)                         | same                                 | 20/min | `not_found`, `invalid`, `permission_denied`, `limit_exceeded` (move to a full computer) |
+| DELETE | `/api/fleet/commands/:id`                        | `{ confirm: true }` → `204` (soft: `deletedAt`)                                                      | same, `confirm`                      | 20/min | `not_found`, `confirmation_required`                                       |
 | GET    | `/api/fleet/commands/:id/runs?limit=30`          | → `FleetCommandRunView[]` incl. `scheduledFor`, skip reasons                                       | audience                             | 60/min | `not_found`                                                                |
-| GET    | `/api/fleet/nodes/:id/schedules`                 | → `ScheduleView[]` (both kinds for one computer)                                                   | `view`                               | 60/min | `not_found`                                                                |
-| POST   | `/api/fleet/nodes/:id/schedules/agent-session`   | `CreateAgentSessionScheduleDto { name, agentId, prompt, checkoutId?, cadence }` → `201 ScheduleView` | `schedules` audience, `work` consent | 20/min | `invalid` (Agent not pinned → hint), `permission_denied`                   |
-| GET    | `/api/schedules*` (existing)                     | now include `node_schedule` rows; `?node=<id>` filter on `/page`                                    | existing                             | —      | —                                                                          |
-| POST   | `/api/schedules/:id/run-now|pause|resume` (existing) | `node_schedule:<id>` delegates to the fleet service                                              | existing                             | —      | as above                                                                   |
+| POST   | `/api/fleet/nodes/:id/schedules/agent-session` (proposed §11.2 addition, spec §8b) | `CreateAgentSessionScheduleDto { name, agentId, prompt, checkoutId?, cadence, confirm }` → `201 ScheduleView` | `schedules` audience, `work` consent | 20/min | `invalid` (Agent not pinned → hint), `permission_denied`, `limit_exceeded` |
+| GET    | `/api/schedules*` (existing)                     | now include `node_schedule` rows; `?node=<id>` filter on the list and `/page` (both kinds for one computer) | existing                             | —      | —                                                                          |
+| POST   | `/api/schedules/:id/run-now|pause|resume` (existing) | `node_schedule:<id>` delegates to the fleet service; run-now gains an optional `confirm` body field (FR-25; additive, other sources ignore it) | existing                             | —      | `unreachable`, `busy`, `kill_switch`, `consent_missing`, `confirmation_required` |
 | POST   | `/api/schedules/disable-all` (AW-10)             | body gains `scope: 'node', nodeId`                                                                 | existing                             | —      | `SCHEDULE_SCOPE_TOO_LARGE`                                                 |
+
+The Rate column is a proposed CONTRACTS §10.1 addition (spec §8b), enforced as written until it
+lands.
 
 ## 6. Node side
 
-**Module:** `apps/node/src/core/schedules/` — `schedule-store.ts` (cache read/write/atomic replace),
-`schedule-clock.ts` (next-fire, missed-run collapse), `schedule-loop.ts` (single armed timer,
-per-schedule mutex, 6 h cap via `command-runner`), `schedule-history.ts` (ring of 30),
-`schedule-channel.ts` (link handler). Started in `apps/node/src/core/runtime.ts` only with
-`--manage`; advertises capability tag `schedules` (CONTRACTS §1.2) when the cache dir is writable.
+**Module (CONTRACTS R-40):** `apps/node/src/core/link/modules/schedule.ts` — the `schedule`
+`NodeModule` (channel handler, `schedules` tag), one entry in `apps/node/src/core/link/modules/index.ts`;
+helpers under `apps/node/src/core/link/modules/schedule/`: `schedule-store.ts` (cache
+read/write/atomic replace), `schedule-clock.ts` (next-fire, missed-run collapse), `schedule-loop.ts`
+(single armed timer, per-schedule mutex, 6 h cap via FL-12's `command-runner.ts`) and
+`schedule-history.ts` (ring of 30). The loop is started by `apps/node/src/core/runtime.ts` only with
+`--manage` and runs whether or not the link is open (CONTRACTS §6); the module advertises
+`schedules` (CONTRACTS §1.2) when the cache dir is writable.
 
 | OS      | Timer                          | Service mode (so a closed lid still runs)                                   | P3 native fallback                                      |
 | ------- | ------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -158,7 +178,8 @@ Link protocol (`schedule` family, one channel per link, opened lazily by the pla
 
 1. On link open the platform sends `schedule.sync { generation, definitions[] }` with **every**
    enabled Command schedule for that node; the node replaces its cache atomically, deletes files
-   not in the set, re-arms the loop, replies `schedule.synced { generation, held }`.
+   not in the set, re-arms the loop, and answers the request `{ requestId, result: { generation,
+   held } }` (`generation` is the proposed field, spec §8b).
 2. Any create/update/pause/resume/delete bumps `syncGeneration` and re-sends the full set
    (sets are small; full replace is idempotent and simple).
 3. `schedule.runs { since }` on link open and every 5 min → node returns runs with `runId`,
@@ -166,9 +187,12 @@ Link protocol (`schedule` family, one channel per link, opened lazily by the pla
    `truncated`; the platform upserts by `runId`.
 4. `schedule.runNow { id }` → node runs immediately (mutex applies → `busy`).
 5. The node refuses the channel without `--manage` (`consent_missing`) and refuses definitions
-   whose `cwd` escapes allowed roots (`invalid`).
-6. Kill switch: FL-02 `link.killSwitch { on }` → loop stops, in-flight runs end `cancelled`; the
-   last known switch state is persisted in the cache and honoured offline.
+   whose `cwd` fails `isUnderAllowedRoot` (shared resolver `apps/node/src/core/link/allowed-roots.ts`,
+   R-39) and is not the owner's home (`invalid`).
+6. Kill switch (R-24, CONTRACTS §3.2): on FL-02's `link.pause` the loop stops and in-flight runs
+   end `failed` with `failedReason: kill-switch`; `link.resume` re-arms it without replaying fires
+   older than the grace; `link.drain` ends in-flight runs with `failedReason: drain`. The last state
+   received is persisted in the cache and honoured while the link is down (spec §8b default).
 
 Consents: `manage` (Command schedules); Agent-session fires need `work` (FL-04 job). Environment:
 FL-12's allow-listed env. Time zone: the node reports `Intl.DateTimeFormat().resolvedOptions().timeZone`
@@ -200,23 +224,24 @@ None.
 | Surface | Names                                                                                                                   | Annotation                                                                 |
 | ------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Agent   | `fleet_schedules_list`, `fleet_schedules_get`, `fleet_schedules_runs`                                                   | `readOnly: true`                                                           |
-| Agent   | `fleet_schedules_create`, `fleet_schedules_update`, `fleet_schedules_delete`, `fleet_schedules_run`, `fleet_schedules_pause`, `fleet_schedules_resume` | `destructive: true`, `confirmationClass: confirm` (pause/resume `plain`), AW-24 `agent.fanout` for create |
-| MCP     | `list_fleet_schedules`, `get_fleet_schedule`, `create_fleet_schedule`, `update_fleet_schedule`, `delete_fleet_schedule`, `run_fleet_schedule`, `pause_fleet_schedule`, `resume_fleet_schedule` | `readOnlyHint` / `destructiveHint` in `apps/mcp/src/openapi-tools/whitelist.ts` |
-| CLI     | `ever-works fleet schedule create|list|get|update|run|pause|resume|runs|delete` with `--on`, `--every`, `--at`, `--days`, `--cron`, `--command`, `--agent`, `--prompt`, `--folder`, `--json` | exit `0/1/2`; `apps/cli/src/commands/fleet/schedule.ts` |
+| Agent   | `fleet_schedules_create`, `fleet_schedules_update`, `fleet_schedules_delete`, `fleet_schedules_run` | `destructive: true`, `confirmationClass: confirm`; AW-24 `agent.fanout` for create/update, `write.destructive` for delete, `machine.run` for run (FL-19 catalogue) |
+| Agent   | `fleet_schedules_pause`, `fleet_schedules_resume` | `destructive: false`, `confirmationClass: plain`, AW-24 `agent.fanout` |
+| MCP     | the same nine names as the Agent tools (`fleet_schedules_list` … `fleet_schedules_resume`, CONTRACTS §11.3) | `readOnlyHint` / `destructiveHint` in `apps/mcp/src/openapi-tools/whitelist.ts` |
+| CLI     | `ever-works fleet schedules create|list|get|update|run|pause|resume|runs|delete` with `--on`, `--every`, `--at`, `--days`, `--cron`, `--command`, `--agent`, `--prompt`, `--folder`, `--json` | exit `0/1/2`; `apps/cli/src/commands/fleet/schedule.ts` |
 
 ## 10. Background jobs
 
 | Task (job-runtime provider, `*_DISPATCHER`)             | File                                                                        | When         | Does                                                                                          | Idempotency                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `fleet-schedule-reconciler`                             | `packages/tasks/src/tasks/trigger/fleet-schedule-reconciler.task.ts`        | every 5 min  | For every linked node with schedules: `schedule.runs { since }`; upsert runs; update streaks; raise/clear `schedule-failed`; apply failure-streak pause | upsert by `runId`; watermark per node          |
+| `fleet-schedule-reconciler`                             | `packages/tasks/src/tasks/trigger/fleet-schedule-reconciler.task.ts`        | every 5 min  | For every linked node with schedules: `schedule.runs { since }`; upsert runs; read the streak from the last five runs; raise/clear `schedule-failed`; apply the five-failure pause (CONTRACTS §6) | upsert by `runId`; watermark per node          |
 | `task-recurrence-dispatcher` (existing)                 | `packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`       | existing     | Fires pinned recurring Tasks; the router places the Run on the pinned node as an `agent-session` job | existing                                      |
-| `fleet-schedule-missed-sweeper`                         | same reconciler                                                             | every 5 min  | Marks Agent-session fires whose job aged out as `skipped-offline`; cancels the Task instance   | by Task instance id                           |
+| `fleet-schedule-missed-sweeper`                         | same reconciler                                                             | every 5 min  | Cancels Agent-session fires whose job aged out past the grace (the Run and its Task instance, reason "offline past the grace window"); the history shows them as skipped — offline | by Task instance id                           |
 
 ## 11. Security & permissions
 
 - Who: `schedules` family audience per computer (default owner); Organization roles from FL-01.
 - Consent: `manage` for Command schedules; `work` for Agent-session fires; refused with the consent named.
-- The node refuses: sync without `--manage`; `cwd` outside allowed roots; a definition over 8 KiB; more than one run per schedule; a run past 6 h.
+- The node refuses: sync without `--manage`; `cwd` outside allowed roots (R-39 resolver); a definition over 8 KiB (proposed limit, spec §8b); more than one run per schedule; a run past 6 h.
 - Credentials: none stored (D6). The FR-26 sentence is the user-visible statement; the plan adds a doc note that the node's own scrubber strips the provider API-key variables the two CLIs read (the existing protected-value list in `apps/node/src/core/executors/model-transcript.ts:44-51`) from reported output.
 - Redaction: definitions, output and audit pass `redactSecrets`; field names avoid the audit redaction key words.
 - Audit: `node.schedule.*` rows `{ family: 'schedules', target, requestedBy, confirmationClass, outcome, before, after }`; reconciled runs write `node.command.run` with `requestedBy: schedule:<commandId>`.
@@ -234,7 +259,7 @@ None.
 | ----- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | P1    | `FLEET_COMMANDS_ENABLED` | Migration, contracts, `node_schedule` source, fleet schedule service, routes, node module (cache, loop, history, channel), computer tab, Activity rows, reconciler, producer, CLI |
 | P2    | same                     | Agent-session schedules (route, dialog variant, FR-26 note, affinity check), cost on rows (FL-20 feed), new NEVER RUNS reasons + repairs, breaker scope node, Agent tools + MCP entries |
-| P3    | same                     | Native-scheduler fallback per OS (`ever-works-node schedule-run <id>`), editors for missed-run grace and failure threshold                        |
+| P3    | same                     | Native-scheduler fallback per OS (`ever-works-node schedule-run <id>`); editors for missed-run grace and failure threshold only once CONTRACTS §6 makes them per schedule (spec §8b) |
 
 ## 14. Test plan
 
@@ -243,7 +268,7 @@ None.
 | `packages/contracts` | Vitest     | `src/fleet/__tests__/fleet-schedule-cadence.spec.ts` — every cadence form across DST boundaries in three zones; invalid inputs; `describeCadence`                                           |
 | `packages/agent`     | Jest       | `src/schedules/__tests__/schedules.service.node-schedule.spec.ts` (projection, thirteen fields, counts); `schedule-health.spec.ts` extended (three reasons); `schedule-controls.spec.ts` extended; `src/fleet/__tests__/fleet-schedule.service.spec.ts` (sync generation, pause/resume, streak, producer, move, delete) |
 | `apps/api`           | Jest       | `src/fleet/fleet-commands.controller.schedules.spec.ts` (every code+hint; offline save; busy); `src/schedules/schedules.controller.spec.ts` extended (`node_schedule:` ids, `?node=`); breaker scope spec |
-| `apps/node`          | Vitest     | `src/core/schedules/schedule-store.spec.ts` (atomic replace, owner-only); `schedule-clock.spec.ts` (next fire, missed collapse, grace edges); `schedule-loop.spec.ts` (mutex → overlap skip, 6 h cap, kill switch, re-arm after sync); `schedule-history.spec.ts` (ring of 30); `schedule-channel.spec.ts` (refusals, reconcile idempotency) |
+| `apps/node`          | Vitest     | `src/core/link/modules/schedule/schedule-store.spec.ts` (atomic replace, owner-only); `schedule-clock.spec.ts` (next fire, missed collapse, grace edges); `schedule-loop.spec.ts` (mutex → overlap skip, 6 h cap, `link.pause` / `link.resume`, re-arm after sync); `schedule-history.spec.ts` (ring of 30); `src/core/link/modules/schedule.spec.ts` (refusals, reconcile idempotency) |
 | `packages/tasks`     | Jest       | `src/__tests__/fleet-schedule-reconciler.task.spec.ts` — upsert, streak, producer raise/clear, missed sweeper                                                                                 |
 | `apps/cli`           | Vitest     | `src/commands/fleet/__tests__/schedule.spec.ts`                                                                                                                                             |
 | `apps/web`           | Vitest     | `components/fleet/schedules/schedules.shared.unit.spec.ts` (two-zone text, reasons); `NewNodeScheduleDialog.unit.spec.tsx` (FR-26 sentence verbatim; unpinned Agent disabled)              |
@@ -253,16 +278,16 @@ None.
 
 | Risk                                                                 | Likelihood | Impact | Mitigation                                                                                   |
 | -------------------------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------- |
-| Two clocks drift (platform shows a next fire the node computed differently) | Medium | Low   | One shared pure algorithm in contracts; node reports its computed next fire in `schedule.synced` and the UI prefers it |
+| Two clocks drift (platform shows a next fire the node computed differently) | Medium | Low   | One shared pure algorithm in contracts; node reports its computed next fire in its `schedule.sync` answer and the UI prefers it |
 | DST edge cases                                                       | High       | Medium | Property tests across DST transitions; "02:30 on a spring-forward day" fires at the next valid minute, documented |
 | Laptop asleep → catch-up storms                                      | Medium     | Medium | Collapse to one run; grace window; failure streak                                            |
-| Agent affinity semantics surprise users (pins the whole Agent)       | High       | Medium | Dialog never pins as a side effect; §8b escalation for a per-Task pin                        |
+| Agent affinity semantics surprise users (pins the whole Agent)       | High       | Medium | Dialog never pins as a side effect; CONTRACTS R-29 keeps affinity as the only pin, so the dialog says what pinning means |
 | FL-04 `agent-session` job lands late                                  | Medium     | High   | P2 gated; P1 ships Command schedules alone                                                   |
 
 ## 16. Constitution reconciliation
 
-I n/a · II n/a · III metadata only · IV reconciler and recurring fires run as job-runtime tasks; the node loop is machine-side by contract · V one slot migration (plus the §8b-flagged `fleet_nodes.timeZone`) · VI tests per package · VII D6, redaction · VIII n/a · IX spec code-free · X additive unions and optional fields.
+I n/a · II n/a · III metadata only · IV reconciler and recurring fires run as job-runtime tasks; the node loop is machine-side by contract · V two slot migrations (`1796130000000`, `1796130100000`) · VI tests per package · VII D6, redaction · VIII n/a · IX spec code-free · X additive unions and optional fields.
 
 ## 17. References
 
-Spec `./spec.md` · Tasks `./tasks.md` · CONTRACTS §4.4, §6, §7, §8, §10, §12, §13 · FL-12 plan · FL-04 plan (`agent-session` job) · FL-01 plan (registry, needs-a-look registry, roles) · AW-10 plan §4.6, §5 · `docs/specs/features/schedules/spec.md`
+Spec `./spec.md` · Tasks `./tasks.md` · CONTRACTS R-29, R-39, R-40, §1.1, §3.2, §3.3, §4.1, §4.4, §6, §7, §8, §10, §12, §13 · FL-12 plan · FL-04 plan (`agent-session` job) · FL-01 plan (registry, `NeedsALookProducer`, roles) · AW-10 plan §4.6, §5 · `docs/specs/features/schedules/spec.md`

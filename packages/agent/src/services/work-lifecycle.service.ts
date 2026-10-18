@@ -987,6 +987,15 @@ export class WorkLifecycleService {
         },
         options: {
             readonly withinCreate?: (work: Work, manager: EntityManager) => Promise<void>;
+            /**
+             * Who creates it (EW-P1-2): stored when it is not the owner — an integration key (or an
+             * agent) — so the integration DTO's `createdBy` names it. The owner (or the act-as
+             * person) stores nothing, as for every other Work.
+             */
+            readonly createdBy?: {
+                readonly type: 'user' | 'agent' | 'integration';
+                readonly id: string;
+            };
         } = {},
     ): Promise<Work> {
         if (!config.everWorks.projectWorks.enabled()) {
@@ -1007,6 +1016,10 @@ export class WorkLifecycleService {
             deployProvider: null,
         };
         if (params.website) workData.website = params.website;
+        if (options.createdBy && options.createdBy.type !== 'user') {
+            workData.createdByType = options.createdBy.type;
+            workData.createdById = options.createdBy.id;
+        }
 
         const withinCreate = options.withinCreate;
         if (withinCreate) {

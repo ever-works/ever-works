@@ -116,6 +116,26 @@ describe('work recording points', () => {
         expectValid(event);
     });
 
+    it('a Work created through an integration key records createdBy = the key; the owner stays the owner', async () => {
+        const KEY = randomUUID();
+        await dataSource
+            .getRepository(Work)
+            .update({ id: WORK }, { createdByType: 'integration', createdById: KEY } as never);
+        await bridge.onWorkCreated(new WorkCreatedEvent(await loadWork()));
+        const [event] = await events();
+        expect(event.data).toMatchObject({
+            createdBy: { type: 'integration', id: KEY },
+            owner: { type: 'user', id: OWNER },
+        });
+        expectValid(event);
+    });
+
+    it('a Work the owner created says so (no stored author)', async () => {
+        await bridge.onWorkCreated(new WorkCreatedEvent(await loadWork()));
+        const [event] = await events();
+        expect(event.data).toMatchObject({ createdBy: { type: 'user', id: OWNER } });
+    });
+
     it('a status change records work.updated, and archiving records work.archived', async () => {
         const changed = (previous: string, next: string) =>
             new WorkStatusChangedEvent(

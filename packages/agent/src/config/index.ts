@@ -557,6 +557,23 @@ export const config = {
             return process.env.FLEET_ENABLED !== 'false';
         },
         /**
+         * Fleet hub (FL-01) — the `FLEET_HUB_ENABLED` switch: the sidebar
+         * entry "Fleet", the `/fleet` hub and its computer pages. The web
+         * tier reads the same variable (`apps/web/src/lib/fleet-flags.ts`)
+         * with the same rule; this getter exists so an API surface that ever
+         * needs to agree with the hub reads ONE definition.
+         *
+         * **Default OFF** (CONTRACTS §9): the hub is new, so off reproduces
+         * today's Settings → Fleet exactly. On ONLY for the literal
+         * `'true'`, and never without `FLEET_ENABLED` — the hub flag alone
+         * cannot resurrect a fleet a deployment switched off (spec U3).
+         */
+        isHubEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' && process.env.FLEET_HUB_ENABLED === 'true'
+            );
+        },
+        /**
          * How long a one-time enrollment token stays redeemable.
          * Default 15 minutes (`FLEET_ENROLLMENT_TOKEN_TTL_MS`), floored
          * at 30s so a token can always actually be typed in.

@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import {
     BadRequestException,
+    ForbiddenException,
     Inject,
     Injectable,
     Logger,
@@ -10,6 +11,11 @@ import {
 import type { IPlugin } from '@ever-works/plugin';
 import {
     activeFleetNodeModelThrottles,
+    diffControlPolicyFamilies,
+    effectiveControlPolicy,
+    FLEET_ACTION_FAMILIES,
+    isFleetAudience,
+    normalizeControlPolicyFamilies,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -37,10 +43,12 @@ import {
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
+    FleetControlPolicyFamiliesInput,
     FleetNodeLimitCeiling,
     FleetNodeView,
     FleetNodeLoadView,
     FleetNodeWorkerState,
+    FleetViewerRole,
 } from '@ever-works/contracts';
 import { config } from '../config';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
@@ -56,6 +64,7 @@ import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { FleetAuditService } from './fleet-audit.service';
+import { FleetAccessService, fleetOwnerOnlyBody } from './fleet-access.service';
 import { normalizeDailyCeilingCents } from './fleet-cost-ceiling.shared';
 import {
     CREDENTIAL_MAX_LENGTH,
@@ -343,6 +352,10 @@ export class FleetService {
         // anywhere but last, or made required, would break them — and an
         // audit trail is not worth making the registry unbootable for.
         @Optional() private readonly audit?: FleetAuditService,
+        // Fleet hub (FL-01) — role derivation for the hub's widened reads and
+        // the owner-only acts. APPENDED and @Optional() for the same reason as
+        // `audit`: unbound, every read stays owner-scoped exactly as before.
+        @Optional() private readonly access?: FleetAccessService,
     ) {}
 
     /** Issue a one-time enrollment token for a new node (owner-scoped). */
@@ -997,6 +1010,136 @@ export class FleetService {
     }
 
     /**
+     * Fleet hub (FL-01) — every Node the caller may SEE (`GET
+     * /api/fleet/nodes?scope=visible`): their own (exactly {@link listForUser},
+     * offline sweep and cluster merge included) followed by the Nodes other
+     * people own that are bound to an Organization where the caller derives a
+     * role admitted by the Node's `view` audience. Every row carries
+     * `viewerRole`.
+     *
+     * The owner-only {@link listForUser} is unchanged and is still what the
+     * runner pill, the panic controls, Settings → Fleet and the lease path
+     * read: a shared Node is never counted as the caller's runner.
+     */
+    async listVisibleForUser(
+        userId: string,
+        options: { includeClusters?: boolean } = {},
+    ): Promise<FleetNodeView[]> {
+        // `includeClusters: false` (the needs-a-look read) skips the live
+        // cluster merge, which talks to the user's Kubernetes API and whose rows
+        // no producer reads — the same reason the pill reads `listEnrolledForUser`.
+        const ownRows =
+            options.includeClusters === false
+                ? await this.listEnrolledForUser(userId)
+                : await this.listForUser(userId);
+        const own = ownRows.map((view) => ({
+            ...view,
+            viewerRole: 'owner' as const,
+        }));
+        if (!this.access) return own;
+        const shared = await this.access.listSharedWith(userId);
+        if (shared.length === 0) return own;
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        return [
+            ...own,
+            ...shared.map(({ node, role }) => toSharedView(this.toView(node), node, role, cutoff)),
+        ];
+    }
+
+    /**
+     * Fleet hub (FL-01) — one Node the caller may see, with their role on it.
+     * A Node outside the caller's `view` audience answers the same 404 as an
+     * unknown id (FR-30). Without the access service this is exactly
+     * {@link getForUser} (owner-only).
+     */
+    async getVisibleForUser(
+        userId: string,
+        nodeId: string,
+    ): Promise<{ view: FleetNodeView; role: FleetViewerRole }> {
+        if (!this.access) {
+            return {
+                view: { ...(await this.getForUser(userId, nodeId)), viewerRole: 'owner' },
+                role: 'owner',
+            };
+        }
+        const { node, role } = await this.access.resolveVisible(nodeId, userId);
+        if (role === 'owner') return { view: { ...this.toView(node), viewerRole: 'owner' }, role };
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        return { view: toSharedView(this.toView(node), node, role, cutoff), role };
+    }
+
+    /**
+     * Fleet hub (FL-01) — star or unstar a Node. The owner's mark alone
+     * (spec §7: owner only, `plain`, not audited — a personal preference,
+     * not a machine act): someone who may see the Node but does not own it
+     * gets `permission_denied`; anyone else the 404 of an unknown id.
+     * Last write wins (spec U12).
+     */
+    async setFavoriteForUser(
+        userId: string,
+        nodeId: string,
+        isFavorite: boolean,
+    ): Promise<FleetNodeView> {
+        if (typeof isFavorite !== 'boolean') {
+            throw new BadRequestException('isFavorite must be true or false');
+        }
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        if (Boolean(node.isFavorite) !== isFavorite) {
+            await this.repository.update(node.id, { isFavorite });
+        }
+        return this.toView({ ...node, isFavorite } as FleetNode);
+    }
+
+    /**
+     * Fleet hub (FL-01) — change who may act in one or more action families
+     * (CONTRACTS §2.1). Owner only. `families` is a PARTIAL map: families it
+     * names change, the rest keep what they had.
+     *
+     * The legacy `controlPolicy` column is the `desktop` family's mirror:
+     * whenever this write names `desktop`, the column is written in the same
+     * UPDATE, so AW-11's take-over (which reads the column) and the map can
+     * never disagree. One `node.policy.change` audit row per family whose
+     * audience actually changed, details `{ family, from, to }` plus the
+     * CONTRACTS §2.3 fields; a write that changes nothing writes nothing.
+     */
+    async setControlPolicyFamiliesForUser(
+        userId: string,
+        nodeId: string,
+        families: unknown,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const input = parseControlPolicyFamiliesInput(families);
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        const stored = normalizeControlPolicyFamilies(node.controlPolicyFamilies) ?? {};
+        const merged: FleetControlPolicyFamiliesInput = { ...stored, ...input };
+        const before = effectiveControlPolicy(node);
+        const patch: Partial<FleetNode> = { controlPolicyFamilies: merged };
+        if (input.desktop) patch.controlPolicy = input.desktop;
+        const after = effectiveControlPolicy({ ...node, ...patch });
+        const changes = diffControlPolicyFamilies(before, after);
+        if (changes.length === 0) return this.toView(node);
+
+        await this.repository.update(node.id, patch);
+        const actor = ctx.actorUserId === undefined ? userId : ctx.actorUserId;
+        for (const change of changes) {
+            await this.auditLifecycle('node.policy.change', userId, node, ctx, {
+                before: { audience: change.from },
+                after: { audience: change.to },
+                extra: {
+                    family: change.family,
+                    from: change.from,
+                    to: change.to,
+                    target: change.family,
+                    requestedBy: actor ? `user:${actor}` : 'system:fleet',
+                    confirmationClass: 'plain',
+                    outcome: 'success',
+                },
+            });
+        }
+        return this.toView({ ...node, ...patch } as FleetNode);
+    }
+
+    /**
      * Every OUTSTANDING enrollment token of this owner — i.e. every node
      * still sitting in `enrolling`, whether the token is fresh, about to
      * expire, or already expired.
@@ -1593,6 +1736,25 @@ export class FleetService {
         }
     }
 
+    /**
+     * The Node, when the caller OWNS it; an owner-only act refused otherwise.
+     * Someone who may see the Node (`gate` family) is told "only the owner"
+     * (`permission_denied`); anyone else gets the 404 of an unknown id. Without
+     * the access service this is exactly {@link getOwnedNode}.
+     */
+    private async getOwnedNodeForOwnerAct(
+        userId: string,
+        nodeId: string,
+        gate: 'view',
+    ): Promise<FleetNode> {
+        if (!this.access) return this.getOwnedNode(userId, nodeId);
+        const { node, role } = await this.access.resolveForFamily(nodeId, userId, gate);
+        if (role !== 'owner') {
+            throw new ForbiddenException(fleetOwnerOnlyBody(node));
+        }
+        return node;
+    }
+
     private async getOwnedNode(userId: string, nodeId: string): Promise<FleetNode> {
         const node = await this.repository.findById(nodeId);
         // Other users' nodes are indistinguishable from missing ones.
@@ -1758,8 +1920,139 @@ export class FleetService {
             recordWatchSessions: Boolean(node.recordWatchSessions),
             recordingRetentionDays: toOptionalNumber(node.recordingRetentionDays) ?? 14,
             controlHolder: toControlHolder(node),
+            // Fleet hub (FL-01): the owner's star and the policy in force,
+            // every family filled in (the legacy column read through as
+            // `desktop` when the map has no entry for it).
+            isFavorite: Boolean(node.isFavorite),
+            controlPolicyFamilies: effectiveControlPolicy(node),
         };
     }
+}
+
+/**
+ * Fleet hub (FL-01) — the view of a Node someone else owns, as an
+ * Organization member sees it (`view` grants listing only).
+ *
+ * An ALLOW-LIST, not a deny-list: only what the hub needs to list a computer
+ * and say its state in words is copied from the owner-shaped view; every
+ * other field is absent, or null where the wire type requires it. So a field
+ * added to `FleetNodeView` later is NOT shared until someone decides it
+ * should be. Withheld in particular: who holds control, the cost and limit
+ * ceilings, the recording settings, pending rotation, the housekeeping
+ * counters, the account the machine's CLI is signed in as, and the
+ * free-text reasons a node reports (quarantine reason, throttle reason).
+ *
+ * `viewerRole` is stamped and `isFavorite` is false (the star is the
+ * owner's). The status is judged at READ time: the offline sweep only runs on
+ * the owner's own reads, so a row still marked `online` whose last heartbeat
+ * is older than the offline window is SHOWN as `offline` (nothing is written
+ * — the owner's next read sweeps it for real).
+ *
+ * Takes the owner-shaped `view` (`toView`) so there is ONE entity → wire
+ * mapping; this only narrows it.
+ */
+function toSharedView(
+    view: FleetNodeView,
+    node: FleetNode,
+    role: FleetViewerRole,
+    offlineCutoff: Date,
+): FleetNodeView {
+    const lastBeat = node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).getTime() : NaN;
+    const stale =
+        view.status === 'online' &&
+        (!Number.isFinite(lastBeat) || lastBeat < offlineCutoff.getTime());
+    return {
+        id: view.id,
+        name: view.name,
+        kind: view.kind,
+        status: stale ? 'offline' : view.status,
+        platform: view.platform,
+        version: view.version,
+        capabilities: view.capabilities,
+        lastHeartbeatAt: view.lastHeartbeatAt,
+        createdAt: view.createdAt,
+        persisted: view.persisted,
+        cliVersion: view.cliVersion ?? null,
+        upgradeRequired: view.upgradeRequired,
+        diskFreeBytes: view.diskFreeBytes ?? null,
+        workerState: view.workerState ?? null,
+        workerStateChangedAt: view.workerStateChangedAt ?? null,
+        // The CLI and window that are out of quota say "throttled" in words;
+        // the node's own sentence about it stays the owner's.
+        modelThrottles: (view.modelThrottles ?? []).map((throttle) => ({
+            ...throttle,
+            reason: '',
+        })),
+        controlPolicy: view.controlPolicy,
+        controlPolicyFamilies: view.controlPolicyFamilies,
+        viewerRole: role,
+        isFavorite: false,
+        hostNodeId: view.hostNodeId ?? null,
+        virtualKind: view.virtualKind ?? null,
+    };
+}
+
+/** The fields a shared view carries (`toSharedView`) — pinned by the spec so a new one is a decision. */
+export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
+    'id',
+    'name',
+    'kind',
+    'status',
+    'platform',
+    'version',
+    'capabilities',
+    'lastHeartbeatAt',
+    'createdAt',
+    'persisted',
+    'cliVersion',
+    'upgradeRequired',
+    'diskFreeBytes',
+    'workerState',
+    'workerStateChangedAt',
+    'modelThrottles',
+    'controlPolicy',
+    'controlPolicyFamilies',
+    'viewerRole',
+    'isFavorite',
+    'hostNodeId',
+    'virtualKind',
+];
+
+/**
+ * Validate a family-map write: an object whose keys are families and whose
+ * values are audiences. Anything else is the caller's mistake (`invalid`),
+ * not something to drop silently — the owner asked for a change and must be
+ * told it was not made.
+ */
+function parseControlPolicyFamiliesInput(value: unknown): FleetControlPolicyFamiliesInput {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw invalidPolicy('controlPolicyFamilies must be a map of family → audience');
+    }
+    const out: FleetControlPolicyFamiliesInput = {};
+    for (const [family, audience] of Object.entries(value as Record<string, unknown>)) {
+        if (!(FLEET_ACTION_FAMILIES as readonly string[]).includes(family)) {
+            throw invalidPolicy(`Unknown action family: ${family}`);
+        }
+        if (!isFleetAudience(audience)) {
+            throw invalidPolicy(
+                `Audience for ${family} must be one of: owner, org-admins, org-members`,
+            );
+        }
+        out[family as keyof FleetControlPolicyFamiliesInput] = audience;
+    }
+    if (Object.keys(out).length === 0) {
+        throw invalidPolicy('controlPolicyFamilies must name at least one family');
+    }
+    return out;
+}
+
+/** A 400 in CONTRACTS §8's envelope (`invalid`, the hint naming the field), with `message` for existing clients. */
+function invalidPolicy(hint: string): BadRequestException {
+    return new BadRequestException({
+        statusCode: 400,
+        message: hint,
+        error: { code: 'invalid', hint, details: { field: 'controlPolicyFamilies' } },
+    });
 }
 
 /**

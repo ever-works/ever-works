@@ -810,6 +810,12 @@ There is no `dashboard.fleet` (hub) namespace and no `dashboard.sessions` namesp
 | 19  | Docs contradict each other on publication: `apps/node/README.md:L11-17` documents `npm install -g ever-works-node` and tags `node-v0.2.0 … 0.2.4` exist, while `docs/features/fleet.md:L367` and `L461` still say "not published to npm yet" / "no published npm package" | §1.1, §1.11                     | — (doc fix)              |
 | 20  | Stale trackers and docs: AW-11 `tasks.md` (`Draft`, nothing ticked), `capabilities.ts:L321-322` comment, `fleet.md` publication lines                                                         | §2.10, §1.6                                    | — (update in the same PRs) |
 
+**Addendum (FL-16…FL-20 audit, 2026-10-18).** Headless fleet runs already put their model cost on
+the platform's books: `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts` (`~L1020-1100`)
+records, once per run behind a replay guard, a `plugin_usage_events` row tagged with the run
+(`billedTo` = the node's model identity, `costUsd`, `turns`, input / output / cache tokens) without
+debiting credits. FL-20 reuses that path for session cost rather than adding a second ledger.
+
 > **Standing rule (inherited from the Agent Workspace substrate):** before you scope a screen or a
 > mechanism as new, `rg` for it in several spellings at the current commit. Several of the rows above
 > moved in one week; the next week will move more.

@@ -24,6 +24,9 @@ import { FleetAuditService } from './fleet-audit.service';
 import { FleetRunCredentialService } from './fleet-run-credential.service';
 import { ApiKey } from '../entities/api-key.entity';
 import { ApiKeyRepository } from '../database/repositories/api-key.repository';
+import { FleetAccessService } from './fleet-access.service';
+import { FleetOrganizationDirectory } from './fleet-organization-directory';
+import { NeedsALookService } from './needs-a-look/needs-a-look.service';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — agent-side module owning
@@ -54,6 +57,16 @@ import { ApiKeyRepository } from '../database/repositories/api-key.repository';
  *     the api-side AgentsModule binds), the run router and every lease;
  *     `FleetAuditService` is the one writer of the `fleet_audit` trail
  *     every panic action records to.
+ *
+ *   - `FleetAccessService` (Fleet hub, FL-01) — the caller's ROLE on a
+ *     node (`owner · org-admin · org-member · stranger`, from the
+ *     Organization the node is bound to) and the per-family audience check
+ *     every Fleet action runs through (CONTRACTS §2.1). Its Organization
+ *     facts come from `FleetOrganizationDirectory`, which reads the roster
+ *     tables BY NAME from the DataSource — so this module imports no
+ *     Organization / Tenant / roster entity and stays as light as it was.
+ *   - `NeedsALookService` (FL-01) — the "needs a look" producer registry the
+ *     hub reads; producers (FL-03 and later) register into it.
  *
  * Both authenticate nodes through the SAME credential helper
  * (`fleet-node-credential.ts`), so enroll / heartbeat / lease can never
@@ -107,6 +120,10 @@ import { ApiKeyRepository } from '../database/repositories/api-key.repository';
         // exactly as the fleet repositories are.
         ApiKeyRepository,
         FleetRunCredentialService,
+        // Fleet hub (FL-01).
+        FleetOrganizationDirectory,
+        FleetAccessService,
+        NeedsALookService,
     ],
     exports: [
         FleetNodeRepository,
@@ -125,6 +142,11 @@ import { ApiKeyRepository } from '../database/repositories/api-key.repository';
         // Exported so the api-side `FleetJobsController` can mint on the
         // node channel and the completion listener can revoke.
         FleetRunCredentialService,
+        // Fleet hub (FL-01) — the family check (FL-02's link authoriser and
+        // every family-gated route) and the needs-a-look registry (producers
+        // register into it; the hub reads it).
+        FleetAccessService,
+        NeedsALookService,
     ],
 })
 export class FleetModule {}

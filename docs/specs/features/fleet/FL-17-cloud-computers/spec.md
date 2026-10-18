@@ -25,8 +25,9 @@ for it — so it appears in the Fleet as an ordinary Node with `origin: cloud`, 
 watchable, and **never holding a credential the platform keeps**. Its page always answers "what has
 this cost?" — hourly rate, this month, since created, projected month — and offers power on/off and
 destroy (which states the cost so far). Because a cloud machine bills until it is destroyed, **Remove
-from Fleet** is deliberately not available for one; an idle policy can tell you about an idle machine
-or power it off after N hours, but never destroys anything by itself.
+from Fleet** is refused for one until the provider reports the machine gone (CONTRACTS R-36 — an
+additive guard, the action itself stays); an idle policy can tell you about an idle machine or power
+it off after N hours, but never destroys anything by itself.
 
 ```
  FLEET HUB › Computers                                         [+ Add computer ▾]
@@ -41,7 +42,7 @@ or power it off after N hours, but never destroys anything by itself.
 
  NEW CLOUD COMPUTER
  ┌─────────────────────────────────────────────────────────────────────────────────────┐
- │ Provider   [ DigitalOcean ▾ ]  (connected as acme-ops)                              │
+ │ Provider   [ DigitalOcean ▾ ]  (connected as acme)                                  │
  │ Name       [ nyc-ops                ]                                               │
  │ Region     [ New York 3 (nearest) ▾ ]                                               │
  │ Size       ( ) 1 CPU · 2 GB · 50 GB        $12/mo   ($0.018/h)                      │
@@ -60,7 +61,7 @@ Three phases, each independently shippable:
 
 | Phase  | Ships                                                                                                                                                                                                   |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P1** | The `machine-provider` plugin category + capability, the facade, the first plugin (DigitalOcean, API token), the create dialog with the price statement, self-enrolment, the machine block, power on/off, destroy with cost so far, Remove hidden, audit, Agent tools |
+| **P1** | The `machine-provider` plugin category + capability, the facade, the first plugin (DigitalOcean, API token), the create dialog with the price statement, self-enrolment, the machine block, power on/off, destroy with cost so far, the Remove guard (R-36), audit, Agent tools |
 | **P2** | Cost: hourly / month-to-date / since-created / projected on the page and in the hub **Usage** tab; the idle policy (nothing · tell me · power off after N hours) evaluated by a platform job; the `cloud-idle` producer; `fleet_cloud_usage`                   |
 | **P3** | Sign-in with the provider (OAuth) where supported; software presets incl. the overlay-VPN client with a one-time auth key; reconciliation of machines changed outside Ever Works; contract review for a second provider                                          |
 
@@ -83,9 +84,10 @@ The machine's page shows where it is, what it is, whether it is running or idle,
 hourly rate, this month so far, since it was created, and the projected month. **Power off** keeps
 the machine (and, for providers that bill stopped machines, the bill); **Power on** brings it back;
 **Destroy…** states the cost so far and requires typing the name. **Remove from Fleet** — the action
-that deletes a registration while leaving a machine running — is hidden for cloud computers and
-refused by the server, so a billing machine can never be orphaned; it reappears only when the
-provider itself reports the machine gone. An **idle policy** per machine (nothing · tell me, the
+that deletes a registration while leaving a machine running — is shown disabled with the reason for
+cloud computers and refused by the server (`unsupported_on_node`, "destroy it instead"; CONTRACTS
+R-36), so a billing machine can never be orphaned; it becomes available when the provider itself
+reports the machine gone. An **idle policy** per machine (nothing · tell me, the
 default · power off after N hours) is evaluated by a platform job: idle means no Session working, no
 job leased and the CPU flat for the window. "Tell me" raises a "needs a look" item with the money it
 is costing; "power off" powers off and tells you. Nothing is ever destroyed automatically.
@@ -105,7 +107,7 @@ show logs and services, and honour the kill switch.
 
 | To get…                                   | Today they must…                                                                                                  | What breaks                                                                                                                                                                                                                                                                                 |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A machine at a cloud provider in the Fleet | Create it in the provider's console, SSH in, install Node and the runtime, come back for a token, run `enroll` | No plugin category or capability for machine providers exists (`packages/plugin/src/contracts/plugin-manifest.types.ts:5-128`; `packages/plugin/src/contracts/facade-capabilities.ts:1-151`); no DigitalOcean plugin exists under `packages/plugins/` (the `vercel` deployment plugin is the closest shape). |
+| A machine at a cloud provider in the Fleet | Create it in the provider's console, SSH in, install Node and the runtime, come back for a token, run `enroll` | No plugin category or capability for machine providers exists (`packages/plugin/src/contracts/plugin-manifest.types.ts:5-128`; `packages/plugin/src/contracts/facade-capabilities.ts:1-159`); no DigitalOcean plugin exists under `packages/plugins/` (the `vercel` deployment plugin is the closest shape). |
 | To know what it costs                     | Open the provider's billing page                                                                                  | A Node has no provider, region, size or rate (`packages/agent/src/entities/fleet-node.entity.ts:96-115`); Budgets and the fleet cost ceiling track **model** spend only (`packages/agent/src/budgets/budget.service.ts`; `packages/agent/src/fleet/fleet-cost-ceiling.service.ts`).           |
 | To avoid an orphaned bill                 | Remember                                                                                                          | **Remove** deletes the registration and nothing else (`apps/web/src/components/settings/FleetSettings.tsx:257-271`; `apps/api/src/fleet/fleet.controller.ts:562-571`), so a cloud machine would keep billing with no trace in Ever Works.                                                     |
 | To be told about an idle box              | Nothing                                                                                                           | Health samples exist from FL-03 but nothing evaluates idleness against money.                                                                                                                                                                                                               |
@@ -122,7 +124,8 @@ Node row in `enrolling` state with a one-time token
 
 `FleetNode` stays the entity (R-4); new columns default to today's meaning. A new plugin category
 and capability are appended (both lists are append-only). "Remove from Fleet" is not removed: an
-additional guard hides and refuses it for one origin, and the escalation is recorded in §8b.
+additional guard disables and refuses it for one origin while a billing machine exists (CONTRACTS
+R-36).
 
 ---
 
@@ -156,10 +159,11 @@ additional guard hides and refuses it for one origin, and the escalation is reco
   deletes it, the Fleet registration is removed, job history is kept, and `node.cloud.destroy` is
   audited with the final cost.
 
-- **S5 — Remove from Fleet is not there.**
-  **Given** `nyc-ops` exists, **when** the owner opens its **⋯** menu or the drawer, **then** there
-  is no **Remove from Fleet** item; in its place a line reads _"Cloud computers are destroyed, not
-  removed, so a machine you pay for is never left behind"_; a direct removal request is refused.
+- **S5 — Remove from Fleet is refused while the machine exists.**
+  **Given** `nyc-ops` exists, **when** the owner opens its **⋯** menu or the drawer, **then** the
+  **Remove from Fleet** item is disabled with the line _"Cloud computers are destroyed, not removed,
+  so a machine you pay for is never left behind"_; a direct removal request is refused
+  `unsupported_on_node` with the hint "destroy it instead" (CONTRACTS R-36).
 
 - **S6 — Idle: tell me (P2).**
   **Given** `fra-nina`'s idle policy is **Tell me after 3 hours** (the default), **when** it has had
@@ -169,7 +173,8 @@ additional guard hides and refuses it for one origin, and the escalation is reco
 
 - **S7 — Idle: power off (P2).**
   **Given** the policy is **Power off after 2 hours**, **when** the window passes, **then** the
-  platform powers the machine off, audits `node.cloud.power` with the policy as the requester, and
+  platform powers the machine off, audits `node.cloud.power` with `requestedBy: system:idle-policy`
+  (CONTRACTS §2.3), and
   raises a "needs a look" item _"fra-nina was powered off after 2 h idle — it still bills while
   off"_ with **Power on** and **Destroy…**.
 
@@ -179,13 +184,15 @@ additional guard hides and refuses it for one origin, and the escalation is reco
   (including the destroyed one), the projected month, and a per-machine table.
 
 - **S9 — An Agent asks for a box.**
-  **Given** Agent `Ops` holds the `machines` grant, **when** it calls `fleet_cloud_create` with
-  `providerPluginId`, `regionId`, `sizeId` and `acknowledgedPriceCents`, **then** the tool is
-  destructive: it is refused `confirmation_required` until an Approval is granted, and the Approval
-  card states _"Creates a 2 CPU · 4 GB cloud computer at DigitalOcean (nyc3) for about $24/month
-  ($0.036/hour), billed to your DigitalOcean account until destroyed."_; a call whose
-  `acknowledgedPriceCents` differs from the current price is refused `invalid` with the current
-  price in the hint.
+  **Given** Agent `Ops`'s tool grants allow `fleet_cloud_create` and its trust ladder puts the
+  tool's categories (`spend.metered`, `machine.admin`) at **Ask** (CONTRACTS §2.1), **when** it calls
+  `fleet_cloud_create` with `providerPluginId`, `regionId`, `sizeId` and `acknowledgedPriceCents`,
+  **then** the call is held as an `agent_action_proposals` row (CONTRACTS R-33) and returns `{ held:
+  true, decisionId }`; the Decision states _"Creates a 2 CPU · 4 GB cloud computer at DigitalOcean
+  (nyc3) for about $24/month ($0.036/hour), billed to your DigitalOcean account until destroyed."_;
+  at **Auto** the call answers 409 `confirmation_required` with that summary until repeated with
+  `confirm: true` (CONTRACTS §2.2); a call whose `acknowledgedPriceCents` differs from the current
+  price is refused `invalid` with the current price in the hint.
 
 - **S10 — An Organization member.**
   **Given** the machine's control policy grants `machines` to `org-admins`, **then** an admin may
@@ -201,11 +208,13 @@ additional guard hides and refuses it for one origin, and the escalation is reco
   account"_); the `enrolling` row is marked `failed` with **Retry** and **Remove** (removal is
   allowed here: no machine exists).
 - **U3 — Created but never enrols.** The provider reports the machine running but no heartbeat
-  arrives within 10 minutes → a "needs a look" item _"nyc-ops never came online and is billing
-  $0.036/h"_ with **Destroy…** and **Retry enrolment** (re-mints the token; the bootstrap polls for
-  a replacement through the provider's metadata service where supported, else Destroy is the fix).
+  arrives within 10 minutes → a "needs a look" item of kind `cloud-idle` (CONTRACTS §4.6; the title
+  and detail carry the variant) _"nyc-ops never came online and is billing $0.036/h"_ with
+  **Destroy…** and **Retry enrolment** (re-mints the token; the bootstrap polls for a replacement
+  through the provider's metadata service where supported, else Destroy is the fix).
 - **U4 — Kill switch.** The Fleet kill switch is on → **Create** and **Power on** are refused
-  `kill_switch`; **Power off** and **Destroy** stay available (they only reduce spend) and say so.
+  `kill_switch`; **Power off** and **Destroy** stay available (they stop spending — CONTRACTS R-36)
+  and say so.
 - **U5 — Plugin disabled while machines exist.** The owner disables the plugin → machines stay in
   the Fleet with a banner _"DigitalOcean plugin is disabled — enable it to power or destroy this
   computer"_; actions refuse `operation_failed` with that hint; cost keeps being estimated.
@@ -219,10 +228,9 @@ additional guard hides and refuses it for one origin, and the escalation is reco
 - **U8 — Permission denied.** Covered by S10.
 - **U9 — Price changed.** The provider's price for the chosen size changed between options and
   Create → refused `invalid`, the dialog reloads prices and asks again.
-- **U10 — Limit.** More than **10** cloud computers per owner → `limit_exceeded` (§8b: CONTRACTS
-  §10 addition).
-- **U11 — Idle but powered off.** A powered-off machine is never "idle" for the policy; the
-  "needs a look" item for a long-powered-off machine is a separate kind only if §8b accepts it.
+- **U10 — Limit.** More than **10** cloud computers per owner → `limit_exceeded` (CONTRACTS §10).
+- **U11 — Idle but powered off.** A powered-off machine is never "idle" for the policy and raises
+  no item in this epic beyond S7's one-time "powered off by policy" item.
 
 ---
 
@@ -234,16 +242,19 @@ Values marked **(C)** come from [CONTRACTS.md](../CONTRACTS.md).
 
 | Family action        | Consent on the machine | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                                   | Audit (C §7)             | Agent tool (C §11.3)                                 |
 | -------------------- | ---------------------- | --------------------------------------------- | ------------------------------------------------------- | ------------------------ | ---------------------------------------------------- |
-| Create               | — (platform → provider) | `machines` / owner                            | `confirm` — the price sentence; Agents: Approval        | `node.cloud.create`      | `fleet_cloud_create` — destructive                   |
+| Create               | — (platform → provider) | `machines` / owner                            | `confirm` — the price sentence; Agents: held at Ask (R-33) | `node.cloud.create`   | `fleet_cloud_create` — destructive                   |
 | Power on / off       | —                      | `machines` / owner                            | `confirm` — "still bills while off" when applicable     | `node.cloud.power`       | `fleet_cloud_power` — destructive                    |
 | Destroy              | —                      | `machines` / owner                            | `confirm-destructive` — type the name; shows cost so far | `node.cloud.destroy`     | `fleet_cloud_destroy` — destructive                  |
-| Idle policy change   | —                      | `machines` / owner                            | `plain`                                                 | `node.cloud.power` is written when the policy acts; the change itself is in the Activity Log | `fleet_cloud_idle_policy` — destructive: false |
+| Idle policy change   | —                      | `machines` / owner                            | `plain`                                                 | `node.policy.change` (C §7) for the change; `node.cloud.power` with `requestedBy: system:idle-policy` when the policy acts | `fleet_cloud_idle_policy` — destructive: false |
 | Options / usage      | —                      | `view`                                        | `plain`                                                 | —                        | `fleet_cloud_options`, `fleet_cloud_usage`, `fleet_cloud_list` — readOnly |
 
-Cloud actions do not cross the node link, so R-24's link refusal does not apply; the platform
-applies the kill switch itself: create and power-on refuse `kill_switch`; power-off and destroy
-proceed (U4). Once the machine is a Node, every node-side family (sessions, logs, …) is governed
-by its own epic.
+Every caller satisfies a class with the same request fields (`confirm: true`, `confirmName`); a call
+without them answers 409 `confirmation_required` with the summary — the price sentence for Create
+(C §2.2). Cloud actions do not cross the node link, so R-24's link refusal does not apply; the
+platform applies the kill switch itself as CONTRACTS R-36 fixes: create and power-on refuse
+`kill_switch`; power-off and destroy proceed (U4). Once the machine is a Node, every node-side family
+(sessions, logs, …) is governed by its own epic, and its link is paused like any node's
+(`link.pause`, C §3.2).
 
 ### 4.2 Providers and options (P1)
 
@@ -280,9 +291,10 @@ by its own epic.
 - **FR-10** The machine MUST be tagged at the provider with the Node id so reconciliation can
   recognise it (U7).
 - **FR-11** A machine that has not heartbeated **10 minutes** after the provider reports it running
-  MUST raise a "needs a look" item naming its hourly cost, with Destroy and Retry enrolment.
-- **FR-12** At most **10** cloud computers MAY exist per owner (§8b); the eleventh MUST be refused
-  `limit_exceeded`.
+  MUST raise a `cloud-idle` "needs a look" item **(C §4.6)** naming its hourly cost, with Destroy and
+  Retry enrolment.
+- **FR-12** At most **10** cloud computers MAY exist per owner **(C §10)**; the eleventh MUST be
+  refused `limit_exceeded`.
 - **FR-13** The machine's name MUST match `^[a-z0-9][a-z0-9-]{1,38}$` and be unique among the
   owner's Nodes.
 - **FR-14** The machine MUST be bound to the Organization the owner was acting in when creating it,
@@ -302,10 +314,10 @@ by its own epic.
   name, MUST ask the provider to delete the machine, MUST remove the registration only after the
   provider confirms deletion (or reports it gone), MUST keep job history, and MUST record the final
   cost in the audit row.
-- **FR-19** **Remove from Fleet** MUST NOT be offered for a cloud computer and MUST be refused
-  server-side with `unsupported_on_node` and the hint _"destroy it instead; it bills until
-  destroyed"_ — except when the provider has reported the machine gone (FR-26) or creation failed
-  before a machine existed (U2).
+- **FR-19** **Remove from Fleet** MUST be shown disabled with the reason for a cloud computer and
+  MUST be refused server-side with `unsupported_on_node` and the hint _"destroy it instead; it bills
+  until destroyed"_ (CONTRACTS R-36) — except when the provider has reported the machine gone
+  (FR-29) or creation failed before a machine existed (U2).
 - **FR-20** Destroy MUST be refused `busy` while a Run or owner Session is live on the machine,
   naming it.
 
@@ -356,8 +368,10 @@ by its own epic.
 
 - **FR-33** `fleet_cloud_list`, `fleet_cloud_options` and `fleet_cloud_usage` MUST be read-only;
   `fleet_cloud_create`, `fleet_cloud_power`, `fleet_cloud_destroy` MUST be destructive with the
-  classes in §4.1 and gated by the Agent's `machines` grant **and** the Node's audience (for
-  create: the owner's grant alone, since no Node exists yet).
+  classes in §4.1 and gated as C §2.1 fixes — the Agent's tool grants and trust ladder (AW-15,
+  AW-24) allow the tool **and** the Node's `machines` audience includes the Agent's owner (for
+  create, where no Node exists yet, the new machine is owned by the Agent's owner and only the
+  grants and ladder apply).
 - **FR-34** `fleet_cloud_create` MUST require `acknowledgedPriceCents`, MUST state size and price in
   its confirmation text, and MUST be refused `invalid` on a mismatch.
 - **FR-35** Every state-changing action MUST write one `fleet_audit` row with `family: machines`,
@@ -415,10 +429,11 @@ this computer."_
                                                           [ Cancel ]  [ Destroy ]
 ```
 
-### 5.5 Where Remove used to be
+### 5.5 Remove from Fleet on a cloud computer
 
-`⋯` menu: **Power off / Power on** · **Change idle policy…** · **Destroy…** · (greyed) _"Cloud
-computers are destroyed, not removed, so a machine you pay for is never left behind."_
+`⋯` menu: **Power off / Power on** · **Change idle policy…** · **Destroy…** · **Remove from Fleet**
+(disabled, with the line _"Cloud computers are destroyed, not removed, so a machine you pay for is
+never left behind."_; enabled once the machine is gone at the provider or never existed).
 
 ### 5.6 Idle policy editor (computer Settings tab)
 
@@ -480,7 +495,7 @@ Dialog keyboard-operable; sizes are a radio group with price read by assistive t
 | **Provider options**        | New (read model) | Regions, sizes with prices, software presets for one provider+account                                                                     |
 | **Bootstrap script**        | New (generated) | Platform-generated first-boot script that installs the runtime and enrols; carries the one-time token                                     |
 | **Idle policy**             | New (per Node) | nothing · tell me after N h · power off after N h                                                                                          |
-| **Needs a look `cloud-idle`** | Existing kind (C §4.6) | Produced by the idle job; also used for "never came online" and "powered off by policy" variants (§8b)                              |
+| **Needs a look `cloud-idle`** | Existing kind (C §4.6) | Produced by the idle job; the same kind carries the "never came online", "powered off by policy" and "unclaimed machine" variants in its title, detail and action |
 | **Operation**               | Existing (FL-02) | Progress of create/power/destroy                                                                                                           |
 | **Fleet audit**             | Existing      | `node.cloud.create|power|destroy`                                                                                                           |
 
@@ -498,14 +513,14 @@ Dialog keyboard-operable; sizes are a radio group with price read by assistive t
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: CONTRACTS change — §13: the origin column is shared with FL-16 (slot 1796160000000). Proposed: whichever lands first adds it with IF NOT EXISTS; please record the owner in §13.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §2.3 requestedBy only allows user | agent | schedule:<commandId>; the idle policy acts on its own. Proposed: add system:idle-policy.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §10: add "Cloud computers per owner: 10" (FR-12), or confirm no cap.]`
-- `[NEEDS CLARIFICATION: CONTRACTS change — §4.6: the never-came-online (U3/FR-11) and powered-off-by-policy (S7) items reuse kind cloud-idle with a variant field; confirm, or add kinds cloud-unenrolled and cloud-powered-off.]`
-- `[NEEDS CLARIFICATION: Hiding Remove from Fleet for cloud computers (FR-19) is written as an additional guard, not a removal; confirm the owner accepts that an action is unavailable for one origin (program rule 5 escalation).]`
-- `[NEEDS CLARIFICATION: Kill switch semantics for cloud actions (U4): power-off and destroy allowed while stopped because they reduce spend. Confirm against R-24's intent.]`
-- `[NEEDS CLARIFICATION: Operator-level OAuth application for the first provider (P3): who registers it and where its client id/secret live (proposed: admin-scope plugin settings with env fallbacks, as the deployment plugin does).]`
-- `[NEEDS CLARIFICATION: Should the overlay-VPN auth key (FR-32) be allowed as a saved user-scope secret setting for repeat use, or stay create-time only as proposed?]`
+- **Resolved** by CONTRACTS R-35: `origin` belongs to FL-16's slot; this epic's slot `1796170000000` adds `providerPluginId`, `providerMachineRef` and `providerMeta`, and both migrations guard every column (including `origin`) with `findColumnByName`, so either may land first.
+- **Resolved** by CONTRACTS §2.3: `requestedBy: system:<job>` — the idle policy writes `system:idle-policy` (S7, FR-27).
+- **Resolved** by CONTRACTS §10: cloud computers per owner — 10 (FR-12, U10).
+- **Resolved** within CONTRACTS §4.6 as written: the never-came-online (U3, FR-11), powered-off-by-policy (S7) and unclaimed-machine (U7) items all use kind `cloud-idle`; the shape's `title`, `detail` and `action` carry the variant, so no new kind is needed.
+- **Resolved** by CONTRACTS R-36: Remove from Fleet on a cloud computer is refused `unsupported_on_node` ("destroy it instead") until the provider reports the machine gone — an additive guard, not a removed action; the UI shows it disabled with the reason (FR-19).
+- **Resolved** by CONTRACTS R-36: power-off and destroy stay allowed while the kill switch is on (they stop spending); create and power-on are refused `kill_switch` (U4).
+- `[NEEDS CLARIFICATION: Who registers the operator-level OAuth application for the first provider (P3), and where do its client id and secret live? Default until answered: admin-scope plugin settings (x-adminOnly, x-scope: global) with env fallbacks, as the deployment plugin does; "Sign in with the provider" stays hidden until both are set, and the token path is always available (FR-31).]`
+- `[NEEDS CLARIFICATION: May the overlay-VPN auth key (FR-32) be saved as a user-scope secret setting for repeat use? Default until answered: create-time only — passed into the bootstrap once, never stored, never echoed or audited.]`
 
 ---
 
@@ -527,7 +542,7 @@ Dialog keyboard-operable; sizes are a radio group with price read by assistive t
 
 - [ ] `ACC-FL17-07` (FR-15, FR-16, FR-17) The Cloud block shows every figure; Power off states the billed-while-off rule; Power on is refused `kill_switch` while stopped.
 - [ ] `ACC-FL17-08` (FR-18, FR-20) Destroy shows the cost so far, requires the typed name, removes the registration only after provider confirmation, keeps job history, audits the final cost, and is refused `busy` under a live Run/Session.
-- [ ] `ACC-FL17-09` (FR-19) Remove from Fleet is absent from the menu and drawer for cloud computers and refused server-side with the destroy hint; it returns for `gone` and for failed-before-create rows.
+- [ ] `ACC-FL17-09` (FR-19) Remove from Fleet is disabled with the reason in the menu and drawer for cloud computers and refused server-side `unsupported_on_node` with the destroy hint; it is enabled for `gone` and for failed-before-create rows.
 
 **Cost and idle (P2)**
 
@@ -566,8 +581,8 @@ Dialog keyboard-operable; sizes are a radio group with price read by assistive t
 
 ## 11. References
 
-- Program: [README](../README.md) (§1 "Cloud computer" copy, D6, D8, D15, rule 18) · [CONTRACTS](../CONTRACTS.md) (R-4, R-15, R-20, R-23, R-24, §2, §4.1, §4.6, §7, §8, §9, §10, §11.2, §13) · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §F
+- Program: [README](../README.md) (§1 "Cloud computer" copy, D6, D8, D15, rule 18) · [CONTRACTS](../CONTRACTS.md) (R-4, R-15, R-20, R-23, R-24, R-33, R-35, R-36, §2, §3.2, §4.1, §4.6, §7, §8, §9, §10, §11.2, §13) · [CAPABILITY-MAP](../CAPABILITY-MAP.md) §F
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Sibling epics: FL-01 (hub, Usage tab shell), FL-03 (health samples, producers), FL-16 (`origin`), FL-19 (tools), FL-20 (Usage tab)
-- Substrate evidence: `packages/plugin/src/contracts/plugin-manifest.types.ts:5-128`; `packages/plugin/src/contracts/facade-capabilities.ts:1-151`; `packages/agent/src/facades/base.facade.ts:57-110`; `packages/agent/src/facades/metrics.facade.ts:47-60`; `packages/plugins/vercel/src/vercel.plugin.ts:57-95`; `packages/agent/src/entities/fleet-node.entity.ts:96-115`; `packages/agent/src/fleet/fleet.service.ts:349-394`; `apps/web/src/components/settings/FleetSettings.tsx:257-271`; `apps/api/src/fleet/fleet.controller.ts:562-571`; `packages/agent/src/budgets/budget.service.ts`; `packages/agent/src/fleet/fleet-cost-ceiling.service.ts`
+- Substrate evidence: `packages/plugin/src/contracts/plugin-manifest.types.ts:5-128`; `packages/plugin/src/contracts/facade-capabilities.ts:1-159`; `packages/agent/src/facades/base.facade.ts:57-110`; `packages/agent/src/facades/metrics.facade.ts:47-60`; `packages/plugins/vercel/src/vercel.plugin.ts:57-95`; `packages/agent/src/entities/fleet-node.entity.ts:96-115`; `packages/agent/src/fleet/fleet.service.ts:349-394`; `apps/web/src/components/settings/FleetSettings.tsx:257-271`; `apps/api/src/fleet/fleet.controller.ts:562-571`; `packages/agent/src/budgets/budget.service.ts`; `packages/agent/src/fleet/fleet-cost-ceiling.service.ts`
 - Constitution: `.specify/memory/constitution.md`

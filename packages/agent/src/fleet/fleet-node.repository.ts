@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 import {
     FleetNode,
@@ -102,6 +102,21 @@ export class FleetNodeRepository {
     async findByUser(userId: string): Promise<FleetNode[]> {
         return this.repository.find({
             where: { userId },
+            order: { createdAt: 'ASC' },
+        });
+    }
+
+    /**
+     * Fleet hub (FL-01) — every Node bound to one of these Organizations,
+     * whoever owns it, oldest first. The caller (`FleetAccessService`)
+     * filters by role and the `view` audience; this read only narrows by
+     * the binding, so it never decides who sees what. Empty input reads
+     * nothing.
+     */
+    async findByOrganizations(organizationIds: readonly string[]): Promise<FleetNode[]> {
+        if (organizationIds.length === 0) return [];
+        return this.repository.find({
+            where: { organizationId: In([...organizationIds]) },
             order: { createdAt: 'ASC' },
         });
     }
