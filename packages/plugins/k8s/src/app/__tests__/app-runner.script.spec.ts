@@ -874,6 +874,32 @@ describe('the isolation probe (plan §4.10: "opens a TCP connection … with a 3
 		expect(only(outcome)).toMatchObject({ kind: 'isolation-probe', connected: false });
 	});
 
+	it('treats the renderer `port: null` as "not given" and uses the kubelet env (prod 2026-10-18)', async () => {
+		const server = await startServer((_request, response) => response.end('x'));
+		try {
+			const outcome = await runRunner(
+				payload([], { kind: 'isolation-probe', isolationProbe: { host: null, port: null, timeoutMs: 3_000 } }),
+				{ KUBERNETES_SERVICE_HOST: '127.0.0.1', KUBERNETES_SERVICE_PORT: String(server.port) }
+			);
+
+			expect(only(outcome)).toMatchObject({ kind: 'isolation-probe', connected: true });
+		} finally {
+			await server.close();
+		}
+	});
+
+	it('falls back to kubernetes.default.svc:443 when neither a target nor the kubelet env is set', async () => {
+		// No such name outside a cluster: the probe must still TRY (a real `connected: false`) instead
+		// of reporting "no host or port to connect to".
+		const outcome = await runRunner(
+			payload([], { kind: 'isolation-probe', isolationProbe: { host: null, port: null, timeoutMs: 1_000 } })
+		);
+
+		const record = only(outcome);
+		expect(record).toMatchObject({ kind: 'isolation-probe', connected: false });
+		expect(String(record.failedExpectation ?? '')).not.toContain('no host or port');
+	});
+
 	it('falls back to the kubelet-set `KUBERNETES_SERVICE_HOST/PORT` (plan §4.10)', async () => {
 		const server = await startServer((_request, response) => response.end('x'));
 		try {
