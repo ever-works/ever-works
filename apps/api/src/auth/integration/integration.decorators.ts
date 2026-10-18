@@ -38,7 +38,13 @@ export const IntegrationOrgOptional = () => SetMetadata(INTEGRATION_ORG_OPTIONAL
  * EW-P1-2 — only a person signed in with a session may call this route: no
  * personal `ew_live_` key, no fleet-run token, no integration key, no
  * delegated Ever ID token. Enforced by `IntegrationForbiddenGuard`; used on
- * the routes that MINT credentials (create and rotate an API key), which
- * closes the gap where any API key could mint more keys.
+ * the routes that MINT credentials (create and rotate an API key, a node
+ * enrollment token), which closes the gap where any API key could mint more
+ * credentials.
+ *
+ * `action` (optional, works-security run-token scope) names what the route
+ * does for the refusal message — "mint a node enrollment token". Omitted, the
+ * message is the API-key one it has always been.
  */
-export const SessionCredentialOnly = () => SetMetadata(SESSION_CREDENTIAL_ONLY_KEY, true);
+export const SessionCredentialOnly = (action?: string) =>
+    SetMetadata(SESSION_CREDENTIAL_ONLY_KEY, action ?? true);
