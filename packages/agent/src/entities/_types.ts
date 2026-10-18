@@ -83,6 +83,34 @@ export enum UsageOutcome {
  * after the 500 surfaced on the KB upload path in production: pass
  * the explicit snake_case column name from the call site.
  */
+/**
+ * The write half of {@link TimestampColumn}: a `Date`, an ISO-8601 string or epoch millis → epoch millis.
+ *
+ * A `Date` is what the entity types promise, but it is not what always arrives. A row written through the
+ * isolated Trigger worker's RPC proxy (`POST /internal/trigger/remote/call`) is JSON, so every `Date` lands
+ * as an ISO string, and some callers pass `toISOString()` themselves. The old `value.getTime()` threw
+ * `TypeError: value.getTime is not a function` on those. On prod 2026-10-18 that 500'd the App runtime-state
+ * write at the end of a READY deploy, so `currentDeploymentId` was never recorded and the App read
+ * `not-deployed` while it served. An unparseable value throws a TypeError that names it instead of storing
+ * garbage. Anything else (e.g. a TypeORM FindOperator) passes through untouched.
+ */
+export function timestampToEpochMillis(value: unknown): unknown {
+    if (value === undefined || value === null || value === '') return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') {
+        const numeric = /^-?\d+$/.test(value.trim()) ? Number(value) : Date.parse(value);
+        if (Number.isFinite(numeric)) return numeric;
+        throw new TypeError(
+            `TimestampColumn: "${value}" is not a date, an ISO-8601 string or epoch milliseconds.`,
+        );
+    }
+    if (typeof (value as { getTime?: unknown }).getTime === 'function') {
+        return (value as { getTime: () => number }).getTime();
+    }
+    return value;
+}
+
 export const TimestampColumn = ({
     nullable = false,
     name,
@@ -94,7 +122,7 @@ export const TimestampColumn = ({
         type: 'bigint',
         nullable,
         transformer: {
-            to: (value?: Date) => (value ? value.getTime() : null),
+            to: timestampToEpochMillis,
             from: (value?: string | number) => (value ? new Date(Number(value)) : null),
         },
     };
