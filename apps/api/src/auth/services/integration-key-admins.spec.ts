@@ -256,4 +256,66 @@ describe('integration keys and organization admins (EW-P2-6)', () => {
             await expect(mayActAs(OWNER, ADMIN, ORG_A)).resolves.toBe(true);
         });
     });
+
+    // Review 2026-10-17 U7 (F117): the Tenant owner rotates an admin's key (it is listed to
+    // them and they may revoke it); everyone else rotates only their own keys.
+    describe('IntegrationKeyService.rotationOwnerOf', () => {
+        const KEY_ID = '0b6f7c1e-7a43-4a4f-9a51-5b9d1d2c0a11';
+        const make = (row: Record<string, unknown> | null) =>
+            new IntegrationKeyService(
+                { findById: jest.fn(async () => row) } as never,
+                tenants as never,
+                {} as never,
+                { findById: jest.fn(async (id: string) => ({ id, tenantId: TENANT })) } as never,
+                undefined,
+                undefined,
+                members as never,
+            );
+        const adminKey = {
+            id: KEY_ID,
+            kind: 'integration',
+            isActive: true,
+            userId: ADMIN,
+            tenantId: TENANT,
+        };
+
+        it("audits the Tenant owner's rotation of an admin's key (the caller is the actor)", async () => {
+            const activityLog = { log: jest.fn().mockResolvedValue(undefined) };
+            const service = new IntegrationKeyService(
+                {
+                    findByIdAndUserId: jest.fn(async () => null),
+                    findById: jest.fn(async () => adminKey),
+                } as never,
+                tenants as never,
+                { findByTenantId: jest.fn().mockResolvedValue([]) } as never,
+                { findById: jest.fn(async (id: string) => ({ id, tenantId: TENANT })) } as never,
+                activityLog as never,
+                undefined,
+                members as never,
+            );
+            await service.recordRotation(OWNER, KEY_ID);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: OWNER }),
+            );
+        });
+
+        it("answers the creator when the Tenant owner rotates an admin's key", async () => {
+            await expect(make(adminKey).rotationOwnerOf(KEY_ID, OWNER)).resolves.toBe(ADMIN);
+        });
+
+        it('answers null for an own key, a non-owner, a revoked or foreign key, a non-uuid', async () => {
+            await expect(make(adminKey).rotationOwnerOf(KEY_ID, ADMIN)).resolves.toBeNull();
+            await expect(make(adminKey).rotationOwnerOf(KEY_ID, MEMBER)).resolves.toBeNull();
+            await expect(
+                make({ ...adminKey, isActive: false }).rotationOwnerOf(KEY_ID, OWNER),
+            ).resolves.toBeNull();
+            await expect(
+                make({ ...adminKey, tenantId: 'tenant-2' }).rotationOwnerOf(KEY_ID, OWNER),
+            ).resolves.toBeNull();
+            await expect(
+                make({ ...adminKey, kind: 'personal' }).rotationOwnerOf(KEY_ID, OWNER),
+            ).resolves.toBeNull();
+            await expect(make(adminKey).rotationOwnerOf('not-a-uuid', OWNER)).resolves.toBeNull();
+        });
+    });
 });

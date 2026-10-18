@@ -7,7 +7,10 @@ import {
     UnprocessableEntityException,
 } from '@nestjs/common';
 import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
-import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
+import {
+    RecordVisibilityService,
+    type TeamSideChange,
+} from '../record-visibility/record-visibility.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository, type EntityManager, type FindOptionsWhere } from 'typeorm';
 import {
@@ -223,8 +226,11 @@ export class GoalsService {
         scope?: OwnershipScope,
     ): Promise<GoalMetricSampleDto[]> {
         await this.findOrThrow(userId, goalId, scope);
+        // Review 2026-10-17 F48: the Goal's OWN metric only (`criterionId IS NULL`); an
+        // external per-criterion sample (`POST /goals/:id/samples {criterionId}`) is another
+        // series with its own unit and target, not a point of this one.
         const rows = await this.samples.find({
-            where: { goalId },
+            where: { goalId, criterionId: IsNull() },
             order: { sampledAt: 'DESC' },
             take: Math.min(500, Math.max(1, limit)),
         });
@@ -321,24 +327,28 @@ export class GoalsService {
                 // An integration create always derives its scope (D11): without Teams or a
                 // hand-set visibility an Organization's Goal is `organization`, never the
                 // column default `private` (which no integration could then read back).
+                let teamSide: TeamSideChange | null = null;
                 if (hasTeams || options.automaticVisibility) {
                     if (!this.recordVisibility) {
                         throw new Error('Goal teamIds need RecordVisibilityModule');
                     }
                     if (hasTeams) {
-                        await this.recordVisibility.setTeamsIn(
+                        const teams = await this.recordVisibility.setTeamsIn(
                             manager,
                             'goal',
                             row.id,
                             input.teamIds as string[],
                             userId,
                         );
+                        teamSide = teams?.teamSide ?? null;
                     }
                     await this.recordVisibility.recomputeAutomaticIn(manager, 'goal', row.id, {
                         recordEvent: false,
                     });
                 }
                 await publisher.created(manager, 'goal', row.id, 'goal.created');
+                // Review 2026-10-17 F34: the Teams' `team.resource.added`, after the Goal's.
+                if (teamSide) await this.recordVisibility!.recordTeamSideIn(manager, teamSide);
                 // T17a pattern — e.g. the integration API's externalRef link, in this
                 // transaction: a throw rolls the Goal back.
                 if (options.withinCreate) await options.withinCreate({ id: row.id }, manager);

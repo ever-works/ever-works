@@ -105,7 +105,23 @@ export function WebhooksSettings({ initialSubscriptions, organizations, loadFail
         });
     }
 
+    /**
+     * Review 2026-10-17 U6: Rotate and Delete ask first. A v1 rotation stops the previous
+     * secret at once, a delete cannot be undone, and a subscription an integration key
+     * owns (Ever Gauzy) stops that integration's event feed.
+     */
+    function confirmed(sub: WebhookSubscription, action: 'rotate' | 'delete'): boolean {
+        if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
+        const lines = [
+            t(action === 'rotate' ? 'confirmRotate' : 'confirmDelete', { url: sub.url }),
+        ];
+        if (action === 'rotate' && sub.version !== 2) lines.push(t('confirmRotateV1'));
+        if (sub.ownerType === 'integration_key') lines.push(t('confirmIntegrationOwned'));
+        return window.confirm(lines.join('\n\n'));
+    }
+
     function rotate(sub: WebhookSubscription) {
+        if (!confirmed(sub, 'rotate')) return;
         startTransition(async () => {
             const result = await rotateWebhookSecret(sub.id);
             if (result.success && result.signingSecret) {
@@ -118,6 +134,7 @@ export function WebhooksSettings({ initialSubscriptions, organizations, loadFail
     }
 
     function remove(sub: WebhookSubscription) {
+        if (!confirmed(sub, 'delete')) return;
         startTransition(async () => {
             const result = await deleteWebhook(sub.id);
             if (result.success) {
@@ -127,6 +144,10 @@ export function WebhooksSettings({ initialSubscriptions, organizations, loadFail
             }
         });
     }
+
+    const secretUrl = secret
+        ? (subscriptions.find((sub) => sub.id === secret.subscriptionId)?.url ?? null)
+        : null;
 
     return (
         <div className="space-y-6">
@@ -150,6 +171,15 @@ export function WebhooksSettings({ initialSubscriptions, organizations, loadFail
                     className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950"
                 >
                     <p className="font-medium">{t('secretTitle')}</p>
+                    {/* U6: which subscription the secret belongs to. */}
+                    {secretUrl && (
+                        <p
+                            className="break-all text-muted-foreground"
+                            data-testid="webhook-secret-for"
+                        >
+                            {t('secretFor', { url: secretUrl })}
+                        </p>
+                    )}
                     <p className="text-muted-foreground">{t('secretHint')}</p>
                     <div className="mt-2 flex items-center gap-2">
                         <code
@@ -210,6 +240,8 @@ export function WebhooksSettings({ initialSubscriptions, organizations, loadFail
                                 onResume={() => setStatus(sub, 'active')}
                                 onTest={() => test(sub)}
                                 onRotate={() => rotate(sub)}
+                                // U6: one secret on screen at a time — Done first.
+                                rotateLocked={secret !== null && secret.subscriptionId !== sub.id}
                                 onDelete={() => remove(sub)}
                             />
                         ))}
@@ -247,6 +279,7 @@ function WebhookRow({
     onTest,
     onRotate,
     onDelete,
+    rotateLocked = false,
 }: {
     t: T;
     sub: WebhookSubscription;
@@ -261,6 +294,8 @@ function WebhookRow({
     onTest: () => void;
     onRotate: () => void;
     onDelete: () => void;
+    /** Another subscription's new secret is still on screen (Done first). */
+    rotateLocked?: boolean;
 }) {
     const canResume = sub.status === 'paused' || sub.status === 'failed';
     return (
@@ -336,7 +371,7 @@ function WebhookRow({
                         <button
                             type="button"
                             className="text-sm"
-                            disabled={busy}
+                            disabled={busy || rotateLocked}
                             onClick={onRotate}
                         >
                             {t('rotate')}

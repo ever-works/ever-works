@@ -6,7 +6,12 @@ import {
 import { IntegrationHttpException } from '../../../auth/integration/integration-http.exception';
 import { TaskTransitionBlockedException } from '@ever-works/agent/tasks-domain';
 import { IntegrationExceptionFilter } from '../integration-exception.filter';
-import { IntegrationTasksWriteController } from '../tasks-write.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
+    IntegrationTasksWriteController,
+    IntegrationUpdateTaskDto,
+} from '../tasks-write.controller';
 
 /**
  * Task writes of `/api/integrations/v1` (EW-P1-4): Idempotency-Key, externalRef
@@ -433,5 +438,34 @@ describe('IntegrationTasksWriteController', () => {
             new TaskTransitionBlockedException('Blocked.', details as never),
         );
         expect(envelope).toMatchObject({ status: 409, code: 'transition_blocked', details });
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateTaskDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateTaskDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['title', 'priority', 'labels', 'teamIds', 'visibility']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of [
+            'description',
+            'workId',
+            'parentTaskId',
+            'dueAt',
+            'startAt',
+            'estimateMinutes',
+        ]) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

@@ -234,6 +234,17 @@ export class DomainEventPublisher {
     ): Promise<void> {
         if (!tombstone) return;
         const dto = tombstone.snapshot.dto as { version?: number };
+        // Review 2026-10-17 F30: where the tombstone was taken in a transaction of its own
+        // (inbox items, ideas, KB documents and folders, agents, works), an edit can land
+        // between it and the delete and record a HIGHER version. Consumers skip an event
+        // whose version is not above the one they applied, so the delete is recorded above
+        // every version already on the feed for this aggregate.
+        const recorded = await this.recorder.latestRecordedAggregateVersion(
+            manager,
+            tombstone.aggregateType,
+            tombstone.id,
+        );
+        const version = Math.max(Number(dto.version) || 1, recorded + 1);
         await this.recorder.record(manager, {
             type,
             tenantId: tombstone.snapshot.tenantId,
@@ -241,9 +252,13 @@ export class DomainEventPublisher {
             aggregate: {
                 type: tombstone.aggregateType,
                 id: tombstone.id,
-                version: Number(dto.version) || 1,
+                version,
             },
-            data: { ...(tombstone.snapshot.dto as Record<string, unknown>), deleted: true },
+            data: {
+                ...(tombstone.snapshot.dto as Record<string, unknown>),
+                ...(dto.version !== undefined ? { version } : {}),
+                deleted: true,
+            },
             actor: options.actor,
             visibility: tombstone.snapshot.visibility,
         });

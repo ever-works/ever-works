@@ -7,7 +7,7 @@ import { CalendarRange } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import type { Task } from '@/lib/api/tasks';
-import { updateTaskAction } from '@/app/actions/tasks';
+import { updateTaskPlanningAction } from '@/app/actions/tasks';
 
 /** `<input type="date">` wants `YYYY-MM-DD` in LOCAL time. */
 function toDateInput(iso: string | null | undefined): string {
@@ -73,12 +73,18 @@ export function TaskPlanningSection({ task }: { task: Task }) {
         // An async transition: `pending` covers the request itself, so the
         // inputs and Save stay disabled until it settles (no overlapping saves).
         startTransition(async () => {
+            // Review 2026-10-17 U9: the refusal comes back as a value, so its reason shows
+            // (a thrown one is replaced by a generic text in production).
             try {
-                await updateTaskAction(task.id, patch);
+                const result = await updateTaskPlanningAction(task.id, patch);
+                if (!result.ok) {
+                    setError(result.message || t('saveError'));
+                    return;
+                }
                 toast.success(t('saved'));
                 router.refresh();
-            } catch (err) {
-                setError(err instanceof Error ? err.message : t('saveError'));
+            } catch {
+                setError(t('saveError'));
             }
         });
     };

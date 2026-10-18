@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { AlertTriangle, Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
@@ -90,8 +90,14 @@ export function IntegrationKeysSection({
 
     const [revokeTarget, setRevokeTarget] = useState<IntegrationKeySummary | null>(null);
 
-    // Captured once per mount: whether a rotation's grace period is still running.
-    const [renderedAt] = useState(() => Date.now());
+    // Whether a rotation's grace period is still running. Review 2026-10-17 U10: the clock
+    // moves (a rotation, and every minute), so a grace that ended while the page is open, or
+    // a rotation without one, no longer reads as a previous secret that still works.
+    const [renderedAt, setRenderedAt] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setRenderedAt(Date.now()), 60_000);
+        return () => clearInterval(timer);
+    }, []);
 
     const orgById = useMemo(
         () => new Map(organizations.map((org) => [org.id, org])),
@@ -184,11 +190,14 @@ export function IntegrationKeysSection({
                                   ...key,
                                   prefix: rotated.prefix,
                                   rotatedAt: rotated.rotatedAt,
-                                  previousKeyGraceUntil: rotated.previousKeyGraceUntil,
+                                  // U10: "None" stopped the old secret at once.
+                                  previousKeyGraceUntil:
+                                      Number(graceHours) > 0 ? rotated.previousKeyGraceUntil : null,
                               }
                             : key,
                     ),
                 );
+                setRenderedAt(Date.now());
                 toast.success(t('messages.rotateSuccess'));
             } else {
                 toast.error(result.error || t('messages.rotateError'));
@@ -370,7 +379,15 @@ export function IntegrationKeysSection({
 
             {/* Create */}
             {/* Open while the secret is on screen too, whatever closed the form. */}
-            <Dialog open={showCreate || secret !== null} onOpenChange={resetCreate}>
+            {/* Review 2026-10-17 U5: Escape or a click outside never drops a secret on screen
+                (it is shown once); only Done / the close button do. */}
+            <Dialog
+                open={showCreate || secret !== null}
+                onOpenChange={() => {
+                    if (secret !== null) return;
+                    resetCreate();
+                }}
+            >
                 <DialogContent>
                     <DialogClose onClose={resetCreate} />
                     <DialogHeader>
@@ -503,7 +520,10 @@ export function IntegrationKeysSection({
             {/* Rotate */}
             <Dialog
                 open={rotateTarget !== null || rotatedSecret !== null}
-                onOpenChange={closeRotate}
+                onOpenChange={() => {
+                    if (rotatedSecret !== null) return;
+                    closeRotate();
+                }}
             >
                 <DialogContent>
                     <DialogClose onClose={closeRotate} />

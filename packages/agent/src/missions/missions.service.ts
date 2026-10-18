@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import type { RecordListView } from '@ever-works/contracts';
 import { RecordAccessPolicy } from '../record-visibility/record-access-policy.service';
-import { RecordVisibilityService } from '../record-visibility/record-visibility.service';
+import {
+    RecordVisibilityService,
+    type TeamSideChange,
+} from '../record-visibility/record-visibility.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, In, Repository, type EntityManager, type FindOptionsWhere } from 'typeorm';
 import {
@@ -407,22 +410,26 @@ export class MissionsService {
                     : {}),
             }),
             async (publisher, manager, row) => {
+                let teamSide: TeamSideChange | null = null;
                 if (input.teamIds && input.teamIds.length > 0) {
                     if (!this.recordVisibility) {
                         throw new Error('Mission teamIds need RecordVisibilityModule');
                     }
-                    await this.recordVisibility.setTeamsIn(
+                    const teams = await this.recordVisibility.setTeamsIn(
                         manager,
                         'mission',
                         row.id,
                         [...new Set(input.teamIds)],
                         userId,
                     );
+                    teamSide = teams?.teamSide ?? null;
                     await this.recordVisibility.recomputeAutomaticIn(manager, 'mission', row.id, {
                         recordEvent: false,
                     });
                 }
                 await publisher.created(manager, 'mission', row.id, 'mission.created');
+                // Review 2026-10-17 F34: the Teams' `team.resource.added`, after the Mission's.
+                if (teamSide) await this.recordVisibility!.recordTeamSideIn(manager, teamSide);
                 // T17a pattern — e.g. the integration API's externalRef link, in this
                 // transaction: a throw rolls the Mission back.
                 if (options.withinCreate) await options.withinCreate({ id: row.id }, manager);

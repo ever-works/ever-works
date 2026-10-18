@@ -7414,6 +7414,38 @@
                         "specUnavailable": "Esta app ainda não tem uma especificação utilizável.",
                         "failed": "Não foi possível salvar o valor. Tente novamente."
                     }
+                },
+                "dependencies": {
+                    "title": "Dependências",
+                    "description": "Os bancos de dados, caches, armazenamento e e-mail de que este app precisa. Eles são provisionados no destino de implantação antes de o app iniciar.",
+                    "loading": "Lendo as dependências…",
+                    "unavailable": "As dependências ainda não podem ser gerenciadas nesta instância.",
+                    "error": "Não foi possível ler as dependências. Recarregue a página para tentar novamente.",
+                    "empty": "A especificação deste app não declara dependências.",
+                    "provider": "Provedor: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# tentativa} other {# tentativas}}",
+                    "noReason": "Nenhum motivo foi registrado.",
+                    "deployRetries": "Implantar novamente tenta outra vez automaticamente — ou clique em Tentar novamente agora.",
+                    "retry": "Tentar novamente",
+                    "retryAria": "Tentar novamente {kind}",
+                    "retried": "{kind}: uma nova tentativa foi agendada.",
+                    "retryQueued": "{kind}: uma nova tentativa começará assim que o worker estiver disponível.",
+                    "leaseHeld": "{kind} está sendo provisionado agora. Tente novamente em instantes.",
+                    "retryFailed": "Não foi possível tentar {kind} novamente. Tente de novo.",
+                    "deleteData": "Excluir dados",
+                    "deleteDataAria": "Excluir os dados de {kind}",
+                    "deleteDialog": {
+                        "title": "Excluir os dados de {kind}?",
+                        "description": "Isso destrói os volumes, bancos de dados e buckets desta dependência. Esta ação não pode ser desfeita.",
+                        "resources": "Será excluído:",
+                        "noResources": "Não há recursos registrados para esta dependência.",
+                        "confirmLabel": "Digite {slug} para confirmar",
+                        "cancel": "Cancelar",
+                        "confirm": "Excluir dados",
+                        "requested": "Excluindo os dados de {kind}.",
+                        "failed": "Não foi possível excluir os dados. {reason}"
+                    }
                 }
             },
             "appEnv": {

@@ -424,6 +424,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // APW-07 T26 (lane aw-env-smtp) — an env change is configuration work on the App Work, never a
     // delivery: the Deployment it leads to has its own `app_deploy` row.
     [ActivityActionType.APP_ENV]: 'work',
+    // Lane aw-deps-api — configuring, retrying or asking to delete a dependency's data is work on
+    // the App Work; the provisioning it leads to is the worker's, and a failure is a `problem`
+    // through the failed-status rule.
+    [ActivityActionType.APP_DEPENDENCY]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

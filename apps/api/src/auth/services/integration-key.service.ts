@@ -229,6 +229,21 @@ export class IntegrationKeyService {
     }
 
     /**
+     * Review 2026-10-17 U7 (F117): whom a rotation of `id` by `userId` acts for — the
+     * key's creator when the caller is the Tenant owner of an active integration key an
+     * Organization admin created (the owner sees, and may revoke, every key of the
+     * Tenant), `null` otherwise (the caller's own keys rotate as before).
+     */
+    async rotationOwnerOf(id: string, userId: string): Promise<string | null> {
+        if (!UUID_RE.test(id)) return null;
+        const row = await this.apiKeys.findById(id);
+        if (!row || row.kind !== INTEGRATION_API_KEY_KIND || !row.isActive) return null;
+        if (row.userId === userId) return null;
+        const tenant = await this.ownedTenant(userId);
+        return tenant && row.tenantId === tenant.id ? row.userId : null;
+    }
+
+    /**
      * Revoke an integration key of the caller's Tenant. Returns `false` when
      * `id` is not an active integration key the caller manages (the controller
      * falls back to the personal-key path, then 404s).
@@ -276,7 +291,14 @@ export class IntegrationKeyService {
     async recordRotation(userId: string, keyId: string): Promise<void> {
         if (!UUID_RE.test(keyId)) return;
         try {
-            const row = await this.apiKeys.findByIdAndUserId(keyId, userId);
+            let row = await this.apiKeys.findByIdAndUserId(keyId, userId);
+            if (!row) {
+                // Review 2026-10-17 U7 (F117): the Tenant owner rotating an admin's key, as
+                // `revoke` allows; the audit row still names the caller.
+                const tenant = await this.ownedTenant(userId);
+                const candidate = tenant ? await this.apiKeys.findById(keyId) : null;
+                row = candidate && candidate.tenantId === tenant?.id ? candidate : null;
+            }
             if (!row || row.kind !== INTEGRATION_API_KEY_KIND) return;
             await this.audit(
                 userId,

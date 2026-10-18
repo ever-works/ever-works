@@ -127,6 +127,23 @@ function extractChipsetLines(stdout: string): string {
  * would be a worse bug than the missing tag it was added to fix.
  */
 export async function detectGpu(runner: CommandRunner, platform: string): Promise<GpuInfo | null> {
+	return (await detectGpuWithEvidence(runner, platform)).gpu;
+}
+
+/**
+ * {@link detectGpu}, plus whether ANY probe actually answered.
+ *
+ * The capability tag only needs "found one or not"; the health snapshot
+ * (FL-03) needs to tell "no GPU" from "could not ask", because the first is
+ * a fact it may show ("no GPU") and the second must render as "—". A probe
+ * that ran and exited 0 without naming an adapter is an answer; a probe that
+ * could not be spawned or failed is not.
+ */
+export async function detectGpuWithEvidence(
+	runner: CommandRunner,
+	platform: string
+): Promise<{ gpu: GpuInfo | null; answered: boolean }> {
+	let answered = false;
 	for (const probe of gpuProbesFor(platform)) {
 		let stdout: string;
 		try {
@@ -138,6 +155,9 @@ export async function detectGpu(runner: CommandRunner, platform: string): Promis
 		} catch {
 			continue;
 		}
+		// `nvidia-smi` exiting 0 says only that THIS vendor's driver answered;
+		// its silence about other vendors is not evidence of no GPU at all.
+		if (probe.command !== 'nvidia-smi') answered = true;
 
 		let text = stdout;
 		if (probe.command === 'lspci') {
@@ -150,7 +170,111 @@ export async function detectGpu(runner: CommandRunner, platform: string): Promis
 		if (!model) {
 			continue;
 		}
-		return { vendor: classifyGpuVendor(text), model };
+		return { gpu: { vendor: classifyGpuVendor(text), model }, answered: true };
 	}
-	return null;
+	return { gpu: null, answered };
+}
+
+// ─── Utilisation and memory (computer health, FL-03) ────────────────────────
+
+/** A GPU's live figures, where the vendor's own tool exposes them. Absent fields were not readable. */
+export interface GpuUsageReading {
+	utilPercent?: number;
+	memUsedMiB?: number;
+	memTotalMiB?: number;
+}
+
+/** The single `nvidia-smi` query that answers name, utilisation and memory in one spawn. */
+export const NVIDIA_SMI_HEALTH_ARGS: readonly string[] = [
+	'--query-gpu=name,utilization.gpu,memory.used,memory.total',
+	'--format=csv,noheader,nounits'
+];
+
+function numericField(text: string | undefined): number | undefined {
+	if (typeof text !== 'string') return undefined;
+	const trimmed = text.trim();
+	// `[N/A]`, `[Not Supported]` and empty cells are "not readable", not zero.
+	if (!/^\d+(\.\d+)?$/.test(trimmed)) return undefined;
+	const value = Number(trimmed);
+	return Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Parse `nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total
+ * --format=csv,noheader,nounits` — one line per GPU, e.g. `NVIDIA GeForce RTX 4070, 12, 2048, 8188`.
+ * A name may itself contain commas, so the three numbers are read from the END of each line.
+ * Lines that do not parse are skipped; an empty list means nothing parsed.
+ */
+export function parseNvidiaSmiHealth(stdout: string): Array<{ name: string } & GpuUsageReading> {
+	const readings: Array<{ name: string } & GpuUsageReading> = [];
+	for (const raw of (stdout ?? '').split(/\r?\n/)) {
+		const reading = parseNvidiaSmiLine(raw.trim());
+		if (reading) readings.push(reading);
+	}
+	return readings;
+}
+
+function parseNvidiaSmiLine(line: string): ({ name: string } & GpuUsageReading) | null {
+	if (!line) return null;
+	const cells = line.split(',');
+	if (cells.length < 4) return null;
+	const memTotal = numericField(cells[cells.length - 1]);
+	const memUsed = numericField(cells[cells.length - 2]);
+	const util = numericField(cells[cells.length - 3]);
+	const name = cells
+		.slice(0, cells.length - 3)
+		.join(',')
+		.trim()
+		.slice(0, 120);
+	if (!name) return null;
+	const reading: { name: string } & GpuUsageReading = { name };
+	if (util !== undefined) reading.utilPercent = util;
+	if (memUsed !== undefined) reading.memUsedMiB = Math.round(memUsed);
+	if (memTotal !== undefined) reading.memTotalMiB = Math.round(memTotal);
+	return reading;
+}
+
+/** The `rocm-smi` query for an AMD card's use and VRAM, as JSON. */
+export const ROCM_SMI_HEALTH_ARGS: readonly string[] = ['--showuse', '--showmeminfo', 'vram', '--json'];
+
+/**
+ * Parse `rocm-smi --showuse --showmeminfo vram --json` — `{ "card0": { "GPU use (%)": "3",
+ * "VRAM Total Memory (B)": "17163091968", "VRAM Total Used Memory (B)": "251658240" } }`.
+ * The first card only; keys matched by meaning, not exact spelling, because the tool's
+ * wording has drifted between releases.
+ */
+export function parseRocmSmiHealth(stdout: string): GpuUsageReading | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse((stdout ?? '').trim());
+	} catch {
+		return null;
+	}
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+	const card = Object.entries(parsed as Record<string, unknown>).find(([key]) => /^card\d+$/i.test(key))?.[1];
+	if (!card || typeof card !== 'object') return null;
+	const fields = Object.entries(card as Record<string, unknown>);
+	const read = (pattern: RegExp): number | undefined => {
+		const entry = fields.find(([key]) => pattern.test(key));
+		return entry ? numericField(String(entry[1])) : undefined;
+	};
+	const util = read(/gpu use \(%\)/i);
+	const totalBytes = read(/vram total memory \(b\)/i);
+	const usedBytes = read(/vram total used memory \(b\)/i);
+	const reading: GpuUsageReading = {};
+	if (util !== undefined) reading.utilPercent = util;
+	if (usedBytes !== undefined) reading.memUsedMiB = Math.round(usedBytes / (1024 * 1024));
+	if (totalBytes !== undefined) reading.memTotalMiB = Math.round(totalBytes / (1024 * 1024));
+	return Object.keys(reading).length > 0 ? reading : null;
+}
+
+/** The `ioreg` query whose `PerformanceStatistics` carry an Apple GPU's utilisation. */
+export const IOREG_GPU_ARGS: readonly string[] = ['-r', '-d', '1', '-w', '0', '-c', 'IOAccelerator'];
+
+/** Read `"Device Utilization %"=12` out of `ioreg -r -d 1 -w 0 -c IOAccelerator`; null when absent. */
+export function parseIoregGpuUtil(stdout: string): number | null {
+	const match = /"Device Utilization %"\s*=\s*(\d+)/.exec(stdout ?? '');
+	if (!match) return null;
+	const value = Number(match[1]);
+	return Number.isFinite(value) ? value : null;
 }

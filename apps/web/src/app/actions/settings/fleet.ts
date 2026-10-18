@@ -104,6 +104,8 @@ export async function updateFleetNodeAction(
     try {
         const data = await fleetAPI.updateNode(nodeId, payload);
         revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        // Fleet hub (FL-01): the ⋯ menu renames / pauses from the hub.
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
         return { success: true, data, error: null };
     } catch (error) {
         return {
@@ -158,10 +160,15 @@ export async function clearFleetNodeModelThrottleAction(
 
 export async function deleteFleetNodeAction(
     nodeId: string,
+    /** Fleet hub (FL-01): the typed name the ⋯ menu's Remove sends (CONTRACTS §2.2). */
+    confirmName?: string,
 ): Promise<FleetActionResult<{ deleted: true }>> {
     await ensureAuth();
     try {
-        await fleetAPI.deleteNode(nodeId);
+        await fleetAPI.deleteNode(nodeId, confirmName === undefined ? undefined : { confirmName });
+        // Settings only: revalidating the hub here would re-render the computer
+        // page that just lost its computer (a 404) before the ⋯ menu navigates
+        // away; the Computers tab it lands on is read fresh.
         revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
         return { success: true, data: { deleted: true }, error: null };
     } catch (error) {
@@ -255,6 +262,7 @@ export async function drainFleetNodeAction(
     try {
         const data = await fleetAPI.drainNode(nodeId, drain);
         revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
         return { success: true, data, error: null };
     } catch (error) {
         return {
@@ -262,6 +270,37 @@ export async function drainFleetNodeAction(
             data: null,
             error: errorMessage(error, 'Failed to drain the node'),
         };
+    }
+}
+
+/**
+ * Fleet hub (FL-01, FR-23) — how many jobs a drain of this computer would
+ * release right now, for the drain confirmation ("2 jobs in flight will be
+ * released…"). From the owner's own node list (`load.activeJobCount`); null
+ * when it cannot be known — a computer shared with the caller carries no load,
+ * and a read that fails here is never shown as "no jobs". An owned computer
+ * with no load is idle (0). Known gap: when the list endpoint's OWN load
+ * lookup fails it already answers every row with "no load" (its documented
+ * degradation), which this cannot tell from idle — closing it needs the list
+ * to say "load unknown".
+ */
+export async function fetchFleetComputerInFlightAction(
+    nodeId: string,
+): Promise<FleetActionResult<number | null>> {
+    await ensureAuth();
+    try {
+        const nodes = await fleetAPI.listNodes();
+        const own = nodes.find((node) => node.id === nodeId && node.persisted);
+        // Not in the owner's own list (a computer shared with the caller): unknown.
+        if (!own) return { success: true, data: null, error: null };
+        // In the list without a load is idle (`FleetNodeView.load`: null/absent = idle).
+        return {
+            success: true,
+            data: typeof own.load?.activeJobCount === 'number' ? own.load.activeJobCount : 0,
+            error: null,
+        };
+    } catch {
+        return { success: true, data: null, error: null };
     }
 }
 

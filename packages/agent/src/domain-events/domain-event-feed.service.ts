@@ -33,6 +33,12 @@ export interface DomainEventFeedQuery {
      * = none of those events.
      */
     readonly grantedScopes?: readonly string[];
+    /**
+     * Read no position above this one (the feed head read earlier). A consumer that
+     * matched its subscriptions at that head must not move past it with a stale list
+     * (review 2026-10-17 F43). Absent = the current head.
+     */
+    readonly upTo?: string;
 }
 
 export interface DomainEventFeedPage {
@@ -102,7 +108,9 @@ export class DomainEventFeedService {
         const state = await this.dataSource
             .getRepository(DomainEventRelayState)
             .findOne({ where: { id: DOMAIN_EVENT_RELAY_STATE_ID } });
-        const head = seqToBigInt(state?.lastSeq);
+        const stateHead = seqToBigInt(state?.lastSeq);
+        const ceiling = query.upTo ? seqToBigInt(query.upTo) : stateHead;
+        const head = ceiling < stateHead ? ceiling : stateHead;
         const floor = seqToBigInt(state?.retentionFloorSeq);
         if (after < floor) {
             throw new DomainEventCursorExpiredError(after.toString(), floor.toString());

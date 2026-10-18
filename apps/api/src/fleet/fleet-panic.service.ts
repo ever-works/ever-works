@@ -31,6 +31,15 @@ export interface DrainNodeOptions {
      * rows beside it would bury the row an operator came to read.
      */
     suppressAudit?: boolean;
+    /**
+     * Fleet hub (FL-01, FR-22) — who drained, when it is not the owner: a
+     * person the node's `machines` audience admits. `userId` stays the
+     * owner (whose row and claims the drain touches); the audit row names
+     * this person as the actor. Omitted = the owner, exactly as before.
+     */
+    actorUserId?: string;
+    /** Extra facts for the audit row (the family and role acted through). */
+    details?: Record<string, unknown>;
 }
 
 export interface CancelInFlightOptions {
@@ -119,12 +128,16 @@ export class FleetPanicService {
         if (!options.suppressAudit) {
             await this.audit.recordNodeAction({
                 action: 'node.drain',
-                actorUserId: userId,
+                actorUserId: options.actorUserId ?? userId,
                 ownerUserId: userId,
                 nodeId,
                 before: before ? { status: before, drained: before === 'disabled' } : null,
                 after: { status: node.status, drained: drain },
-                extra: { releasedJobs, via: options.via ?? 'node-drain' },
+                extra: {
+                    releasedJobs,
+                    via: options.via ?? 'node-drain',
+                    ...(options.details ?? {}),
+                },
             });
         }
         return { node, releasedJobs };

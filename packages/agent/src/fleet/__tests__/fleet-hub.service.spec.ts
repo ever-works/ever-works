@@ -62,6 +62,9 @@ function build(rows: FleetNode[] = [node()]) {
             const current = store.get(id);
             if (current) store.set(id, { ...current, ...patch } as FleetNode);
         }),
+        delete: jest.fn(async (id: string) => {
+            store.delete(id);
+        }),
         sweepOffline: jest.fn(async () => 0),
         findStaleOnline: jest.fn(async () => []),
         findOfflineUnnoticed: jest.fn(async () => []),
@@ -291,6 +294,33 @@ describe('FleetService.listVisibleForUser (S9)', () => {
         expect(shared.modelThrottles?.[0]).toMatchObject({ provider: 'claude-code', reason: '' });
     });
 
+    it('shares the health snapshot (FL-03: reading health is the `view` family) but not the disk floor', async () => {
+        const at = new Date().toISOString();
+        const health = {
+            at,
+            cpuPercent: 31,
+            diskPercent: 92,
+            failedServices: 2,
+            pendingReboot: true,
+            gpu: [{ vendor: 'nvidia' as const, name: 'RTX 4090' }],
+        };
+        const holder = node({
+            id: 'node-shared',
+            userId: 'someone',
+            health,
+            minFreeDiskBytes: String(5 * 1024 ** 3),
+        } as Partial<FleetNode>);
+        const { service } = build([holder]);
+        const [shared] = await service.listVisibleForUser(MEMBER);
+        expect(shared.health).toEqual(health);
+        // The floor is one of the owner's limits: a shared reader's "disk low"
+        // is the percentage rule alone.
+        expect(shared).not.toHaveProperty('minFreeDiskBytes');
+        // A node that never reported health is shared as "none", not omitted.
+        const { service: other } = build([node({ id: 'node-shared', userId: 'someone' })]);
+        expect((await other.listVisibleForUser(MEMBER))[0].health).toBeNull();
+    });
+
     it('keeps the needs-a-look read off the live cluster merge', async () => {
         const { service } = build([others]);
         const listForUser = jest.spyOn(service, 'listForUser');
@@ -325,5 +355,128 @@ describe('FleetService.listVisibleForUser (S9)', () => {
         await expect(service.getVisibleForUser('stranger', 'node-shared')).rejects.toBeInstanceOf(
             NotFoundException,
         );
+    });
+});
+
+describe('FleetService machines-family acts (FR-22, ACC-FL01-16)', () => {
+    const shared = (overrides: Partial<FleetNode> = {}) =>
+        node({ id: 'node-shared', userId: 'someone-else', ...overrides });
+
+    it('lets the owner act as themselves, with an empty audit context', async () => {
+        const { service } = build();
+        await expect(service.resolveMachinesActor(OWNER, 'node-1')).resolves.toEqual({
+            ownerUserId: OWNER,
+            role: 'owner',
+            nodeName: 'build-01',
+            ctx: {},
+        });
+    });
+
+    it('refuses a member outside the machines audience with permission_denied naming the family', async () => {
+        const { service } = build([shared()]);
+        const refusal = await service.resolveMachinesActor(MEMBER, 'node-shared').catch((e) => e);
+        expect(refusal).toBeInstanceOf(ForbiddenException);
+        expect((refusal as ForbiddenException).getResponse()).toMatchObject({
+            error: {
+                code: 'permission_denied',
+                hint: 'Ask the owner of build-01 to allow org members: lifecycle.',
+                details: { family: 'machines' },
+            },
+        });
+    });
+
+    it('lets a member the machines audience admits act on the owner’s row, audited as themselves', async () => {
+        const { service, store, audits } = build([
+            shared({ controlPolicyFamilies: { machines: 'org-members' } }),
+        ]);
+        const actor = await service.resolveMachinesActor(MEMBER, 'node-shared');
+        expect(actor).toMatchObject({ ownerUserId: 'someone-else', role: 'org-member' });
+        await service.renameForUser(actor.ownerUserId, 'node-shared', 'build-02', actor.ctx);
+        expect(store.get('node-shared')?.name).toBe('build-02');
+        expect(audits).toEqual([
+            expect.objectContaining({
+                action: 'node.rename',
+                actorUserId: MEMBER,
+                extra: expect.objectContaining({
+                    family: 'machines',
+                    viewerRole: 'org-member',
+                    requestedBy: `user:${MEMBER}`,
+                }),
+            }),
+        ]);
+    });
+
+    it('answers a stranger with the 404 of an unknown id, whatever the policy', async () => {
+        const { service } = build([shared({ controlPolicyFamilies: { machines: 'org-members' } })]);
+        await expect(
+            service.resolveMachinesActor('stranger', 'node-shared'),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('keeps an enrolling row (an outstanding token) the owner’s alone', async () => {
+        const { service } = build([
+            shared({ status: 'enrolling', controlPolicyFamilies: { machines: 'org-members' } }),
+        ]);
+        await expect(service.resolveMachinesActor(MEMBER, 'node-shared')).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        await expect(service.getVisibleForUser(MEMBER, 'node-shared')).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+
+    it('is the owner-only lookup it always was without the access service', async () => {
+        const repository = {
+            findById: jest.fn(async () =>
+                shared({ controlPolicyFamilies: { machines: 'org-members' } }),
+            ),
+        };
+        const service = new FleetService(repository as never);
+        await expect(service.resolveMachinesActor(MEMBER, 'node-shared')).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+});
+
+describe('FleetService.deleteForUser confirmName (CONTRACTS §2.2, T-20)', () => {
+    it('removes exactly as before when no name is sent', async () => {
+        const { service, store, audits } = build();
+        await service.deleteForUser(OWNER, 'node-1');
+        expect(store.has('node-1')).toBe(false);
+        expect(audits).toEqual([expect.objectContaining({ action: 'node.delete', extra: null })]);
+    });
+
+    it('removes when the typed name matches, and records the confirmation class', async () => {
+        const { service, store, audits } = build();
+        await service.deleteForUser(OWNER, 'node-1', {}, { confirmName: '  build-01 ' });
+        expect(store.has('node-1')).toBe(false);
+        expect(audits).toEqual([
+            expect.objectContaining({
+                action: 'node.delete',
+                extra: { confirmationClass: 'confirm-destructive' },
+            }),
+        ]);
+    });
+
+    it('refuses a wrong name with invalid and deletes nothing', async () => {
+        const { service, store, repository } = build();
+        for (const confirmName of ['Build-01', 'build', '', null, 42]) {
+            const refusal = await service
+                .deleteForUser(OWNER, 'node-1', {}, { confirmName })
+                .catch((e) => e);
+            expect(refusal).toBeInstanceOf(BadRequestException);
+            expect((refusal as BadRequestException).getResponse()).toMatchObject({
+                error: { code: 'invalid', details: { field: 'confirmName' } },
+            });
+        }
+        expect(repository.delete).not.toHaveBeenCalled();
+        expect(store.has('node-1')).toBe(true);
+    });
+
+    it('answers a stranger with a 404 before looking at the name', async () => {
+        const { service } = build();
+        await expect(
+            service.deleteForUser('stranger', 'node-1', {}, { confirmName: 'wrong' }),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });

@@ -12,6 +12,18 @@ jest.mock('@ever-works/agent/services', () => ({
 jest.mock('@ever-works/agent/app-runtime', () => ({
     AppDeployRequestService: class AppDeployRequestService {},
 }));
+// Lane aw-deps-api — the two optional collaborators of the transient-dependency retry, as DI tokens
+// only (each suite below supplies its own double), and the Activity enum the writer stamps.
+jest.mock('@ever-works/agent/app-dependencies', () => ({
+    AppDependenciesService: class AppDependenciesService {},
+}));
+jest.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
+}));
+jest.mock('@ever-works/agent/entities', () => ({
+    ActivityActionType: { APP_DEPENDENCY: 'app_dependency' },
+    ActivityStatus: { COMPLETED: 'completed' },
+}));
 // The auth barrel pulls `better-auth`, an ESM package jest cannot parse, which is
 // why every controller spec in this app stubs it. Nothing here drives a router,
 // so the decorators only have to exist.
@@ -275,5 +287,115 @@ describe('WorkAppDeployController — the status', () => {
         expect(body.advisory).toEqual([
             { code: 'primary_domain_missing', message: 'No primary domain yet.' },
         ]);
+    });
+});
+
+/**
+ * Lane aw-deps-api — pressing Deploy is the owner's consent to retry a dependency that failed for a
+ * transient reason (`AppDependenciesService.retryTransientFailures` owns which rows qualify).
+ */
+describe('WorkAppDeployController — transient dependency retry', () => {
+    function dependencies(answer: unknown = { retried: [], leaseHeld: [], undispatched: [] }) {
+        return { retryTransientFailures: jest.fn(async () => answer) };
+    }
+    function activity() {
+        return { log: jest.fn(async () => ({})) };
+    }
+
+    it('retries BEFORE the request is evaluated, so the preconditions see the fresh rows', async () => {
+        const order: string[] = [];
+        const deps = {
+            retryTransientFailures: jest.fn(async () => {
+                order.push('retry');
+                return { retried: [], leaseHeld: [], undispatched: [] };
+            }),
+        };
+        const request = {
+            request: jest.fn(async () => {
+                order.push('request');
+                return result();
+            }),
+        } as unknown as AppDeployRequestService;
+
+        await new WorkAppDeployController(ownership(), request, deps as never).deploy(
+            auth,
+            WORK_ID,
+            {},
+            response(),
+        );
+
+        expect(deps.retryTransientFailures).toHaveBeenCalledWith(WORK_ID);
+        expect(order).toEqual(['retry', 'request']);
+    });
+
+    it('writes one app_dependency Activity row naming the kinds it retried', async () => {
+        const log = activity();
+        await new WorkAppDeployController(
+            ownership(),
+            service(),
+            dependencies({
+                retried: ['postgres', 'smtp'],
+                undispatched: ['redis'],
+                leaseHeld: [],
+            }) as never,
+            log as never,
+        ).deploy(auth, WORK_ID, {}, response());
+
+        expect(log.log).toHaveBeenCalledTimes(1);
+        expect(log.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: USER_ID,
+                workId: WORK_ID,
+                actionType: 'app_dependency',
+                action: 'app.dependency.retried',
+                metadata: { kinds: ['postgres', 'smtp'], trigger: 'deploy' },
+            }),
+        );
+    });
+
+    it('writes no row when nothing needed a retry', async () => {
+        const log = activity();
+        await new WorkAppDeployController(
+            ownership(),
+            service(),
+            dependencies() as never,
+            log as never,
+        ).deploy(auth, WORK_ID, {}, response());
+
+        expect(log.log).not.toHaveBeenCalled();
+    });
+
+    it('never lets the retry fail or block the Deploy request', async () => {
+        const request = service();
+        const deps = {
+            retryTransientFailures: jest.fn(async () => {
+                throw new Error('db down');
+            }),
+        };
+        const res = response();
+
+        const body = await new WorkAppDeployController(ownership(), request, deps as never).deploy(
+            auth,
+            WORK_ID,
+            {},
+            res,
+        );
+
+        expect(request.request).toHaveBeenCalledTimes(1);
+        expect(res.code()).toBe(202);
+        expect(body.status).toBe('accepted');
+    });
+
+    it('does not retry anything for a caller without edit access', async () => {
+        const deps = dependencies();
+        await expect(
+            new WorkAppDeployController(
+                refusingOwnership(HttpStatus.FORBIDDEN),
+                service(),
+                deps as never,
+            ).deploy(auth, WORK_ID, {}, response()),
+        ).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+
+        expect(deps.retryTransientFailures).not.toHaveBeenCalled();
     });
 });

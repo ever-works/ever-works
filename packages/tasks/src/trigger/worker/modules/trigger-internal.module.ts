@@ -48,7 +48,7 @@ import {
     CreditsSweepService,
     PaygService,
 } from '@ever-works/agent/subscriptions';
-import { FleetJobService } from '@ever-works/agent/fleet';
+import { FleetJobService, FleetNodeHealthService } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
@@ -280,6 +280,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: FleetJobService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetJobService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Computer health (FL-03) — the fleet-health-rollup cron calls
+        // rollupAndPrune() over the internal RPC channel; the repositories
+        // live API-side.
+        {
+            provide: FleetNodeHealthService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetNodeHealthService'),
             inject: [TriggerInternalApiClient],
         },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
@@ -597,6 +606,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         TaskRunDenormService,
         TaskWorkspaceService,
         FleetJobService,
+        FleetNodeHealthService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

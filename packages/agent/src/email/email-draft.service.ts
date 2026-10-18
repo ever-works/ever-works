@@ -129,7 +129,10 @@ export class EmailDraftService {
         // it is released (the send that actually goes out).
         const replyThreading = input.headers ? threadingFieldsOf(input.headers) : null;
 
+        // Review 2026-10-17 U1 (F112): the held draft lives where its address does.
+        const ownership = (await this.facade.ownershipOfAddress?.(input.emailAddressId)) ?? {};
         const draft = await this.messages.save({
+            ...ownership,
             userId: input.userId,
             agentId: input.agentId,
             taskId: input.taskId ?? null,

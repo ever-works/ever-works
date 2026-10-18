@@ -1,5 +1,10 @@
 import 'reflect-metadata';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { NeedsALookService } from '@ever-works/agent/fleet';
@@ -43,7 +48,15 @@ const item = (over: Partial<NeedsALookItem> = {}): NeedsALookItem => ({
     ...over,
 });
 
-function build(options: { needsALook?: NeedsALookService | null; role?: string } = {}) {
+function build(
+    options: {
+        needsALook?: NeedsALookService | null;
+        role?: string;
+        /** The caller's role for a machines-family act; `refuse` = permission_denied. */
+        actor?: 'owner' | 'org-admin' | 'org-member' | 'refuse' | 'missing';
+    } = {},
+) {
+    const actorRole = options.actor ?? 'owner';
     const service = {
         listForUser: jest.fn(async () => [view()]),
         listVisibleForUser: jest.fn(async () => [
@@ -61,6 +74,37 @@ function build(options: { needsALook?: NeedsALookService | null; role?: string }
         }),
         setFavoriteForUser: jest.fn(async () => view({ isFavorite: true })),
         setControlPolicyFamiliesForUser: jest.fn(async () => view()),
+        resolveMachinesActor: jest.fn(async (userId: string, id: string) => {
+            if (actorRole === 'missing') throw new NotFoundException(`Fleet node ${id} not found`);
+            if (actorRole === 'refuse') {
+                throw new ForbiddenException({
+                    statusCode: 403,
+                    error: { code: 'permission_denied', details: { family: 'machines' } },
+                });
+            }
+            if (actorRole === 'owner') {
+                return { ownerUserId: userId, role: 'owner', nodeName: 'build-01', ctx: {} };
+            }
+            return {
+                ownerUserId: 'the-owner',
+                role: actorRole,
+                nodeName: 'build-01',
+                ctx: {
+                    actorUserId: userId,
+                    details: { family: 'machines', viewerRole: actorRole },
+                },
+            };
+        }),
+        renameForUser: jest.fn(async () => view({ name: 'build-02', modelIdentity: 'secret' })),
+        setPausedForUser: jest.fn(async () => view({ status: 'paused' })),
+        setDisabledForUser: jest.fn(async () => view({ status: 'disabled' })),
+        deleteForUser: jest.fn(async () => undefined),
+    };
+    const panic = {
+        drainNodeForUser: jest.fn(async () => ({
+            node: view({ status: 'disabled' }),
+            releasedJobs: 2,
+        })),
     };
     const jobs = {
         loadByNodeForUser: jest.fn(async () => ({ [OWN]: { activeJobCount: 2 } })),
@@ -72,7 +116,7 @@ function build(options: { needsALook?: NeedsALookService | null; role?: string }
         { snapshot: jest.fn() } as never,
         { listForUser: jest.fn() } as never,
         { describeForUser: jest.fn() } as never,
-        { drainNodeForUser: jest.fn() } as never,
+        panic as never,
         { findByIds: jest.fn(async () => []) } as never,
         { recentForOwnerNode: jest.fn(async () => []) } as never,
         undefined,
@@ -80,7 +124,7 @@ function build(options: { needsALook?: NeedsALookService | null; role?: string }
     );
     const headers: Record<string, string> = {};
     const res = { setHeader: (name: string, value: string) => void (headers[name] = value) };
-    return { controller, service, jobs, headers, res };
+    return { controller, service, jobs, panic, headers, res };
 }
 
 describe('GET /api/fleet/nodes — scope (FR-15)', () => {
@@ -244,5 +288,120 @@ describe('PATCH /api/fleet/nodes/:id — favourite and policy families', () => {
     ])('validates %s', async (_name, body, valid) => {
         const errors = await validate(plainToInstance(UpdateFleetNodeDto, body));
         expect(errors.length === 0).toBe(valid);
+    });
+});
+
+describe('machines-family acts — rename, pause, disable, drain, remove (FR-22, ACC-FL01-16)', () => {
+    const adminCtx = {
+        actorUserId: 'user-1',
+        details: { family: 'machines', viewerRole: 'org-admin' },
+    };
+
+    it('lets the owner rename exactly as before', async () => {
+        const { controller, service } = build();
+        await controller.update(auth, OWN, { name: 'build-02' } as UpdateFleetNodeDto);
+        expect(service.resolveMachinesActor).toHaveBeenCalledWith('user-1', OWN);
+        expect(service.renameForUser).toHaveBeenCalledWith('user-1', OWN, 'build-02');
+        expect(service.getVisibleForUser).not.toHaveBeenCalled();
+    });
+
+    it('lets an org admin the family admits rename the owner’s row, answered with the shared view', async () => {
+        const { controller, service } = build({ actor: 'org-admin', role: 'org-admin' });
+        const result = await controller.update(auth, SHARED, {
+            name: 'build-02',
+            paused: true,
+        } as UpdateFleetNodeDto);
+        expect(service.renameForUser).toHaveBeenCalledWith(
+            'the-owner',
+            SHARED,
+            'build-02',
+            adminCtx,
+        );
+        expect(service.setPausedForUser).toHaveBeenCalledWith('the-owner', SHARED, true, adminCtx);
+        // Never the owner's full row: the view the owner shares with them.
+        expect(service.getVisibleForUser).toHaveBeenCalledWith('user-1', SHARED);
+        expect(result).toMatchObject({ id: SHARED, viewerRole: 'org-admin' });
+        expect(result).not.toHaveProperty('modelIdentity');
+    });
+
+    it('refuses owner-only fields beside a lifecycle act before ANY write', async () => {
+        const { controller, service } = build({ actor: 'org-admin', role: 'org-admin' });
+        const refusal = await controller
+            .update(auth, SHARED, { name: 'build-02', isFavorite: true } as UpdateFleetNodeDto)
+            .catch((e) => e);
+        expect(refusal).toBeInstanceOf(ForbiddenException);
+        expect((refusal as ForbiddenException).getResponse()).toMatchObject({
+            error: { code: 'permission_denied', details: { ownerOnly: true } },
+        });
+        expect(service.renameForUser).not.toHaveBeenCalled();
+        expect(service.setFavoriteForUser).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing when the family refuses the caller', async () => {
+        const { controller, service } = build({ actor: 'refuse' });
+        await expect(
+            controller.update(auth, SHARED, { disabled: true } as UpdateFleetNodeDto),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(service.setDisabledForUser).not.toHaveBeenCalled();
+    });
+
+    it('drains as the owner exactly as before', async () => {
+        const { controller, panic } = build();
+        await controller.drain(auth, OWN, { drain: true });
+        expect(panic.drainNodeForUser).toHaveBeenCalledWith('user-1', OWN, true);
+    });
+
+    it('drains the owner’s node for an org admin, audited as them, answered with the shared view', async () => {
+        const { controller, panic } = build({ actor: 'org-admin', role: 'org-admin' });
+        const result = await controller.drain(auth, SHARED, { drain: true });
+        expect(panic.drainNodeForUser).toHaveBeenCalledWith('the-owner', SHARED, true, {
+            actorUserId: 'user-1',
+            details: adminCtx.details,
+        });
+        expect(result.releasedJobs).toBe(2);
+        expect(result.node).toMatchObject({ id: SHARED, viewerRole: 'org-admin' });
+    });
+
+    it('drains nothing for a stranger (the 404 of an unknown id)', async () => {
+        const { controller, panic } = build({ actor: 'missing' });
+        await expect(controller.drain(auth, SHARED, { drain: true })).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(panic.drainNodeForUser).not.toHaveBeenCalled();
+    });
+
+    it('removes for an org admin with the typed name, on the owner’s row', async () => {
+        const { controller, service } = build({ actor: 'org-admin' });
+        await controller.remove(auth, SHARED, 'build-01');
+        expect(service.deleteForUser).toHaveBeenCalledWith('the-owner', SHARED, adminCtx, {
+            confirmName: 'build-01',
+        });
+    });
+
+    it('asks a non-owner for the typed name before removing the owner’s computer (CONTRACTS §2.2)', async () => {
+        const { controller, service } = build({ actor: 'org-admin' });
+        const refusal = await controller.remove(auth, SHARED).catch((e) => e);
+        expect(refusal).toBeInstanceOf(ConflictException);
+        expect((refusal as ConflictException).getResponse()).toMatchObject({
+            error: {
+                code: 'confirmation_required',
+                details: { class: 'confirm-destructive', summary: 'Remove build-01 from Fleet?' },
+            },
+        });
+        expect(service.deleteForUser).not.toHaveBeenCalled();
+    });
+
+    it('removes for the owner without a typed name exactly as before', async () => {
+        const { controller, service } = build();
+        await controller.remove(auth, OWN);
+        expect(service.deleteForUser).toHaveBeenCalledWith('user-1', OWN);
+    });
+
+    it('removes nothing when the family refuses the caller', async () => {
+        const { controller, service } = build({ actor: 'refuse' });
+        await expect(controller.remove(auth, SHARED, 'build-01')).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        expect(service.deleteForUser).not.toHaveBeenCalled();
     });
 });

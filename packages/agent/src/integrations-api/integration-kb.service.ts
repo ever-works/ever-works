@@ -173,6 +173,29 @@ export class IntegrationKbService {
         return (result.affected ?? 0) > 0;
     }
 
+    /**
+     * Review 2026-10-17 F53: undo a {@link claimVersion} no write used (the write was
+     * refused, or changed nothing): the version goes back only while it is still the
+     * claimed one, so a concurrent writer's bump is never undone.
+     */
+    async releaseClaimedVersion(
+        kind: 'kb_document' | 'kb_folder',
+        id: string,
+        expected: number,
+    ): Promise<void> {
+        const target = kind === 'kb_document' ? WorkKnowledgeDocument : MemoryFolder;
+        const escape = (name: string) => this.dataSource.driver.escape(name);
+        await this.dataSource
+            .createQueryBuilder()
+            .update(target)
+            .set({ version: () => `${escape('version')} - 1` })
+            .where(`${escape('id')} = :id AND ${escape('version')} = :claimed`, {
+                id,
+                claimed: expected + 1,
+            })
+            .execute();
+    }
+
     /** One library folder of the pinned organization (`404 not_found` for any other). */
     async getFolder(organizationId: string, id: string): Promise<IntegrationKbFolder> {
         const row = await this.dataSource.getRepository(MemoryFolder).findOne({

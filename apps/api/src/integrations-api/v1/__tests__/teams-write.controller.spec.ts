@@ -1,5 +1,10 @@
 import { VersionMismatchError } from '@ever-works/agent/integrations-api';
-import { IntegrationTeamsWriteController } from '../teams-write.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
+    IntegrationTeamsWriteController,
+    IntegrationUpdateTeamDto,
+} from '../teams-write.controller';
 
 /**
  * Team writes of `/api/integrations/v1` (EW-P1-4): create with Idempotency-Key
@@ -190,6 +195,21 @@ describe('IntegrationTeamsWriteController', () => {
         ]);
     });
 
+    // Review 2026-10-17 F36: the full-set PUTs take If-Match like PATCH (412, nothing changed).
+    it('PUT members and resources refuse a stale If-Match with 412 before any change', async () => {
+        const { controller, teams, teamResources } = setup();
+        await expect(
+            controller.members(user, 'team-1', { members: [] }, res(), '"4"'),
+        ).rejects.toMatchObject({ expected: 4, current: 5 });
+        await expect(
+            controller.resourcesSet(user, 'team-1', { resources: [] }, res(), '"4"'),
+        ).rejects.toMatchObject({ expected: 4, current: 5 });
+        expect(teams.removeMember).not.toHaveBeenCalled();
+        expect(teamResources.detach).not.toHaveBeenCalled();
+        await controller.members(user, 'team-1', { members: [] }, res(), '"5"');
+        expect(teams.removeMember).toHaveBeenCalled();
+    });
+
     it('PUT resources applies the difference and refuses an unknown type', async () => {
         const { controller, teamResources } = setup();
         await controller.resourcesSet(
@@ -221,5 +241,27 @@ describe('IntegrationTeamsWriteController', () => {
                 res(),
             ),
         ).rejects.toMatchObject({ code: 'validation_failed' });
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateTeamDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateTeamDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['name']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of ['description', 'parentTeamId', 'avatarIcon']) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

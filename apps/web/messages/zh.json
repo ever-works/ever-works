@@ -7414,6 +7414,38 @@
                         "specUnavailable": "此应用还没有可用的 App spec。",
                         "failed": "无法保存该值。请重试。"
                     }
+                },
+                "dependencies": {
+                    "title": "依赖项",
+                    "description": "此应用所需的数据库、缓存、存储和邮件服务。它们会在应用启动前在其部署目标上完成预配。",
+                    "loading": "正在读取依赖项…",
+                    "unavailable": "此实例暂不支持管理依赖项。",
+                    "error": "无法读取依赖项。请重新加载页面后重试。",
+                    "empty": "此应用的 App 规范未声明任何依赖项。",
+                    "provider": "提供方：{label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {已尝试 # 次}}",
+                    "noReason": "未记录原因。",
+                    "deployRetries": "再次部署会自动重试，也可以现在点击“重试”。",
+                    "retry": "重试",
+                    "retryAria": "重试 {kind}",
+                    "retried": "{kind}：已安排新的尝试。",
+                    "retryQueued": "{kind}：工作进程可用后将立即开始新的尝试。",
+                    "leaseHeld": "{kind} 正在预配中。请稍后重试。",
+                    "retryFailed": "无法重试 {kind}。请再试一次。",
+                    "deleteData": "删除数据",
+                    "deleteDataAria": "删除 {kind} 的数据",
+                    "deleteDialog": {
+                        "title": "删除 {kind} 的数据？",
+                        "description": "此操作会销毁该依赖项的卷、数据库和存储桶，且无法撤销。",
+                        "resources": "将被删除：",
+                        "noResources": "此依赖项没有记录任何资源。",
+                        "confirmLabel": "输入 {slug} 以确认",
+                        "cancel": "取消",
+                        "confirm": "删除数据",
+                        "requested": "正在删除 {kind} 的数据。",
+                        "failed": "无法删除数据。{reason}"
+                    }
                 }
             },
             "appEnv": {

@@ -19,6 +19,7 @@ export * from './fleet-client';
 export * from './gpu-probe';
 export * from './job-client';
 export * from './heartbeat';
+export * from './health-probe';
 export * from './logger';
 export * from './model-execution/model-process';
 export * from './runtime';

@@ -53,6 +53,31 @@ describe('IntegrationTaskSetsController', () => {
         return { controller, tasks };
     };
 
+    // Review 2026-10-17 F36: a stale If-Match answers 412 and changes nothing.
+    it('every PUT-set refuses a stale If-Match with 412 before any change', async () => {
+        const { controller, tasks } = setup();
+        const stale = '"3"'; // the task is at version 4
+        await expect(
+            controller.assignees(user, 'task-1', { assignees: [] }, res(), stale),
+        ).rejects.toMatchObject({ expected: 3, current: 4 });
+        await expect(
+            controller.watchers(user, 'task-1', { userIds: [] }, res(), stale),
+        ).rejects.toMatchObject({ expected: 3, current: 4 });
+        await expect(
+            controller.blocks(user, 'task-1', { blockedBy: [] }, res(), stale),
+        ).rejects.toMatchObject({ expected: 3, current: 4 });
+        await expect(
+            controller.relations(user, 'task-1', { relations: [] }, res(), stale),
+        ).rejects.toMatchObject({ expected: 3, current: 4 });
+        expect(tasks.removeAssignee).not.toHaveBeenCalled();
+        expect(tasks.removeWatcher).not.toHaveBeenCalled();
+        expect(tasks.removeBlocker).not.toHaveBeenCalled();
+        expect(tasks.removeRelation).not.toHaveBeenCalled();
+        // The current version passes.
+        await controller.assignees(user, 'task-1', { assignees: [] }, res(), '"4"');
+        expect(tasks.removeAssignee).toHaveBeenCalledTimes(2);
+    });
+
     it('assignees: removes the dropped, adds the new, keeps the rest', async () => {
         const { controller, tasks } = setup();
         const response = res();

@@ -12,7 +12,8 @@ import type { Logger } from './core/logger';
 import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
 import { resolveModelCliPaths } from './core/model-cli-probe';
 import type { ResourceProbe, ResourceSample } from './core/resource-limits';
-import type { DiskProbeIo } from './core/telemetry-probe';
+import type { DiskProbeIo, DiskVolumeReading } from './core/telemetry-probe';
+import type { HealthProbeIo } from './core/health-probe';
 
 /**
  * Real IO adapters for the headless node.
@@ -24,12 +25,20 @@ import type { DiskProbeIo } from './core/telemetry-probe';
 /** `execFile`-backed runner, matching `apps/desktop`'s command-runner shape. */
 export function createCommandRunner(): CommandRunner {
 	return {
-		run: (command, args) =>
+		run: (command, args, options) =>
 			new Promise((resolve) => {
+				// A caller's deadline (the health probe's per-fact budget) replaces
+				// the default; anything that is not a positive finite number keeps it.
+				const timeout =
+					typeof options?.timeoutMs === 'number' &&
+					Number.isFinite(options.timeoutMs) &&
+					options.timeoutMs > 0
+						? options.timeoutMs
+						: 10_000;
 				execFile(
 					command,
 					args,
-					{ shell: process.platform === 'win32', windowsHide: true, timeout: 10_000 },
+					{ shell: process.platform === 'win32', windowsHide: true, timeout },
 					(error, stdout, stderr) => {
 						const code = error
 							? ((error as NodeJS.ErrnoException & { code?: number | string }).code ?? 1)
@@ -38,6 +47,10 @@ export function createCommandRunner(): CommandRunner {
 							code: typeof code === 'number' ? code : 1,
 							stdout: String(stdout),
 							stderr: String(stderr),
+							// A string code is a spawn failure (`ENOENT`: not installed),
+							// not an exit status; `code` above still reads 1 for callers
+							// that only ask "did it succeed".
+							...(typeof code === 'string' ? { spawnError: code } : {}),
 							// `execFile` sets `killed` when it terminated the child at
 							// `timeout`; what the child printed until then is partial.
 							timedOut: Boolean(error && (error as { killed?: boolean }).killed)
@@ -306,9 +319,20 @@ function readCpuTicks(): CpuTicks {
  * `sampleWindowMs > 0` makes the first call take a real reading by waiting
  * that long between two snapshots; the default 0 keeps `sample()` synchronous
  * and relies on the delta between successive polls (which are seconds apart).
+ *
+ * `firstSampleWindowMs > 0` (computer health, FL-03) waits only when there is
+ * no previous reading — the FIRST call — and diffs against the previous call
+ * after that. The health snapshot needs exactly this: its CPU figure is the
+ * average since the last beat, and its very first figure must be a real
+ * measurement, never the "0% admits work" bias above, which would be a value
+ * the machine did not report. Give the health probe its OWN instance: two
+ * callers sharing one would each measure only the gap since the other.
  */
-export function createResourceProbe(options: { sampleWindowMs?: number } = {}): ResourceProbe {
-	const windowMs = Math.max(options.sampleWindowMs ?? 0, 0);
+export function createResourceProbe(
+	options: { sampleWindowMs?: number; firstSampleWindowMs?: number } = {}
+): ResourceProbe {
+	const everyWindowMs = Math.max(options.sampleWindowMs ?? 0, 0);
+	const firstWindowMs = Math.max(options.firstSampleWindowMs ?? 0, 0);
 	let previous: CpuTicks | null = null;
 
 	const measure = (current: CpuTicks, baseline: CpuTicks | null): number => {
@@ -323,6 +347,7 @@ export function createResourceProbe(options: { sampleWindowMs?: number } = {}): 
 	return {
 		sample: async (): Promise<ResourceSample> => {
 			let baseline = previous;
+			const windowMs = everyWindowMs > 0 ? everyWindowMs : previous === null ? firstWindowMs : 0;
 			if (windowMs > 0) {
 				baseline = readCpuTicks();
 				await new Promise((resolve) => setTimeout(resolve, windowMs));
@@ -367,6 +392,53 @@ export function createDiskProbe(): DiskProbeIo {
 				return Number.isFinite(available) && available >= 0 ? available : null;
 			} catch {
 				return null;
+			}
+		},
+		// Computer health (FL-03): the same `statfs`, read whole. Null on the
+		// same failures, and on any figure that is not a sane byte count.
+		volume: async (targetPath: string): Promise<DiskVolumeReading | null> => {
+			try {
+				const stats = await fsp.statfs(targetPath);
+				const block = Number(stats.bsize);
+				const reading = {
+					totalBytes: Number(stats.blocks) * block,
+					freeBytes: Number(stats.bfree) * block,
+					availableBytes: Number(stats.bavail) * block
+				};
+				const sane = Object.values(reading).every((value) => Number.isFinite(value) && value >= 0);
+				return sane && reading.totalBytes > 0 ? reading : null;
+			} catch {
+				return null;
+			}
+		}
+	};
+}
+
+/**
+ * Real host facts for the health probe (FL-03): `node:os` only, nothing
+ * spawned. The probe decides what each fact means per platform (the load
+ * average Windows always reports as zero is dropped THERE, where it is
+ * tested); this adapter only reads.
+ */
+export function createHealthProbeIo(runner: CommandRunner): HealthProbeIo {
+	return {
+		platform: process.platform,
+		runner,
+		// Its own sampler — see `createResourceProbe` on why it is never shared
+		// with the admission gate — whose first reading is a real 250 ms one.
+		resourceProbe: createResourceProbe({ firstSampleWindowMs: 250 }),
+		host: {
+			loadAvg1: () => os.loadavg()[0] ?? null,
+			uptimeSec: () => os.uptime(),
+			cores: () => (typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length)
+		},
+		disk: createDiskProbe(),
+		pathExists: async (target: string) => {
+			try {
+				await fsp.access(target);
+				return true;
+			} catch {
+				return false;
 			}
 		}
 	};

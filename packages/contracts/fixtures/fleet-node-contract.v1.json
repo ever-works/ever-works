@@ -150,6 +150,40 @@
 						"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
 						"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 					}
+				},
+				"withHealth": {
+					"expect": "accept",
+					"note": "Computer health (FL-03): a beat carrying the health snapshot in its own newest tier (CONTRACTS §4.5 revision 3 shape). A platform older than the field 400s it and the node drops only that tier.",
+					"body": {
+						"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+						"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+						"platform": "linux/x64",
+						"version": "1.0.0",
+						"capabilities": ["terminal", "workspace"],
+						"health": {
+							"cpuPercent": 31.2,
+							"memPercent": 58.1,
+							"memTotalMiB": 16384,
+							"memUsedMiB": 9523,
+							"diskPercent": 40,
+							"diskFreeMiB": 120832,
+							"diskTotalMiB": 201390,
+							"loadAvg1": 1.93,
+							"cpuCores": 4,
+							"uptimeSec": 273600,
+							"gpu": [
+								{
+									"vendor": "nvidia",
+									"name": "RTX 4070",
+									"utilPercent": 12,
+									"memUsedMiB": 2048,
+									"memTotalMiB": 8188
+								}
+							],
+							"pendingReboot": false,
+							"failedServices": 1
+						}
+					}
 				}
 			},
 			"response": {
@@ -522,6 +556,7 @@
 			"maxConcurrentJobs",
 			"maxCpuPercent",
 			"maxMemoryMb",
+			"health",
 			"consents"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
@@ -537,6 +572,7 @@
 			"maxConcurrentJobs",
 			"maxCpuPercent",
 			"maxMemoryMb",
+			"health",
 			"consents"
 		],
 		"controllerForwards": {
@@ -558,6 +594,7 @@
 				"maxConcurrentJobs",
 				"maxCpuPercent",
 				"maxMemoryMb",
+				"health",
 				"consents"
 			],
 			"heartbeat": [
@@ -578,6 +615,7 @@
 				"maxConcurrentJobs",
 				"maxCpuPercent",
 				"maxMemoryMb",
+				"health",
 				"consents"
 			]
 		}

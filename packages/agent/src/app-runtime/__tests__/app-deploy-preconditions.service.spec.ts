@@ -40,6 +40,7 @@ import {
     type AppDeployRuntimeStateReader,
     type AppDeploySpecSnapshot,
     type AppDeploySpecSource,
+    dependencyNotReadyMessage,
 } from '../app-deploy-preconditions.service';
 import type { AppRuntimeEnvContext, AppRuntimeEnvSource, AppsTierPolicy } from '../ports';
 
@@ -1192,6 +1193,55 @@ describe('AppDeployPreconditionsService — dependency_not_ready (GAP-05, ACC-06
         expect(dependencies.calls).toEqual(['work-1']);
         expect(codes(result)).toEqual(['dependency_not_ready']);
         expect(entryFor(result, 'dependency_not_ready').names).toEqual(['postgres', 'redis']);
+    });
+
+    it('names a FAILED dependency and its reason — never "Provisioning was requested" for it', async () => {
+        // Prod 2026-10-18: both rows had failed `providerNotSupported` and the refusal still
+        // said "not ready yet … Provisioning was requested; Deploy again", which could never
+        // come true — a definite failure is not re-dispatched (FR-43).
+        const { service, dependencies } = makeHarness();
+        dependencies.readiness = {
+            ready: false,
+            notReady: [
+                { kind: 'postgres', status: 'failed', reason: 'providerNotSupported' },
+                { kind: 'smtp', status: 'provisioning', reason: 'clusterUnreachable' },
+                { kind: 'redis', status: 'awaiting_config', reason: null },
+            ],
+            optional: [],
+        };
+
+        const result = await service.evaluate(request());
+        const entry = entryFor(result, 'dependency_not_ready');
+
+        expect(entry.names).toEqual(['postgres', 'smtp', 'redis']);
+        expect(entry.message).toContain(
+            'This dependency failed to provision: postgres (providerNotSupported).',
+        );
+        expect(entry.message).toContain('retry from the Dependencies card');
+        expect(entry.message).toContain('redis needs configuration on the Dependencies card');
+        expect(entry.message).toContain('Not ready yet: smtp (provisioning: clusterUnreachable).');
+    });
+
+    it('keeps the "Provisioning was requested" wording when nothing has failed', () => {
+        expect(
+            dependencyNotReadyMessage([
+                { kind: 'postgres', status: 'pending' },
+                { kind: 'redis', status: 'provisioning' },
+            ]),
+        ).toBe(
+            'These dependencies are not ready yet: postgres (pending), redis (provisioning). ' +
+                'Provisioning was requested; Deploy again when they are ready.',
+        );
+        expect(
+            dependencyNotReadyMessage([
+                { kind: 'postgres', status: 'failed', reason: 'noDefaultStorageClass' },
+                { kind: 'smtp', status: 'failed', reason: null },
+            ]),
+        ).toBe(
+            'These dependencies failed to provision: postgres (noDefaultStorageClass), smtp (no reason ' +
+                'recorded). They are not retried on their own: fix the cause or retry from the ' +
+                'Dependencies card, then Deploy again.',
+        );
     });
 
     it('says nothing when every dependency is ready', async () => {

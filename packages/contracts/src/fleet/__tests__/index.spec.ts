@@ -353,6 +353,40 @@ const COMMIT_MESSAGE_EXPORTS = [
 	'retypeFleetCommitMessage'
 ] as const;
 
+// Computer health (FL-03) — `fleet-node-health.types.ts`, pinned in
+// `fleet-node-health.spec.ts`; and the "needs a look" item shape (seam owned
+// by FL-01) — `fleet-needs-a-look.types.ts`, pinned in `fleet-needs-a-look.spec.ts`.
+const HEALTH_EXPORTS = [
+	'FLEET_HEALTH_PROBE_TIMEOUT_MS',
+	'FLEET_HEALTH_SAMPLE_MIN_INTERVAL_MS',
+	'FLEET_HEALTH_ROLLUP_CRON',
+	'FLEET_HEALTH_RAW_RETENTION_MS',
+	'FLEET_HEALTH_HOURLY_RETENTION_MS',
+	'FLEET_HEALTH_MAX_HISTORY_POINTS',
+	'FLEET_HEALTH_DISK_CRITICAL_MARGIN_BYTES',
+	'FLEET_HEALTH_DISK_WARN_FREE_FRACTION',
+	'FLEET_HEALTH_BYTES_PER_MIB',
+	'FLEET_HEALTH_MAX_GPU_MODEL_LENGTH',
+	'FLEET_HEALTH_MAX_GPUS',
+	'FLEET_HEALTH_MAX_MIB',
+	'FLEET_HEALTH_MAX_LOAD_AVG',
+	'FLEET_HEALTH_MAX_CORES',
+	'FLEET_HEALTH_MAX_UPTIME_SEC',
+	'FLEET_HEALTH_MAX_FAILED_SERVICES',
+	'FLEET_NODE_CLEAR_QUARANTINE_COMMAND',
+	'FLEET_CLEAR_MODEL_THROTTLE_COMMAND',
+	'FLEET_NODE_GPU_VENDORS',
+	'FLEET_NODE_HEALTH_RESOLUTIONS',
+	'FLEET_NODE_HEALTH_RANGES',
+	'COMPUTER_STATES',
+	'sanitizeFleetNodeHealthSnapshot',
+	'hasFleetNodeHealthReading',
+	'isFleetNodeHealthStale',
+	'diskLowSeverity',
+	'fleetNodeDiskLowInput',
+	'resolveComputerState'
+] as const;
+
 // Fleet hub (FL-01) — `fleet-access.types.ts` (the per-family control
 // policy and the role truth table) and `fleet-needs-a-look.types.ts` (the
 // one item shape every producer emits), pinned in `fleet-access.spec.ts`
@@ -493,6 +527,7 @@ const OPERATION_EXPORTS = [
 ] as const;
 
 const ALL_EXPORTS = [
+	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
 	...JOB_EXPORTS,
@@ -579,6 +614,12 @@ const FUNCTION_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage',
+	'sanitizeFleetNodeHealthSnapshot',
+	'hasFleetNodeHealthReading',
+	'isFleetNodeHealthStale',
+	'diskLowSeverity',
+	'fleetNodeDiskLowInput',
+	'resolveComputerState',
 	'isFleetActionFamily',
 	'isFleetAudience',
 	'normalizeControlPolicyFamilies',
@@ -646,7 +687,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 353 runtime symbols', () => {
+	it('exposes exactly these 381 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -709,7 +750,10 @@ describe('fleet barrel', () => {
 		// three of `fleet-operations.types.ts` — three NEW modules, so the
 		// witness table below gains three rows — and the legacy tag cap in
 		// `fleet-node.types.ts`.
-		expect(Object.keys(fleet)).toHaveLength(353);
+		// → 381 with computer health (FL-03): the twenty-eight symbols of
+		// `fleet-node-health.types.ts` — a NEW module, so the witness table
+		// below gains a row.
+		expect(Object.keys(fleet)).toHaveLength(381);
 	});
 
 	it.each([
@@ -725,6 +769,7 @@ describe('fleet barrel', () => {
 		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY'],
 		['fleet-model-usage-limit.types.js', 'FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT'],
 		['fleet-commit-message.types.js', 'FLEET_COMMIT_TYPES'],
+		['fleet-node-health.types.js', 'COMPUTER_STATES'],
 		['fleet-access.types.js', 'FLEET_ACTION_FAMILIES'],
 		['fleet-needs-a-look.types.js', 'NEEDS_A_LOOK_KINDS'],
 		['fleet-link.types.js', 'FLEET_LINK_FAMILIES'],

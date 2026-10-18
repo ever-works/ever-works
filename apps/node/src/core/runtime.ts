@@ -17,6 +17,7 @@ import { NodeLifecycleTracker, type NodeLifecycleRecord, type UpgradeHoldable } 
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import { createHealthProbe, type HealthProbeIo } from './health-probe';
 import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
@@ -103,6 +104,13 @@ export interface NodeIo {
 	 * `fs.stat`-backed one.
 	 */
 	statFile?: (path: string) => Promise<ModelCliFileStamp | null> | ModelCliFileStamp | null;
+	/**
+	 * Computer health (FL-03) — what the per-beat health snapshot reads.
+	 * Optional: without it the heartbeat carries no `health` field, exactly
+	 * as before the field existed. `node-io.ts` supplies the real one
+	 * (`createHealthProbeIo`); every test can leave it out.
+	 */
+	health?: HealthProbeIo;
 }
 
 /**
@@ -586,6 +594,24 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		},
 		cliCompat
 	);
+	// Computer health (FL-03): the snapshot on every BEAT — wired here and
+	// not in `buildSelfDescriptionTelemetry`, because that also feeds
+	// enrolment, which has no strip-and-retry fallback for a field an older
+	// platform does not know. One probe per process: its slow-fact caches
+	// live in the closure. Every consent gets it — health is what enrolment
+	// alone already grants (CONTRACTS §1.1).
+	// Once the platform has proven it predates `health` the beat strips it
+	// for the life of the process (`acceptsField`, FL-02's), so the probe —
+	// and the tools it spawns — stops running too (`loopRef` is set once the
+	// loop below exists).
+	let loopRef: HeartbeatLoop | null = null;
+	if (io.health) {
+		const probeHealth = createHealthProbe(io.health, {
+			workspacePath: io.workspacePath ?? workspaceRoot,
+			...(io.now ? { now: io.now } : {})
+		});
+		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probeHealth());
+	}
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
 	// `attended` (and `screen`) are advertised only by a process started with it.
@@ -681,7 +707,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		}
 	};
 
-	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions), lifecycle, cliCompat, consents };
+	const loop = new HeartbeatLoop(loopOptions);
+	loopRef = loop;
+	const runtime: NodeRuntime = { client, loop, lifecycle, cliCompat, consents };
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.

@@ -57,10 +57,14 @@ function liveEverGauzyKeys<T extends { integrationKind: string; expiresAt: strin
  * The webhook subscriptions integration keys own (Ever Gauzy creates its own
  * through the integration API), or `null` when they could not be read: the
  * card then says so instead of claiming a key has none.
+ *
+ * Review 2026-10-17 F47: read for every key the viewer manages. A key an
+ * Organization admin created keeps its subscriptions in the admin's account, so
+ * the viewer's own list showed the Tenant owner "no webhooks" for it.
  */
 async function keyOwnedWebhooks(): Promise<WebhookSubscription[] | null> {
     try {
-        const all = await webhooksAPI.list();
+        const all = await webhooksAPI.listForIntegrationKeys();
         return all.filter((sub) => sub.ownerType === 'integration_key' && !!sub.ownerId);
     } catch {
         return null;

@@ -36,8 +36,14 @@ describe('IntegrationLinksController writes', () => {
             put: jest.fn().mockResolvedValue(row),
             remove: jest.fn().mockResolvedValue(1),
             list: jest.fn(),
+            listPage: jest
+                .fn()
+                .mockResolvedValue({ data: [row], nextCursor: 'cursor-2', hasMore: true }),
         };
-        const resources = { assertLinkTarget: jest.fn().mockResolvedValue(true) };
+        const resources = {
+            assertLinkTarget: jest.fn().mockResolvedValue(true),
+            withoutPrivateTargets: jest.fn(async (rows: unknown[]) => rows),
+        };
         const scope = { getScope: () => ({ tenantId: 'tenant-1', organizationId: ORG }) };
         const controller = new IntegrationLinksController(
             links as never,
@@ -61,6 +67,22 @@ describe('IntegrationLinksController writes', () => {
             { entityType: 'task', entityId: TASK, externalId: 'g-1', externalUrl: null },
         );
         expect(dto).toMatchObject({ entityId: TASK, source: 'gauzy', externalId: 'g-1' });
+    });
+
+    // Review 2026-10-17 F42: a keyset page, `{data, nextCursor, hasMore}`.
+    it('GET pages the links with the list params and answers nextCursor / hasMore', async () => {
+        const { controller, links } = setup();
+        const page = await controller.list(user, 'task', undefined, 'cursor-1', '50', undefined);
+        expect(links.listPage).toHaveBeenCalledWith(
+            { organizationId: ORG, source: 'gauzy' },
+            { entityType: 'task', externalId: undefined },
+            { cursor: 'cursor-1', limit: 50, updatedSince: null },
+        );
+        expect(page).toMatchObject({ nextCursor: 'cursor-2', hasMore: true });
+        expect(page.data).toHaveLength(1);
+        await expect(
+            controller.list(user, undefined, undefined, undefined, 'many', undefined),
+        ).rejects.toMatchObject({ code: 'validation_failed' });
     });
 
     it('PUT refuses an unknown entity type and one v1 does not serve yet', async () => {

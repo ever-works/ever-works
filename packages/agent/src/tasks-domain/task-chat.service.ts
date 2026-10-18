@@ -652,8 +652,13 @@ export class TaskChatService {
         if (!body || body.trim().length === 0) {
             throw new BadRequestException('Chat body is required.');
         }
-        if (body.length > MAX_CHAT_BYTES) {
-            throw new BadRequestException(`Chat body exceeds max ${MAX_CHAT_BYTES} bytes.`);
+        // Review 2026-10-17 F40: counted in characters (code points), as the integration
+        // DTO (`@Length`) and the contract (`maxLength`) count them: an emoji is one, not
+        // two UTF-16 units. A body within the cap in UTF-16 units is within it in
+        // characters too, so only a longer one is counted.
+        const length = body.length <= MAX_CHAT_BYTES ? body.length : [...body].length;
+        if (length > MAX_CHAT_BYTES) {
+            throw new BadRequestException(`Chat body exceeds max ${MAX_CHAT_BYTES} characters.`);
         }
         assertNoSecrets(body, 'task.chat.body');
     }

@@ -6,7 +6,11 @@ import {
     Optional,
     UnauthorizedException,
 } from '@nestjs/common';
-import { DomainEventPublisher, recordAfterWrite } from '@ever-works/agent/domain-events';
+import {
+    buildMemberSnapshot,
+    DomainEventPublisher,
+    recordAfterWrite,
+} from '@ever-works/agent/domain-events';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, type EntityManager } from 'typeorm';
 import {
@@ -17,6 +21,7 @@ import {
 import { isUniqueConstraintError } from '@ever-works/agent/utils';
 import type {
     Organization,
+    OrganizationMember,
     OrganizationRegistrationProvider,
     OrganizationRegistrationStatus,
 } from '@ever-works/agent/entities';
@@ -508,6 +513,13 @@ export class OrganizationService {
              * before anything is written. Omitted (every app path): generated.
              */
             id?: string;
+            /**
+             * Review 2026-10-17 F52: an Organization admin's integration key creating an
+             * Organization makes its creator an `admin` of it IN the create's transaction
+             * (with `organization.member.added`), so a failure can never leave an
+             * Organization the key cannot use (and a retry a duplicate).
+             */
+            initialAdmin?: { userId: string; invitedById: string | null };
         },
     ): Promise<Organization> {
         const trimmedName = name?.trim();
@@ -578,6 +590,32 @@ export class OrganizationService {
                     saved.id,
                     'organization.created',
                 );
+                if (extra?.initialAdmin) {
+                    const members =
+                        manager.getRepository<OrganizationMember>('organization_members');
+                    const member = await members.save(
+                        members.create({
+                            organizationId: saved.id,
+                            tenantId: tenant.id,
+                            userId: extra.initialAdmin.userId,
+                            role: 'admin',
+                            invitedById: extra.initialAdmin.invitedById,
+                            invitationId: null,
+                            joinedAt: new Date(),
+                        } as Partial<OrganizationMember>),
+                    );
+                    const snapshot = await buildMemberSnapshot(manager, member);
+                    if (snapshot && this.domainEvents) {
+                        await this.domainEvents.child(
+                            manager,
+                            'organization',
+                            saved.id,
+                            'organization.member.added',
+                            snapshot as unknown as Record<string, unknown>,
+                            { changedFields: ['members'] },
+                        );
+                    }
+                }
 
                 // Step (d): pin the new Org as the user's last-seen scope
                 // so the next login lands on it. Only do this if the user

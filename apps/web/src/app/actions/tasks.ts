@@ -97,6 +97,33 @@ export async function updateTaskAction(
     return task;
 }
 
+/**
+ * Review 2026-10-17 U9 (F119): the Planning section's save, answering a refusal as a value
+ * (a production build hides the message of an error thrown out of a Server Action), so
+ * the section can show why (for instance a Task shared with the viewer, not theirs).
+ */
+export async function updateTaskPlanningAction(
+    id: string,
+    patch: Partial<Pick<Task, 'dueAt' | 'startAt' | 'estimateMinutes'>>,
+): Promise<{ ok: true; task: Task } | { ok: false; message: string }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.update(id, patch);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return { ok: true, task };
+    } catch (err) {
+        if (err instanceof ApiResponseError) return { ok: false, message: err.message };
+        // Not an answer of the API (transport, unexpected): logged here, the section shows
+        // its generic message.
+        console.error('task planning save failed', err);
+        return { ok: false, message: '' };
+    }
+}
+
 export async function deleteTaskAction(id: string): Promise<{ deleted: true }> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();

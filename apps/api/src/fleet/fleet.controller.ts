@@ -1,8 +1,10 @@
 import {
     BadRequestException,
     Body,
+    ConflictException,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     HttpCode,
     HttpStatus,
@@ -19,7 +21,7 @@ import {
     UnauthorizedException,
     UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type {
     CreateEnrollmentTokenResult,
@@ -32,6 +34,7 @@ import {
     FleetJobService,
     FleetService,
     NeedsALookService,
+    fleetOwnerOnlyBody,
 } from '@ever-works/agent/fleet';
 import type {
     FleetAuditView,
@@ -552,10 +555,22 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: DrainFleetNodeDto,
     ): Promise<FleetNodeDrainResult> {
+        // Fleet hub (FL-01, FR-22): drain / return is a `machines`-family
+        // act, answered server-side before anything moves. The owner drains
+        // exactly as before.
+        const actor = await this.service.resolveMachinesActor(auth.userId, id);
         // The drain itself (disable FIRST, then requeue — the order is
         // load-bearing) lives in FleetPanicService so that drain-all
         // (EW-778) performs exactly this, once per node.
-        return this.panic.drainNodeForUser(auth.userId, id, body.drain);
+        if (actor.role === 'owner') return this.panic.drainNodeForUser(auth.userId, id, body.drain);
+        // Someone the family admits drains the OWNER's node (their row, their
+        // claims), recorded as themselves, and is answered with the view the
+        // owner shares with them — never the owner's full row.
+        const result = await this.panic.drainNodeForUser(actor.ownerUserId, id, body.drain, {
+            actorUserId: auth.userId,
+            details: actor.ctx.details,
+        });
+        return { ...result, node: (await this.service.getVisibleForUser(auth.userId, id)).view };
     }
 
     @Post('nodes/:id/clear-model-throttle')
@@ -636,9 +651,39 @@ export class FleetController {
                 'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite and/or controlPolicyFamilies',
             );
         }
+        // Fleet hub (FL-01, FR-22): rename, pause / resume and disable /
+        // enable are `machines`-family acts — resolved once, server-side,
+        // before anything is written (404 outside `view`, permission_denied
+        // outside the family). The owner acts exactly as before; a role the
+        // family admits acts on the owner's row and is audited as themselves.
+        const actor =
+            typeof body.name === 'string' ||
+            typeof body.paused === 'boolean' ||
+            typeof body.disabled === 'boolean'
+                ? await this.service.resolveMachinesActor(auth.userId, id)
+                : null;
+        const sharedActor = actor && actor.role !== 'owner' ? actor : null;
+        if (
+            sharedActor &&
+            (Array.isArray(body.capabilities) ||
+                body.dailyCostCeilingCents !== undefined ||
+                typeof body.isFavorite === 'boolean' ||
+                body.controlPolicyFamilies !== undefined)
+        ) {
+            // Owner-only edits beside a lifecycle act are refused before ANY
+            // write, so a mixed body can never half-apply.
+            throw new ForbiddenException(fleetOwnerOnlyBody({ name: sharedActor.nodeName }));
+        }
         let view: FleetNodeView | null = null;
         if (typeof body.name === 'string') {
-            view = await this.service.renameForUser(auth.userId, id, body.name);
+            view = sharedActor
+                ? await this.service.renameForUser(
+                      sharedActor.ownerUserId,
+                      id,
+                      body.name,
+                      sharedActor.ctx,
+                  )
+                : await this.service.renameForUser(auth.userId, id, body.name);
         }
         // Fleet cost accounting (EW-777): `null` is a value here (clear the
         // ceiling), so the test is on `undefined`, never on truthiness.
@@ -676,23 +721,79 @@ export class FleetController {
         // Pause first, disable second: when both arrive, the harder stop
         // is the one that must be visible in the returned view.
         if (typeof body.paused === 'boolean') {
-            view = await this.service.setPausedForUser(auth.userId, id, body.paused);
+            view = sharedActor
+                ? await this.service.setPausedForUser(
+                      sharedActor.ownerUserId,
+                      id,
+                      body.paused,
+                      sharedActor.ctx,
+                  )
+                : await this.service.setPausedForUser(auth.userId, id, body.paused);
         }
         if (typeof body.disabled === 'boolean') {
-            view = await this.service.setDisabledForUser(auth.userId, id, body.disabled);
+            view = sharedActor
+                ? await this.service.setDisabledForUser(
+                      sharedActor.ownerUserId,
+                      id,
+                      body.disabled,
+                      sharedActor.ctx,
+                  )
+                : await this.service.setDisabledForUser(auth.userId, id, body.disabled);
         }
+        // A non-owner is answered with the view the owner shares with them.
+        if (sharedActor) return (await this.service.getVisibleForUser(auth.userId, id)).view;
         return view as FleetNodeView;
     }
 
     @Delete('nodes/:id')
     @ApiOperation({ summary: 'Delete a fleet node registration' })
+    @ApiBody({
+        required: false,
+        description:
+            '`confirmName` is the typed-name confirmation (CONTRACTS §2.2 `confirm-destructive`): when sent it must be the node’s name, or nothing is deleted (400 `invalid`). Optional for the node’s OWNER — without it the owner’s delete works exactly as it always has. Required for anyone else the node’s Lifecycle (`machines`) family admits: without it they get 409 `confirmation_required`.',
+        schema: { type: 'object', properties: { confirmName: { type: 'string' } } },
+    })
+    @ApiResponse({
+        status: 409,
+        description:
+            '`confirmation_required` — someone other than the owner sent no `confirmName`; `error.details` carries `{ class: "confirm-destructive", summary }`.',
+    })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Read by name, not through a DTO: a body this route never validated
+        // must keep being accepted exactly as it was (no field = no check).
+        @Body('confirmName') confirmName?: unknown,
     ): Promise<void> {
-        await this.service.deleteForUser(auth.userId, id);
+        // Fleet hub (FL-01, FR-22): remove is a `machines`-family act.
+        const actor = await this.service.resolveMachinesActor(auth.userId, id);
+        if (actor.role !== 'owner' && confirmName === undefined) {
+            // "No field = as before" protects the owner's existing callers. Someone
+            // else removing the owner's computer has no such history: the act is
+            // `confirm-destructive` (CONTRACTS §2.2), so the typed name is required.
+            const summary = `Remove ${actor.nodeName} from Fleet?`;
+            throw new ConflictException({
+                statusCode: 409,
+                message: summary,
+                error: {
+                    code: 'confirmation_required',
+                    hint: `Type ${actor.nodeName} as confirmName to remove it.`,
+                    details: { class: 'confirm-destructive', summary },
+                },
+            });
+        }
+        if (actor.role === 'owner' && confirmName === undefined) {
+            await this.service.deleteForUser(auth.userId, id);
+        } else {
+            await this.service.deleteForUser(
+                actor.ownerUserId,
+                id,
+                actor.ctx,
+                confirmName === undefined ? {} : { confirmName },
+            );
+        }
         this.closeLink(id, 'node removed');
     }
 
@@ -734,6 +835,8 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Computer health (FL-03): sanitised by the service, never trusted.
+            health: body.health,
             // Fleet node link (FL-02): the consents, should an enrolling node send them.
             consents: body.consents,
         });
@@ -779,6 +882,8 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Computer health (FL-03): the snapshot, sanitised by the service.
+            health: body.health,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
         });

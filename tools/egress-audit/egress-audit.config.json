@@ -5,6 +5,8 @@
 	"api_service": "ever-works-api",
 	"process_services": ["ever-works-api"],
 	"services": ["ever-works-api"],
+	"web_service": null,
+	"no_web_reason": "The web app (apps/web, a separate Next.js service) is not yet built inside the sealed audit network, so this audit covers the API process only; the browser leg is planned (follow-up PR).",
 	"health_url": "http://ever-works-api:3100/api/health",
 	"health_timeout_s": 600,
 	"module_routes": ["/api/instance-stats/status", "/api/instance-stats/last"],

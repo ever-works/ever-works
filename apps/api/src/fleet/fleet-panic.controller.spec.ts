@@ -170,6 +170,30 @@ describe('FleetPanicService', () => {
             });
         });
 
+        // Fleet hub (FL-01, FR-22) — someone the node's machines audience
+        // admits drains the OWNER's node: their row, their claims, and the
+        // audit row names the person who did it.
+        it('records a non-owner who drained as the actor, on the owner’s node', async () => {
+            await service.drainNodeForUser('user-1', 'node-online', true, {
+                actorUserId: 'admin-2',
+                details: { family: 'machines', viewerRole: 'org-admin' },
+            });
+            expect(jobs.releaseClaimsForNode).toHaveBeenCalledWith('user-1', 'node-online');
+            expect(audit.recordNodeAction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'node.drain',
+                    actorUserId: 'admin-2',
+                    ownerUserId: 'user-1',
+                    extra: expect.objectContaining({
+                        releasedJobs: 1,
+                        via: 'node-drain',
+                        family: 'machines',
+                        viewerRole: 'org-admin',
+                    }),
+                }),
+            );
+        });
+
         it('returning to service requeues nothing', async () => {
             const result = await service.drainNodeForUser('user-1', 'node-online', false);
             expect(jobs.releaseClaimsForNode).not.toHaveBeenCalled();

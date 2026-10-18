@@ -7414,6 +7414,38 @@
                         "specUnavailable": "このアプリにはまだ使用可能な App spec がありません。",
                         "failed": "値を保存できませんでした。もう一度お試しください。"
                     }
+                },
+                "dependencies": {
+                    "title": "依存関係",
+                    "description": "このアプリが必要とするデータベース、キャッシュ、ストレージ、メールです。アプリの起動前に、デプロイ先でプロビジョニングされます。",
+                    "loading": "依存関係を読み込んでいます…",
+                    "unavailable": "このインスタンスでは、まだ依存関係を管理できません。",
+                    "error": "依存関係を読み込めませんでした。ページを再読み込みして、もう一度お試しください。",
+                    "empty": "このアプリの App スペックでは依存関係が宣言されていません。",
+                    "provider": "プロバイダー: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {# 回試行}}",
+                    "noReason": "理由は記録されていません。",
+                    "deployRetries": "再度デプロイすると自動的に再試行されます。今すぐ「再試行」を押すこともできます。",
+                    "retry": "再試行",
+                    "retryAria": "{kind} を再試行",
+                    "retried": "{kind}: 新しい試行をスケジュールしました。",
+                    "retryQueued": "{kind}: ワーカーが利用可能になり次第、新しい試行を開始します。",
+                    "leaseHeld": "{kind} は現在プロビジョニング中です。しばらくしてからもう一度お試しください。",
+                    "retryFailed": "{kind} を再試行できませんでした。もう一度お試しください。",
+                    "deleteData": "データを削除",
+                    "deleteDataAria": "{kind} のデータを削除",
+                    "deleteDialog": {
+                        "title": "{kind} のデータを削除しますか？",
+                        "description": "この依存関係のボリューム、データベース、バケットが破棄されます。この操作は元に戻せません。",
+                        "resources": "削除されるもの:",
+                        "noResources": "この依存関係に記録されたリソースはありません。",
+                        "confirmLabel": "確認のため {slug} と入力してください",
+                        "cancel": "キャンセル",
+                        "confirm": "データを削除",
+                        "requested": "{kind} のデータを削除しています。",
+                        "failed": "データを削除できませんでした。{reason}"
+                    }
                 }
             },
             "appEnv": {

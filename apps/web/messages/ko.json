@@ -7414,6 +7414,38 @@
                         "specUnavailable": "이 앱에는 아직 사용할 수 있는 App spec이 없습니다.",
                         "failed": "값을 저장할 수 없습니다. 다시 시도하세요."
                     }
+                },
+                "dependencies": {
+                    "title": "종속성",
+                    "description": "이 앱에 필요한 데이터베이스, 캐시, 스토리지, 메일입니다. 앱이 시작되기 전에 배포 대상에 프로비저닝됩니다.",
+                    "loading": "종속성을 읽는 중…",
+                    "unavailable": "이 인스턴스에서는 아직 종속성을 관리할 수 없습니다.",
+                    "error": "종속성을 읽을 수 없습니다. 페이지를 새로 고친 후 다시 시도하세요.",
+                    "empty": "이 앱의 App 스펙에 선언된 종속성이 없습니다.",
+                    "provider": "제공자: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {#회 시도}}",
+                    "noReason": "기록된 사유가 없습니다.",
+                    "deployRetries": "다시 배포하면 자동으로 재시도합니다. 지금 '다시 시도'를 눌러도 됩니다.",
+                    "retry": "다시 시도",
+                    "retryAria": "{kind} 다시 시도",
+                    "retried": "{kind}: 새 시도가 예약되었습니다.",
+                    "retryQueued": "{kind}: 워커를 사용할 수 있게 되면 새 시도가 시작됩니다.",
+                    "leaseHeld": "{kind}이(가) 지금 프로비저닝 중입니다. 잠시 후 다시 시도하세요.",
+                    "retryFailed": "{kind}을(를) 다시 시도할 수 없습니다. 다시 시도하세요.",
+                    "deleteData": "데이터 삭제",
+                    "deleteDataAria": "{kind}의 데이터 삭제",
+                    "deleteDialog": {
+                        "title": "{kind} 데이터를 삭제할까요?",
+                        "description": "이 종속성의 볼륨, 데이터베이스, 버킷이 영구히 삭제됩니다. 되돌릴 수 없습니다.",
+                        "resources": "삭제될 항목:",
+                        "noResources": "이 종속성에 기록된 리소스가 없습니다.",
+                        "confirmLabel": "확인하려면 {slug}을(를) 입력하세요",
+                        "cancel": "취소",
+                        "confirm": "데이터 삭제",
+                        "requested": "{kind} 데이터를 삭제하는 중입니다.",
+                        "failed": "데이터를 삭제할 수 없습니다. {reason}"
+                    }
                 }
             },
             "appEnv": {

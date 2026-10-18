@@ -151,7 +151,7 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
         },
     ],
 })
-class AppDependencyProvisionWorkerModule {}
+export class AppDependencyProvisionWorkerModule {}
 
 export const appDependencyProvisionTask = task<
     'app-dependency-provision',
