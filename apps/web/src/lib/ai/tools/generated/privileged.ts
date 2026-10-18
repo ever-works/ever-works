@@ -120,7 +120,9 @@ const NOT_STARTED_TASK_STATUSES = new Set(['backlog', 'todo']);
 /** `create_task`: confirm when the Task would be born already started. */
 export function createsStartedTask(args: Record<string, unknown>): boolean {
     const status = bodyOf(args)?.status;
-    return status !== undefined && status !== null && !NOT_STARTED_TASK_STATUSES.has(String(status));
+    return (
+        status !== undefined && status !== null && !NOT_STARTED_TASK_STATUSES.has(String(status))
+    );
 }
 
 /**
@@ -158,7 +160,9 @@ export function startsTaskWork(args: Record<string, unknown>): boolean {
 /** `update_webhook`: confirm when the call moves where (or what) the webhook delivers. */
 export function redirectsWebhook(args: Record<string, unknown>): boolean {
     const body = bodyOf(args);
-    return Boolean(body && (body.url !== undefined || body.events !== undefined || body.secret !== undefined));
+    return Boolean(
+        body && (body.url !== undefined || body.events !== undefined || body.secret !== undefined),
+    );
 }
 
 /** `update_notification_channel`: confirm when the call changes the channel's destination config. */

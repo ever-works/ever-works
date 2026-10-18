@@ -81,7 +81,8 @@ export interface SecretOnceEntry {
 }
 
 /** Placeholder left where a lifted secret was. */
-export const SECRET_LIFTED_PLACEHOLDER = '[shown once to the user in the chat — never repeat or ask for it]';
+export const SECRET_LIFTED_PLACEHOLDER =
+    '[shown once to the user in the chat — never repeat or ask for it]';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);

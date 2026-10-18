@@ -84,7 +84,10 @@ describe('MCP privileged tools switch', () => {
 	let apiClient: ApiClientService;
 
 	const build = () => {
-		apiClient = new ApiClientService({ apiUrl: 'http://localhost:3100/api', apiKey: 'ew_test_key' } as McpConfigService);
+		apiClient = new ApiClientService({
+			apiUrl: 'http://localhost:3100/api',
+			apiKey: 'ew_test_key'
+		} as McpConfigService);
 		registry = { registerTool: vi.fn() };
 		const loader = { getOperations: vi.fn(() => operations) } as unknown as OpenApiLoaderService;
 		const service = new ToolRegistrationService(loader, new SchemaConverterService(), apiClient, registry as never);
@@ -93,7 +96,10 @@ describe('MCP privileged tools switch', () => {
 	const names = () => registry.registerTool.mock.calls.map((call: unknown[]) => (call[0] as { name: string }).name);
 	const registered = (name: string) =>
 		registry.registerTool.mock.calls.find((call: unknown[]) => (call[0] as { name: string }).name === name)?.[0] as
-			| { parameters: z.ZodObject<Record<string, z.ZodTypeAny>>; handler: (a: Record<string, unknown>) => Promise<unknown> }
+			| {
+					parameters: z.ZodObject<Record<string, z.ZodTypeAny>>;
+					handler: (a: Record<string, unknown>) => Promise<unknown>;
+			  }
 			| undefined;
 
 	beforeEach(() => {

@@ -53,7 +53,9 @@ describe('withAgentFanOutSuppressed (pure)', () => {
 
     it('suppresses the fan-out for every agent-driven move', () => {
         for (const to of Object.values(TaskStatus)) {
-            expect(withAgentFanOutSuppressed({ actorType: 'agent' }, to, on).suppressAgentFanOut).toBe(true);
+            expect(
+                withAgentFanOutSuppressed({ actorType: 'agent' }, to, on).suppressAgentFanOut,
+            ).toBe(true);
         }
     });
 
@@ -66,8 +68,11 @@ describe('withAgentFanOutSuppressed (pure)', () => {
 
     it('suppresses → in_progress even for the run’s own Task', () => {
         expect(
-            withAgentFanOutSuppressed({ actorType: 'agent', ownRunTask: true }, TaskStatus.IN_PROGRESS, on)
-                .suppressAgentFanOut,
+            withAgentFanOutSuppressed(
+                { actorType: 'agent', ownRunTask: true },
+                TaskStatus.IN_PROGRESS,
+                on,
+            ).suppressAgentFanOut,
         ).toBe(true);
     });
 
@@ -103,7 +108,9 @@ describe('TaskTransitionService — agent moves start no other agent', () => {
         blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
         approvers = { allApproved: jest.fn().mockResolvedValue(true) };
         assignees = {
-            findAgentAssignees: jest.fn().mockResolvedValue([{ assigneeType: 'agent', assigneeId: 'agent-b' }]),
+            findAgentAssignees: jest
+                .fn()
+                .mockResolvedValue([{ assigneeType: 'agent', assigneeId: 'agent-b' }]),
         };
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
@@ -142,7 +149,9 @@ describe('TaskTransitionService — agent moves start no other agent', () => {
     it('an agent’s → in_progress moves the Task but dispatches nobody', async () => {
         const task = makeTask({ status: TaskStatus.TODO });
         tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
-        const moved = await makeSvc().transition(task, TaskStatus.IN_PROGRESS, { actorType: 'agent' });
+        const moved = await makeSvc().transition(task, TaskStatus.IN_PROGRESS, {
+            actorType: 'agent',
+        });
         await flush();
         expect(moved.status).toBe(TaskStatus.IN_PROGRESS);
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
@@ -152,7 +161,10 @@ describe('TaskTransitionService — agent moves start no other agent', () => {
     it('an agent re-opening a done Task (done → in_progress) dispatches nobody', async () => {
         const task = makeTask({ status: TaskStatus.DONE });
         tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
-        await makeSvc().transition(task, TaskStatus.IN_PROGRESS, { actorType: 'agent', force: false });
+        await makeSvc().transition(task, TaskStatus.IN_PROGRESS, {
+            actorType: 'agent',
+            force: false,
+        });
         await flush();
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });
@@ -198,7 +210,10 @@ describe('TaskTransitionService — agent moves start no other agent', () => {
     it('the awaiting-owner hold (#2769) still refuses an agent move outright', async () => {
         const task = makeTask({ status: TaskStatus.TODO, labels: [AWAITING_OWNER_LABEL] });
         await expect(
-            makeSvc().transition(task, TaskStatus.IN_PROGRESS, { actorType: 'agent', ownRunTask: true }),
+            makeSvc().transition(task, TaskStatus.IN_PROGRESS, {
+                actorType: 'agent',
+                ownRunTask: true,
+            }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(tasks.casUpdateStatus).not.toHaveBeenCalled();
     });

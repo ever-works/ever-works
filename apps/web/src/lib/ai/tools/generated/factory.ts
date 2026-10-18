@@ -64,11 +64,17 @@ function fieldPreviewOf(args: Record<string, unknown>, fields: string[]): string
     if (!body || fields.length === 0) return undefined;
     let text: string;
     try {
-        text = JSON.stringify(Object.fromEntries(fields.map((field) => [field, body[field]])), null, 1);
+        text = JSON.stringify(
+            Object.fromEntries(fields.map((field) => [field, body[field]])),
+            null,
+            1,
+        );
     } catch {
         return undefined;
     }
-    return text.length > MAX_FIELD_PREVIEW_CHARS ? `${text.slice(0, MAX_FIELD_PREVIEW_CHARS)}…` : text;
+    return text.length > MAX_FIELD_PREVIEW_CHARS
+        ? `${text.slice(0, MAX_FIELD_PREVIEW_CHARS)}…`
+        : text;
 }
 
 /**

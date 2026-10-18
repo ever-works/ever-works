@@ -59,7 +59,8 @@ export class ToolRegistrationService {
 		const heldBack: string[] = [];
 
 		for (const whitelistEntry of WHITELIST) {
-			const entryName = whitelistEntry.toolName || this.generateToolName(whitelistEntry.method, whitelistEntry.path);
+			const entryName =
+				whitelistEntry.toolName || this.generateToolName(whitelistEntry.method, whitelistEntry.path);
 			if (isHeldBack(entryName, privilegedEnabled)) {
 				heldBack.push(entryName);
 				continue;

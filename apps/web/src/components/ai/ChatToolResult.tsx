@@ -312,7 +312,10 @@ export function ChatToolResult({
     const secretOnce = secretOnceEntries(output);
     if (secretOnce) {
         return (
-            <SecretOnceBox label={LABELS[toolName] ?? humanizeToolName(toolName)} entries={secretOnce} />
+            <SecretOnceBox
+                label={LABELS[toolName] ?? humanizeToolName(toolName)}
+                entries={secretOnce}
+            />
         );
     }
 

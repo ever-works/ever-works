@@ -479,7 +479,10 @@ describe('TaskWorkspaceService', () => {
             // Exactly one transition — the review-entry edge. A second
             // (duplicated) write here would double-fire the gates.
             expect(transitions.transition).toHaveBeenCalledTimes(1);
-            expect(transitions.transition.mock.calls[0][2]).toEqual({ actorType: 'agent', ownRunTask: true });
+            expect(transitions.transition.mock.calls[0][2]).toEqual({
+                actorType: 'agent',
+                ownRunTask: true,
+            });
         });
 
         it('an empty run still does NOT enter review — nothing to review', async () => {

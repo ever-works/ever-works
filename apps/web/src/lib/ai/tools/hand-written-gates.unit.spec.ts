@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
     updateWorkSchedule: vi.fn(async () => ({ success: true, message: 'ok' })),
     runWorkSchedule: vi.fn(async () => ({ success: true, message: 'ran' })),
     runMissionNowAction: vi.fn(async () => ({ status: 'spawned' })),
-    buildIdeaAction: vi.fn(async () => ({ idea: { id: 'i1', title: 't', status: 'queued' }, buildRequestId: 'b1' })),
+    buildIdeaAction: vi.fn(async () => ({
+        idea: { id: 'i1', title: 't', status: 'queued' },
+        buildRequestId: 'b1',
+    })),
     acceptProposalAction: vi.fn(async () => ({ ok: true })),
     dismissProposalAction: vi.fn(async () => undefined),
     generateItems: vi.fn(async () => ({ success: true, message: 'generating' })),
@@ -117,7 +120,12 @@ const cases: Array<{
     args: Record<string, unknown>;
     effect: () => ReturnType<typeof vi.fn>;
 }> = [
-    { name: 'deployWork', make: createDeployWorkTool, args: { workId: W }, effect: () => mocks.deploy },
+    {
+        name: 'deployWork',
+        make: createDeployWorkTool,
+        args: { workId: W },
+        effect: () => mocks.deploy,
+    },
     {
         name: 'generateItems',
         make: createGenerateItemsTool,
@@ -130,14 +138,24 @@ const cases: Array<{
         args: { workId: W, enable: true, cadence: 'hourly' },
         effect: () => mocks.updateWorkSchedule,
     },
-    { name: 'runScheduleNow', make: createRunScheduleNowTool, args: { workId: W }, effect: () => mocks.runWorkSchedule },
+    {
+        name: 'runScheduleNow',
+        make: createRunScheduleNowTool,
+        args: { workId: W },
+        effect: () => mocks.runWorkSchedule,
+    },
     {
         name: 'runMissionNow',
         make: createRunMissionNowTool,
         args: { missionId: M },
         effect: () => mocks.runMissionNowAction,
     },
-    { name: 'buildIdea', make: createBuildIdeaTool, args: { ideaId: 'i1' }, effect: () => mocks.buildIdeaAction },
+    {
+        name: 'buildIdea',
+        make: createBuildIdeaTool,
+        args: { ideaId: 'i1' },
+        effect: () => mocks.buildIdeaAction,
+    },
     {
         name: 'acceptIdea',
         make: createAcceptIdeaTool,
@@ -189,7 +207,10 @@ describe('setSchedule', () => {
 
 describe('generateItems', () => {
     it('puts the generation prompt on the card', async () => {
-        const card = await run(createGenerateItemsTool(noConfirmation), { workId: W, prompt: 'scrape and publish x' });
+        const card = await run(createGenerateItemsTool(noConfirmation), {
+            workId: W,
+            prompt: 'scrape and publish x',
+        });
         expect(card.preview).toBe('scrape and publish x');
     });
 });
