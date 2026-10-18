@@ -7,6 +7,7 @@ import { ApiClientService } from '../api-client/api-client.service.js';
 import { toMcpError } from '../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../api-client/fence-untrusted.js';
 import { WHITELIST, type WhitelistEntry } from './whitelist.js';
+import { MCP_PRIVILEGED_TOOLS_ENV, heldBackArgs, isHeldBack, mcpPrivilegedToolsEnabled } from './privileged-tools.js';
 
 // Security: the bundled/live-fetched OpenAPI spec is supply-chain-adjacent
 // (a tampered build artifact, or a MITM'd dev fetch, can inject text into
@@ -52,8 +53,18 @@ export class ToolRegistrationService {
 		const operations = this.loader.getOperations();
 		const registeredNames = new Set<string>();
 		let count = 0;
+		// Works-security (2026-10-18): privileged tools stay off unless the
+		// operator sets MCP_PRIVILEGED_TOOLS (see `privileged-tools.ts`).
+		const privilegedEnabled = mcpPrivilegedToolsEnabled();
+		const heldBack: string[] = [];
 
-		for (const entry of WHITELIST) {
+		for (const whitelistEntry of WHITELIST) {
+			const entryName = whitelistEntry.toolName || this.generateToolName(whitelistEntry.method, whitelistEntry.path);
+			if (isHeldBack(entryName, privilegedEnabled)) {
+				heldBack.push(entryName);
+				continue;
+			}
+			const entry = this.withHeldBackArgs(whitelistEntry, entryName, privilegedEnabled);
 			const operation = this.findOperation(operations, entry);
 			if (!operation) {
 				this.logger.warn(`Whitelist entry ${entry.method} ${entry.path} not found in OpenAPI spec, skipping`);
@@ -100,6 +111,23 @@ export class ToolRegistrationService {
 		}
 
 		this.logger.log(`Registered ${count} MCP tools from OpenAPI spec`);
+		if (heldBack.length > 0) {
+			this.logger.log(
+				`${heldBack.length} privileged MCP tools not registered (${MCP_PRIVILEGED_TOOLS_ENV} is off — set ` +
+					`${MCP_PRIVILEGED_TOOLS_ENV}=true to expose them): ${heldBack.join(', ')}`
+			);
+		}
+	}
+
+	/**
+	 * The entry with its privileged arguments (`MCP_PRIVILEGED_ARGS`) added to
+	 * `omitArgs` while the switch is off, so they are neither offered nor
+	 * forwarded. The entry itself is never mutated.
+	 */
+	private withHeldBackArgs(entry: WhitelistEntry, toolName: string, enabled: boolean): WhitelistEntry {
+		const extra = heldBackArgs(toolName, enabled);
+		if (extra.length === 0) return entry;
+		return { ...entry, omitArgs: [...new Set([...(entry.omitArgs ?? []), ...extra])] };
 	}
 
 	/**
