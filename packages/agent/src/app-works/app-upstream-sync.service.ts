@@ -45,6 +45,14 @@ import {
     upstreamSyncBranch,
     type AppUpstreamSyncSettings,
 } from './upstream-schedule';
+import {
+    APP_UPSTREAM_COMPARE_MAX_FILES,
+    APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS_ENV,
+    holdsForWorkflowReview,
+    upstreamWorkflowChangesAllowedForWork,
+    workflowChanges,
+    type UpstreamWorkflowChanges,
+} from './upstream-workflow-diff';
 
 /**
  * APW-02 T26 — one upstream sync run (plan §6.3, `plan.md:715-754`).
@@ -107,11 +115,30 @@ import {
  *      (FR-41, FR-42, FR-45) and the default-branch rename of FR-43;
  *   6. `trigger === 'divergence'` ⇒ compare only, settle with the outcome that was
  *      already recorded, and stop;
- *   7. the compare, then either the fast-forward (fork, behind-only, licence not
- *      worse) or the pull-request path (FR-35, FR-36, FR-37);
+ *   7. the compare, then **the workflow hold** (FR-60/FR-61, T46 — below), then
+ *      either the fast-forward (fork, behind-only, licence not worse) or the
+ *      pull-request path (FR-35, FR-36, FR-37);
  *   8. settle: record the outcome, the next slot (§6.4), the licence request and
  *      the hygiene pass — the last two only when the tracked branch changed
  *      (FR-40, plan §6.3 step 8).
+ *
+ * ## The workflow hold (FR-60, FR-61, S29 — prompt-injection hardening)
+ *
+ * Moving `ever-works/upstream-sync`, opening the sync pull request and
+ * fast-forwarding the tracked branch all put **third-party commits on a
+ * same-repository ref**, and GitHub runs the workflows those commits carry with
+ * the App repository's secrets — its Build values included — before Actions
+ * hygiene could ever see a new workflow file. So once the range is known and
+ * before ANY of those moves, the run reads the compare of `tracked
+ * branch...upstream head` (pinned to the exact head it would move to) and, when
+ * the range touches `.github/workflows/**` or `.github/actions/**` — or the
+ * compare cannot be read, or cannot prove it is the whole range — it moves
+ * nothing, opens nothing, records `skipped` / `held_for_workflow_review`, and
+ * emits one `app.upstream.held` naming the paths (never their content). Every
+ * trigger takes the same branch: scheduled, manual and retried. The only way
+ * past it is an operator listing the Work in
+ * `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS` — never the App spec, which the
+ * upstream author can write.
  *
  * ## Fail-closed everywhere a seam is missing
  *
@@ -435,7 +462,11 @@ export class ProviderBudgetExceededError extends Error {
 
 /** One Activity event this run emits itself (§3.5's eight, minus the ones T23 owns). */
 interface SyncEvent {
-    action: 'app.upstream.behind' | 'app.upstream.unavailable' | 'app.fork.missing';
+    action:
+        | 'app.upstream.behind'
+        | 'app.upstream.unavailable'
+        | 'app.upstream.held'
+        | 'app.fork.missing';
     actionType: ActivityActionType;
     status: ActivityStatus;
     summary: string;
@@ -828,6 +859,20 @@ export class AppUpstreamSyncService {
             return { ...base, commits: 0 };
         }
 
+        // FR-60/FR-61 (T46): the workflow hold — before the private copy's branch
+        // move, before the fast-forward, and before any push to
+        // `ever-works/upstream-sync` (the history-rewritten recreation included,
+        // which is only reachable from the pull-request path below).
+        const held = await this.holdForWorkflowReview(
+            context,
+            row,
+            base,
+            comparison.upstreamHeadSha,
+        );
+        if (held) {
+            return held;
+        }
+
         if (row.relation === 'private-copy') {
             // FR-36 + FR-63: behind ⇒ the sync branch moves and one pull request is
             // kept open on it. The move itself lives in the pull-request path, so both
@@ -846,16 +891,32 @@ export class AppUpstreamSyncService {
                 return await this.pullRequestPath(context, row, base, 'license_worse');
             }
 
-            try {
-                const synced = await context.budget.call(() =>
-                    this.git.syncForkBranch(row.dataOwner, row.dataRepo, row.dataDefaultBranch, {
-                        userId: context.ownerUserId as string,
-                        providerId: context.providerId,
-                        workId,
-                    }),
-                );
-                const outcome = String(synced?.outcome ?? '');
-                if (outcome === 'fast_forwarded' || outcome === 'merged') {
+            // FR-60 (T46): the tracked branch moves to the EXACT sha the workflow hold
+            // and the licence gate just checked — never to wherever upstream's branch
+            // points by the time the move lands. GitHub's merge-upstream
+            // (`syncForkBranch`) merges upstream's LIVE tip, so an upstream that flips
+            // its branch between a clean commit and a workflow commit could land the
+            // workflow past the hold. A fork network shares its objects (the
+            // pull-request path already points `ever-works/upstream-sync` at this same
+            // sha), and `force: false` keeps the move a fast-forward: a fork that moved
+            // since the compare answers `unprocessable`, which the pull request carries.
+            const checkedSha = nonEmptyString(comparison.upstreamHeadSha);
+            if (checkedSha) {
+                try {
+                    await context.budget.call(() =>
+                        this.git.updateBranchRef(
+                            row.dataOwner,
+                            row.dataRepo,
+                            row.dataDefaultBranch,
+                            checkedSha,
+                            { force: false },
+                            {
+                                userId: context.ownerUserId as string,
+                                providerId: context.providerId,
+                                workId,
+                            },
+                        ),
+                    );
                     return {
                         ...base,
                         result: 'fast_forwarded',
@@ -864,17 +925,14 @@ export class AppUpstreamSyncService {
                         // the licence gate again and re-runs hygiene.
                         trackedBranchChanged: true,
                     };
-                }
-                if (outcome === 'up_to_date') {
-                    return { ...base, commits: 0 };
-                }
-                // `conflict` / `unprocessable`: the platform does not resolve it and does
-                // not force anything — the pull-request path carries it (§9.2).
-            } catch (error) {
-                // A 409 race (upstream moved between the compare and the merge) is an
-                // answer, not a failure: the pull request carries the range instead.
-                if (!isPullRequestWorthy(error)) {
-                    throw error;
+                } catch (error) {
+                    // `unprocessable` (not a fast-forward: the fork moved, or the branch
+                    // is protected) and `conflict` are answers, not failures: the
+                    // platform does not resolve them and does not force anything — the
+                    // pull request carries the range instead (§9.2).
+                    if (!isPullRequestWorthy(error)) {
+                        throw error;
+                    }
                 }
             }
         }
@@ -883,6 +941,148 @@ export class AppUpstreamSyncService {
         // fast-forward raced or was refused, and every private copy that is behind: one
         // reusable pull request on `ever-works/upstream-sync` (FR-36).
         return await this.pullRequestPath(context, row, base);
+    }
+
+    // ── the workflow hold (FR-60, FR-61, T46) ─────────────────────────────────
+
+    /**
+     * `null` ⇒ the range may be synced; an outcome ⇒ it is held and nothing moves.
+     *
+     * Held when the compare names a protected path, and equally when it cannot
+     * prove there is none (unreadable, truncated, at the provider's file ceiling):
+     * a check that cannot answer has not said yes. The `app.upstream.held` event is
+     * emitted once per held upstream head — a weekly schedule that keeps finding the
+     * same head held records the state again but notifies the owner only once.
+     */
+    private async holdForWorkflowReview(
+        context: RunContext,
+        row: WorkUpstreamState,
+        base: SyncOutcome,
+        headSha: string,
+    ): Promise<SyncOutcome | null> {
+        if (upstreamWorkflowChangesAllowedForWork(context.workId)) {
+            this.logger.warn(
+                `App upstream sync: work ${context.workId} is listed in ${APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS_ENV}, so the upstream range to ${headSha || '(unknown head)'} is synced without the workflow-change hold.`,
+            );
+            return null;
+        }
+
+        const changes = await this.readUpstreamWorkflowChanges(context, row, headSha);
+        if (!holdsForWorkflowReview(changes)) {
+            return null;
+        }
+
+        const alreadyHeld =
+            row.lastSyncReason === 'held_for_workflow_review' &&
+            (row.lastSyncedUpstreamSha ?? null) === (headSha || null);
+        this.logger.warn(
+            `App upstream sync: work ${context.workId} held — the upstream range to ${headSha || '(unknown head)'} ${
+                changes.complete
+                    ? `changes ${changes.pathCount} workflow/action path(s)`
+                    : 'could not be proven free of workflow/action changes'
+            }; nothing was moved (FR-60).`,
+        );
+
+        return {
+            ...base,
+            result: 'skipped',
+            reason: 'held_for_workflow_review',
+            events: [
+                ...(base.events ?? []),
+                ...(alreadyHeld ? [] : [workflowHeldEvent(headSha, changes)]),
+            ],
+        };
+    }
+
+    /**
+     * The protected paths the range `tracked branch...headSha` touches (FR-60).
+     *
+     * - **Fork**: the compare is read in the App repository itself, with the
+     *   upstream head as an exact sha (a fork network shares its objects), so the
+     *   range checked is the range that would move — never a branch name that
+     *   upstream could advance between the check and the move.
+     * - **Private copy**: it shares no objects with upstream, so the compare is read
+     *   in the upstream repository from the commit `ever-works/upstream-sync`
+     *   already holds (always an upstream commit, and one this hold already let
+     *   through), or — when that branch is gone — from `copyPushedSha`, the upstream
+     *   commit the copy was made from. Neither ⇒ no trustworthy base ⇒ held.
+     *
+     * Rate limits and the run budget propagate (they have their own outcomes and
+     * move nothing either); every other failure is "unreadable", which holds.
+     */
+    private async readUpstreamWorkflowChanges(
+        context: RunContext,
+        row: WorkUpstreamState,
+        headSha: string,
+    ): Promise<UpstreamWorkflowChanges> {
+        const unreadable: UpstreamWorkflowChanges = { paths: [], pathCount: 0, complete: false };
+        if (!nonEmptyString(headSha)) {
+            return unreadable;
+        }
+        const options = {
+            userId: context.ownerUserId as string,
+            providerId: context.providerId,
+            workId: context.workId,
+        };
+        // Paths are all the hold reads: no patch text, and the provider's whole file list.
+        const caps = { maxFiles: APP_UPSTREAM_COMPARE_MAX_FILES, maxBytes: 0 };
+
+        try {
+            if (row.relation === 'private-copy') {
+                const tip = await context.budget.call(() =>
+                    this.git.getLatestCommit(
+                        row.dataOwner,
+                        row.dataRepo,
+                        APP_UPSTREAM_SYNC_BRANCH,
+                        options,
+                    ),
+                );
+                // No sync branch (never created, or deleted when its pull request
+                // merged) ⇒ the commit the copy was made from: an upstream commit the
+                // member's repository already holds, so the range is still everything
+                // new. Neither ⇒ no trustworthy base ⇒ held.
+                const baseSha = nonEmptyString(tip?.sha) ?? nonEmptyString(row.copyPushedSha);
+                if (!baseSha) {
+                    return unreadable;
+                }
+                const diff = await context.budget.call(() =>
+                    this.git.getCompareDiff(
+                        row.upstreamOwner as string,
+                        row.upstreamRepo as string,
+                        baseSha,
+                        headSha,
+                        caps,
+                        options,
+                    ),
+                );
+                return workflowChanges(diff);
+            }
+
+            const diff = await context.budget.call(() =>
+                this.git.getCompareDiff(
+                    row.dataOwner,
+                    row.dataRepo,
+                    row.dataDefaultBranch,
+                    headSha,
+                    caps,
+                    options,
+                ),
+            );
+            return workflowChanges(diff);
+        } catch (error) {
+            const reason = providerReasonOf(error);
+            if (
+                error instanceof ProviderBudgetExceededError ||
+                reason === 'rate_limited' ||
+                reason === 'secondary_rate_limited'
+            ) {
+                throw error;
+            }
+            this.logger.warn(
+                `App upstream sync: reading the upstream range of work ${context.workId} for workflow changes failed (${errorText(error)}); the range is held rather than synced unchecked.`,
+            );
+            return unreadable;
+        }
     }
 
     // ── the compare (§6.3 step 6) ────────────────────────────────────────────
@@ -1429,10 +1629,15 @@ export class AppUpstreamSyncService {
      * answer the gate ever gave, and FR-37 was off. The two branches now agree:
      * unknown ⇒ take the pull-request path.
      *
-     * The visible consequence, stated rather than hidden: until that token is bound,
-     * every sync of a Work whose upstream moved opens a pull request instead of
-     * fast-forwarding. That is slower and it is correct; the way to get the
+     * The visible consequence, stated rather than hidden: wherever that token is not
+     * bound, every sync of a Work whose upstream moved opens a pull request instead
+     * of fast-forwarding. That is slower and it is correct; the way to get the
      * fast-forward back is to BIND the licence service, not to loosen the gate.
+     *
+     * Since then `AppLicenseModule` provides the token (`useExisting: AppLicenseService`)
+     * and the Trigger.dev upstream-sync task binds it too, so the fast-forward path IS
+     * reachable in production — which is why that path moves the tracked branch to the
+     * exact sha the workflow hold checked rather than calling merge-upstream.
      */
     private async licenseIsWorse(
         context: RunContext,
@@ -1440,10 +1645,10 @@ export class AppUpstreamSyncService {
         headSha: string,
     ): Promise<boolean> {
         if (!this.licenses || typeof this.licenses.previewUpstream !== 'function') {
-            // Unknown, not “fine” — see this method's docstring. `APP_UPSTREAM_LICENSE_SERVICE`
-            // is bound nowhere today, so this is the branch production actually takes.
+            // Unknown, not “fine” — see this method's docstring. Reached only where
+            // `APP_UPSTREAM_LICENSE_SERVICE` is not bound in this process.
             this.logger.warn(
-                `App upstream sync: no licence service is wired (APP_UPSTREAM_LICENSE_SERVICE is bound in no module), so the FR-37 licence check for work ${context.workId} cannot run; the sync takes the pull-request path rather than fast-forwarding unasked.`,
+                `App upstream sync: no licence service is wired (APP_UPSTREAM_LICENSE_SERVICE is not bound in this process), so the FR-37 licence check for work ${context.workId} cannot run; the sync takes the pull-request path rather than fast-forwarding unasked.`,
             );
             return true;
         }
@@ -1819,6 +2024,30 @@ function behindEvents(
             },
         },
     ];
+}
+
+/**
+ * FR-60's owner notice: the range was held, and which protected paths it touches —
+ * paths and counts only, never file content (S29). `complete: false` says the
+ * compare could not prove the range clean (unreadable or truncated), which holds
+ * just the same.
+ */
+function workflowHeldEvent(headSha: string, changes: UpstreamWorkflowChanges): SyncEvent {
+    return {
+        action: 'app.upstream.held',
+        actionType: ActivityActionType.APP_UPSTREAM,
+        // Waiting on a person: an operator lifts it, or upstream reverts the change.
+        status: ActivityStatus.PENDING,
+        summary: 'Upstream changed its workflows. Review before syncing.',
+        details: {
+            reason: 'held_for_workflow_review',
+            upstreamHeadSha: headSha || null,
+            paths: changes.paths,
+            pathCount: changes.pathCount,
+            complete: changes.complete,
+            optIn: APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS_ENV,
+        },
+    };
 }
 
 /**

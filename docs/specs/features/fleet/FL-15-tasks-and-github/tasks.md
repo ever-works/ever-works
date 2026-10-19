@@ -115,8 +115,7 @@
       **Test**: `packages/agent/src/triggers/__tests__/trigger-event-matcher.spec.ts` extended —
       audience × login matrix, missing key = today's behaviour, case-insensitive login.
 - [ ] **T-13**. Create `apps/api/src/ingest/github/github-pr-intake.service.ts` beside the issue
-      intake: `pull_request` actions `review_requested · review_request_removed · assigned ·
-      unassigned · opened · ready_for_review · reopened · closed` → `github.pr` envelopes with
+      intake: `pull_request` actions `review_requested · review_request_removed · assigned · unassigned · opened · ready_for_review · reopened · closed` → `github.pr` envelopes with
       `requestedReviewer`, `assignees`, `author`, `headRef`, `headRepo`, `maintainerCanModify`;
       register in `github-webhook-dispatcher.service.ts`.
       **Test**: `apps/api/src/ingest/github/github-pr-intake.service.spec.ts` — each action, subject

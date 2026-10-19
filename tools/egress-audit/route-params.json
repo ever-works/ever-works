@@ -1,0 +1,14 @@
+{
+	"locale": "en",
+	"id": "00000000-0000-4000-8000-000000000000",
+	"runId": "00000000-0000-4000-8000-000000000001",
+	"messageId": "00000000-0000-4000-8000-000000000002",
+	"tenantId": "00000000-0000-4000-8000-000000000003",
+	"pluginId": "egress-audit-unknown-plugin",
+	"slug": "egress-audit-unknown",
+	"token": "egress-audit-unknown-token",
+	"path": "egress-audit",
+	"rest": "egress-audit-unknown-page",
+	"/:locale/help/:slug": { "slug": "what-ever-works-is" },
+	"/:locale/settings/plugins/:category": { "category": "git-provider" }
+}

@@ -15,6 +15,20 @@ import { TerminalAttachService } from '../terminal/terminal-attach.service';
  * as an expired or malformed one.
  */
 
+/**
+ * Added to the lifetime of a token's single-use claim (L4): the claim is set
+ * with the claiming replica's clock, while another replica decides "expired"
+ * with its own. A replica whose clock runs behind would otherwise still accept
+ * the token after the claim lapsed. Generous next to NTP skew; a claim key
+ * costs a few bytes for one more minute.
+ */
+export const FLEET_LINK_CLAIM_SKEW_MARGIN_MS = 60_000;
+
+/** How long a token's single-use claim must be held: until it expires on every replica's clock. */
+export function fleetLinkClaimTtlMs(expiresAtMs: number, now: number = Date.now()): number {
+    return Math.max(1, expiresAtMs - now) + FLEET_LINK_CLAIM_SKEW_MARGIN_MS;
+}
+
 /** Records a token id once; answers false for one already seen. */
 export interface FleetLinkReplayGuard {
     /** True the first time `jti` is seen within `ttlMs`; false after. */
@@ -36,6 +50,23 @@ export class InProcessFleetLinkReplayGuard implements FleetLinkReplayGuard {
         if (expiresAt !== undefined && expiresAt > now) return false;
         this.seen.set(jti, now + ttlMs);
         return true;
+    }
+}
+
+/**
+ * The replay guard over the relay bus (FL-02 P1b): with Valkey a token's
+ * `jti` is claimed with `SET … NX PX`, so a token is single-use across every
+ * API replica; with the single-replica bus, in this process. A bus that
+ * cannot answer throws, and the token is refused.
+ */
+export class RelayBusFleetLinkReplayGuard implements FleetLinkReplayGuard {
+    constructor(
+        private readonly bus: { claimOnce(key: string, ttlMs: number): Promise<boolean> },
+        private readonly scope = 'fleet-link',
+    ) {}
+
+    claim(jti: string, ttlMs: number): Promise<boolean> {
+        return this.bus.claimOnce(`${this.scope}:jti:${jti}`, ttlMs);
     }
 }
 
@@ -97,7 +128,7 @@ export class FleetLinkTokenService {
             return false;
         }
         try {
-            return await this.replay.claim(claims.jti, Math.max(1, claims.exp - Date.now()));
+            return await this.replay.claim(claims.jti, fleetLinkClaimTtlMs(claims.exp));
         } catch {
             // A guard that cannot answer must not let a token through twice.
             return false;

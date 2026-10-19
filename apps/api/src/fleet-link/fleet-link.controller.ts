@@ -94,12 +94,12 @@ export class FleetLinkController {
         summary:
             'Ask the computer to cancel a running operation. The operation then reads cancelled; one that already ended is returned as it is.',
     })
-    cancelOperation(
+    async cancelOperation(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-    ): FleetOperationCancelResult {
+    ): Promise<FleetOperationCancelResult> {
         if (!config.fleet.isNodeLinkEnabled() || !isFleetLinkId(id))
             throw fleetLinkError('not_found', 'no such operation');
-        return this.operations.cancel(id, auth.userId);
+        return this.operations.requestCancel(id, auth.userId);
     }
 }

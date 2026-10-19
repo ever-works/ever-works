@@ -97,7 +97,11 @@ describe('request_app_change / get_app_change (APW-08 T26)', () => {
     it("refuses a Work the agent's owner can edit but does not OWN — a member's agent never launches the owner's", async () => {
         const service = { request: jest.fn(), getChange: jest.fn(), listChanges: jest.fn() };
         const tools = buildAppChangeTools({
-            agent: { id: 'm-agent', userId: 'member', permissions: { canCommitToRepo: true } as never },
+            agent: {
+                id: 'm-agent',
+                userId: 'member',
+                permissions: { canCommitToRepo: true } as never,
+            },
             service: service as never,
             authorize: jest.fn(async () => work),
         });

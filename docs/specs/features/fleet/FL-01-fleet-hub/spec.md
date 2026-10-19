@@ -17,7 +17,7 @@
 ## 0. TL;DR
 
 Ever Works already knows the owner's machines: they enrol, heartbeat, lease work and show up as a
-table under **Settings → Fleet**. What the product lacks is a *place* for them. This epic adds exactly
+table under **Settings → Fleet**. What the product lacks is a _place_ for them. This epic adds exactly
 one sidebar entry, **Fleet**, directly below **Teams**, a hub at `/fleet` with six tabs, and one page
 per computer with its own tab strip — the shell every later Fleet epic plugs into. It moves the
 machine table, the enrol hand-off and the node drawer from Settings into the hub (Settings keeps the
@@ -85,7 +85,7 @@ acts (rename, favourite, pause/resume, drain, remove) with the confirmation each
 Underneath, this epic derives the roles the whole program's permission model is written against:
 who is the computer's **owner**, who is an **org-admin** or **org-member** of the Organization the
 computer is bound to, and who is a **stranger**. Today the code answers only owner-or-stranger
-(§2.2). The Node's control policy becomes a map from *action family* to *audience*, with the
+(§2.2). The Node's control policy becomes a map from _action family_ to _audience_, with the
 existing single value carried over as the audience of the `desktop` family, so AW-11's behaviour is
 unchanged on the day this ships.
 
@@ -99,14 +99,14 @@ unchanged on the day this ships.
 
 ### 2.2 What they do today, and what breaks
 
-| To answer…                                   | Today they must…                                                                                                                                                                      | What breaks                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| "Which machines do I have?"                  | Open Settings, find the Fleet tab (`apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx:147-150`), read a table (`apps/web/src/components/settings/FleetSettings.tsx:488`). | A machine is not a setting. The sidebar (`apps/web/src/components/dashboard/DashboardSidebar.tsx:147-234`) has no Fleet entry; the footer pill links to Settings (`apps/web/src/components/dashboard/RunnerStatusPill.tsx:262-263`).                                                                                                                                      |
-| "Which ones need me?"                        | Scan the table for a red badge, open each drawer, read `workerStateReason` (`apps/web/src/components/settings/FleetNodeDrawer.tsx:317-345`).                                           | There is no list of things that need attention; the only banner is the kill switch (`FleetSettings.tsx:464`). A throttled or quarantined machine is one row among many.                                                                                                                                                                                                 |
-| "Show me *this* computer."                   | Open the drawer inside the Settings table.                                                                                                                                            | A drawer cannot host tabs for sessions, logs, services, files; there is no route for one machine, nothing to bookmark or link to from a Run.                                                                                                                                                                                                                              |
-| "Find it from anywhere."                     | The palette knows the Settings → Fleet screen (`apps/web/src/components/command-palette/registry/screens.ts:212-215`) and nothing per computer.                                        | No "go to computer build-01".                                                                                                                                                                                                                                                                                                                                             |
-| "Let my team see it."                        | AW-11 declared `owner · org-admins · org-members` (`packages/agent/src/entities/fleet-node.entity.ts:502`).                                                                              | The role derivation returns `owner` or `stranger` only — `packages/agent/src/computer/control-policy.ts:44-49` says so in its own comment. Every family check in this program would inherit that gap.                                                                                                                                                                      |
-| "Keep my favourites on top; show VMs under their host." | Nothing: the node row has no favourite and no parent (`fleet-node.entity.ts:99-135`; no `isFavorite`, no `hostNodeId` anywhere in `packages/` or `apps/`).                  | Five machines fit a table; a fleet with virtual computers (FL-16) needs grouping the table was never built for.                                                                                                                                                                                                                                                           |
+| To answer…                                              | Today they must…                                                                                                                                                                                  | What breaks                                                                                                                                                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Which machines do I have?"                             | Open Settings, find the Fleet tab (`apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx:147-150`), read a table (`apps/web/src/components/settings/FleetSettings.tsx:488`). | A machine is not a setting. The sidebar (`apps/web/src/components/dashboard/DashboardSidebar.tsx:147-234`) has no Fleet entry; the footer pill links to Settings (`apps/web/src/components/dashboard/RunnerStatusPill.tsx:262-263`). |
+| "Which ones need me?"                                   | Scan the table for a red badge, open each drawer, read `workerStateReason` (`apps/web/src/components/settings/FleetNodeDrawer.tsx:317-345`).                                                      | There is no list of things that need attention; the only banner is the kill switch (`FleetSettings.tsx:464`). A throttled or quarantined machine is one row among many.                                                              |
+| "Show me _this_ computer."                              | Open the drawer inside the Settings table.                                                                                                                                                        | A drawer cannot host tabs for sessions, logs, services, files; there is no route for one machine, nothing to bookmark or link to from a Run.                                                                                         |
+| "Find it from anywhere."                                | The palette knows the Settings → Fleet screen (`apps/web/src/components/command-palette/registry/screens.ts:212-215`) and nothing per computer.                                                   | No "go to computer build-01".                                                                                                                                                                                                        |
+| "Let my team see it."                                   | AW-11 declared `owner · org-admins · org-members` (`packages/agent/src/entities/fleet-node.entity.ts:502`).                                                                                       | The role derivation returns `owner` or `stranger` only — `packages/agent/src/computer/control-policy.ts:44-49` says so in its own comment. Every family check in this program would inherit that gap.                                |
+| "Keep my favourites on top; show VMs under their host." | Nothing: the node row has no favourite and no parent (`fleet-node.entity.ts:99-135`; no `isFavorite`, no `hostNodeId` anywhere in `packages/` or `apps/`).                                        | Five machines fit a table; a fleet with virtual computers (FL-16) needs grouping the table was never built for.                                                                                                                      |
 
 ### 2.3 Why this epic is additive only
 
@@ -253,7 +253,7 @@ right answer.
   **Desktop** and **⋯**.
 - **FR-17** The computer page MUST render a tab strip of exactly twelve tabs in the order
   `overview · sessions · desktop · logs · services · docker · processes · ports · files ·
-  schedules · checkouts · settings`, selected by the `tab` query parameter, defaulting to
+schedules · checkouts · settings`, selected by the `tab` query parameter, defaulting to
   `overview`.
 - **FR-18** Tabs MUST register from one registry; a registered tab MUST be code-split and loaded
   only when selected; an unregistered tab MUST render the placeholder of FR-4.
@@ -276,8 +276,8 @@ right answer.
 - **FR-26** A computer bound to no Organization MUST yield `stranger` for every viewer but its
   owner.
 - **FR-27** The control policy MUST be a map from the thirteen action families (`view · sessions ·
-  desktop · logs · services · docker · processes · ports · files · commands · schedules ·
-  checkouts · machines`, CONTRACTS §2.1) to an audience in `owner · org-admins · org-members`,
+desktop · logs · services · docker · processes · ports · files · commands · schedules ·
+checkouts · machines`, CONTRACTS §2.1) to an audience in `owner · org-admins · org-members`,
   defaulting `view` to `org-members` and every other family to `owner`.
 - **FR-28** A computer whose family map has no `desktop` entry MUST read its `desktop` audience from
   the existing single-value policy, every other family taking its default, and every change to the
@@ -479,28 +479,28 @@ the "needs a look" list is a labelled region announcing its count; placeholders 
 
 ## 7. Key entities & concepts
 
-| Entity / concept                 | New?         | Description                                                                                                     |
-| -------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Fleet** / **Node** (Computer)  | Existing     | The registry and one machine in it. Gains a favourite mark and, read-only here, a host reference (FL-16 writes it). |
-| **Organization**                 | Existing     | The scope a computer may be bound to; its member roles feed the derived viewer role.                            |
-| **Viewer role**                  | **NEW** (derived) | `owner · org-admin · org-member · stranger` for one viewer against one computer. Never stored.                |
-| **Action family / audience**     | **NEW** (shape) | The thirteen families and three audiences of CONTRACTS §2.1; the control policy becomes this map.           |
-| **"Needs a look" item**          | **NEW** (computed) | The one shape of CONTRACTS §4.6; produced by registered producers, rendered here.                        |
-| **Tab registry**                 | **NEW** (internal) | Where hub panels and computer-page tabs register with their flag, consent and kind requirements (D9).    |
-| **Fleet audit**                  | Existing     | Receives the policy-change rows and the existing lifecycle rows.                                                 |
+| Entity / concept                | New?               | Description                                                                                                         |
+| ------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Fleet** / **Node** (Computer) | Existing           | The registry and one machine in it. Gains a favourite mark and, read-only here, a host reference (FL-16 writes it). |
+| **Organization**                | Existing           | The scope a computer may be bound to; its member roles feed the derived viewer role.                                |
+| **Viewer role**                 | **NEW** (derived)  | `owner · org-admin · org-member · stranger` for one viewer against one computer. Never stored.                      |
+| **Action family / audience**    | **NEW** (shape)    | The thirteen families and three audiences of CONTRACTS §2.1; the control policy becomes this map.                   |
+| **"Needs a look" item**         | **NEW** (computed) | The one shape of CONTRACTS §4.6; produced by registered producers, rendered here.                                   |
+| **Tab registry**                | **NEW** (internal) | Where hub panels and computer-page tabs register with their flag, consent and kind requirements (D9).               |
+| **Fleet audit**                 | Existing           | Receives the policy-change rows and the existing lifecycle rows.                                                    |
 
 **Acts this epic adds to the page (rule 7).** None needs a consent: they are registry acts, not
 machine acts, so none rides the node link and none is refused by the kill switch.
 
-| Act                     | Family / audience default | Confirmation                                   | Audit (existing unless marked)      | Errors                                   | Agent tool                        |
-| ----------------------- | ------------------------- | ---------------------------------------------- | ----------------------------------- | ---------------------------------------- | --------------------------------- |
-| Rename                  | `machines` / owner        | `plain`                                        | `node.rename`                       | `invalid`, `permission_denied`, `not_found` | — (FL-19)                       |
-| Favourite on/off        | owner only                | `plain`                                        | — (a personal preference)           | `permission_denied`, `not_found`         | —                                 |
-| Pause / resume          | `machines` / owner        | `plain` + toast                                | `node.pause`                        | `permission_denied`, `not_found`         | — (FL-19)                         |
-| Drain / return          | `machines` / owner        | `confirm` — _"Drain build-01? 2 jobs in flight will be released…"_ | `node.drain`       | `permission_denied`, `not_found`         | existing MCP `drain_fleet_node`   |
-| Remove from Fleet       | `machines` / owner        | `confirm-destructive` — type the name          | `node.delete`                       | `invalid` (name mismatch), `permission_denied`, `not_found` | — (FL-19)    |
-| Change a family's audience | owner only             | `plain`                                        | **`node.policy.change`** (new)      | `invalid`, `permission_denied`           | —                                 |
-| List / open a computer  | `view` / org-members      | `plain`                                        | — (read)                            | `not_found` (also for strangers)         | existing `list_fleet_nodes` · readOnly |
+| Act                        | Family / audience default | Confirmation                                                       | Audit (existing unless marked) | Errors                                                      | Agent tool                             |
+| -------------------------- | ------------------------- | ------------------------------------------------------------------ | ------------------------------ | ----------------------------------------------------------- | -------------------------------------- |
+| Rename                     | `machines` / owner        | `plain`                                                            | `node.rename`                  | `invalid`, `permission_denied`, `not_found`                 | — (FL-19)                              |
+| Favourite on/off           | owner only                | `plain`                                                            | — (a personal preference)      | `permission_denied`, `not_found`                            | —                                      |
+| Pause / resume             | `machines` / owner        | `plain` + toast                                                    | `node.pause`                   | `permission_denied`, `not_found`                            | — (FL-19)                              |
+| Drain / return             | `machines` / owner        | `confirm` — _"Drain build-01? 2 jobs in flight will be released…"_ | `node.drain`                   | `permission_denied`, `not_found`                            | existing MCP `drain_fleet_node`        |
+| Remove from Fleet          | `machines` / owner        | `confirm-destructive` — type the name                              | `node.delete`                  | `invalid` (name mismatch), `permission_denied`, `not_found` | — (FL-19)                              |
+| Change a family's audience | owner only                | `plain`                                                            | **`node.policy.change`** (new) | `invalid`, `permission_denied`                              | —                                      |
+| List / open a computer     | `view` / org-members      | `plain`                                                            | — (read)                       | `not_found` (also for strangers)                            | existing `list_fleet_nodes` · readOnly |
 
 ---
 

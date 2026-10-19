@@ -18,7 +18,12 @@ import {
     type FleetOperationView,
 } from '@ever-works/contracts';
 import { fleetLinkError } from './fleet-link.errors';
-import { FleetLinkRegistry, type FleetLinkOperationMessage } from './fleet-link.registry';
+import {
+    FleetLinkRegistry,
+    type FleetLinkEvent,
+    type FleetLinkOperationMessage,
+} from './fleet-link.registry';
+import { FleetLinkRemote, type FleetOperationSnapshot } from './fleet-link-remote.service';
 
 /**
  * Fleet node link — long operations (CONTRACTS §3.3, spec FR-17, FR-18).
@@ -44,8 +49,11 @@ import { FleetLinkRegistry, type FleetLinkOperationMessage } from './fleet-link.
  *    {@link FLEET_OPERATION_EARLY_UPDATE_MS} and applied when the operation is
  *    tracked — never applied to another node's operation.
  *
- * Request state, not work: the records live in this process (and, with the
- * relay bus, are visible to every replica through it).
+ * Request state, not work: the records live in this process, and with the
+ * relay bus every change is shared with the other replicas (`FleetLinkRemote`),
+ * so any replica answers the routes. Updates from the node are applied on the
+ * replica that holds its link; a peer's copy of a finished operation is
+ * final, and a running one never overwrites an end.
  */
 
 /** An operation still running after this long is failed — the node never said it finished. */
@@ -104,12 +112,16 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
     private readonly clearTimer: (handle: unknown) => void;
     private readonly awayTimers = new Map<string, unknown>();
     private readonly unsubscribeLinks: () => void;
+    private readonly unsubscribeRemote: Array<() => void> = [];
     /** Keyed `<nodeId> <operationId>`: the latest progress and the completion, if any. */
     private readonly early = new Map<string, EarlyUpdates>();
 
     constructor(
         private readonly registry: FleetLinkRegistry,
         @Optional() @Inject(FLEET_OPERATIONS_OPTIONS) options?: FleetOperationsOptions,
+        // The relay bus (FL-02 P1b). Appended LAST + @Optional(): unbound,
+        // records stay this process's own.
+        @Optional() private readonly remote?: FleetLinkRemote,
     ) {
         this.now = options?.now ?? (() => Date.now());
         this.retentionMs = options?.retentionMs ?? FLEET_OPERATION_RETENTION_MS;
@@ -128,33 +140,48 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         // CONTRACTS §3.3 (rev 5): the link or the node went away mid-operation.
         // A fresh node process cannot finish what the old one started; a link
         // that stays away past the resume window is treated the same.
-        this.unsubscribeLinks = this.registry.onLinkEvent((event) => {
-            const away = this.awayTimers.get(event.nodeId);
-            if (away !== undefined) {
-                this.clearTimer(away);
+        this.unsubscribeLinks = this.registry.onLinkEvent((event) => this.onLink(event));
+        if (this.remote) {
+            this.unsubscribeRemote.push(
+                // A link coming or going on another replica moves the same timers.
+                this.remote.onLinkEvent((event) => this.onLink(event)),
+                this.remote.onOperation((snapshot) => this.adopt(snapshot)),
+                this.remote.onCancelRequest((operationId) => this.markCancelRequested(operationId)),
+            );
+        }
+    }
+
+    /**
+     * A link came or went, here or on another replica (CONTRACTS §3.3 rev 5):
+     * a fresh node process cannot finish what the old one started, and a link
+     * that stays away past the resume window is treated the same.
+     */
+    private onLink(event: FleetLinkEvent): void {
+        const away = this.awayTimers.get(event.nodeId);
+        if (away !== undefined) {
+            this.clearTimer(away);
+            this.awayTimers.delete(event.nodeId);
+        }
+        if (event.type === 'connected') {
+            if (!event.continued)
+                this.interruptNode(event.nodeId, 'the computer restarted while this was running');
+            return;
+        }
+        this.awayTimers.set(
+            event.nodeId,
+            this.setTimer(() => {
                 this.awayTimers.delete(event.nodeId);
-            }
-            if (event.type === 'connected') {
-                if (!event.continued)
+                if (
+                    !this.registry.isConnected(event.nodeId) &&
+                    this.remote?.isHeldElsewhere(event.nodeId) !== true
+                ) {
                     this.interruptNode(
                         event.nodeId,
-                        'the computer restarted while this was running',
+                        'the computer went away while this was running',
                     );
-                return;
-            }
-            this.awayTimers.set(
-                event.nodeId,
-                this.setTimer(() => {
-                    this.awayTimers.delete(event.nodeId);
-                    if (!this.registry.isConnected(event.nodeId)) {
-                        this.interruptNode(
-                            event.nodeId,
-                            'the computer went away while this was running',
-                        );
-                    }
-                }, this.resumeWindowMs),
-            );
-        });
+                }
+            }, this.resumeWindowMs),
+        );
     }
 
     onModuleInit(): void {
@@ -167,6 +194,7 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         for (const timer of this.awayTimers.values()) this.clearTimer(timer);
         this.awayTimers.clear();
         this.unsubscribeLinks();
+        for (const stop of this.unsubscribeRemote.splice(0)) stop();
         this.registry.setOperationSink(null);
     }
 
@@ -202,16 +230,10 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         });
         this.bound();
         // Updates the node sent before this reply was handled.
-        const key = earlyKey(input.nodeId, input.operationId);
-        const early = this.early.get(key);
-        if (early) {
-            this.early.delete(key);
-            if (now - early.at < FLEET_OPERATION_EARLY_UPDATE_MS) {
-                if (early.progress) this.fromNode(input.nodeId, early.progress);
-                if (early.done) this.fromNode(input.nodeId, early.done);
-            }
-        }
-        return { ...this.records.get(input.operationId)!.view };
+        this.applyEarly(input.nodeId, input.operationId);
+        const record = this.records.get(input.operationId)!;
+        this.share(record);
+        return { ...record.view };
     }
 
     /** The operation as `userId` may see it, or `not_found`. */
@@ -238,7 +260,36 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
             );
         }
         record.view = { ...record.view, cancelRequested: true };
+        this.share(record);
         return { operation: { ...record.view }, sent: true };
+    }
+
+    /**
+     * {@link cancel} wherever the node's link is: on this replica, or through
+     * the replica that holds it (which marks the record before telling the
+     * node, so the node's answer reads `cancelled`). The DELETE route calls this.
+     */
+    async requestCancel(operationId: string, userId: string): Promise<FleetOperationCancelResult> {
+        const record = this.require(operationId, userId);
+        if (isFleetOperationTerminal(record.view.state))
+            return { operation: { ...record.view }, sent: false };
+        const nodeId = record.view.nodeId;
+        if (this.registry.isConnected(nodeId) || !this.remote?.isHeldElsewhere(nodeId)) {
+            return this.cancel(operationId, userId);
+        }
+        if (!(await this.remote.cancelOperation(nodeId, operationId))) {
+            throw fleetLinkError(
+                'unreachable',
+                'the computer is not connected; the operation keeps running there',
+                { operationId },
+            );
+        }
+        const current = this.records.get(operationId) ?? record;
+        if (!isFleetOperationTerminal(current.view.state)) {
+            current.view = { ...current.view, cancelRequested: true };
+            this.share(current);
+        }
+        return { operation: { ...current.view }, sent: true };
     }
 
     /** Remove expired records; fail operations the node never finished. Exposed for tests. */
@@ -291,6 +342,7 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
                 ...record.view,
                 progress: { ...message.progress } as FleetLinkOperationProgressValue,
             };
+            this.share(record);
             return;
         }
         if (message.error) {
@@ -340,6 +392,76 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         if (outcome.state === 'done') view.result = outcome.result;
         record.view = view;
         record.endedAtMs = now;
+        this.share(record);
+    }
+
+    /** Apply the updates a node sent here before this replica knew the operation. */
+    private applyEarly(nodeId: string, operationId: string): void {
+        const key = earlyKey(nodeId, operationId);
+        const early = this.early.get(key);
+        if (!early) return;
+        this.early.delete(key);
+        if (this.now() - early.at >= FLEET_OPERATION_EARLY_UPDATE_MS) return;
+        if (early.progress) this.fromNode(nodeId, early.progress);
+        if (early.done) this.fromNode(nodeId, early.done);
+    }
+
+    /** Tell the other replicas (nothing to do with the single-replica bus). */
+    private share(record: FleetOperationRecord): void {
+        this.remote?.publishOperation({
+            view: { ...record.view },
+            requesterUserId: record.requesterUserId,
+            ownerUserId: record.ownerUserId,
+            startedAtMs: record.startedAtMs,
+            endedAtMs: record.endedAtMs,
+        });
+    }
+
+    /**
+     * A peer's copy of a record. An end is final: a finished record here is
+     * never touched, and a finished copy replaces a running one. A running
+     * copy only adds what it knows (progress, a cancel asked for) — it never
+     * clears what this replica already had.
+     */
+    private adopt(snapshot: FleetOperationSnapshot): void {
+        const id = snapshot.view.id;
+        const existing = this.records.get(id);
+        if (existing) {
+            if (existing.view.nodeId !== snapshot.view.nodeId) return;
+            if (isFleetOperationTerminal(existing.view.state)) return;
+            if (isFleetOperationTerminal(snapshot.view.state)) {
+                existing.view = { ...snapshot.view };
+                existing.endedAtMs = snapshot.endedAtMs ?? this.now();
+                return;
+            }
+            existing.view = {
+                ...existing.view,
+                progress: snapshot.view.progress ?? existing.view.progress,
+                cancelRequested: existing.view.cancelRequested || snapshot.view.cancelRequested,
+            };
+            return;
+        }
+        this.records.set(id, {
+            view: { ...snapshot.view },
+            requesterUserId: snapshot.requesterUserId ?? null,
+            ownerUserId: snapshot.ownerUserId,
+            startedAtMs:
+                typeof snapshot.startedAtMs === 'number' ? snapshot.startedAtMs : this.now(),
+            endedAtMs: isFleetOperationTerminal(snapshot.view.state)
+                ? (snapshot.endedAtMs ?? this.now())
+                : null,
+        });
+        this.bound();
+        // The node may have reported to THIS replica (it holds the link) before
+        // the record arrived from the replica that tracked it.
+        this.applyEarly(snapshot.view.nodeId, id);
+    }
+
+    /** The holder was asked to cancel: the node's answer then reads `cancelled`. */
+    private markCancelRequested(operationId: string): void {
+        const record = this.records.get(operationId);
+        if (!record || isFleetOperationTerminal(record.view.state)) return;
+        record.view = { ...record.view, cancelRequested: true };
     }
 
     private require(operationId: string, userId: string): FleetOperationRecord {

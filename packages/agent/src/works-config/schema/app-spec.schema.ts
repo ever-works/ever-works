@@ -163,6 +163,41 @@ export const APP_SPEC_ENV_NAME_PATTERN = /^[A-Z_][A-Z0-9_]{0,127}$/;
 export const APP_SPEC_REL_PATH_PATTERN =
     /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*(?:^|\/)\.git(?:\/|$))[\s\S]{1,255}$/;
 
+/**
+ * Prompt-injection hardening — App-spec text the generated build workflow carries
+ * (`build.args[].value`, `build.services[].env[].value`).
+ *
+ * The APW-05 workflow is committed to the App repository and run with its
+ * secrets, and GitHub evaluates `${{ … }}` inside every YAML value; a build
+ * argument is also one line of a `|` block scalar, which a line break would end.
+ * So these values may carry neither `${` (the prefix of every expression and every
+ * shell parameter expansion — the App spec's own grammar is `{{ … }}`, §21) nor
+ * a line break or any other control character (C0, DEL, C1, U+2028/U+2029, BOM —
+ * YAML 1.1 parsers such as the Actions runner's break lines on U+0085/U+2028/
+ * U+2029). One JSON-Schema-expressible pattern, so an editor refuses exactly what
+ * the platform does; the build plugin refuses the same strings again
+ * (`github-actions-build/src/workflow/input-guard.ts`).
+ */
+export const APP_SPEC_WORKFLOW_SAFE_TEXT_PATTERN =
+    /^(?![\s\S]*\$\{)[^\u0000-\u001f\u007f-\u009f\u2028\u2029\ufeff]*$/;
+
+/**
+ * `RelPath` as the build workflow carries it (`build.context`, `build.dockerfile`):
+ * {@link APP_SPEC_REL_PATH_PATTERN}'s four rules plus
+ * {@link APP_SPEC_WORKFLOW_SAFE_TEXT_PATTERN}'s, as ONE pattern (a second `.regex()`
+ * would publish as an `allOf`, and the two must not drift apart).
+ */
+export const APP_SPEC_WORKFLOW_SAFE_REL_PATH_PATTERN =
+    /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*(?:^|\/)\.git(?:\/|$))(?![\s\S]*\$\{)[^\u0000-\u001f\u007f-\u009f\u2028\u2029\ufeff]{1,255}$/;
+
+/**
+ * A build service's env name (`build.services[].env[].name`) — written by the
+ * build workflow as a plain YAML key, so only characters a plain key cannot
+ * misread. Wider than `EnvName` on purpose: some service images are configured by
+ * dotted, lower-case names (Elasticsearch's `discovery.type`).
+ */
+export const APP_SPEC_BUILD_SERVICE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_.]{0,127}$/;
+
 /** §0 `Glob`: a `RelPath` that may contain `*`, `**`, `?`; 1–200 characters. */
 export const APP_SPEC_GLOB_PATTERN =
     /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*(?:^|\/)\.git(?:\/|$))[\s\S]{1,200}$/;
@@ -233,6 +268,15 @@ const relPath = z
     .regex(APP_SPEC_REL_PATH_PATTERN)
     .describe(
         'RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`.',
+    );
+
+/** `RelPath` the build workflow carries — see {@link APP_SPEC_WORKFLOW_SAFE_REL_PATH_PATTERN}. */
+const workflowRelPath = z
+    .string()
+    .regex(APP_SPEC_WORKFLOW_SAFE_REL_PATH_PATTERN)
+    .describe(
+        'RelPath (schema.md §0) the build workflow carries: 1–255 characters, relative, no `..` segment, ' +
+            'not under `.git/`, and no `${`, line break or control character.',
     );
 
 /** `Glob` — §0's `RelPath` that may contain `*`, `**` and `?`. */
@@ -456,9 +500,11 @@ export const appSpecBuildArgSchema = z.strictObject({
     value: z
         .string()
         .max(1000)
+        .regex(APP_SPEC_WORKFLOW_SAFE_TEXT_PATTERN)
         .optional()
         .describe(
-            'A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10).',
+            'A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10). ' +
+                'No `${`, line break or control character: it is written into the build workflow.',
         ),
     fromEnv: envName
         .optional()
@@ -467,10 +513,27 @@ export const appSpecBuildArgSchema = z.strictObject({
         ),
 });
 
-/** §9:176 — one `env` entry of an ephemeral build service. §9 states no bound for either field. */
+/**
+ * §9:176 — one `env` entry of an ephemeral build service. §9 states no bound for
+ * either field; both are written into the build workflow, so the name is a plain
+ * YAML key ({@link APP_SPEC_BUILD_SERVICE_ENV_NAME_PATTERN}) and the value is
+ * workflow-safe text ({@link APP_SPEC_WORKFLOW_SAFE_TEXT_PATTERN}).
+ */
 export const appSpecBuildServiceEnvEntrySchema = z.strictObject({
-    name: z.string().describe('The variable name of a build service’s environment entry (§9:176).'),
-    value: z.string().describe('The value of a build service’s environment entry (§9:176).'),
+    name: z
+        .string()
+        .regex(APP_SPEC_BUILD_SERVICE_ENV_NAME_PATTERN)
+        .describe(
+            'The variable name of a build service’s environment entry (§9:176): ' +
+                '^[A-Za-z_][A-Za-z0-9_.]{0,127}$.',
+        ),
+    value: z
+        .string()
+        .regex(APP_SPEC_WORKFLOW_SAFE_TEXT_PATTERN)
+        .describe(
+            'The value of a build service’s environment entry (§9:176). ' +
+                'No `${`, line break or control character: it is written into the build workflow.',
+        ),
 });
 
 /** §9:176 — one ephemeral, build-only service: at most 5, each with at most 20 env entries. */
@@ -529,12 +592,12 @@ export const appSpecBuildSchema = z.strictObject({
             'How the image is produced (§9:170): dockerfile · image · auto · none. ' +
                 'Required when `components` is non-empty; `none` when it is empty. No builder name (R-13).',
         ),
-    dockerfile: relPath
+    dockerfile: workflowRelPath
         .optional()
         .describe(
             'The Dockerfile path, only with `strategy: dockerfile` (§9:171); default: `Dockerfile`.',
         ),
-    context: relPath
+    context: workflowRelPath
         .optional()
         .describe('The build context, only with `dockerfile` or `auto` (§9:172); default: `.`.'),
     target: dockerTarget

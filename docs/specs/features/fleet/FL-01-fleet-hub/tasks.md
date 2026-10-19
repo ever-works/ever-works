@@ -128,7 +128,7 @@
       guards as in `1795161700000-AddFleetModelUsageLimits.ts`.
       **Test**: applies twice on sqlite and Postgres; `migration:generate` afterwards is empty; a row
       with `controlPolicy = 'org-admins'` and a null map yields `effectiveControlPolicy(node).desktop
-  === 'org-admins'`; writing `families.desktop = 'owner'` writes `controlPolicy = 'owner'` back.
+=== 'org-admins'`; writing `families.desktop = 'owner'` writes `controlPolicy = 'owner'` back.
 - [x] **T-18**. Create `packages/agent/src/fleet/fleet-access.service.ts` (`roleFor`, `assertFamily`,
       `canAct`) over `OrganizationMemberRepository`
       (`packages/agent/src/database/repositories/organization-member.repository.ts`); register and export

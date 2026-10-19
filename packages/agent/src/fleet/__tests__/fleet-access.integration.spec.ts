@@ -50,26 +50,22 @@ describe('fleet access — roles from the real roster (better-sqlite3)', () => {
         await dataSource.initialize();
 
         ids.tenantOwner = await user('tenant-owner');
-        const tenant = await dataSource
-            .getRepository(Tenant)
-            .save({
-                ownerUserId: ids.tenantOwner,
-                slug: 'acme',
-                displayName: 'Acme',
-            } as Partial<Tenant>);
+        const tenant = await dataSource.getRepository(Tenant).save({
+            ownerUserId: ids.tenantOwner,
+            slug: 'acme',
+            displayName: 'Acme',
+        } as Partial<Tenant>);
         const org = await dataSource.getRepository(Organization).save({
             tenantId: tenant.id,
             slug: 'acme-org',
             displayName: 'Acme',
         } as Partial<Organization>);
         const otherTenantOwner = await user('other-owner');
-        const otherTenant = await dataSource
-            .getRepository(Tenant)
-            .save({
-                ownerUserId: otherTenantOwner,
-                slug: 'other',
-                displayName: 'Other',
-            } as Partial<Tenant>);
+        const otherTenant = await dataSource.getRepository(Tenant).save({
+            ownerUserId: otherTenantOwner,
+            slug: 'other',
+            displayName: 'Other',
+        } as Partial<Tenant>);
         const otherOrg = await dataSource.getRepository(Organization).save({
             tenantId: otherTenant.id,
             slug: 'other-org',

@@ -428,5 +428,4 @@ describe('inbox DTO validation', () => {
         expect(await errorsFor(SetInboxReadStateDto, { unread: 'yes' })).toEqual(['unread']);
         expect(await errorsFor(SetInboxReadStateDto, { unread: true })).toEqual([]);
     });
-
 });

@@ -213,6 +213,8 @@ describe('Ever ID copy — every message survives translation', () => {
                         {
                             terms: (chunks: ReactNode) => chunks,
                             privacy: (chunks: ReactNode) => chunks,
+                            // #2717: the Ever ID button sets its name in the brand wordmark.
+                            wordmark: (chunks: ReactNode) => chunks,
                         } as never,
                     );
                 } else {
@@ -243,6 +245,7 @@ describe('Ever ID copy — every message survives translation', () => {
                                   {
                                       terms: (chunks: string) => `[${chunks}]`,
                                       privacy: (chunks: string) => `[${chunks}]`,
+                                      wordmark: (chunks: string) => `[${chunks}]`,
                                   } as never,
                               )
                             : translate(fullKey as never, SAMPLE_VALUES as never);

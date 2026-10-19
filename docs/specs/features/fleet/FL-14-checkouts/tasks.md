@@ -174,8 +174,7 @@
 - [ ] **T-27**. Add `fleet_checkouts_list|get|create|sync|archive|delete` to
       `packages/agent/src/fleet/agent-fleet-tools.ts` with CONTRACTS §11.3 annotations; add the routes
       to `apps/mcp/src/openapi-tools/whitelist.ts` with the same names; add
-      `apps/cli/src/commands/fleet/checkout.ts` (FL-19 §9.3's file; `ever-works fleet checkouts
-      list|get|create|sync|archive|delete [--json]`).
+      `apps/cli/src/commands/fleet/checkout.ts` (FL-19 §9.3's file; `ever-works fleet checkouts list|get|create|sync|archive|delete [--json]`).
       **Test**: `packages/agent/src/fleet/__tests__/agent-fleet-tools.spec.ts` extended (annotations,
       audience refusal → `permission_denied`), `apps/mcp` whitelist spec, `apps/cli/src/commands/fleet/__tests__/checkout.spec.ts`.
 - [ ] **T-28**. Extend `apps/web/e2e/flow-fleet-checkouts.spec.ts` with create worktree, pull/push
