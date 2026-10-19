@@ -56,11 +56,11 @@ share the host's kernel and have no init system of their own.
 
 Three phases, each independently shippable:
 
-| Phase  | Ships                                                                                                                                                                                                             |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P1** | Linux **Containers**: the create dialog, host choice, the child enrolling itself, nesting in the hub, start / stop / destroy, "Runs here" on the host, limits, consents, audit, Agent tools                        |
+| Phase  | Ships                                                                                                                                                                                                            |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1** | Linux **Containers**: the create dialog, host choice, the child enrolling itself, nesting in the hub, start / stop / destroy, "Runs here" on the host, limits, consents, audit, Agent tools                      |
 | **P2** | Windows **VMs**: the `kvm` requirement, the 15–30 minute install as an operation with progress, "watch the install", the generated password kept on the host with a one-time audited reveal, 2-minute stop grace |
-| **P3** | Resize a stopped machine (CPUs / memory), refresh the system catalogue, rebuild a Container from a newer image, CLI parity hand-off to FL-19                                                                        |
+| **P3** | Resize a stopped machine (CPUs / memory), refresh the system catalogue, rebuild a Container from a newer image, CLI parity hand-off to FL-19                                                                     |
 
 ---
 
@@ -102,13 +102,13 @@ computer is a second way for a Node row to come into being (CONTRACTS R-20).
 
 ### 2.2 What they do today, and what breaks
 
-| To get…                            | Today they must…                                                                                                                     | What breaks                                                                                                                                                                                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| To get…                            | Today they must…                                                                                                                     | What breaks                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A second machine in the Fleet      | Find or buy hardware, install the OS, install the node runtime, open Settings → Fleet → Add node, copy a token, run `enroll` by hand | The Add-node flow issues a token and waits for a human to run a command on a machine that already exists (`apps/web/src/components/settings/FleetSettings.tsx:826-891`; `packages/agent/src/fleet/fleet.service.ts:349-394`). There is no way to _make_ the machine. |
-| A clean Windows for a Windows task | Keep a spare Windows PC, or run the agent on the owner's own desktop                                                                  | Nothing in the Fleet can create or control a VM: the only job kinds are `acceptance-checks`, `agent-task`, `browser-check`, `computer-session` (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-125`).                                                                  |
-| A throwaway Linux box per Agent    | Share one machine's worktree pool between every Agent                                                                                | A Node has no parent and no notion of being virtual: `kind` is `desktop-node · node · k8s` and the entity has no host column (`packages/contracts/src/fleet/fleet-node.types.ts:46-55`; `packages/agent/src/entities/fleet-node.entity.ts:96-115`).           |
-| To know whether a host can do it   | Guess                                                                                                                                | The node detects `docker` by probing for the binary but never checks `/dev/kvm` or free memory for this purpose (`apps/node/src/core/capabilities.ts:277-294`).                                                                                      |
-| To watch an install                | Nothing                                                                                                                              | The screen channel shows an Agent's browser or (FL-07) a desktop; nothing surfaces an installer's console.                                                                                                                                           |
+| A clean Windows for a Windows task | Keep a spare Windows PC, or run the agent on the owner's own desktop                                                                 | Nothing in the Fleet can create or control a VM: the only job kinds are `acceptance-checks`, `agent-task`, `browser-check`, `computer-session` (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-125`).                                                         |
+| A throwaway Linux box per Agent    | Share one machine's worktree pool between every Agent                                                                                | A Node has no parent and no notion of being virtual: `kind` is `desktop-node · node · k8s` and the entity has no host column (`packages/contracts/src/fleet/fleet-node.types.ts:46-55`; `packages/agent/src/entities/fleet-node.entity.ts:96-115`).                  |
+| To know whether a host can do it   | Guess                                                                                                                                | The node detects `docker` by probing for the binary but never checks `/dev/kvm` or free memory for this purpose (`apps/node/src/core/capabilities.ts:277-294`).                                                                                                      |
+| To watch an install                | Nothing                                                                                                                              | The screen channel shows an Agent's browser or (FL-07) a desktop; nothing surfaces an installer's console.                                                                                                                                                           |
 
 Two existing mechanics make this cheap: executors are registered per job kind and only when the
 machine can honour them (`apps/node/src/core/runtime.ts:940-953`), and a consent-specific lease
@@ -248,14 +248,14 @@ Every default and limit below is a number. Values marked **(C)** come from
 
 ### 4.1 Action families (program rule 12)
 
-| Family action      | Consent on host (C §1.1) | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                       | Audit (C §7)                                    | Agent tool (C §11.3)                                   |
-| ------------------ | ------------------------ | --------------------------------------------- | ------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------ |
-| Create             | `--manage`               | `machines` / owner                            | `confirm` — states CPUs, memory, disk, host  | `node.vm.create`                                | `fleet_virtual_create` — destructive                   |
-| Start / Stop       | `--manage`               | `machines` / owner                            | `plain` start; `confirm` stop               | `node.vm.start` · `node.vm.stop`                | `fleet_virtual_power` — destructive                    |
-| Destroy            | `--manage`               | `machines` / owner                            | `confirm-destructive` — type the name       | `node.vm.destroy`                               | `fleet_virtual_destroy` — destructive                  |
-| Reveal password    | `--manage`               | owner only (default; §8b)                     | `confirm` — "reveal once, audited"          | `node.vm.password.reveal` (C §7)                | not offered to Agents                                  |
-| Resize / Rebuild (P3) | `--manage`            | `machines` / owner                            | `confirm`                                   | `node.vm.resize` · `node.vm.rebuild` (C §7)     | not offered to Agents in this epic                     |
-| List / options     | enrolled                 | `view`                                        | `plain`                                     | —                                               | `fleet_virtual_list`, `fleet_virtual_options` — readOnly |
+| Family action         | Consent on host (C §1.1) | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                       | Audit (C §7)                                | Agent tool (C §11.3)                                     |
+| --------------------- | ------------------------ | --------------------------------------------- | ------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| Create                | `--manage`               | `machines` / owner                            | `confirm` — states CPUs, memory, disk, host | `node.vm.create`                            | `fleet_virtual_create` — destructive                     |
+| Start / Stop          | `--manage`               | `machines` / owner                            | `plain` start; `confirm` stop               | `node.vm.start` · `node.vm.stop`            | `fleet_virtual_power` — destructive                      |
+| Destroy               | `--manage`               | `machines` / owner                            | `confirm-destructive` — type the name       | `node.vm.destroy`                           | `fleet_virtual_destroy` — destructive                    |
+| Reveal password       | `--manage`               | owner only (default; §8b)                     | `confirm` — "reveal once, audited"          | `node.vm.password.reveal` (C §7)            | not offered to Agents                                    |
+| Resize / Rebuild (P3) | `--manage`               | `machines` / owner                            | `confirm`                                   | `node.vm.resize` · `node.vm.rebuild` (C §7) | not offered to Agents in this epic                       |
+| List / options        | enrolled                 | `view`                                        | `plain`                                     | —                                           | `fleet_virtual_list`, `fleet_virtual_options` — readOnly |
 
 Every caller — the web dialog, Agent tools, MCP and the CLI — satisfies a class with the same
 request fields (`confirm: true`, `confirmName`), and a call without them answers 409
@@ -298,8 +298,8 @@ switch itself. "Drain all" leaves virtual computers as they are.
   disk, that nothing is billed and no credits are spent, and — for Windows — the approximate download
   (6 GB) and install time (15–30 minutes).
 - **FR-13** Progress MUST be shown as an operation with named phases (`pulling image · starting ·
-  installing the node runtime · enrolling · online` for Containers; `pulling image · downloading
-  Windows · installing · first boot · installing the node runtime · enrolling · online` for VMs),
+installing the node runtime · enrolling · online` for Containers; `pulling image · downloading
+Windows · installing · first boot · installing the node runtime · enrolling · online` for VMs),
   updated at least every 5 seconds while the link is up, and resumable after a link drop.
 - **FR-14** The child MUST enrol by itself, outbound, with a one-time token minted for it only when
   the guest signals it is ready to enrol (both kinds — CONTRACTS R-35); the token MUST be handed to
@@ -510,16 +510,16 @@ no literal dots.
 
 ## 7. Key entities & concepts
 
-| Concept                  | New?            | Description (shapes in CONTRACTS)                                                                                              |
-| ------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Node** (Computer)      | Existing        | Gains `origin` (`enrolled · virtual · cloud`), `hostNodeId` and `virtualKind` (`vm · container`) — C §4.1. `kind` unchanged (R-4). |
-| **Host**                 | Role, not a noun | A Node that hosts virtual computers; must advertise `docker` + `managed` (+ `kvm` for VMs).                                   |
-| **Virtual computer**     | UI copy          | A child Node with `origin: virtual`; **VM** when `virtualKind = vm`, **Container** when `container`.                            |
-| **System catalogue**     | New (node-side)  | The pinned images and Windows editions a host can build, advertised through the options endpoint.                              |
-| **Operation**            | Existing (FL-02) | Progress of a create / power / destroy; polled or streamed.                                                                    |
-| **Job kinds**            | Existing union   | `vm-create`, `vm-control` — durable (C §12), leased by the host's management lane under `--manage` (C R-34).                   |
-| **Enrolment token**      | Existing         | Minted for the child when the guest signals readiness, both kinds (C R-35; FR-14, FR-24).                                      |
-| **Fleet audit**          | Existing         | `node.vm.create|start|stop|destroy|resize|rebuild` and `node.vm.password.reveal` (C §7).                                       |
+| Concept              | New?             | Description (shapes in CONTRACTS)                                                                                                  |
+| -------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Node** (Computer)  | Existing         | Gains `origin` (`enrolled · virtual · cloud`), `hostNodeId` and `virtualKind` (`vm · container`) — C §4.1. `kind` unchanged (R-4). |
+| **Host**             | Role, not a noun | A Node that hosts virtual computers; must advertise `docker` + `managed` (+ `kvm` for VMs).                                        |
+| **Virtual computer** | UI copy          | A child Node with `origin: virtual`; **VM** when `virtualKind = vm`, **Container** when `container`.                               |
+| **System catalogue** | New (node-side)  | The pinned images and Windows editions a host can build, advertised through the options endpoint.                                  |
+| **Operation**        | Existing (FL-02) | Progress of a create / power / destroy; polled or streamed.                                                                        |
+| **Job kinds**        | Existing union   | `vm-create`, `vm-control` — durable (C §12), leased by the host's management lane under `--manage` (C R-34).                       |
+| **Enrolment token**  | Existing         | Minted for the child when the guest signals readiness, both kinds (C R-35; FR-14, FR-24).                                          |
+| **Fleet audit**      | Existing         | `node.vm.create\|start\|stop\|destroy\|resize\|rebuild` and `node.vm.password.reveal` (C §7).                                      |
 
 ---
 

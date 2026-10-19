@@ -52,11 +52,11 @@ command to run there.
  └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Phase  | Ships                                                                                                                                                                                             | Flag                          |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **P1** | Services tab (list, find, start/stop/restart/at-boot, blast-radius warnings, root rule); Processes tab (busiest 300, Stop/Kill, GPUs); `services` and `processes` tools; palette entries           | `FLEET_MACHINE_FACTS_ENABLED` |
-| **P2** | Docker tab: containers (start/stop/restart/remove, run dialog) and images (pull/run/remove/prune) as operations with progress; "Runs here" block on Overview; `docker` tools                        | same                          |
-| **P3** | Compose projects: picture / list / merged logs views, up/down/restart/pull; shell inside a container as an owner Session (FL-04); `compose` tools                                                  | same                          |
+| Phase  | Ships                                                                                                                                                                                    | Flag                          |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **P1** | Services tab (list, find, start/stop/restart/at-boot, blast-radius warnings, root rule); Processes tab (busiest 300, Stop/Kill, GPUs); `services` and `processes` tools; palette entries | `FLEET_MACHINE_FACTS_ENABLED` |
+| **P2** | Docker tab: containers (start/stop/restart/remove, run dialog) and images (pull/run/remove/prune) as operations with progress; "Runs here" block on Overview; `docker` tools             | same                          |
+| **P3** | Compose projects: picture / list / merged logs views, up/down/restart/pull; shell inside a container as an owner Session (FL-04); `compose` tools                                        | same                          |
 
 Each phase is independently shippable.
 
@@ -111,16 +111,16 @@ by the Agent's permissions and the Node's policy.
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer…                                   | Today they must…                                                        | What breaks                                                                                                                                                                                                                                                                                                 |
-| -------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Which services are failed?"                 | ssh in and run the service manager.                                     | A computer's health is heartbeat, disk free, worker state and tags (`docs/features/fleet.md:110`); no service is listed anywhere. The health sample reserves a `failedServices` count (CONTRACTS §4.5) that nothing fills yet.                                                                               |
-| "Restart it."                                | ssh in, `sudo`, type a password.                                        | Nothing on the platform acts on a service; the program refuses typing a sudo password into the web UI (README §3), so an action needs a rule for root that does not exist yet.                                                                                                                              |
-| "What containers run there?"                 | `docker ps` on the machine.                                             | Docker is a single tag turned on by `docker --version` exiting 0 (`apps/node/src/core/capabilities.ts:278-294`); no container, image or Compose project is read or shown.                                                                                                                                   |
-| "Open a shell inside that container."        | ssh, then `docker exec`.                                                | The only shell the platform can show is the live-view terminal channel — read-only until a take-over, under the Agent's own file root (`apps/node/src/core/screen/terminal-channel.ts:36-44`), not a persistent Session, and never inside a container.                                                      |
-| "What is using the CPU?"                     | `top` on the machine.                                                   | The node probes a GPU's vendor and model once per heartbeat (`apps/node/src/core/gpu-probe.ts:19-26`) and nothing else about processes; there is no process list, no signal, no utilisation.                                                                                                                 |
-| "Let Nina do it."                            | Paste output into chat and type the commands yourself.                  | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`); the MCP whitelist's three fleet actions are set/clear affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`; EXISTING-SUBSTRATE §8.2).                                                     |
-| "Who restarted what, when?"                  | Nothing.                                                                | The ledger exists (`packages/agent/src/fleet/fleet-audit.service.ts:96-116`) and already redacts; the action union (`packages/contracts/src/fleet/fleet-panic.types.ts:60-114`) has no service, Docker or process member because no such action exists.                                                     |
-| "Can an org admin do this on my machine?"    | Nothing.                                                                | The control policy is declared with three audiences but the code derives only `owner` or `stranger` (`packages/agent/src/computer/control-policy.ts:39-49`); FL-01 derives the roles; this epic is the first to use three families of them.                                                                 |
+| To answer…                                | Today they must…                                       | What breaks                                                                                                                                                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Which services are failed?"              | ssh in and run the service manager.                    | A computer's health is heartbeat, disk free, worker state and tags (`docs/features/fleet.md:110`); no service is listed anywhere. The health sample reserves a `failedServices` count (CONTRACTS §4.5) that nothing fills yet.                          |
+| "Restart it."                             | ssh in, `sudo`, type a password.                       | Nothing on the platform acts on a service; the program refuses typing a sudo password into the web UI (README §3), so an action needs a rule for root that does not exist yet.                                                                          |
+| "What containers run there?"              | `docker ps` on the machine.                            | Docker is a single tag turned on by `docker --version` exiting 0 (`apps/node/src/core/capabilities.ts:278-294`); no container, image or Compose project is read or shown.                                                                               |
+| "Open a shell inside that container."     | ssh, then `docker exec`.                               | The only shell the platform can show is the live-view terminal channel — read-only until a take-over, under the Agent's own file root (`apps/node/src/core/screen/terminal-channel.ts:36-44`), not a persistent Session, and never inside a container.  |
+| "What is using the CPU?"                  | `top` on the machine.                                  | The node probes a GPU's vendor and model once per heartbeat (`apps/node/src/core/gpu-probe.ts:19-26`) and nothing else about processes; there is no process list, no signal, no utilisation.                                                            |
+| "Let Nina do it."                         | Paste output into chat and type the commands yourself. | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`); the MCP whitelist's three fleet actions are set/clear affinity and drain (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`; EXISTING-SUBSTRATE §8.2).    |
+| "Who restarted what, when?"               | Nothing.                                               | The ledger exists (`packages/agent/src/fleet/fleet-audit.service.ts:96-116`) and already redacts; the action union (`packages/contracts/src/fleet/fleet-panic.types.ts:60-114`) has no service, Docker or process member because no such action exists. |
+| "Can an org admin do this on my machine?" | Nothing.                                               | The control policy is declared with three audiences but the code derives only `owner` or `stranger` (`packages/agent/src/computer/control-policy.ts:39-49`); FL-01 derives the roles; this epic is the first to use three families of them.             |
 
 ### 2.3 What this epic closes
 
@@ -594,15 +594,15 @@ _"Docker on build-01"_, _"Processes on build-01"_.
 
 ## 7. Key entities & concepts
 
-| Entity / concept                | New?     | Description                                                                                      |
-| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| **Node / Computer**             | Existing | The machine; its `consents`, `controlPolicy` families `services · docker · processes` gate the tabs. |
-| **Service, container, image, Compose project, process** | plain words | Read from the Node, never stored (README §1).                                        |
-| **Operation**                   | Existing (FL-02) | A long link action with progress; pull / run / prune / up / down / restart / Compose pull. |
-| **Session**                     | Existing (FL-04) | A shell inside a container is an owner Session, `provider: shell`, titled `Shell · inside <c>`. |
-| **Blast radius**                | concept  | The node's sentence naming what an action could cut off; drives the `blast-radius` class.       |
-| **Fleet audit**                 | Existing | Gains the §7 action names for services, Docker, Compose and processes.                            |
-| **Health sample**               | Existing (FL-03) | `failedServices` is filled from this epic's services module.                              |
+| Entity / concept                                        | New?             | Description                                                                                          |
+| ------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
+| **Node / Computer**                                     | Existing         | The machine; its `consents`, `controlPolicy` families `services · docker · processes` gate the tabs. |
+| **Service, container, image, Compose project, process** | plain words      | Read from the Node, never stored (README §1).                                                        |
+| **Operation**                                           | Existing (FL-02) | A long link action with progress; pull / run / prune / up / down / restart / Compose pull.           |
+| **Session**                                             | Existing (FL-04) | A shell inside a container is an owner Session, `provider: shell`, titled `Shell · inside <c>`.      |
+| **Blast radius**                                        | concept          | The node's sentence naming what an action could cut off; drives the `blast-radius` class.            |
+| **Fleet audit**                                         | Existing         | Gains the §7 action names for services, Docker, Compose and processes.                               |
+| **Health sample**                                       | Existing (FL-03) | `failedServices` is filled from this epic's services module.                                         |
 
 No new noun (README §1).
 
@@ -633,13 +633,13 @@ No new noun (README §1).
   listed beside their collection roots; the plan uses exactly these.
 - **Resolved** by CONTRACTS §11.1: the FL-01 registry has `registerOverviewBlock`; **Runs here** is
   registered through it (FR-30).
-- `[NEEDS CLARIFICATION: Agent `fleet_docker_run` by default. Default until answered: allowed only
-  with an explicit per-Agent grant (AW-15), `destructive: false`, class `confirm`, and held as an
-  Approval (CONTRACTS R-33) below AW-24 trust level "trusted".]`
+- `[NEEDS CLARIFICATION: Agent `fleet_docker_run`by default. Default until answered: allowed only
+with an explicit per-Agent grant (AW-15),`destructive: false`, class `confirm`, and held as an
+Approval (CONTRACTS R-33) below AW-24 trust level "trusted".]`
 - `[NEEDS CLARIFICATION: Compose **Down** from an Agent when the project contains a container that
-  is a Node (FL-16). Default until answered: the node computes a `blast-radius` warning for it
-  ("this stops <child>, a computer in your Fleet"), so an Agent below the allowing trust level is
-  held for approval (FR-22).]`
+is a Node (FL-16). Default until answered: the node computes a `blast-radius` warning for it
+("this stops <child>, a computer in your Fleet"), so an Agent below the allowing trust level is
+held for approval (FR-22).]`
 - **Resolved** by CONTRACTS §10 (rev 4): 5 concurrent machine operations per Node, 60-min operation cap, 20 finished operations kept per Node.
 
 ---

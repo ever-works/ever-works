@@ -105,8 +105,7 @@
       **Test**: `packages/agent/src/fleet/__tests__/session-action-rules.spec.ts` — full truth table;
       shell provider → none; outside checkout → recap only.
 - [ ] **T-13**. Create `packages/agent/src/fleet/fleet-session-action.service.ts` (`list`, `send`:
-      render with the Agent's `agent.yml` override or default → `session.input { source:'action',
-      actionId }` via FL-04's link service → for an Agent session a ledger row in `agent_run_logs`
+      render with the Agent's `agent.yml` override or default → `session.input { source:'action', actionId }` via FL-04's link service → for an Agent session a ledger row in `agent_run_logs`
       (`step: 'fleet.action'`, `level: 'INFO'`) → for both kinds an audit `node.session.input` with
       `details.action` and a redacted 200-char `promptPreview`; owner-session ledger read from those
       audit rows (spec §8b default); 10/min and 2 s refusals; echo → `deliveredAt`; `resend`).

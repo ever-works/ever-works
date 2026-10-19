@@ -160,6 +160,9 @@ describe('AppBuildSpecReadSource', () => {
             commitSha: 'c'.repeat(40),
             specHash: 'sha256:abc',
             valid: true,
+            // baa5bf1eb: the raw status rides along so a Build judged at its own
+            // commit can say WHICH unusable status refused it.
+            status: 'valid',
         });
     });
 

@@ -2063,3 +2063,81 @@ describe('registration in the works.yml envelope', () => {
         expect(result.errors).toEqual([]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Prompt-injection hardening — App-spec text the build workflow carries
+// ---------------------------------------------------------------------------
+
+/**
+ * The APW-05 build workflow is committed to the App repository and run with its
+ * secrets. `build.args[].value` is written as one line of a `|` block scalar and
+ * `build.services[].env[]` as a YAML key and value; GitHub evaluates `${{ … }}`
+ * in all of them. So the schema refuses `${`, every line break (including the
+ * U+0085 / U+2028 / U+2029 a YAML 1.1 parser breaks on) and every other control
+ * character there, and a service env name is a plain-YAML-key shape. The build
+ * plugin refuses the same strings again (`input-guard.ts`); this is the early,
+ * editor-visible half.
+ */
+describe('workflow-safe build text (prompt-injection hardening)', () => {
+    const hostileText = [
+        ['a GitHub expression', '${{ secrets.ORG_DEPLOY_KEY }}'],
+        ['a bare `${`', 'x${HOME}'],
+        ['a newline that ends the build-args line', 'production\n  pwn: true'],
+        ['a carriage return', 'a\rb'],
+        ['a next-line (U+0085)', 'a\u0085b'],
+        ['a line separator (U+2028)', 'a\u2028b'],
+        ['a paragraph separator (U+2029)', 'a\u2029b'],
+        ['a tab', 'a\tb'],
+        ['a NUL', 'a\u0000b'],
+        ['a BOM', '\ufeffa'],
+    ] as const;
+
+    it.each(hostileText)('refuses %s in a build argument value', (_label, value) => {
+        expectRefused(withLeaf(validSpec, ['build', 'args', 0, 'value'], value));
+    });
+
+    it.each(hostileText)('refuses %s in a build service env value', (_label, value) => {
+        expectRefused(withLeaf(validSpec, ['build', 'services', 0, 'env', 0, 'value'], value));
+    });
+
+    it.each([
+        ['a GitHub expression', '${{ secrets.X }}'],
+        ['a newline', 'docker/Dockerfile\npush: true'],
+        ['a control character', 'docker/\u0007Dockerfile'],
+    ])('refuses %s in build.dockerfile and build.context', (_label, value) => {
+        expectRefused(withLeaf(validSpec, ['build', 'dockerfile'], value));
+        expectRefused(withLeaf(validSpec, ['build', 'context'], value));
+    });
+
+    it.each([
+        ['a URL', 'https://example.com/path?x=1&y=2#frag'],
+        ['a literal dollar sign', 'costs $5, see $HOME'],
+        ['the App spec template grammar', '{{ env.PUBLIC_URL }}'],
+        ['quotes and YAML punctuation', `a: b # "c" 'd' [e] {f}`],
+        ['non-ASCII text', 'é ü 漢字 ✓'],
+        ['an empty value', ''],
+    ])('accepts %s as a build argument and service env value', (_label, value) => {
+        expectAccepted(withLeaf(validSpec, ['build', 'args', 0, 'value'], value));
+        expectAccepted(withLeaf(validSpec, ['build', 'services', 0, 'env', 0, 'value'], value));
+    });
+
+    it.each([
+        ['an EnvName', 'POSTGRES_PASSWORD', true],
+        ['a dotted, lower-case name (Elasticsearch)', 'discovery.type', true],
+        ['a leading underscore', '_X', true],
+        ['YAML syntax', 'A: b', false],
+        ['a newline', 'A\nB', false],
+        ['an expression', '${{ x }}', false],
+        ['a leading digit', '1A', false],
+        ['a leading dot', '.a', false],
+        ['an empty name', '', false],
+        ['129 characters', `A${'B'.repeat(128)}`, false],
+    ] as const)('a build service env name: %s', (_label, value, accepted) => {
+        const doc = withLeaf(validSpec, ['build', 'services', 0, 'env', 0, 'name'], value);
+        if (accepted) {
+            expectAccepted(doc);
+        } else {
+            expectRefused(doc);
+        }
+    });
+});
