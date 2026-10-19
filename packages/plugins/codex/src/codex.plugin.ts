@@ -93,39 +93,38 @@ import {
 } from './utils/pipeline-helpers.js';
 import { startTaxonomyWatcher } from './utils/taxonomy-watcher.js';
 
+// Recommended Codex models from https://learn.chatgpt.com/docs/models and
+// https://developers.openai.com/api/docs/models. Availability still depends on
+// the user's sign-in method, plan and rollout; the UI accepts custom model IDs.
+const CURRENT_MODEL_CAPABILITIES = {
+	supportsStructuredOutput: true,
+	supportsStreaming: true,
+	supportsToolCalling: true,
+	supportsVision: true,
+	maxContextLength: 1050000,
+	maxOutputTokens: 128000
+} as const;
+
 const CODEX_SUPPORTED_MODELS: readonly AiModel[] = [
 	{
-		id: 'gpt-5.4',
-		name: 'GPT-5.4',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 400000
-		}
+		id: 'gpt-6-astra',
+		name: 'GPT-6 Astra',
+		capabilities: CURRENT_MODEL_CAPABILITIES
 	},
 	{
-		id: 'codex-mini-latest',
-		name: 'Codex Mini Latest',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 200000
-		}
+		id: 'gpt-5.6-sol',
+		name: 'GPT-5.6 Sol',
+		capabilities: CURRENT_MODEL_CAPABILITIES
 	},
 	{
-		id: 'gpt-5.2-codex',
-		name: 'GPT-5.2 Codex',
-		capabilities: {
-			supportsStructuredOutput: true,
-			supportsStreaming: true,
-			supportsToolCalling: true,
-			supportsVision: true,
-			maxContextLength: 400000
-		}
+		id: 'gpt-5.6-terra',
+		name: 'GPT-5.6 Terra',
+		capabilities: CURRENT_MODEL_CAPABILITIES
+	},
+	{
+		id: 'gpt-5.6-luna',
+		name: 'GPT-5.6 Luna',
+		capabilities: CURRENT_MODEL_CAPABILITIES
 	}
 ] as const;
 
@@ -302,7 +301,8 @@ export class CodexPlugin
 				'x-scope': 'global',
 				'x-widget': 'model-select',
 				default: DEFAULT_MODEL,
-				description: 'Model to use for Codex generation'
+				description:
+					'Model to use for Codex generation. Availability depends on your sign-in method and account.'
 			},
 			unsafeBypassSandbox: {
 				type: 'boolean',
