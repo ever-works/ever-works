@@ -198,9 +198,12 @@ describe('IntegrationKeysSection', () => {
         expect(screen.getByTestId('integration-key-secret').textContent).toBe(
             'ew_int_' + 'b'.repeat(64),
         );
-        fireEvent.click(screen.getByText('dialog.done'));
-        // The dialog leaves through a headlessui transition; on a loaded CI runner that
-        // outlasts waitFor's default 1 s (stage run 39245383947 failed here at 5.8 s).
+        // Done ignores clicks until the rotation's transition has settled (`isPending`); on a
+        // loaded CI runner that outlasted the secret's first render, so the click was dropped
+        // (stage runs 39245383947 #1 and #2). Click once it is enabled.
+        const done = screen.getByRole('button', { name: 'dialog.done' }) as HTMLButtonElement;
+        await waitFor(() => expect(done.disabled).toBe(false), { timeout: 5_000 });
+        fireEvent.click(done);
         await waitFor(
             () => {
                 expect(screen.queryByTestId('integration-key-secret')).toBeNull();

@@ -536,7 +536,11 @@ export function IntegrationKeysSection({
                         <>
                             {secretPanel(rotatedSecret, t('rotate.warning'))}
                             <DialogFooter>
-                                <Button onClick={closeRotate}>{t('dialog.done')}</Button>
+                                {/* `closeRotate` ignores a click while the rotation's transition is
+                                    still settling; say so instead of swallowing the click. */}
+                                <Button onClick={closeRotate} disabled={isPending}>
+                                    {t('dialog.done')}
+                                </Button>
                             </DialogFooter>
                         </>
                     ) : (
