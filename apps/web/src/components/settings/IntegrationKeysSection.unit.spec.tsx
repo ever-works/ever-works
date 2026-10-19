@@ -199,7 +199,15 @@ describe('IntegrationKeysSection', () => {
             'ew_int_' + 'b'.repeat(64),
         );
         fireEvent.click(screen.getByText('dialog.done'));
-        await waitFor(() => expect(screen.queryByTestId('integration-key-secret')).toBeNull());
+        // The dialog leaves through a headlessui transition; on a loaded CI runner that
+        // outlasts waitFor's default 1 s (stage run 39245383947 failed here at 5.8 s).
+        await waitFor(
+            () => {
+                expect(screen.queryByTestId('integration-key-secret')).toBeNull();
+                expect(screen.queryByRole('dialog')).toBeNull();
+            },
+            { timeout: 5_000 },
+        );
     });
 
     // Review 2026-10-17 U10: "None" stops the old secret at once, so no grace line.
