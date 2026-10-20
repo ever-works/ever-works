@@ -1711,6 +1711,35 @@ describe('a Job whose pod can never start fails with the rollout’s own code (2
 		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'timeout' });
 	});
 
+	it('drops an earlier waiting reason once the pod has recovered (no stale image_pull)', async () => {
+		const h = stuckMigrate({ reason: 'ImagePullBackOff', message: 'Back-off pulling image' }, undefined, 120);
+		// After the first observation the pod starts (Running, no waiting state) but the Job still
+		// runs out its 120 s deadline: the verdict must be the plain timeout, not a stale pull failure.
+		let polls = 0;
+		const listPods = h.cluster.listObjects?.bind(h.cluster);
+		if (listPods) {
+			h.cluster.listObjects = (async (...args: unknown[]) => {
+				const pods = (await (listPods as (...a: unknown[]) => Promise<Json[]>)(...args)) as Json[];
+				if (args[2] !== 'Pod') return pods;
+				polls += 1;
+				if (polls <= 3) return pods;
+				return pods.map((pod) => ({
+					...pod,
+					status: {
+						phase: 'Running',
+						containerStatuses: [{ name: 'migrate', ready: true, restartCount: 0, state: { running: {} } }]
+					}
+				}));
+			}) as typeof h.cluster.listObjects;
+		}
+
+		const result = await h.deploy();
+
+		expect(polls).toBeGreaterThan(1);
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'job_failed' });
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'timeout' });
+	});
+
 	it('does not judge this run’s Job by a pod of another Job that shares its `ever-works.io/job` label', async () => {
 		const h = stuckMigrate(
 			{ reason: 'CreateContainerConfigError', message: ROOT_KUBELET_MESSAGE },

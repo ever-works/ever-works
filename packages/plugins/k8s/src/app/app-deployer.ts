@@ -1193,7 +1193,12 @@ export class AppDeployer {
 			}
 			const verdicts = await this.classifyJobPods(state, entry);
 			podFailure = verdicts.failure;
-			lastStuck = verdicts.stuckNow ?? lastStuck;
+			// Replace (also with null) whenever this Job's pods were seen, so a pod that recovered
+			// leaves no stale reason; keep it only when the list failed or the Job controller has
+			// already removed the pod (it deletes active pods at the deadline).
+			if (verdicts.observed) {
+				lastStuck = verdicts.stuckNow;
+			}
 			if (podFailure) {
 				status = 'failed';
 				break;
@@ -1243,7 +1248,7 @@ export class AppDeployer {
 	private async classifyJobPods(
 		state: RunState,
 		entry: AppJobPlanEntry
-	): Promise<{ failure: AppPodFailure | null; stuckNow: AppPodFailure | null }> {
+	): Promise<{ failure: AppPodFailure | null; stuckNow: AppPodFailure | null; observed: boolean }> {
 		let pods: AppRolloutPod[];
 		try {
 			pods = await this.api.listObjects<AppRolloutPod>(
@@ -1255,7 +1260,7 @@ export class AppDeployer {
 				state.context
 			);
 		} catch {
-			return { failure: null, stuckNow: null };
+			return { failure: null, stuckNow: null, observed: false };
 		}
 
 		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
@@ -1276,7 +1281,7 @@ export class AppDeployer {
 					userMessageSeconds: 0,
 					stuckPodSeconds: JOB_STUCK_NOW_SECONDS
 				});
-		return { failure, stuckNow };
+		return { failure, stuckNow, observed: own.length > 0 };
 	}
 
 	/* --------------------------------------------------------------------- *
