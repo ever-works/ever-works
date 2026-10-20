@@ -665,7 +665,12 @@ export class AppLifecycleOpsService {
             // set above, or the App would read `paused` while still serving (prod, 2026-10-20).
             const failure = result?.failure?.code ?? null;
             if (failure) {
-                await this.setPaused(workId, false);
+                if ((await this.setPaused(workId, false)) !== true) {
+                    this.logger.warn(
+                        `pause of work ${workId} failed (${failure}) AND the 'paused' flag could not be ` +
+                            `rolled back; the App may read 'paused' while still running.`,
+                    );
+                }
                 return this.failed(payload, failure, {
                     detail: { message: result?.failure?.message ?? null },
                 });
@@ -694,7 +699,12 @@ export class AppLifecycleOpsService {
             this.logger.warn(`pause failed for work ${workId}: ${messageOf(error)}`);
             // The scale threw (e.g. the apply was rejected): the App never paused, so clear the
             // optimistic `paused` mark rather than leave it stuck paused-but-running.
-            await this.setPaused(workId, false);
+            if ((await this.setPaused(workId, false)) !== true) {
+                this.logger.warn(
+                    `pause of work ${workId} threw AND the 'paused' flag could not be rolled back; ` +
+                        `the App may read 'paused' while still running.`,
+                );
+            }
 
             return this.failed(payload, APP_OP_CODE_CLUSTER_UNREACHABLE, {
                 detail: { message: messageOf(error) },

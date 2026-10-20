@@ -1102,7 +1102,11 @@ export class AppLifecycle {
 				metadata: {
 					name: objectName,
 					namespace,
-					...(live.metadata?.labels ? { labels: live.metadata.labels } : {})
+					// Carry the labels AND annotations the field manager already owns: the same manager
+					// re-applies here, so anything omitted (e.g. `ever-works.io/deployment-id`, which
+					// log targeting reads) would be pruned by the server-side apply.
+					...(live.metadata?.labels ? { labels: live.metadata.labels } : {}),
+					...(live.metadata?.annotations ? { annotations: live.metadata.annotations } : {})
 				},
 				// The live spec carries selector + the full template; only the replica count changes.
 				spec: { ...live.spec, replicas: asReplicaCount(replicas) }

@@ -1107,6 +1107,9 @@ describe('scaleApp (FR-49, ACC-06-35)', () => {
 			expect(object.spec.template).toBeDefined();
 			expect(object.spec.template.spec.containers[0].name).toBeTruthy();
 		}
+		// The deployment-id annotation (which log targeting reads) survives the scale: omitting it
+		// from the same-field-manager apply would let the server-side apply prune it.
+		expect(deployments[0].metadata.annotations['ever-works.io/deployment-id']).toBeTruthy();
 		expect(h.cluster.appliedOf('CronJob')).toEqual([
 			expect.objectContaining({
 				metadata: expect.objectContaining({ name: 'cron-nightly' }),
