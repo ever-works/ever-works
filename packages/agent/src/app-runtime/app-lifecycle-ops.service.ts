@@ -660,6 +660,16 @@ export class AppLifecycleOpsService {
 
         try {
             const result = await scaleApp(access.access.ref, access.access.credential, 'pause', {});
+            // `scaleApp` reports a scale-down that did not complete as `result.failure` (not a throw):
+            // the pods are still up, so the App is NOT paused. Roll back the optimistic `paused` mark
+            // set above, or the App would read `paused` while still serving (prod, 2026-10-20).
+            const failure = result?.failure?.code ?? null;
+            if (failure) {
+                await this.setPaused(workId, false);
+                return this.failed(payload, failure, {
+                    detail: { message: result?.failure?.message ?? null },
+                });
+            }
             const events = await this.emit('app.deploy.paused', {
                 workId,
                 userId: text(payload?.userId) || null,
@@ -682,6 +692,9 @@ export class AppLifecycleOpsService {
             };
         } catch (error) {
             this.logger.warn(`pause failed for work ${workId}: ${messageOf(error)}`);
+            // The scale threw (e.g. the apply was rejected): the App never paused, so clear the
+            // optimistic `paused` mark rather than leave it stuck paused-but-running.
+            await this.setPaused(workId, false);
 
             return this.failed(payload, APP_OP_CODE_CLUSTER_UNREACHABLE, {
                 detail: { message: messageOf(error) },
