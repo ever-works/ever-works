@@ -973,7 +973,14 @@ export class AppLifecycle {
 			const liveDeployment = live.find(
 				(deployment) => String(deployment?.metadata?.name ?? '') === target.objectName
 			);
-			await this.applyReplicas(credential, namespace, target.objectName, target.replicas, liveDeployment, context);
+			await this.applyReplicas(
+				credential,
+				namespace,
+				target.objectName,
+				target.replicas,
+				liveDeployment,
+				context
+			);
 		}
 
 		for (const cronJob of await this.workCronJobs(credential, ref, context)) {
