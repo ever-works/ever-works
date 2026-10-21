@@ -41,6 +41,14 @@ failure thresholds stay fixed (§6) until the owner asks for editors.
 channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
 `session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
 
+**Revision 10 (2026-10-21)** — FL-04 P3 (recording, AW-11 P3): session recordings are session-keyed
+`terminal_transcript_chunks` (R-9) kept `FLEET_SESSION_RECORDING_RETENTION_DAYS` = 14 days whatever the plan;
+`GET /api/fleet/sessions/:id/recording` answers `FleetSessionRecordingManifest { state, chunks, durationMs, firstAt,
+lastAt, driverSpans[], expired, retentionDays }`, or with `?from=<seq>&limit=<n>` a `FleetSessionRecordingPage
+{ chunks[{ seq, text, at }], lastSeq, hasMore }`; `POST …/recording { on }` answers the session; defaults: Agent
+sessions recorded, owner sessions when the node's `recordWatchSessions` is on; the platform records through a
+watch-only `session` channel (a system caller) on the replica holding the link.
+
 **Revision 9 (2026-10-21)** — FL-04 P2 (Agent sessions): job kind `agent-session` (§6 / R-28) with
 `FleetAgentSessionPayload { fleetSessionId, agentId, agentRunId, nodeId, provider: claude-code|codex, cwd, title,
 firstMessage, cols, rows, permissionMode, leaseTtlSec }` (ids, the folder and the first message — never a command

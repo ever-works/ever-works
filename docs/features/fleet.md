@@ -1077,3 +1077,7 @@ Uploading a node's own log when a run fails is not built: the node has no authen
 - [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
 - [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
   what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)
+
+## Sessions on computers
+
+A computer can also keep **sessions** — a shell, Claude Code or Codex in a folder, kept running by the computer even when nobody watches, for you or for one of your Agents. See [Sessions on computers](./fleet-sessions.md).
