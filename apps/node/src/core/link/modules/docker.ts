@@ -1,4 +1,12 @@
+import { existsSync } from 'node:fs';
 import {
+	isFleetComposeAction,
+	isFleetComposeProject,
+	isFleetComposeService,
+	isFleetContainerShell,
+	type FleetComposeDescription,
+	type FleetComposeListResult,
+	type FleetContainerShellsResult,
 	FLEET_MACHINE_OPERATIONS_PER_NODE,
 	isFleetContainerAction,
 	isFleetContainerRef,
@@ -28,6 +36,15 @@ import {
 	parseStats
 } from './machine-facts/docker-cli';
 import { createPullProgress, dockerRunArgv, parsePruneSummary, safeOutputLine } from './machine-facts/docker-ops';
+import {
+	composeActionArgs,
+	composeFileArgs,
+	mergeComposeServices,
+	parseComposeConfig,
+	parseComposeLs,
+	parseComposePs,
+	projectView
+} from './machine-facts/compose';
 import { createMachineCommandRunner, firstLine } from './machine-facts/exec';
 import { createStreamRunner, type StreamRunner } from './machine-facts/stream';
 import { MachineVerbError, type MachineVerbContext, type NodeModule } from './registry';
@@ -62,6 +79,8 @@ export interface DockerModuleDeps {
 	/** The shared folders a bind mount may come from (R-18; the runtime resolves them). */
 	allowedRoots?: () => Promise<string[]>;
 	now?: () => Date;
+	/** Whether a Compose config file is still there (U14); injected for tests. */
+	fileExists?: (path: string) => boolean;
 }
 
 const ACTION_TIMEOUT_MS = 120_000;
@@ -105,6 +124,7 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 	const stream = deps.stream ?? createStreamRunner();
 	const platform = deps.platform ?? process.platform;
 	const now = deps.now ?? (() => new Date());
+	const fileExists = deps.fileExists ?? ((path: string) => existsSync(path));
 	let runningOperations = 0;
 
 	/** Docker must answer: `unsupported_on_node` when it is not installed (U6), `operation_failed` when its daemon is down (U7). */
@@ -310,9 +330,116 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		});
 	};
 
+	// ─── Compose (P3) ─────────────────────────────────────────────────────
+
+	const composeProjects = async () => {
+		const result = await runner.run(DOCKER, ['compose', 'ls', '--all', '--format', 'json'], { timeoutMs: 15_000 });
+		if (result.code !== 0) throw refuse('operation_failed', firstLine(result.stderr, 'docker compose ls failed'));
+		return parseComposeLs(result.stdout).map((row) => projectView(row, fileExists));
+	};
+
+	const composeList = async (): Promise<FleetComposeListResult> => {
+		const status = await dockerStatus(runner);
+		if (!status.installed || !status.daemonRunning) {
+			return { docker: status, projects: [], sampledAt: now().toISOString() };
+		}
+		return { docker: status, projects: await composeProjects(), sampledAt: now().toISOString() };
+	};
+
+	/** The project as Compose lists it — a request names a project, never a path. */
+	const findProject = async (raw: unknown, machine: string) => {
+		if (!isFleetComposeProject(raw)) throw refuse('invalid', 'that is not a Compose project name', { field: 'project' });
+		await requireDaemon(machine);
+		const project = (await composeProjects()).find((row) => row.name === raw);
+		if (!project) throw refuse('not_found', `${raw} is not a Compose project on ${machine}`);
+		return project;
+	};
+
+	const composeDescribe = async (context: MachineVerbContext): Promise<FleetComposeDescription> => {
+		const project = await findProject(context.params.project, context.nodeName);
+		const [config, ps] = await Promise.all([
+			project.filesMissing
+				? Promise.resolve(null)
+				: runner.run(
+						DOCKER,
+						['compose', '-p', project.name, ...composeFileArgs(project.configFiles), 'config', '--format', 'json'],
+						{ timeoutMs: 20_000 }
+					),
+			runner.run(DOCKER, ['compose', '-p', project.name, 'ps', '-a', '--format', 'json'], { timeoutMs: 15_000 })
+		]);
+		if (config && config.code !== 0) {
+			// The files are there but Compose cannot read them: say so with its first line (U14).
+			throw refuse('operation_failed', firstLine(config.stderr, 'docker compose config failed'));
+		}
+		const parsedConfig = config ? parseComposeConfig(config.stdout) : { services: [], networks: [], volumes: [] };
+		const rows = ps.code === 0 ? parseComposePs(ps.stdout) : [];
+		const runningIds = rows.filter((row) => row.state === 'running' && row.id).map((row) => row.id);
+		let stats = new Map<string, { cpuPercent: number | null; memBytes: number | null }>();
+		if (runningIds.length > 0) {
+			const read = await runner.run(DOCKER, ['stats', '--no-stream', '--no-trunc', '--format', '{{json .}}', ...runningIds], {
+				timeoutMs: 15_000
+			});
+			if (read.code === 0) stats = parseStats(read.stdout);
+		}
+		return {
+			project,
+			services: mergeComposeServices(parsedConfig, rows, stats),
+			networks: parsedConfig.networks,
+			volumes: parsedConfig.volumes
+		};
+	};
+
+	const composeAction = async (context: MachineVerbContext) => {
+		const action = context.params.action;
+		if (!isFleetComposeAction(action)) throw refuse('invalid', 'action must be up, down, restart or pull', { field: 'action' });
+		const service = context.params.service;
+		if (service !== undefined && service !== null && !isFleetComposeService(service)) {
+			throw refuse('invalid', 'that is not a Compose service name', { field: 'service' });
+		}
+		const project = await findProject(context.params.project, context.nodeName);
+		if (!project.actions.includes(action)) {
+			throw refuse('unsupported_on_node', `${project.name}'s Compose files are missing on ${context.nodeName}; only Down is possible`);
+		}
+		const args = composeActionArgs(project.name, project.filesMissing ? [] : project.configFiles, action, typeof service === 'string' ? service : undefined);
+		const progress = createPullProgress();
+		return asOperation(context.nodeName, async () => {
+			const result = await stream(DOCKER, args, {
+				signal: context.signal,
+				onLine: (line) => {
+					const update = action === 'pull' ? progress(line) : null;
+					context.progress(update ? { ...update, ...(update.message ? { message: safeOutputLine(update.message) } : {}) } : { message: safeOutputLine(line) });
+				}
+			});
+			if (result.aborted) throw refuse('operation_failed', 'cancelled');
+			if (result.timedOut) throw refuse('operation_failed', 'timed out after 60 min');
+			if (result.code !== 0) {
+				throw refuse('operation_failed', safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? `docker compose ${action} failed`));
+			}
+			context.logger?.info(`docker: compose ${action} ${project.name}${typeof service === 'string' ? ` ${service}` : ''}`);
+			return { project: project.name, action, ...(typeof service === 'string' ? { service } : {}) };
+		});
+	};
+
+	/** Which shells a running container has (FR-35): `bash`, `sh`. */
+	const containerShells = async (context: MachineVerbContext): Promise<FleetContainerShellsResult> => {
+		const id = context.params.id;
+		if (!isFleetContainerRef(id)) throw refuse('invalid', 'that is not a container id or name', { field: 'id' });
+		await requireDaemon(context.nodeName);
+		const found: FleetContainerShellsResult['shells'] = [];
+		for (const shell of ['bash', 'sh'] as const) {
+			const probe = await runner.run(DOCKER, ['exec', id, shell, '-c', 'exit 0'], { timeoutMs: 10_000 });
+			if (probe.code === 0 && isFleetContainerShell(shell)) found.push(shell);
+		}
+		return { shells: found };
+	};
+
 	return {
 		id: 'docker',
 		machineVerbs: {
+			'compose.list': { stateChanging: false, run: () => composeList() },
+			'compose.describe': { stateChanging: false, run: composeDescribe },
+			'compose.action': { stateChanging: true, run: composeAction },
+			'docker.container.shells': { stateChanging: false, run: containerShells },
 			'docker.containers': { stateChanging: false, run: containers },
 			'docker.images': { stateChanging: false, run: () => images() },
 			'docker.container.action': { stateChanging: true, run: containerAction },
