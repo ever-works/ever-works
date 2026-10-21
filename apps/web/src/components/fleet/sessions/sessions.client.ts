@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+    FleetSessionAnswerResponse,
     FleetSessionListResponse,
     FleetSessionRecordingManifest,
     FleetSessionRecordingPage,
@@ -92,6 +93,21 @@ export const sessionsClient = {
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording`, {
             method: 'POST',
             body: { on },
+        }),
+    /** FL-05 P2: answer what a session asks — one option, or a free text. */
+    answer: (
+        sessionId: string,
+        answer: { key: string; optionId?: string; text?: string; source?: 'card' | 'detail' },
+    ) =>
+        call<FleetSessionAnswerResponse>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/answer`, {
+            method: 'POST',
+            body: answer,
+        }),
+    /** FL-05 P2: opening a session acknowledges its attention (clears unread, never the prompt). */
+    acknowledge: (sessionId: string, key: string) =>
+        call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}`, {
+            method: 'PATCH',
+            body: { acknowledge: key },
         }),
     restart: (sessionId: string, size: { cols?: number; rows?: number } = {}) =>
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/restart`, {
