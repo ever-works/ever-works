@@ -7,12 +7,13 @@ import { fleetRunBindingOf, type MachinePrincipalRequest } from './machine-princ
  * `FleetRunCredentialService` mints a run token bound to the job's
  * Organization, and `SessionScopeGuard` seeds that Organization as the
  * request's scope. Every surface that READS the seeded scope (Goals,
- * Missions, Agents, Tasks, Ideas) was therefore pinned already. Three did
- * not read it and answered per USER instead: Works (`WorkOwnershipService`
- * is creator / member only, the Works list is every accessible Work), the
- * Knowledge Base nested under a Work, and the Inbox. A prompt-injected run in
- * Organization A could list and read every Work, KB document and Inbox item
- * of the owner's other Organizations, and carry it out through the tools.
+ * Missions, Agents, Tasks) was therefore pinned already. Four did not read it
+ * and answered per USER instead: Works (`WorkOwnershipService` is creator /
+ * member only, the Works list is every accessible Work), the Knowledge Base
+ * nested under a Work, the Inbox, and Ideas (the `mine` list and the owner's
+ * single read are per user). A prompt-injected run in Organization A could
+ * list and read every Work, KB document, Inbox item and Idea of the owner's
+ * other Organizations, and carry it out through the tools.
  *
  * The pin is the token's binding, never a header the caller controls:
  *

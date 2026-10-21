@@ -15,6 +15,7 @@ import {
     Put,
     Query,
     Optional,
+    Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -22,10 +23,13 @@ import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import type { WorkProposal } from '@ever-works/agent/entities';
 import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
+import { WorkRepository } from '@ever-works/agent/database';
 import { normalizeRecordListView } from '@ever-works/contracts';
 import { ScopeContextService } from '../scope';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import type { MachinePrincipalRequest } from '../auth/machine-principal';
+import { fleetRunOrganizationPin, isInsideOrganizationPin } from '../auth/fleet-run-scope';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
@@ -122,6 +126,9 @@ export class WorkProposalsController {
         private readonly budgetService: BudgetService,
         // Record visibility (EW-P1-3) — the active scope for the shared / org tabs.
         @Optional() private readonly scopeContext?: ScopeContextService,
+        // Works-security (run-token scope) — the target Work of a fleet-run
+        // token's Idea must be in the token's Organization. Appended LAST.
+        @Optional() private readonly works?: WorkRepository,
     ) {}
 
     /**
@@ -140,7 +147,22 @@ export class WorkProposalsController {
     async createUserManual(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateWorkProposalDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<WorkProposalResponseDto> {
+        // Works-security (run-token scope) — a fleet-run token may aim an Idea
+        // only at a Work of its own Organization (`null` = personal scope);
+        // anything else is the same 404 a missing Work gets. Fails closed when
+        // the repository is not bound.
+        const pin = fleetRunOrganizationPin(req);
+        if (pin && body.targetWorkId) {
+            const target = this.works
+                ? await this.works.findByIdForAccess(body.targetWorkId)
+                : null;
+            if (!isInsideOrganizationPin(target, pin)) {
+                throw new NotFoundException(`Work with id '${body.targetWorkId}' not found`);
+            }
+        }
         const created = await this.service.createUserManual(auth.userId, {
             description: body.description,
             title: body.title,
@@ -156,6 +178,8 @@ export class WorkProposalsController {
     async list(
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListWorkProposalsQueryDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<WorkProposalResponseDto[]> {
         const statuses: WorkProposalStatus[] =
             query.statuses && query.statuses.length > 0
@@ -168,9 +192,20 @@ export class WorkProposalsController {
             offset: query.offset,
         };
         const view = normalizeRecordListView(query.view);
+        // Works-security (run-token scope) — a fleet-run token lists only the
+        // Ideas of the Organization it was minted for (`null` = personal
+        // scope): the `mine` query is narrowed, and every view is filtered
+        // once more on the way out (the shared / organization views read the
+        // active scope, but a personal-scope run must not see an
+        // Organization's Ideas either). Every other credential is unchanged.
+        const pin = fleetRunOrganizationPin(req);
         const proposals =
             view === 'mine'
-                ? await this.service.list(auth.userId, statuses, opts)
+                ? await this.service.list(
+                      auth.userId,
+                      statuses,
+                      pin ? { ...opts, organizationId: pin.organizationId } : opts,
+                  )
                 : await this.service.listVisible(
                       auth.userId,
                       view,
@@ -178,7 +213,10 @@ export class WorkProposalsController {
                       opts,
                       this.scopeContext?.getScope(),
                   );
-        return proposals.map(toResponseDto);
+        const inside = pin
+            ? proposals.filter((proposal) => isInsideOrganizationPin(proposal, pin))
+            : proposals;
+        return inside.map(toResponseDto);
     }
 
     @Get('status')
@@ -245,6 +283,8 @@ export class WorkProposalsController {
     async getOne(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<WorkProposalResponseDto> {
         // Record visibility (EW-P1-3): READ through the access policy; every write
         // route keeps the owner-only paths.
@@ -254,6 +294,12 @@ export class WorkProposalsController {
             this.scopeContext?.getScope(),
         );
         if (!proposal) throw new NotFoundException('Proposal not found');
+        // Works-security (run-token scope) — an Idea of another Organization is
+        // the same 404 as a missing one for a fleet-run token.
+        const pin = fleetRunOrganizationPin(req);
+        if (pin && !isInsideOrganizationPin(proposal, pin)) {
+            throw new NotFoundException('Proposal not found');
+        }
         return toResponseDto(proposal);
     }
 
@@ -266,12 +312,20 @@ export class WorkProposalsController {
     async budget(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<OwnerBudgetSummary> {
         // Phase 7 PR U — ownership gate first so the per-Idea
         // spend isn't introspectable by unrelated users. Mirrors
         // the Mission endpoint shape.
         const proposal = await this.service.getForUser(auth.userId, id);
         if (!proposal) throw new NotFoundException('Proposal not found');
+        // Works-security (run-token scope) — and, for a fleet-run token, in its
+        // own Organization.
+        const pin = fleetRunOrganizationPin(req);
+        if (pin && !isInsideOrganizationPin(proposal, pin)) {
+            throw new NotFoundException('Proposal not found');
+        }
         return this.budgetService.summarizeForOwner({
             ownerType: BudgetOwnerType.IDEA,
             ownerId: id,

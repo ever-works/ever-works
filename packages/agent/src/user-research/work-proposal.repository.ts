@@ -46,6 +46,13 @@ export interface ListWorkProposalOptions {
     search?: string;
     limit?: number;
     offset?: number;
+    /**
+     * Works-security (run-token scope) — only Ideas of this Organization;
+     * `null` = only Ideas with no Organization (the personal scope).
+     * `undefined` (the default) = every Organization, exactly as before. Set
+     * for an Organization-pinned fleet-run token.
+     */
+    organizationId?: string | null;
 }
 
 /** The statuses a transition may start from, its target, and the columns it also writes. */
@@ -208,6 +215,16 @@ export class WorkProposalRepository {
             qb.andWhere('p.missionId IS NULL');
         } else if (typeof opts.missionId === 'string') {
             qb.andWhere('p.missionId = :missionId', { missionId: opts.missionId });
+        }
+
+        // Works-security (run-token scope) — the Organization pin of a
+        // fleet-run token; `undefined` leaves the query exactly as it was.
+        if (opts.organizationId === null) {
+            qb.andWhere('p.organizationId IS NULL');
+        } else if (typeof opts.organizationId === 'string') {
+            qb.andWhere('p.organizationId = :pinnedOrganizationId', {
+                pinnedOrganizationId: opts.organizationId,
+            });
         }
 
         // `ILIKE` is PostgreSQL-only. SQLite has no such operator, so the
