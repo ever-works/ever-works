@@ -60,6 +60,8 @@ describe('inbox.shared — contract parity', () => {
             'system',
             'work',
             'fleet-run',
+            // FL-05 — a session on a computer that needs you.
+            'fleet-session',
         ]);
     });
 
