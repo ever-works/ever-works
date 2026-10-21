@@ -135,6 +135,10 @@ export interface FleetServiceActionResult {
 	since: string | null;
 	exitCode: number | null;
 	atBoot: boolean | null;
+	/** The warning the node computed before the act (it was acknowledged), for the audit row. */
+	blastRadius?: FleetBlastRadius | null;
+	/** True when the act ran as root (`sudo -n`, root, or elevated). */
+	viaRoot?: boolean;
 }
 
 /** Sort rank: failed first, then running, then the rest (FR-2). */

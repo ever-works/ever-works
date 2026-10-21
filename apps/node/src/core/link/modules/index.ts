@@ -1,6 +1,8 @@
 import { controlModule } from './control';
 import { createMachineModule, type MachineModuleOptions } from './machine';
+import { createProcessesModule } from './processes';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
+import { createServicesModule } from './services';
 
 /**
  * Fleet node link — the compile-time module list (README D8).
@@ -10,7 +12,11 @@ import { composeNodeModules, type ComposedNodeModules, type NodeModule } from '.
  * Nothing else in the link changes. The `control` and `machine` modules are
  * the link's own and are always first.
  */
-export const NODE_LINK_MODULES: readonly NodeModule[] = [];
+export const NODE_LINK_MODULES: readonly NodeModule[] = [
+	// FL-09 P1 — services (systemd / launchd + Homebrew / Windows) and processes.
+	createServicesModule(),
+	createProcessesModule()
+];
 
 export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions, 'verb'> {
 	/** Extra modules after the list above (tests and embedders). */
@@ -45,6 +51,8 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createProcessesModule, type ProcessesModuleDeps } from './processes';
+export { createServicesModule, type ServicesModuleDeps } from './services';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
 export {
 	composeNodeModules,
