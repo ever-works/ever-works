@@ -6,8 +6,8 @@
 
 **Epic ID:** `FL-02-node-link`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) in PR 2
-**Last updated:** 2026-10-18
+**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) merged (#2748); web (T-16 … T-18) in PR 3 (#2827); T-22, T-24 … T-29 in PR 4
+**Last updated:** 2026-10-21
 
 ---
 
@@ -128,17 +128,17 @@
 
 ## P1.D — Web and i18n
 
-- [ ] **T-16**. Link line in `apps/web/src/components/fleet/computer/ComputerHeader.tsx` from
+- [x] **T-16**. Link line in `apps/web/src/components/fleet/computer/ComputerHeader.tsx` from
       `node.link`; `apps/web/src/components/fleet/link/ConsentsCard.tsx` registered with
       `registerOverviewBlock` (FL-01);
       `link.shared.ts` (state word, missing-consent command, bytes). Registry placeholder resolution
       reads `effectiveConsents`.
       **Test**: `link.shared.unit.spec.ts`, `ConsentsCard.unit.spec.tsx` (command for each missing
       consent; kind-cannot variant).
-- [ ] **T-17**. i18n `fleet.link.*`, `fleet.consents.*`, `fleet.errors.*` additions in
+- [x] **T-17**. i18n `fleet.link.*`, `fleet.consents.*`, `fleet.errors.*` additions in
       `apps/web/messages/en.json`.
       **Test**: no dotted leaf; no literal string in `apps/web/src/components/fleet/link/**`.
-- [ ] **T-18**. Playwright `apps/web/e2e/flow-fleet-link-contract.spec.ts` (token shape, hello/ready
+- [x] **T-18**. Playwright `apps/web/e2e/flow-fleet-link-contract.spec.ts` (token shape, hello/ready
       fixture via the node harness, refusal codes) and `flow-fleet-consents.spec.ts`.
       **Test**: itself; AW-11 `flow-agent-computer-*.spec.ts` unchanged and green.
 
