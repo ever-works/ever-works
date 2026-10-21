@@ -76,6 +76,7 @@ import {
     FleetNodeHealthService,
     FleetSessionSweepService,
     FleetVirtualReconcileService,
+    FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
@@ -741,6 +742,11 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetVirtualReconcileService?: FleetVirtualReconcileService,
+        // Actions runners on computers (FL-18) — backs the `fleet-runners-poll` cron:
+        // the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetActionsRunnersPollService?: FleetActionsRunnersPollService,
     ) {}
 
     onModuleInit() {
@@ -892,6 +898,13 @@ export class TriggerInternalController implements OnModuleInit {
             // loud "Unknown remote target") when virtual computers are not mounted.
             FleetVirtualReconcileService: this.fleetVirtualReconcileService
                 ? { reconcile: () => this.fleetVirtualReconcileService!.reconcile() }
+                : undefined,
+            // Actions runners on computers (FL-18) — `fleet-runners-poll` calls
+            // `reconcile()` here, and only that: `FleetActionsRunnersPollService` is a
+            // one-member facade over `FleetActionsRunnersService` (whose install /
+            // control / token mint must never reach the worker).
+            FleetActionsRunnersPollService: this.fleetActionsRunnersPollService
+                ? { reconcile: () => this.fleetActionsRunnersPollService!.reconcile() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

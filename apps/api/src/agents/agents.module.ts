@@ -132,6 +132,7 @@ import {
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetVirtualService,
+    FleetActionsRunnersService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2184,6 +2185,11 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
                 // tools are not offered; create/update/delete/run only ever file an approval.
                 { token: FleetScheduleService, optional: true },
+                // Actions runners on computers (FL-18) — backs `fleet_runners_*`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_ACTIONS_RUNNERS_ENABLED off)
+                // the tools are not offered; install / stop / restart / remove only ever file
+                // an approval.
+                { token: FleetActionsRunnersService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2223,6 +2229,7 @@ async function assertRealWriteTarget(
                 fleetGitIdentity?: FleetGitIdentityService | null,
                 fleetWake?: FleetWakeToolPort | null,
                 fleetSchedules?: FleetScheduleService | null,
+                fleetRunners?: FleetActionsRunnersService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2268,6 +2275,7 @@ async function assertRealWriteTarget(
                           }
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
+                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()

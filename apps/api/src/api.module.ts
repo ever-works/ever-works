@@ -81,6 +81,7 @@ import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.m
 import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetSessionGitApiModule } from './fleet/session-git/fleet-session-git-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
+import { FleetActionsRunnersApiModule } from './fleet/runners/fleet-actions-runners-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
 import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
@@ -350,6 +351,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // on a computer of the Fleet: the routes, the host-facing token mint and
         // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
         FleetVirtualApiModule,
+        // Actions runners on computers (FL-18) — GitHub Actions self-hosted runners
+        // installed on computers of the Fleet: the routes, the node-facing token and
+        // progress, and the poll fallback. Dark unless FLEET_ACTIONS_RUNNERS_ENABLED.
+        FleetActionsRunnersApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
