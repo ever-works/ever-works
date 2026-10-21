@@ -14,6 +14,7 @@ import {
     MinLength,
 } from 'class-validator';
 import {
+    FLEET_SESSION_ATTACH_ROLES,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
     FLEET_SESSION_KINDS,
@@ -23,6 +24,7 @@ import {
     FLEET_SESSION_MIN_ROWS,
     FLEET_SESSION_STARTABLE_PROVIDERS,
     FLEET_SESSION_TITLE_MAX_LENGTH,
+    type FleetSessionAttachRole,
     type FleetSessionKind,
     type FleetSessionStartableProvider,
 } from '@ever-works/contracts';
@@ -187,4 +189,22 @@ export class ListFleetSessionsQueryDto {
     @IsString()
     @MaxLength(120)
     cursor?: string;
+}
+
+/** Body for `POST /api/fleet/sessions/:id/attach-token` (FL-04 P1b). */
+export class FleetSessionAttachTokenDto extends FleetSessionSizeDto {
+    @ApiProperty({
+        enum: FLEET_SESSION_ATTACH_ROLES,
+        description:
+            '`viewer` watches (never types); `driver` types and sizes the terminal. Both need the computer’s `sessions` audience.',
+    })
+    @IsIn(FLEET_SESSION_ATTACH_ROLES as unknown as string[])
+    role!: FleetSessionAttachRole;
+}
+
+/** Body for `POST /api/fleet/sessions/:id/recording` (FL-04 P3). */
+export class FleetSessionRecordingDto {
+    @ApiProperty({ description: 'true starts recording the session from now; false stops it.' })
+    @IsBoolean()
+    on!: boolean;
 }

@@ -167,6 +167,8 @@ import { FleetOperationsService } from './fleet-operations.service';
         // `FleetLinkRemote` is NOT exported (L8): it is this module's own
         // plumbing; every other module reaches a link through `FleetLinkService`.
         FleetLinkAttachService,
+        // FL-04 P1b: the session presence observes its viewers (`registerObserver`).
+        FleetLinkViewerGatewayService,
         FLEET_LINK_AUDIENCE,
         FLEET_LINK_HEARTBEAT_OBSERVER,
         FLEET_LINK_NODE_STATE,

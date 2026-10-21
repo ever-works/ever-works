@@ -62,6 +62,8 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.link.connect',
 	'node.link.disconnect',
 	'node.link.channel-open',
+	// Computer health (FL-03, CONTRACTS §7).
+	'node.wake',
 	// Sessions on computers (FL-04, CONTRACTS §7).
 	'node.session.start',
 	'node.session.attach',

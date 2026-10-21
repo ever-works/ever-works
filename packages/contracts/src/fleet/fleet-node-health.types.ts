@@ -31,6 +31,7 @@
 
 import { FLEET_NODE_UPGRADE_COMMAND, type FleetNodeStatus, type FleetNodeWorkerState } from './fleet-node.types.js';
 import type { FleetNodeModelThrottleView } from './fleet-model-usage-limit.types.js';
+import type { FleetHealthRefreshAvailability, FleetNodeWakeAvailability } from './fleet-node-wake.types.js';
 
 // ─── Limits (CONTRACTS §10) ─────────────────────────────────────────────────
 
@@ -215,6 +216,18 @@ export interface FleetNodeHealthView {
 	state: ComputerStateResolution;
 	/** Whether this deployment keeps health history (`FLEET_HEALTH_HISTORY_ENABLED`). */
 	historyEnabled: boolean;
+	/**
+	 * FL-03 second phase — whether THIS viewer can wake the computer, and why
+	 * not. Absent from a platform older than the phase (the page then offers no
+	 * Wake).
+	 */
+	wake?: FleetNodeWakeAvailability;
+	/**
+	 * FL-03 second phase — whether Refresh now can reach the computer right
+	 * now, and why not. Absent from a platform older than the phase (the page
+	 * then shows the button disabled, as it did).
+	 */
+	refresh?: FleetHealthRefreshAvailability;
 }
 
 /** History resolutions — one table, one discriminator (CONTRACTS §4.5). */

@@ -19,7 +19,10 @@ import {
     type FleetSessionListQuery,
 } from '@ever-works/agent/fleet';
 import {
+    FLEET_SESSION_ATTACHES_PER_MINUTE,
     FLEET_SESSION_STARTS_PER_MINUTE,
+    isFleetSessionLive,
+    type FleetSessionAttachTokenResponse,
     type FleetSessionListResponse,
     type FleetSessionView,
 } from '@ever-works/contracts';
@@ -28,12 +31,15 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
     EndFleetSessionDto,
+    FleetSessionAttachTokenDto,
     ListFleetSessionsQueryDto,
     RenameFleetSessionDto,
     RestartFleetSessionDto,
     StartFleetSessionDto,
 } from './dto/fleet-session.dto';
 import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
+import { FleetSessionAttachService } from './fleet-session-attach.service';
+import { FleetSessionPresenceService } from './fleet-session-presence.service';
 
 function actorOf(auth: AuthenticatedUser): FleetSessionActor {
     return { userId: auth.userId };
@@ -67,14 +73,19 @@ function listQuery(query: ListFleetSessionsQueryDto): FleetSessionListQuery {
  * then one `fleet_audit` row. Every refusal is the CONTRACTS §8 envelope with
  * its status, thrown by the service and passed through untouched.
  *
- * Recording (`GET|POST /sessions/:id/recording`) arrives with P3, the viewer
- * attach token with P1b.
+ * P1b adds the viewer attach token (`POST /sessions/:id/attach-token`,
+ * minted through FL-02's one minter) and who is attached (`presence` on the
+ * detail). Recording (`GET|POST /sessions/:id/recording`) arrives with P3.
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetSessionsEnabledGuard)
 export class FleetSessionsController {
-    constructor(private readonly sessions: FleetSessionService) {}
+    constructor(
+        private readonly sessions: FleetSessionService,
+        private readonly attach: FleetSessionAttachService,
+        private readonly presence: FleetSessionPresenceService,
+    ) {}
 
     @Get('nodes/:id/sessions')
     @ApiOperation({
@@ -157,7 +168,9 @@ export class FleetSessionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<FleetSessionView> {
-        return this.sessions.get(id, actorOf(auth));
+        const view = await this.sessions.get(id, actorOf(auth));
+        if (!isFleetSessionLive(view.state)) return view;
+        return { ...view, presence: this.presence.presence(view.id) };
     }
 
     @Patch('sessions/:id')
@@ -200,5 +213,20 @@ export class FleetSessionsController {
         @Body() body: RestartFleetSessionDto,
     ): Promise<FleetSessionView> {
         return this.sessions.restart(id, actorOf(auth), { cols: body?.cols, rows: body?.rows });
+    }
+
+    @Post('sessions/:id/attach-token')
+    @ApiOperation({
+        summary:
+            'A 60-second, single-use token to watch (`viewer`) or drive (`driver`) a live session in the browser, and the socket path to present it on. At most five people are attached to one session.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: FLEET_SESSION_ATTACHES_PER_MINUTE, ttl: 60_000 } })
+    async attachToken(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetSessionAttachTokenDto,
+    ): Promise<FleetSessionAttachTokenResponse> {
+        return this.attach.mint(id, actorOf(auth), body.role);
     }
 }

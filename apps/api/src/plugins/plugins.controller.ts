@@ -19,6 +19,8 @@ import { AuthSessionGuard, CurrentUser } from '../auth';
 import { RefuseFleetRunGuard } from '../auth/guards/refuse-fleet-run.guard';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { WorkOwnershipService } from '@ever-works/agent/services';
+import { isAppWorkKind } from '@ever-works/contracts';
+import { appTargetChangeRequiresOwner, requireAppWorkOwnerSession } from '../works/app-owner-gate';
 import { PluginOperationsService, PluginInstallerService } from '@ever-works/agent/plugins';
 // EW-693 — catalog + install endpoints.
 import { PluginCatalogService } from './plugin-catalog.service';
@@ -484,7 +486,8 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: EnableWorkPluginDto,
     ): Promise<WorkPluginResponseDto> {
-        await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const access = await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        await this.requireOwnerForAppClusterCredential(access, workId, auth, dto?.settings);
         const result = await this.pluginsService.enablePluginForWork(
             workId,
             pluginId,
@@ -573,7 +576,14 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: UpdateWorkPluginSettingsDto,
     ) {
-        await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        const access = await this.ownershipService.ensureCanEdit(workId, auth.userId);
+        await this.requireOwnerForAppClusterCredential(
+            access,
+            workId,
+            auth,
+            dto?.settings,
+            dto?.secretSettings,
+        );
         const result = await this.pluginsService.updateWorkPluginSettings(
             workId,
             pluginId,
@@ -631,4 +641,39 @@ export class PluginsController {
             dto.capability,
         );
     }
+
+    /**
+     * Works-security (2026-10-18) — the generic Work plugin settings routes are a second way to
+     * replace an App Work's your-cluster credential (the k8s plugin's `kubeconfig` is
+     * `x-scope: user`, which a Work-level write may override). Whoever sets it chooses the
+     * cluster every App secret is rendered into, so while `APP_TARGET_CHANGE_REQUIRES_OWNER` is
+     * on, a write that touches `kubeconfig`, `kubeContext` or `clusterSource` on an App Work
+     * needs the owner in a signed-in session — the same rule as `POST app-target/check`. Other
+     * keys, other plugins' settings and non-App Works are unchanged.
+     */
+    private async requireOwnerForAppClusterCredential(
+        access: { work?: { kind?: string | null } | null } | null | undefined,
+        workId: string,
+        auth: AuthenticatedUser,
+        ...bags: Array<Record<string, unknown> | null | undefined>
+    ): Promise<void> {
+        // `isAppWorkKind` normalises case and whitespace, so a stored `App` / ` app ` is gated too.
+        if (!appTargetChangeRequiresOwner() || !isAppWorkKind(access?.work?.kind)) return;
+        const touched = bags.some(
+            (bag) =>
+                !!bag &&
+                typeof bag === 'object' &&
+                APP_CLUSTER_CREDENTIAL_KEYS.some((key) => bag[key] !== undefined),
+        );
+        if (!touched) return;
+        await requireAppWorkOwnerSession(
+            this.ownershipService,
+            workId,
+            auth,
+            "change the cluster credential this App deploys with",
+        );
+    }
 }
+
+/** The k8s settings that decide which cluster an App Work's secrets are rendered into. */
+const APP_CLUSTER_CREDENTIAL_KEYS: readonly string[] = ['kubeconfig', 'kubeContext', 'clusterSource'];

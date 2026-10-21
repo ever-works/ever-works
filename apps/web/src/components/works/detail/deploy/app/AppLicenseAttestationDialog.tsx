@@ -54,13 +54,18 @@ export function AppLicenseAttestationDialog({
     const [confirmed, setConfirmed] = useState(false);
     const [pending, setPending] = useState(false);
     const [refusal, setRefusal] = useState<AppLicenseAttestRefusal | 'failed' | null>(null);
+    // A `403` with no code we have copy for (works-security: the attestation needs a person
+    // signed in, never an API key) is shown in the API's own words.
+    const [serverMessage, setServerMessage] = useState<string | null>(null);
 
     const spdx = license.spdx ?? t('unknownSpdx');
+    const errorText = serverMessage ?? (refusal ? t(`refusals.${refusal}`) : null);
 
     const submit = async () => {
         if (!confirmed || pending) return;
         setPending(true);
         setRefusal(null);
+        setServerMessage(null);
         try {
             const result = await attestAppLicenseAction(workId, {
                 spdx: license.spdx,
@@ -79,6 +84,10 @@ export function AppLicenseAttestationDialog({
                 return;
             }
             if (code === 'licenseChanged') onLicenseChanged();
+            if (result.httpStatus === 403 && !result.code && result.error) {
+                setServerMessage(result.error);
+                return;
+            }
             setRefusal(code ?? 'failed');
         } catch {
             setRefusal('failed');
@@ -130,13 +139,13 @@ export function AppLicenseAttestationDialog({
                         {t('footer')}
                     </p>
 
-                    {refusal && (
+                    {errorText && (
                         <p
                             role="alert"
                             className="text-sm text-red-600 dark:text-red-400"
                             data-testid="app-license-attest-error"
                         >
-                            {t(`refusals.${refusal}`)}
+                            {errorText}
                         </p>
                     )}
 

@@ -112,7 +112,10 @@ import { FleetRunCredentialService } from '../fleet-run-credential.service';
 import { FleetNodeHealthSampleRepository } from '../fleet-node-health-sample.repository';
 import { FleetNodeHealthService } from '../fleet-node-health.service';
 import { NEEDS_A_LOOK_PRODUCERS } from '../needs-a-look/needs-a-look.producer';
-import { FL03_NEEDS_A_LOOK_PRODUCERS } from '../needs-a-look/producers';
+import {
+    FL02_NEEDS_A_LOOK_PRODUCERS,
+    FL03_NEEDS_A_LOOK_PRODUCERS,
+} from '../needs-a-look/producers';
 import { ApiKeyRepository } from '../../database/repositories/api-key.repository';
 import { FleetOrganizationDirectory } from '../fleet-organization-directory';
 import { FleetAccessService } from '../fleet-access.service';
@@ -151,9 +154,11 @@ describe('FleetModule', () => {
             FleetNodeHealthSampleRepository,
             FleetNodeHealthService,
             ...FL03_NEEDS_A_LOOK_PRODUCERS,
+            // FL-02's producer (the version floor).
+            ...FL02_NEEDS_A_LOOK_PRODUCERS,
             expect.objectContaining({
                 provide: NEEDS_A_LOOK_PRODUCERS,
-                inject: [...FL03_NEEDS_A_LOOK_PRODUCERS],
+                inject: [...FL03_NEEDS_A_LOOK_PRODUCERS, ...FL02_NEEDS_A_LOOK_PRODUCERS],
             }),
             // Fleet hub (FL-01).
             FleetOrganizationDirectory,

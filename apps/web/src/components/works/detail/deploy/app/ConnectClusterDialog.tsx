@@ -25,6 +25,7 @@ import {
     APP_RUNTIME_ROUTE_UNAVAILABLE,
     APP_TARGET_TLS_MODES,
     clusterCheckAllowsSave,
+    isAppOwnerRequired,
     type AppClusterCheckView,
     type AppTargetTlsMode,
     type AppTargetView,
@@ -51,6 +52,14 @@ export interface ConnectClusterDialogProps {
     target: AppTargetView;
     /** Called with the saved target after **Save** succeeds. */
     onSaved: (target: AppTargetView) => void;
+    /**
+     * Works-security — whether the member is the Work's owner. `false` disables the kubeconfig and
+     * context fields (connecting a cluster or changing its context is the owner's while the API's
+     * `APP_TARGET_CHANGE_REQUIRES_OWNER` switch is on) with a line saying so; checking the stored
+     * connection again and the cluster settings stay available. `undefined` = not known: nothing
+     * is disabled and the API's refusal is shown if it comes.
+     */
+    isOwner?: boolean;
     pollIntervalMs?: number;
     pollMax?: number;
 }
@@ -76,11 +85,15 @@ export function ConnectClusterDialog({
     workId,
     target,
     onSaved,
+    isOwner,
     pollIntervalMs = CLUSTER_CHECK_POLL_INTERVAL_MS,
     pollMax = CLUSTER_CHECK_POLL_MAX,
 }: ConnectClusterDialogProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.connect');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const ids = useId();
+    // Only a definite "not the owner" locks the credential fields — never an unknown role.
+    const credentialLocked = isOwner === false;
 
     const [kubeconfig, setKubeconfig] = useState('');
     const [kubeContext, setKubeContext] = useState('');
@@ -141,6 +154,7 @@ export function ConnectClusterDialog({
             });
             if (!sent.success) {
                 if (sent.code === APP_RUNTIME_ROUTE_UNAVAILABLE) setUnavailable(true);
+                else if (isAppOwnerRequired(sent)) setNotice(tApp('ownerRequired'));
                 else if (sent.code === 'kubeconfig_too_large') setNotice(t('kubeconfigTooLarge'));
                 else setNotice(t('checkFailed', { reason: sent.error ?? '' }));
                 return;
@@ -187,6 +201,7 @@ export function ConnectClusterDialog({
             });
             if (!result.success || !result.data) {
                 if (result.code === APP_RUNTIME_ROUTE_UNAVAILABLE) setUnavailable(true);
+                else if (isAppOwnerRequired(result)) setNotice(tApp('ownerRequired'));
                 else setNotice(t('saveFailed', { reason: result.error ?? '' }));
                 return;
             }
@@ -201,6 +216,7 @@ export function ConnectClusterDialog({
     const ingressClasses = check?.ingressClasses ?? [];
     const issuers = check?.clusterIssuers ?? [];
     const isolationWarningId = `${ids}-isolation-warning`;
+    const ownerOnlyId = `${ids}-owner-only`;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,6 +241,18 @@ export function ConnectClusterDialog({
                         </p>
                     )}
 
+                    {credentialLocked && !unavailable && (
+                        <p
+                            id={ownerOnlyId}
+                            className="flex items-start gap-2 rounded-md border border-border dark:border-border-dark p-3 text-sm"
+                            role="note"
+                            data-testid="connect-cluster-owner-only"
+                        >
+                            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                            {t('ownerOnly')}
+                        </p>
+                    )}
+
                     <Textarea
                         label={t('kubeconfigLabel')}
                         name="kubeconfig"
@@ -235,7 +263,8 @@ export function ConnectClusterDialog({
                         rows={6}
                         spellCheck={false}
                         autoComplete="off"
-                        disabled={unavailable}
+                        disabled={unavailable || credentialLocked}
+                        aria-describedby={credentialLocked ? ownerOnlyId : undefined}
                         variant="form"
                         data-testid="connect-cluster-kubeconfig"
                     />
@@ -246,8 +275,10 @@ export function ConnectClusterDialog({
                         onChange={(event) => setKubeContext(event.target.value)}
                         helperText={t('contextHelp')}
                         autoComplete="off"
-                        disabled={unavailable}
+                        disabled={unavailable || credentialLocked}
+                        aria-describedby={credentialLocked ? ownerOnlyId : undefined}
                         variant="form"
+                        data-testid="connect-cluster-context"
                     />
 
                     <div>
@@ -255,7 +286,10 @@ export function ConnectClusterDialog({
                             type="button"
                             variant="secondary"
                             onClick={runCheck}
-                            disabled={unavailable || checking}
+                            // A non-owner can re-check a stored connection, never send a new one.
+                            disabled={
+                                unavailable || checking || (credentialLocked && !kubeconfigSent)
+                            }
                             loading={checking}
                             data-testid="connect-cluster-check"
                         >

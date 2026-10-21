@@ -136,6 +136,8 @@ export * from '../apps-tier/config-apps-tier-policy';
 export * from './app-build-succeeded.listener';
 // APW-06 T33 / T31 (lane aw-deploy-2) — the app-target/app-status service and the cluster-op gate.
 export * from './app-target.service';
+// Works-security (2026-10-18) — the owner-only App actions' switches and the credential rule.
+export * from './app-owner-gates';
 export * from './app-spec-applied.listener';
 export * from './app-runtime-activity.listener';
 export * from './app-managed-dns.listener';

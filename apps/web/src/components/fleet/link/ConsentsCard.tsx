@@ -5,6 +5,7 @@ import { Check, X } from 'lucide-react';
 import type { FleetNodeView } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 import type { FleetOverviewBlockProps } from '../registry';
+import { desktopHasConsentWiring } from '../fleet-consents.shared';
 import { CopyCommand } from './CopyCommand';
 import {
     LINK_CONSENT_KEYS,
@@ -22,9 +23,12 @@ import {
  * desktop parity; a cluster row has no node at all. Only asked for a consent
  * that is OFF — a consent the computer reports as on is never "cannot".
  */
-export function kindCannotGive(node: Pick<FleetNodeView, 'kind'>, key: LinkConsentKey): boolean {
+export function kindCannotGive(
+    node: Pick<FleetNodeView, 'kind'> & Partial<Pick<FleetNodeView, 'link' | 'consents'>>,
+    key: LinkConsentKey,
+): boolean {
     if (node.kind === 'k8s') return true;
-    if (node.kind === 'desktop-node') return key !== 'work';
+    if (node.kind === 'desktop-node') return key !== 'work' && !desktopHasConsentWiring(node);
     return false;
 }
 
@@ -119,6 +123,24 @@ export default function ConsentsCard({ nodes }: FleetOverviewBlockProps) {
                                     data-testid={`fleet-consent-kind-cannot-${key}`}
                                 >
                                     {t('kindCannot', { consent })}
+                                </p>
+                            );
+                        }
+                        if (node.kind === 'desktop-node') {
+                            // The desktop app turns a consent on from its tray (FL-02 T-26).
+                            return (
+                                <p
+                                    key={key}
+                                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                                    data-testid={`fleet-consent-tray-${key}`}
+                                >
+                                    {owner
+                                        ? t('trayHint', { consent, name: node.name })
+                                        : t('missingHintShared', {
+                                              consent,
+                                              name: node.name,
+                                              flag: consentFlag(key),
+                                          })}
                                 </p>
                             );
                         }

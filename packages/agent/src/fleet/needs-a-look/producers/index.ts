@@ -6,12 +6,14 @@ export * from './disk-low.producer';
 export * from './helper-untrusted.producer';
 export * from './node-quarantined.producer';
 export * from './node-throttled.producer';
+export * from './node-upgrade-required.producer';
 
 import { ConsentMissingProducer } from './consent-missing.producer';
 import { DiskLowProducer } from './disk-low.producer';
 import { HelperUntrustedProducer } from './helper-untrusted.producer';
 import { NodeQuarantinedProducer } from './node-quarantined.producer';
 import { NodeThrottledProducer } from './node-throttled.producer';
+import { NodeUpgradeRequiredProducer } from './node-upgrade-required.producer';
 
 /** FL-03's producers, in the order the module registers them. */
 export const FL03_NEEDS_A_LOOK_PRODUCERS = [
@@ -21,3 +23,6 @@ export const FL03_NEEDS_A_LOOK_PRODUCERS = [
     ConsentMissingProducer,
     HelperUntrustedProducer,
 ] as const;
+
+/** FL-02's producer (node link & runtime foundations): the version floor. */
+export const FL02_NEEDS_A_LOOK_PRODUCERS = [NodeUpgradeRequiredProducer] as const;

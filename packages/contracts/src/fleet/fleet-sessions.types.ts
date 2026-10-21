@@ -318,7 +318,45 @@ export interface FleetSessionView {
 	updatedAt: string;
 	/** The last 2 000 lines the daemon kept when the session ended (detail only). */
 	lastScreen?: string | null;
+	/** Who is attached right now (detail only; FL-04 P1b). */
+	presence?: FleetSessionPresence;
 }
+
+/**
+ * Who is attached to a live session right now (FL-04 P1b, spec FR-21 … FR-26):
+ * the people watching and driving through the browser, as the API replica that
+ * serves the reader counts them. Ids only, never a keystroke.
+ */
+export interface FleetSessionPresence {
+	/** Everyone attached (watchers and drivers), at most {@link FLEET_SESSION_MAX_VIEWERS}. */
+	attached: FleetSessionPresenceEntry[];
+	/** How many of them drive. */
+	drivers: number;
+	/** How many only watch. */
+	watchers: number;
+}
+
+export interface FleetSessionPresenceEntry {
+	userId: string;
+	role: FleetSessionAttachRole;
+	/** When this attach began (ISO). */
+	since: string;
+}
+
+/** `POST /api/fleet/sessions/:id/attach-token` body (plan §5). */
+export interface FleetSessionAttachTokenRequest {
+	role: FleetSessionAttachRole;
+	cols?: number;
+	rows?: number;
+}
+
+/**
+ * The request a browser sends on the session channel right after
+ * `viewer.ready` to start the stream (`{ requestId, type: 'session.attach',
+ * params: { cols, rows } }`). The node answers {@link FleetSessionAttachResult};
+ * the replay and live output follow as `DATA` frames.
+ */
+export const FLEET_SESSION_BROWSER_ATTACH_VERB = 'session.attach';
 
 /** `POST /api/fleet/nodes/:id/sessions` (CONTRACTS §11.2). */
 export interface FleetSessionStartRequest {

@@ -1562,3 +1562,91 @@ describe('AppDeployPreconditionsService — never throws for an unmet preconditi
         expect(result.warnings.length).toBeGreaterThan(0);
     });
 });
+
+describe('AppDeployPreconditionsService — works-security: the owner confirms a credential someone else saved', () => {
+    const ENV = 'APP_TARGET_CHANGE_REQUIRES_OWNER';
+    const previous = process.env[ENV];
+    afterEach(() => {
+        if (previous === undefined) delete process.env[ENV];
+        else process.env[ENV] = previous;
+    });
+
+    const savedByEditor = {
+        savedByUserId: 'editor-1',
+        savedByOwner: false,
+        savedAt: '2026-10-18T00:00:00.000Z',
+    };
+
+    it('refuses a credential a non-owner saved — for every trigger, and the request flag cannot stand in', async () => {
+        const { service, states } = makeHarness();
+        states.state = {
+            ...states.state,
+            targetSettings: { ...states.state.targetSettings, clusterCredential: savedByEditor },
+        };
+
+        const manual = await service.evaluate(request());
+        expect(codes(manual)).toEqual(['cluster_changed_unconfirmed']);
+        expect(entryFor(manual, 'cluster_changed_unconfirmed').names).toEqual([
+            'owner_confirmation_required',
+        ]);
+        // Only the persisted confirmation counts — the deploy route records it after it has
+        // established the owner in a session; a flag in the request body is not that.
+        expect(codes(await service.evaluate(request({ confirmClusterChange: true })))).toEqual([
+            'cluster_changed_unconfirmed',
+        ]);
+        // A Build-triggered auto-deploy has no person at all.
+        expect(codes(await service.evaluate(request({ userId: null })))).toEqual([
+            'cluster_changed_unconfirmed',
+        ]);
+    });
+
+    it('passes once the owner confirmation is on record', async () => {
+        const { service, states } = makeHarness();
+        states.state = {
+            ...states.state,
+            targetSettings: {
+                ...states.state.targetSettings,
+                clusterCredential: {
+                    ...savedByEditor,
+                    ownerConfirmedByUserId: 'owner-1',
+                    ownerConfirmedAt: '2026-10-18T01:00:00.000Z',
+                },
+            },
+        };
+
+        expect(codes(await service.evaluate(request()))).toEqual([]);
+    });
+
+    it('a never-deployed Work whose credential has no recorded origin needs the owner first', async () => {
+        const { service, states } = makeHarness();
+        states.state = { ...states.state, clusterFingerprint: null };
+
+        expect(codes(await service.evaluate(request()))).toEqual(['cluster_changed_unconfirmed']);
+    });
+
+    it('a credential the owner saved deploys as before', async () => {
+        const { service, states } = makeHarness();
+        states.state = {
+            ...states.state,
+            clusterFingerprint: null,
+            targetSettings: {
+                ...states.state.targetSettings,
+                clusterCredential: { savedByUserId: 'owner-1', savedByOwner: true },
+            },
+        };
+
+        expect(codes(await service.evaluate(request()))).toEqual([]);
+    });
+
+    it('APP_TARGET_CHANGE_REQUIRES_OWNER=false restores the previous behaviour', async () => {
+        process.env[ENV] = 'false';
+        const { service, states } = makeHarness();
+        states.state = {
+            ...states.state,
+            clusterFingerprint: null,
+            targetSettings: { ...states.state.targetSettings, clusterCredential: savedByEditor },
+        };
+
+        expect(codes(await service.evaluate(request()))).toEqual([]);
+    });
+});

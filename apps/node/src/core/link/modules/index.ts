@@ -1,4 +1,6 @@
+import type { ComputerLegBroker } from '../computer-leg';
 import { controlModule } from './control';
+import { createDesktopModule } from './desktop';
 import { createMachineModule, type MachineModuleOptions } from './machine';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
 
@@ -23,6 +25,12 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 */
 	session?: NodeModule;
 	/**
+	 * Fleet node link (FL-02 T-22) — the runtime's live-view leg broker. With
+	 * it, the `desktop` family module (`./desktop`) is composed, carrying a
+	 * view's leg over the link; without it the family stays unclaimed.
+	 */
+	computerLegs?: ComputerLegBroker;
+	/**
 	 * Checkouts on computers (FL-14) — the `checkouts.*` machine verbs, built
 	 * by the runtime around this machine's code folders and Task pool
 	 * (`createCheckoutsModule`). Absent on a process with neither `--manage`
@@ -33,7 +41,7 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], session, checkouts, ...machineOptions } = options;
+	const { extra = [], session, computerLegs, checkouts, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
@@ -44,6 +52,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		machine,
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
+		...(computerLegs ? [createDesktopModule(computerLegs)] : []),
 		...(checkouts ? [checkouts] : []),
 		...extra
 	]);
@@ -53,6 +62,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
 export { createCheckoutsModule, type CheckoutsModule, type CheckoutsModuleOptions } from './checkouts';
 export {

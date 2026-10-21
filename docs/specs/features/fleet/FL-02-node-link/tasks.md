@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-02-node-link`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) merged (#2748); web (T-16 … T-18) in PR 3 (#2827); T-22, T-24 … T-29 in PR 4
+**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) merged (#2748); web (T-16 … T-18) merged (#2827); T-22, T-24 … T-28 merged (#2832); T-29 (the full gates) is the owner's cascade under the fast-build rule
 **Last updated:** 2026-10-21
 
 ---
@@ -165,7 +165,7 @@
       **Test**: `fleet-link-relay.spec.ts` (viewer input → error frame, never forwarded; driver
       forwarded; cross-replica via bus mock); `fleet-link-viewer-gateway.spec.ts` (token single use,
       wrong-channel token refused).
-- [ ] **T-22**. Computer-session leg over the link: `apps/node/src/core/executors/computer-session.ts`
+- [x] **T-22**. Computer-session leg over the link: `apps/node/src/core/executors/computer-session.ts`
       uses a `desktop { source: 'browser' }` channel when `runtime.link` is connected, else
       `openNodeLeg` (unchanged); `EVER_WORKS_NODE_LINK_LEGACY_LEG=1` forces the old path. API side:
       `computer-relay.registry.ts` accepts frames from the bridge as the `worker` role.
@@ -176,7 +176,7 @@
 
 ## P3 — Lifecycle, management lane and parity
 
-- [ ] **T-24**. Upgrade-required surfaces: `apps/web/src/components/fleet/link/UpgradeRequiredSection.tsx`
+- [x] **T-24**. Upgrade-required surfaces: `apps/web/src/components/fleet/link/UpgradeRequiredSection.tsx`
       on the Settings tab; card/header word from FL-03's state mapping (`node.upgradeRequired`);
       `recommendedNodeVersion` (CONTRACTS §1.1) from `FLEET_RECOMMENDED_NODE_VERSION` in
       `packages/agent/src/config/` and `FleetService.heartbeat` result (`fleet.service.ts:620-630`);
@@ -185,25 +185,25 @@
       **Test**: `UpgradeRequiredSection.unit.spec.tsx`; extend `config.spec.ts` and the heartbeat spec;
       `packages/agent/src/fleet/__tests__/node-upgrade-required.producer.spec.ts` (one `info` item per
       below-floor node, stable id, none at or above the floor).
-- [ ] **T-25**. Node self-update: `apps/node/src/core/link/self-update.ts` (compare, installer
+- [x] **T-25**. Node self-update: `apps/node/src/core/link/self-update.ts` (compare, installer
       detection reusing `doctor`'s install-path logic, run, exit 75, failure log + heartbeat
       `selfUpdateFailedAt`); `--auto-update` on `start` in `program.ts`; `node-lifecycle.ts` record gains
       the verdict.
       **Test**: `self-update.spec.ts` (ladder, refuse unknown installer, failure keeps old version);
       container integration in `apps/node/packaging/` smoke script.
-- [ ] **T-26**. Desktop shell: consents in `apps/desktop-node/src/main/main.ts:138` options,
+- [x] **T-26**. Desktop shell: consents in `apps/desktop-node/src/main/main.ts:138` options,
       `apps/desktop-node/src/main/tray.ts` toggles, wizard step in `apps/desktop-node/src/renderer/`;
       config persisted beside the enrolment.
       **Test**: `apps/desktop-node/src/main/start-order.spec.ts` extend (consents passed through);
       renderer unit spec for the step.
-- [ ] **T-27**. Management lane (CONTRACTS R-34): `FLEET_MANAGEMENT_LANE_KINDS` (empty) and
+- [x] **T-27**. Management lane (CONTRACTS R-34): `FLEET_MANAGEMENT_LANE_KINDS` (empty) and
       `FLEET_MANAGEMENT_LANE_CONSENT` in `packages/contracts/src/fleet/fleet-jobs.types.ts`;
       `createManagementLane` beside `createAttendedLane` in `apps/node/src/core/runtime.ts`
       (`:1026-1070`), started only when a registered kind's consent is on, concurrency 1 outside
       `--concurrency`; the work lane's kind filter (`runtime.ts:657-661`) excludes the lane's kinds.
       **Test**: `apps/node/src/core/runtime.management-lane.spec.ts` — with a test kind: leased only
       with its consent, never by the work lane, work-lane slots unchanged; empty set → no lane started.
-- [ ] **T-28**. Docs: `docs/features/fleet-node-link.md` (consents, what the link is, what it never
+- [x] **T-28**. Docs: `docs/features/fleet-node-link.md` (consents, what the link is, what it never
       does, operator relay settings, self-update); add to `apps/docs/sidebarsPlatform.ts` beside
       `'features/fleet'` (`:183`); extend `docs/features/fleet.md` §"Keeping nodes current" and
       §"Connect a machine"; `docs/specs/security/fleet-session-trust-model.md` gains a link section;

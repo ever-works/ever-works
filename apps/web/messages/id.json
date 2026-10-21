@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "Tinjau akses aplikasi GitHub",
                     "openOnGitHub": "Buka di GitHub",
                     "enableBuildWorkflow": "Aktifkan alur kerja build"
-                }
+                },
+                "editAccessRequired": "Anda memerlukan akses edit ke Karya App ini untuk melakukannya."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Kembangkan dengan agennya",
                     "body": "Minta agen Karya untuk mengubah aplikasi — menambahkan fitur, memperbaiki bug, meningkatkan dependensi. Agen bekerja di Repositori Karya dan membuka pull request.",
                     "button": "Mengobrol tentang App ini"
-                }
+                },
+                "editAccessRequired": "Anda memerlukan akses edit ke Karya App ini untuk mencoba lagi."
             },
             "builds": {
                 "title": "Build",
@@ -7178,7 +7180,8 @@
                     "saved": "Target disimpan.",
                     "saveFailed": "Tidak dapat menyimpan target: {reason}",
                     "changeNote": "Mengubah target tidak menghapus apa pun yang sudah berjalan.",
-                    "routeUnavailable": "Mengubah target belum tersedia di instans ini."
+                    "routeUnavailable": "Mengubah target belum tersedia di instans ini.",
+                    "ownerOnly": "Hanya pemilik karya yang dapat mengubah tempat aplikasi berjalan atau menghubungkan kluster baru."
                 },
                 "connect": {
                     "title": "Hubungkan kluster Anda",
@@ -7219,7 +7222,8 @@
                     "saving": "Menyimpan…",
                     "saveBlocked": "Simpan tersedia setelah pemeriksaan lolos dengan semua izin yang diperlukan.",
                     "saved": "Kluster terhubung.",
-                    "saveFailed": "Tidak dapat menyimpan koneksi kluster: {reason}"
+                    "saveFailed": "Tidak dapat menyimpan koneksi kluster: {reason}",
+                    "ownerOnly": "Hanya pemilik karya yang dapat menghubungkan kluster atau mengubah konteksnya."
                 },
                 "check": {
                     "ok": "Terhubung",
@@ -7356,7 +7360,8 @@
                         "resume": "Pelanjutan diminta.",
                         "remove": "Penghapusan diminta.",
                         "cancelDeploy": "Pembatalan diminta."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Hanya pemilik karya yang dapat menghapus data tersimpan."
                 },
                 "environment": {
                     "title": "Lingkungan",
@@ -7445,8 +7450,11 @@
                         "confirm": "Hapus data",
                         "requested": "Menghapus data {kind}.",
                         "failed": "Data tidak dapat dihapus. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Hanya pemilik karya yang dapat menghapus data ini."
+                },
+                "ownerRequired": "Hanya pemilik karya yang dapat melakukan ini.",
+                "ownerConfirmCluster": "Anggota lain menyimpan koneksi kluster ini, jadi pemilik karya harus melakukan deploy sekali untuk mengonfirmasinya."
             },
             "appEnv": {
                 "errors": {
