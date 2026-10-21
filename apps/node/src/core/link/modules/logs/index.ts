@@ -40,7 +40,7 @@ import { createUnifiedLogReader } from './unified-log-source';
 
 export interface LogsLinkModuleOptions {
 	io: LogIo;
-	/** The allowed roots (`resolveAllowedRoots` with the standard log directories), read per call. */
+	/** The allowed roots (`resolveCanonicalAllowedRoots`, purpose `logs`), read per call. */
 	roots(): Promise<readonly AllowedRoot[]>;
 	nodeName: string;
 }
