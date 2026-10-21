@@ -102,6 +102,13 @@ interface LiveRun {
     flushing: Promise<void> | null;
 }
 
+/** One computer of a request, after existence and the audience: its refusal, or null to run. */
+interface ResolvedTarget {
+    nodeId: string;
+    node: FleetNode;
+    refusal: FleetLinkError | null;
+}
+
 /** How often a live run's head and tail are written to its row. */
 const FLUSH_INTERVAL_MS = 1_000;
 /** A row column is an `int`: a byte count never overflows it. */
@@ -359,10 +366,10 @@ export class FleetCommandService implements OnModuleDestroy {
     private async resolveTargets(
         nodeIds: readonly string[],
         actor: FleetCommandActor,
-    ): Promise<Array<{ nodeId: string; node: FleetNode; refusal: FleetLinkError | null }>> {
+    ): Promise<ResolvedTarget[]> {
         const now = this.now();
         return Promise.all(
-            nodeIds.map(async (nodeId) => {
+            nodeIds.map(async (nodeId): Promise<ResolvedTarget> => {
                 let node: FleetNode;
                 try {
                     ({ node } = await this.access.resolveForFamily(nodeId, actor.userId, 'commands'));
