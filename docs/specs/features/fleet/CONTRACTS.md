@@ -153,6 +153,19 @@ started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDU
 on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
 'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
 
+**Revision 21 (2026-10-21)** — FL-06 P2 (lane log decisions 13–20): `GET /sessions/:id/actions` answers
+`FleetSessionActionsResponse { sessionId, actions[{ id, available, reason?, update?, warning?, unresolvedComments?,
+readAsAnswer? }], templates{ <id>: { text, source: default|agent } }, context, disabled }`; `POST /sessions/:id/actions
+{ actionId, prompt }` → `202 { ledgerId, delivery: pending|delivered|undelivered }`; `GET /sessions/:id/actions/ledger` →
+`{ sessionId, entries[FleetSessionActionLedgerEntry], sessionCostCents }`; `POST /sessions/:id/actions/:ledgerId/resend
+{ prompt? }`; `POST /checkouts/:id/pull-request { title, body?, draft?, sessionId? }` → `{ number, url, state, updated,
+taskId }` and the new `GET /checkouts/:id/pull-request/draft` → `FleetPullRequestDraft`; `session.input` may carry
+`source: 'action'` + `actionId`; one `node.session.action` row per send (`action`, redacted `promptPreview`, `delivery`)
+and one `node.session.pull-request.open` per opened / updated pull request (`checkoutId`, `number`, `url`, `updated`);
+`agent.yml` may carry `fleet { branchPrefix?, actions?{ <id>: template } }` (validated on save); the git provider
+contract gains optional `updatePullRequest`; `FLEET_RUN_TOKEN_ROUTES` gains `GET`/`POST
+/api/fleet/checkouts/{id}/pull-request`.
+
 **Revision 20 (2026-10-21)** — FL-06 P1 (session git, lane log `docs/internal/fleet/lanes/FL-06.md` decisions 1–12):
 `FleetSessionView.git` (`FleetSessionGitRef { checkoutId, path, kind, state, isolation, createdBy, repository, branch,
 gitLine }`) on every session view; `checkouts.changes { path, maxBytes?, checkoutId? }` answers
