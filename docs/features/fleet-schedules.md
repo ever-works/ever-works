@@ -98,6 +98,23 @@ computer it is pinned to.
 them; anyone else their own), says how many and how many runs are in flight (they finish; nothing new starts), and
 offers **Undo** for 15 minutes. Nothing is deleted.
 
+## When the node is not a service
+
+Started from a terminal rather than as a service, the node runs its schedules only while it is open. Start it with
+`ever-works-node start --manage --native-schedules` and it also hands every schedule to the operating system's own
+scheduler, which starts `ever-works-node schedule-run <id>` at each time even when nobody has the node open:
+
+| System  | Where                                                                        |
+| ------- | ---------------------------------------------------------------------------- |
+| Linux   | a marked block in your crontab (`# >>> ever-works-node schedules` … `# <<<`) |
+| macOS   | one LaunchAgent per schedule (`works.ever.node.schedule.<id>`)               |
+| Windows | Task Scheduler folder `\EverWorks\`, one task per schedule                  |
+
+While a node process is running, `schedule-run` leaves the fire to it, so nothing runs twice. A cron expression that
+launchd or Task Scheduler cannot express is left to the node's own clock (the node logs which). `unenroll` removes
+everything the fallback wrote; nothing else in your crontab, LaunchAgents or Task Scheduler is touched. Running as a
+service does not need it.
+
 ## Told only when it fails
 
 Two failures in a row put the schedule under **Needs a look** in the Fleet hub ("Nightly tests failed twice on
