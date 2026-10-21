@@ -197,6 +197,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-session-status',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
+				// Tasks on computers (FL-15) — the hand-off, the Computer block, GitHub things for me, git identity.
+				'features/fleet-tasks-and-github',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
 				// Browsing and moving a computer's files through that link (FL-11).
@@ -205,6 +207,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-services-docker',
 				// What a computer serves, opened on it or previewed in your browser (FL-10).
 				'features/fleet-ports',
+				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
+				'features/fleet-virtual-computers',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

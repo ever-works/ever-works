@@ -1043,9 +1043,12 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
 		expect(leases).toContainEqual(expect.objectContaining({ kinds: ['computer-session'] }));
 		// Control 18: with the default local policy (no node-run shell commands)
-		// the work lane also never leases `acceptance-checks` jobs.
+		// the work lane also never leases `acceptance-checks` jobs — nor, since
+		// FL-16 registered them, the management lane's VM jobs (CONTRACTS R-34).
 		expect(leases).toContainEqual(
-			expect.objectContaining({ excludeKinds: ['computer-session', 'acceptance-checks'] })
+			expect.objectContaining({
+				excludeKinds: ['computer-session', 'acceptance-checks', 'vm-create', 'vm-control']
+			})
 		);
 	});
 

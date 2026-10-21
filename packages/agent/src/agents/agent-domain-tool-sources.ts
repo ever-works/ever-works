@@ -11,6 +11,7 @@ import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
+import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
@@ -19,6 +20,7 @@ import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.servi
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
 import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
+import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
@@ -115,6 +117,11 @@ export interface AgentFleetToolSource {
      * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
      * Optional: unbound, those tools are simply not offered.
      */
+    /**
+     * Virtual computers (FL-16) — backs `fleet_virtual_*`. Optional: unbound (or
+     * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
+     */
+    virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'
@@ -191,6 +198,16 @@ export interface AgentFleetToolSource {
  */
 export interface AgentFleetCommandToolSource {
     service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
+}
+
+/**
+ * FL-15 P3 — Tasks on computers (`fleet/agent-fleet-task-tools.ts`): the
+ * hand-off options and the git identity check. Each half is optional; the
+ * builder offers nothing while FLEET_CHECKOUTS_ENABLED is off.
+ */
+export interface AgentFleetTaskToolSource {
+    handoff?: FleetTaskHandoffToolPort | null;
+    identity?: FleetGitIdentityToolPort | null;
 }
 
 /** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
@@ -326,6 +343,8 @@ export interface AgentDomainToolSources {
     fleetSessions?: AgentFleetSessionToolSource;
     /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
     fleetCommands?: AgentFleetCommandToolSource;
+    /** FL-15 P3 — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_*`. */
+    fleetTasks?: AgentFleetTaskToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

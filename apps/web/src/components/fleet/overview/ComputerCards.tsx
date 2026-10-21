@@ -21,6 +21,7 @@ import {
 import { osKeyOf } from '../fleet-os.shared';
 import { ComputerStateSentence } from '../health/ComputerStateSentence';
 import { HealthSparkline } from '../health/HealthSparkline';
+import { VirtualChildRow } from '../virtual/VirtualChildRow';
 
 interface ComputerCardsProps {
     nodes: FleetNodeView[];
@@ -270,6 +271,8 @@ function ComputerCard({
                         : t('overview.computers.nestedVm', { host: hostName })}
                 </p>
             )}
+            {/* FL-16: a virtual computer's system, size, state and create progress. */}
+            {node.virtual ? <VirtualChildRow node={node} /> : null}
         </Link>
     );
 }

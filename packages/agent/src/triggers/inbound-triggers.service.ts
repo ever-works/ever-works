@@ -13,6 +13,7 @@ import { IsNull, Repository } from 'typeorm';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
     InboundTrigger,
+    type InboundTriggerAutoStart,
     type InboundTriggerEventMatcher,
     type InboundTriggerMode,
     type InboundTriggerVariable,
@@ -47,7 +48,9 @@ import {
     type TestFireInboundTriggerResult,
     type UpdateInboundTriggerInput,
 } from './inbound-trigger.types';
-import { matchesEvent, normalizeEventMatcher } from './trigger-event-matcher';
+import { matchesEvent, normalizeEventAudience, normalizeEventMatcher } from './trigger-event-matcher';
+import { GitHubAppUserLinkRepository } from '../database/repositories/github-app-user-link.repository';
+import { TaskChatService } from '../tasks-domain/task-chat.service';
 import {
     PLATFORM_EVENT_TEMPLATE_PATHS,
     findInvalidTemplatePlaceholders,
@@ -170,6 +173,12 @@ export class FireRefusedError extends BadRequestException {}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fire-log reason for a fire the subject window swallowed. */
+/** FL-15 P3 — the name the **GitHub: things for me** preset gives its Trigger. */
+export const GITHUB_FOR_ME_TRIGGER_NAME = 'GitHub: things for me';
+
+/** FL-15 P3 (§5.5) — the label "about me" Tasks carry. */
+export const GITHUB_FOR_ME_LABEL = 'github';
+
 export const SUBJECT_COALESCED_REASON =
     'Coalesced: this trigger already fired for the same subject inside its replay window';
 
@@ -245,7 +254,87 @@ export class InboundTriggersService {
         @Optional()
         @Inject(TASK_TEMPLATE_LOOKUP)
         private readonly taskTemplates?: TaskTemplateLookup | null,
+        // FL-15 P3 — "GitHub events about me": the owner's linked GitHub
+        // login (who "me" is) and the Task chat line a coalesced event posts.
+        // Appended LAST + @Optional(): without them an audience matcher
+        // matches nothing (fail closed) and coalesced events post nothing.
+        @Optional() private readonly githubLinks?: GitHubAppUserLinkRepository,
+        @Optional() private readonly taskChat?: TaskChatService,
     ) {}
+
+    /**
+     * FL-15 P3 (spec FR-19, U11) — **GitHub: things for me**: one
+     * event-sourced Trigger over GitHub events about the owner (review
+     * requested from me, assigned to me, my pull requests), parked in the
+     * Backlog unless `autoStart: 'always'`, optionally assigned to an Agent,
+     * coalescing on the pull request or issue for the longest window. Refused
+     * `400` without a linked GitHub account — the Trigger needs to know who
+     * "me" is.
+     */
+    async createGithubForMe(
+        scope: InboundTriggerScope,
+        input: { audience?: string[] | null; agentId?: string | null; autoStart?: InboundTriggerAutoStart | null },
+    ): Promise<{ trigger: InboundTriggerView; secret: string }> {
+        const audience = normalizeEventAudience({
+            me: input.audience && input.audience.length > 0 ? input.audience : ['review-requested', 'assigned', 'authored'],
+        });
+        if (!audience) {
+            throw new BadRequestException('Choose at least one of: review requested, assigned, authored.');
+        }
+        return this.create(scope, {
+            name: GITHUB_FOR_ME_TRIGGER_NAME,
+            description: 'GitHub events about me become Tasks on the board.',
+            sourceType: 'event',
+            eventMatcher: { source: 'github', kind: 'github.*', audience },
+            ...(input.agentId ? { targetAgentId: input.agentId } : {}),
+            autoStart: input.autoStart ?? 'manual',
+            showOnBoard: true,
+            replayWindowSec: MAX_REPLAY_WINDOW_SEC,
+        });
+    }
+
+    /** FL-15 P3 (U11): an audience matcher needs the owner's linked GitHub account. */
+    private async assertGithubLinkedFor(userId: string, matcher: InboundTriggerEventMatcher | null): Promise<void> {
+        if (!matcher?.audience) return;
+        const link = this.githubLinks ? await this.githubLinks.findByUserId(userId).catch(() => null) : null;
+        if (!link?.githubLogin) {
+            throw new BadRequestException(
+                "Connect your GitHub account first — the Trigger needs to know who 'me' is.",
+            );
+        }
+    }
+
+    /** The owner's GitHub login, read at most once per fire batch; null when not linked. */
+    private async githubLoginOf(userId: string): Promise<string | null> {
+        if (!this.githubLinks) return null;
+        const link = await this.githubLinks.findByUserId(userId).catch(() => null);
+        return link?.githubLogin ?? null;
+    }
+
+    /**
+     * FL-15 P3 (spec U12): an event about a subject that already has a Task
+     * from this audience Trigger posts one chat line on that Task instead of
+     * a second Task. Best effort; never throws.
+     */
+    private async noteCoalescedEvent(row: InboundTrigger, taskId: string, event: IngestedEvent): Promise<void> {
+        if (!this.taskChat || !row.eventMatcher?.audience) return;
+        try {
+            const action =
+                event.payload && typeof event.payload.action === 'string' ? event.payload.action.replace(/_/g, ' ') : 'update';
+            const subject = event.subjectExternalId ?? event.title ?? 'this item';
+            const line = `GitHub: ${action} on ${subject}${event.sourceUrl ? ` — ${event.sourceUrl}` : ''}`;
+            await this.taskChat.post(
+                row.userId,
+                { taskId, body: line.slice(0, 1000), authorType: 'user', authorId: row.userId } as never,
+            );
+        } catch (error) {
+            this.logger.debug(
+                `Trigger ${row.id}: coalesced event ${event.id} not noted on task ${taskId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     async list(scope: InboundTriggerScope): Promise<InboundTriggerView[]> {
         const rows = await this.repo.find({
@@ -281,6 +370,7 @@ export class InboundTriggersService {
         }
         const sourceType = input.sourceType ?? 'webhook';
         const eventMatcher = this.resolveEventMatcher(sourceType, input.eventMatcher);
+        await this.assertGithubLinkedFor(scope.userId, eventMatcher);
         this.assertTemplateValid('taskTitleTemplate', input.taskTitleTemplate);
         this.assertTemplateValid('taskDescriptionTemplate', input.taskDescriptionTemplate);
         this.assertTemplateSlugValid(input.taskTemplateSlug);
@@ -400,6 +490,7 @@ export class InboundTriggersService {
                 );
             }
             row.eventMatcher = this.resolveEventMatcher('event', input.eventMatcher);
+            await this.assertGithubLinkedFor(scope.userId, row.eventMatcher);
         }
         const saved = await this.repo.save(row);
         return this.toView(saved);
@@ -649,9 +740,13 @@ export class InboundTriggersService {
         });
 
         const subjectKey = eventSubjectDedupeKey(event);
+        // FL-15 P3: "me" is the owner's linked GitHub login, read once per event and only when a rule needs it.
+        const githubLogin = rows.some((row) => row.eventMatcher?.audience)
+            ? await this.githubLoginOf(event.userId)
+            : null;
 
         for (const row of rows) {
-            if (!matchesEvent(row.eventMatcher, event)) continue;
+            if (!matchesEvent(row.eventMatcher, event, { githubLogin })) continue;
             try {
                 // Permanent claim (no window): one ingested event fires a
                 // trigger once, no matter how often the drain retries.
@@ -682,6 +777,7 @@ export class InboundTriggersService {
                 // fire log renders, so the coalescing is visible rather
                 // than silent. Events with no subject (a raw message, a
                 // push) are unaffected and fire per event as before.
+                let subjectMarker: InboundTriggerFire | null = null;
                 if (subjectKey) {
                     const coalesced = await this.fires.claim(
                         row.id,
@@ -693,9 +789,14 @@ export class InboundTriggersService {
                         await this.closeFire(claim.fire, 'refused', {
                             reason: SUBJECT_COALESCED_REASON,
                         });
+                        // FL-15 P3 (U12): the subject's Task hears about it.
+                        if (coalesced.fire.taskId) {
+                            await this.noteCoalescedEvent(row, coalesced.fire.taskId, event);
+                        }
                         result.deduped += 1;
                         continue;
                     }
+                    subjectMarker = coalesced.fire;
                     // The subject row is a coalescing marker, not a fire:
                     // settle it immediately so it never shows as running,
                     // and so it is not re-claimable as a "produced no
@@ -704,12 +805,17 @@ export class InboundTriggersService {
                 }
 
                 const templateEvent = this.toTemplateEvent(event);
-                await this.executeFire(row, {
+                const task = await this.executeFire(row, {
                     fire: claim.fire,
                     event: templateEvent,
                     workId: event.workId ?? null,
                     fallbackDescription: () => this.buildEventTaskDescription(row, templateEvent),
                 });
+                // FL-15 P3 (U12): the subject marker remembers its Task, so a later
+                // event about the same pull request or issue finds it.
+                if (subjectMarker && row.eventMatcher?.audience) {
+                    await this.closeFire(subjectMarker, 'done', { taskId: task.id });
+                }
                 result.fired += 1;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -878,6 +984,8 @@ export class InboundTriggersService {
                     title,
                     description,
                     workId: ctx.workId ?? null,
+                    // FL-15 P3 (§5.5): "about me" Tasks carry the `github` label.
+                    ...(row.eventMatcher?.audience ? { labels: [GITHUB_FOR_ME_LABEL] } : {}),
                     // Automated work stays off the human board unless the
                     // trigger's owner opted it in.
                     hiddenFromBoard: !row.showOnBoard,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AgentsModule as AgentAgentsModule } from '@ever-works/agent/agents';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { FleetCheckoutsModule, FleetGitModule, FleetModule, FleetSessionsModule } from '@ever-works/agent/fleet';
@@ -23,6 +23,10 @@ import { FleetTaskHandoffService } from './fleet-task-handoff.service';
  * decision 2). The node link port (`FLEET_SESSION_NODE_PORT`) comes from the
  * global `FleetSessionsApiModule`. Nothing imports this module back.
  */
+// `@Global()` (P3): the API's AgentsModule resolves `FleetTaskHandoffService` and
+// `FleetGitIdentityService` (optionally) for the Agent tools, without importing this
+// module; nothing here injects the agents module back, so there is no cycle.
+@Global()
 @Module({
     imports: [
         DatabaseModule,
@@ -42,6 +46,6 @@ import { FleetTaskHandoffService } from './fleet-task-handoff.service';
         FleetSessionsEnabledGuard,
         FleetCheckoutsEnabledGuard,
     ],
-    exports: [FleetTaskHandoffService],
+    exports: [FleetTaskHandoffService, FleetGitModule],
 })
 export class FleetTasksApiModule {}

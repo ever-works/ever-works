@@ -670,35 +670,38 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet tasks handoff-options'
 	}),
 
-	// ── virtual (FL-16) ──
-	read('fleet_virtual_list', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', {
+	// ── virtual (FL-16) ── P1 shipped: Containers. A create, a stop and a destroy are held for
+	// the owner's approval by the Agent tools (`agent-fleet-virtual-tools.ts`).
+	read('fleet_virtual_list', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/nodes/{id}/virtual'),
 		cli: 'fleet virtual list'
 	}),
-	read('fleet_virtual_options', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', {
+	read('fleet_virtual_options', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', {
 		phase: 'P3',
-		route: GET('/api/fleet/providers'),
+		route: GET('/api/fleet/nodes/{id}/virtual/options'),
 		cli: 'fleet virtual options'
 	}),
-	act('fleet_virtual_create', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_virtual_create', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', confirm('machine.admin'), {
 		phase: 'P3',
 		route: POST('/api/fleet/nodes/{id}/virtual'),
 		cli: 'fleet virtual create',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
-	act('fleet_virtual_power', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_virtual_power', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', confirm('machine.admin'), {
 		phase: 'P3',
-		route: POST('/api/fleet/nodes/{id}/virtual/{vmId}/power'),
+		route: POST('/api/fleet/nodes/{id}/virtual/{childId}/power'),
 		cli: 'fleet virtual power',
 		waitable: true,
-		confirmationNote: 'plain to start; confirm to stop'
+		confirmationNote: 'plain to start; confirm to stop (an Agent\'s stop is held for the owner)'
 	}),
-	act('fleet_virtual_destroy', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', typed('write.destructive'), {
+	act('fleet_virtual_destroy', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', typed('write.destructive'), {
 		phase: 'P3',
-		route: DELETE('/api/fleet/nodes/{id}/virtual/{vmId}'),
+		route: POST('/api/fleet/nodes/{id}/virtual/{childId}/destroy'),
 		cli: 'fleet virtual destroy',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
 
 	// ── cloud (FL-17) ──

@@ -444,6 +444,44 @@ export function fleetComputerPortsScreens(
         }));
 }
 
+/**
+ * Virtual computers (FL-16, spec FR-34, §5.9) — "New virtual computer" (the
+ * Computers tab with the dialog open) and, for every virtual computer the
+ * viewer may see, "Start <name>" or "Stop <name>", opening its page where the
+ * act and its confirmation live. Only while `FLEET_VIRTUAL_ENABLED` is on.
+ */
+export function fleetVirtualScreens(
+    computers: ReadonlyArray<{ id: string; name: string; hostNodeId?: string; virtualState?: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.virtual.new',
+            href: `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=virtual`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.virtual.palette.newVirtual'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        if (!computer.hostNodeId) continue;
+        const running = computer.virtualState === 'running';
+        if (!running && computer.virtualState !== 'stopped') continue;
+        screens.push({
+            id: `fleet.virtual.${computer.id}.${running ? 'stop' : 'start'}`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+            icon: Monitor,
+            title: (t: PaletteTranslator) =>
+                running
+                    ? t('fleet.virtual.palette.stop', { name: computer.name })
+                    : t('fleet.virtual.palette.start', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */

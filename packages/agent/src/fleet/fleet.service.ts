@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from 'crypto';
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Inject,
     Injectable,
     Logger,
     NotFoundException,
     Optional,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
 import {
@@ -55,7 +57,10 @@ import {
     normalizeFleetLanId,
     normalizeFleetMacAddress,
     selectFleetWakeSiblings,
+    isFleetNodeOrigin,
+    isFleetVirtualKind,
 } from '@ever-works/contracts';
+import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -108,6 +113,13 @@ export const FLEET_ENROLLMENT_TOKEN_TTL_MS = FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_
 
 /** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
 export const FLEET_NODE_OFFLINE_AFTER_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
+
+/**
+ * Virtual computers (FL-16, lane decision 8) — how long a host must have been
+ * silent before a child's registration may be removed without destroying the
+ * machine (nothing can confirm the machine either way any more).
+ */
+export const FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS = 24 * 60 * 60 * 1000;
 
 /** Kinds a machine can enroll as ('k8s' is list-time only, never a row). */
 export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
@@ -1484,7 +1496,10 @@ export class FleetService {
         const now = Date.now();
         const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
         return rows
-            .filter((row) => row.status === 'enrolling')
+            // A virtual computer being built (FL-16) is not a token a person
+            // minted: its row waits for the guest, which is handed its own
+            // token when it is ready. The hub shows it under its host instead.
+            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual')
             .map((row) => {
                 const issuedAtMs = credentialIssuedAtMs(row);
                 const hasIssuedAt = Number.isFinite(issuedAtMs);
@@ -1963,6 +1978,10 @@ export class FleetService {
         confirmation: FleetRemoveConfirmation = {},
     ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
+        // Virtual computers (FL-16, spec FR-29, the R-36 shape) — two additive
+        // refusals, checked before anything is deleted: a host that still hosts
+        // children, and a child whose machine still runs on its host.
+        await this.assertVirtualRemovable(node);
         if (confirmation.confirmName !== undefined) {
             assertConfirmName(node, confirmation.confirmName);
             ctx = {
@@ -1974,6 +1993,53 @@ export class FleetService {
         await this.auditLifecycle('node.delete', userId, node, ctx, {
             before: { status: node.status, name: node.name, kind: node.kind },
             after: null,
+        });
+    }
+
+    /**
+     * Virtual computers (FL-16, spec FR-29, FR-30, U14) — whether a Node's
+     * registration may be removed:
+     *
+     *  - a HOST with children is refused `busy`, naming them ("destroy or
+     *    remove its 2 virtual computers first");
+     *  - a virtual CHILD whose machine still exists is refused
+     *    `unsupported_on_node` with "destroy it instead" — an orphaned machine
+     *    would keep running on the host. Allowed again once the machine is
+     *    known to be gone (`gone`), never built (`failed`, `not-enrolled`), its
+     *    host's registration is gone, or its host has been silent for a day
+     *    (lane decision 8: nothing can confirm the machine either way, and the
+     *    owner must not be left with a registration they can never remove).
+     */
+    private async assertVirtualRemovable(node: FleetNode): Promise<void> {
+        // Read through a guard: a repository double built before FL-16 has no
+        // children finder, and a registry without one has no children.
+        const finder = (this.repository as Partial<FleetNodeRepository>).findByHostNodeIds;
+        const children = typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
+        if (children.length > 0) {
+            const names = children.map((child) => child.name).sort();
+            const hint =
+                children.length === 1
+                    ? `destroy or remove ${names[0]} first — it is a virtual computer on ${node.name}`
+                    : `destroy or remove its ${children.length} virtual computers first`;
+            throw new ConflictException({
+                statusCode: 409,
+                message: hint,
+                error: { code: 'busy', hint, details: { children: names } },
+            });
+        }
+        if (node.origin !== 'virtual' && !node.hostNodeId) return;
+        const state = node.virtualMeta?.state ?? null;
+        if (state === 'gone' || state === 'failed' || state === 'not-enrolled') return;
+        if (node.status === 'enrolling' && state === null) return;
+        const host = node.hostNodeId ? await this.repository.findById(node.hostNodeId) : null;
+        if (!host) return;
+        const hostBeat = host.lastHeartbeatAt ? new Date(host.lastHeartbeatAt).getTime() : NaN;
+        if (!Number.isFinite(hostBeat) || Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS) return;
+        const hint = `${node.name} still runs on ${host.name}; destroy it instead`;
+        throw new UnprocessableEntityException({
+            statusCode: 422,
+            message: hint,
+            error: { code: 'unsupported_on_node', hint, details: { hostNodeId: host.id } },
         });
     }
 
@@ -2293,7 +2359,25 @@ export class FleetService {
             // Fleet node link (FL-02 T-25). Omitted when never reported, so a
             // view of a daemon older than the field is exactly what it was.
             ...selfUpdateView(node),
+            // Virtual computers (FL-16): how the row came into being, the host
+            // a child runs on, what it is, and its system / size / state.
+            origin: isFleetNodeOrigin(node.origin) ? node.origin : 'enrolled',
+            hostNodeId: node.hostNodeId ?? null,
+            virtualKind: isFleetVirtualKind(node.virtualKind) ? node.virtualKind : null,
+            virtual: fleetVirtualViewOf(node),
         };
+    }
+
+    /**
+     * Virtual computers (FL-16) — the wire view of a row for a caller of a
+     * known role: the owner's full view, anyone else the shared projection
+     * (`toSharedView`). For a service that already resolved the role (the
+     * children of a host); it decides nothing about access itself.
+     */
+    viewForRole(node: FleetNode, role: FleetViewerRole): FleetNodeView {
+        if (role === 'owner') return { ...this.toView(node), viewerRole: 'owner' };
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        return toSharedView(this.toView(node), node, role, cutoff);
     }
 }
 
@@ -2540,6 +2624,11 @@ function toSharedView(
         isFavorite: false,
         hostNodeId: view.hostNodeId ?? null,
         virtualKind: view.virtualKind ?? null,
+        // Virtual computers (FL-16) — DECIDED shared: the origin and the child's
+        // system, size and state are what the nested row shows anyone who may
+        // see the host; the block carries no password, token or host path.
+        origin: view.origin ?? 'enrolled',
+        virtual: view.virtual ?? null,
         // Computer health (FL-03) — DECIDED shared: reading health is the `view`
         // family (FL-03 spec §7, "Read health / history: view / org-members").
         // The stored snapshot carries numbers, booleans, a failed-service COUNT
@@ -2574,6 +2663,8 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'isFavorite',
     'hostNodeId',
     'virtualKind',
+    'origin',
+    'virtual',
     'health',
 ];
 

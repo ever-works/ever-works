@@ -74,12 +74,29 @@ const testLane = (consent: 'manage' | 'work' | 'usageScan' = 'manage'): Manageme
 });
 
 describe('the management lane — as it ships', () => {
-	it('has no kinds and no executors, so no node starts it', () => {
+	it('owns the FL-16 kinds but, without a virtual data folder, has no executor, so no node starts it', () => {
+		// FL-02 shipped the lane with no kinds; FL-16 registered `vm-create` and
+		// `vm-control`. Their executors are built by the runtime only for a host
+		// with a virtual data folder (`virtualDataDir`), so a process without one
+		// owns the kinds (its work lane never leases them) and leases none.
 		expect(MANAGEMENT_LANE_EXECUTORS).toEqual([]);
 		const plan = planManagementLane({ work: true, attend: true, manage: true, usageScan: true });
-		expect(plan).toEqual({ kinds: [], ownedKinds: [], executors: [] });
+		expect(plan).toEqual({ kinds: [], ownedKinds: ['vm-create', 'vm-control'], executors: [] });
 		const runtime = createNodeRuntime(config(), platform().io, { workerEnabled: true, manageEnabled: true });
 		expect(runtime.management).toBeUndefined();
+	});
+
+	it('starts with the VM kinds on a Linux host with --manage and a virtual data folder (FL-16)', () => {
+		const runtime = createNodeRuntime(config(), platform().io, {
+			manageEnabled: true,
+			virtualDataDir: '/var/lib/ever-works-node/virtual'
+		});
+		expect(runtime.management?.kinds).toEqual(['vm-create', 'vm-control']);
+		const without = createNodeRuntime(config(), platform().io, {
+			workerEnabled: true,
+			virtualDataDir: '/var/lib/ever-works-node/virtual'
+		});
+		expect(without.management).toBeUndefined();
 	});
 
 	it('leaves the work lane exactly as it was (no extra excluded kind)', async () => {
