@@ -100,7 +100,21 @@ function makeFullService(): AgentToolService {
             ingest: { repository: stub() },
             digest: { digestService: stub() },
             meetings: { repository: stub() },
-            fleet: { service: stub() },
+            // Mirrors the catalog harness (FL-19): every fleet sub-source, and the
+            // sessions and commands bundles, so the two assemblies stay comparable.
+            fleet: {
+                service: stub(),
+                machine: stub(),
+                ports: stub(),
+                portTunnels: { isEnabled: () => true },
+                health: { service: stub(), history: stub(), needsALook: stub() },
+                checkouts: { service: stub() },
+                logs: { reader: stub() },
+                status: stub(),
+                operations: stub(),
+            },
+            fleetSessions: { service: stub() },
+            fleetCommands: { service: stub() },
             prReview: { prReviewService: stub() },
             mergePolicy: { service: stub(), authorize: async () => null },
             browser: { facade: stub() },
@@ -162,6 +176,14 @@ describe('buildAgentToolCatalog', () => {
         expect(names).toContain('submitTaskReview');
         expect(names).toContain('resolve_merge_policy');
         expect(names).toContain('resolve_tool_grants');
+        // FL-19 — the fleet catalogue's own tools and one per bound fleet family.
+        expect(names).toContain('fleet_status');
+        expect(names).toContain('fleet_nodes_list');
+        expect(names).toContain('fleet_operations_get');
+        expect(names).toContain('fleet_services_list');
+        expect(names).toContain('fleet_logs_read');
+        expect(names).toContain('fleet_nodes_health');
+        expect(names).toContain('fleet_ports_list');
     });
 
     it('computes the permission gate the assembly actually applies', () => {

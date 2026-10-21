@@ -12827,6 +12827,65 @@
         }
     },
     "fleet": {
+        "tools": {
+            "capabilities": {
+                "title": "Fleet tools",
+                "description": "{agent} can reach your computers through tools. What {agent} may do depends on three things: its tool grants, its trust ladder, and what each computer's owner allows.",
+                "noCredential": "Tools never carry a credential. {agent} acts through the platform; the platform asks the computer.",
+                "error": "Could not read {agent}'s fleet permissions.",
+                "retry": "Retry",
+                "empty": "You have no computers yet.",
+                "addComputer": "Add computer",
+                "stopped": "All computers are stopped: every act is refused until the stop is cleared under Settings → Fleet. Reads keep working.",
+                "comingSoon": "Coming soon",
+                "change": "Change",
+                "computerRefuses": "this computer refuses",
+                "yes": "Yes",
+                "no": "No",
+                "columns": {
+                    "family": "Family",
+                    "read": "Read",
+                    "act": "Act",
+                    "whyNot": "Why not"
+                },
+                "rungs": {
+                    "auto": "Auto",
+                    "ask": "Ask",
+                    "draft": "Draft"
+                },
+                "gates": {
+                    "killSwitch": "Stopped",
+                    "workspacePause": "Workspace paused",
+                    "agentPause": "Agent paused",
+                    "grants": "Denied",
+                    "ladder": "Off",
+                    "caps": "Limit reached",
+                    "audience": "Owner",
+                    "consent": "Consent"
+                },
+                "families": {
+                    "status": "Status",
+                    "nodes": "Computers",
+                    "sessions": "Sessions",
+                    "desktop": "Desktop",
+                    "logs": "Logs",
+                    "services": "Services",
+                    "processes": "Processes",
+                    "docker": "Docker",
+                    "ports": "Ports",
+                    "files": "Files",
+                    "commands": "Commands",
+                    "schedules": "Schedules",
+                    "checkouts": "Checkouts",
+                    "tasks": "Tasks",
+                    "virtual": "Virtual computers",
+                    "cloud": "Cloud computers",
+                    "runners": "Actions runners",
+                    "usage": "Usage",
+                    "operations": "Operations"
+                }
+            }
+        },
         "gitIdentity": {
             "card": {
                 "title": "Git on {node}",

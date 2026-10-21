@@ -25,7 +25,8 @@ program.addCommand(authCommand);
 program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
 // `ever-works fleet …`: sessions (FL-04), commands (FL-12, `fleet commands run --on a,b -- <cmd>`) and
-// checkouts (FL-14, `fleet checkouts list|get|create|sync|archive|delete`).
+// checkouts (FL-14, `fleet checkouts list|get|create|sync|archive|delete`); FL-19 adds status, nodes,
+// logs, services, processes, docker, ports, operations and tools, with `--json` and exits 0/1/2/124.
 program.addCommand(fleetCommand);
 registerKbCommands(program);
 

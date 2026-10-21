@@ -1,4 +1,5 @@
 import {
+    fleetToolEntryPointCategories,
     isActionCategory,
     matchesAnyToolPattern,
     moreRestrictiveCategory,
@@ -47,6 +48,12 @@ import {
  * nothing.
  */
 export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Object.freeze({
+    // ── Fleet tools (FL-19) — every `fleet_<family>_<verb>` row of the catalogue
+    // (`FLEET_TOOL_CATALOGUE`), so the ladder holds or refuses a machine act by
+    // its OWN category. Spread FIRST: an entry written below by the family's
+    // owning epic (FL-12, FL-14) overrides the catalogue's — the owner decided.
+    ...fleetToolEntryPointCategories(),
+
     // ── read.internal — reading what is already inside the workspace ──
     // Not laddered (FR-2): connections and tool grants decide this, and a
     // second way to express it would be a second thing to get wrong.

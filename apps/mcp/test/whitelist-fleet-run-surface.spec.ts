@@ -109,6 +109,38 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_sessions_start: 'starts a process on a computer',
 	fleet_sessions_rename: "a person's sessions on their computers",
 	fleet_sessions_end: 'destructive: stops a process on a computer',
+	// Checkouts, logs, commands and ports (FL-14, FL-08, FL-12, FL-10) — the family epics added
+	// these tools without a run-token grant; FL-19 names the refusal so it is a decision. A run's
+	// Agent reaches its owner's computers through its own gated fleet tools, never through a
+	// person's MCP surface.
+	fleet_checkouts_list: "a person's checkouts on their computers",
+	fleet_checkouts_get: "a person's checkouts on their computers",
+	fleet_checkouts_create: 'writes on a computer',
+	fleet_checkouts_sync: 'pushes and pulls on a computer',
+	fleet_checkouts_archive: 'moves a checkout to the bin',
+	fleet_checkouts_delete: 'destructive: deletes a checkout',
+	fleet_logs_sources: "a computer's log sources",
+	fleet_logs_read: "a computer's logs",
+	fleet_commands_run: 'runs commands on computers',
+	fleet_commands_list: "a person's commands and their output",
+	fleet_commands_get: "a person's commands and their output",
+	fleet_commands_cancel: 'stops a command on a computer',
+	fleet_ports_list: 'what a computer listens on',
+	fleet_ports_open: 'opens a page on a computer',
+	fleet_ports_preview_close: "closes a person's preview tunnel",
+	// FL-19 P1 — the catalogue's reads: machine state of every computer the owner has.
+	fleet_status: "the owner's whole fleet at a glance",
+	fleet_nodes_health: "a computer's health",
+	fleet_nodes_needs_a_look: 'what needs a look on a computer',
+	fleet_services_list: 'the services on a computer',
+	fleet_processes_list: 'the processes on a computer',
+	fleet_docker_containers_list: 'the containers on a computer',
+	fleet_docker_images_list: 'the images on a computer',
+	fleet_docker_compose_list: 'the Compose projects on a computer',
+	fleet_operations_get: "a person's long operations",
+	fleet_operations_list: "a person's long operations",
+	fleet_nodes_git_identity_get: "a computer's git identity",
+	fleet_tasks_handoff_options: "a person's computers, checkouts and agents for a Task",
 	// FL-05 P2: typing an answer into a person's session prompt.
 	fleet_sessions_answer: "answers a prompt in a person's session"
 };

@@ -757,6 +757,100 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: false }
 	},
 
+	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
+	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
+	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each
+	// route keeps its own flag (404 while dark). `fleet_nodes_list|get` are the Agent names of the
+	// routes the legacy `list_fleet_nodes` / `get_fleet_node` entries above already expose, which
+	// stay exactly as they are (spec FR-3). Enrolment, heartbeat, lease, attach-token and
+	// credential routes are never exposed (spec FR-17).
+	{
+		method: 'GET',
+		path: '/api/fleet/status',
+		toolName: 'fleet_status',
+		description:
+			'How is my fleet, in one call: every computer I may see (status, platform, consents, CPU / memory / disk, live sessions), what needs a look on them with the fix for each, whether the fleet kill switch is on, and the server time. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/health',
+		toolName: 'fleet_nodes_health',
+		description:
+			"One fleet computer's health from its latest check-in (CPU, memory, disk, load, uptime, GPU, pending reboot, failed services), whether it is stale, and its state in plain words with its one fix. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/needs-a-look',
+		toolName: 'fleet_nodes_needs_a_look',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/services',
+		toolName: 'fleet_services_list',
+		description:
+			"The services on one fleet computer (systemd, launchd or Windows services), failed first, read on the machine. Needs the computer's services audience and --manage. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/processes',
+		toolName: 'fleet_processes_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/containers',
+		toolName: 'fleet_docker_containers_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/images',
+		toolName: 'fleet_docker_images_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/compose',
+		toolName: 'fleet_docker_compose_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/operations/{id}',
+		toolName: 'fleet_operations_get',
+		description:
+			'A long operation on one of my fleet computers (a call that answered with an operationId): running, done, failed, cancelled or interrupted, its progress, and the result or the error. An interrupted operation never reads done. Read-only; poll it while it runs.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/operations',
+		toolName: 'fleet_operations_list',
+		annotations: { readOnlyHint: true }
+	},
+	// Tasks & GitHub on the fleet (FL-15) — the reads behind "Fix on a computer" and the Git card
+	// (dark unless FLEET_CHECKOUTS_ENABLED; hand-off options also need FLEET_SESSIONS_ENABLED).
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/git/identity',
+		toolName: 'fleet_nodes_git_identity_get',
+		description:
+			"The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/tasks/{taskId}/handoff-options',
+		toolName: 'fleet_tasks_handoff_options',
+		description:
+			'Where a Task could be fixed on one of my computers: the computers that can take it, the checkouts of its repository on each, and the agents available there. Start the session with fleet_sessions_start and the taskId. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.
 	{
