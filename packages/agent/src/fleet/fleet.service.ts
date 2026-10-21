@@ -1953,6 +1953,23 @@ export class FleetService {
     async unenrollByCredential(nodeId: unknown, secret: unknown): Promise<boolean> {
         const node = await this.authenticateNodeByCredential(nodeId, secret);
         if (!node) return false;
+        // Cloud computers (FL-17, CONTRACTS R-36): a cloud machine that leaves
+        // must not take its registration with it while the provider may still
+        // bill — the owner destroys it from the Fleet. Its credential dies here
+        // (heartbeat fails closed on a NULL hash) and the row stays, drained.
+        if ((node.origin === 'cloud' || node.providerPluginId) && !fleetCloudRemovableNode(node)) {
+            await this.repository.update(node.id, { status: 'disabled', enrollmentTokenHash: null });
+            await this.tryAuditNode({
+                action: 'node.unenroll',
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                before: { status: node.status, name: node.name, kind: node.kind },
+                after: { status: 'disabled' },
+                extra: { via: 'node', keptForDestroy: true },
+            });
+            return true;
+        }
         await this.repository.delete(node.id);
         // The registration is gone; this row is the only record that the
         // machine ever existed, and `fleet_audit.nodeId` carries no FK so
