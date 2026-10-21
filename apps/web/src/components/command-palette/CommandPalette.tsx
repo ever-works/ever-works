@@ -38,7 +38,8 @@ import { PALETTE_RECENT_BOOST_WINDOW_MS, usePaletteRecents } from './hooks/use-p
 import { useWorkspaceSearch } from './hooks/use-workspace-search';
 import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
-import { screensFor } from './registry/screens';
+import { fleetComputerScreens, screensFor } from './registry/screens';
+import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
 import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import {
     buildPaletteSections,
@@ -249,9 +250,14 @@ export function CommandPalette({
     }, [commandContext, response]);
     // Fleet hub (FL-01, FR-13): the hub's screens exist only while it is on.
     const fleetHubEnabled = useFleetHubEnabled();
+    // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
+    const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
     const screens = useMemo(
-        () => screensFor(appPath, { fleetHubEnabled }),
-        [appPath, fleetHubEnabled],
+        () => [
+            ...screensFor(appPath, { fleetHubEnabled }),
+            ...fleetComputerScreens(fleetComputers),
+        ],
+        [appPath, fleetHubEnabled, fleetComputers],
     );
 
     const sections = useMemo(
