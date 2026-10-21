@@ -5,3 +5,6 @@ export * from './fleet-ports-node.port';
 export * from './fleet-ports.module';
 export * from './fleet-ports.policy';
 export * from './fleet-ports.service';
+export * from './fleet-port-tunnel.repository';
+export * from './fleet-port-tunnel.service';
+export { FleetPortTunnel } from '../../entities/fleet-port-tunnel.entity';

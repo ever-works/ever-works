@@ -76,7 +76,11 @@ after that the run ends as _"Connection lost"_ — the full output stays on the 
 The platform stores the first and the last 64 KiB of each run's output (the card says _"first 64 KiB and last 64 KiB
 shown"_ when there was more), so a card from yesterday can be read when the computer is off. The computer itself
 keeps the full output of its last 30 runs in its node folder (`commands/`, readable only by its owner). **Recent**
-holds your last eight commands; each opens with its stored cards. You see only the commands you ran.
+holds your last eight commands; each opens with its stored cards, and **↻** (or **Run again** on an open command)
+fills the composer with it and asks for the confirmation again. You see only the commands you ran. The stored head
+and tail are cleared 30 days after a run ended (`FLEET_JOB_RETENTION_DAYS`); the run itself stays in the history.
+
+When **Checkouts** are on, the folder field offers the picked computers' checkouts.
 
 ## From a computer's page
 
