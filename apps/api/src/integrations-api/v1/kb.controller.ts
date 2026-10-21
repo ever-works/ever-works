@@ -51,6 +51,7 @@ import {
     type IntegrationKbDocument,
     type IntegrationKbFolder,
     IntegrationKbService,
+    integrationContentWrite,
     type KeysetPage,
     parseIfMatch,
     VersionMismatchError,
@@ -86,6 +87,7 @@ import {
     IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
+import { integrationKbAcceptRequiresPerson } from './integration-safety-switches';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Statuses a KB document may be written with (archive has its own route). */
@@ -466,6 +468,16 @@ export class IntegrationKbController {
                 // with X-Act-As-User stays `accepted`, as their own edit in Ever
                 // Works would be.
                 ...(principal.actAsUserId ? {} : { reviewState: 'proposed' as never }),
+                // Works-security lane (integration API gates, finding 2) — who wrote
+                // this content (the key as itself, or a person it relayed for), so the
+                // accept route can tell a key's own content from a person's.
+                metadata: {
+                    lastContentWrite: integrationContentWrite({
+                        keyId: principal.keyId,
+                        integrationKind: principal.integrationKind,
+                        actAsUserId: principal.actAsUserId,
+                    }),
+                },
             };
             // Before the create: filing afterwards would leave the document
             // behind (one more per retry) when the folder is not one of this
@@ -574,14 +586,23 @@ export class IntegrationKbController {
         // like a key-only create: otherwise a key could rewrite an accepted
         // document straight into every later prompt. A person's edit relayed
         // with X-Act-As-User leaves the review state alone.
-        if (
-            !principalOf(user).actAsUserId &&
-            (patch.title !== undefined ||
-                patch.body !== undefined ||
-                patch.description !== undefined ||
-                patch.class !== undefined)
-        ) {
+        const principal = principalOf(user);
+        const changesContent =
+            patch.title !== undefined ||
+            patch.body !== undefined ||
+            patch.description !== undefined ||
+            patch.class !== undefined;
+        if (!principal.actAsUserId && changesContent) {
             patch.reviewState = 'proposed' as KbDocumentPatch['reviewState'];
+        }
+        // Works-security lane (integration API gates, finding 2) — the content now
+        // on the document is this key's (as itself, or relayed for a person).
+        if (changesContent) {
+            patch.contentWrite = integrationContentWrite({
+                keyId: principal.keyId,
+                integrationKind: principal.integrationKind,
+                actAsUserId: principal.actAsUserId,
+            });
         }
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
@@ -657,6 +678,32 @@ export class IntegrationKbController {
         // so the review happens there and this route records its outcome.
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
+        // Works-security lane (integration API gates, finding 2) — a relayed
+        // review decision is a PERSON's: without X-Act-As-User the key would be
+        // accepting on its own (its own `proposed` create included), and an
+        // accepted document feeds every later agent prompt. Content the key
+        // wrote as itself is never accepted through a relay either: no person
+        // stands behind that content (a stale approval in the other system, or a
+        // person's edit the key re-sent as itself, must not carry it into every
+        // prompt); a person accepts it in Ever Works.
+        if (integrationKbAcceptRequiresPerson()) {
+            if (!principalOf(user).actAsUserId) {
+                throw new IntegrationHttpException(
+                    422,
+                    'domain_rule',
+                    "Accepting a Knowledge Base document relays a person's review decision: send X-Act-As-User with the reviewer, or accept it in Ever Works.",
+                    { reason: 'act_as_required' },
+                );
+            }
+            if (current.keyAuthored === true && current.dto.reviewState === 'proposed') {
+                throw new IntegrationHttpException(
+                    422,
+                    'domain_rule',
+                    "This document's current content was written by an integration key acting as itself; no person stands behind it, so it is accepted by a person in Ever Works (or re-sent as a person's write with X-Act-As-User), not through a relay.",
+                    { reason: 'key_authored_content' },
+                );
+            }
+        }
         await asDomainRule(async () => {
             if (current.workId) {
                 await this.knowledgeBase.acceptDocument(current.workId, id, user.userId);

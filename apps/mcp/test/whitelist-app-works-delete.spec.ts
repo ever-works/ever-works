@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import { ToolRegistrationService } from '../src/openapi-tools/tool-registration.service.js';
 import { OpenApiLoaderService, type OpenApiOperation } from '../src/openapi-tools/openapi-loader.service.js';
@@ -73,7 +73,17 @@ describe('delete_work — the stored-data flag is not an MCP argument', () => {
 	let registry: { registerTool: ReturnType<typeof vi.fn> };
 	let apiClient: ApiClientService;
 
+	// Works-security (2026-10-18): delete_work is a privileged tool, off unless
+	// MCP_PRIVILEGED_TOOLS is set. These cases pin its shape WHEN an operator
+	// turns it on, so the switch is on here.
+	const previousSwitch = process.env.MCP_PRIVILEGED_TOOLS;
+	afterEach(() => {
+		if (previousSwitch === undefined) delete process.env.MCP_PRIVILEGED_TOOLS;
+		else process.env.MCP_PRIVILEGED_TOOLS = previousSwitch;
+	});
+
 	beforeEach(() => {
+		process.env.MCP_PRIVILEGED_TOOLS = 'true';
 		const config = { apiUrl: 'http://localhost:3100/api', apiKey: 'ew_test_key' } as McpConfigService;
 		apiClient = new ApiClientService(config);
 		const loader = {

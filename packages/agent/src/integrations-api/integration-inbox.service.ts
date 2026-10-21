@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { toIntegrationInboxItemDto } from '../domain-events/domain-event-snapshots';
 import { InboxItem } from '../entities/inbox-item.entity';
 import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
+import { requiresIndividualDecision } from '../agent-approvals/individual-decision';
 import { etagFor } from './if-match';
 import { ResourceNotFoundError } from './integration-api.errors';
 import { type KeysetPage, type KeysetQuery, readKeysetPage } from './keyset-cursor';
@@ -114,6 +115,39 @@ export class IntegrationInboxService {
             return !row || row.actionType === 'merge_pull_request';
         } catch {
             return true;
+        }
+    }
+
+    /**
+     * Works-security lane (integration API gates, finding 6) — which opt-in
+     * decision scope answering this item needs, by the platform's own rule for
+     * approvals that are never decided in bulk (`requiresIndividualDecision`):
+     *
+     * - `'merge'`: a `merge_pull_request` proposal (relayed only with
+     *   `merges:decide`);
+     * - `'individual'`: the release of a held Agent email draft, an agent's
+     *   rewrite of its own identity files (SOUL.md / AGENTS.md), an
+     *   agent-proposed closure of an escalation (relayed only with
+     *   `decisions:individual` or `merges:decide`);
+     * - `null`: anything else (questions, the owner's own escalations, notices,
+     *   ordinary approvals) — `inbox:write` alone, as before.
+     *
+     * Fails CLOSED like {@link isMergeApproval}: a proposal that cannot be read,
+     * or no longer exists, counts as a merge.
+     */
+    async decisionScopeOf(
+        dto: Pick<IntegrationInboxItemDto, 'kind' | 'proposalId'>,
+    ): Promise<'merge' | 'individual' | null> {
+        if (dto.kind !== 'approval' || !dto.proposalId) return null;
+        try {
+            const row = await this.dataSource.getRepository(AgentActionProposal).findOne({
+                where: { id: dto.proposalId },
+                select: ['id', 'actionType', 'payload'],
+            });
+            if (!row || row.actionType === 'merge_pull_request') return 'merge';
+            return requiresIndividualDecision(row) ? 'individual' : null;
+        } catch {
+            return 'merge';
         }
     }
 

@@ -1,12 +1,26 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import {
+	reservedTaskLabelChanges,
+	reservedTaskLabelRefusal,
+	taskReservedLabelsEnforced,
+	TASK_RESERVED_LABELS_ENFORCED_ENV
+} from '@ever-works/contracts';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import type { z } from 'zod';
 import { OpenApiLoaderService, type OpenApiOperation } from './openapi-loader.service.js';
 import { SchemaConverterService } from './schema-converter.service.js';
 import { ApiClientService } from '../api-client/api-client.service.js';
-import { toMcpError } from '../api-client/api-error.js';
+import { ApiError, toMcpError } from '../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../api-client/fence-untrusted.js';
 import { WHITELIST, type WhitelistEntry } from './whitelist.js';
+import {
+	MCP_PRIVILEGED_TOOLS_ENV,
+	heldBackArgs,
+	heldBackValueNote,
+	heldBackValueRefusal,
+	isHeldBack,
+	mcpPrivilegedToolsEnabled
+} from './privileged-tools.js';
 
 // Security: the bundled/live-fetched OpenAPI spec is supply-chain-adjacent
 // (a tampered build artifact, or a MITM'd dev fetch, can inject text into
@@ -37,6 +51,43 @@ function sanitizeSpecDescription(value: string): string {
 	return `${cleaned.slice(0, MAX_SPEC_DESCRIPTION_LENGTH)}…`;
 }
 
+/**
+ * Works-security (2026-10-18) — refuse a `create_task` / `update_task` call
+ * whose `labels` would add or remove a RESERVED Task label. `update` reads the
+ * Task first (the PATCH replaces the whole list, so a list that merely omits
+ * `awaiting-owner` would strip it). Throws an {@link ApiError} 403, which the
+ * handler turns into an MCP error result; nothing is written.
+ */
+async function refuseReservedTaskLabelChange(
+	apiClient: ApiClientService,
+	mode: 'create' | 'update',
+	args: Record<string, unknown>,
+	bodyParams: Record<string, unknown>
+): Promise<void> {
+	if (bodyParams.labels === undefined) return;
+	if (!taskReservedLabelsEnforced(process.env[TASK_RESERVED_LABELS_ENFORCED_ENV])) return;
+	const after = Array.isArray(bodyParams.labels)
+		? (bodyParams.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+		: bodyParams.labels === null
+			? null
+			: [];
+	let before: string[] = [];
+	if (mode === 'update') {
+		const id = typeof args.id === 'string' || typeof args.id === 'number' ? `${args.id}` : '';
+		if (!id) throw new ApiError(400, 'update_task needs the Task id to check its labels.');
+		const current = await apiClient.request<{ labels?: unknown } | null>(
+			'GET',
+			`/tasks/${encodeURIComponent(id)}`
+		);
+		before = Array.isArray(current?.labels)
+			? (current!.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+			: [];
+	}
+	const change = reservedTaskLabelChanges(before, after);
+	if (change.added.length === 0 && change.removed.length === 0) return;
+	throw new ApiError(403, reservedTaskLabelRefusal('An MCP tool call', change));
+}
+
 @Injectable()
 export class ToolRegistrationService {
 	private readonly logger = new Logger(ToolRegistrationService.name);
@@ -52,8 +103,19 @@ export class ToolRegistrationService {
 		const operations = this.loader.getOperations();
 		const registeredNames = new Set<string>();
 		let count = 0;
+		// Works-security (2026-10-18): privileged tools stay off unless the
+		// operator sets MCP_PRIVILEGED_TOOLS (see `privileged-tools.ts`).
+		const privilegedEnabled = mcpPrivilegedToolsEnabled();
+		const heldBack: string[] = [];
 
-		for (const entry of WHITELIST) {
+		for (const whitelistEntry of WHITELIST) {
+			const entryName =
+				whitelistEntry.toolName || this.generateToolName(whitelistEntry.method, whitelistEntry.path);
+			if (isHeldBack(entryName, privilegedEnabled)) {
+				heldBack.push(entryName);
+				continue;
+			}
+			const entry = this.withHeldBackArgs(whitelistEntry, entryName, privilegedEnabled);
 			const operation = this.findOperation(operations, entry);
 			if (!operation) {
 				this.logger.warn(`Whitelist entry ${entry.method} ${entry.path} not found in OpenAPI spec, skipping`);
@@ -80,9 +142,9 @@ export class ToolRegistrationService {
 			// is the supply-chain-attackable source that reaches the LLM verbatim.
 			const specDescription = operation.summary || operation.description;
 			const description =
-				entry.description ||
-				(specDescription ? sanitizeSpecDescription(specDescription) : '') ||
-				`${entry.method} ${entry.path}`;
+				(entry.description ||
+					(specDescription ? sanitizeSpecDescription(specDescription) : '') ||
+					`${entry.method} ${entry.path}`) + heldBackValueNote(toolName, privilegedEnabled);
 			const parameters = this.withoutOmittedArgs(
 				this.converter.buildToolParameters(operation.pathParams, operation.queryParams, operation.requestBody),
 				entry,
@@ -94,12 +156,29 @@ export class ToolRegistrationService {
 				description,
 				parameters,
 				annotations: entry.annotations,
-				handler: this.createHandler(entry, operation)
+				handler: this.createHandler(entry, operation, toolName, privilegedEnabled)
 			});
 			count++;
 		}
 
 		this.logger.log(`Registered ${count} MCP tools from OpenAPI spec`);
+		if (heldBack.length > 0) {
+			this.logger.log(
+				`${heldBack.length} privileged MCP tools not registered (${MCP_PRIVILEGED_TOOLS_ENV} is off — set ` +
+					`${MCP_PRIVILEGED_TOOLS_ENV}=true to expose them): ${heldBack.join(', ')}`
+			);
+		}
+	}
+
+	/**
+	 * The entry with its privileged arguments (`MCP_PRIVILEGED_ARGS`) added to
+	 * `omitArgs` while the switch is off, so they are neither offered nor
+	 * forwarded. The entry itself is never mutated.
+	 */
+	private withHeldBackArgs(entry: WhitelistEntry, toolName: string, enabled: boolean): WhitelistEntry {
+		const extra = heldBackArgs(toolName, enabled);
+		if (extra.length === 0) return entry;
+		return { ...entry, omitArgs: [...new Set([...(entry.omitArgs ?? []), ...extra])] };
 	}
 
 	/**
@@ -140,7 +219,12 @@ export class ToolRegistrationService {
 		return parameters.omit(mask) as z.ZodObject<Record<string, z.ZodTypeAny>>;
 	}
 
-	private createHandler(entry: WhitelistEntry, operation: OpenApiOperation) {
+	private createHandler(
+		entry: WhitelistEntry,
+		operation: OpenApiOperation,
+		toolName: string = entry.toolName || this.generateToolName(entry.method, entry.path),
+		privilegedEnabled: boolean = mcpPrivilegedToolsEnabled()
+	) {
 		const pathParamNames = new Set(operation.pathParams.map((p) => p.name));
 		const queryParamNames = new Set(operation.queryParams.map((p) => p.name));
 		// Belt and braces for the schema-level omit above: if a transport ever
@@ -151,6 +235,13 @@ export class ToolRegistrationService {
 		const apiClient = this.apiClient;
 
 		return async (args: Record<string, unknown>) => {
+			// Works-security: a privileged argument VALUE (a dispatching Task move,
+			// an @mention that wakes an Agent) is refused while the switch is off.
+			// Nothing is sent upstream.
+			const refusal = heldBackValueRefusal(toolName, args ?? {}, privilegedEnabled);
+			if (refusal) {
+				return { content: [{ type: 'text' as const, text: refusal }], isError: true as const };
+			}
 			try {
 				let apiPath = entry.path;
 				const queryParams = new URLSearchParams();
@@ -181,6 +272,10 @@ export class ToolRegistrationService {
 				const queryString = queryParams.toString();
 				if (queryString) {
 					requestPath += `?${queryString}`;
+				}
+
+				if (entry.reservedTaskLabels) {
+					await refuseReservedTaskLabelChange(apiClient, entry.reservedTaskLabels, args, bodyParams);
 				}
 
 				const hasBody = Object.keys(bodyParams).length > 0;

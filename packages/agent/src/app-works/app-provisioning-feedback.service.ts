@@ -12,6 +12,7 @@ import {
 } from '../events/app-build.events';
 import { TaskChatService } from '../tasks-domain/task-chat.service';
 import { TasksService } from '../tasks-domain/tasks.service';
+import { isAwaitingOwner } from '../tasks-domain/awaiting-owner';
 import { PROVISION_LABEL } from './app-change-guard';
 import { AppProvisioningService } from './app-provisioning.service';
 
@@ -163,7 +164,10 @@ export class AppProvisioningFeedbackService {
                     'failure, fix `.works/works.yml` (or `.works/overlay/**`) on this branch, and say what you changed.',
             );
             await this.label(work, task, attempt);
-            if (task.agentId && this.tasks) {
+            // A Task held for its owner (`awaiting-owner`: a member's request, or a
+            // re-provision the owner did not opt into) is never started by this loop —
+            // `runTask` would clear the hold as if the owner had pressed Run.
+            if (task.agentId && this.tasks && !isAwaitingOwner(task)) {
                 try {
                     await this.tasks.runTask(
                         work.userId,
@@ -183,9 +187,13 @@ export class AppProvisioningFeedbackService {
 
         // Delivered (merged) — a new provisioning Task carries the chain forward.
         if (!this.provisioning) return 'ignored';
+        // A platform trigger: it runs only when the owner opted into automatic
+        // re-provisioning (`provisioning.autoReprovision`); otherwise the new Task is filed,
+        // held and announced (works-security 2026-10-18).
         const result = await this.provisioning.start({
             workId: work.id,
             trigger: 'build-failed',
+            systemTrigger: true,
             restart: true,
             attempt,
             note:

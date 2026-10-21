@@ -119,6 +119,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'FleetNode',
     // Computer health (FL-03) — raw and hourly health history per node
     'FleetNodeHealthSample',
+    // Sessions on computers (FL-04) — persistent processes on a Node
+    'FleetSession',
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',

@@ -19,11 +19,13 @@ import {
 import { osKeyOf } from '../fleet-os.shared';
 import '../modules';
 import {
+    computerActionProps,
     getComputerActions,
     type FleetComputerActionRegistration,
     type FleetFeatureFlags,
 } from '../registry';
 import { RegisteredComponent } from '../RegisteredComponent';
+import { LinkLine } from '../link/LinkLine';
 
 const ACTION =
     'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium h-8 px-3 text-xs border border-border dark:border-border-dark text-text dark:text-text-dark disabled:opacity-50 disabled:cursor-not-allowed';
@@ -44,7 +46,9 @@ export function formatUptime(seconds: unknown): string | null {
  * them, until FL-04 and FL-07 register their actions; uptime shows once a
  * health snapshot (FL-03) carries it. Header actions other epics register
  * (`registerComputerAction` with `placement: 'header'`) take the place of the
- * placeholder they `replace`, or sit after it. `menu` is the ⋯ menu.
+ * placeholder they `replace`, or sit after it. `menu` is the ⋯ menu. Under
+ * the facts, FL-02's link line (`../link/LinkLine`) says what the node's link
+ * is doing, from the platform's own socket state (`node.link`).
  */
 export function ComputerHeader({
     node,
@@ -78,7 +82,7 @@ export function ComputerHeader({
             key={action.id}
             id={`action:${action.id}`}
             load={action.load}
-            props={{ node, flags }}
+            props={computerActionProps(node, flags, action)}
             loading={null}
             failed={null}
         />
@@ -159,6 +163,7 @@ export function ComputerHeader({
                             </>
                         )}
                     </p>
+                    <LinkLine node={node} />
                 </div>
                 <div className="flex items-center gap-2" data-testid="fleet-computer-actions">
                     {replacement(headerActions, 'new-session') ? (

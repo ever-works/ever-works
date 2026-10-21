@@ -167,6 +167,8 @@ export * from './credit-meter-event.entity';
 export * from './fleet-node.entity';
 // Computer health (FL-03) — raw and hourly health history per node.
 export * from './fleet-node-health-sample.entity';
+// Sessions on computers (FL-04) — persistent interactive processes on a Node
+export * from './fleet-session.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';

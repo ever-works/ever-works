@@ -13,6 +13,8 @@ import {
     refreshProposalsAction,
 } from '@/app/actions/dashboard/work-proposals';
 import { attachUploadsBestEffort, extractUploadIds } from './utils';
+import type { UserConfirmationCheck } from './generated/confirmation';
+import { CONFIRMED_FIELD_DESCRIPTION, requireUserConfirmation } from './confirm-gate';
 
 /**
  * Phase 9 PR Z1 — in-app AI Chat tools for Ideas (spec §4.5).
@@ -178,50 +180,101 @@ export const refreshIdeas = tool({
 // Lifecycle — build / dismiss / accept
 // ────────────────────────────────────────────────────────────────
 
-export const buildIdea = tool({
-    description: [
-        'Queue an Idea for build. Transitions status PENDING/FAILED → QUEUED and spawns a WorkBuildRequest under the hood.',
-        'Returns the new build-request id so the user can navigate to the live-run view.',
-    ].join(' '),
-    inputSchema: z.object({
-        ideaId: z.string().describe('Idea ID to queue for build'),
-    }),
-    execute: async ({ ideaId }) => {
-        const result = await buildIdeaAction(ideaId);
-        return {
-            queued: true,
-            idea: summarizeIdea(result.idea),
-            buildRequestId: result.buildRequestId,
-        };
-    },
-});
+// Works-security (2026-10-18): building spends model credits and creates a
+// Work; dismissing is irreversible from the UI; accepting closes the Idea
+// against a Work the user names. Each is the user's call, confirmed in their
+// own message (same handshake as the generated tools). The factories take the
+// per-turn check; the plain exports are the legacy flag-only instances.
 
-export const dismissIdea = tool({
-    description: [
-        'Dismiss an Idea so it stops showing in the pending list.',
-        "Used when the user explicitly says they're not interested. NOT reversible from the UI — surface a confirmation in chat first.",
-    ].join(' '),
-    inputSchema: z.object({
-        ideaId: z.string().describe('Idea ID to dismiss'),
-    }),
-    execute: async ({ ideaId }) => {
-        await dismissProposalAction(ideaId);
-        return { dismissed: true, ideaId };
-    },
-});
+export function createBuildIdeaTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Queue an Idea for build. Transitions status PENDING/FAILED → QUEUED and spawns a WorkBuildRequest under the hood.',
+            'Returns the new build-request id so the user can navigate to the live-run view.',
+            'Starts a paid build — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            ideaId: z.string().describe('Idea ID to queue for build'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ ideaId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'buildIdea',
+                action: 'Queue an Idea for build',
+                target: ideaId,
+                args: { ideaId },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            const result = await buildIdeaAction(ideaId);
+            return {
+                queued: true,
+                idea: summarizeIdea(result.idea),
+                buildRequestId: result.buildRequestId,
+            };
+        },
+    });
+}
 
-export const acceptIdea = tool({
-    description: [
-        'Link an Idea to a pre-existing Work (manual accept, NOT a build).',
-        'Use when the user already has a Work that fulfills the Idea and just wants the back-reference.',
-        'Use `buildIdea` instead when they want a brand-new Work generated.',
-    ].join(' '),
-    inputSchema: z.object({
-        ideaId: z.string().describe('Idea ID to accept'),
-        workId: z.string().describe('Existing Work ID to link the Idea to'),
-    }),
-    execute: async ({ ideaId, workId }) => {
-        const result = await acceptProposalAction(ideaId, workId);
-        return { ...result, ideaId, workId };
-    },
-});
+export const buildIdea = createBuildIdeaTool();
+
+export function createDismissIdeaTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Dismiss an Idea so it stops showing in the pending list.',
+            "Used when the user explicitly says they're not interested. NOT reversible from the UI — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).",
+        ].join(' '),
+        inputSchema: z.object({
+            ideaId: z.string().describe('Idea ID to dismiss'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ ideaId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'dismissIdea',
+                action: 'Dismiss an Idea',
+                target: ideaId,
+                args: { ideaId },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            await dismissProposalAction(ideaId);
+            return { dismissed: true, ideaId };
+        },
+    });
+}
+
+export const dismissIdea = createDismissIdeaTool();
+
+export function createAcceptIdeaTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Link an Idea to a pre-existing Work (manual accept, NOT a build).',
+            'Use when the user already has a Work that fulfills the Idea and just wants the back-reference.',
+            'Use `buildIdea` instead when they want a brand-new Work generated.',
+            'Requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            ideaId: z.string().describe('Idea ID to accept'),
+            workId: z.string().describe('Existing Work ID to link the Idea to'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ ideaId, workId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'acceptIdea',
+                action: 'Link an Idea to an existing Work',
+                target: ideaId,
+                args: { ideaId, workId },
+                confirmed,
+                userConfirmed,
+                kind: 'privileged',
+            });
+            if (card) return card;
+            const result = await acceptProposalAction(ideaId, workId);
+            return { ...result, ideaId, workId };
+        },
+    });
+}
+
+export const acceptIdea = createAcceptIdeaTool();

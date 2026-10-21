@@ -14,6 +14,7 @@ import {
 import { readNodeConsents } from '@/components/fleet/fleet-consents.shared';
 import { ComputerHeader } from '@/components/fleet/computer/ComputerHeader';
 import { ComputerActionsMenu } from '@/components/fleet/computer/ComputerActionsMenu';
+import { ComputerShortcutSheet } from '@/components/fleet/computer/ComputerShortcutSheet';
 import { ComputerTabs } from '@/components/fleet/computer/ComputerTabs';
 import { ComputerTabPlaceholder } from '@/components/fleet/computer/ComputerTabPlaceholder';
 import { FleetTelemetryOnMount } from '@/components/fleet/FleetTelemetryOnMount';
@@ -91,6 +92,7 @@ export default async function FleetComputerPage({
                 menu={<ComputerActionsMenu node={node} flags={flags} />}
             />
             <ComputerTabs nodeId={node.id} active={tab} />
+            <ComputerShortcutSheet />
             <div
                 id="fleet-computer-panel"
                 role="tabpanel"

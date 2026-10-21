@@ -734,6 +734,20 @@ export const config = {
             return process.env.FLEET_NODE_LINK_ENABLED === 'true';
         },
         /**
+         * Sessions on computers (FL-04, CONTRACTS §9) — `FLEET_SESSIONS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**sessions**` route answers 404 (the surface is
+         * not even confirmed) and node reports on the link are dropped. A
+         * session needs the node link, so the link flag gates the machine
+         * calls on its own. Read per call: flipping it needs no restart.
+         */
+        isSessionsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_SESSIONS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single
