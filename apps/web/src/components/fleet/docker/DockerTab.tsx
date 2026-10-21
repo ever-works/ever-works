@@ -31,7 +31,9 @@ import { dialogForRow, formatBytes, formatPercent, formatSince } from '../machin
 import { useMachineAction } from '../machine/use-machine-action';
 import { useMachineList } from '../machine/use-machine-list';
 import { containerGlyph, imageName, portsText, sortContainers } from './docker.shared';
+import { ComposeView } from './ComposeView';
 import { RunContainerDialog } from './RunContainerDialog';
+import { ShellInsideButton } from './ShellInsideButton';
 
 /** Lists refresh every 10 s while the tab is visible, and at once after an act. */
 const REFRESH_MS = 10_000;
@@ -49,8 +51,9 @@ interface RunningOperation {
  * (Start / Stop / Restart / Remove / Logs, Run a container) and Images (Pull,
  * Run, Remove, Remove unused), every act through the shared confirm dialog
  * (Remove needs the container's name typed), long acts as operation cards.
- * Docker not installed (U6) or not running (U7) is said in words; the Compose
- * view arrives with P3.
+ * Docker not installed (U6) or not running (U7) is said in words. Compose
+ * projects (P3) have their own view (`ComposeView`), and every running
+ * container offers Shell inside (an owner Session, FL-04).
  */
 export default function DockerTab({ node }: FleetComputerTabProps) {
     const t = useTranslations('fleet.docker');
@@ -303,6 +306,9 @@ export default function DockerTab({ node }: FleetComputerTabProps) {
                                                             {t(`act.${action}`)}
                                                         </Button>
                                                     ))}
+                                                    {container.state === 'running' ? (
+                                                        <ShellInsideButton nodeId={node.id} container={container.id} disabled={!allowed} />
+                                                    ) : null}
                                                     <Button
                                                         type="button"
                                                         size="sm"
@@ -416,9 +422,13 @@ export default function DockerTab({ node }: FleetComputerTabProps) {
             ) : null}
 
             {view === 'compose' ? (
-                <p role="status" className="rounded-xl border border-dashed border-border dark:border-border-dark p-8 text-center text-sm text-text-muted dark:text-text-muted-dark">
-                    {t('compose.arrives')}
-                </p>
+                <ComposeView
+                    nodeId={node.id}
+                    machine={node.name}
+                    allowed={allowed}
+                    machineAction={machineAction}
+                    onOperation={track}
+                />
             ) : null}
 
             <RunContainerDialog
