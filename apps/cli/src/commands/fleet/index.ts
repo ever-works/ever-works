@@ -30,6 +30,7 @@ import { toolsCommand } from './tools';
 import { answerCommand } from './session/answer';
 import { questionCommand } from './session/question';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
+import { virtualCommand } from './virtual';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -107,4 +108,6 @@ export const fleetCommand = new Command('fleet')
     // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
     .addCommand(schedulesCommand)
     // Tasks on computers (FL-15 P3): `fleet tasks handoff-options <taskId>`.
-    .addCommand(fleetTasksCommand);
+    .addCommand(fleetTasksCommand)
+    // Virtual computers (FL-16 P3): `fleet virtual list|options|create|start|stop|power|resize|rebuild|destroy`.
+    .addCommand(virtualCommand);

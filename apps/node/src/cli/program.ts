@@ -2,6 +2,9 @@ import { Command, CommanderError } from 'commander';
 import { homedir as osHomedir } from 'node:os';
 import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
+import type { FleetVirtualSystemId } from '@ever-works/contracts';
+import { parseCatalogueLock, resolveVirtualImage, VIRTUAL_CONTAINER_IMAGES } from '../core/link/modules/virtual/catalogue';
+import { resolveWindowsImage } from '../core/link/modules/virtual/windows';
 import { createNativeScheduler } from '../core/link/modules/schedule/native-scheduler';
 import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
 import { ScheduleLoop } from '../core/link/modules/schedule/schedule-loop';
@@ -1897,8 +1900,12 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	const now = (deps.now ?? (() => Date.now()))();
 	// Sessions on computers (FL-04): the session daemon, asked read-only.
 	const sessions = await describeSessionDaemon(deps);
+	// Virtual computers (FL-16 P3, T-36): what each system is pinned to here.
+	const virtual = await describeVirtualCatalogue(deps);
 	if (options.json === true) {
-		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions }, null, 2));
+		deps.out(
+			JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual }, null, 2)
+		);
 		return;
 	}
 	printHousekeepingHeader(deps, report, now);
@@ -1916,7 +1923,41 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 				: `daemon not running — ${sessions.reason ?? 'unknown'}`
 		}`
 	);
+	if (virtual) {
+		const pinned = virtual.catalogue.filter((entry) => entry.digest).length;
+		deps.out(
+			`virtual      ${pinned} of ${virtual.catalogue.length} Container system(s) pinned here; Windows installer image ${
+				virtual.windowsImage ?? 'not configured'
+			}`
+		);
+	}
 	printPlan(deps, report.plan, now);
+}
+
+/**
+ * Virtual computers (FL-16 P3, T-36) — the host's system catalogue as it stands
+ * here: each Container system's image, the digest it is pinned to (or not yet),
+ * and where that came from (the catalogue, the lock file, an operator
+ * override); and the operator's Windows installer image. Null on Windows (no
+ * virtual computers there). Never throws.
+ */
+export async function describeVirtualCatalogue(deps: CliDeps): Promise<{
+	catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }>;
+	windowsImage: string | null;
+} | null> {
+	if (deps.platform === 'win32') return null;
+	try {
+		const lockPath = posix.join(posix.dirname(deps.configPath), 'virtual', 'catalogue.lock.json');
+		const lock = parseCatalogueLock(await deps.fs.readFile(lockPath).catch(() => null));
+		const catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }> = [];
+		for (const systemId of Object.keys(VIRTUAL_CONTAINER_IMAGES) as FleetVirtualSystemId[]) {
+			const image = resolveVirtualImage(systemId, { env: process.env, lock });
+			if (image) catalogue.push({ systemId, ref: image.ref, digest: image.digest, source: image.source });
+		}
+		return { catalogue, windowsImage: resolveWindowsImage(process.env)?.ref ?? null };
+	} catch {
+		return null;
+	}
 }
 
 /** `gc`: plan, then reap — unless `--dry-run`, which prints the plan and writes nothing. */

@@ -153,6 +153,20 @@ started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDU
 on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
 'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
 
+**Revision 20 (2026-10-21)** — FL-06 P1 (session git, lane log `docs/internal/fleet/lanes/FL-06.md` decisions 1–12):
+`FleetSessionView.git` (`FleetSessionGitRef { checkoutId, path, kind, state, isolation, createdBy, repository, branch,
+gitLine }`) on every session view; `checkouts.changes { path, maxBytes?, checkoutId? }` answers
+`FleetCheckoutChangesReply { path, files[{ path, previousPath, status, added, removed, binary, patch, truncated }],
+truncated, omittedFiles, omittedBytes, totalBytes, at }` and needs `work-or-manage` (a `FLEET_LINK_VERB_CONSENT_OVERRIDES`
+entry: a Task's worktree on `--work`, any other checkout `--manage`, checked on the machine); `GET
+/sessions/branch-proposal?nodeId&checkoutId&agentId?&firstMessage?&title?&taskId?` answers `FleetSessionBranchProposal
+{ branch, base, suffixed, source: task|message|title|generated, reason, repository, remoteChecked }`; `GET
+/checkouts/:id/pull-request` answers `FleetCheckoutPullRequestFacts { checkoutId, pr, unresolvedComments, mergeable,
+baseRef, defaultBranch, checkedAt, unknownSince }` (only `pr` is stored, on the git line); the node's `pr: null` never
+overwrites the platform's resolved `pr` while the branch is unchanged; audit names `node.session.action` and
+`node.session.pull-request.open` are in `FLEET_AUDIT_ACTIONS`. Shapes in
+`packages/contracts/src/fleet/fleet-session-actions.types.ts`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

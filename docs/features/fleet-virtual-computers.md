@@ -58,6 +58,25 @@ A virtual computer's page carries **Start** / **Stop** and **Destroy…**:
 
 The host's Overview lists its virtual computers inside **Runs here**, with Start / Stop and the host's free memory net of what they reserve.
 
+## Resize and rebuild
+
+- **Resize…** (a stopped virtual computer): pick 2, 4 or 8 CPUs and 4, 8 or 16 GB of memory; it uses the new size from its next start. A Container's caps change in place; a Windows VM's installer container is re-created with the new size, keeping its disk.
+- **Rebuild…** (Containers): re-creates the Container from the system's current image — the host pulls the tag again and pins the new digest — keeping its home folder and its Fleet registration, so it comes back as the same computer without enrolling again. Refused while a Run or a session is live on it.
+
+## From a shell
+
+```bash
+ever-works fleet virtual list [--on build-01]
+ever-works fleet virtual options --system ubuntu-26.04
+ever-works fleet virtual create ubuntu-nina --system ubuntu-26.04 [--on build-01] [--cpus 2 --memory 4] --yes
+ever-works fleet virtual stop ubuntu-nina --yes
+ever-works fleet virtual resize ubuntu-nina --cpus 4 --yes
+ever-works fleet virtual rebuild ubuntu-nina --yes
+ever-works fleet virtual destroy ubuntu-nina --confirm-name ubuntu-nina
+```
+
+Every verb takes `--json` and exits `0` (done), `1` (refused, with the reason) or `2` (needs a confirmation or a fix to the command line). On the host, `ever-works-node doctor` shows what each system is pinned to and the Windows installer image.
+
 ## Removing computers from the Fleet
 
 - A host that still has virtual computers cannot be removed — destroy or remove them first.

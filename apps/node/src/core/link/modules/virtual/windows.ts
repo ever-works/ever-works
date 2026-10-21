@@ -158,6 +158,17 @@ export function windowsRunArgs(input: WindowsRunInput): string[] {
 	];
 }
 
+/**
+ * Resize (P3): the same container, CREATED (not started) with new sizes — a
+ * stopped VM keeps its disk volume, first-boot files and shared folder, and
+ * boots with the new size when it is next started.
+ */
+export function windowsCreateArgs(input: WindowsRunInput): string[] {
+	const run = windowsRunArgs(input);
+	// `run -d …` → `create …` (every other argument is the same).
+	return ['create', ...run.slice(2)];
+}
+
 /** `docker port <child> 8006/tcp` → the loopback port Docker picked. */
 export function viewerPortArgs(childNodeId: string): string[] {
 	return ['port', fleetVirtualContainerName(childNodeId), `${WINDOWS_VIEWER_PORT}/tcp`];

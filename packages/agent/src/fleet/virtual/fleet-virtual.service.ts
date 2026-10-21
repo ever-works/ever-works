@@ -474,6 +474,97 @@ export class FleetVirtualService {
     }
 
     /**
+     * Resize (P3, spec FR-38, ACC-FL16-21): a STOPPED virtual computer's CPUs
+     * and memory, within the creation choices. Refused `busy` while it runs (or
+     * is being built, started, stopped or destroyed); `confirm`-class. The host
+     * applies it (`vm-control resize`) and reports the new size.
+     */
+    async resize(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+        childNodeId: string,
+        input: { cpus?: unknown; memoryGiB?: unknown; fields?: FleetActionConfirmFields | null },
+    ): Promise<FleetVirtualOperationResponse> {
+        this.requireEnabled();
+        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.resize');
+        const meta = normalizeVirtualMeta(child.virtualMeta);
+        if (input.cpus !== undefined && !isFleetVirtualCpus(input.cpus)) {
+            throw fleetMachineError('invalid', 'CPUs must be 2, 4 or 8', { field: 'cpus' });
+        }
+        if (input.memoryGiB !== undefined && !isFleetVirtualMemoryGiB(input.memoryGiB)) {
+            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', { field: 'memoryGiB' });
+        }
+        const cpus = isFleetVirtualCpus(input.cpus) ? input.cpus : (meta?.cpus ?? FLEET_VIRTUAL_DEFAULT_CPUS);
+        const memoryGiB = isFleetVirtualMemoryGiB(input.memoryGiB)
+            ? input.memoryGiB
+            : (meta?.memoryGiB ?? FLEET_VIRTUAL_DEFAULT_MEMORY_GIB);
+        const state = deriveVirtualState(child);
+        if (state !== 'stopped') {
+            throw fleetMachineError('busy', `${child.name} is ${state}; stop it first`, { state });
+        }
+        this.requireConfirmation(
+            'resize',
+            child.name,
+            `Resize ${child.name} to ${cpus} CPUs and ${memoryGiB} GB of memory? It uses the new size from its next start.`,
+            input.fields,
+        );
+        const job = await this.enqueueControl(host, child, 'resize', { cpus, memoryGiB });
+        await this.patchMeta(child, { lastControlJobId: job.id });
+        await this.record('node.vm.resize', caller, host, child.id, {
+            targetName: child.name,
+            requestedBy: describeFleetMachineCaller(caller),
+            confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.resize,
+            outcome: 'ok',
+            hostNodeId: host.id,
+            cpus,
+            memoryGiB,
+            jobId: job.id,
+        });
+        return { operationId: job.id, jobId: job.id };
+    }
+
+    /**
+     * Rebuild (P3, spec FR-39): a Container re-created from the catalogue's
+     * current image, keeping its Fleet registration and its home (its enrolment
+     * and files). A Windows VM is not rebuilt (`unsupported_on_node`). Refused
+     * `busy` while a Run or a session is live on it; `confirm`-class.
+     */
+    async rebuild(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+        childNodeId: string,
+        fields?: FleetActionConfirmFields | null,
+    ): Promise<FleetVirtualOperationResponse> {
+        this.requireEnabled();
+        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.rebuild');
+        if (child.virtualKind !== 'container') {
+            throw fleetMachineError('unsupported_on_node', 'only a Container is rebuilt from an image');
+        }
+        const state = deriveVirtualState(child);
+        if (state !== 'running' && state !== 'stopped') {
+            throw fleetMachineError('busy', `${child.name} is ${state}; wait for it to finish`, { state });
+        }
+        await this.assertNotWorking(child, caller, host);
+        this.requireConfirmation(
+            'rebuild',
+            child.name,
+            `Rebuild ${child.name} from the current image? Its home folder and its Fleet registration are kept; sessions on it end.`,
+            fields,
+        );
+        const job = await this.enqueueControl(host, child, 'rebuild');
+        await this.patchMeta(child, { state: 'starting', lastControlJobId: job.id });
+        await this.record('node.vm.rebuild', caller, host, child.id, {
+            targetName: child.name,
+            requestedBy: describeFleetMachineCaller(caller),
+            confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.rebuild,
+            outcome: 'ok',
+            hostNodeId: host.id,
+            jobId: job.id,
+        });
+        return { operationId: job.id, jobId: job.id };
+    }
+
+    /**
      * Retry enrolment (U10, FR-24): the guest is built but never heartbeated
      * (its token expired, the link dropped at the wrong moment). The host
      * re-requests a token for it and hands it over again — nothing is rebuilt.
@@ -670,6 +761,9 @@ export class FleetVirtualService {
             };
         }
         if (typeof report.activated === 'boolean') next.activated = report.activated;
+        // Resize (P3): the size the host applied.
+        if (typeof report.cpus === 'number' && isFleetVirtualCpus(report.cpus)) next.cpus = report.cpus;
+        if (typeof report.memoryGiB === 'number' && isFleetVirtualMemoryGiB(report.memoryGiB)) next.memoryGiB = report.memoryGiB;
         if (report.viewerPort === null) next.viewerPort = null;
         else if (typeof report.viewerPort === 'number' && Number.isInteger(report.viewerPort)) {
             if (report.viewerPort > 0 && report.viewerPort < 65536) next.viewerPort = report.viewerPort;
@@ -922,7 +1016,12 @@ export class FleetVirtualService {
         );
     }
 
-    private async enqueueControl(host: FleetNode, child: FleetNode, action: FleetVmControlAction) {
+    private async enqueueControl(
+        host: FleetNode,
+        child: FleetNode,
+        action: FleetVmControlAction,
+        extra: Partial<Pick<FleetVmControlPayload, 'cpus' | 'memoryGiB'>> = {},
+    ) {
         const meta = normalizeVirtualMeta(child.virtualMeta);
         const system = fleetVirtualSystem(meta?.systemId) ?? fleetVirtualOfferedSystems()[0];
         const payload: FleetVmControlPayload = {
@@ -932,6 +1031,7 @@ export class FleetVirtualService {
             kind: child.virtualKind === 'vm' ? 'vm' : 'container',
             systemId: system.id,
             action,
+            ...extra,
         };
         return this.jobs.enqueue({
             userId: host.userId,

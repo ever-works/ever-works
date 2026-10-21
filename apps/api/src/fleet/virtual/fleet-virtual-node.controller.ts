@@ -90,6 +90,8 @@ export class FleetVirtualNodeController {
         }
         if (body.activated !== undefined) report.activated = body.activated;
         if (body.viewerPort !== undefined) report.viewerPort = body.viewerPort;
+        if (body.cpus !== undefined) report.cpus = body.cpus;
+        if (body.memoryGiB !== undefined) report.memoryGiB = body.memoryGiB;
         const accepted = await this.virtual.reportProgress(childId, report);
         if (!accepted) throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         return { ok: true };

@@ -1,5 +1,6 @@
 import { join, resolve, sep } from 'node:path';
 import {
+	clampFleetChangesMaxBytes,
 	FLEET_CHECKOUT_PATH_MAX_LENGTH,
 	fleetConsentMissingHint,
 	isFleetCheckoutBranchName,
@@ -27,6 +28,7 @@ import {
 	withCheckoutCredential,
 	type CheckoutCredentialClient
 } from './checkouts/checkout-credential';
+import { readCheckoutChanges } from './checkouts/checkout-changes';
 import { discoverCheckouts } from './checkouts/checkout-discovery';
 import { evidenceGrew, isEvidenceClean, readChangesEvidence } from './checkouts/checkout-evidence';
 import {
@@ -64,7 +66,7 @@ import { MachineVerbError, type MachineVerbContext, type NodeModule } from './re
 
 /**
  * Checkouts on computers (FL-14, CONTRACTS §3.3 `machine` family, R-40) —
- * the node's half: one module, four verbs.
+ * the node's half: one module, five verbs (`checkouts.changes` is FL-06's).
  *
  *  - `checkouts.list { rescan?, refresh?, paths?, measureSize?, remoteHeads?,
  *    archivedPaths? }` — what this machine holds: the registry (discovered
@@ -776,6 +778,36 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 		});
 	};
 
+	/**
+	 * FL-06 (spec FR-9, FR-10, §4.4): the uncommitted diff of one checkout —
+	 * read-only, capped, text only. A Task's worktree needs `--work`, any other
+	 * checkout `--manage` (checked HERE whatever the platform asked); refused
+	 * while the kill switch has the link paused (spec U3); only a path this
+	 * node holds (its registry, or its Task pool).
+	 */
+	const changes = async (context: MachineVerbContext) => {
+		const raw = context.params;
+		if (!isFleetCheckoutPath(raw.path)) refuse('invalid', 'path', { field: 'path' });
+		const path = raw.path as string;
+		if (context.control.paused) refuse('kill_switch', 'clear it under Settings → Fleet');
+		const entry = await findEntry(path);
+		const task = !entry && inPool(path);
+		if (!entry && !task) refuse('not_found', 'no such checkout on this computer', { path });
+		if (!context.consents.manage && !(task && context.consents.work)) {
+			refuse('consent_missing', fleetConsentMissingHint('manage', context.nodeName), {
+				verb: 'checkouts.changes',
+				consent: 'manage'
+			});
+		}
+		const target = entry?.path ?? path;
+		if (!(await isGitCheckout(target))) refuse('not_found', 'the folder is gone from this computer', { path });
+		return readCheckoutChanges(target, git, {
+			maxBytes: clampFleetChangesMaxBytes(raw.maxBytes),
+			signal: context.signal,
+			now
+		});
+	};
+
 	return {
 		id: 'checkouts',
 		tags: () => [],
@@ -783,7 +815,9 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 			'checkouts.list': { stateChanging: false, run: list },
 			'checkouts.sync': { stateChanging: true, run: sync },
 			'checkouts.create': { stateChanging: true, run: create },
-			'checkouts.delete': { stateChanging: true, run: remove }
+			'checkouts.delete': { stateChanging: true, run: remove },
+			// FL-06: a read (the platform and the verb refuse it under the kill switch, spec U3).
+			'checkouts.changes': { stateChanging: false, run: changes }
 		},
 		async containerArgvFor(path, command, argvOptions = {}) {
 			const entry = await findEntry(path);
