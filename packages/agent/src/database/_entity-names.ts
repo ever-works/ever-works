@@ -109,6 +109,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ExternalRecordLink',
     'FleetAgentNodeAffinity',
     'FleetAudit',
+    // Checkouts on computers (FL-14) — clones and worktrees on a Node
+    'FleetCheckout',
     // Fleet local-runner routing — local-vs-cloud execution preference
     'FleetExecutionPreference',
     'FleetCostPolicy',
