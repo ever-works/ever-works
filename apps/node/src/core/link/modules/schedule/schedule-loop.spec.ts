@@ -35,7 +35,8 @@ function harness(options: { now: number; stored?: StoredSchedule[]; paused?: boo
 		},
 		setPaused: async (paused: boolean) => {
 			state.paused = paused;
-		}
+		},
+		touchAlive: async () => undefined
 	} as unknown as ScheduleStore;
 	const history = {
 		put: async (report: FleetScheduleRunReport) => {

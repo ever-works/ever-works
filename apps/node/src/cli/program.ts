@@ -2,6 +2,13 @@ import { Command, CommanderError } from 'commander';
 import { homedir as osHomedir } from 'node:os';
 import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
+import type { FleetVirtualSystemId } from '@ever-works/contracts';
+import { parseCatalogueLock, resolveVirtualImage, VIRTUAL_CONTAINER_IMAGES } from '../core/link/modules/virtual/catalogue';
+import { resolveWindowsImage } from '../core/link/modules/virtual/windows';
+import { createNativeScheduler } from '../core/link/modules/schedule/native-scheduler';
+import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
+import { ScheduleLoop } from '../core/link/modules/schedule/schedule-loop';
+import { ScheduleStore } from '../core/link/modules/schedule/schedule-store';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
@@ -513,6 +520,12 @@ export interface StartCommandOptions {
 	 */
 	autoUpdate?: boolean;
 	/**
+	 * Schedules on computers (FL-13 P3) — also hand this machine's schedules to
+	 * the operating system's scheduler when the node is not a service, so they
+	 * run while nobody has the node open. Off by default; process-scoped.
+	 */
+	nativeSchedules?: boolean;
+	/**
 	 * Checkouts on computers (FL-14, CONTRACTS R-41) — a folder this machine's
 	 * owner keeps code in; discovery walks it for git clones. Repeatable;
 	 * persisted (the list given replaces the stored one), like
@@ -810,6 +823,16 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// Fleet node link (FL-02 T-25): the self-update's report rides every
 		// beat, and every accepted beat's version verdict reaches it.
 		selfUpdateReport: () => selfUpdate?.report() ?? null,
+		// Schedules on computers (FL-13 P3): the OS-scheduler fallback, opt-in.
+		...(options.nativeSchedules === true && deps.sessionDaemonCommand
+			? {
+					nativeSchedules: true,
+					nativeScheduleCommand: {
+						file: deps.sessionDaemonCommand.command,
+						args: [...deps.sessionDaemonCommand.args]
+					}
+				}
+			: {}),
 		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response),
 		// Checkouts on computers (FL-14): the node-local checkout registry,
 		// beside the config like the session daemon's state.
@@ -821,7 +844,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// folders (bootstrap, meta, the catalogue lock) beside the config. A
 		// Windows host never hosts virtual computers (spec U4).
 		...(deps.platform !== 'win32'
-			? { virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual') }
+			? {
+					virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual'),
+					// Windows VM passwords (FL-16 P2) live in the same keychain as the node credential.
+					virtualSecrets: deps.secrets ?? null
+				}
 			: {})
 	});
 	// The daemon starts with the node, before the first beat, so that beat can
@@ -1313,6 +1340,8 @@ export async function runUnenroll(deps: CliDeps, options: { localOnly?: boolean 
 	}
 
 	await clearConfig(deps.fs, deps.configPath, config, { secrets: deps.secrets ?? null });
+	// Schedules on computers (FL-13 P3): whatever the OS-scheduler fallback wrote goes with the enrolment.
+	await removeNativeSchedules(deps);
 
 	if (options.localOnly === true) {
 		deps.out(`Removed the local credential for node ${config.nodeId}.`);
@@ -1871,8 +1900,12 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	const now = (deps.now ?? (() => Date.now()))();
 	// Sessions on computers (FL-04): the session daemon, asked read-only.
 	const sessions = await describeSessionDaemon(deps);
+	// Virtual computers (FL-16 P3, T-36): what each system is pinned to here.
+	const virtual = await describeVirtualCatalogue(deps);
 	if (options.json === true) {
-		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions }, null, 2));
+		deps.out(
+			JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual }, null, 2)
+		);
 		return;
 	}
 	printHousekeepingHeader(deps, report, now);
@@ -1890,7 +1923,41 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 				: `daemon not running — ${sessions.reason ?? 'unknown'}`
 		}`
 	);
+	if (virtual) {
+		const pinned = virtual.catalogue.filter((entry) => entry.digest).length;
+		deps.out(
+			`virtual      ${pinned} of ${virtual.catalogue.length} Container system(s) pinned here; Windows installer image ${
+				virtual.windowsImage ?? 'not configured'
+			}`
+		);
+	}
 	printPlan(deps, report.plan, now);
+}
+
+/**
+ * Virtual computers (FL-16 P3, T-36) — the host's system catalogue as it stands
+ * here: each Container system's image, the digest it is pinned to (or not yet),
+ * and where that came from (the catalogue, the lock file, an operator
+ * override); and the operator's Windows installer image. Null on Windows (no
+ * virtual computers there). Never throws.
+ */
+export async function describeVirtualCatalogue(deps: CliDeps): Promise<{
+	catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }>;
+	windowsImage: string | null;
+} | null> {
+	if (deps.platform === 'win32') return null;
+	try {
+		const lockPath = posix.join(posix.dirname(deps.configPath), 'virtual', 'catalogue.lock.json');
+		const lock = parseCatalogueLock(await deps.fs.readFile(lockPath).catch(() => null));
+		const catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }> = [];
+		for (const systemId of Object.keys(VIRTUAL_CONTAINER_IMAGES) as FleetVirtualSystemId[]) {
+			const image = resolveVirtualImage(systemId, { env: process.env, lock });
+			if (image) catalogue.push({ systemId, ref: image.ref, digest: image.digest, source: image.source });
+		}
+		return { catalogue, windowsImage: resolveWindowsImage(process.env)?.ref ?? null };
+	} catch {
+		return null;
+	}
 }
 
 /** `gc`: plan, then reap — unless `--dry-run`, which prints the plan and writes nothing. */
@@ -2064,6 +2131,10 @@ export function buildProgram(deps: CliDeps): Command {
 			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
 		)
 		.option(
+			'--native-schedules',
+			"With --manage and when not running as a service: also hand this machine's schedules to the OS scheduler (crontab / LaunchAgents / Task Scheduler) so they run while the node is closed"
+		)
+		.option(
 			'--code-folder <dir>',
 			'A folder you keep code in; Ever Works lists the git clones under it, three folders deep (repeatable; persisted; needs --manage)',
 			(value: string, previous: string[] = []) => [...previous, value]
@@ -2170,6 +2241,15 @@ export function buildProgram(deps: CliDeps): Command {
 			await runGc(deps, options);
 		});
 
+	// Schedules on computers (FL-13 P3): what the OS scheduler starts. Hidden.
+	program
+		.command('schedule-run', { hidden: true })
+		.description("Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)")
+		.argument('<id>', 'The schedule the OS scheduler fired')
+		.action(async (id: string) => {
+			await runScheduleRun(deps, id);
+		});
+
 	// Sessions on computers (FL-04): the session daemon's own entry. Hidden —
 	// the node starts it, a person never does (README D3: one installable).
 	program
@@ -2272,5 +2352,65 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 		const message = error instanceof Error ? error.message : String(error);
 		deps.io.logger.error(deps.io.logger.redact(message));
 		return EXIT_FAILURE;
+	}
+}
+
+/** `<configDir>/schedules` — where `start` keeps the schedules (FL-13). */
+function scheduleDirFor(deps: CliDeps): string {
+	const paths = deps.platform === 'win32' ? win32 : posix;
+	return paths.join(paths.dirname(deps.configPath), 'schedules');
+}
+
+/**
+ * `ever-works-node schedule-run <id>` (hidden; FL-13 P3) — what the OS
+ * scheduler starts at a fire. When a node process holds the schedule loop
+ * (its lease is fresh) this does nothing: that loop runs the fire on its own
+ * clock. Otherwise it loads the held schedules, runs whatever is due (the
+ * same catch-up rule as the loop: within the 60-minute grace, at most once
+ * per fire, one at a time per schedule), waits for the runs to end and exits.
+ * The runs are kept in the history and reported on the next link.
+ */
+export async function runScheduleRun(deps: CliDeps, id: string): Promise<void> {
+	const dir = scheduleDirFor(deps);
+	const store = new ScheduleStore({ dir });
+	if (await store.isLoopAlive(Date.now())) {
+		deps.out(`The node is running; its own clock runs schedule ${id}.`);
+		return;
+	}
+	let nodeName = 'this computer';
+	try {
+		const config = await requireConfig(deps);
+		nodeName = config.name?.trim() || nodeName;
+	} catch {
+		// A schedule still runs on a machine whose config cannot be read now.
+	}
+	const loop = new ScheduleLoop({
+		store,
+		history: new ScheduleHistory({ dir }),
+		nodeName,
+		platform: deps.platform,
+		homedir: osHomedir(),
+		env: process.env,
+		timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+		logger: deps.io.logger,
+		lease: false
+	});
+	await loop.start();
+	await loop.idle();
+	loop.dispose();
+}
+
+/** Remove every OS-scheduler entry the fallback wrote (best-effort; `unenroll`). */
+async function removeNativeSchedules(deps: CliDeps): Promise<void> {
+	try {
+		await createNativeScheduler({
+			platform: deps.platform,
+			homedir: osHomedir(),
+			command: { file: '', args: [] }
+		})?.remove();
+	} catch (error) {
+		deps.io.logger.warn(
+			`Could not remove the OS-scheduler entries of this node's schedules: ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
 }

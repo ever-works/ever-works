@@ -10,12 +10,15 @@ import { Button } from '@/components/ui/button';
 import {
     destroyFleetVirtualAction,
     fleetVirtualPowerAction,
+    rebuildFleetVirtualAction,
     retryFleetVirtualEnrollmentAction,
 } from '@/app/actions/fleet/virtual';
 import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
 import type { FleetComputerActionProps } from '../registry';
 import { isVirtualBusy, isVirtualChild } from './virtual.shared';
+import { RevealPasswordDialog } from './RevealPasswordDialog';
+import { ResizeVirtualDialog } from './ResizeVirtualDialog';
 
 /**
  * Virtual computers (FL-16, spec §5.5, §5.6, FR-26 – FR-28, FR-33, U10) — the
@@ -31,8 +34,10 @@ import { isVirtualBusy, isVirtualChild } from './virtual.shared';
 export default function VirtualChildActions({ node, allowed = true }: FleetComputerActionProps) {
     const t = useTranslations('fleet.virtual');
     const router = useRouter();
-    const [dialog, setDialog] = useState<{ act: 'stop' | 'destroy'; model: ConfirmDialogModel } | null>(null);
+    const [dialog, setDialog] = useState<{ act: 'stop' | 'destroy' | 'rebuild'; model: ConfirmDialogModel } | null>(null);
     const [pending, startTransition] = useTransition();
+    const [revealOpen, setRevealOpen] = useState(false);
+    const [resizeOpen, setResizeOpen] = useState(false);
     if (!isVirtualChild(node) || !node.hostNodeId) return null;
     const hostNodeId = node.hostNodeId;
     const virtual = node.virtual ?? null;
@@ -69,12 +74,17 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             const result =
                 current.act === 'stop'
                     ? await fleetVirtualPowerAction(hostNodeId, node.id, 'stop', { confirm: true })
-                    : await destroyFleetVirtualAction(hostNodeId, node.id, typed);
+                    : current.act === 'rebuild'
+                      ? await rebuildFleetVirtualAction(hostNodeId, node.id)
+                      : await destroyFleetVirtualAction(hostNodeId, node.id, typed);
             if (result.ok) {
                 setDialog(null);
                 if (current.act === 'destroy') {
                     toast.success(t('destroy.started', { name: node.name }));
                     router.push(ROUTES.DASHBOARD_FLEET_COMPUTERS);
+                } else if (current.act === 'rebuild') {
+                    toast.success(t('rebuild.started', { name: node.name }));
+                    router.refresh();
                 } else {
                     toast.success(isVm ? t('power.stoppingVm', { name: node.name }) : t('power.stopping', { name: node.name }));
                     router.refresh();
@@ -96,6 +106,12 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             },
         });
 
+    const openRebuild = () =>
+        setDialog({
+            act: 'rebuild',
+            model: { class: 'confirm', title: t('rebuild.title', { name: node.name }), body: t('rebuild.body') },
+        });
+
     const openDestroy = () =>
         setDialog({
             act: 'destroy',
@@ -108,10 +124,54 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
         });
 
     const notAllowed = allowed ? undefined : t('power.notAllowed', { name: hostLabel });
+    // Copy password is the owner's alone (spec U16), and only a Windows VM has one.
+    const isOwner = (node.viewerRole ?? 'owner') === 'owner';
+    const viewerPort = virtual?.viewerPort ?? null;
+
+    // Watch the install (FR-23): the installer's screen, opened ON the host
+    // through FL-10's "open on the machine" (its viewer listens on the host's
+    // loopback only).
+    const watch = () =>
+        startTransition(async () => {
+            if (!viewerPort) return;
+            try {
+                const response = await fetch(
+                    `/api/fleet/nodes/${encodeURIComponent(hostNodeId)}/ports/${viewerPort}/open`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: 'desktop' }),
+                    },
+                );
+                if (response.ok) toast.success(t('watch.opened', { host: hostLabel }));
+                else {
+                    const body = (await response.json().catch(() => null)) as { error?: { hint?: string } } | null;
+                    toast.error(body?.error?.hint || t('watch.failed'));
+                }
+            } catch {
+                toast.error(t('watch.failed'));
+            }
+        });
     const running = state === 'running' || node.status === 'online';
 
     return (
         <div className="flex items-center gap-2" data-testid="fleet-virtual-child-actions">
+            {isVm && viewerPort ? (
+                <Button type="button" size="sm" variant="ghost" onClick={watch} disabled={pending} data-testid="fleet-virtual-watch">
+                    {t('watch.button')}
+                </Button>
+            ) : null}
+            {isVm && isOwner && state !== 'creating' && state !== 'destroying' ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRevealOpen(true)}
+                    data-testid="fleet-virtual-copy-password"
+                >
+                    {t('password.button')}
+                </Button>
+            ) : null}
             {state === 'not-enrolled' ? (
                 <Button type="button" size="sm" variant="ghost" onClick={retry} disabled={!allowed || busy} title={notAllowed}>
                     {t('power.retryEnrollment')}
@@ -124,6 +184,32 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             ) : state === 'stopped' ? (
                 <Button type="button" size="sm" variant="ghost" onClick={start} disabled={!allowed || busy} title={notAllowed}>
                     {t('power.start')}
+                </Button>
+            ) : null}
+            {state === 'stopped' ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setResizeOpen(true)}
+                    disabled={!allowed || busy}
+                    title={notAllowed}
+                    data-testid="fleet-virtual-resize"
+                >
+                    {t('resize.button')}
+                </Button>
+            ) : null}
+            {!isVm && (state === 'running' || state === 'stopped') ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={openRebuild}
+                    disabled={!allowed || busy}
+                    title={notAllowed}
+                    data-testid="fleet-virtual-rebuild"
+                >
+                    {t('rebuild.button')}
                 </Button>
             ) : null}
             <Button
@@ -139,11 +225,37 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             </Button>
             <ConfirmActionDialog
                 model={dialog?.model ?? null}
-                actionLabel={dialog?.act === 'destroy' ? t('destroy.confirm') : t('power.stop')}
+                actionLabel={
+                    dialog?.act === 'destroy'
+                        ? t('destroy.confirm')
+                        : dialog?.act === 'rebuild'
+                          ? t('rebuild.confirm')
+                          : t('power.stop')
+                }
                 pending={pending}
                 onConfirm={confirm}
                 onCancel={() => setDialog(null)}
             />
+            <ResizeVirtualDialog
+                open={resizeOpen}
+                hostNodeId={hostNodeId}
+                childNodeId={node.id}
+                name={node.name}
+                cpus={virtual?.cpus ?? 4}
+                memoryGiB={virtual?.memoryGiB ?? 8}
+                onClose={() => setResizeOpen(false)}
+                onDone={() => router.refresh()}
+            />
+            {isVm ? (
+                <RevealPasswordDialog
+                    open={revealOpen}
+                    hostNodeId={hostNodeId}
+                    childNodeId={node.id}
+                    name={node.name}
+                    hostName={hostLabel}
+                    onClose={() => setRevealOpen(false)}
+                />
+            ) : null}
         </div>
     );
 }

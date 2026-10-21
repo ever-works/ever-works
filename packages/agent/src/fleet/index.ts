@@ -36,6 +36,8 @@ export * from './files/agent-fleet-files-tools';
 export * from './fleet-tool-gate';
 export * from './fleet-tool-factory';
 export * from './fleet-status';
+export * from './fleet-held-call';
+export * from './fleet-requested-by';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
@@ -65,6 +67,8 @@ export * from './machine';
 export * from './checkouts';
 // Tasks on computers (FL-15 P2) — a computer's global git identity.
 export * from './git';
+// Session git & actions (FL-06) — the branch rule, action prompts, ledger.
+export * from './session-git';
 // Tasks on computers (FL-15 P3) — the hand-off and identity Agent tools.
 export * from './agent-fleet-task-tools';
 export * from './ports';

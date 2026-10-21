@@ -60,10 +60,10 @@ describe('the virtual-computer system catalogue', () => {
 		expect(isFleetVirtualSystemId('macos')).toBe(false);
 	});
 
-	it('hides the Windows systems until phase 2 ships them', () => {
-		expect(FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED).toBe(false);
-		expect(fleetVirtualOfferedSystems().every((system) => system.kind === 'container')).toBe(true);
-		expect(fleetVirtualOfferedSystems(true)).toHaveLength(FLEET_VIRTUAL_SYSTEMS.length);
+	it('offers the Windows systems once phase 2 shipped them (hidden before)', () => {
+		expect(FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED).toBe(true);
+		expect(fleetVirtualOfferedSystems()).toHaveLength(FLEET_VIRTUAL_SYSTEMS.length);
+		expect(fleetVirtualOfferedSystems(false).every((system) => system.kind === 'container')).toBe(true);
 	});
 });
 

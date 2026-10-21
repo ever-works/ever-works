@@ -38,7 +38,9 @@ export const attachCommand = new Command('attach')
     .description('Attach this terminal to a session on one of your computers (Ctrl-] then d detaches)')
     .argument('<sessionId>', 'Session id')
     .option('--watch', 'Watch only — never type into the session')
-    .action(async (sessionId: string, options: { watch?: boolean }) => {
+    // FL-19 (spec FR-22) names `--drive` for typing; accepted beside FL-04's default (driver unless --watch).
+    .option('--drive', 'Type into the session (the default unless --watch)')
+    .action(async (sessionId: string, options: { watch?: boolean; drive?: boolean }) => {
         if (!UUID.test(sessionId)) {
             console.error(chalk.red('Error: <sessionId> must be a session id (a UUID)'));
             process.exit(SESSION_CLI_EXIT.usage);
@@ -49,7 +51,7 @@ export const attachCommand = new Command('attach')
             process.exit(SESSION_CLI_EXIT.usage);
         }
         await requireAuth();
-        const role = options.watch ? 'viewer' : 'driver';
+        const role = options.watch && !options.drive ? 'viewer' : 'driver';
         const size = () => ({ cols: process.stdout.columns || 120, rows: process.stdout.rows || 32 });
         let grant: { token: string; wsPath: string; role: string };
         try {

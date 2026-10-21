@@ -168,6 +168,41 @@ export function readScheduleConfirmation(details: Record<string, unknown>): Flee
     return details as unknown as FleetScheduleConfirmationDetails;
 }
 
+/** One Agent-session schedule on the computer, as its Schedules-view row carries it (FL-13 P2). */
+export interface AgentSessionScheduleRow {
+    /** `recurring_task:<taskId>` — the Schedules-view id its controls take. */
+    id: string;
+    taskId: string;
+    name: string;
+    agentName: string | null;
+    cadenceHuman: string;
+    nextRunAt: string | null;
+    lastRunAt: string | null;
+    paused: boolean;
+}
+
+/** The Agent-session schedules (pinned recurring Tasks) a page carries for one computer. */
+export function agentSessionsOfPage(page: unknown): AgentSessionScheduleRow[] {
+    const items = (page as { items?: unknown } | null)?.items;
+    if (!Array.isArray(items)) return [];
+    const rows: AgentSessionScheduleRow[] = [];
+    for (const raw of items) {
+        const item = raw as Record<string, unknown> | null;
+        if (!item || item.sourceType !== 'recurring_task' || typeof item.id !== 'string') continue;
+        rows.push({
+            id: item.id,
+            taskId: typeof item.ownerId === 'string' ? item.ownerId : '',
+            name: typeof item.ownerName === 'string' ? item.ownerName : '',
+            agentName: typeof item.agentName === 'string' ? item.agentName : null,
+            cadenceHuman: typeof item.cadenceHuman === 'string' ? item.cadenceHuman : '',
+            nextRunAt: typeof item.nextRunAt === 'string' ? item.nextRunAt : null,
+            lastRunAt: typeof item.lastRunAt === 'string' ? item.lastRunAt : null,
+            paused: item.status === 'paused',
+        });
+    }
+    return rows;
+}
+
 /** The schedules a page of the Schedules view carries for one computer. */
 export function schedulesOfPage(page: unknown): FleetScheduleView[] {
     const items = (page as { items?: unknown } | null)?.items;

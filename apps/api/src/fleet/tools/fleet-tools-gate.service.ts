@@ -54,6 +54,8 @@ export function fleetToolFlagOn(flag: FleetToolFlag): boolean {
             return config.fleet.isCommandsEnabled();
         case 'FLEET_CHECKOUTS_ENABLED':
             return config.fleet.isCheckoutsEnabled();
+        case 'FLEET_VIRTUAL_ENABLED':
+            return config.fleet.isVirtualEnabled();
         default:
             // FLEET_DESKTOP / VIRTUAL / CLOUD / ACTIONS_RUNNERS / USAGE_SCAN: their epics
             // add the getter with their family; until then the rows are `planned` anyway.

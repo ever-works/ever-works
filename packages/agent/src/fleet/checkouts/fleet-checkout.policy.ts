@@ -1,6 +1,8 @@
 import {
     FLEET_CHECKOUT_CREATING_STALE_MS,
+    parseFleetGitLine,
     type FleetCheckoutCreatedBy,
+    type FleetGitLine,
     type FleetCheckoutLastCommand,
     type FleetCheckoutState,
     type FleetNodeCheckoutOrigin,
@@ -47,6 +49,22 @@ export function nextCheckoutState(
     return present ? 'ready' : 'missing';
 }
 
+/**
+ * FL-06 (spec FR-7): the node never knows the pull request — its git line
+ * always carries `pr: null`. The platform's resolved `pr` survives a node
+ * refresh while the branch is the one it was resolved for; a branch change
+ * drops it (the enrichment resolves the new branch within a minute).
+ */
+export function withKnownPullRequest(
+    next: FleetGitLine,
+    previous: FleetGitLine | Record<string, unknown> | null,
+): FleetGitLine {
+    if (next.pr) return next;
+    const known = previous ? parseFleetGitLine(previous) : null;
+    if (!known?.pr || known.branch !== next.branch) return next;
+    return { ...next, pr: known.pr };
+}
+
 /** The columns a node record writes. `row` null = the first time the platform hears of it. */
 export function checkoutPatchFromRecord(
     row: Pick<
@@ -68,7 +86,7 @@ export function checkoutPatchFromRecord(
         patch.remoteHadCredential = record.remoteHadCredential;
         patch.isolation = record.isolation;
     }
-    if (record.gitLine) patch.gitLine = record.gitLine;
+    if (record.gitLine) patch.gitLine = withKnownPullRequest(record.gitLine, row?.gitLine ?? null);
     else if (!row) patch.gitLine = null;
     if (record.sizeBytes !== null) patch.sizeBytes = record.sizeBytes;
     else if (!row) patch.sizeBytes = null;

@@ -2,6 +2,10 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
+    clampFleetChangesMaxBytes,
+    parseFleetCheckoutChangesReply,
+    type FleetCheckoutChangesReply,
+    type FleetGitLinePullRequest,
     fleetCheckoutDisplayPath,
     fleetCheckoutFolderName,
     fleetCheckoutName,
@@ -1036,6 +1040,154 @@ export class FleetCheckoutService {
         const ids = candidates.filter((row) => isCheckoutFolderRemoved(row)).map((row) => row.id);
         if (ids.length > 0) await this.checkouts.deleteMany(ids);
         return { purged: ids.length };
+    }
+
+    // ─── FL-06: session git & actions ──────────────────────────────────────
+
+    /**
+     * The uncommitted diff of one checkout (FL-06 spec FR-9, FR-10, §4.4) —
+     * read on the machine, capped (1 MiB / 64 KiB per file), text only. Family
+     * `checkouts` (a stranger reads 404, a member outside the audience
+     * `permission_denied`), the kill switch (`kill_switch`, U3), the computer
+     * (`unreachable`, U1), then the machine's own consent check: `--manage`, or
+     * `--work` for a Task's worktree. A read: no audit row.
+     */
+    async changes(id: string, actor: FleetCheckoutActor, maxBytes?: number): Promise<FleetCheckoutChangesReply> {
+        const { checkout, node } = await this.resolve(id, actor, 'checkouts');
+        this.requireUsable(checkout, node);
+        if (await this.isStopped())
+            throw fleetCheckoutError('kill_switch', 'clear it under Settings → Fleet');
+        if (!this.node || !this.node.isConnected(node.id)) {
+            const ago = describeAgo(node.lastHeartbeatAt, this.now());
+            throw fleetCheckoutError(
+                'unreachable',
+                ago ? `${node.name} is offline (last seen ${ago} ago)` : `${node.name} is offline`,
+                { nodeId: node.id },
+            );
+        }
+        const cap = clampFleetChangesMaxBytes(maxBytes);
+        const outcome = await this.askOrThrow(node, actor, {
+            verb: 'checkouts.changes',
+            params: { path: checkout.path, maxBytes: cap, checkoutId: checkout.id },
+            // A Task's worktree reads under `--work`; anything else needs `--manage`.
+            ...(checkout.createdBy === 'task' ? {} : { consent: 'manage' as const }),
+            actionFamily: 'checkouts',
+            stateChanging: false,
+            target: checkout.path,
+            timeoutMs: LIST_TIMEOUT_MS,
+        });
+        const reply = 'result' in outcome ? parseFleetCheckoutChangesReply(outcome.result, cap) : null;
+        if (!reply) {
+            throw fleetCheckoutError('operation_failed', `${node.name} did not answer in time; try again`);
+        }
+        return reply;
+    }
+
+    /**
+     * The branch names already used for a checkout's repository (FL-06 spec
+     * FR-5, U9): every row on the Node owner's computers with the same remote,
+     * the bin included, plus the remote's own branches when the computer can
+     * be asked (`remoteHeads`, `--manage` on the machine). `remoteChecked` is
+     * false when it could not — the rows were still checked.
+     */
+    async takenBranchNames(
+        id: string,
+        actor: FleetCheckoutActor,
+    ): Promise<{ checkout: FleetCheckoutView; nodeName: string; taken: string[]; remoteChecked: boolean }> {
+        const { checkout, node } = await this.resolve(id, actor, 'view');
+        const taken = new Set<string>();
+        if (checkout.remoteUrl) {
+            for (const row of await this.checkouts.findForUser(node.userId)) {
+                if (row.branch && fleetRemotesMatch(row.remoteUrl, checkout.remoteUrl)) taken.add(row.branch);
+            }
+        }
+        let remoteChecked = false;
+        if (this.node?.isConnected(node.id) && checkout.state === 'ready') {
+            try {
+                const outcome = await this.ask(node, actor, {
+                    verb: 'checkouts.list',
+                    params: { paths: [checkout.path], remoteHeads: true },
+                    actionFamily: 'view',
+                    stateChanging: false,
+                    target: checkout.path,
+                    timeoutMs: LIST_TIMEOUT_MS,
+                });
+                const reply = 'result' in outcome ? parseFleetCheckoutsListReply(outcome.result) : null;
+                if (reply?.remoteBranches) {
+                    remoteChecked = true;
+                    for (const name of reply.remoteBranches) taken.add(name);
+                }
+            } catch (error) {
+                this.logger.debug(
+                    `Remote branches of ${checkout.path} on node ${node.id} could not be read: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        return { checkout: await this.view(checkout, actor), nodeName: node.name, taken: [...taken], remoteChecked };
+    }
+
+    /**
+     * FL-06 (spec FR-7): write the platform-resolved pull request onto one
+     * checkout's git line — this service stays the one writer of
+     * `fleet_checkouts`. Only while the line is still on the branch the pull
+     * request was resolved for; answers whether anything changed.
+     */
+    async setPullRequest(id: string, branch: string, pr: FleetGitLinePullRequest | null): Promise<boolean> {
+        const row = await this.checkouts.findById(id);
+        if (!row) return false;
+        const line = parseFleetGitLine(row.gitLine);
+        if (!line || line.branch !== branch) return false;
+        const same =
+            (line.pr === null && pr === null) ||
+            (line.pr !== null &&
+                pr !== null &&
+                line.pr.number === pr.number &&
+                line.pr.state === pr.state &&
+                line.pr.checks === pr.checks &&
+                line.pr.url === pr.url);
+        if (same) return false;
+        await this.checkouts.update(row.id, { gitLine: { ...line, pr } });
+        return true;
+    }
+
+    /**
+     * FL-06 (spec FR-11): recompute these checkouts' git lines on their
+     * computer now — the platform itself asking (the session cadence: every
+     * minute while a session works in them, once when it stops). Never
+     * contacts the remote; skipped while the computer cannot be reached or the
+     * kill switch is on. Never throws.
+     */
+    async refreshForSessions(nodeId: string, checkoutIds: readonly string[]): Promise<{ refreshed: number }> {
+        if (!this.node || !this.node.isConnected(nodeId) || checkoutIds.length === 0) return { refreshed: 0 };
+        if (await this.isStopped()) return { refreshed: 0 };
+        try {
+            const node = await this.nodes.findById(nodeId);
+            if (!node) return { refreshed: 0 };
+            const rows = (await this.checkouts.findByIds(checkoutIds)).filter(
+                (row) => row.nodeId === nodeId && row.state === 'ready',
+            );
+            if (rows.length === 0) return { refreshed: 0 };
+            const outcome = await this.node.request({
+                nodeId,
+                verb: 'checkouts.list',
+                params: { refresh: true, paths: rows.map((row) => row.path) },
+                caller: { kind: 'system', job: 'fleet-session-git-cadence' },
+                actionFamily: 'view',
+                stateChanging: false,
+                timeoutMs: LIST_TIMEOUT_MS,
+            });
+            if ('result' in outcome) await this.applyNodeList(node, outcome.result);
+            return { refreshed: rows.length };
+        } catch (error) {
+            this.logger.debug(
+                `Session cadence could not refresh checkouts on node ${nodeId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { refreshed: 0 };
+        }
     }
 
     // ─── What the node reports ─────────────────────────────────────────────

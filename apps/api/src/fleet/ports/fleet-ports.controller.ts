@@ -10,6 +10,7 @@ import {
     Post,
     Query,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -20,6 +21,7 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { ListFleetPortsQueryDto, OpenFleetPortDto } from './dto/fleet-ports.dto';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetPortsActor {
     return { kind: 'user', userId: auth.userId, displayName: auth.username ?? null };
@@ -44,6 +46,9 @@ function actorOf(auth: AuthenticatedUser): FleetPortsActor {
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetMachineFactsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetPortsController {
     constructor(private readonly ports: FleetPortsService) {}
 

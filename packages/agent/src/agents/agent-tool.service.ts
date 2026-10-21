@@ -70,12 +70,13 @@ import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-too
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
+import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
-import { buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
+import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -673,6 +674,16 @@ export class AgentToolService {
                     operations: fleet.operations ?? null,
                 }),
             );
+            // FL-19 P2 — wake and cancel an operation (each when bound). The git identity
+            // tools are FL-15's own (`fleetTasks`), assembled below.
+            add('fleet-acts', () =>
+                buildFleetActTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    wake: fleet.wake ?? null,
+                    operations: fleet.operations ?? null,
+                }),
+            );
             // Logs on computers (FL-08): the read-only log tools, when bound.
             if (fleet.logs) {
                 const logs = fleet.logs;
@@ -732,6 +743,26 @@ export class AgentToolService {
                             ? runContext.runId
                             : null,
                     service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-13 P2 — Schedules on computers. Create, update, delete and run never
+        // act themselves: each files an approval the owner decides in My Decisions
+        // (fail-closed without the queue); pause and resume apply at once. Bound
+        // only while FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetSchedules) {
+            const fleetSchedules = sources.fleetSchedules;
+            add('fleet-schedules', () =>
+                buildFleetScheduleTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetSchedules.service,
                     proposals: sources.proposals ?? null,
                 }),
             );

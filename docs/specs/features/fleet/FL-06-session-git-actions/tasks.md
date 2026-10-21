@@ -25,9 +25,12 @@
 
 ---
 
+> Lane log: [`docs/internal/fleet/lanes/FL-06.md`](../../../../internal/fleet/lanes/FL-06.md). P1 ticked items are
+> written, not run (fast-build rule); T-06 ships as an API cron (no Trigger task yet), T-11 without its Playwright spec.
+
 ## P1.A — Contracts and branch rule
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-session-actions.types.ts` (action ids,
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-session-actions.types.ts` (action ids,
       defaults, context, availability, ledger entry, send/changes/PR request shapes, rate and cap
       constants, `renderActionPrompt`); export from `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-session-actions.spec.ts` — placeholder
@@ -37,13 +40,13 @@
       `packages/agent/src/agents/agent-file.service.ts` (unknown keys still rejected; block optional).
       **Test**: extend `packages/agent/src/agents/__tests__/agent-file.service.spec.ts` — parses, round-trips,
       an invalid action id is refused with the field named.
-- [ ] **T-03**. Create pure `packages/agent/src/fleet/branch-proposal.ts` (`proposeBranch(ctx)`:
+- [x] **T-03**. Create pure `packages/agent/src/fleet/branch-proposal.ts` (`proposeBranch(ctx)`:
       Task branch reuse via `taskBranchName` from `packages/agent/src/tasks-domain/task-isolation.ts`,
       else `<prefix>/<slug>` from first message / title / generated name; suffixing against a
       supplied set of taken names).
       **Test**: `packages/agent/src/fleet/__tests__/branch-proposal.spec.ts` — Task reuse, slug
       rules (≤ 40 chars, kebab), prefix defaults, `-2`/`-3` suffixing, Unicode input.
-- [ ] **T-04**. Add `GET /api/fleet/sessions/branch-proposal` to a new
+- [x] **T-04**. Add `GET /api/fleet/sessions/branch-proposal` to a new
       `apps/api/src/fleet/fleet-session-actions.controller.ts` (taken names = `fleet_checkouts.branch`
       for the remote incl. archived + node `git ls-remote --heads` through an optional
       `remoteHeads: true` request flag this task adds to FL-14's `checkouts.list` in
@@ -53,7 +56,7 @@
       raised in spec §8b.
       **Test**: `apps/api/src/fleet/fleet-session-actions.controller.spec.ts` — proposal shape,
       `unreachable` when the node cannot list remote heads, cross-user 404.
-- [ ] **T-05**. Extend FL-04's start dialog (`apps/web/src/components/fleet/sessions/SessionStartDialog.tsx`)
+- [x] **T-05**. Extend FL-04's start dialog (`apps/web/src/components/fleet/sessions/SessionStartDialog.tsx`)
       Where step: `apps/web/src/components/fleet/sessions/BranchProposalField.tsx`,
       preselect **New worktree** for Agent sessions when the folder is a checkout; record
       `checkoutId` on the session start request.
@@ -61,7 +64,7 @@
 
 ## P1.B — Git line with PR, cadence, changes
 
-- [ ] **T-06**. Create `packages/agent/src/fleet/fleet-pr-enrichment.service.ts` (PR by head branch
+- [x] **T-06**. Create `packages/agent/src/fleet/fleet-pr-enrichment.service.ts` (PR by head branch
       through `GitFacadeService`, state, checks roll-up, unresolved review comments, mergeable;
       writes only the CONTRACTS §4.7 fields `{ number, state, checks, url }` to
       `fleet_checkouts.gitLine.pr` and keeps `unresolvedComments`/`mergeable` in the 60 s
@@ -71,21 +74,21 @@
       dispatcher symbol bound in `apps/api/src/fleet/fleet.module.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/fleet-pr-enrichment.service.spec.ts` (cache,
       state mapping, unknown on provider error with age), `packages/tasks/src/__tests__/fleet-pr-enrichment.task.spec.ts`.
-- [ ] **T-07** _(parallel)_. Drive the git-line cadence from session `session.status` changes: in
+- [x] **T-07** _(parallel)_. Drive the git-line cadence from session `session.status` changes: in
       FL-04's `packages/agent/src/fleet/sessions/fleet-session.service.ts` call FL-14's refresh every
       60 s while `working` and once on `done`/`ended` (`checkouts.list { refresh: true, checkoutIds }`).
       **Test**: extend `packages/agent/src/fleet/sessions/__tests__/fleet-session.service.spec.ts` —
       timer starts/stops with state, stop refresh happens exactly once.
-- [ ] **T-08**. Add `checkouts.changes` to `apps/node/src/core/link/modules/checkouts.ts` and
+- [x] **T-08**. Add `checkouts.changes` to `apps/node/src/core/link/modules/checkouts.ts` and
       `apps/node/src/core/checkouts/checkout-changes.ts` (porcelain v2 + `git diff HEAD`, caps,
       binary without patch, `.ever-works/` and `.mounts/` excluded). The verb is in the CONTRACTS
       §3.3 `machine` vocabulary (rev 2).
       **Test**: `apps/node/src/core/checkouts/checkout-changes.spec.ts` — caps per file and total,
       omitted counts, binary, excluded dirs, no HTML in output.
-- [ ] **T-09**. Add `GET /api/fleet/checkouts/:id/changes` to `fleet-session-actions.controller.ts`
+- [x] **T-09**. Add `GET /api/fleet/checkouts/:id/changes` to `fleet-session-actions.controller.ts`
       (family `checkouts`, consent check, `maxBytes` clamp).
       **Test**: extend the controller spec — `consent_missing`, `unreachable`, clamp.
-- [ ] **T-10**. Web: `apps/web/src/components/fleet/sessions/PrPill.tsx` (reuses `safePrUrl` from
+- [x] **T-10**. Web: `apps/web/src/components/fleet/sessions/PrPill.tsx` (reuses `safePrUrl` from
       `apps/web/src/components/tasks/TaskPrPill.tsx`), add the `pr` slot to
       `apps/web/src/components/fleet/checkouts/GitLine.tsx`, wire the git line + pill into FL-05's
       `apps/web/src/components/fleet/sessions/SessionCard.tsx` footer slots and FL-04's session
@@ -93,7 +96,7 @@
       `apps/web/src/app/api/fleet/checkouts/[id]/changes/route.ts`, `apps/web/src/app/api/fleet/sessions/branch-proposal/route.ts`.
       **Test**: `PrPill.unit.spec.tsx` (tones, invalid URL not rendered), `ChangesPanel.unit.spec.tsx`
       (text node only, omission footer), `GitLine.unit.spec.tsx` extended (pr slot, staleness).
-- [ ] **T-11**. i18n `fleet.sessionGit.{gitLine,prPill,changes,branch}` in `apps/web/messages/en.json`;
+- [x] **T-11**. i18n `fleet.sessionGit.{gitLine,prPill,changes,branch}` in `apps/web/messages/en.json`;
       write `apps/web/e2e/flow-fleet-session-git.spec.ts` P1 flows (Where default, suffix note,
       git line on card and detail, Changes panel).
       **Test**: e2e green in CI; no literal strings in `components/fleet/sessions/`.

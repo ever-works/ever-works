@@ -1,9 +1,13 @@
 import {
+    parseFleetGitLine,
+    parseFleetRemote,
+    type FleetSessionGitRef,
     parseFleetSessionAttention,
     parseFleetSessionHooks,
     parseFleetSessionLastEvidence,
     type FleetSessionView,
 } from '@ever-works/contracts';
+import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import type { FleetSession } from '../../entities/fleet-session.entity';
 
 const iso = (value: Date | string | null | undefined): string | null => {
@@ -57,4 +61,26 @@ export function toFleetSessionView(
     view.boundaryUntil = iso(row.boundaryUntil);
     if (options.includeScreen) view.lastScreen = row.lastScreen ?? null;
     return view;
+}
+
+/**
+ * Session git & actions (FL-06, spec FR-1, FR-6) — the checkout a session
+ * works in, as the session card's `gitLine` / `prPill` slots and the detail
+ * header read it. The remote's URL never leaves the platform here — only its
+ * `owner/repo`.
+ */
+export function toFleetSessionGitRef(row: FleetCheckout): FleetSessionGitRef {
+    const gitLine = parseFleetGitLine(row.gitLine ?? null);
+    const remote = parseFleetRemote(row.remoteUrl ?? null);
+    return {
+        checkoutId: row.id,
+        path: row.path,
+        kind: row.kind,
+        state: row.state,
+        isolation: row.isolation ?? 'host',
+        createdBy: row.createdBy,
+        repository: remote ? `${remote.owner}/${remote.repo}` : null,
+        branch: gitLine?.branch ?? row.branch ?? null,
+        gitLine,
+    };
 }

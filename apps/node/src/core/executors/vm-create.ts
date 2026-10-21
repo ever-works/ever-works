@@ -31,11 +31,12 @@ import {
 	waitFor,
 	type VirtualHostDeps
 } from '../link/modules/virtual/host';
+import { buildWindowsVm } from './vm-windows';
 
 /**
  * Virtual computers (FL-16, plan §6.1, §6.7, T-16) — the host's `vm-create`
  * executor, run by the management lane under `--manage` (CONTRACTS R-34).
- * Phase 1 builds Containers; a Windows system is refused until phase 2.
+ * Phase 1 builds Containers; phase 2 adds the Windows path (`./vm-windows`).
  *
  * Phases (spec FR-13), each reported to the platform as it starts:
  *
@@ -121,9 +122,8 @@ export function createVmCreateExecutor(deps: VirtualHostDeps) {
 		const { payload, system } = parseVmCreatePayload(job);
 		const child = payload.childNodeId;
 		if (system.kind !== 'container') {
-			const message = 'Windows VMs are not available on this computer yet';
-			await report(deps, job, child, { state: 'failed', error: message });
-			throw new VirtualHostError(message);
+			// Windows VMs (P2): their own path — prechecks, the installer, the first boot.
+			return buildWindowsVm(deps, job, payload, system, signal, deps.nodeName ?? 'this computer');
 		}
 		const apiUrl = payload.apiUrl ?? deps.apiUrl;
 		const runtimeSpec = deps.env.EVER_WORKS_NODE_VIRTUAL_RUNTIME_SPEC?.trim() || `ever-works-node@${deps.nodeVersion}`;

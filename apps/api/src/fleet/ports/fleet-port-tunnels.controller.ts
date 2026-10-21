@@ -9,6 +9,7 @@ import {
     ParseUUIDPipe,
     Post,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -20,6 +21,7 @@ import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { FleetPortTunnelEnabledGuard } from './fleet-port-tunnel-enabled.guard';
 import { FleetPortTunnelTokens } from './fleet-port-tunnel-tokens';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetPortsActor {
     return { kind: 'user', userId: auth.userId, displayName: auth.username ?? null };
@@ -44,6 +46,9 @@ function actorOf(auth: AuthenticatedUser): FleetPortsActor {
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetMachineFactsEnabledGuard, FleetPortTunnelEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetPortTunnelsController {
     constructor(
         private readonly tunnels: FleetPortTunnelService,
