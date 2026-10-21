@@ -6,6 +6,7 @@ import { authCommand } from './commands/auth';
 import { workCommand } from './commands/work';
 import { pluginsCommand } from './commands/plugins';
 import { registerKbCommands } from './commands/kb';
+import { registerFleetCommands } from './commands/fleet';
 
 // Load environment variables
 dotenv.config({ debug: false, quiet: true });
@@ -24,6 +25,8 @@ program.addCommand(authCommand);
 program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
 registerKbCommands(program);
+// Commands on computers (FL-12): `ever-works fleet commands run --on a,b -- <cmd>`.
+registerFleetCommands(program);
 
 // Parse arguments
 program.parse(process.argv);
