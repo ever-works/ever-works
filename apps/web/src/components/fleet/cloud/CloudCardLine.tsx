@@ -22,7 +22,7 @@ export function CloudCardLine({ node }: { node: FleetNodeView }) {
         cost: money(cloud.cost.sinceCreatedCents, cloud.currency),
     });
     let suffix: string | null = null;
-    if (state === 'creating') suffix = t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}`, { provider: cloud.providerName });
+    if (state === 'creating') suffix = t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as never, { provider: cloud.providerName });
     else if (state === 'failed') suffix = t('card.failed');
     else if (state === 'gone') suffix = t('card.gone', { provider: cloud.providerName });
     else if (state === 'unenrolled') suffix = t('card.unenrolled');

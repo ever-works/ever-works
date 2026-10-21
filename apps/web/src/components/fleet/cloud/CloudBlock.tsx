@@ -15,7 +15,7 @@ import {
     type CloudDisplayState,
 } from './cloud.shared';
 
-type Translate = ReturnType<typeof useTranslations>;
+type Translate = ReturnType<typeof useTranslations<'fleet.cloud'>>;
 
 /** The state half of the block's first line ("running 3 d 7 h", "powered off 2 h · still billed …"). */
 function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloudView): string {
@@ -43,7 +43,7 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
         case 'creating':
         default:
             return t('block.creating', {
-                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}`, { provider: cloud.providerName }),
+                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as never, { provider: cloud.providerName }),
             });
     }
 }
@@ -104,7 +104,7 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
                                 className={reached ? 'font-medium' : 'text-text-muted dark:text-text-muted-dark'}
                                 aria-current={phase === cloud.phase ? 'step' : undefined}
                             >
-                                {t(`progress.${CLOUD_PHASE_KEYS[phase]}`, { provider: cloud.providerName })}
+                                {t(`progress.${CLOUD_PHASE_KEYS[phase]}` as never, { provider: cloud.providerName })}
                             </li>
                         );
                     })}

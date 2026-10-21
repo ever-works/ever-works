@@ -308,7 +308,7 @@ export function NewCloudComputerDialog({
                                             onChange={() => toggleSoftware(entry.id)}
                                             data-testid={`fleet-cloud-software-${entry.id}`}
                                         />
-                                        {t(`create.softwareNames.${CLOUD_SOFTWARE_KEYS[entry.id]}`)}
+                                        {t(`create.softwareNames.${CLOUD_SOFTWARE_KEYS[entry.id]}` as never)}
                                     </label>
                                 ))}
                             </div>
