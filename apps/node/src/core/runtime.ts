@@ -60,6 +60,8 @@ import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { composeNodeLinkModules, createHealthLinkModule, type WakeSender } from './link/modules';
+import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { resolveAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
@@ -69,7 +71,7 @@ import { ensureDaemonToken } from './sessions/daemon-token';
 import type { SessionDaemonPaths } from './sessions/daemon/daemon-paths';
 import { NO_HOOK_OVERLAY, type HookOverlayPort } from './sessions/hook-overlay.port';
 import { spawn as spawnProcess } from 'node:child_process';
-import { homedir as osHomedir } from 'node:os';
+import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -145,6 +147,12 @@ export interface NodeIo {
 	 * is not offered on the link.
 	 */
 	wakeSender?: WakeSender;
+	/**
+	 * Logs on computers (FL-08) — what the `logs` link module reads the machine
+	 * through. Optional: absent, the runtime binds the real one
+	 * (`createNodeLogIo`) for a `--manage` process.
+	 */
+	logs?: LogIo;
 }
 
 /**
@@ -629,6 +637,13 @@ export interface CreateNodeRuntimeOptions {
 	sessionHookOverlay?: HookOverlayPort;
 	/** Folders besides home that owner sessions may start in. */
 	sessionExtraRoots?: readonly string[];
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
+	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
+	 * tab lists log files under them (and FL-11's Files tab will browse them).
+	 * Process-scoped, like `--manage`; never the home directory as a whole.
+	 */
+	filesRoots?: readonly string[];
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 }
@@ -755,6 +770,48 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(readNetwork ? { network: readNetwork } : {}),
 		...(io.wakeSender ? { wakeSender: io.wakeSender } : {})
 	});
+	// Logs on computers (FL-08): the `logs` link module — the `logs` family,
+	// the `logs.sources` verb and the `logs` tag — for a `--manage` process
+	// only. The allowed roots (R-18) are re-resolved on every request: the
+	// standard log directories, the workspace root and the `--files-root`
+	// folders (FL-14 adds ready checkouts), never the home directory itself.
+	let logsLinkModule: NodeModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		let user = 'this user';
+		try {
+			user = osUserInfo().username || user;
+		} catch {
+			// no passwd entry: the hint names no account
+		}
+		const logIo =
+			io.logs ??
+			createNodeLogIo({
+				platform,
+				runner: io.runner,
+				homedir,
+				user,
+				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
+			});
+		logsLinkModule = createLogsLinkModule({
+			io: logIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const resolved = await resolveAllowedRoots(
+					{
+						platform,
+						homedir,
+						workspaceRoot,
+						filesRoots: options.filesRoots ?? [],
+						logDirs: standardLogDirs(platform, homedir)
+					},
+					logIo.fs
+				);
+				return resolved.roots;
+			}
+		});
+	}
 	// Sessions on computers (FL-04): the session daemon's supervisor and the
 	// link's `session` module, for a process that may host sessions (owner
 	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
@@ -826,7 +883,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
-		extra: [healthLinkModule, ...(options.linkModules ?? [])],
+		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(io.scheduler

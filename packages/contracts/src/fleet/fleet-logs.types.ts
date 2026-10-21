@@ -289,6 +289,8 @@ export interface FleetLogLine {
 	src: number;
 	/** How many spans of this line the scan replaced. */
 	redactions: number;
+	/** P2: the line belongs to an older page (`logs.earlier`), to be prepended, not appended. */
+	earlier?: true;
 }
 
 /** Read one line off the wire; null for anything malformed. The text is bounded, the level checked. */
@@ -302,13 +304,15 @@ export function sanitizeFleetLogLine(value: unknown): FleetLogLine | null {
 		typeof record.redactions === 'number' && Number.isInteger(record.redactions) && record.redactions >= 0
 			? Math.min(record.redactions, 10_000)
 			: 0;
-	return {
+	const line: FleetLogLine = {
 		ts,
 		level: isFleetLogLevel(record.level) ? record.level : 'info',
 		text: capFleetLogText(record.text),
 		src,
 		redactions
 	};
+	if (record.earlier === true) line.earlier = true;
+	return line;
 }
 
 /** Cut a line to {@link FLEET_LOGS_MAX_LINE_CHARS}, marking the cut. */
@@ -521,6 +525,10 @@ export interface FleetLogsEarlierDone {
 	type: 'logs.earlier-done';
 	count: number;
 	hasMore: boolean;
+	/** The merged-view index of the source the page is from (P2). */
+	src?: number;
+	/** The source cannot page back (container logs are bounded by the log driver, FR-37). */
+	unsupported?: boolean;
 }
 
 export const FLEET_LOGS_NOTICE_KINDS = [
@@ -576,8 +584,16 @@ export function parseFleetLogsChannelMessage(
 			}
 			return done;
 		}
-		case FLEET_LOGS_MESSAGES.earlierDone:
-			return { type: 'logs.earlier-done', count: count(message.count), hasMore: message.hasMore === true };
+		case FLEET_LOGS_MESSAGES.earlierDone: {
+			const done: FleetLogsEarlierDone = {
+				type: 'logs.earlier-done',
+				count: count(message.count),
+				hasMore: message.hasMore === true
+			};
+			if (typeof message.src === 'number') done.src = count(message.src);
+			if (message.unsupported === true) done.unsupported = true;
+			return done;
+		}
 		case FLEET_LOGS_MESSAGES.notice: {
 			if (!isFleetLogsNoticeKind(message.kind)) return null;
 			const notice: FleetLogsNotice = { type: 'logs.notice', kind: message.kind };
