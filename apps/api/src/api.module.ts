@@ -82,6 +82,7 @@ import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
+import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
 import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
@@ -350,6 +351,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FleetPortsApiModule,
         // Logs on computers (FL-08): /api/fleet/nodes/:id/logs/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
         FleetLogsApiModule,
+        // Files on computers (FL-11): /api/fleet/nodes/:id/files/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
+        FleetFilesApiModule,
         // Agent, MCP & CLI surface (FL-19): GET /api/fleet/status and /api/fleet/tools/gate, and
         // the status reader behind the `fleet_status` Agent tool (FLEET_ENABLED-gated).
         FleetToolsApiModule,

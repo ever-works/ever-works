@@ -671,6 +671,30 @@ export const WHITELIST: WhitelistEntry[] = [
 		omitArgs: ['follow']
 	},
 
+	// Files on computers (3) — `apps/api/src/fleet/files/fleet-files.controller.ts`
+	// (FL-11 P1, CONTRACTS §11.3). All read-only: a computer's allowed roots, one
+	// folder's entries (flagged hidden / credential-shaped / link inside the root),
+	// one entry. No MCP tool downloads a file; copy and delete arrive with P2.
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/roots',
+		toolName: 'fleet_files_roots',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/list',
+		toolName: 'fleet_files_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/stat',
+		toolName: 'fleet_files_stat',
+		annotations: { readOnlyHint: true }
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers

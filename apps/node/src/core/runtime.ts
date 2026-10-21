@@ -66,8 +66,14 @@ import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { resolveAllowedRoots } from './link/allowed-roots';
-import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import {
+	composeNodeLinkModules,
+	createHealthLinkModule,
+	createMachineFactModules,
+	type WakeSender
+} from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -177,6 +183,12 @@ export interface NodeIo {
 	 * (`createNodeLogIo`) for a `--manage` process.
 	 */
 	logs?: LogIo;
+	/**
+	 * Files on computers (FL-11) — what the `files` link module reads and
+	 * writes the machine through. Optional: absent, the runtime binds the real
+	 * one (`createNodeFilesIo`) for a `--manage` process.
+	 */
+	files?: FilesIo;
 }
 
 /**
@@ -1072,6 +1084,35 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			}
 		});
 	}
+	// Files on computers (FL-11): the `files` link module — the `files`
+	// family, the `files.roots` verb and the `files` tag — for a `--manage`
+	// process only. The allowed roots (R-18, R-39, R-41) are re-resolved on
+	// every request: ready checkouts, the workspace root and the
+	// `--files-root` folders — never the home directory, never a log folder.
+	let filesLinkModule: FilesLinkModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		const filesIo = io.files ?? createNodeFilesIo({ platform, homedir });
+		filesLinkModule = createFilesLinkModule({
+			io: filesIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				return resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'files',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? []
+					},
+					filesIo
+				);
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -1119,6 +1160,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		extra: [
 			healthLinkModule,
 			...(logsLinkModule ? [logsLinkModule] : []),
+			...(filesLinkModule ? [filesLinkModule] : []),
 			...(virtualModule ? [virtualModule] : []),
 			...(options.linkModules ?? [])
 		],

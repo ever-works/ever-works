@@ -29,6 +29,8 @@ export * from './agent-fleet-session-tools';
 export * from './agent-fleet-health-tools';
 // Logs on computers (FL-08) — the log tool shapes and the port the API binds.
 export * from './logs/agent-fleet-logs-tools';
+// Files on computers (FL-11) — the file tool shapes and the port the API binds.
+export * from './files/agent-fleet-files-tools';
 // FL-19 — the Agent half of the fleet tool catalogue: the gate's published rule,
 // the descriptor decoration + FL-19's own tools, and `fleet_status`'s composition.
 export * from './fleet-tool-gate';

@@ -74,6 +74,7 @@ import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
+import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
 import { buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
@@ -680,6 +681,17 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: logs.reader,
+                    }),
+                );
+            }
+            // Files on computers (FL-11): the read-only file tools, when bound.
+            if (fleet.files) {
+                const files = fleet.files;
+                add('fleet-files', () =>
+                    buildFleetFilesTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: files.reader,
                     }),
                 );
             }

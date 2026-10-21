@@ -77,6 +77,12 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	// Logs on computers (FL-08, CONTRACTS §7).
 	'node.logs.read',
 	'node.logs.follow',
+	'node.files.list',
+	'node.files.read',
+	'node.files.write',
+	'node.files.copy',
+	'node.files.delete',
+	'node.clip.paste',
 	'node.command.run',
 	'node.command.cancel',
 	// Services, Docker, Compose and processes (FL-09, CONTRACTS §7).

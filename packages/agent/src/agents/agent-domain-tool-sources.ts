@@ -19,6 +19,7 @@ import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.ser
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
 import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
@@ -167,6 +168,16 @@ export interface AgentFleetToolSource {
      */
     logs?: {
         reader: FleetLogsReaderPort;
+    };
+    /**
+     * Files on computers (FL-11) — when bound, the read-only
+     * `fleet_files_roots` / `fleet_files_list` / `fleet_files_stat` tools are
+     * offered (`buildFleetFilesTools`), reading through the API's node link.
+     * Optional and unbound by default: FL-19 owns the Agent catalogue and binds
+     * it (the API binds the port under `FLEET_FILES_READER`).
+     */
+    files?: {
+        reader: FleetFilesReaderPort;
     };
     /**
      * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status
