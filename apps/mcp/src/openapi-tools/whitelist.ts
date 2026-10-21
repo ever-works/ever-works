@@ -611,6 +611,25 @@ export const WHITELIST: WhitelistEntry[] = [
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
 
+	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
+	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
+	// read at most 500 secret-scanned lines of one. The read never follows; a
+	// `follow` argument is cut from the tool (the route refuses it anyway).
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/logs/sources',
+		toolName: 'fleet_logs_sources',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/logs/read',
+		toolName: 'fleet_logs_read',
+		annotations: { readOnlyHint: true },
+		omitArgs: ['follow']
+	},
+
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.
 	{
