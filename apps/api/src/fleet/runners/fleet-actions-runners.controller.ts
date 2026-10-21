@@ -97,6 +97,26 @@ export class FleetActionsRunnersController {
         });
     }
 
+    // Declared before `:action` so the static segment wins; the same act as `…/:action` with
+    // `remove`, named on its own for the tool catalogue and MCP (`fleet_runners_remove`).
+    @Post('nodes/:id/runners/:runnerId/remove')
+    @ApiOperation({
+        summary:
+            'Remove one Actions runner: deregister it at GitHub, uninstall its service and delete its folder on the computer. Send `confirmName` = the runner’s name; refused `busy` while it runs a job. Answers 202.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runnerId', ParseUUIDPipe) runnerId: string,
+        @Body() body: FleetActionsRunnerControlDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetActionsRunnerOperationResponse> {
+        refuseMachinePrincipalAction(auth, req, 'remove an Actions runner', REFUSAL_WHY);
+        return this.runners.control({ kind: 'user', userId: auth.userId }, id, runnerId, 'remove', runnerConfirmFields(body));
+    }
+
     @Post('nodes/:id/runners/:runnerId/:action')
     @ApiOperation({
         summary:
