@@ -126,6 +126,7 @@ import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/in
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
+    FleetCommandService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
@@ -2133,6 +2134,10 @@ async function assertRealWriteTarget(
                 // tools. APPENDED LAST (positional), optional: unbound (checkouts not
                 // mounted), the tools are simply not offered.
                 { token: FleetCheckoutService, optional: true },
+                // Commands on computers (FL-12 P2) — backs `fleet_commands_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the four
+                // tools are not offered; `fleet_commands_run` only ever files an approval.
+                { token: FleetCommandService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2160,6 +2165,7 @@ async function assertRealWriteTarget(
                 fleetSessions?: FleetSessionService | null,
                 fleetPorts?: FleetPortsService | null,
                 checkouts?: FleetCheckoutService | null,
+                fleetCommands?: FleetCommandService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2188,6 +2194,9 @@ async function assertRealWriteTarget(
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
+                ...(fleetCommands && config.fleet.isCommandsEnabled()
+                    ? { fleetCommands: { service: fleetCommands } }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
