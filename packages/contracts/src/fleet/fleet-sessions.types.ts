@@ -30,6 +30,7 @@ import type {
 	FleetSessionHooks,
 	FleetSessionLastEvidence
 } from './fleet-session-status.types.js';
+import type { FleetSessionUsage } from './fleet-usage.types.js';
 
 // ─── Kinds, providers, states (CONTRACTS §4.2, §5.1) ────────────────────────
 
@@ -349,6 +350,13 @@ export interface FleetSessionView {
 	 * checkout, or on a platform that predates FL-06.
 	 */
 	git?: FleetSessionGitRef | null;
+	// ─── FL-20 (CONTRACTS §4.2 — absent on a platform that predates it) ───
+	/** Tokens by model and class from the computer's opt-in usage scan; null until a scan reported it. */
+	tokens?: FleetSessionUsage | null;
+	/** The session's model work at LIST price, in cents (priced models only); null = nothing priced. */
+	costCents?: number | null;
+	/** The list-price version the figures used (FR-7). */
+	priceListVersion?: number | null;
 }
 
 /** The Task a session's Run carries (FL-15, CONTRACTS R-22): `T-42` and its title. */

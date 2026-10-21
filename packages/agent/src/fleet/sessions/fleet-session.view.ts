@@ -5,6 +5,7 @@ import {
     parseFleetSessionAttention,
     parseFleetSessionHooks,
     parseFleetSessionLastEvidence,
+    parseFleetSessionUsage,
     type FleetSessionView,
 } from '@ever-works/contracts';
 import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
@@ -60,6 +61,11 @@ export function toFleetSessionView(
     view.lastEvidence = row.lastEvidence ? parseFleetSessionLastEvidence(row.lastEvidence) : null;
     view.boundaryUntil = iso(row.boundaryUntil);
     if (options.includeScreen) view.lastScreen = row.lastScreen ?? null;
+    // FL-20 (CONTRACTS §4.2): what the computer's usage scan attributed to it.
+    const usage = row.tokens ? parseFleetSessionUsage(row.tokens) : null;
+    view.tokens = usage;
+    view.costCents = typeof row.costCents === 'number' ? row.costCents : null;
+    view.priceListVersion = usage?.priceListVersion ?? null;
     return view;
 }
 
