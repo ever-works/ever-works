@@ -9,3 +9,4 @@ export * from './fleet-schedule.repository';
 export * from './fleet-schedule.service';
 export * from './fleet-schedule.view';
 export * from './fleet-schedules.module';
+export * from './fleet-session-schedule.service';

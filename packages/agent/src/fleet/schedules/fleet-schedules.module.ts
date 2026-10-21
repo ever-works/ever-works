@@ -2,11 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FleetCommand } from '../../entities/fleet-command.entity';
 import { FleetCommandRun } from '../../entities/fleet-command-run.entity';
+import { Agent } from '../../entities/agent.entity';
 import { FleetModule } from '../fleet.module';
 import { FleetScheduleNeedsALookProducer } from './fleet-schedule-needs-a-look.producer';
 import { FleetScheduleProposalListener } from './fleet-schedule-proposal.listener';
 import { FleetScheduleRepository } from './fleet-schedule.repository';
 import { FleetScheduleService } from './fleet-schedule.service';
+import { FleetSessionScheduleService } from './fleet-session-schedule.service';
 
 /**
  * Schedules on computers (FL-13) — the agent-side module for Command
@@ -21,14 +23,16 @@ import { FleetScheduleService } from './fleet-schedule.service';
  * (FL-12 registered them).
  */
 @Module({
-    imports: [FleetModule, TypeOrmModule.forFeature([FleetCommand, FleetCommandRun])],
+    imports: [FleetModule, TypeOrmModule.forFeature([FleetCommand, FleetCommandRun, Agent])],
     // P2: an approved Agent schedule write is applied by `FleetScheduleProposalListener`.
     providers: [
         FleetScheduleRepository,
         FleetScheduleService,
         FleetScheduleNeedsALookProducer,
         FleetScheduleProposalListener,
+        // P2: Agent-session schedules (a recurring Task pinned through affinity).
+        FleetSessionScheduleService,
     ],
-    exports: [FleetScheduleRepository, FleetScheduleService],
+    exports: [FleetScheduleRepository, FleetScheduleService, FleetSessionScheduleService],
 })
 export class FleetSchedulesModule {}

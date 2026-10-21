@@ -4,6 +4,8 @@
 // — this module owns the per-Task DB entities + repositories.
 export * from './tasks.module';
 export * from './tasks.service';
+// Schedules on computers (FL-13 P2): how one fire of an Agent-session schedule is started.
+export * from './task-session-schedule.port';
 // Task board read model (AW-02) — per-column true totals + column paging.
 export * from './task-board.service';
 export * from './task-gates';

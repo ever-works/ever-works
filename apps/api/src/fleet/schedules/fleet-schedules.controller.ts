@@ -14,11 +14,17 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { FleetScheduleService, type FleetScheduleActor } from '@ever-works/agent/fleet';
+import {
+    FleetScheduleService,
+    FleetSessionScheduleService,
+    type FleetScheduleActor,
+} from '@ever-works/agent/fleet';
 import {
     FLEET_SCHEDULE_HISTORY,
     FLEET_SCHEDULE_WRITES_PER_MINUTE,
+    type FleetAgentSessionScheduleView,
     type FleetCommandRunView,
+    type FleetScheduleAgentOption,
     type FleetSchedulePauseAllResult,
     type FleetScheduleView,
 } from '@ever-works/contracts';
@@ -31,8 +37,10 @@ import {
     UpdateFleetScheduleDto,
 } from '../commands/dto/fleet-commands.dto';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
+import { ScopeContextService } from '../../scope';
 import {
     ConfirmFleetScheduleDto,
+    CreateAgentSessionScheduleDto,
     CreateFleetScheduleDto,
     ListFleetSchedulesQueryDto,
     UndoPauseAllSchedulesDto,
@@ -207,7 +215,57 @@ export class FleetSchedulesController {
 @Controller('api/fleet/nodes')
 @UseGuards(FleetEnabledGuard, FleetCommandsEnabledGuard)
 export class FleetNodeSchedulesController {
-    constructor(private readonly schedules: FleetScheduleService) {}
+    constructor(
+        private readonly schedules: FleetScheduleService,
+        private readonly sessionSchedules: FleetSessionScheduleService,
+        private readonly scopeContext: ScopeContextService,
+    ) {}
+
+    @Get(':id/schedules/agents')
+    @ApiOperation({
+        summary:
+            "The Agents an Agent-session schedule on this computer may use: pinned to it first, every other one listed with why it cannot be picked (pinned elsewhere, not pinned, no Organization).",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async agents(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ agents: FleetScheduleAgentOption[] }> {
+        return { agents: await this.sessionSchedules.listAgentsForNode(this.sessionActor(auth), id) };
+    }
+
+    @Post(':id/schedules/agent-session')
+    @ApiOperation({
+        summary:
+            "Schedule an Agent session on this computer (FL-13 P2): a recurring Task of an Agent pinned here; each fire runs as an Agent session on this computer with the sign-in set up there. Without `confirm: true` it answers 409 `confirmation_required` carrying the unattended-credential sentence.",
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
+    async createAgentSession(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: CreateAgentSessionScheduleDto,
+    ): Promise<FleetAgentSessionScheduleView> {
+        return this.sessionSchedules.create(this.sessionActor(auth), id, {
+            name: body.name,
+            agentId: body.agentId,
+            prompt: body.prompt,
+            provider: body.provider as 'claude-code' | 'codex',
+            ...(body.checkoutId !== undefined ? { checkoutId: body.checkoutId } : {}),
+            cadence: body.cadence,
+            ...(body.confirm !== undefined ? { confirm: body.confirm } : {}),
+        });
+    }
+
+    private sessionActor(auth: AuthenticatedUser) {
+        const scope = this.scopeContext.getScope();
+        return {
+            userId: auth.userId,
+            tenantId: scope?.tenantId ?? null,
+            organizationId: scope?.organizationId ?? null,
+        };
+    }
 
     @Post(':id/schedules/pause-all')
     @ApiOperation({

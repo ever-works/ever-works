@@ -1155,6 +1155,105 @@ export function fleetScheduleNeverRunsHint(reason: FleetScheduleNeverRunsReason,
 	}
 }
 
+// ─── Agent-session schedules (FL-13 P2, R-29) ───────────────────────────────
+
+/**
+ * The unattended-credential sentence an Agent-session schedule's dialog
+ * carries VERBATIM in its body (spec FR-26), with the computer's name for
+ * `{computer}`. The web renders its own copy from ONE i18n key
+ * (`fleet.schedules.unattendedCredentialNote`); this is the API's and the CLI's.
+ */
+export function fleetScheduleUnattendedCredentialSentence(computer: string): string {
+	return `Runs happen on ${computer} using the Claude Code or Codex sign-in — or the API key — that is set up on that computer. Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a look until someone signs in on ${computer} again.`;
+}
+
+/** What an Agent-session schedule's row and dialog say about spend (spec §5.2). */
+export const FLEET_SCHEDULE_AGENT_COST_SENTENCE = 'Each run appears in Runs with its cost like any other run.';
+
+/**
+ * The cadence as a five-field cron expression — what a recurring Task stores
+ * (`recurrenceCron`), so an Agent-session schedule fires on the platform's
+ * existing recurrence dispatcher (R-29: no second scheduler).
+ */
+export function fleetScheduleCadenceToCron(cadence: FleetScheduleCadence): string | null {
+	switch (cadence.kind) {
+		case 'interval': {
+			const minutes = Number(cadence.expr);
+			if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) return null;
+			return minutes >= 60 ? '0 * * * *' : minutes === 1 ? '* * * * *' : `*/${minutes} * * * *`;
+		}
+		case 'daily':
+		case 'weekdays': {
+			if (!isFleetScheduleClockTime(cadence.at)) return null;
+			const [hour, minute] = cadence.at.split(':').map(Number);
+			return `${minute} ${hour} * * ${cadence.kind === 'weekdays' ? '1-5' : '*'}`;
+		}
+		case 'cron':
+			return parseFleetCron(cadence.expr) ? (cadence.expr ?? null) : null;
+		default:
+			return null;
+	}
+}
+
+/** One Agent the Agent-session dialog offers on a computer (spec §5.2, U9). */
+export interface FleetScheduleAgentOption {
+	agentId: string;
+	name: string;
+	/** Pinned to THIS computer — the only Agents a schedule here can use. */
+	pinned: boolean;
+	/** Why it cannot be picked: pinned elsewhere, not pinned, or the scope has no Organization. */
+	reason: 'pinnedElsewhere' | 'notPinned' | 'needsOrganization' | null;
+}
+
+/** `POST /api/fleet/nodes/:id/schedules/agent-session` (CONTRACTS §11.2). */
+export interface FleetAgentSessionScheduleRequest {
+	name: string;
+	agentId: string;
+	/** What the Agent is asked on every fire (3 … 16 KiB). */
+	prompt: string;
+	/** The agent CLI the session drives on the computer. */
+	provider: 'claude-code' | 'codex';
+	/** The checkout on that computer it works in; absent = the owner's home. */
+	checkoutId?: string;
+	cadence: unknown;
+	confirm?: boolean;
+}
+
+/** What creating one answers: the recurring Task it is, and its row in the Schedules view. */
+export interface FleetAgentSessionScheduleView {
+	kind: 'agent-session';
+	/** The recurring Task. */
+	taskId: string;
+	/** `recurring_task:<taskId>` — its row in the Schedules view (it keeps that source, FR-2). */
+	scheduleId: string;
+	name: string;
+	nodeId: string;
+	nodeName: string;
+	agentId: string;
+	agentName: string;
+	cadence: FleetScheduleCadence;
+	cadenceHuman: string;
+	nextRunAt: string | null;
+}
+
+/** `details` of an Agent-session schedule's `confirmation_required` (FR-25, FR-26). */
+export interface FleetAgentSessionScheduleConfirmation {
+	class: 'confirm';
+	action: 'create';
+	kind: 'agent-session';
+	name: string;
+	agentName: string;
+	nodeId: string;
+	nodeName: string;
+	provider: 'claude-code' | 'codex';
+	cadenceHuman: string;
+	nodeTimeZone: string | null;
+	next: string[];
+	/** {@link fleetScheduleUnattendedCredentialSentence}, verbatim. */
+	credentialSentence: string;
+	costSentence: typeof FLEET_SCHEDULE_AGENT_COST_SENTENCE;
+}
+
 /**
  * Consecutive failures at the head of a newest-first run list: a `failed`
  * or `timeout` run counts; `skipped-overlap` is neither (the previous run is
