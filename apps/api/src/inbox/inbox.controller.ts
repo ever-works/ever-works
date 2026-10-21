@@ -11,6 +11,7 @@ import {
     Patch,
     Post,
     Query,
+    Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -23,7 +24,12 @@ import {
 } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { isHumanSession, requireHumanSession } from '../auth/machine-principal';
+import {
+    isHumanSession,
+    requireHumanSession,
+    type MachinePrincipalRequest,
+} from '../auth/machine-principal';
+import { fleetRunOrganizationPin } from '../auth/fleet-run-scope';
 import {
     ListInboxDecisionsQueryDto,
     ListInboxQueryDto,
@@ -69,6 +75,8 @@ export class InboxController {
     async list(
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListInboxQueryDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<{
         data: InboxItemDto[];
         meta: { total: number; limit: number; offset: number; unreadCount: number };
@@ -85,6 +93,9 @@ export class InboxController {
             // Self-build slice AU — the "From your fleet" filter; same
             // conditional shape.
             ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+            // Works-security (run-token scope) — a fleet-run token reads only
+            // the items of its own Organization (`null` = personal scope).
+            ...inboxPinOf(req),
         });
         return { data: items, meta: { total, limit, offset, unreadCount } };
     }
@@ -92,8 +103,17 @@ export class InboxController {
     @Get('unread-count')
     @ApiOperation({ summary: 'Unread inbox count — the sidebar badge.' })
     @HttpCode(HttpStatus.OK)
-    async unreadCount(@CurrentUser() auth: AuthenticatedUser): Promise<{ count: number }> {
-        return { count: await this.inbox.unreadCount(auth.userId) };
+    async unreadCount(
+        @CurrentUser() auth: AuthenticatedUser,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<{ count: number }> {
+        const pin = fleetRunOrganizationPin(req);
+        return {
+            count: pin
+                ? await this.inbox.unreadCount(auth.userId, pin)
+                : await this.inbox.unreadCount(auth.userId),
+        };
     }
 
     // The two decision routes are declared BEFORE `:id`: Nest matches in
@@ -167,8 +187,15 @@ export class InboxController {
     async getOne(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ): Promise<InboxItemDto> {
-        const item = await this.inbox.getForUser(id, auth.userId);
+        // Works-security (run-token scope) — an item of another Organization
+        // is the same 404 as a foreign or missing one for a fleet-run token.
+        const pin = fleetRunOrganizationPin(req);
+        const item = pin
+            ? await this.inbox.getForUser(id, auth.userId, pin)
+            : await this.inbox.getForUser(id, auth.userId);
         if (!item) {
             // Foreign and missing are the same answer, on purpose.
             throw new NotFoundException(`Inbox item ${id} not found.`);
@@ -258,4 +285,14 @@ export class InboxController {
         await this.inbox.delete(id, auth.userId);
         return { deleted: true, itemId: id };
     }
+}
+
+/**
+ * Works-security (run-token scope) — the Inbox list's Organization filter for
+ * a fleet-run token, spread into the list options; `{}` for every other
+ * credential so their call shape stays exactly what it was.
+ */
+function inboxPinOf(req: MachinePrincipalRequest | undefined): { organizationId?: string | null } {
+    const pin = fleetRunOrganizationPin(req);
+    return pin ? { organizationId: pin.organizationId } : {};
 }

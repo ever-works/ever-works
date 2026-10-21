@@ -46,6 +46,7 @@ import {
     isHumanSession,
     machinePrincipalKind,
     refuseMachinePrincipalAction,
+    refuseMachinePrincipalFields,
     type MachinePrincipalRequest,
 } from '../auth/machine-principal';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -308,6 +309,19 @@ export class KbController {
         // Appended LAST so positional callers (specs) keep their meaning.
         @Req() req?: MachinePrincipalRequest,
     ) {
+        // Works-security (run-token scope) — `status` archives / un-archives
+        // (or re-drafts) a document: archiving hides it from every later run
+        // and from the owner's working set, un-archiving brings a retired one
+        // back into context. The dedicated archive routes are not granted to a
+        // machine principal, so neither is this side door; content edits stay.
+        refuseMachinePrincipalFields(
+            auth,
+            req,
+            body as unknown as Record<string, unknown>,
+            ['status'],
+            'a knowledge-base document',
+            'archiving and restoring documents is done by a person in the app.',
+        );
         // The body's own `reviewState` (DTO: `proposed` only) is never
         // spread into the patch; the decision below is the only writer.
         const { reviewState: requestedReviewState, ...patch } = body;

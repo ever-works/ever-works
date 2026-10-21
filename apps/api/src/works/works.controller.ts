@@ -122,6 +122,7 @@ import {
     truthyFields,
     type MachinePrincipalRequest,
 } from '../auth/machine-principal';
+import { fleetRunOrganizationPin } from '../auth/fleet-run-scope';
 import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 // EW-P2-4 — validates the works-list `kind` filter.
@@ -267,6 +268,8 @@ export class WorksController {
         @Query('search') search?: string,
         // EW-P2-4 — the works-list kind filter (additive; absent = every kind).
         @Query('kind') kind?: string,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: MachinePrincipalRequest,
     ) {
         const kindFilter = kind?.trim().toLowerCase() || undefined;
         if (kindFilter && !(WORK_KINDS as readonly string[]).includes(kindFilter)) {
@@ -279,12 +282,18 @@ export class WorksController {
 
         const user = await this.authService.getUser(auth.userId);
 
+        // Works-security (run-token scope) — a fleet-run token lists only the
+        // Works of the Organization it was minted for (`null` = personal
+        // scope). Every other credential lists exactly what it always did.
+        const pin = fleetRunOrganizationPin(req);
+
         return this.workQueryService.getWorks(
             {
                 limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
                 offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
                 search: search || undefined,
                 kind: kindFilter,
+                ...(pin ? { organizationId: pin.organizationId } : {}),
             },
             user,
         );

@@ -105,7 +105,14 @@ export class WorkProposalsApiService {
     async list(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
-        opts: { missionId?: string | null; search?: string; limit?: number; offset?: number } = {},
+        opts: {
+            missionId?: string | null;
+            search?: string;
+            limit?: number;
+            offset?: number;
+            /** Works-security (run-token scope) — only this Organization's Ideas (`null` = none). */
+            organizationId?: string | null;
+        } = {},
     ) {
         return this.proposals.list(userId, statuses, opts);
     }

@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { FLEET_LINK_CLOSE_CODES } from '@ever-works/contracts';
+import { CacheEntry } from '@ever-works/agent/entities';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetEnabledGuard } from '../fleet/guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from '../fleet/guards/fleet-node-auth.guard';
@@ -14,6 +16,7 @@ import { FleetLinkRegistry } from './fleet-link.registry';
 import { FleetLinkRemote } from './fleet-link-remote.service';
 import { FleetLinkService } from './fleet-link.service';
 import {
+    CacheEntryFleetLinkReplayGuard,
     FLEET_LINK_REPLAY_GUARD,
     FleetLinkTokenService,
     InProcessFleetLinkReplayGuard,
@@ -49,7 +52,8 @@ import { FleetOperationsService } from './fleet-operations.service';
  *   - `FleetLinkViewerGatewayService` — `/ws/fleet/<family>/<target>`, a browser bridged to a channel.
  *
  * Single-use tokens (the link's and the viewers') are claimed on the relay
- * bus (`FLEET_LINK_REPLAY_GUARD`), so they stay single-use across replicas.
+ * bus (`FLEET_LINK_REPLAY_GUARD`) — or, without a Valkey bus, in the shared
+ * `cache_entries` table — so they stay single-use across replicas.
  *
  * `@Global()` for the reason `ComputerApiModule` documents: four tokens bound
  * HERE are consumed `@Optional()` by modules that must not import this one —
@@ -80,11 +84,28 @@ import { FleetOperationsService } from './fleet-operations.service';
         FleetLinkAttachService,
         FleetLinkViewerGatewayService,
         { provide: FLEET_LINK_AUDIENCE, useClass: RoleBasedFleetLinkAudience },
+        // Single-use tokens stay single-use across EVERY replica: claimed on
+        // the Valkey relay bus when one is configured; otherwise (works-
+        // security, run-token scope) in the shared `cache_entries` table every
+        // replica already reads, so a deployment that runs two replicas
+        // without the bus still cannot open one link per replica with one
+        // token. The in-process map is only the fallback for a graph with
+        // neither (unit tests).
         {
             provide: FLEET_LINK_REPLAY_GUARD,
-            useFactory: (bus?: RelayBus): FleetLinkReplayGuard =>
-                bus ? new RelayBusFleetLinkReplayGuard(bus) : new InProcessFleetLinkReplayGuard(),
-            inject: [{ token: RELAY_BUS, optional: true }],
+            useFactory: (bus?: RelayBus, dataSource?: DataSource): FleetLinkReplayGuard => {
+                if (bus && bus.mode === 'valkey') return new RelayBusFleetLinkReplayGuard(bus);
+                if (dataSource) {
+                    return new CacheEntryFleetLinkReplayGuard(dataSource.getRepository(CacheEntry));
+                }
+                return bus
+                    ? new RelayBusFleetLinkReplayGuard(bus)
+                    : new InProcessFleetLinkReplayGuard();
+            },
+            inject: [
+                { token: RELAY_BUS, optional: true },
+                { token: DataSource, optional: true },
+            ],
         },
         {
             provide: FLEET_LINK_HEARTBEAT_OBSERVER,
