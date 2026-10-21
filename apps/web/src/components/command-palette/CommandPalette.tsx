@@ -38,7 +38,7 @@ import { PALETTE_RECENT_BOOST_WINDOW_MS, usePaletteRecents } from './hooks/use-p
 import { useWorkspaceSearch } from './hooks/use-workspace-search';
 import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
-import { fleetComputerScreens, screensFor } from './registry/screens';
+import { fleetComputerPortsScreens, fleetComputerScreens, screensFor } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
 import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import {
@@ -256,6 +256,8 @@ export function CommandPalette({
         () => [
             ...screensFor(appPath, { fleetHubEnabled }),
             ...fleetComputerScreens(fleetComputers),
+            // Servers and ports (FL-10): "Ports on <computer>".
+            ...fleetComputerPortsScreens(fleetComputers),
         ],
         [appPath, fleetHubEnabled, fleetComputers],
     );

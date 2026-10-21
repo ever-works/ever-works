@@ -373,6 +373,24 @@ export function fleetComputerScreens(
     }));
 }
 
+/**
+ * Servers and ports (FL-10, FR-21) — "Ports on <computer>" for every computer
+ * the viewer may see, opening its Ports tab. Added beside "Go to computer"
+ * (same computers, same breadcrumb); the tab says so itself when machine facts
+ * are switched off on this deployment.
+ */
+export function fleetComputerPortsScreens(
+    computers: ReadonlyArray<{ id: string; name: string }>,
+): PaletteScreen[] {
+    return computers.map((computer) => ({
+        id: `fleet.computer.${computer.id}.ports`,
+        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
+        icon: Monitor,
+        title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
+        breadcrumb: fleet,
+    }));
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */

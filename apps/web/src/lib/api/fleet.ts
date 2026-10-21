@@ -225,6 +225,16 @@ export const fleetAPI = {
         });
     },
 
+    /** Servers and ports (FL-10) — the "Preview browser" switch (owner only). */
+    setPreviewProfileEnabled: async (nodeId: string, previewProfileEnabled: boolean) => {
+        return serverMutation<FleetNodeView>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
+            data: { previewProfileEnabled },
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
     /** Fleet hub (FL-01) — change who may act in some action families (owner only). */
     setPolicyFamilies: async (
         nodeId: string,
