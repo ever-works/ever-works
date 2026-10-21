@@ -110,20 +110,6 @@ its current attention (`invalid`), and types the CLI's keys itself — the platf
 guard is `validateFleetSessionRulesFile` (`fleet-session-rules.types.ts`). Tools `fleet_sessions_question` (readOnly) /
 `fleet_sessions_answer` (`confirm`), MCP `fleet_sessions_answer`, CLI `fleet session question|answer`.
 
-**Revision 17 (2026-10-21)** — FL-06 P1 (session git, lane log `docs/internal/fleet/lanes/FL-06.md` decisions 1–12):
-`FleetSessionView.git` (`FleetSessionGitRef { checkoutId, path, kind, state, isolation, createdBy, repository, branch,
-gitLine }`) on every session view; `checkouts.changes { path, maxBytes?, checkoutId? }` answers
-`FleetCheckoutChangesReply { path, files[{ path, previousPath, status, added, removed, binary, patch, truncated }],
-truncated, omittedFiles, omittedBytes, totalBytes, at }` and needs `work-or-manage` (a `FLEET_LINK_VERB_CONSENT_OVERRIDES`
-entry: a Task's worktree on `--work`, any other checkout `--manage`, checked on the machine); `GET
-/sessions/branch-proposal?nodeId&checkoutId&agentId?&firstMessage?&title?&taskId?` answers `FleetSessionBranchProposal
-{ branch, base, suffixed, source: task|message|title|generated, reason, repository, remoteChecked }`; `GET
-/checkouts/:id/pull-request` answers `FleetCheckoutPullRequestFacts { checkoutId, pr, unresolvedComments, mergeable,
-baseRef, defaultBranch, checkedAt, unknownSince }` (only `pr` is stored, on the git line); the node's `pr: null` never
-overwrites the platform's resolved `pr` while the branch is unchanged; audit names `node.session.action` and
-`node.session.pull-request.open` are in `FLEET_AUDIT_ACTIONS`. Shapes in
-`packages/contracts/src/fleet/fleet-session-actions.types.ts`.
-
 **Revision 16 (2026-10-21)** — FL-05 P3 (board): `GET /api/fleet/sessions?view=board[&nodeId&agentId&kind]` answers
 `FleetSessionBoardResponse { columns: { needs_you, working, done, idle }, generatedAt }` — every LIVE session on the
 computers in the reader's `sessions` audience (at most 400), each column most recently moved first, `done` only for 24 h
@@ -166,6 +152,20 @@ beside `/nodes/:id/schedules/agent-session`. An Agent-session schedule is a recu
 started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDULE_DISPATCHER` as an FL-04 Agent session
 on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
 'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
+
+**Revision 20 (2026-10-21)** — FL-06 P1 (session git, lane log `docs/internal/fleet/lanes/FL-06.md` decisions 1–12):
+`FleetSessionView.git` (`FleetSessionGitRef { checkoutId, path, kind, state, isolation, createdBy, repository, branch,
+gitLine }`) on every session view; `checkouts.changes { path, maxBytes?, checkoutId? }` answers
+`FleetCheckoutChangesReply { path, files[{ path, previousPath, status, added, removed, binary, patch, truncated }],
+truncated, omittedFiles, omittedBytes, totalBytes, at }` and needs `work-or-manage` (a `FLEET_LINK_VERB_CONSENT_OVERRIDES`
+entry: a Task's worktree on `--work`, any other checkout `--manage`, checked on the machine); `GET
+/sessions/branch-proposal?nodeId&checkoutId&agentId?&firstMessage?&title?&taskId?` answers `FleetSessionBranchProposal
+{ branch, base, suffixed, source: task|message|title|generated, reason, repository, remoteChecked }`; `GET
+/checkouts/:id/pull-request` answers `FleetCheckoutPullRequestFacts { checkoutId, pr, unresolvedComments, mergeable,
+baseRef, defaultBranch, checkedAt, unknownSince }` (only `pr` is stored, on the git line); the node's `pr: null` never
+overwrites the platform's resolved `pr` while the branch is unchanged; audit names `node.session.action` and
+`node.session.pull-request.open` are in `FLEET_AUDIT_ACTIONS`. Shapes in
+`packages/contracts/src/fleet/fleet-session-actions.types.ts`.
 
 ---
 
