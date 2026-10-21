@@ -698,40 +698,46 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		alwaysHeld: true
 	}),
 
-	// ── cloud (FL-17) ──
-	read('fleet_cloud_list', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', {
+	// ── cloud (FL-17) ── P1 shipped: providers, create, power, destroy, usage. A create, a power
+	// change and a destroy are held for the owner's approval by the Agent tools
+	// (`agent-fleet-cloud-tools.ts`); the idle policy arrives with P2.
+	read('fleet_cloud_list', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/cloud'),
 		cli: 'fleet cloud list'
 	}),
-	read('fleet_cloud_options', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', {
+	read('fleet_cloud_options', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/providers/{plugin}/options'),
 		cli: 'fleet cloud options'
 	}),
-	read('fleet_cloud_usage', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', {
+	read('fleet_cloud_usage', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/cloud/usage'),
 		cli: 'fleet cloud usage'
 	}),
-	act('fleet_cloud_create', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', confirm('spend.metered'), {
+	act('fleet_cloud_create', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', confirm('spend.metered'), {
 		phase: 'P3',
 		route: POST('/api/fleet/cloud'),
 		cli: 'fleet cloud create',
 		waitable: true,
-		confirmationNote: 'confirm with the price; also machine.admin'
+		alwaysHeld: true,
+		confirmationNote: 'confirm with the price (acknowledgedPriceCents); also machine.admin'
 	}),
-	act('fleet_cloud_power', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_cloud_power', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', confirm('machine.admin'), {
 		phase: 'P3',
 		route: POST('/api/fleet/cloud/{id}/power'),
 		cli: 'fleet cloud power',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
-	act('fleet_cloud_destroy', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', typed('write.destructive'), {
+	act('fleet_cloud_destroy', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', typed('write.destructive'), {
 		phase: 'P3',
-		route: DELETE('/api/fleet/cloud/{id}'),
+		// FL-17 plan §5 — `DELETE /api/fleet/cloud/{id}` answers the same (an alias).
+		route: POST('/api/fleet/cloud/{id}/destroy'),
 		cli: 'fleet cloud destroy',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
 	act('fleet_cloud_idle_policy', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', plain('machine.admin'), {
 		phase: 'P3',

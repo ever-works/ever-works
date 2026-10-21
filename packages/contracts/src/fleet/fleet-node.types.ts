@@ -42,6 +42,7 @@ import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access
 import type { FleetConsents, FleetNodeLinkView } from './fleet-link.types.js';
 import type { FleetSessionDaemonReport } from './fleet-sessions.types.js';
 import type { FleetNodeOrigin, FleetNodeVirtualView } from './fleet-virtual.types.js';
+import type { FleetNodeCloudView } from './fleet-cloud.types.js';
 
 /**
  * App shape of a fleet node.
@@ -657,6 +658,19 @@ export interface FleetNodeView {
 	 * Node that is not `origin: 'virtual'`. Owner and shared views alike.
 	 */
 	virtual?: FleetNodeVirtualView | null;
+	/**
+	 * Cloud computers (FL-17, CONTRACTS §4.1) — the machine-provider plugin
+	 * that created this Node. Null / absent for every Node that is not
+	 * `origin: 'cloud'`.
+	 */
+	providerPluginId?: string | null;
+	/**
+	 * Cloud computers (FL-17) — the Cloud block: provider, region, size, power
+	 * state, create phase, idle policy, cost so far and whether "Remove from
+	 * Fleet" may run (R-36). Null / absent for every Node that is not
+	 * `origin: 'cloud'`. Carries prices and states only, never a credential.
+	 */
+	cloud?: FleetNodeCloudView | null;
 	/**
 	 * Sessions on computers (FL-04) — the session daemon as the node last
 	 * reported it (heartbeat `daemon`), or null when it never reported one.
