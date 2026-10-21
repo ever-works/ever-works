@@ -42,7 +42,7 @@ describe('fleet held calls', () => {
             rung: 'ask',
             confirmationClass: 'confirm',
         });
-        expect(payload.summary).toBe('Nina wants to restart nginx (services action)');
+        expect(payload.summary).toBe('Nina wants to restart nginx (services)');
         expect(isFleetHeldCallPayload(payload)).toBe(true);
     });
 
@@ -78,7 +78,7 @@ describe('fleet held calls', () => {
 
     it('names the act a person recognises', () => {
         expect(fleetHeldCallSummary(null, { name: 'fleet_ports_open', family: 'ports', verb: 'open' }, { port: 3000 })).toBe(
-            'An Agent wants to 3000 (ports open)',
+            'An Agent wants to open 3000 (ports)',
         );
     });
 

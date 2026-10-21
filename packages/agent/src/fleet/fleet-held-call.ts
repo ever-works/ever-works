@@ -117,10 +117,9 @@ export function fleetHeldCallSummary(
     const who = agentName && agentName.trim().length > 0 ? agentName.trim() : 'An Agent';
     const action = argText(args, 'action', 'signal');
     const object = argText(args, 'name', 'service', 'container', 'project', 'image', 'port', 'pid', 'path', 'title');
-    const verb = entry.verb ? entry.verb.replace(/_/g, ' ') : entry.family;
-    const what = [action, object].filter(Boolean).join(' ');
-    const phrase = what ? `${what} (${entry.family} ${verb})` : `${entry.family} ${verb}`;
-    return `${who} wants to ${phrase}`.slice(0, 200);
+    const verb = action ?? (entry.verb ? entry.verb.replace(/_/g, ' ') : 'act');
+    const phrase = object ? `${verb} ${object}` : verb;
+    return `${who} wants to ${phrase} (${entry.family})`.slice(0, 200);
 }
 
 /** The payload for one held call, or null when it is not a held fleet act or its arguments cannot be kept. */
