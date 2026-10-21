@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, LessThan, Not, Repository } from 'typeorm';
 import { FLEET_SESSION_RECENT_FOLDERS, type FleetSessionKind } from '@ever-works/contracts';
 import { advisoryLockObjectId } from '../../database/repositories/agent-run.repository';
+import { AgentRun } from '../../entities/agent-run.entity';
 import { FleetSession } from '../../entities/fleet-session.entity';
 
 /**
@@ -21,6 +22,11 @@ export interface FleetSessionListQuery {
     limit?: number;
     /** `<lastActivityAt ISO>|<id>` of the last row of the previous page. */
     cursor?: string;
+    /**
+     * FL-15 P1: only sessions whose Run works on this Task (the Task page's
+     * Computer block, `GET /api/fleet/sessions?taskId=&limit=1`).
+     */
+    taskId?: string;
 }
 
 export const FLEET_SESSION_LIST_DEFAULT_LIMIT = 50;
@@ -101,6 +107,11 @@ export class FleetSessionRepository {
         });
     }
 
+    /** Live AGENT sessions on a node (FL-15: a Task hand-off needs a free slot, spec U5). */
+    async countLiveAgentForNode(nodeId: string): Promise<number> {
+        return this.repository.count({ where: { nodeId, kind: 'agent', state: Not('ended') } });
+    }
+
     /** The folders of the node's most recent sessions, newest first, distinct (spec FR-15). */
     async recentFolders(
         nodeId: string,
@@ -142,6 +153,13 @@ export class FleetSessionRepository {
         if (query.agentId)
             builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
         if (query.since) builder.andWhere('session.createdAt >= :since', { since: query.since });
+        if (query.taskId) {
+            // A session knows its Run, a Run knows its Task (spec §7): no column of its own.
+            builder.innerJoin(AgentRun, 'run', 'run.id = session.agentRunId').andWhere(
+                'run.taskId = :taskId',
+                { taskId: query.taskId },
+            );
+        }
         const cursor = parseCursor(query.cursor);
         if (cursor) {
             builder.andWhere(
