@@ -205,6 +205,34 @@ export class FleetSessionRepository {
         });
     }
 
+    /** FL-05's "needs a look" producer: sessions waiting on someone, on these nodes. */
+    async findNeedsYouForNodes(nodeIds: readonly string[], limit = 200): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        return this.repository.find({
+            where: { nodeId: In([...nodeIds]), state: 'needs_you' },
+            order: { stateChangedAt: 'DESC' },
+            take: limit,
+        });
+    }
+
+    /** FL-05: sessions on these nodes that ended without a result (a restart) since `since`. */
+    async findUnconfirmedEndedSince(
+        nodeIds: readonly string[],
+        since: Date,
+        limit = 500,
+    ): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        return this.repository
+            .createQueryBuilder('session')
+            .where({ nodeId: In([...nodeIds]) })
+            .andWhere('session.state = :ended', { ended: 'ended' })
+            .andWhere('session.outcome = :unconfirmed', { unconfirmed: 'unconfirmed' })
+            .andWhere('session.endedAt >= :since', { since })
+            .orderBy('session.endedAt', 'DESC')
+            .take(limit)
+            .getMany();
+    }
+
     /** Owner sessions still `starting` since before `cutoff` (the sweeper). */
     async findStartingBefore(cutoff: Date, limit = 200): Promise<FleetSession[]> {
         return this.repository.find({

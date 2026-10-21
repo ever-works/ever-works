@@ -11,6 +11,7 @@ import { FleetSessionService } from './fleet-session.service';
 import { FleetSessionStateService } from './fleet-session-state.service';
 import { FleetSessionAttentionDelivery } from './fleet-session-attention.delivery';
 import { FLEET_SESSION_ATTENTION_SINK } from './fleet-session-attention.port';
+import { SessionNeedsYouProducer } from './session-needs-you.producer';
 import { NotificationsModule } from '../../notifications/notifications.module';
 
 /**
@@ -54,6 +55,8 @@ export class FleetSessionSweepService {
         FleetSessionStateService,
         FleetSessionAttentionDelivery,
         { provide: FLEET_SESSION_ATTENTION_SINK, useExisting: FleetSessionAttentionDelivery },
+        // FL-05: the hub's "needs a look" rows for sessions (registers itself at init).
+        SessionNeedsYouProducer,
         AgentRepository,
         AgentRunRepository,
     ],
