@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-01-fleet-hub`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Merged` — P1a #2734, P1b #2741, PR 3 roles in use #2745, PR 4 polish #2749 (T-27 … T-31)
+**Status:** `Merged` — P1a #2734, P1b #2741, PR 3 roles in use #2745, PR 4 polish #2749 (T-27 … T-31), PR 5 registry hooks pinned #2828
 **Last updated:** 2026-10-21
 
 ---
