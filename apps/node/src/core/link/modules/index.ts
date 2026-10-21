@@ -47,6 +47,13 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 */
 	command?: NodeModule;
 	/**
+	 * Schedules on computers (FL-13) — the `schedule` family, built by the
+	 * runtime for a process started with `--manage` (`createScheduleModule`);
+	 * its timer loop runs whether or not the link is up. Absent, every
+	 * schedule channel is refused `unsupported_on_node` (spec U11).
+	 */
+	schedule?: NodeModule;
+	/**
 	 * Servers and ports (FL-10) — the `ports` module (`ports.list`,
 	 * `ports.open`), built by the runtime around the machine's runner and its
 	 * preview browser (`createPortsModule`). Absent without `--manage`.
@@ -86,6 +93,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		extra = [],
 		session,
 		command,
+		schedule,
 		computerLegs,
 		checkouts,
 		machineFacts = [],
@@ -105,6 +113,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
 		...(command ? [command] : []),
+		...(schedule ? [schedule] : []),
 		...(ports ? [ports] : []),
 		...(computerLegs || desktopSourcesGiven ? [createDesktopModule(computerLegs ?? null, desktopSources)] : []),
 		...(checkouts ? [checkouts] : []),
@@ -123,6 +132,13 @@ export { createServicesModule, type ServicesModuleDeps } from './services';
 export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
 export { createCommandModule, type CommandModuleOptions } from './command';
+export {
+	createScheduleModule,
+	FLEET_SCHEDULES_CAPABILITY,
+	type ScheduleModule,
+	type ScheduleModuleLink,
+	type ScheduleModuleOptions
+} from './schedule';
 export { CommandOutputStore } from './command/command-output-store';
 export { createCheckoutsModule, type CheckoutsModule, type CheckoutsModuleOptions } from './checkouts';
 export {

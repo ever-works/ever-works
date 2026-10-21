@@ -68,6 +68,7 @@ import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfac
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createCommandModule } from './link/modules/command';
+import { createScheduleModule, type ScheduleModule } from './link/modules/schedule';
 import { CommandOutputStore } from './link/modules/command/command-output-store';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
 import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
@@ -677,6 +678,13 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	commandOutputDir?: string;
 	/**
+	 * Schedules on computers (FL-13) — where the machine keeps its Command
+	 * schedules, their clock state, their last 30 runs and outputs
+	 * (`<configDir>/schedules`). With `--manage`, the schedule loop starts
+	 * whether or not the link is up. Absent: no schedules on this process.
+	 */
+	scheduleDir?: string;
+	/**
 	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
 	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
 	 * tab lists log files under them (and FL-11's Files tab will browse them).
@@ -1008,6 +1016,31 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// when the shell runs one — the broker matches the `desktop` channels the
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
+	// Schedules on computers (FL-13): the `schedule` family and the machine's own
+	// timer loop, for a process started with --manage. The loop starts now —
+	// independent of the link (FR-12) — and follows the kill switch once a
+	// link is bound below.
+	const scheduleModule: ScheduleModule | null =
+		consents.manage && options.scheduleDir
+			? createScheduleModule({
+					consents,
+					dir: options.scheduleDir,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					env: process.env,
+					...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+					timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+					logger: io.logger
+				})
+			: null;
+	if (scheduleModule) {
+		void scheduleModule
+			.start()
+			.catch((error: unknown) =>
+				io.logger.warn(`Schedules could not start: ${error instanceof Error ? error.message : String(error)}`)
+			);
+	}
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
@@ -1026,6 +1059,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					})
 				}
 			: {}),
+		...(scheduleModule ? { schedule: scheduleModule } : {}),
 		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
@@ -1071,6 +1105,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	};
 	telemetry.consents = () => consents;
 	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
+	// Schedules on computers (FL-13): the zone this machine's schedules fire in.
+	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
 	const managementPlan = planManagementLane(consents, options.managementLane);
@@ -1193,6 +1229,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.link = link;
 		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
 		sessions?.module.bindLink(link);
+		// Schedules (FL-13): the kill switch and drain reach the machine's own loop.
+		scheduleModule?.bindLink(link);
 		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
