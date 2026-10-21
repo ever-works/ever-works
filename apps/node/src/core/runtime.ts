@@ -55,7 +55,7 @@ import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoo
 import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
-import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
+import { HeadlessBrowserCaptureBackend, HeadlessPreviewBrowser } from './screen/headless-browser-backend';
 import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
@@ -64,6 +64,10 @@ import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModule
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
+import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
+import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import { createCheckoutsModule } from './link/modules/checkouts';
 import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
 import type { ConnectFn } from './sessions/daemon-client';
@@ -592,6 +596,18 @@ export interface CreateNodeRuntimeOptions {
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
 	/**
+	 * Servers and ports (FL-10) — where the owner-level preview browser profile
+	 * lives; defaults to `~/.ever-works/preview-profile` (R-3), beside the Agent
+	 * profiles, never inside them.
+	 */
+	previewProfileRoot?: string;
+	/**
+	 * Servers and ports (FL-10) — the opener behind "Open on the desktop".
+	 * Undefined = the system opener when this process runs in a desktop session
+	 * with `--attend`; null = none (FL-07's helper binds its own when it lands).
+	 */
+	portsDesktopOpener?: DesktopUrlOpener | null;
+	/**
 	 * Services and processes (FL-09) — replaces the machine-facts modules the
 	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
 	 * or fakes so no real `systemctl` / `ps` runs.
@@ -837,6 +853,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions = { supervisor, module: sessionModule };
 		telemetry.sessionDaemon = () => supervisor.report();
 	}
+	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
+	// preview source, for a process started with `--manage`. The preview
+	// browser is the probed one in an owner-level profile beside — never
+	// inside — the Agent profiles (R-3); without a browser it refuses with the
+	// sentence spec U10 gives. Open on the desktop uses the system opener only
+	// when the node itself runs in a desktop session with `--attend`, until
+	// FL-07's helper binds its own.
+	let portsModule: PortsModule | null = null;
+	if (consents.manage) {
+		const previewWebSockets =
+			options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+		const browserPath = io.environment.browserPath;
+		const restrictPreview =
+			options.restrictProfileDir ??
+			(io.environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+		const previewFs = createAgentProfileFs();
+		const preview = new PreviewBrowserManager({
+			starter: browserPath
+				? new HeadlessPreviewBrowser({ browserPath, webSocketFactory: previewWebSockets })
+				: null,
+			root: options.previewProfileRoot ?? defaultPreviewProfileRoot(options.env ?? process.env),
+			mkdir: (path) => previewFs.mkdir(path),
+			...(restrictPreview ? { restrictToOwner: restrictPreview } : {}),
+			nodeName: config.name?.trim() || 'this computer',
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		portsModule = createPortsModule({
+			// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+			// `docker ps --format` carries braces and tabs a shell would split.
+			runner: createMachineCommandRunner(),
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			nodeName: config.name?.trim() || 'this computer',
+			attend: consents.attend,
+			desktopOpener:
+				options.portsDesktopOpener !== undefined
+					? options.portsDesktopOpener
+					: consents.attend && io.environment.hasDisplay
+						? createSystemBrowserOpener(io.runner, io.environment.platform)
+						: null,
+			preview,
+			logger: io.logger,
+			...(io.now ? { now: io.now } : {})
+		});
+	}
 	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
 	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
 	const checkoutsModule =
@@ -864,6 +927,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
+		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		// FL-09 — services and processes (their verbs need --manage on this machine).

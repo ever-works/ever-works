@@ -7,6 +7,7 @@ import type { FleetComputerTabProps } from '../../registry';
 import { PolicyFamiliesEditor } from '../PolicyFamiliesEditor';
 import { ComputerMachineSettings } from '../ComputerMachineSettings';
 import { UpgradeRequiredSection } from '../../link/UpgradeRequiredSection';
+import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
 
 /**
  * Fleet hub (FL-01, spec §5.10) — a computer's Settings tab, FL-01's part:
@@ -30,6 +31,8 @@ export default function SettingsTab({
         <div className="space-y-8" data-testid="fleet-computer-settings">
             {isOwner && <UpgradeRequiredSection node={node} />}
             <PolicyFamiliesEditor node={node} />
+            {/* Servers and ports (FL-10): the preview browser switch, owner only. */}
+            {isOwner && <PreviewBrowserSwitch node={node} />}
             {isOwner && machine && <ComputerMachineSettings node={node} {...machine} />}
             {isOwner && !machine && (
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">

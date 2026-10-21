@@ -68,6 +68,7 @@ import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
+import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -580,6 +581,16 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+            // Servers and ports (FL-10): read-only list + audited open, as the Agent for its owner.
+            if (fleet.ports) {
+                const ports = fleet.ports;
+                add('fleet-ports', () =>
+                    buildFleetPortsTools({
+                        agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
+                        service: ports,
+                    }),
+                );
+            }
             // Services and processes on computers (FL-09) — every call runs the same
             // chain a person's click does, as this Agent; a blast-radius act and every
             // SIGKILL are held for the owner's approval (FR-22).
