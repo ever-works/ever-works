@@ -66,6 +66,7 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
+import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
@@ -609,6 +610,23 @@ export class AgentToolService {
                                 ? runContext.runId
                                 : null,
                         service: machine,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Virtual computers (FL-16): list / options read-only; a create, a stop and a
+            // destroy are held for the owner's approval (spec S9).
+            if (fleet.virtual) {
+                const virtual = fleet.virtual;
+                add('fleet-virtual', () =>
+                    buildFleetVirtualTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: virtual,
                         proposals: sources.proposals ?? null,
                     }),
                 );

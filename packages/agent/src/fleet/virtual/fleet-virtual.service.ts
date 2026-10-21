@@ -305,7 +305,10 @@ export class FleetVirtualService {
 
         // 5: the confirmation.
         const summary = fleetVirtualCreateSummary({ system, hostName: host.name, cpus, memoryGiB, diskGiB });
-        this.requireConfirmation('create', name, summary, input.fields ?? { confirm: input.confirm });
+        this.requireConfirmation('create', name, summary, input.fields ?? { confirm: input.confirm }, {
+            // "Choose for me" is resolved by now: a held Agent act runs on THIS host.
+            hostNodeId: host.id,
+        });
 
         // The registration first (FR-7), then the durable job.
         const now = new Date();
@@ -441,8 +444,9 @@ export class FleetVirtualService {
         if (state === 'destroying') {
             throw fleetMachineError('busy', `${child.name} is already being destroyed`, { state });
         }
-        this.requireConfirmation('destroy', child.name, destroySummary(kind, child.name, host.name), fields);
+        // Busy first (U13): a person never types the name only to be told to wait.
         await this.assertNotWorking(child, caller, host);
+        this.requireConfirmation('destroy', child.name, destroySummary(kind, child.name, host.name), fields);
         // A create still queued or running for it is cancelled first: the destroy wins.
         const meta = normalizeVirtualMeta(child.virtualMeta);
         if (meta?.createJobId) await this.jobs.cancel(meta.createJobId).catch(() => undefined);
@@ -798,6 +802,7 @@ export class FleetVirtualService {
         target: string,
         summary: string,
         fields: FleetActionConfirmFields | null | undefined,
+        extra: Record<string, unknown> = {},
     ): void {
         const baseClass: FleetConfirmationClass = FLEET_VIRTUAL_ACTION_CLASS[act];
         const missing = fleetMissingConfirmation({ class: baseClass, target, fields });
@@ -806,6 +811,7 @@ export class FleetVirtualService {
             'confirmation_required',
             missing === 'confirm-destructive' ? `type ${target} to confirm` : 'send confirm: true to confirm',
             {
+                ...extra,
                 class: missing,
                 summary,
                 ...(missing === 'confirm-destructive' ? { target } : {}),

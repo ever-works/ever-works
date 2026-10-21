@@ -130,6 +130,7 @@ import {
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
+    FleetVirtualService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2142,6 +2143,10 @@ async function assertRealWriteTarget(
                 // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
                 // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
                 { token: FleetPortTunnelService, optional: true },
+                // Virtual computers (FL-16) — backs `fleet_virtual_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_VIRTUAL_ENABLED off) the
+                // five tools are not offered; create / stop / destroy only ever file an approval.
+                { token: FleetVirtualService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2171,6 +2176,7 @@ async function assertRealWriteTarget(
                 checkouts?: FleetCheckoutService | null,
                 fleetCommands?: FleetCommandService | null,
                 fleetPortTunnels?: FleetPortTunnelService | null,
+                fleetVirtual?: FleetVirtualService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2197,6 +2203,7 @@ async function assertRealWriteTarget(
                     ...(fleetMachine ? { machine: fleetMachine } : {}),
                     ...(fleetPorts ? { ports: fleetPorts } : {}),
                     ...(fleetPortTunnels ? { portTunnels: fleetPortTunnels } : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

@@ -3,6 +3,7 @@ import { config } from '../../config';
 import { FleetModule } from '../fleet.module';
 import { FleetSessionsModule } from '../sessions/fleet-sessions.module';
 import { FleetVirtualService } from './fleet-virtual.service';
+import { FleetVirtualProposalListener } from './fleet-virtual-proposal.listener';
 
 /**
  * Virtual computers (FL-16) — the reconcile sweep's one-member facade.
@@ -33,7 +34,8 @@ export class FleetVirtualReconcileService {
  */
 @Module({
     imports: [FleetModule, FleetSessionsModule],
-    providers: [FleetVirtualService, FleetVirtualReconcileService],
+    // The listener runs a held Agent act once a person approves it (spec S9).
+    providers: [FleetVirtualService, FleetVirtualReconcileService, FleetVirtualProposalListener],
     exports: [FleetVirtualService, FleetVirtualReconcileService],
 })
 export class FleetVirtualModule {}
