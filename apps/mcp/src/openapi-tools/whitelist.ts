@@ -611,6 +611,34 @@ export const WHITELIST: WhitelistEntry[] = [
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
 
+	// Checkouts on computers (6) — FL-14, `apps/api/src/fleet/checkouts/
+	// fleet-checkouts.controller.ts`, the same names as the Agent tools
+	// (CONTRACTS §11.3). Pull, push, archive and delete answer
+	// `confirmation_required` first; the caller repeats with `confirm` /
+	// `confirmName` (CONTRACTS §2.2). The node-facing credential route
+	// (`/api/fleet/checkouts/{id}/credential`) is deliberately NOT exposed.
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts',
+		toolName: 'fleet_checkouts_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/checkouts', toolName: 'fleet_checkouts_create' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/sync', toolName: 'fleet_checkouts_sync' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/archive', toolName: 'fleet_checkouts_archive' },
+	{
+		method: 'DELETE',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_delete',
+		annotations: { destructiveHint: true }
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
@@ -635,6 +663,28 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/sessions/{id}/end',
 		toolName: 'fleet_sessions_end',
 		annotations: { destructiveHint: true }
+	},
+
+	// Servers and ports (FL-10, CONTRACTS §2.1) — `apps/api/src/fleet/ports/fleet-ports.controller.ts`.
+	// The list is a read of the machine (nothing stored, nothing audited); open is
+	// not destructive — it opens the port's page ON the machine (its desktop or its
+	// preview browser) and is audited `node.port.open`. Dark unless
+	// FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/ports',
+		toolName: 'fleet_ports_list',
+		description:
+			'List the TCP ports a fleet computer is listening on, read on the machine: web servers first (title, status, program or container), other ports, hidden system ports. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/ports/{port}/open',
+		toolName: 'fleet_ports_open',
+		description:
+			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
+		annotations: { destructiveHint: false }
 	},
 
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the

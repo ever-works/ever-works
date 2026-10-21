@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateFleetRunRequest } from '@ever-works/contracts';
-import { isUnderAllowedRoots, resolveAllowedRoots } from '../../allowed-roots';
+import { resolveAllowedRoots } from '../../allowed-roots';
+import { bindSourceAllowed } from '../docker';
 import {
 	containerActions,
 	countImageUse,
@@ -163,23 +164,22 @@ describe('pull progress and prune', () => {
 	});
 });
 
-describe('allowed roots (R-18, R-39)', () => {
-	const fs = {
-		realpath: async (target: string) => {
-			if (target.startsWith('/missing')) throw new Error('ENOENT');
-			// /srv/shared/link points outside the root.
-			if (target === '/srv/shared/link') return '/etc';
-			return target.replace(/\/+$/, '') || '/';
-		}
+describe('bind-mount sources under the shared folders (R-18, R-39)', () => {
+	const realpath = async (target: string) => {
+		if (target.startsWith('/missing')) throw new Error('ENOENT');
+		// /srv/shared/link points outside the root.
+		if (target === '/srv/shared/link') return '/etc';
+		return target.replace(/\/+$/, '') || '/';
 	};
 
-	it('accepts a path inside a root and refuses one outside or escaping through a link', async () => {
-		const roots = await resolveAllowedRoots({ workspaceRoot: '/srv/shared', extraRoots: ['/missing/root', 'relative'] }, fs);
+	it('accepts a folder inside a root and refuses one outside, missing, or escaping through a link', async () => {
+		const roots = resolveAllowedRoots({ workspaceRoot: '/srv/shared', extraRoots: ['relative'], purpose: 'files', platform: 'linux' });
 		expect(roots).toEqual(['/srv/shared']);
-		expect(await isUnderAllowedRoots('/srv/shared/data', roots, 'linux', fs)).toBe(true);
-		expect(await isUnderAllowedRoots('/srv/shared', roots, 'linux', fs)).toBe(true);
-		expect(await isUnderAllowedRoots('/srv/shared-other', roots, 'linux', fs)).toBe(false);
-		expect(await isUnderAllowedRoots('/srv/shared/link', roots, 'linux', fs)).toBe(false);
-		expect(await isUnderAllowedRoots('/home/ops', roots, 'linux', fs)).toBe(false);
+		expect(await bindSourceAllowed('/srv/shared/data', roots, 'linux', realpath)).toBe(true);
+		expect(await bindSourceAllowed('/srv/shared', roots, 'linux', realpath)).toBe(true);
+		expect(await bindSourceAllowed('/srv/shared-other', roots, 'linux', realpath)).toBe(false);
+		expect(await bindSourceAllowed('/srv/shared/link', roots, 'linux', realpath)).toBe(false);
+		expect(await bindSourceAllowed('/missing/data', roots, 'linux', realpath)).toBe(false);
+		expect(await bindSourceAllowed('/home/ops', roots, 'linux', realpath)).toBe(false);
 	});
 });

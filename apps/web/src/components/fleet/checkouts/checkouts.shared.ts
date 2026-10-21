@@ -81,8 +81,16 @@ export function compareCheckoutRows(a: FleetCheckoutView, b: FleetCheckoutView):
     );
 }
 
-/** The actions a P1 row offers. */
-export type CheckoutRowAction = 'refresh' | 'fetch' | 'archive' | 'restore';
+/** The actions a row offers (P1: refresh, fetch, archive, restore; P2: pull, push, delete, forget). */
+export type CheckoutRowAction =
+    | 'refresh'
+    | 'fetch'
+    | 'pull'
+    | 'push'
+    | 'archive'
+    | 'restore'
+    | 'delete'
+    | 'forget';
 
 /** Why an action is disabled — an `fleet.checkouts.disabled.*` key. */
 export type CheckoutDisabledReason =
@@ -95,7 +103,8 @@ export type CheckoutDisabledReason =
     | 'creating'
     | 'busy'
     | 'folderRemoved'
-    | 'taskWorktree';
+    | 'taskWorktree'
+    | 'discovered';
 
 export interface CheckoutRowContext {
     /** The computer the row is on (absent: the hub could not read it — treated as offline). */
@@ -121,7 +130,7 @@ export function mayManageCheckouts(node: CheckoutRowContext['node']): boolean {
  */
 export function checkoutActionState(
     action: CheckoutRowAction,
-    row: Pick<FleetCheckoutView, 'state' | 'busy' | 'folderRemoved' | 'createdBy'>,
+    row: Pick<FleetCheckoutView, 'state' | 'busy' | 'folderRemoved' | 'createdBy' | 'kind'>,
     context: CheckoutRowContext,
 ): { enabled: true } | { enabled: false; reason: CheckoutDisabledReason } {
     if (!mayManageCheckouts(context.node)) return { enabled: false, reason: 'notAllowed' };
@@ -130,6 +139,20 @@ export function checkoutActionState(
         if (row.state === 'archived') return { enabled: false, reason: 'archived' };
         if (row.state === 'creating') return { enabled: false, reason: 'creating' };
         if (row.busy === 'session') return { enabled: false, reason: 'busy' };
+        return { enabled: true };
+    }
+    if (action === 'forget') {
+        if (row.state === 'creating') return { enabled: false, reason: 'creating' };
+        return { enabled: true };
+    }
+    if (action === 'delete') {
+        if (row.kind === 'discovered') return { enabled: false, reason: 'discovered' };
+        if (row.createdBy === 'task') return { enabled: false, reason: 'taskWorktree' };
+        if (row.state === 'creating') return { enabled: false, reason: 'creating' };
+        if (row.folderRemoved) return { enabled: false, reason: 'folderRemoved' };
+        if (row.busy === 'session') return { enabled: false, reason: 'busy' };
+        // The computer computes what would be lost; a gone folder needs no computer.
+        if (row.state !== 'missing' && !isComputerOnline(context.node)) return { enabled: false, reason: 'offline' };
         return { enabled: true };
     }
     if (action === 'restore') {
@@ -143,13 +166,22 @@ export function checkoutActionState(
     if (row.state === 'archived') return { enabled: false, reason: 'archived' };
     if (row.state === 'missing') return { enabled: false, reason: 'missing' };
     if (row.state === 'creating') return { enabled: false, reason: 'creating' };
-    if (action === 'fetch') {
+    if (action === 'fetch' || action === 'pull' || action === 'push') {
         if (row.createdBy === 'task') return { enabled: false, reason: 'taskWorktree' };
         if (context.node?.consents && context.node.consents.manage === false)
             return { enabled: false, reason: 'consentMissing' };
         if (row.busy === 'operation') return { enabled: false, reason: 'busy' };
+        // Spec U9: pull and push wait for the session working in the checkout; fetch does not.
+        if (action !== 'fetch' && row.busy === 'session') return { enabled: false, reason: 'busy' };
     }
     return { enabled: true };
+}
+
+/** The actions one row shows, in order (the ones it cannot take render disabled with the reason). */
+export function checkoutRowActions(row: Pick<FleetCheckoutView, 'state' | 'kind' | 'createdBy'>): CheckoutRowAction[] {
+    const removal: CheckoutRowAction = row.kind === 'discovered' || row.createdBy === 'task' ? 'forget' : 'delete';
+    if (row.state === 'archived') return ['restore', removal];
+    return ['fetch', 'pull', 'push', 'refresh', 'archive', removal];
 }
 
 /** `1.2 GB`, `420 MB`, `12 KB` — sizes on disk (spec FR-14). Null for unknown. */

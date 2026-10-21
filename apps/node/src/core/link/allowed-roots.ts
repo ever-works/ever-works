@@ -1,92 +1,85 @@
-import { realpath } from 'node:fs/promises';
-import * as path from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 
 /**
- * Fleet node link — the ONE allowed-roots resolver (CONTRACTS R-18, R-39,
- * R-41). Logs (FL-08), files (FL-11), checkouts (FL-14) and Docker bind
- * mounts (FL-09) see only these folders on the machine:
+ * Fleet node link — THE allowed-roots resolver (CONTRACTS R-18, R-39, R-41).
  *
- *  - every checkout in state `ready` (R-41 — `creating`, `missing` and
- *    `archived` ones are not roots);
- *  - the node's workspace root;
- *  - any extra root the machine's owner lists in the node's local config
- *    (`--files-root`), set on the machine only.
+ * The Files tab (FL-11), the Logs file source (FL-08) and checkouts (FL-14)
+ * see only these folders on a machine:
  *
- * The home directory is never a root by default. Every root and every
- * candidate is canonicalised (`realpath`), so a symlink that escapes a root
- * is refused, and a candidate must exist. Created by FL-09 P2, the first epic
- * to land that needs it; the others import it and never define a second one.
- * (The OS log directories are a logs-only root FL-08 adds through
- * {@link AllowedRootsSources.extraRoots} for its own reads.)
+ *  - every checkout in state `ready` (R-41: `creating`, `missing` and
+ *    `archived` ones are not roots) — the checkouts module's `readyPaths()`;
+ *  - the node's workspace root (its Task pool);
+ *  - the OS standard log directories — for logs only (`purpose: 'logs'`);
+ *  - any extra root the machine owner listed in the node's local config
+ *    (`--files-root`, FL-11).
+ *
+ * The home directory is never a root by default. Paths are canonicalised; a
+ * candidate is inside a root only as a strict descendant or the root itself,
+ * compared without case on Windows. Symlinks escaping a root are the
+ * caller's to refuse (it holds the real path); this module answers the
+ * lexical question exactly one way for everyone.
+ *
+ * Created by FL-14 (the first of FL-08 / FL-11 / FL-14 to land, R-39); the
+ * others import it and never define a second resolver.
  */
 
-export interface AllowedRootsSources {
-	/** The node's workspace root, when it has one. */
+export type AllowedRootsPurpose = 'files' | 'logs' | 'checkouts';
+
+export interface AllowedRootsInput {
+	/** `ready` checkout paths (the checkouts module's `readyPaths()`). */
+	checkouts?: readonly string[];
+	/** The node's workspace root, when it keeps a Task pool. */
 	workspaceRoot?: string | null;
-	/** The `ready` checkout paths (FL-14's `CheckoutsModule.readyPaths`). */
-	readyCheckouts?: () => Promise<string[]>;
-	/** Owner-listed roots from the machine's own config. */
+	/** Extra roots the owner listed on the machine (`--files-root`). */
 	extraRoots?: readonly string[];
+	/** OS log directories — included for `purpose: 'logs'` only. */
+	logDirs?: readonly string[];
+	purpose?: AllowedRootsPurpose;
+	platform?: string;
 }
 
-export interface AllowedRootsFs {
-	realpath(target: string): Promise<string>;
+function keyOf(path: string, platform: string): string {
+	return platform === 'win32' ? path.toLowerCase() : path;
 }
 
-const defaultFs: AllowedRootsFs = { realpath: (target) => realpath(target) };
-
-function comparable(value: string, platform: string): string {
-	const normalized = path.normalize(value);
-	return platform === 'win32' || platform === 'darwin' ? normalized.toLowerCase() : normalized;
-}
-
-/** The canonical roots, de-duplicated, roots that do not exist dropped. */
-export async function resolveAllowedRoots(
-	sources: AllowedRootsSources,
-	fs: AllowedRootsFs = defaultFs
-): Promise<string[]> {
-	const candidates: string[] = [];
-	if (sources.workspaceRoot) candidates.push(sources.workspaceRoot);
-	for (const root of sources.extraRoots ?? []) candidates.push(root);
-	if (sources.readyCheckouts) {
-		try {
-			candidates.push(...(await sources.readyCheckouts()));
-		} catch {
-			// a registry that cannot be read contributes nothing
-		}
-	}
+/** The canonical, de-duplicated root list, in a stable order. */
+export function resolveAllowedRoots(input: AllowedRootsInput): string[] {
+	const platform = input.platform ?? process.platform;
 	const out: string[] = [];
-	for (const candidate of candidates) {
-		if (!candidate || !path.isAbsolute(candidate)) continue;
-		try {
-			const real = await fs.realpath(candidate);
-			if (!out.includes(real)) out.push(real);
-		} catch {
-			// a root that is not there is not a root
-		}
-	}
+	const seen = new Set<string>();
+	const add = (path: string | null | undefined): void => {
+		if (typeof path !== 'string' || path.length === 0 || !isAbsolute(path)) return;
+		const normalized = resolve(path);
+		const key = keyOf(normalized, platform);
+		if (seen.has(key)) return;
+		seen.add(key);
+		out.push(normalized);
+	};
+	for (const path of input.checkouts ?? []) add(path);
+	add(input.workspaceRoot ?? null);
+	for (const path of input.extraRoots ?? []) add(path);
+	if (input.purpose === 'logs') for (const path of input.logDirs ?? []) add(path);
 	return out;
 }
 
-/** True when `target` (after `realpath`) is one of `roots` or inside one. A target that does not exist is outside. */
-export async function isUnderAllowedRoots(
-	target: string,
+/** True when `candidate` is a root or strictly inside one. */
+export function isWithinAllowedRoots(
+	candidate: string,
 	roots: readonly string[],
-	platform: string = process.platform,
-	fs: AllowedRootsFs = defaultFs
-): Promise<boolean> {
-	if (!target || !path.isAbsolute(target)) return false;
-	let real: string;
-	try {
-		real = await fs.realpath(target);
-	} catch {
-		return false;
+	platform: string = process.platform
+): boolean {
+	if (!isAbsolute(candidate)) return false;
+	const target = resolve(candidate);
+	for (const root of roots) {
+		const base = resolve(root);
+		const rel = relative(base, target);
+		if (rel === '') return true;
+		const first = rel.split(/[\\/]/)[0];
+		if (first !== '..' && !isAbsolute(rel)) {
+			// `relative` already compares case-insensitively on win32 drives;
+			// keep the explicit platform branch for injected test platforms.
+			if (platform !== 'win32' || keyOf(target, platform).startsWith(keyOf(base, platform))) return true;
+		}
 	}
-	const candidate = comparable(real, platform);
-	return roots.some((root) => {
-		const base = comparable(root, platform);
-		if (candidate === base) return true;
-		const withSep = base.endsWith(path.sep) ? base : `${base}${path.sep}`;
-		return candidate.startsWith(withSep);
-	});
+	return false;
 }

@@ -2317,7 +2317,8 @@
                 "agent": "Agent",
                 "noMission": "This run was not part of a Mission",
                 "openSchedule": "Open the schedule that ran this",
-                "openFleetSession": "Open the session on its computer"
+                "openFleetSession": "Open the session on its computer",
+                "rewatchFleetSession": "Re-watch the session"
             },
             "shortcuts": {
                 "button": "Keyboard shortcuts",
@@ -12838,7 +12839,14 @@
                 "archive": "Archive",
                 "restore": "Restore",
                 "archiveConfirm": "Move to bin",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "new": "New checkout",
+                "pull": "Pull",
+                "push": "Push",
+                "delete": "Delete",
+                "forget": "Forget",
+                "pullConfirm": "Pull",
+                "pushConfirm": "Push"
             },
             "bin": {
                 "toggle": "Bin ({count})",
@@ -12917,13 +12925,17 @@
                 "creating": "Still being created",
                 "busy": "Something is working in this checkout",
                 "folderRemoved": "The folder was removed; it cannot be restored",
-                "taskWorktree": "Task worktrees are kept in sync by their runs"
+                "taskWorktree": "Task worktrees are kept in sync by their runs",
+                "discovered": "A checkout found on this computer is only forgotten, never deleted"
             },
             "notices": {
                 "running": "Running on the computer…",
                 "fetchFailed": "Fetch failed (exit {code}): {line}",
                 "fetched": "Fetched",
-                "refreshed": "Refreshed"
+                "refreshed": "Refreshed",
+                "syncFailed": "{op} failed (exit {code}): {line}",
+                "pulled": "Pulled",
+                "pushed": "Pushed"
             },
             "gitLine": {
                 "detached": "detached",
@@ -12937,13 +12949,53 @@
                 "clean": "✓ clean",
                 "pr": "PR #{number} ({state})",
                 "notRead": "git line not read yet"
+            },
+            "confirmPull": "Pull {branch} on {name}? Fast-forward only.",
+            "confirmPush": "Push {branch} to {remote}?",
+            "newDialog": {
+                "title": "New checkout",
+                "where": "Computer",
+                "offline": "offline",
+                "needsManage": "needs --manage",
+                "how": "How",
+                "clone": "Fresh clone",
+                "worktree": "Worktree of a checkout here",
+                "repoUrl": "Repository URL",
+                "credentialNote": "A repository your GitHub App installation covers is cloned with a short-lived credential for this one operation; a public one without any.",
+                "parent": "Worktree of",
+                "chooseParent": "Choose a checkout…",
+                "branch": "Branch",
+                "branchPlaceholder": "proposed for you",
+                "branchNote": "A name already on the remote or on another checkout gets -2, -3, …",
+                "cost": "Uses disk on {name}. No tokens or credits.",
+                "costWithSize": "Uses disk on {name} (about {size}). No tokens or credits.",
+                "cancel": "Cancel",
+                "create": "Create",
+                "creating": "Creating…",
+                "failed": "The checkout could not be created."
+            },
+            "deleteDialog": {
+                "title": "Delete checkout",
+                "forgetTitle": "Forget checkout",
+                "wouldLose": "{what} would be lost.",
+                "lostFiles": "{count, plural, one {# uncommitted file} other {# uncommitted files}}",
+                "lostCommits": "{count, plural, one {# commit not on any remote} other {# commits not on any remote}}",
+                "and": " and ",
+                "cleanSummary": "Delete {path}? Nothing would be lost.",
+                "forgetSummary": "Forget {path}? The folder is not touched.",
+                "typeName": "Type {name} to confirm.",
+                "cancel": "Cancel",
+                "delete": "Delete",
+                "forget": "Forget",
+                "failed": "It could not be deleted."
             }
         },
         "palette": {
             "goToComputer": "Go to computer {name}",
             "servicesOn": "Services on {name}",
             "dockerOn": "Docker on {name}",
-            "processesOn": "Processes on {name}"
+            "processesOn": "Processes on {name}",
+            "portsOn": "Ports on {name}"
         },
         "nav": {
             "label": "Fleet"
@@ -13515,6 +13567,96 @@
                 "back": "Back to Fleet"
             }
         },
+        "commands": {
+            "title": "Run a command",
+            "description": "One command, the computers it should run on, and what each one said.",
+            "sandbox": "These are real machines, not a sandbox. The command runs as you, in your login shell.",
+            "costNote": "Running a command spends no model tokens and no credits.",
+            "stop": "Stop",
+            "composer": {
+                "label": "Command",
+                "placeholder": "git -C ~/code/api status --short",
+                "timeout": "Timeout",
+                "timeoutMinutes": "{minutes} min",
+                "folder": "Folder",
+                "folderPlaceholder": "home (~)",
+                "run": "Run on {count}",
+                "runNone": "Run"
+            },
+            "picker": {
+                "label": "On",
+                "none": "No computer can take a command right now",
+                "reasons": {
+                    "offline": "offline · last seen {time} ago",
+                    "offlineNever": "offline",
+                    "manageOff": "management is off — start the node with --manage",
+                    "notAllowed": "the owner of {name} has not allowed you to run commands on it",
+                    "paused": "paused",
+                    "disabled": "disabled",
+                    "enrolling": "still enrolling",
+                    "cluster": "a cluster node",
+                    "linkDown": "not connected right now"
+                }
+            },
+            "confirm": {
+                "title": "Run on {count} computers?",
+                "titleOne": "Run on {name}?",
+                "description": "Check the command and where it runs.",
+                "line": "{name} · {os} · {shell} as the machine owner, from {folder}",
+                "lineNoOs": "{name} · {shell} as the machine owner, from {folder}",
+                "refusedLine": "{name} — {hint}",
+                "timeout": "Timeout {minutes} min · no input is possible (prompts fail — pass -y)",
+                "nothingRunnable": "None of these computers can run it.",
+                "cancel": "Cancel",
+                "run": "Run on {count}",
+                "running": "Starting…"
+            },
+            "card": {
+                "running": "Running · {duration}",
+                "linkDown": "Connection to {name} lost — the command may still be running there",
+                "done": "✓ {duration}",
+                "exit": "Exit {code} · {duration}",
+                "timedOut": "Timed out after {clock}",
+                "killSwitch": "Stopped by the fleet kill switch",
+                "drain": "Stopped — the fleet is draining",
+                "linkLost": "Connection to {name} lost — the full output stays on the computer",
+                "nodeRestart": "{name} restarted while it ran",
+                "cancelled": "Stopped",
+                "shellFailed": "The shell could not start: {hint}",
+                "refused": "{hint}",
+                "failed": "Failed · {duration}",
+                "truncated": "first 64 KiB and last 64 KiB shown",
+                "capped": "Output capped at 10 MiB",
+                "noOutput": "No output",
+                "removed": "a removed computer",
+                "expand": "Expand",
+                "collapse": "Collapse",
+                "copy": "Copy",
+                "copied": "Copied",
+                "fullOutput": "Open full output",
+                "fullOutputSoon": "The full output is kept on the computer; opening it arrives soon",
+                "fullOutputOffline": "The full output is on {name}, which is offline"
+            },
+            "summary": {
+                "running": "{running} of {total} running",
+                "allDone": "All done · {duration}",
+                "someFailed": "{failed} of {total} failed · {duration}"
+            },
+            "recent": {
+                "title": "Recent",
+                "empty": "No commands yet",
+                "loading": "Loading recent commands"
+            },
+            "empty": {
+                "title": "No computers yet",
+                "body": "Add a computer to run commands on it."
+            },
+            "errors": {
+                "generic": "The command could not be sent.",
+                "withHint": "{hint}",
+                "network": "Ever Works could not be reached. Try again."
+            }
+        },
         "sessions": {
             "providers": {
                 "shell": "Shell",
@@ -13649,7 +13791,12 @@
                 "copyLink": "Copy link",
                 "shortcuts": "Keyboard shortcuts",
                 "waiting": "Waiting for a free slot on {node}…",
-                "openRun": "Open the Run"
+                "openRun": "Open the Run",
+                "recording": "Recording",
+                "recordOn": "Record",
+                "recordOff": "Stop recording",
+                "notRecordingNow": "Not recording",
+                "rewatch": "Re-watch"
             },
             "shortcuts": {
                 "title": "Session shortcuts",
@@ -13702,6 +13849,27 @@
                 "title": "Sessions",
                 "empty": "{agent} has no sessions on your computers yet.",
                 "loadFailed": "The sessions could not be loaded."
+            },
+            "replay": {
+                "title": "Re-watch · {title} · {node} · {date}",
+                "open": "Re-watch",
+                "loading": "Loading the recording…",
+                "notRecorded": "This session was not recorded.",
+                "storageFailed": "Recording stopped — storage was unavailable.",
+                "expired": "The recording was removed after {days} days.",
+                "nothingYet": "Nothing has been recorded yet.",
+                "driverSpan": "{name} drove {from}–{to}",
+                "someone": "Someone",
+                "anAgent": "The Agent",
+                "play": "Play",
+                "pause": "Pause",
+                "restart": "From the start",
+                "back10": "Back 10 s",
+                "forward10": "Forward 10 s",
+                "speed": "Speed",
+                "position": "Position {at} of {total}",
+                "close": "Close",
+                "failed": "The recording could not be loaded."
             }
         },
         "actions": {
@@ -13843,6 +14011,82 @@
                 "stopTitle": "Send SIGTERM to {name} ({pid}) on {machine}?",
                 "killTitle": "Send SIGKILL to {name} ({pid}) on {machine}?",
                 "killBody": "It cannot save its work."
+            }
+        },
+        "ports": {
+            "title": "Servers on {name}",
+            "live": "live ({seconds} s)",
+            "openAPort": "Open a port…",
+            "openAPortLabel": "A port to watch for",
+            "openAPortAdd": "Watch",
+            "openAPortInvalid": "A port is a number from 1 to 65535.",
+            "waiting": "waiting for a server…",
+            "watchLive": "Watching — the row turns live when a server starts.",
+            "removeWatch": "Stop watching :{port}",
+            "stopped": "stopped",
+            "localOnly": "only on {name} itself",
+            "noTitle": "— (no title)",
+            "https": "https",
+            "noHttpAnswer": "no HTTP answer",
+            "otherPorts": "{count, plural, one {# other port} other {# other ports}}",
+            "systemPorts": "{count, plural, one {# system port (hidden)} other {# system ports (hidden)}}",
+            "show": "show",
+            "hide": "hide",
+            "open": "Open",
+            "openMenu": "Open options for :{port}",
+            "rowMenu": "More for :{port}",
+            "openOnDesktop": "Open on the desktop",
+            "openInPreview": "Open in the preview browser",
+            "copyAddress": "Copy address",
+            "copied": "Address copied",
+            "showInProcesses": "Show in Processes",
+            "showInDocker": "Show in Docker",
+            "openedDesktop": "Opened {url} in the default browser on {name}.",
+            "watchDesktop": "Watch the desktop",
+            "openFailed": "Could not open :{port}",
+            "noOpen": "Only the owner of {name} can open its servers",
+            "reasons": {
+                "attendMissing": "live viewing is switched off — run {command} there",
+                "desktopFamily": "you may not drive the desktop of {name}",
+                "noDesktop": "{name} has no desktop the node can open a browser on",
+                "previewOff": "The preview browser is switched off for {name} — turn it on under Settings",
+                "noBrowser": "No browser found on {name} — install Chrome, Edge or Chromium there, or point the node at one.",
+                "portsFamily": "Only the owner of {name} can open its servers"
+            },
+            "states": {
+                "loading": "Asking {name} what is listening…",
+                "slow": "{name} has not answered yet.",
+                "empty": "Nothing is listening on {name} — start a server, or type a port to watch for one.",
+                "error": "Could not list ports on {name}",
+                "offline": "{name} is not connected",
+                "consentMissing": "Ports need machine management switched on for {name}",
+                "permissionDenied": "You may not see the ports of {name}",
+                "unsupported": "{name} cannot list its ports yet",
+                "killSwitch": "The fleet is stopped — nothing can be opened until it is cleared",
+                "lastKnown": "Showing the last list read.",
+                "tryAgain": "Try again"
+            },
+            "preview": {
+                "title": "Preview · {name} · :{port} · preview profile",
+                "live": "LIVE",
+                "refresh": "Refresh the picture",
+                "close": "Close the preview",
+                "connecting": "Starting the preview browser on {name}…",
+                "driving": "You are driving the preview browser on {name}. It is yours — no agent uses this profile.",
+                "endsIn": "Ends when you leave, or in {time}.",
+                "ended": "This preview has ended. Open it again from the list.",
+                "a11y": "Preview of :{port} on {name}"
+            },
+            "servers": {
+                "title": "Servers",
+                "otherPorts": "{count, plural, one {# other port} other {# other ports}}",
+                "open": "Open the Ports tab"
+            },
+            "settings": {
+                "title": "Preview browser",
+                "body": "Lets Open show a page in a browser profile on this computer that no agent uses.",
+                "saved": "Saved.",
+                "failed": "Could not switch the preview browser."
             }
         },
         "operations": {

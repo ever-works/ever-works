@@ -28,6 +28,8 @@ export interface CheckoutGitRunOptions {
 	timeoutMs?: number;
 	/** Extra environment for this one command (never written anywhere). */
 	env?: Readonly<Record<string, string>>;
+	/** Inherited variables this one command must NOT see (a credentialed child drops every other credential source). */
+	unsetEnv?: readonly string[];
 }
 
 export type CheckoutGitRunner = (args: readonly string[], options: CheckoutGitRunOptions) => Promise<CheckoutGitResult>;
@@ -52,9 +54,11 @@ export function createCheckoutGitRunner(platform: string = process.platform): Ch
 		signals.push(AbortSignal.timeout(options.timeoutMs ?? CHECKOUT_GIT_LOCAL_TIMEOUT_MS));
 		const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
 		try {
+			const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', ...(options.env ?? {}) };
+			for (const name of options.unsetEnv ?? []) delete env[name];
 			const { error, stdout, stderr } = await execFileWithVerifiedCancellation('git', [...prefix, ...args], {
 				cwd: options.cwd,
-				env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...(options.env ?? {}) },
+				env,
 				windowsHide: true,
 				maxBuffer: 16 * 1024 * 1024,
 				signal

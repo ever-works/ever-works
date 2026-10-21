@@ -17,7 +17,8 @@ import {
 	type FleetImagesListResult
 } from '@ever-works/contracts';
 import type { CommandRunner } from '../../capabilities';
-import { isUnderAllowedRoots } from '../allowed-roots';
+import { realpath } from 'node:fs/promises';
+import { isWithinAllowedRoots } from '../allowed-roots';
 import {
 	countImageUse,
 	DOCKER,
@@ -64,6 +65,36 @@ export interface DockerModuleDeps {
 }
 
 const ACTION_TIMEOUT_MS = 120_000;
+
+/**
+ * True when a bind-mount source is one of the shared folders or inside one
+ * (R-18): the source must exist, and both it and the roots are compared by
+ * their REAL paths, so a link inside a root that points out of it is refused
+ * (the shared resolver answers the lexical question; the symlink check is the
+ * caller's, R-39).
+ */
+export async function bindSourceAllowed(
+	source: string,
+	roots: readonly string[],
+	platform: string,
+	resolveReal: (target: string) => Promise<string> = (target) => realpath(target)
+): Promise<boolean> {
+	let real: string;
+	try {
+		real = await resolveReal(source);
+	} catch {
+		return false;
+	}
+	const realRoots: string[] = [];
+	for (const root of roots) {
+		try {
+			realRoots.push(await resolveReal(root));
+		} catch {
+			// a root that is not there admits nothing
+		}
+	}
+	return isWithinAllowedRoots(real, realRoots, platform);
+}
 
 function refuse(code: Parameters<typeof makeFleetLinkError>[0], hint: string, details?: Record<string, unknown>): MachineVerbError {
 	return new MachineVerbError(makeFleetLinkError(code, hint, details));
@@ -185,7 +216,7 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		const roots = deps.allowedRoots ? await deps.allowedRoots().catch(() => [] as string[]) : [];
 		for (const volume of request.volumes) {
 			if (!isFleetHostPath(volume.source)) continue;
-			if (!(await isUnderAllowedRoots(volume.source, roots, platform))) {
+			if (!(await bindSourceAllowed(volume.source, roots, platform))) {
 				throw refuse('invalid', FLEET_RUN_DANGEROUS_HINT, { field: 'volumes', source: volume.source });
 			}
 		}

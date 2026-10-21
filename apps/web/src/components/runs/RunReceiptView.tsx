@@ -196,6 +196,16 @@ export function RunReceiptView({
                         {t('openFleetSession')}
                     </Link>
                 )}
+                {/* FL-04 P3 — re-watch the session's recording. */}
+                {row.fleetSessionId && (
+                    <Link
+                        href={`${ROUTES.DASHBOARD_FLEET_SESSION(row.fleetSessionId)}?rewatch=1`}
+                        className="block text-xs text-primary hover:underline"
+                        data-testid="run-receipt-fleet-session-rewatch"
+                    >
+                        {t('rewatchFleetSession')}
+                    </Link>
+                )}
             </Section>
 
             <Section title={t('filesTouched')} testId="run-receipt-files">

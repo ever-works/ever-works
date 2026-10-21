@@ -130,6 +130,8 @@ import {
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetModule,
+    FleetPortsService,
+    FleetCheckoutService,
     FleetService,
     FleetSessionService,
 } from '@ever-works/agent/fleet';
@@ -2124,6 +2126,13 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED
                 // off) the six tools are simply not offered.
                 { token: FleetSessionService, optional: true },
+                // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortsService, optional: true },
+                // Checkouts on computers (FL-14 P2) — backs the `fleet_checkouts_*`
+                // tools. APPENDED LAST (positional), optional: unbound (checkouts not
+                // mounted), the tools are simply not offered.
+                { token: FleetCheckoutService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2149,6 +2158,8 @@ async function assertRealWriteTarget(
                 approvals?: AgentApprovalsService | null,
                 fleetMachine?: FleetMachineActionsService | null,
                 fleetSessions?: FleetSessionService | null,
+                fleetPorts?: FleetPortsService | null,
+                checkouts?: FleetCheckoutService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2169,7 +2180,12 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet, ...(fleetMachine ? { machine: fleetMachine } : {}) },
+                fleet: {
+                    service: fleet,
+                    ...(checkouts ? { checkouts: { service: checkouts } } : {}),
+                    ...(fleetMachine ? { machine: fleetMachine } : {}),
+                    ...(fleetPorts ? { ports: fleetPorts } : {}),
+                },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
                     : {}),
