@@ -791,6 +791,16 @@ export class FleetSessionService {
         if (!isFleetSessionLive(session.state)) {
             throw fleetSessionError('invalid', 'the session has ended', { state: session.state });
         }
+        // FL-05 (FR-30): an Agent never answers a permission prompt — not through
+        // `fleet_sessions_answer`, and not by typing into the session either.
+        if (actor.agentId && session.state === 'needs_you') {
+            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            if (attention?.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+        }
         if (await this.isStopped())
             throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
         await this.requireNode().request({
