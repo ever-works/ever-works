@@ -72,6 +72,8 @@ import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
+import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
+import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
 import { SchedulesModule } from './schedules/schedules.module';
@@ -288,6 +290,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Capability & playbook catalogue (AW-21) — read-only playbook list,
         // detail and preflight over enabled playbook-provider plugins.
         CatalogModule,
+        // Relay bus (FL-02, CONTRACTS R-7) — how the terminal, computer and
+        // node-link relays reach the other API replicas: Valkey when REDIS_URL
+        // is set, in-process otherwise; FLEET_RELAY_REQUIRE_BUS=true makes a
+        // missing bus a boot error. Global, consumed @Optional().
+        RelayBusModule,
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,
@@ -302,6 +309,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // operations routes, and the service every machine tab calls. Dark
         // unless FLEET_ENABLED and FLEET_NODE_LINK_ENABLED are both on.
         FleetLinkApiModule,
+        // Sessions on computers (FL-04) — sessions on a machine kept by its
+        // session daemon, over the node link: the session routes, the link
+        // adapter and listener, and the sweeper fallback. Dark unless
+        // FLEET_SESSIONS_ENABLED (and the link) are on.
+        FleetSessionsApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,

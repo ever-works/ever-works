@@ -65,8 +65,7 @@
       `apps/node/src/core/screen/headless-browser-backend.ts` without changing `BrowserPageSource`;
       write `apps/node/src/core/link/modules/ports/preview-browser.ts` (profile root
       `~/.ever-works/preview-profile` beside `agent-profiles`, lazy with the owner-only ACL from
-      `apps/node/src/core/screen/agent-profile.ts`; one `PreviewBrowserSession` per node; capture pump
-      + input injector reuse; 15 s leave grace; 60 min cap).
+      `apps/node/src/core/screen/agent-profile.ts`; one `PreviewBrowserSession` per node; capture pump + input injector reuse; 15 s leave grace; 60 min cap).
     - **Test**: `apps/node/src/core/screen/headless-browser-backend.spec.ts` (navigate refuses
       `http://example.com`), `modules/ports/preview-browser.spec.ts` (dir is a sibling of
       agent-profiles, never inside; busy; caps).
@@ -149,8 +148,7 @@
 ## P2.B — Node tunnel channel
 
 - [ ] **T-17**. Write `apps/node/src/core/link/modules/ports/tunnel.ts` (`tunnel` channel handler:
-      `tunnel.request` envelope + `DATA` + `END` → `http.request` to `127.0.0.1:<port>` → `tunnel.response`
-      + streamed `DATA` + `END`; `ACK` credits both ways; 60 s per request; byte counters; refuses
+      `tunnel.request` envelope + `DATA` + `END` → `http.request` to `127.0.0.1:<port>` → `tunnel.response` + streamed `DATA` + `END`; `ACK` credits both ways; 60 s per request; byte counters; refuses
       a port not listening with `channel.refused { code: 'not_found' }`); wire `ports.preview` accept in
       `modules/ports/index.ts`.
     - **Test**: `tunnel.spec.ts` — round trip against a local test server; large body streams under

@@ -20,7 +20,7 @@ import { listAvailablePipelines } from './providers.tools';
 import { navigate, reloadPage } from './navigation.tools';
 import {
     checkDeployConnection,
-    deployWork,
+    createDeployWorkTool,
     checkDeploymentStatus,
     listDomains,
 } from './deploy.tools';
@@ -28,11 +28,11 @@ import {
     addItemTool,
     createRemoveItemTool,
     updateItemTool,
-    generateItemsTool,
+    createGenerateItemsTool,
     checkItemHealthTool,
     regenerateMarkdownTool,
 } from './items.tools';
-import { setSchedule, runScheduleNow, cancelSchedule } from './schedule.tools';
+import { createSetScheduleTool, createRunScheduleNowTool, cancelSchedule } from './schedule.tools';
 import { webSearch } from './search.tools';
 import { getUserInfo } from './user.tools';
 import { createSuggestWorksTool } from './suggest.tools';
@@ -42,14 +42,14 @@ import {
     listMissions,
     getMissionDetails,
     getMissionBudget,
-    createMission,
-    updateMission,
+    createCreateMissionTool,
+    createUpdateMissionTool,
     pauseMission,
-    resumeMission,
+    createResumeMissionTool,
     completeMission,
     createDeleteMissionTool,
-    runMissionNow,
-    cloneMission,
+    createRunMissionNowTool,
+    createCloneMissionTool,
     // PR-2 (domain-model evolution) — Mission ↔ Work relations.
     listMissionWorks,
     attachWorkToMission,
@@ -62,9 +62,9 @@ import {
     getIdeasRefreshStatus,
     createIdea,
     refreshIdeas,
-    buildIdea,
-    dismissIdea,
-    acceptIdea,
+    createBuildIdeaTool,
+    createDismissIdeaTool,
+    createAcceptIdeaTool,
 } from './ideas.tools';
 // Manifest-driven generated tools (agents, tasks, skills, notifications,
 // members, api-keys, budgets/usage, webhooks, orgs, KB, templates, plugins …).
@@ -129,18 +129,20 @@ export function buildChatTools(model: LanguageModel, options: GeneratedToolsOpti
         addItem: addItemTool,
         removeItem: createRemoveItemTool(options.userConfirmed),
         updateItem: updateItemTool,
-        generateItems: generateItemsTool,
+        // Works-security: run-starting / spend tools carry the same user-turn
+        // confirmation check as the generated tools.
+        generateItems: createGenerateItemsTool(options.userConfirmed),
         checkItemHealth: checkItemHealthTool,
         regenerateMarkdown: regenerateMarkdownTool,
 
         // Deploy
-        deployWork,
+        deployWork: createDeployWorkTool(options.userConfirmed),
         checkDeploymentStatus,
         listDomains,
 
         // Schedule
-        setSchedule,
-        runScheduleNow,
+        setSchedule: createSetScheduleTool(options.userConfirmed),
+        runScheduleNow: createRunScheduleNowTool(options.userConfirmed),
         cancelSchedule,
 
         // Search & User
@@ -156,14 +158,17 @@ export function buildChatTools(model: LanguageModel, options: GeneratedToolsOpti
         listMissions,
         getMissionDetails,
         getMissionBudget,
-        createMission,
-        updateMission,
+        // Works-security: a scheduled / auto-building Mission, a resume and a
+        // clone (it starts active with the source schedule) need the user's
+        // own confirmation, like runMissionNow.
+        createMission: createCreateMissionTool(options.userConfirmed),
+        updateMission: createUpdateMissionTool(options.userConfirmed),
         pauseMission,
-        resumeMission,
+        resumeMission: createResumeMissionTool(options.userConfirmed),
         completeMission,
         deleteMission: createDeleteMissionTool(options.userConfirmed),
-        runMissionNow,
-        cloneMission,
+        runMissionNow: createRunMissionNowTool(options.userConfirmed),
+        cloneMission: createCloneMissionTool(options.userConfirmed),
 
         // PR-2 — Mission ↔ Work relations (attach/detach, never ownership)
         listMissionWorks,
@@ -177,9 +182,9 @@ export function buildChatTools(model: LanguageModel, options: GeneratedToolsOpti
         getIdeasRefreshStatus,
         createIdea,
         refreshIdeas,
-        buildIdea,
-        dismissIdea,
-        acceptIdea,
+        buildIdea: createBuildIdeaTool(options.userConfirmed),
+        dismissIdea: createDismissIdeaTool(options.userConfirmed),
+        acceptIdea: createAcceptIdeaTool(options.userConfirmed),
     };
 }
 

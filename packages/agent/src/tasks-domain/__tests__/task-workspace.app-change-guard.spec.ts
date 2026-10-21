@@ -266,14 +266,26 @@ describe('what the gate is handed', () => {
         });
     });
 
-    it('passes the Task’s labels, for APW-04’s app-provision exemption', async () => {
+    it('passes the Task’s server-written origin, for APW-04’s provisioning exemption', async () => {
+        const m = mocks();
+
+        await service(m).finalizeRemotePush(
+            pushInput({ task: task({ labels: ['app-provision'], origin: 'app-provisioning' }) }),
+        );
+
+        expect(m.evaluate.mock.calls[0][0].taskOrigin).toBe('app-provisioning');
+        // Never the labels (works-security 2026-10-18): a caller can write those.
+        expect(m.evaluate.mock.calls[0][0]).not.toHaveProperty('taskLabels');
+    });
+
+    it('passes no origin for a Task that only carries the app-provision label', async () => {
         const m = mocks();
 
         await service(m).finalizeRemotePush(
             pushInput({ task: task({ labels: ['app-provision'] }) }),
         );
 
-        expect(m.evaluate.mock.calls[0][0].taskLabels).toEqual(['app-provision']);
+        expect(m.evaluate.mock.calls[0][0].taskOrigin).toBeNull();
     });
 });
 
@@ -1144,14 +1156,16 @@ describe('finalizeRun — judged before anything is pushed (cloud pushes enabled
         );
     });
 
-    it('hands checkPaths the branch changes, resolved server-side, with the Task’s labels', async () => {
+    it('hands checkPaths the branch changes, resolved server-side, with the Task’s origin', async () => {
         const m = allow(mocks());
         m.branchChanges.mockResolvedValue({
             paths: ['src/a.ts', 'src/b.ts'],
             contents: {},
         });
 
-        await service(m).finalizeRun(runInput({ labels: ['app-provision'] }));
+        await service(m).finalizeRun(
+            runInput({ labels: ['app-provision'], origin: 'app-provisioning' }),
+        );
 
         expect(m.branchChanges).toHaveBeenCalledWith(
             {
@@ -1170,7 +1184,7 @@ describe('finalizeRun — judged before anything is pushed (cloud pushes enabled
             repo: 'their-app',
             baseRef: 'production',
             paths: ['src/a.ts', 'src/b.ts'],
-            taskLabels: ['app-provision'],
+            taskOrigin: 'app-provisioning',
             gitOptions: { userId: 'u-1', providerId: 'github', workId: WORK_ID },
         });
         expect(handed).not.toHaveProperty('baseSha');

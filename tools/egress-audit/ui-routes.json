@@ -1,0 +1,782 @@
+{
+	"framework": "next-app",
+	"entry": "apps/web/src/app",
+	"routes": [
+		{
+			"path": "/:locale",
+			"file": "apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/:rest+",
+			"file": "apps/web/src/app/[locale]/[...rest]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/:slug/dashboard",
+			"file": "apps/web/src/app/[locale]/[slug]/dashboard/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/activity",
+			"file": "apps/web/src/app/[locale]/(dashboard)/activity/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/admin/plugins/allowlist",
+			"file": "apps/web/src/app/[locale]/(dashboard)/admin/plugins/allowlist/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/admin/tenants/:tenantId/runtime-allowlist",
+			"file": "apps/web/src/app/[locale]/(dashboard)/admin/tenants/[tenantId]/runtime-allowlist/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/admin/usage",
+			"file": "apps/web/src/app/[locale]/(dashboard)/admin/usage/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/activity",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/activity/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/budgets",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/budgets/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/capabilities",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/capabilities/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/collaborators",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/collaborators/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/computer",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/inbox",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/inbox/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/inbox/:messageId",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/inbox/[messageId]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/inbox/compose",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/inbox/compose/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/instructions",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/instructions/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/mcp-servers",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/mcp-servers/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/settings",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/skills",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/skills/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/:id/terminal",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/[id]/terminal/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/activity",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/activity/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/activity/:runId",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/activity/[runId]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/archived",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/archived/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/chart",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/chart/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/sessions",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/sessions/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/sessions/:runId",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/sessions/[runId]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/skills",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/skills/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/agents/templates",
+			"file": "apps/web/src/app/[locale]/(dashboard)/agents/templates/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/auth/error",
+			"file": "apps/web/src/app/[locale]/(auth)/auth/error/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/auth/ever-id/account-exists",
+			"file": "apps/web/src/app/[locale]/(auth)/auth/ever-id/account-exists/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/auth/ever-id/create-account",
+			"file": "apps/web/src/app/[locale]/(auth)/auth/ever-id/create-account/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/catalog",
+			"file": "apps/web/src/app/[locale]/(dashboard)/catalog/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/catalog/playbooks/:slug",
+			"file": "apps/web/src/app/[locale]/(dashboard)/catalog/playbooks/[slug]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/catalog/workflows",
+			"file": "apps/web/src/app/[locale]/(dashboard)/catalog/workflows/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/catalog/workflows/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/catalog/workflows/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/claim/:token",
+			"file": "apps/web/src/app/[locale]/claim/[token]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/email-address/verify/:token",
+			"file": "apps/web/src/app/[locale]/email-address/verify/[token]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/checkouts",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/checkouts/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/commands",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/commands/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/computers",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/computers/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/computers/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/computers/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/sessions",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/sessions/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/sessions/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/sessions/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/fleet/usage",
+			"file": "apps/web/src/app/[locale]/(dashboard)/fleet/usage/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/forgot-password",
+			"file": "apps/web/src/app/[locale]/(auth)/forgot-password/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/goals",
+			"file": "apps/web/src/app/[locale]/(dashboard)/goals/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/goals/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/goals/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/goals/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/goals/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/help",
+			"file": "apps/web/src/app/[locale]/(dashboard)/help/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/help/:slug",
+			"file": "apps/web/src/app/[locale]/(dashboard)/help/[slug]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ideas",
+			"file": "apps/web/src/app/[locale]/(dashboard)/ideas/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ideas/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/ideas/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ideas/:id/agents/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/ideas/[id]/agents/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ideas/:id/tasks",
+			"file": "apps/web/src/app/[locale]/(dashboard)/ideas/[id]/tasks/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/ideas/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/ideas/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/inbox",
+			"file": "apps/web/src/app/[locale]/(dashboard)/inbox/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/login",
+			"file": "apps/web/src/app/[locale]/(auth)/login/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/login/magic-link",
+			"file": "apps/web/src/app/[locale]/(auth)/login/magic-link/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/meetings",
+			"file": "apps/web/src/app/[locale]/(dashboard)/meetings/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/meetings/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/meetings/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/meetings/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/meetings/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/memory",
+			"file": "apps/web/src/app/[locale]/(dashboard)/memory/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions/:id/agents",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/[id]/agents/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions/:id/agents/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/[id]/agents/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions/:id/tasks",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/[id]/tasks/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/missions/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/missions/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/onboarding",
+			"file": "apps/web/src/app/[locale]/onboarding/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/org-invite/:token",
+			"file": "apps/web/src/app/[locale]/org-invite/[token]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/plugins",
+			"file": "apps/web/src/app/[locale]/(dashboard)/plugins/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/plugins/:pluginId",
+			"file": "apps/web/src/app/[locale]/(dashboard)/plugins/[pluginId]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/profile",
+			"file": "apps/web/src/app/[locale]/(dashboard)/profile/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/register",
+			"file": "apps/web/src/app/[locale]/(auth)/register/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/resend-verification",
+			"file": "apps/web/src/app/[locale]/(auth)/resend-verification/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/reset-password",
+			"file": "apps/web/src/app/[locale]/(auth)/reset-password/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/runs",
+			"file": "apps/web/src/app/[locale]/(dashboard)/runs/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/schedules",
+			"file": "apps/web/src/app/[locale]/(dashboard)/schedules/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/admin/ever-id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/admin/ever-id/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/agent-plugins",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/agent-plugins/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/api-keys",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/api-keys/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/app-launcher",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/app-launcher/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/billing",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/billing/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/billing/payment-method",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/billing/payment-method/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/connections",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/connections/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/danger",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/danger/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/data",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/data/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/digest",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/digest/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/environments",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/environments/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/ever-platform",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/ever-platform/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/fleet",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/fleet/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/github-app",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/github-app/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/integrations/channels",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/integrations/channels/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/integrations/emails",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/integrations/emails/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/integrations/ever-gauzy",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/integrations/ever-gauzy/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/integrations/webhooks",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/integrations/webhooks/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/job-runtime",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/job-runtime/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/notifications",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/notifications/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/organization",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/organization/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/plugins",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/plugins/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/plugins/:category",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/plugins/[category]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/repositories",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/repositories/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/security",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/security/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/security/connect-ever-id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/security/connect-ever-id/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/usage",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/usage/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/settings/work-agent",
+			"file": "apps/web/src/app/[locale]/(dashboard)/settings/work-agent/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/skills",
+			"file": "apps/web/src/app/[locale]/(dashboard)/skills/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/skills/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/skills/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/skills/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/skills/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/skills/templates",
+			"file": "apps/web/src/app/[locale]/(dashboard)/skills/templates/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks/templates",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/templates/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks/triggers",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/triggers/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/tasks/triggers/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/tasks/triggers/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/teams",
+			"file": "apps/web/src/app/[locale]/(dashboard)/teams/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/teams/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/teams/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/teams/:id/settings",
+			"file": "apps/web/src/app/[locale]/(dashboard)/teams/[id]/settings/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/teams/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/teams/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/teams/org-chart",
+			"file": "apps/web/src/app/[locale]/(dashboard)/teams/org-chart/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/templates",
+			"file": "apps/web/src/app/[locale]/(dashboard)/templates/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/activity",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/activity/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/agents/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/agents/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/builds",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/builds/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/deploy",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/deploy/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/generator",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/generator/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/generator/comparisons",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/generator/comparisons/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/generator/comparisons/:slug",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/generator/comparisons/[slug]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/generator/history",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/generator/history/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/generator/schedule",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/generator/schedule/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/items",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/items/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/kb",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/kb/:path+",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/[...path]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/kb/embed/:path+",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/embed/[...path]/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/kb/review",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/review/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/members",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/members/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/plugins",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/plugins/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/pull-requests",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/pull-requests/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/settings",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/settings/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/settings/app-spec",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/settings/app-spec/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/settings/budgets-usage",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/settings/budgets-usage/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/settings/members",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/settings/members/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/tasks",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/tasks/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/:id/upstream",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/[id]/upstream/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/new",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/new/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/works/new/campaign",
+			"file": "apps/web/src/app/[locale]/(dashboard)/works/new/campaign/page.tsx",
+			"source": "router"
+		}
+	],
+	"notes": []
+}

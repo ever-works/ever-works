@@ -3420,6 +3420,13 @@ export class KnowledgeBaseService {
         title?: string;
         /** Derive the class from the extracted text instead of `targetClass`. */
         autoClassify?: boolean;
+        /**
+         * Works-security (#2804 review) — `proposed` when the upload came from
+         * anything but a person's session (`KB_NON_SESSION_WRITES_PROPOSED`):
+         * the created document then waits for a person's Accept like any other
+         * non-session KB write. Omitted = the source's own default (accepted).
+         */
+        reviewState?: KbReviewState;
     }): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
         await this.ownershipService.ensureCanEdit(input.workId, input.userId);
 
@@ -3515,6 +3522,9 @@ export class KnowledgeBaseService {
         workId: string,
         uploadId: string,
         userId: string,
+        // Works-security (#2804 review) — see `createUpload`'s `reviewState`.
+        // Appended LAST so positional callers keep their meaning.
+        opts: { reviewState?: KbReviewState } = {},
     ): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
         const access = await this.ownershipService.ensureCanEdit(workId, userId);
         if (access.role !== 'owner' && access.role !== 'manager') {
@@ -3557,6 +3567,7 @@ export class KnowledgeBaseService {
             tags: upload.tags ?? undefined,
             description: null,
             title: undefined,
+            reviewState: opts.reviewState,
         });
         // Same stale-state hazard as createUpload (see comment there): the
         // extract path updates the row but returns only the document, so
@@ -3618,6 +3629,7 @@ export class KnowledgeBaseService {
             description?: string | null;
             title?: string;
             autoClassify?: boolean;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         let body: string | null = null;
@@ -3738,6 +3750,7 @@ export class KnowledgeBaseService {
                 tags: input.tags,
                 source: 'imported' as KbDocumentSource,
                 sourceUploadId: upload.id,
+                reviewState: input.reviewState,
             });
 
             const docRow = await this.documentRepository.findById(input.workId, doc.id);
@@ -3923,6 +3936,7 @@ export class KnowledgeBaseService {
             tags?: string[];
             description?: string | null;
             title?: string;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         if (!this.hasBinaryViewer(input.file.mimeType)) {
@@ -3962,6 +3976,7 @@ export class KnowledgeBaseService {
             tags?: string[];
             description?: string | null;
             title?: string;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
@@ -3980,6 +3995,7 @@ export class KnowledgeBaseService {
                 tags: input.tags,
                 source: 'imported' as KbDocumentSource,
                 sourceUploadId: upload.id,
+                reviewState: input.reviewState,
             });
             const docRow = await this.documentRepository.findById(input.workId, doc.id);
             if (!docRow) {

@@ -1,4 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { neutralizeUntrustedLine } from '../utils/untrusted-content';
 
 /**
  * APW-04 — repository detection for the App Provisioner (Ruling A's "AI half").
@@ -151,7 +152,12 @@ export function detectAppRepository(snapshot: AppRepositorySnapshot): AppReposit
         // Line-wise, never a backtracking regex over repository text (CodeQL js/polynomial-redos).
         const web = files['Procfile'].split(/\r?\n/).find((line) => line.startsWith('web:'));
         procfileWeb = web ? web.slice('web:'.length).trim() || null : null;
-        evidence.push(`Procfile${procfileWeb ? ` (web: ${procfileWeb})` : ''}`);
+        // Works-security (2026-10-18) — the `web:` command is REPOSITORY text an upstream
+        // author wrote; it reaches the Agent's brief and a pull request body, so it is
+        // one line, defused and capped before it becomes evidence.
+        evidence.push(
+            `Procfile${procfileWeb ? ` (web: ${quoteRepositoryText(procfileWeb, 160)})` : ''}`,
+        );
     }
 
     // ── language, package manager, framework ─────────────────────────────
@@ -170,8 +176,18 @@ export function detectAppRepository(snapshot: AppRepositorySnapshot): AppReposit
             ...(record(pkg?.devDependencies) ?? {}),
         };
         const names = new Set(Object.keys(all));
+        // Works-security (2026-10-18) — `packageManager` is free text in an upstream-authored
+        // file, and it becomes the draft's start COMMAND (`[packageManager, 'start']`) and a
+        // line of evidence. Only a package manager the platform knows is taken from it;
+        // anything else falls back to the lockfile.
+        const declaredManager =
+            typeof pkg?.packageManager === 'string'
+                ? pkg.packageManager.split('@')[0].trim().toLowerCase()
+                : null;
         packageManager =
-            (typeof pkg?.packageManager === 'string' ? pkg.packageManager.split('@')[0] : null) ??
+            (declaredManager && KNOWN_NODE_PACKAGE_MANAGERS.includes(declaredManager)
+                ? declaredManager
+                : null) ??
             (root.has('pnpm-lock.yaml')
                 ? 'pnpm'
                 : root.has('yarn.lock')
@@ -345,13 +361,37 @@ export function detectAppRepository(snapshot: AppRepositorySnapshot): AppReposit
 export interface AppSpecDraftContext {
     /** The Work's name, used for `name:` at the root. */
     readonly name: string;
-    /** The existing `.works/works.yml`, when the repository has one (its owned blocks are kept). */
+    /**
+     * The `.works/works.yml` on the repository's default branch, when it has one. Its
+     * `version` and `name` are kept; its OWNED blocks are not (works-security
+     * 2026-10-18) — on a fork that file may be what an upstream author wrote.
+     */
     readonly existingText?: string | null;
-    /** The source relation, when there is no existing file to read it from. */
+    /**
+     * The platform's own record of the source (`work.sourceRepository`). It WINS over any
+     * `source` block in {@link existingText}.
+     */
     readonly source?: {
         relation: string;
         upstream?: { repo: string; defaultBranch?: string };
     } | null;
+    /**
+     * The Work's EFFECTIVE App spec (stored and validated by the platform), when it has
+     * one. The owned blocks are carried from HERE — never from {@link existingText}.
+     */
+    readonly effectiveSpec?: Record<string, unknown> | null;
+}
+
+/** Node package managers a `package.json` `packageManager` field may name (anything else: the lockfile decides). */
+const KNOWN_NODE_PACKAGE_MANAGERS: readonly string[] = ['npm', 'pnpm', 'yarn', 'bun'];
+
+/**
+ * One line of repository text quoted as evidence: newlines collapsed, chat-template
+ * markers and prompt-tag look-alikes defused (`neutralizeUntrustedLine`), backticks
+ * neutralized (so it cannot close a Markdown code span or block), capped.
+ */
+export function quoteRepositoryText(value: string, maxChars = 200): string {
+    return neutralizeUntrustedLine(value, { maxChars }).replace(/`/g, "'");
 }
 
 /** Blocks the provisioner never rewrites (SKILL.md hard rule 5). */
@@ -365,21 +405,37 @@ const OWNED_BLOCKS = [
 ];
 
 /**
- * Build a `.works/works.yml` document from a detection. The owned blocks of an existing
- * file are carried over verbatim; everything the detection can justify is added.
+ * Build a `.works/works.yml` document from a detection. Everything the detection can
+ * justify is added.
+ *
+ * The OWNED blocks (`source`, `blueprint`, `license`, `upstreamSync`,
+ * `upstreamPullRequests`, `provisioning`) come from platform state only
+ * (works-security 2026-10-18): the Work's effective spec when it has one, and
+ * `source` from the platform's own record. A `.works/works.yml` that is not yet the
+ * effective spec — on a fork, possibly what an upstream author wrote — never decides
+ * them: an upstream file declaring a permissive `license`, an `autoReprovision: true`
+ * or a different `source` would otherwise be handed to the Agent as "keep exactly as
+ * it is".
  */
 export function draftAppSpecDocument(
     detection: AppRepositoryDetection,
     context: AppSpecDraftContext,
 ): string {
     const existing = parseExisting(context.existingText);
-    const existingSpec = record(existing?.spec) ?? {};
+    const effective = record(context.effectiveSpec) ?? null;
     const spec: Record<string, unknown> = {};
-    for (const key of OWNED_BLOCKS) {
-        if (existingSpec[key] !== undefined) spec[key] = existingSpec[key];
+    if (effective) {
+        for (const key of OWNED_BLOCKS) {
+            if (effective[key] !== undefined) spec[key] = effective[key];
+        }
     }
-    if (spec['source'] === undefined && context.source) {
+    if (context.source) {
         spec['source'] = context.source;
+    } else if (spec['source'] === undefined) {
+        // No platform record at all: the file's `source` is the only statement there is,
+        // and the validator still judges it. Nothing else is taken from the file.
+        const fileSource = record(existing?.spec)?.['source'];
+        if (fileSource !== undefined) spec['source'] = fileSource;
     }
 
     if (detection.runnable) {

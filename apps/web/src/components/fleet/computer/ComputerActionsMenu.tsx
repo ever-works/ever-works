@@ -28,6 +28,8 @@ import {
     type FleetViewerRole,
 } from '@ever-works/contracts';
 import { useRouter } from '@/i18n/navigation';
+import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
+import { useShortcut } from '@/lib/hooks/use-shortcut';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,7 +55,7 @@ import {
     setFleetNodeFavoriteAction,
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
-import { getComputerActions, type FleetFeatureFlags } from '../registry';
+import { computerActionProps, getComputerActions, type FleetFeatureFlags } from '../registry';
 import { RegisteredComponent } from '../RegisteredComponent';
 import { captureFleetEvent } from '../fleet-telemetry';
 
@@ -156,7 +158,8 @@ export function ComputerActionsMenu({
     };
 
     // ── Favourite ──────────────────────────────────────────────────────────
-    const toggleFavourite = () => {
+    // `announce`: the keyboard has no menu to show the change, so it says it.
+    const toggleFavourite = (announce = false) => {
         const next = !node.isFavorite;
         captureFleetEvent({ name: 'fleet_favorite_toggled', properties: { on: next } });
         startTransition(async () => {
@@ -165,9 +168,32 @@ export function ComputerActionsMenu({
                 toast.error(result.error || t('favouriteFailed'));
                 return;
             }
+            if (announce) {
+                toast.success(
+                    next
+                        ? t('favouriteAdded', { name: node.name })
+                        : t('favouriteRemoved', { name: node.name }),
+                );
+            }
             router.refresh();
         });
     };
+
+    // `F` toggles the favourite from anywhere on the page, never while typing
+    // (spec §5.12, FR-34) — the owner's act, so only bound for the owner.
+    useShortcut(
+        {
+            id: 'fleet.computer.favourite',
+            scope: 'fleet-computer',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled: isOwner,
+        },
+        (event) =>
+            event.key.toLowerCase() === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        () => {
+            if (!isPending) toggleFavourite(true);
+        },
+    );
 
     // ── Pause / resume (plain, a toast) ────────────────────────────────────
     const togglePaused = () => {
@@ -347,7 +373,7 @@ export function ComputerActionsMenu({
                             'fleet-computer-menu-favourite',
                             <Star className={iconClass} aria-hidden="true" />,
                             node.isFavorite && isOwner ? t('removeFavourite') : t('addFavourite'),
-                            toggleFavourite,
+                            () => toggleFavourite(),
                             ownerOnlyDenied,
                         )}
                         {item(
@@ -384,7 +410,7 @@ export function ComputerActionsMenu({
                                 key={action.id}
                                 id={`menu:${action.id}`}
                                 load={action.load}
-                                props={{ node, flags }}
+                                props={computerActionProps(node, flags, action)}
                                 loading={null}
                                 failed={null}
                             />

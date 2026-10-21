@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FleetNodeView } from '@ever-works/contracts';
 
@@ -34,6 +34,7 @@ vi.mock('sonner', () => ({ toast }));
 vi.mock('@/app/actions/settings/fleet', () => actions);
 vi.mock('../fleet-telemetry', () => ({ captureFleetEvent: vi.fn() }));
 
+import { __resetShortcutRegistryForTests } from '@/lib/keyboard/shortcut-registry';
 import { ComputerActionsMenu } from './ComputerActionsMenu';
 
 const node = (over: Partial<FleetNodeView> = {}): FleetNodeView =>
@@ -291,5 +292,88 @@ describe('ComputerActionsMenu — organisation roles (mirrors the server)', () =
         expect(screen.queryByTestId('fleet-computer-menu-rename-denied')).toBeNull();
         expect(screen.queryByTestId('fleet-computer-menu-remove-denied')).toBeNull();
         expect(screen.getByTestId('fleet-computer-menu-favourite-denied')).toBeInTheDocument();
+    });
+});
+
+describe('ComputerActionsMenu — `F` (spec §5.12, FR-34, T-28)', () => {
+    function press(init: KeyboardEventInit, target: EventTarget = document.body): KeyboardEvent {
+        const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+        act(() => {
+            target.dispatchEvent(event);
+        });
+        return event;
+    }
+
+    afterEach(() => {
+        __resetShortcutRegistryForTests();
+        document.querySelectorAll('[data-test-typing]').forEach((element) => element.remove());
+    });
+
+    it('stars the computer for the owner and says so, since no menu shows the change', async () => {
+        actions.setFleetNodeFavoriteAction.mockResolvedValue(ok(node({ isFavorite: true })));
+        render(<ComputerActionsMenu node={node()} />);
+        const event = press({ key: 'f' });
+        expect(event.defaultPrevented).toBe(true);
+        await waitFor(() =>
+            expect(actions.setFleetNodeFavoriteAction).toHaveBeenCalledWith('n1', true),
+        );
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith('favouriteAdded:build-01'));
+        await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+        // The menu never opened.
+        expect(screen.queryByTestId('fleet-computer-menu-favourite')).toBeNull();
+    });
+
+    it('unstars a favourite on `F` (either case)', async () => {
+        actions.setFleetNodeFavoriteAction.mockResolvedValue(ok(node({ isFavorite: false })));
+        render(<ComputerActionsMenu node={node({ isFavorite: true })} />);
+        press({ key: 'F', shiftKey: true });
+        await waitFor(() =>
+            expect(actions.setFleetNodeFavoriteAction).toHaveBeenCalledWith('n1', false),
+        );
+        await waitFor(() =>
+            expect(toast.success).toHaveBeenCalledWith('favouriteRemoved:build-01'),
+        );
+    });
+
+    it('says why when the star is refused, and does not refresh', async () => {
+        actions.setFleetNodeFavoriteAction.mockResolvedValue({
+            success: false,
+            data: null,
+            error: 'Fleet is unavailable',
+        });
+        render(<ComputerActionsMenu node={node()} />);
+        press({ key: 'f' });
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fleet is unavailable'));
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(router.refresh).not.toHaveBeenCalled();
+    });
+
+    it('is not bound for anyone but the owner', () => {
+        for (const viewerRole of ['org-admin', 'org-member', 'stranger'] as const) {
+            const { unmount } = render(<ComputerActionsMenu node={node({ viewerRole })} />);
+            const event = press({ key: 'f' });
+            expect(event.defaultPrevented).toBe(false);
+            unmount();
+        }
+        expect(actions.setFleetNodeFavoriteAction).not.toHaveBeenCalled();
+    });
+
+    it('never fires while the viewer is typing', () => {
+        render(<ComputerActionsMenu node={node()} />);
+        const input = document.createElement('input');
+        input.setAttribute('data-test-typing', '');
+        document.body.appendChild(input);
+        press({ key: 'f' }, input);
+        expect(actions.setFleetNodeFavoriteAction).not.toHaveBeenCalled();
+    });
+
+    it('leaves Ctrl+F / Cmd+F (find in page) to the browser', () => {
+        render(<ComputerActionsMenu node={node()} />);
+        const ctrl = press({ key: 'f', ctrlKey: true });
+        const cmd = press({ key: 'f', metaKey: true });
+        press({ key: 'f', altKey: true });
+        expect(ctrl.defaultPrevented).toBe(false);
+        expect(cmd.defaultPrevented).toBe(false);
+        expect(actions.setFleetNodeFavoriteAction).not.toHaveBeenCalled();
     });
 });

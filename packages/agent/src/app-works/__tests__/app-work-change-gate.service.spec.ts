@@ -96,7 +96,7 @@ function harness() {
 function input(overrides: Partial<AppWorkChangeGateInput> = {}): AppWorkChangeGateInput {
     return {
         work: WORK,
-        taskLabels: [],
+        taskOrigin: null,
         owner: 'acme',
         repo: 'their-app',
         gitOptions: { userId: 'u-1', providerId: 'github', workId: 'w-1' },
@@ -306,7 +306,7 @@ describe('the branch’s .works/works.yml, three ways', () => {
         expect(verdict.allowed === false && verdict.message).toContain('source');
     });
 
-    it('lets APW-04’s app-provision label past rule 4, and only rule 4', async () => {
+    it('lets an App provisioning Task (origin) past rule 4, and only rule 4', async () => {
         const { gate, m } = harness();
         m.getCompareDiff.mockResolvedValue(diff([{ path: APP_SPEC_PATH, status: 'modified' }]));
         m.parseDraft.mockResolvedValue({
@@ -315,10 +315,24 @@ describe('the branch’s .works/works.yml, three ways', () => {
         });
 
         await expect(
-            gate.evaluate(input({ taskLabels: ['app-provision'] })),
+            gate.evaluate(input({ taskOrigin: 'app-provisioning' })),
         ).resolves.toMatchObject({
             allowed: true,
         });
+    });
+
+    it('refuses the same change for a Task that only carries the app-provision LABEL', async () => {
+        const { gate, m } = harness();
+        m.getCompareDiff.mockResolvedValue(diff([{ path: APP_SPEC_PATH, status: 'modified' }]));
+        m.parseDraft.mockResolvedValue({
+            status: 'valid',
+            spec: { source: { relation: 'fork', branch: 'somewhere-else' } } as AppSpec,
+        });
+
+        const verdict = await gate.evaluate(
+            input({ taskOrigin: null, ...({ taskLabels: ['app-provision'] } as object) }),
+        );
+        expect(verdict.allowed).toBe(false);
     });
 });
 
@@ -456,19 +470,19 @@ describe('checkPaths — the pre-write question (FR-8)', () => {
             return { gate, m };
         };
 
-        it('lets APW-04’s app-provision label past rule 4 — as `evaluate` does', async () => {
+        it('lets an App provisioning Task (origin) past rule 4 — as `evaluate` does', async () => {
             const { gate } = sourceMoved();
 
             await expect(
                 gate.checkPaths({
                     ...pathsInput([APP_SPEC_PATH]),
                     contents: { [APP_SPEC_PATH]: 'the new spec' },
-                    taskLabels: ['app-provision'],
+                    taskOrigin: 'app-provisioning',
                 }),
             ).resolves.toMatchObject({ allowed: true });
         });
 
-        it('still refuses the same change without the label', async () => {
+        it('still refuses the same change without the origin', async () => {
             const { gate } = sourceMoved();
 
             const verdict = await gate.checkPaths({
@@ -480,12 +494,12 @@ describe('checkPaths — the pre-write question (FR-8)', () => {
             expect(verdict.allowed === false && verdict.message).toContain('source');
         });
 
-        it('never lets the label past a protected path — only rule 4', async () => {
+        it('never lets the origin past a protected path — only rule 4', async () => {
             const { gate } = harness();
 
             const verdict = await gate.checkPaths({
                 ...pathsInput(['.github/workflows/ci.yml']),
-                taskLabels: ['app-provision'],
+                taskOrigin: 'app-provisioning',
             });
 
             expect(verdict).toMatchObject({ allowed: false, paths: ['.github/workflows/ci.yml'] });

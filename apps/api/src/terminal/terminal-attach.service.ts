@@ -39,6 +39,16 @@ export interface TerminalAttachClaims {
      * it the second time. Absent on every terminal and computer token.
      */
     jti?: string;
+    /**
+     * Fleet node link viewers (FL-02, `fleet-link-viewer` tokens only): the node
+     * whose link carries the channel (`runId` is `<family>:<target>`, the path
+     * the token opens) and the params the channel opens with. Absent on every
+     * other token.
+     */
+    linkNodeId?: string;
+    linkParams?: Record<string, unknown>;
+    /** The requirement the token was authorised under (consent, action family, state-changing, target). */
+    linkRequirement?: Record<string, unknown>;
 }
 
 /**

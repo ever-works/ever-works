@@ -113,6 +113,8 @@ describe('TasksController create/update — a fleet-run credential cannot relax 
         const service = {
             create: jest.fn().mockResolvedValue({ id: taskId }),
             update: jest.fn().mockResolvedValue({ id: taskId }),
+            // Works-security (2026-10-18): a machine principal's PATCH reads the Task first.
+            getOne: jest.fn().mockResolvedValue({ id: taskId, labels: [] }),
         };
         const controller = new TasksController(
             service as never,

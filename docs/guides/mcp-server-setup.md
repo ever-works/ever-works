@@ -221,12 +221,12 @@ The production manifest pins `EVER_WORKS_MCP_AUTH_MODE=per-user-jwt`. That has o
 
 Four families of tools, from three different sources.
 
-| Family                    | Count | Source                                    | Examples                                                              |
-| ------------------------- | ----- | ----------------------------------------- | --------------------------------------------------------------------- |
-| OpenAPI-whitelisted verbs | 66    | `apps/mcp/src/openapi-tools/whitelist.ts` | `list_works`, `generate_items`, `deploy_work`, `create_mission`       |
-| Knowledge Base            | 5     | `apps/mcp/src/tools/kb/`                  | `kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`              |
-| Zero-friction onboarding  | 1     | `apps/mcp/src/register-work.tool.ts`      | `register_work`                                                       |
-| Health                    | 1     | `apps/mcp/src/ping.tool.ts`               | `ping`                                                                |
+| Family                    | Count | Source                                    | Examples                                                        |
+| ------------------------- | ----- | ----------------------------------------- | --------------------------------------------------------------- |
+| OpenAPI-whitelisted verbs | 66    | `apps/mcp/src/openapi-tools/whitelist.ts` | `list_works`, `generate_items`, `deploy_work`, `create_mission` |
+| Knowledge Base            | 5     | `apps/mcp/src/tools/kb/`                  | `kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`        |
+| Zero-friction onboarding  | 1     | `apps/mcp/src/register-work.tool.ts`      | `register_work`                                                 |
+| Health                    | 1     | `apps/mcp/src/ping.tool.ts`               | `ping`                                                          |
 
 The 66 whitelisted verbs are not hand-written. At startup the server loads the API's OpenAPI spec, matches each whitelist entry against it, and derives the tool's parameters, types and description from the spec — so a tool's schema is never out of step with the endpoint behind it. An entry with no matching operation is skipped with a warning rather than registered half-formed.
 

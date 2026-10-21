@@ -598,7 +598,9 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         }
 
         function mailgunWebhook(signingKey: string) {
-            const timestamp = '1790000000';
+            // F56 (896973282): Mailgun signatures are accepted only while fresh, so the
+            // signing time is now, not a fixed instant that ages out of the window.
+            const timestamp = String(Math.floor(Date.now() / 1000));
             const token = 'token-1';
             const signature = createHmac('sha256', signingKey)
                 .update(`${timestamp}${token}`)
