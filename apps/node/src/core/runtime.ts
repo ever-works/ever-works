@@ -26,6 +26,7 @@ import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { runAgentSessionJob } from './executors/agent-session';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
@@ -1221,6 +1222,34 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				await pushCredentials?.dispose();
 			}
 		});
+		// Sessions on computers (FL-04 P2): an Agent working in an interactive
+		// session on this machine. The WORK lane only (never the attended
+		// lane), counted against `--concurrency` like `agent-task` (R-28);
+		// started through the session daemon under the Task-run isolation, the
+		// lease held while the session lives. Without a daemon (no `--work` /
+		// `--manage`, or the shell did not wire one) every job is refused with
+		// the reason rather than pretending to have run it.
+		worker.register('agent-session', (job, signal) =>
+			runAgentSessionJob(job, signal, {
+				workEnabled: options.workerEnabled === true,
+				daemon: sessions?.supervisor ?? null,
+				modelCli,
+				containment: {
+					sessionConfigFs: defaultSessionConfigFs,
+					managedMcpConfigFs: defaultSessionConfigFs,
+					modelCli,
+					nodeId: config.nodeId,
+					logger: io.logger,
+					...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {})
+				},
+				nodeId: config.nodeId,
+				homedir: osHomedir(),
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
+				platform: io.environment.platform as NodeJS.Platform,
+				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+			})
+		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising
 		// the `browser` capability with no executor behind it would fail
