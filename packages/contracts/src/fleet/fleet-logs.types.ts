@@ -118,7 +118,12 @@ export const FLEET_LOGS_READ_RATE_LIMIT = 30;
 
 // ─── Sources ────────────────────────────────────────────────────────────────
 
-export const FLEET_LOG_SOURCE_KINDS = ['system', 'file', 'container', 'service'] as const;
+/**
+ * `runner` (FL-18, spec FR-18) is appended last: an Actions runner's newest
+ * diagnostic log (`runner:<runner name>`), which the machine resolves itself
+ * under its own runners folder — a caller never names a path.
+ */
+export const FLEET_LOG_SOURCE_KINDS = ['system', 'file', 'container', 'service', 'runner'] as const;
 
 export type FleetLogSourceKind = (typeof FLEET_LOG_SOURCE_KINDS)[number];
 
@@ -205,7 +210,7 @@ export interface FleetLogSourceList {
 	listedAt: string;
 }
 
-/** `system:journal` · `file:/var/log/syslog` · `container:acme-api` · `service:nginx.service`. */
+/** `system:journal` · `file:/var/log/syslog` · `container:acme-api` · `service:nginx.service` · `runner:build-01-1`. */
 export function fleetLogSourceId(kind: FleetLogSourceKind, key: string): string {
 	return `${kind}:${key}`;
 }
@@ -222,6 +227,13 @@ export function isFleetLogServiceKey(value: unknown): value is string {
 
 export function isFleetLogContainerKey(value: unknown): value is string {
 	return typeof value === 'string' && CONTAINER_KEY_PATTERN.test(value);
+}
+
+/** Actions runner names (FL-18): what `config --name` accepts, never `.` or `..`. */
+const RUNNER_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+export function isFleetLogRunnerKey(value: unknown): value is string {
+	return typeof value === 'string' && RUNNER_KEY_PATTERN.test(value) && value !== '.' && value !== '..';
 }
 
 /** An absolute path a file source may name: POSIX `/…` or a Windows drive path, no NUL, bounded. */
@@ -259,6 +271,8 @@ export function parseFleetLogSourceId(value: unknown): FleetLogSourceRef | null 
 			return isFleetLogContainerKey(key) ? { kind, key } : null;
 		case 'service':
 			return isFleetLogServiceKey(key) ? { kind, key } : null;
+		case 'runner':
+			return isFleetLogRunnerKey(key) ? { kind, key } : null;
 		default:
 			return null;
 	}

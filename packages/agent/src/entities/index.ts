@@ -175,6 +175,8 @@ export * from './fleet-command-run.entity';
 export * from './fleet-port-tunnel.entity';
 // Checkouts on computers (FL-14) — clones and worktrees on a Node
 export * from './fleet-checkout.entity';
+// Actions runners on computers (FL-18) — GitHub Actions self-hosted runners on a Node
+export * from './fleet-actions-runner.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';

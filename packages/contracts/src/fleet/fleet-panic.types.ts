@@ -288,7 +288,21 @@ export type FleetAuditAction =
 	/** A Container recreated from the current catalogue image, keeping its home (P3). */
 	| 'node.vm.rebuild'
 	/** The one-time reveal of a Windows VM's generated password — `revealed: true`, never the value (P2). */
-	| 'node.vm.password.reveal';
+	| 'node.vm.password.reveal'
+	/**
+	 * Actions runners on computers (FL-18, CONTRACTS §7) — one row per runner
+	 * installed (and per start / stop / restart / remove), `family: 'machines'`,
+	 * the runner as `target`, `requestedBy`, `confirmationClass`, `outcome`, plus
+	 * the repository or organisation, labels, mode and runner version; never a
+	 * registration or remove token.
+	 */
+	| 'node.runner.install'
+	| 'node.runner.start'
+	| 'node.runner.stop'
+	| 'node.runner.restart'
+	| 'node.runner.remove'
+	/** A whole GitHub workflow run cancelled from the Actions jobs panel (P2, R-37) — the run as `target`. */
+	| 'node.runner.job.cancel';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -390,7 +404,13 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.vm.destroy',
 	'node.vm.resize',
 	'node.vm.rebuild',
-	'node.vm.password.reveal'
+	'node.vm.password.reveal',
+	'node.runner.install',
+	'node.runner.start',
+	'node.runner.stop',
+	'node.runner.restart',
+	'node.runner.remove',
+	'node.runner.job.cancel'
 ];
 
 /**

@@ -37,3 +37,4 @@ export * from './fleet-task-workspace.types.js';
 export * from './fleet-tools.types.js';
 export * from './fleet-task-handoff.types.js';
 export * from './fleet-virtual.types.js';
+export * from './fleet-actions-runners.types.js';

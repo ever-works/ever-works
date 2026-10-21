@@ -147,7 +147,14 @@ export const PLUGIN_CAPABILITIES = {
 	// `capabilities/domain-event-subscriber.interface.ts`. Appended last, so
 	// every existing constant keeps its value and its position; no category is
 	// added (a subscriber plugin keeps the category of what it otherwise is).
-	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber'
+	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber',
+	// Actions runners on computers (FL-18, CONTRACTS R-14) — GitHub's self-hosted
+	// runner API through the Ever Works GitHub App (`github-actions-runners`),
+	// consumed only through `ActionsRunnersFacadeService`; see
+	// `capabilities/actions-runners.interface.ts`. Appended last, so every
+	// existing constant keeps its value and its position; no category is added
+	// (the plugin is an `integration`, which exists).
+	ACTIONS_RUNNERS: 'actions-runners'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 105 plugins under `packages/plugins/`, spanning **21 of the 27 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, utility, build, and identity. (`form`, `integration`, `theme`, `memory`, `rag`, and `app-dependency` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
+The platform ships with 106 plugins under `packages/plugins/`, spanning **22 of the 27 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, utility, build, identity, and integration. (`form`, `theme`, `memory`, `rag`, and `app-dependency` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
 
 ## Plugin count by category
 
@@ -36,6 +36,7 @@ Counted from each package's `everworks.plugin.category` field.
 | `dns`                   | 1     | `cloudflare-dns`                                                                                                                                                                                                                        |
 | `build`                 | 1     | `github-actions-build`                                                                                                                                                                                                                  |
 | `identity`              | 1     | `oidc-identity`                                                                                                                                                                                                                         |
+| `integration`           | 1     | `github-actions-runners`                                                                                                                                                                                                                |
 
 A plugin's **capabilities** are independent of its category: `scrapfly` sits in `content-extractor` but also advertises `screenshot`, and every `search` plugin except `brave`, `perplexity` and `serpapi` also advertises `content-extractor`.
 
@@ -1968,3 +1969,7 @@ Anything else (a scheme, a path, an `@`, an embedded wildcard) is rejected as a 
 - [Plugin Categories & Capabilities](./plugin-categories.md) · [Creating a Plugin](./creating-a-plugin.md) · [Plugin API Reference](./api-reference.md)
 - Feature guides: [Plugins](../features/plugins.md) · [Storage Backends](../features/storage-backends.md) · [Secret Stores](../features/secret-stores.md) · [Job Runtimes](../features/job-runtimes.md) · [Connectors](../features/connectors.md) · [Notifications](../features/notifications.md) · [Goals](../features/goals.md)
 - Deployment: [Kubernetes Deployment](../features/k8s-deployment.md) · [Managed Hosting](../features/managed-hosting.md) · [Custom Domains](../features/custom-domains.md)
+
+## GitHub Actions runners (`github-actions-runners`)
+
+Category `integration`, capability `actions-runners` (Fleet epic FL-18). Turns computers of your Fleet into GitHub Actions self-hosted runners for repositories and organisations the Ever Works GitHub App is installed on: it lists the runner builds GitHub publishes with their SHA-256, mints the one-time registration and remove tokens, reads runner status and the queued and running jobs, and cancels a workflow run. It talks to GitHub only with a short-lived installation token the platform mints for each call, narrowed to the one permission that call needs; it has no settings and never asks for a personal token. Switched on with `FLEET_ACTIONS_RUNNERS_ENABLED`. See [Actions runners on computers](../features/fleet-actions-runners.md).
