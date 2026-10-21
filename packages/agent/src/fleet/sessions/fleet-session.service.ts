@@ -107,11 +107,24 @@ function rowFacts(row: FleetSession): FleetSessionRowFacts {
     };
 }
 
-function folderTitle(cwd: string): string {
-    const trimmed = cwd.replace(/[\\/]+$/, '');
+function isPathSeparator(char: string): boolean {
+    return char === '/' || char === '\\';
+}
+
+/**
+ * The last folder name of a path. A plain scan, never a regex anchored at the
+ * end of a separator run: the folder is the caller's input, and
+ * `/[\\/]+$/` backtracks polynomially on a long run of separators that does
+ * not end the string (CodeQL js/polynomial-redos).
+ */
+export function fleetSessionFolderTitle(cwd: string): string {
+    let end = cwd.length;
+    while (end > 0 && isPathSeparator(cwd.charAt(end - 1))) end -= 1;
+    const trimmed = cwd.slice(0, end);
     if (trimmed === '~' || trimmed === '') return '~';
-    const parts = trimmed.split(/[\\/]/);
-    return parts[parts.length - 1] || trimmed;
+    let start = end;
+    while (start > 0 && !isPathSeparator(trimmed.charAt(start - 1))) start -= 1;
+    return trimmed.slice(start) || trimmed;
 }
 
 /** The default title: the first message's opening words for an agent, else the folder. */
@@ -124,7 +137,7 @@ export function defaultFleetSessionTitle(
         const preview = redactSecrets(firstMessage.trim().replace(/\s+/g, ' ')).cleaned;
         return preview.length > 60 ? `${preview.slice(0, 57)}…` : preview;
     }
-    return folderTitle(cwd).slice(0, FLEET_SESSION_TITLE_MAX_LENGTH);
+    return fleetSessionFolderTitle(cwd).slice(0, FLEET_SESSION_TITLE_MAX_LENGTH);
 }
 
 @Injectable()
