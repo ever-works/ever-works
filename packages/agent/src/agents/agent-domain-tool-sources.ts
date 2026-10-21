@@ -10,6 +10,7 @@ import type { IngestedEventRepository } from '../ingest/ingested-event.repositor
 import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
+import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -91,6 +92,11 @@ export interface AgentMeetingToolSource {
 
 export interface AgentFleetToolSource {
     service: Pick<FleetService, 'listForUser'>;
+}
+
+/** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
+export interface AgentFleetSessionToolSource {
+    service: FleetSessionsToolService['service'];
 }
 
 export interface AgentPrReviewToolSource {
@@ -218,6 +224,7 @@ export interface AgentDomainToolSources {
     digest?: AgentDigestToolSource;
     meetings?: AgentMeetingToolSource;
     fleet?: AgentFleetToolSource;
+    fleetSessions?: AgentFleetSessionToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

@@ -130,7 +130,9 @@ import {
     FleetKillSwitchService,
     FleetModule,
     FleetService,
+    FleetSessionService,
 } from '@ever-works/agent/fleet';
+import { config } from '@ever-works/agent/config';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
@@ -2113,6 +2115,10 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // FL-04 P2 — the `sessions` tool family (fleet_sessions_*). APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED
+                // off) the six tools are simply not offered.
+                { token: FleetSessionService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2136,6 +2142,7 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                fleetSessions?: FleetSessionService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2157,6 +2164,9 @@ async function assertRealWriteTarget(
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
                 fleet: { service: fleet },
+                ...(fleetSessions && config.fleet.isSessionsEnabled()
+                    ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

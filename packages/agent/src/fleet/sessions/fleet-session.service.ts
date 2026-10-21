@@ -657,6 +657,43 @@ export class FleetSessionService {
         return toFleetSessionView(ended, { includeScreen: true });
     }
 
+    /**
+     * Type text into a live session as a driver (FL-04 P2, `fleet_sessions_send`):
+     * the audience, the kill switch, then the machine; ONE `node.session.input`
+     * row with its byte count (a tool's send is one span) — never the text.
+     */
+    async sendInput(id: string, actor: FleetSessionActor, data: string): Promise<void> {
+        const { session, node } = await this.resolve(id, actor);
+        if (typeof data !== 'string' || data.length === 0 || data.length > 64 * 1024) {
+            throw fleetSessionError('invalid', 'the text to send is 1–64 KiB', { field: 'text' });
+        }
+        if (!isFleetSessionLive(session.state)) {
+            throw fleetSessionError('invalid', 'the session has ended', { state: session.state });
+        }
+        if (await this.isStopped())
+            throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
+        await this.requireNode().request({
+            nodeId: node.id,
+            sessionId: session.daemonSessionId,
+            kind: session.kind,
+            mode: 'driver',
+            verb: 'session.input',
+            params: { data },
+            caller: { kind: 'user', userId: actor.userId },
+            stateChanging: true,
+        });
+        const at = new Date(this.now()).toISOString();
+        await this.record('node.session.input', actor.userId, node, session.id, {
+            role: 'driver',
+            confirmationClass: 'plain',
+            outcome: 'span',
+            from: at,
+            to: at,
+            bytes: Buffer.byteLength(data, 'utf8'),
+            ...(actor.agentId ? { requestedBy: `agent:${actor.agentId}` } : {}),
+        });
+    }
+
     // ─── Attach (FL-04 P1b) ────────────────────────────────────────────────
 
     /**
