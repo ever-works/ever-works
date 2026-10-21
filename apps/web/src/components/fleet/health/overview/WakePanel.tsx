@@ -45,13 +45,13 @@ export interface WakePanelProps {
  */
 export type WakePhase = 'idle' | 'sending' | 'listening' | 'not-yet' | 'back' | 'no-answer';
 
-const REASON_KEYS: Record<Exclude<FleetWakeUnavailableReason, 'not-offline'>, string> = {
+const REASON_KEYS = {
     'no-sibling': 'noSibling',
     'no-hardware-address': 'noHardwareAddress',
     'rate-limited': 'rateLimited',
     'not-allowed': 'notAllowed',
     'kill-switch': 'killSwitch',
-};
+} as const satisfies Record<Exclude<FleetWakeUnavailableReason, 'not-offline'>, string>;
 
 /**
  * Computer health, second phase (FL-03, spec S7, §5.5, U4, U6, U7) — Wake an
