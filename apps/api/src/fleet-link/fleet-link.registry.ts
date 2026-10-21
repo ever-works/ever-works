@@ -300,6 +300,12 @@ export class FleetLinkRegistry {
     /** Epoch ms each node's last link dropped, for the "reconnecting" state. */
     private readonly lastDrop = new Map<string, number>();
     /**
+     * Fleet node link (FL-02 T-26) — desktop-app computers seen linking by this
+     * replica: a desktop app with the consents wiring. Their view reads
+     * `not-open` rather than `unsupported-kind` while the link is down.
+     */
+    private readonly linkedDesktops = new Set<string>();
+    /**
      * Per node: the generation its last link resumed from, when that link
      * dropped before the node was heard on it (see the class doc).
      */
@@ -443,6 +449,9 @@ export class FleetLinkRegistry {
         link.nextChannel = resumed.length > 0 ? Math.max(...resumed) + 1 : 1;
         this.links.set(nodeId, link);
         this.lastDrop.delete(nodeId);
+        if (link.nodeKind === 'desktop-node' && this.linkedDesktops.size < 100_000) {
+            this.linkedDesktops.add(nodeId);
+        }
         const ready: FleetLinkReady = {
             type: 'link.ready',
             linkGeneration: generation,
@@ -588,8 +597,11 @@ export class FleetLinkRegistry {
         if (droppedAt !== undefined && this.now() - droppedAt < this.resumeWindowMs) {
             return { ...base, state: 'reconnecting', since: new Date(droppedAt).toISOString() };
         }
-        // The desktop shell cannot report consents (and so open a link) yet (CONTRACTS R-10).
-        if (node.kind === 'desktop-node') return { ...base, state: 'unsupported-kind' };
+        // A desktop shell older than FL-02's parity cannot report consents (and so
+        // open a link) (CONTRACTS R-10); one this replica has seen link can.
+        if (node.kind === 'desktop-node' && !this.linkedDesktops.has(node.id)) {
+            return { ...base, state: 'unsupported-kind' };
+        }
         return { ...base, state: 'not-open' };
     }
 

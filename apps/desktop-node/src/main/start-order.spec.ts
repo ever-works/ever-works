@@ -152,3 +152,31 @@ describe('startRuntimeInOrder', () => {
 		expect(loop.getState().state).toBe('connected');
 	});
 });
+
+describe('startRuntimeInOrder — the other lanes (FL-02 T-26)', () => {
+	it('starts the live-view and management lanes after the worker, once a beat was accepted', async () => {
+		const order: string[] = [];
+		const lane = (name: string) => ({ start: vi.fn(async () => void order.push(name)) });
+		const loop = {
+			start: vi.fn(async () => undefined),
+			getState: () => ({
+				state: 'connected' as const,
+				lastHeartbeatAt: Date.now(),
+				consecutiveFailures: 0,
+				nextAttemptInMs: null,
+				lastError: null,
+				lastErrorKind: null,
+				node: null
+			}),
+			onChange: () => () => undefined
+		};
+		const runtime = {
+			loop,
+			worker: lane('work'),
+			attended: { worker: lane('attended') },
+			management: { worker: lane('management') }
+		};
+		await startRuntimeInOrder(runtime as unknown as Parameters<typeof startRuntimeInOrder>[0], () => true);
+		expect(order).toEqual(['work', 'attended', 'management']);
+	});
+});

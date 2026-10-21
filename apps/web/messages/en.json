@@ -13079,7 +13079,8 @@
             "copy": "Copy",
             "copied": "Copied",
             "copyFailed": "Could not copy. Select the command and copy it yourself.",
-            "copyLabel": "Copy the command that turns on {consent}"
+            "copyLabel": "Copy the command that turns on {consent}",
+            "trayHint": "{consent} is off. Turn it on from the Ever Works Desktop Node tray on {name}."
         },
         "errors": {
             "notFound": "This is not here any more.",
