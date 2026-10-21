@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runAgentTaskJob, type AgentTaskIo, type AgentTaskScratchFs } from './agent-task';
 import type { AgentTaskQuestionFs } from './agent-task-question';
 import { MODEL_CLI_FLEET_SETTINGS } from './model-cli';
+import { DEFAULT_NODE_EXECUTION_POLICY } from '../types';
 
 /**
  * Control 17 — a fleet Claude Code run never loads the REPOSITORY's own
@@ -219,7 +220,7 @@ describe('runAgentTaskJob — control 17: the repository’s Claude Code setting
 				spawnFn,
 				scratchFs: scratchFs().fs,
 				modelCliCompat: compat(['-p', '--restricted']),
-				executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: false }
+				executionPolicy: { ...DEFAULT_NODE_EXECUTION_POLICY, restrictedMode: false }
 			})
 		);
 

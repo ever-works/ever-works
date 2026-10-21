@@ -178,6 +178,12 @@ export interface FleetSessionAttachFacts {
     nodeName: string;
     /** People attached right now (names when known, else ids) — the five a refusal names (U8). */
     attached: readonly string[];
+    /**
+     * The role asked for (FL-04 P1b). A watcher changes nothing, so the kill
+     * switch does not keep one out — the stop banner is what it then reads;
+     * absent = a driver (the P1 reading).
+     */
+    role?: 'viewer' | 'driver';
 }
 
 /**
@@ -186,7 +192,8 @@ export interface FleetSessionAttachFacts {
  * shows the kept last screen instead.
  */
 export function canAttachFleetSession(facts: FleetSessionAttachFacts): FleetSessionRefusal {
-    if (facts.killSwitchOn) return refuse('kill_switch', 'clear it under Settings → Fleet');
+    if (facts.killSwitchOn && facts.role !== 'viewer')
+        return refuse('kill_switch', 'clear it under Settings → Fleet');
     if (!isFleetSessionLive(facts.state)) {
         return refuse('invalid', 'the session has ended; its last screen is on its page', {
             state: facts.state,

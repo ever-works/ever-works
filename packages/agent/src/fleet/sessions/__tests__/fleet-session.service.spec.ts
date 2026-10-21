@@ -125,6 +125,17 @@ class FakeSessionRepository {
             .map((row) => ({ ...row }));
     }
 
+    async findAgentStartingBefore(cutoff: Date): Promise<FleetSession[]> {
+        return [...this.rows.values()]
+            .filter(
+                (row) =>
+                    row.state === 'starting' &&
+                    row.kind === 'agent' &&
+                    new Date(row.createdAt).getTime() < cutoff.getTime(),
+            )
+            .map((row) => ({ ...row }));
+    }
+
     seed(overrides: Partial<FleetSession> = {}): FleetSession {
         const id = overrides.id ?? `aaaaaaaa-0000-4000-8000-${String(this.rows.size).padStart(12, '0')}`;
         const past = new Date(Date.now() - 10 * 60_000);
@@ -709,5 +720,122 @@ describe('FleetSessionService reads', () => {
         expect((await h.service.get(row.id, { userId: OWNER })).lastScreen).toBe('done');
         const page = await h.service.listPage({ userId: OWNER });
         expect(page.sessions[0]).not.toHaveProperty('lastScreen');
+    });
+});
+
+describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
+    const AGENT_ID = '55555555-5555-4555-8555-555555555555';
+    const RUN_ID = '66666666-6666-4666-8666-666666666666';
+    const AGENT_START = {
+        kind: 'agent' as const,
+        provider: 'claude-code' as const,
+        cwd: '~/code/app',
+        agentId: AGENT_ID,
+        firstMessage: 'Fix the failing build please',
+    };
+
+    function agentHarness(options: { agentOwner?: string; enqueueFails?: boolean } = {}) {
+        const base = harness();
+        const agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string) =>
+                id === AGENT_ID && userId === (options.agentOwner ?? OWNER) ? { id, name: 'Nina' } : null,
+            ),
+        };
+        const runs = {
+            createQueued: jest.fn(async () => ({ id: RUN_ID })),
+            markDispatchFailed: jest.fn(async () => undefined),
+            markStarted: jest.fn(async () => true),
+            markCompleted: jest.fn(async () => undefined),
+            markFailed: jest.fn(async () => undefined),
+            cancel: jest.fn(async () => ({ found: true })),
+        };
+        const dispatcher = {
+            enqueue: jest.fn(async () => {
+                if (options.enqueueFails) throw new Error('no runtime');
+                return { jobId: 'job-1' };
+            }),
+            cancelForSession: jest.fn(async () => true),
+        };
+        const service = new FleetSessionService(
+            base.repo as never,
+            { findById: jest.fn(async () => base.node), findByUser: jest.fn(async () => [base.node]) } as never,
+            {
+                resolveForFamily: jest.fn(async () => ({ node: base.node, role: 'owner' })),
+                listSharedWith: jest.fn(async () => []),
+            } as never,
+            base.killSwitch as never,
+            base.audit as never,
+            base.port,
+            agents as never,
+            runs as never,
+            dispatcher as never,
+        );
+        return { ...base, service, agents, runs, dispatcher };
+    }
+
+    it('queues an Agent session: row starting, its Run linked both ways, the job pinned to the node', async () => {
+        const h = agentHarness();
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, AGENT_START);
+        expect(view.state).toBe('starting');
+        expect(view.kind).toBe('agent');
+        expect(view.agentRunId).toBe(RUN_ID);
+        expect(view.startedBy).toBe(`agent:${AGENT_ID}`);
+        expect(h.runs.createQueued).toHaveBeenCalledWith(
+            expect.objectContaining({ triggerKind: 'session', fleetSessionId: view.id, agentId: AGENT_ID }),
+        );
+        const enqueued = h.dispatcher.enqueue.mock.calls[0][0] as { payload: Record<string, unknown> };
+        expect(enqueued.payload).toMatchObject({ fleetSessionId: view.id, nodeId: NODE_ID, agentRunId: RUN_ID });
+        // The machine is not asked on the link: the job carries the start.
+        expect(h.port.request).not.toHaveBeenCalled();
+    });
+
+    it('treats an Agent actor as an Agent session of itself, whatever the request says (FR-51)', async () => {
+        const h = agentHarness();
+        const view = await h.service.start(
+            NODE_ID,
+            { userId: OWNER, agentId: AGENT_ID },
+            { kind: 'owner', provider: 'claude-code', cwd: '~/code/app', firstMessage: 'do the thing now' },
+        );
+        expect(view.kind).toBe('agent');
+        expect(view.agentId).toBe(AGENT_ID);
+    });
+
+    it('refuses a shell, a short first message, somebody else’s Agent', async () => {
+        const h = agentHarness();
+        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...AGENT_START, provider: 'shell' }))).code).toBe(
+            'invalid',
+        );
+        expect(
+            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...AGENT_START, firstMessage: 'hi' }))).code,
+        ).toBe('invalid');
+        const other = agentHarness({ agentOwner: MEMBER });
+        expect((await refusalOf(other.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code).toBe('not_found');
+    });
+
+    it('ends the row and fails the Run when the job cannot be queued — no session waits on nothing', async () => {
+        const h = agentHarness({ enqueueFails: true });
+        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code).toBe('unreachable');
+        expect(h.runs.markDispatchFailed).toHaveBeenCalledWith(RUN_ID, expect.any(String));
+        expect([...h.repo.rows.values()].every((row) => row.state === 'ended')).toBe(true);
+    });
+
+    it('ending an Agent session withdraws its job and settles its Run (R-1)', async () => {
+        const h = agentHarness();
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, AGENT_START);
+        await h.service.end(view.id, { userId: OWNER }, { confirm: true });
+        expect(h.dispatcher.cancelForSession).toHaveBeenCalledWith(view.id);
+        expect(h.runs.cancel).toHaveBeenCalledWith(RUN_ID, OWNER);
+    });
+
+    it('a settled job ends a still-live session and completes the Run on success', async () => {
+        const h = agentHarness();
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, AGENT_START);
+        await h.service.agentSessionJobSettled(view.id, {
+            succeeded: true,
+            result: { exitCode: 0, outcome: 'success', providerSessionId: null },
+            error: null,
+        });
+        expect(h.repo.rows.get(view.id)?.state).toBe('ended');
+        expect(h.runs.markCompleted).toHaveBeenCalledWith(RUN_ID, expect.any(String));
     });
 });

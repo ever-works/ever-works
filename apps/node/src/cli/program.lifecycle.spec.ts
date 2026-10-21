@@ -375,7 +375,8 @@ describe('policy — the machine owner’s local execution policy (control 18)',
 		expect(saved.executionPolicy).toEqual({
 			allowSkipPermissions: false,
 			allowShellCommands: true,
-			restrictedMode: true
+			restrictedMode: true,
+			allowMcpBridge: true
 		});
 		expect(h.output()).toContain('WARNING: jobs may now make this node run shell commands');
 		expect(h.output()).toContain('Restart the node service');
@@ -385,8 +386,30 @@ describe('policy — the machine owner’s local execution policy (control 18)',
 		expect(JSON.parse(h.files.get(CONFIG_PATH) ?? '{}').executionPolicy).toEqual({
 			allowSkipPermissions: false,
 			allowShellCommands: false,
-			restrictedMode: true
+			restrictedMode: true,
+			allowMcpBridge: true
 		});
+	});
+
+	it('works-security 0.2.7: switches the platform MCP bridge off and on, and status shows it', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		expect(await runCli(['policy'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('platform MCP bridge allowed');
+		expect(await runCli(['policy', '--allow-mcp-bridge', 'off'], h.deps)).toBe(EXIT_OK);
+		expect(JSON.parse(h.files.get(CONFIG_PATH) ?? '{}').executionPolicy).toEqual({
+			allowSkipPermissions: false,
+			allowShellCommands: false,
+			restrictedMode: true,
+			allowMcpBridge: false
+		});
+		expect(h.output()).toContain('platform MCP bridge REFUSED');
+		expect(h.output()).toContain('the platform MCP bridge is OFF');
+		expect(h.leases).toHaveLength(0);
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toMatch(/policy {7}.*platform MCP bridge REFUSED/);
+		expect(await runCli(['policy', '--allow-mcp-bridge', 'on'], h.deps)).toBe(EXIT_OK);
+		expect(JSON.parse(h.files.get(CONFIG_PATH) ?? '{}').executionPolicy.allowMcpBridge).toBe(true);
+		expect(await runCli(['policy', '--allow-mcp-bridge', 'perhaps'], h.deps)).not.toBe(EXIT_OK);
 	});
 
 	it('switches Claude Code restricted mode off and back on, saying what that changes', async () => {

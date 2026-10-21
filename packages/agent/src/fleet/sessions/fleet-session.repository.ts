@@ -187,6 +187,15 @@ export class FleetSessionRepository {
             take: limit,
         });
     }
+
+    /** Agent sessions still waiting for a slot (their job queued) since before `cutoff` (FL-04 P2 sweeper). */
+    async findAgentStartingBefore(cutoff: Date, limit = 200): Promise<FleetSession[]> {
+        return this.repository.find({
+            where: { state: 'starting', kind: 'agent', createdAt: LessThan(cutoff) },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
 }
 
 /** The cursor of the row after which the next page starts. */

@@ -763,6 +763,19 @@ export const config = {
             );
         },
         /**
+         * Checkouts on computers (FL-14, CONTRACTS §9) — `FLEET_CHECKOUTS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**checkouts**` route answers 404 and the
+         * reconcile sweep does nothing. Read per call: flipping it needs no
+         * restart.
+         */
+        isCheckoutsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_CHECKOUTS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single

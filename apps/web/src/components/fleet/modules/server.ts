@@ -2,6 +2,8 @@ import 'server-only';
 import './index';
 import './fl-01-hub';
 import './fl-09-machine';
+import './fl-04-sessions.server';
+import './fl-14-checkouts';
 
 /**
  * Fleet hub (FL-01, README D9) — where Fleet modules register what renders ON
@@ -11,7 +13,9 @@ import './fl-09-machine';
  * client component. Each epic adds ONE file beside this one and ONE import
  * line above. Imported by the hub pages and the computer page only.
  *
- * Registered today: FL-01's own computer tabs (`./fl-01-hub`); FL-09's Services and
+ * Registered today: FL-01's own computer tabs (`./fl-01-hub`); FL-04's
+ * Sessions tab and session page (`./fl-04-sessions.server`); FL-14's hub and
+ * computer Checkouts tabs (`./fl-14-checkouts`); FL-09's Services and
  * Processes tabs (`./fl-09-machine`).
  */
 export {};

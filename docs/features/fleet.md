@@ -33,6 +33,8 @@ Enrolled nodes go **offline** after five minutes without a heartbeat.
 
 ## Enrolling a node
 
+> **Consents (FL-02).** Enrolling lets a computer report health and nothing else; running work (`--work`), live viewing (`--attend`) and managing the machine (`--manage`) are separate consents its owner gives when starting the node — or in the desktop app's wizard and tray. With any of them on, the node also keeps one outbound link to the platform. See [Fleet node link](./fleet-node-link.md).
+
 Enrollment is outbound-only: the node calls the platform, never the other way round. Nothing needs to be reachable from the internet.
 
 0. **Install the node app** — `npm install -g ever-works-node` (Node.js ≥ 22). It is a single-file bundle published from `apps/node`; the unattended-run scripts (systemd unit, Windows service/scheduled-task installer) ship inside the package under `packaging/`.
@@ -110,6 +112,9 @@ Drain disables **first** and requeues second. The order is deliberate: the node 
 The whole surface is gated by `FLEET_ENABLED` on the API. When it is off, every `/api/fleet/**` route answers **404**, not 403 — a disabled deployment does not confirm the channel exists. The flag defaults to on.
 
 ## Health signals
+
+> The per-check-in health snapshot (CPU, memory, disk, GPU, load, uptime, pending reboot, failed services),
+> its history, **Refresh now** and **Wake** are described in [Computer health](./fleet-health.md).
 
 `status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
 
@@ -299,17 +304,17 @@ Check subprocesses get an environment built **from scratch**, never the inherite
 
 `ever-works-node` is the headless node: a CLI and a long-running service. It enrolls this machine, keeps it visible in Fleet with a heartbeat, and — only when you ask for it with `--work` — leases and executes platform work on it.
 
-| Command                                                                                                                  | What it does                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `ever-works-node enroll --api-url <url> --token <token>`                                                                 | Consumes the one-time token from **Settings → Fleet** and writes the local config; the credential goes to the OS keychain.          |
-| `ever-works-node start [--work] [-c <count>]`                                                                            | Runs the heartbeat loop until `SIGINT`/`SIGTERM`. With `--work`, also runs the worker host: lease → execute → report.               |
-| `ever-works-node pause` / `resume`                                                                                       | Drain and undrain this machine. Pausing stops leasing immediately and lets in-flight jobs finish and report — it is not a kill.     |
-| `ever-works-node unenroll`                                                                                               | Retires the machine: deletes the platform registration, then erases the local credential.                                           |
-| `ever-works-node status`                                                                                                 | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
-| `ever-works-node capabilities`                                                                                           | Prints the tags this machine would report, without enrolling.                                                                       |
-| `ever-works-node clear-quarantine`                                                                                       | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
-| `ever-works-node doctor [--json]`                                                                                        | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
-| `ever-works-node policy [--allow-skip-permissions on\|off] [--allow-shell-commands on\|off] [--restricted-mode on\|off]` | Shows or changes this machine's **local execution policy** (below). Local only — the platform has no way to change it.              |
+| Command                                                                                                                                               | What it does                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `ever-works-node enroll --api-url <url> --token <token>`                                                                                              | Consumes the one-time token from **Settings → Fleet** and writes the local config; the credential goes to the OS keychain.          |
+| `ever-works-node start [--work] [-c <count>]`                                                                                                         | Runs the heartbeat loop until `SIGINT`/`SIGTERM`. With `--work`, also runs the worker host: lease → execute → report.               |
+| `ever-works-node pause` / `resume`                                                                                                                    | Drain and undrain this machine. Pausing stops leasing immediately and lets in-flight jobs finish and report — it is not a kill.     |
+| `ever-works-node unenroll`                                                                                                                            | Retires the machine: deletes the platform registration, then erases the local credential.                                           |
+| `ever-works-node status`                                                                                                                              | Prints the local enrollment — where the credential is stored, and whether the node is paused. The credential itself is never shown. |
+| `ever-works-node capabilities`                                                                                                                        | Prints the tags this machine would report, without enrolling.                                                                       |
+| `ever-works-node clear-quarantine`                                                                                                                    | Clears a persisted unsafe-worker state, after you have verified every prior process tree is stopped.                                |
+| `ever-works-node doctor [--json]`                                                                                                                     | Read-only check: daemon version vs the platform floor, each pinned model CLI's version and flag compatibility, disk vs the floor.   |
+| `ever-works-node policy [--allow-skip-permissions on\|off] [--allow-shell-commands on\|off] [--restricted-mode on\|off] [--allow-mcp-bridge on\|off]` | Shows or changes this machine's **local execution policy** (below). Local only — the platform has no way to change it.              |
 
 `--work` is opt-in on purpose: **enrolling a machine and letting it run the owner's commands are two different consents.** A paused node keeps heartbeating, too — a drained machine that vanished from Fleet would be indistinguishable from a dead one.
 
@@ -325,6 +330,10 @@ A job is the platform's plan, and the platform is one more party a prompt inject
 | `--allow-shell-commands`   | A job carrying a setup phase, command steps or acceptance checks is refused, and `acceptance-checks` jobs are not leased at all. Model runs and the node's own Git work still run.               | The node runs those commands. They execute repository code as your account — after a model step, code the model may just have written (an edited `package.json` script or test file makes `pnpm test` run it). |
 
 A third switch, `--restricted-mode` (default **on**), starts Claude Code with `--restricted` when the installed CLI supports it: no command-running built-ins, no WebFetch, and no settings files at all — including your own `~/.claude/settings.json`. Turn it off only if this PC authenticates Claude Code through settings `env` / `apiKeyHelper` (Bedrock, Vertex, a proxy base URL).
+
+A fourth switch, `--allow-mcp-bridge` (default **on**, since 0.2.7), decides whether a job may start the platform MCP bridge — platform tools (questions, Task updates, creating Tasks) for the model under a run-scoped credential. The platform only asks for it when the deployment enables the bridge and the Agent has external tools; with the switch off such a job is refused on this machine before anything runs, and every other job is unaffected. It is on by default because it adds nothing on the PC itself: its tools act on the platform, under the run token's scope.
+
+**Upgrading to 0.2.7 (no new refusals by default):** fleet commit messages never carry a CI-skip directive — a Task title such as `Fix login [skip ci]` commits as `fix: login (skip ci)`, so the PR's GitHub Actions always run; every checkout-type Git command the node runs (provisioning `worktree add`, a read-only mount's reset) runs no repository hook, fsmonitor or filter driver, so **Git LFS files arrive as pointer files** in a fleet worktree (the model can still read the rest of the tree; the node's own commit keeps running the filters you configured, so LFS commits are unaffected); a worktree whose `.git` no longer points at its own Git directory is refused instead of committed from; and the Windows probes start `powershell` / `nvidia-smi` from absolute paths without `cmd.exe`. A Codex run's containment block also names a repository-local `.codex/config.toml` / `.codex/hooks.json` in the checkout (`codex-repository-config`) and a native-Windows run without your `[windows] sandbox` setting in the Codex config (`codex-windows-sandbox`); both are disclosures, not refusals. Trust model controls 20–24.
 
 **Upgrading to 0.2.6:** with the default policy, a job that carries setup, command steps or acceptance checks now fails on this machine with a message naming `--allow-shell-commands`, and `acceptance-checks` jobs stay with nodes that allow them. Works with checks off (the default for repository Works) are unaffected. The desktop app has no policy screen yet: run `ever-works-node policy …` with `EVER_WORKS_NODE_CONFIG` set to the app's `node-config.json`.
 
@@ -424,6 +433,8 @@ The node now probes the **pinned** model CLI binaries — the exact paths an `ag
 `ever-works-node doctor` prints one line for the daemon and one per pinned CLI; `--json` carries the same facts (`daemonVersion`, `minNodeVersion`, `upgradeRequired`, `upgradeCommand`, `modelCli[]`). `doctor` resolves the CLIs the way this shell does; a service started with `--claude-path` / `--codex-path` pins its own and logs its verdict at startup.
 
 There is no self-updater and no canary ring yet: an opt-in, reviewed self-update path is a follow-up. Until then the floor plus `doctor` is the rollout tool — upgrade a canary machine, confirm with `doctor`, upgrade the rest, then raise `FLEET_MIN_NODE_VERSION`.
+
+**Update (FL-02):** the opt-in self-update has shipped — `ever-works-node start --auto-update` lets a machine upgrade itself (npm installs only, never while a job runs, exit `75` for the service manager to restart it), and operators can name a recommended version with `FLEET_RECOMMENDED_NODE_VERSION`. The computer's **Settings** tab in the Fleet hub shows the version, the exact upgrade command for its OS, and what its self-update did last. See [Fleet node link](./fleet-node-link.md#keeping-nodes-current-opt-in-self-update). The canary-first rollout above is still the recommended way to raise the floor.
 
 ## Remote node limits
 

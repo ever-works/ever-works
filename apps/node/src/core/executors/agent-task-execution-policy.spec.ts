@@ -138,8 +138,42 @@ describe('control 18 — the node’s local execution policy (agent-task)', () =
 		expect(DEFAULT_NODE_EXECUTION_POLICY).toEqual({
 			allowSkipPermissions: false,
 			allowShellCommands: false,
-			restrictedMode: true
+			restrictedMode: true,
+			// works-security 0.2.7: the bridge keeps today's behaviour by default.
+			allowMcpBridge: true
 		});
+	});
+
+	const bridgePayload = {
+		...modelPayload,
+		mcp: { enabled: true, serverUrl: 'https://api.ever.works/mcp', serverName: 'ever-works' }
+	};
+
+	it('works-security 0.2.7: refuses a job asking for the MCP bridge when the owner switched it off — before provisioning or spawning', async () => {
+		const { commands, spawnFn } = recordingSpawn();
+		const mint = vi.fn(async () => ({ token: 'run-token', serverUrl: 'https://api.ever.works/mcp' }));
+		const { io: value, provisionWorkspace } = io(
+			{ ...OFF, allowMcpBridge: false },
+			{ spawnFn, mcpBridge: { mint, revoke: vi.fn(async () => undefined) } as never }
+		);
+
+		await expect(runAgentTaskJob(job(bridgePayload), value)).rejects.toThrowError(NodeExecutionPolicyError);
+		await expect(runAgentTaskJob(job(bridgePayload), value)).rejects.toThrowError(/--allow-mcp-bridge/);
+		expect(provisionWorkspace).not.toHaveBeenCalled();
+		expect(mint).not.toHaveBeenCalled();
+		expect(commands).toHaveLength(0);
+	});
+
+	it('works-security 0.2.7: the switch only refuses jobs that ASK for the bridge', async () => {
+		const { commands, spawnFn } = recordingSpawn();
+		const { io: value } = io({ ...OFF, allowMcpBridge: false }, { spawnFn });
+
+		const outcome = await runAgentTaskJob(job(modelPayload), value);
+		expect(outcome.status).toBe('succeeded');
+		expect(commands).toHaveLength(1);
+		// A malformed block is "no bridge" (resolveMcpBridgeSpec), so it is not refused either.
+		const malformed = await runAgentTaskJob(job({ ...modelPayload, mcp: { enabled: 'yes' } }), value);
+		expect(malformed.status).toBe('succeeded');
 	});
 
 	it('refuses a skip-permissions job before provisioning or spawning anything', async () => {

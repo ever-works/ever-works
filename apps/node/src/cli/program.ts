@@ -1,4 +1,5 @@
 import { Command, CommanderError } from 'commander';
+import { homedir as osHomedir } from 'node:os';
 import { posix, win32 } from 'node:path';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
@@ -77,6 +78,12 @@ import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
 import { DaemonControlClient } from '../core/sessions/daemon-client';
 import { resolveSessionDaemonPaths } from '../core/sessions/daemon/daemon-paths';
 import { installDaemonProcessHandlers, runSessionDaemon } from '../core/sessions/daemon/daemon-main';
+import {
+	SELF_UPDATE_EXIT_CODE,
+	SelfUpdateController,
+	readSelfUpdateRecord,
+	writeSelfUpdateRecord
+} from '../core/link/self-update';
 
 /**
  * `ever-works-node` CLI.
@@ -163,6 +170,12 @@ export interface CliDeps {
 	restrictFile?: (file: string) => Promise<void> | void;
 	/** The session daemon's own entry (the hidden subcommand); a seam for the CLI spec. */
 	runSessionDaemon?: typeof runSessionDaemon;
+	/**
+	 * Fleet node link (FL-02 T-25) — the running binary's real path, so the
+	 * opt-in self-update can tell an `npm install -g` install (which it
+	 * upgrades) from anything else (which it refuses). Unset → refused.
+	 */
+	entryPath?: string | null;
 }
 
 /**
@@ -407,6 +420,64 @@ export interface StartCommandOptions {
 	 * independent of `--work` and `--attend`.
 	 */
 	manage?: boolean;
+	/**
+	 * Fleet node link (FL-02 T-25) — let this machine upgrade itself when the
+	 * platform raises its version floor or names a recommended version: it
+	 * waits for running jobs, installs through npm, and exits 75 so its
+	 * service manager starts the new binary. Off by default (report only).
+	 */
+	autoUpdate?: boolean;
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS R-41) — a folder this machine's
+	 * owner keeps code in; discovery walks it for git clones. Repeatable;
+	 * persisted (the list given replaces the stored one), like
+	 * `--workspace-root`.
+	 */
+	codeFolder?: string[];
+}
+
+/**
+ * Parse `--code-folder` (FL-14, spec FR-3): every value absolute (a leading
+ * `~/` is the home folder), never a filesystem root, and never the home
+ * folder ITSELF — discovery must not walk a whole home directory. Duplicates
+ * collapse. `undefined` / empty means the flag was not given.
+ */
+export function parseCodeFolders(
+	raw: readonly string[] | undefined,
+	platform: string,
+	home: string = osHomedir()
+): string[] | undefined {
+	if (!raw || raw.length === 0) return undefined;
+	const path = platform === 'win32' ? win32 : posix;
+	const homeResolved = home ? path.resolve(home) : '';
+	const out: string[] = [];
+	for (const entry of raw) {
+		let value = entry.trim();
+		if (value.length === 0) throw new CliError('--code-folder must not be empty');
+		if (value === '~') {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if ((value.startsWith('~/') || value.startsWith('~\\')) && homeResolved) {
+			value = path.join(homeResolved, value.slice(2));
+		}
+		if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+			throw new CliError(`--code-folder must be an absolute directory (got "${entry}")`);
+		}
+		const normalized = path.resolve(value);
+		if (normalized === path.parse(normalized).root) {
+			throw new CliError(`--code-folder cannot be a filesystem root (got "${entry}")`);
+		}
+		const same =
+			platform === 'win32'
+				? normalized.toLowerCase() === homeResolved.toLowerCase()
+				: normalized === homeResolved;
+		if (homeResolved && same) {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if (!out.includes(normalized)) out.push(normalized);
+	}
+	if (out.length > 32) throw new CliError('--code-folder can be given at most 32 times');
+	return out;
 }
 
 /**
@@ -457,6 +528,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const override = parseIntervalSeconds(options.heartbeatInterval);
 	// Usage errors first, before the config is even read.
 	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
+	const codeFolders = parseCodeFolders(options.codeFolder, deps.platform);
 	const workspaceGcOverrides = parseWorkspaceGcFlags(options);
 	const stored = await requireConfig(deps);
 	// The reaper policy is persisted on `start` (see `StartCommandOptions`),
@@ -475,11 +547,20 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// directory in the admin's own profile, reported as "nothing to
 	// reclaim" while the node refused every job for want of space on D:.
 	const rootChanged = workspaceRoot !== undefined && workspaceRoot !== stored.workspaceRoot;
-	if (workspaceGcOverrides !== undefined || rootChanged) {
+	// `--code-folder` is persisted for the same reason (FL-14): the service
+	// re-reads it on every start, and `install-service` re-applies flags.
+	const foldersChanged =
+		codeFolders !== undefined && JSON.stringify(codeFolders) !== JSON.stringify(stored.codeFolders ?? []);
+	if (workspaceGcOverrides !== undefined || rootChanged || foldersChanged) {
 		await saveConfig(
 			deps.fs,
 			deps.configPath,
-			{ ...stored, workspaceGc, ...(workspaceRoot !== undefined ? { workspaceRoot } : {}) },
+			{
+				...stored,
+				workspaceGc,
+				...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+				...(codeFolders !== undefined ? { codeFolders } : {})
+			},
 			{ platform: deps.platform, secrets: deps.secrets ?? null, logger: deps.io.logger }
 		);
 	}
@@ -487,12 +568,19 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...stored,
 		workspaceGc,
 		...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+		...(codeFolders !== undefined ? { codeFolders } : {}),
 		...(override === undefined ? {} : { heartbeatIntervalMs: override })
 	};
 
 	const workerEnabled = options.work === true;
 	const attendEnabled = options.attend === true;
 	const manageEnabled = options.manage === true;
+	// Fleet node link (FL-02 T-25): the opt-in self-update. Built after the
+	// runtime (it needs the lanes to know when the machine is idle), reached
+	// through these closures from the heartbeat.
+	const autoUpdate = options.autoUpdate === true;
+	let selfUpdate: SelfUpdateController | null = null;
+	let restartForUpdate: string | null = null;
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
@@ -593,7 +681,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					}
 				}
 			: {}),
-		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {})
+		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {}),
+		// Fleet node link (FL-02 T-25): the self-update's report rides every
+		// beat, and every accepted beat's version verdict reaches it.
+		selfUpdateReport: () => selfUpdate?.report() ?? null,
+		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response),
+		// Checkouts on computers (FL-14): the node-local checkout registry,
+		// beside the config like the session daemon's state.
+		checkoutsRegistryPath: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'checkouts.json'
+		)
 	});
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
@@ -607,6 +705,29 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, present only
+	// when a kind registered for it has its consent on (none in FL-02).
+	const managementWorker = runtime.management?.worker ?? null;
+	selfUpdate = new SelfUpdateController({
+		enabled: autoUpdate,
+		currentVersion: deps.io.version,
+		runner: deps.io.runner,
+		logger: deps.io.logger,
+		platform: deps.platform,
+		entryPath: deps.entryPath ?? null,
+		// Never kills work: an upgrade waits until no lane runs a job.
+		isIdle: () =>
+			[worker, attendedWorker, managementWorker].every(
+				(lane) => !lane || lane.getState().activeJobIds.length === 0
+			),
+		requestRestart: (to) => {
+			restartForUpdate = to;
+			requestShutdown();
+		},
+		persist: (record) => writeSelfUpdateRecord(deps.fs, deps.configPath, record),
+		previous: await readSelfUpdateRecord(deps.fs, deps.configPath),
+		...(deps.now ? { now: deps.now } : {})
+	});
 	// One line per ACCEPTED beat. The loop patches its state more than once per
 	// beat (`connected`, then the next attempt's delay) and every patch
 	// notifies, so keying on the state alone logged each beat twice. Keyed on
@@ -662,11 +783,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					: 'Live view enabled — terminal only: no browser was found here to show a screen'
 			);
 		}
+		if (managementWorker) {
+			await managementWorker.start();
+			deps.out(
+				`Management lane enabled — leasing [${(runtime.management?.kinds ?? []).join(', ')}] one at a time, outside --concurrency`
+			);
+		}
 	};
 	let lanesStarted: Promise<void> = Promise.resolve();
 	let laneStartFailed = false;
 	let laneStartFailure: unknown = undefined;
-	if (worker || attendedWorker) {
+	if (worker || attendedWorker || managementWorker) {
 		if (loop.getState().state === 'connected') {
 			await startLanes();
 		} else {
@@ -776,6 +903,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		}
 		await attendedWorker.stop();
 	}
+	if (managementWorker) {
+		// Drains like the work lane: a machine job in flight finishes and reports.
+		await managementWorker.stop();
+	}
 	if (worker) {
 		// Drains: stops leasing at once, then WAITS for the jobs already
 		// running so their verdicts reach the platform instead of being
@@ -785,6 +916,14 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out(`Worker host stopped (completed ${state.completed}, failed ${state.failed}).`);
 	}
 	deps.out('Stopped.');
+	// Fleet node link (FL-02 T-25): a self-update installed a new binary; exit
+	// 75 so the service manager starts it.
+	if (restartForUpdate !== null) {
+		throw new CliError(
+			`Restarting into ever-works-node ${restartForUpdate} (self-update) — exit ${SELF_UPDATE_EXIT_CODE} asks the service manager to start the new binary.`,
+			SELF_UPDATE_EXIT_CODE
+		);
+	}
 	if (laneStartFailed) {
 		throw new CliError(
 			`Worker lanes failed to start after the first accepted heartbeat: ${describeError(laneStartFailure)}`,
@@ -839,14 +978,16 @@ export interface PolicyCommandOptions {
 	allowSkipPermissions?: string;
 	allowShellCommands?: string;
 	restrictedMode?: string;
+	allowMcpBridge?: string;
 }
 
-/** One line: both control-18 switches, in words. */
+/** One line: every local execution-policy switch, in words. */
 export function describeExecutionPolicy(policy: NodeExecutionPolicy): string {
 	return (
 		`skip-permissions ${policy.allowSkipPermissions ? 'ALLOWED' : 'refused'}, ` +
 		`node-run shell commands ${policy.allowShellCommands ? 'ALLOWED' : 'refused'}, ` +
-		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}`
+		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}, ` +
+		`platform MCP bridge ${policy.allowMcpBridge ? 'allowed' : 'REFUSED'}`
 	);
 }
 
@@ -872,17 +1013,19 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 	const skip = parsePolicySwitch('--allow-skip-permissions', options.allowSkipPermissions);
 	const shell = parsePolicySwitch('--allow-shell-commands', options.allowShellCommands);
 	const restricted = parsePolicySwitch('--restricted-mode', options.restrictedMode);
-	if (skip === undefined && shell === undefined && restricted === undefined) {
+	const mcpBridge = parsePolicySwitch('--allow-mcp-bridge', options.allowMcpBridge);
+	if (skip === undefined && shell === undefined && restricted === undefined && mcpBridge === undefined) {
 		deps.out(`policy       ${describeExecutionPolicy(current)}`);
 		deps.out(
-			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off`.'
+			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off --allow-mcp-bridge on|off`.'
 		);
 		return;
 	}
 	const next: NodeExecutionPolicy = {
 		allowSkipPermissions: skip ?? current.allowSkipPermissions,
 		allowShellCommands: shell ?? current.allowShellCommands,
-		restrictedMode: restricted ?? current.restrictedMode
+		restrictedMode: restricted ?? current.restrictedMode,
+		allowMcpBridge: mcpBridge ?? current.allowMcpBridge
 	};
 	await saveConfig(
 		deps.fs,
@@ -908,6 +1051,12 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 		deps.out(
 			'Note: Claude Code restricted mode is OFF — runs keep the baseline isolation (no repository settings, no ' +
 				'hooks) but get the command-running built-ins back and read your ~/.claude/settings.json.'
+		);
+	}
+	if (!next.allowMcpBridge) {
+		deps.out(
+			'Note: the platform MCP bridge is OFF — jobs whose Agent has external tools enabled are refused on this ' +
+				'machine instead of running with platform tools.'
 		);
 	}
 	deps.out('Restart the node service for a running worker to apply the change.');
@@ -1742,6 +1891,10 @@ export function buildProgram(deps: CliDeps): Command {
 			'Allow managing this machine from the dashboard — owner sessions, logs, services, Docker, processes, ports, files, commands, schedules (off by default; independent of --work and --attend)'
 		)
 		.option(
+			'--auto-update',
+			'Upgrade this node itself when the platform raises its minimum version or names a recommended one (waits for running jobs; npm installs only; off by default)'
+		)
+		.option(
 			'-c, --concurrency <count>',
 			'Max jobs to execute at once when --work is set (overrides the stored limit)'
 		)
@@ -1765,6 +1918,11 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--workspace-root <dir>',
 			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
+		)
+		.option(
+			'--code-folder <dir>',
+			'A folder you keep code in; Ever Works lists the git clones under it, three folders deep (repeatable; persisted; needs --manage)',
+			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
@@ -1802,6 +1960,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--restricted-mode <on|off>',
 			'Run Claude Code with --restricted when it supports it (no shell tools, no settings files). Default on.'
+		)
+		.option(
+			'--allow-mcp-bridge <on|off>',
+			'Let jobs start the platform MCP bridge (platform tools for the model, run-scoped credential). Default on.'
 		)
 		.action(async (options: PolicyCommandOptions) => {
 			await runPolicy(deps, options);

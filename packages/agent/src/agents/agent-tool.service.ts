@@ -66,6 +66,8 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
+import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -596,6 +598,32 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Computer health (FL-03): the read-only health tools, when bound.
+            if (fleet.health) {
+                const health = fleet.health;
+                add('fleet-health', () =>
+                    buildFleetHealthTools({
+                        userId: agent.userId,
+                        service: health.service,
+                        history: health.history,
+                        ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
+        }
+
+        // FL-04 P2 — the Agent's own sessions on computers (start is always an
+        // Agent session of THIS Agent, FR-51). Bound only while
+        // FLEET_SESSIONS_ENABLED is on.
+        if (sources.fleetSessions) {
+            const fleetSessions = sources.fleetSessions;
+            add('fleet-sessions', () =>
+                buildFleetSessionTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleetSessions.service,
+                }),
+            );
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it

@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import type { FleetActionFamily, FleetNodeView, FleetViewerRole } from '@ever-works/contracts';
 import { fleetFamilyAllows, isNeedsALookRoute } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
+import { desktopHasConsentWiring } from './fleet-consents.shared';
 
 /**
  * Fleet hub (FL-01) — the internal module registry the hub and the computer
@@ -486,7 +487,17 @@ export type FleetTabState<P> =
     | { kind: 'not-shipped'; epic: string }
     | { kind: 'switched-off'; epic: string }
     | { kind: 'kind-cannot' }
-    | { kind: 'consent-missing'; consent: FleetTabConsent; command: string };
+    | {
+          kind: 'consent-missing';
+          consent: FleetTabConsent;
+          command: string;
+          /**
+           * FL-02 desktop parity: `tray` when the computer is a desktop app,
+           * whose owner turns the consent on from its tray rather than with a
+           * command line (`command` is then only a reference).
+           */
+          via?: 'tray';
+      };
 
 /** The consents a computer reports, as far as this build can tell. */
 export type FleetConsentsRead = Readonly<Record<FleetTabConsent, boolean>>;
@@ -506,7 +517,7 @@ function resolveSlot<P>(
     registered: { load: Loader<P> } | undefined,
     context: {
         flags: FleetFeatureFlags;
-        node?: Pick<FleetNodeView, 'kind'>;
+        node?: Pick<FleetNodeView, 'kind'> & Partial<Pick<FleetNodeView, 'link' | 'consents'>>;
         consents?: FleetConsentsRead;
     },
 ): FleetTabState<P> {
@@ -516,13 +527,17 @@ function resolveSlot<P>(
     const consent = slot.consent;
     if (consent && context.node) {
         const granted = context.consents?.[consent] === true;
-        if (!granted && KIND_CANNOT[context.node.kind]?.includes(consent))
+        // FL-02 desktop parity (R-10): a desktop app with the consents wiring
+        // CAN give them — from its tray.
+        const parity = desktopHasConsentWiring(context.node);
+        if (!granted && !parity && KIND_CANNOT[context.node.kind]?.includes(consent))
             return { kind: 'kind-cannot' };
         if (!granted) {
             return {
                 kind: 'consent-missing',
                 consent,
                 command: FLEET_CONSENT_START_COMMANDS[consent],
+                ...(parity ? { via: 'tray' as const } : {}),
             };
         }
     }
@@ -534,7 +549,7 @@ export function resolveComputerTab(
     id: FleetComputerTabId,
     context: {
         flags: FleetFeatureFlags;
-        node: Pick<FleetNodeView, 'kind'>;
+        node: Pick<FleetNodeView, 'kind'> & Partial<Pick<FleetNodeView, 'link' | 'consents'>>;
         consents: FleetConsentsRead;
     },
 ): FleetTabState<FleetComputerTabProps> {

@@ -62,6 +62,8 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.link.connect',
 	'node.link.disconnect',
 	'node.link.channel-open',
+	// Computer health (FL-03, CONTRACTS §7).
+	'node.wake',
 	// Sessions on computers (FL-04, CONTRACTS §7).
 	'node.session.start',
 	'node.session.attach',
@@ -91,7 +93,12 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.compose.down',
 	'node.compose.restart',
 	'node.compose.pull',
-	'node.process.signal'
+	'node.process.signal',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

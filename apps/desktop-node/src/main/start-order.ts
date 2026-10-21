@@ -23,7 +23,7 @@ import { untilHeartbeatAccepted, type NodeRuntime } from 'ever-works-node';
  * loop, which reports `stopped`, so the wait ends instead of lingering.
  */
 export async function startRuntimeInOrder(
-	runtime: Pick<NodeRuntime, 'loop' | 'worker'>,
+	runtime: Pick<NodeRuntime, 'loop' | 'worker'> & Partial<Pick<NodeRuntime, 'attended' | 'management'>>,
 	isCurrent: () => boolean
 ): Promise<void> {
 	await runtime.loop.start();
@@ -31,4 +31,9 @@ export async function startRuntimeInOrder(
 	const accepted = await untilHeartbeatAccepted(runtime.loop, isCurrent);
 	if (!accepted || !isCurrent()) return;
 	await runtime.worker?.start();
+	// Fleet node link (FL-02 T-26): the live-view lane (`attend`) and the
+	// management lane, under the same rule — after an accepted beat.
+	if (!isCurrent()) return;
+	await runtime.attended?.worker.start();
+	await runtime.management?.worker.start();
 }

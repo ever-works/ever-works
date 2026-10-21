@@ -276,6 +276,14 @@ export class FleetClient {
 		if (ceiling) {
 			response.limitCeiling = ceiling;
 		}
+		// Fleet node link (FL-02, CONTRACTS §1.1): the version this deployment
+		// recommends — what `--auto-update` upgrades to. Only a well-formed version.
+		const recommended = normalizeFleetNodeVersionFloor(
+			(payload as { recommendedNodeVersion?: unknown } | null)?.recommendedNodeVersion
+		);
+		if (recommended) {
+			response.recommendedNodeVersion = recommended;
+		}
 		return response;
 	}
 
@@ -458,6 +466,23 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 			manage: source.consents.manage === true,
 			usageScan: source.consents.usageScan === true
 		};
+	}
+	// Computer health, second phase (FL-03): the hardware address and the
+	// opaque network identity, both or neither (`describeSelf` validated them).
+	if (typeof source.macAddress === 'string' && typeof source.lanId === 'string') {
+		out.macAddress = source.macAddress;
+		out.lanId = source.lanId;
+	}
+	// Sessions on computers (FL-04): the session daemon's report, already
+	// normalised by `describeSelf` — without this line the runtime computed it
+	// and the wire never carried it (the conformance spec pins the projection).
+	if (source.daemon !== undefined) {
+		out.daemon = source.daemon;
+	}
+	// Fleet node link (FL-02 T-25): the self-update report, already normalised
+	// by `describeSelf`; copied as is. Heartbeat-only in practice.
+	if (source.selfUpdate !== undefined) {
+		out.selfUpdate = source.selfUpdate;
 	}
 	return out;
 }
