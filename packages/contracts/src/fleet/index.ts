@@ -6,6 +6,7 @@ export * from './fleet-jobs.types.js';
 export * from './fleet-link.codec.js';
 export * from './fleet-link-viewer.types.js';
 export * from './fleet-link.types.js';
+export * from './fleet-logs.types.js';
 export * from './fleet-model-usage-limit.types.js';
 export * from './fleet-needs-a-look.types.js';
 export * from './fleet-node.types.js';

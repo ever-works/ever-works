@@ -155,7 +155,16 @@ export type FleetAuditAction =
 	/** A session was ended, with its reason. */
 	| 'node.session.end'
 	| 'node.session.recording.start'
-	| 'node.session.recording.stop';
+	| 'node.session.recording.stop'
+	/**
+	 * Logs on computers (FL-08, CONTRACTS §7) — someone read a log source
+	 * (one row per open or one-shot read) or started following it. Details
+	 * carry `source` (the source id), `kind`, `requestedBy`, `lines`,
+	 * `redactions`, `confirmationClass: 'plain'` and `outcome`; never a log
+	 * line (spec FR-27).
+	 */
+	| 'node.logs.read'
+	| 'node.logs.follow';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -204,7 +213,9 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.logs.read',
+	'node.logs.follow'
 ];
 
 /**
