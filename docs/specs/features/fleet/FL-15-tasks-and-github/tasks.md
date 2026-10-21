@@ -29,23 +29,23 @@
 
 ## P1.A — Contracts and hand-off service
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-task-handoff.types.ts` (computers, closed-set
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-task-handoff.types.ts` (computers, closed-set
       reasons, candidate agents, checkout choice, Computer block, `FleetGitIdentity`,
       `FleetGithubAudience`) and the optional `taskId` on FL-04's `FleetSessionStartRequest`
       (additive); export from `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-task-handoff.types.spec.ts`.
-- [ ] **T-02**. Create pure `packages/agent/src/fleet/task-handoff.rules.ts` (`eligibleComputers`,
+- [x] **T-02**. Create pure `packages/agent/src/fleet/task-handoff.rules.ts` (`eligibleComputers`,
       `defaultCheckoutChoice`, `buildFirstMessage` with the 2 000-char excerpt and source link).
       **Test**: `packages/agent/src/fleet/__tests__/task-handoff.rules.spec.ts` — eligibility truth
       table, pin constrains to one, excerpt cap, Trigger source link included.
-- [ ] **T-03**. Create `packages/agent/src/fleet/fleet-task-handoff.service.ts` (`options`: nodes via
+- [x] **T-03**. Create `packages/agent/src/fleet/fleet-task-handoff.service.ts` (`options`: nodes via
       `FleetService.listForUser`, affinity via `FleetAgentNodeAffinityService.getAffinity`,
       candidates via the resolver `RunWithAgentMenu` uses, checkouts via FL-14; `validateStart`, called
       by FL-04's `FleetSessionService.start` whenever the request carries `taskId`: eligibility,
       Task branch, Run carries the Task, `busy` when an in-flight session exists for (task, agent)).
       **Test**: `packages/agent/src/fleet/__tests__/fleet-task-handoff.service.spec.ts` — every
       refusal code, affinity never written, Run carries `taskId`.
-- [ ] **T-04**. Create `apps/api/src/fleet/fleet-task-handoff.controller.ts` (`GET /tasks/:id/handoff-options`,
+- [x] **T-04**. Create `apps/api/src/fleet/fleet-task-handoff.controller.ts` (`GET /tasks/:id/handoff-options`,
       a proposed CONTRACTS §11.2 addition — spec §8b) with DTOs in
       `apps/api/src/fleet/dto/fleet-task-handoff.dto.ts`; mount in `apps/api/src/fleet/fleet.module.ts`.
       Extend FL-04's `POST /api/fleet/nodes/:id/sessions` DTO with optional `taskId` (routing to
@@ -57,7 +57,7 @@
 
 ## P1.B — Web
 
-- [ ] **T-05**. Create `apps/web/src/components/fleet/tasks/task-handoff.shared.ts` and
+- [x] **T-05**. Create `apps/web/src/components/fleet/tasks/task-handoff.shared.ts` and
       `FixOnComputerDialog.tsx` with `ComputerPicker.tsx` (reuses `runnerDotClass` from
       `apps/web/src/components/dashboard/runner-status.shared.ts`), `CheckoutChoice.tsx`,
       `FirstMessageField.tsx`, `IdentityLine.tsx` (placeholder until P2); BFF route
@@ -65,18 +65,18 @@
       FL-04's session BFF routes with `taskId`).
       **Test**: `task-handoff.shared.unit.spec.ts`, `FixOnComputerDialog.unit.spec.tsx` — pin note,
       reasons, Start disabled when nothing is selectable, cost sentence present.
-- [ ] **T-06**. Add `apps/web/src/components/tasks/FixOnComputerButton.tsx` beside `RunWithAgentMenu`
+- [x] **T-06**. Add `apps/web/src/components/tasks/FixOnComputerButton.tsx` beside `RunWithAgentMenu`
       in `apps/web/src/components/tasks/TaskDetailClient.tsx`'s button row and a ⋯ menu item in
       `apps/web/src/components/tasks/TasksKanbanView.tsx`; keyboard `F` on Task detail.
       **Test**: `FixOnComputerButton.unit.spec.tsx` — hidden without flags or nodes; opens the dialog.
-- [ ] **T-07**. Create `apps/web/src/components/tasks/TaskFleetSection.tsx` (Computer block from
+- [x] **T-07**. Create `apps/web/src/components/tasks/TaskFleetSection.tsx` (Computer block from
       `GET /api/fleet/sessions?taskId=<id>&limit=1` and the session's checkout: session
       state glyph, elapsed, Open/End, checkout + FL-14 `GitLine`, `TaskPrPill`) mounted after
       `TaskRunControls` (`TaskDetailClient.tsx:541`); fill FL-05's `taskChip` slot in
       `apps/web/src/components/fleet/sessions/SessionCard.tsx`.
       **Test**: `TaskFleetSection.unit.spec.tsx` (empty/live/ended/offline), `SessionCard.unit.spec.tsx`
       extended (chip links to the Task).
-- [ ] **T-08**. i18n `fleet.taskHandoff.*` in `apps/web/messages/en.json`; palette entry in
+- [ ] **T-08** (i18n done in P1; palette entry and Playwright left — lane log Next step). i18n `fleet.taskHandoff.*` in `apps/web/messages/en.json`; palette entry in
       `apps/web/src/components/command-palette/registry/screens.ts`; write
       `apps/web/e2e/flow-fleet-task-handoff.spec.ts`.
       **Test**: e2e green; no literal strings in `components/fleet/tasks/`.
