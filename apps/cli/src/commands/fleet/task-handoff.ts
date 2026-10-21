@@ -247,5 +247,50 @@ export const gitIdentityCommand = new Command('git-identity')
         }
     });
 
-/** `ever-works fleet nodes …` (FL-15 P3: `git-identity`). */
-export const fleetNodesCommand = new Command('nodes').description('Your computers').addCommand(gitIdentityCommand);
+/**
+ * FL-15 P3: kept for embedders that compose their own CLI; `ever-works fleet nodes git-identity` is
+ * `gitIdentityCommand` added to FL-19's `fleet nodes` group (`./index.ts`).
+ */
+export const fleetNodesGitIdentityCommands: readonly Command[] = [gitIdentityCommand];
+
+/** `ever-works fleet tasks handoff-options <taskId> [--agent <id>] [--json]` (the catalogue's CLI verb). */
+export const handoffOptionsCommand = new Command('handoff-options')
+    .description('Where a Task could be fixed: computers (and why not), checkouts, the first message')
+    .argument('<taskId>', 'The Task')
+    .option('--agent <id>', 'Judge the computers for this Agent')
+    .option('--json', 'Print JSON (FleetTaskHandoffOptions)')
+    .action(async (taskId: string, options: { agent?: string; json?: boolean }) => {
+        const json = options.json === true;
+        if (!UUID.test(taskId)) usage('Error: <taskId> must be a Task id (a UUID)');
+        if (options.agent && !UUID.test(options.agent)) usage('Error: --agent must be an Agent id (a UUID)');
+        await requireAuth();
+        try {
+            const query = options.agent ? `?agentId=${options.agent}` : '';
+            const handoff = (
+                await getHttpClient().get<FleetTaskHandoffOptions>(`/fleet/tasks/${taskId}/handoff-options${query}`)
+            ).data;
+            if (json) {
+                console.log(JSON.stringify(handoff, null, 2));
+                process.exit(0);
+            }
+            console.log(chalk.bold(`${handoff.task.slug} · ${handoff.task.title}`));
+            if (handoff.task.branch) console.log(`Branch  ${handoff.task.branch}`);
+            for (const computer of handoff.computers) {
+                const mark = computer.selectable ? chalk.green('✓') : chalk.gray('·');
+                console.log(
+                    `${mark} ${computer.name.padEnd(20)} ${computer.online ? 'online ' : 'offline'} ${
+                        computer.selectable ? '' : (computer.hint ?? computer.reason ?? '')
+                    }`,
+                );
+            }
+            process.exit(0);
+        } catch (error) {
+            fail(json, error);
+        }
+    });
+
+/** `ever-works fleet tasks …` (FL-15 P3). */
+export const fleetTasksCommand = new Command('tasks')
+    .alias('task')
+    .description('Tasks on your computers: handoff-options')
+    .addCommand(handoffOptionsCommand);

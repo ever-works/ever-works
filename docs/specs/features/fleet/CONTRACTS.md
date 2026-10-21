@@ -110,7 +110,27 @@ its current attention (`invalid`), and types the CLI's keys itself — the platf
 guard is `validateFleetSessionRulesFile` (`fleet-session-rules.types.ts`). Tools `fleet_sessions_question` (readOnly) /
 `fleet_sessions_answer` (`confirm`), MCP `fleet_sessions_answer`, CLI `fleet session question|answer`.
 
-**Revision 16 (2026-10-21)** — FL-15 (lane log `docs/internal/fleet/lanes/FL-15.md`): `FleetSessionStartRequest`
+**Revision 16 (2026-10-21)** — FL-05 P3 (board): `GET /api/fleet/sessions?view=board[&nodeId&agentId&kind]` answers
+`FleetSessionBoardResponse { columns: { needs_you, working, done, idle }, generatedAt }` — every LIVE session on the
+computers in the reader's `sessions` audience (at most 400), each column most recently moved first, `done` only for 24 h
+after it finished (`fleetSessionBoardColumn`); the list is the existing paged `GET /api/fleet/sessions`. The Activity
+view is `sessions` (key `n`) and exists only while `FLEET_SESSIONS_ENABLED` is on; its address-bar state is `mode`
+(`board|list`), `g` (`day|week`), `agent`, `node`, `kind`, `state`.
+
+**Revision 17 (2026-10-21)** — FL-13 P1 (lane log `docs/internal/fleet/lanes/FL-13.md`): the `schedule` family's
+messages are written down in `packages/contracts/src/fleet/fleet-schedules.types.ts` — `schedule.sync { generation,
+definitions[] }` answered `{ generation, held, refused, next, timeZone }`, `schedule.runs { since }` answered `{ runs,
+more, timeZone }` (each run `{ runId, scheduleId, scheduledFor, startedAt, endedAt, status, failedReason, exitCode,
+head, tail, truncated, capped, bytes, kept, trigger }`), `schedule.runNow { id, runId }` answered `{ runId, startedAt }`;
+one short-lived channel per request. A schedule's ONE computer is `nodeIds[0]`. A schedule's run keeps the machine's run
+id as its `fleet_command_runs` id (reconciliation is an upsert by it). Schedule routes are FL-12's paths (`POST
+/commands` with `cadence` + `name` → 201, `PATCH` / `DELETE /commands/:id`, `/commands/:id/runs?limit≤30`); Run now /
+Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes `{ confirm }` (other sources ignore it).
+`ScheduleOwnerType` gains `node`; the heartbeat's newest strip tier is `timeZone`; the node advertises `schedules`
+under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
+`invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
+
+**Revision 18 (2026-10-21)** — FL-15 (lane log `docs/internal/fleet/lanes/FL-15.md`): `FleetSessionStartRequest`
 gains `taskId?` (an Agent session's Run carries the Task; refused `busy` while the same Agent works it, `invalid` off
 the Agent's pinned computer, `limit_exceeded` with no free agent slot) and `checkoutId` is now honoured (a `ready`,
 host-isolated checkout on the same computer; its path is the folder); `GET /sessions?taskId=`; `FleetSessionView.task?`

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { FLEET_LOGS_READER, FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
@@ -20,6 +20,9 @@ import { FleetLogsService } from './fleet-logs.service';
  * `FleetService`, `FleetNodeRepository` and `FleetAuditService` from the
  * agent-side `FleetModule`.
  */
+// FL-19: `@Global()` so the api-side `AgentsModule` reaches `FLEET_LOGS_READER` and binds the
+// Agent log tools (`fleet_logs_sources`, `fleet_logs_read`) without importing this module.
+@Global()
 @Module({
     imports: [AgentFleetModule],
     controllers: [FleetLogsController],

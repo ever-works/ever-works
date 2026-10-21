@@ -20,6 +20,7 @@ import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
 import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
+import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -161,6 +162,16 @@ export interface AgentFleetToolSource {
     logs?: {
         reader: FleetLogsReaderPort;
     };
+    /**
+     * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status
+     * service under `FLEET_STATUS_READER`. Unbound, the tool is not offered.
+     */
+    status?: FleetStatusReaderPort;
+    /**
+     * FL-19 — `fleet_operations_get|list`: the node link's operations registry
+     * (FL-02). Unbound (no link in this context), the tools are not offered.
+     */
+    operations?: FleetOperationsToolPort;
 }
 
 /**

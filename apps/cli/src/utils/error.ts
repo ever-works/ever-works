@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { emitFleetError, readFleetCliError } from '../commands/fleet/fleet-output';
 
 export function handleCliError(error: any) {
     if (!error) {
@@ -29,4 +30,14 @@ export function handleCliError(error: any) {
             );
         }
     }
+}
+
+/**
+ * FL-19 (plan §9.3) — the `ever-works fleet …` error path: maps an API refusal
+ * to the `--json` envelope `{ ok: false, error: { code, hint, details } }` and
+ * the contract's exit code (`2` for a missing confirmation or bad input, else
+ * `1`), beside — never instead of — {@link handleCliError}.
+ */
+export function handleFleetCliError(error: unknown, options: { json: boolean }): never {
+    return emitFleetError(options.json, readFleetCliError(error));
 }

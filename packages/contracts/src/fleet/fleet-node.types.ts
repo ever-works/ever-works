@@ -392,6 +392,16 @@ export interface FleetNodeSelfDescription {
 	 * {@link normalizeFleetNodeSelfUpdate}.
 	 */
 	selfUpdate?: FleetNodeSelfUpdateReport;
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §1.1, §4.1) — the machine's IANA
+	 * time zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, e.g.
+	 * `Europe/Paris`). Command schedules fire on the machine's own wall clock,
+	 * so the platform shows both this zone and the viewer's. Heartbeat only,
+	 * in the node's NEWEST strip tier: a platform older than the field 400s
+	 * the beat once and the node retries without it. Validated with
+	 * `isFleetTimeZone`; an unusable value is dropped, never a 400.
+	 */
+	timeZone?: string;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -589,6 +599,12 @@ export interface FleetNodeView {
 	macAddress?: string | null;
 	/** Computer health (FL-03, second phase) — the stored (owner-salted) network identity, or null. Owner only. */
 	lanId?: string | null;
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §4.1) — the IANA time zone the
+	 * machine last reported, or null when it never did (a daemon older than
+	 * the field). Command schedules on it fire in this zone.
+	 */
+	timeZone?: string | null;
 	/**
 	 * Computer health (FL-03, second phase) — the sibling an offline computer
 	 * can be woken through right now, or null when it cannot (not offline, no

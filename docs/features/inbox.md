@@ -245,3 +245,4 @@ Quiet hours and category mutes apply downstream exactly as they do for every oth
 - [Notifications](./notifications.md) · [Agent Email & Inboxes](./agent-email.md)
 - [Agents](./agents.md) · [Autonomous Operation](./autonomous-operation.md) · [Budgets & Usage](./budgets-and-usage.md) · [Activity](./activity.md)
 - API reference: [Notifications](../api/notifications.md) · [Agents](../api/agents.md)
+- [Session status](./fleet-session-status.md) — a question or permission request from a session on one of your computers is a Decision here, marked _From a session_; answering it types the answer into the session.

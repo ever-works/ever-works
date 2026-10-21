@@ -164,6 +164,7 @@ const TODAY_KIND_KEY: Record<HomeScheduleKind, string> = {
     source_validation: 'sourceValidation',
     data_sync: 'dataSync',
     inbound_trigger: 'inboundTrigger',
+    node_schedule: 'nodeSchedule',
 };
 
 /**

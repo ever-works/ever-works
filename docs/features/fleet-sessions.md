@@ -15,6 +15,9 @@ Sessions are available with `FLEET_SESSIONS_ENABLED=true` (default off). They ri
 
 :::
 
+What each session is doing right now — working, needs you, done, idle — and answering what it asks from the card, the
+Inbox or My Decisions is described in [Session status and the Sessions board](./fleet-session-status.md).
+
 ## Two kinds
 
 | Kind              | Who works in it                         | Needs on the computer             | Runs as                                                                                       | Cost                                                         |
