@@ -405,7 +405,13 @@ export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLin
 	 * needs only `--work`; a person's or an Agent's needs `--manage`, which the
 	 * verb checks on the machine from `createdBy` and the platform narrows to.
 	 */
-	'checkouts.create': 'work-or-manage'
+	'checkouts.create': 'work-or-manage',
+	/**
+	 * Session git & actions (FL-06, spec §4.4): the Changes view of a Task's
+	 * worktree needs only `--work`; any other checkout's needs `--manage`,
+	 * which the verb checks on the machine and the platform narrows to.
+	 */
+	'checkouts.changes': 'work-or-manage'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */

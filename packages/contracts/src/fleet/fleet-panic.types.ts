@@ -157,6 +157,14 @@ export type FleetAuditAction =
 	| 'node.session.recording.start'
 	| 'node.session.recording.stop'
 	/**
+	 * Session git & actions (FL-06, CONTRACTS §7): an action prompt was typed
+	 * into a session (`action`, a redacted 200-character `promptPreview`, the
+	 * delivery) — an owner session's ledger is read back from these rows (R-38).
+	 */
+	| 'node.session.action'
+	/** A pull request was opened or updated for a session's checkout (platform-side, never a merge). */
+	| 'node.session.pull-request.open'
+	/**
 	 * Logs on computers (FL-08, CONTRACTS §7) — someone read a log source
 	 * (one row per open or one-shot read) or started following it. Details
 	 * carry `source` (the source id), `kind`, `requestedBy`, `lines`,
@@ -284,6 +292,8 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	'node.session.action',
+	'node.session.pull-request.open',
 	'node.logs.read',
 	'node.logs.follow',
 	'node.command.run',
