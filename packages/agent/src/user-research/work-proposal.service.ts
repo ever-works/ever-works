@@ -622,7 +622,14 @@ export class WorkProposalService {
     async list(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
-        opts: { missionId?: string | null; search?: string; limit?: number; offset?: number } = {},
+        opts: {
+            missionId?: string | null;
+            search?: string;
+            limit?: number;
+            offset?: number;
+            /** Works-security (run-token scope) — see `ListWorkProposalOptions.organizationId`. */
+            organizationId?: string | null;
+        } = {},
     ) {
         return this.repo.findByUser(userId, statuses, opts);
     }

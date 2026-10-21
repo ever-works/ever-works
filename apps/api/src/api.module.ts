@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
+import { FleetRunOrgPinGuard } from './auth/guards/fleet-run-org-pin.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
 import { config } from './config/constants';
 import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
@@ -480,6 +481,15 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_GUARD,
             useClass: SessionScopeGuard,
+        },
+        // Works-security (run-token scope) — runs right AFTER SessionScopeGuard
+        // (which pins a fleet-run token's request scope to its Organization):
+        // a fleet-run token reaches `/api/works/{id}…` / `/api/deploy/works/{id}…`
+        // only for a Work of that same Organization (404 otherwise). A no-op for
+        // every other credential and when FLEET_RUN_TOKEN_ORG_PIN_ENFORCED=false.
+        {
+            provide: APP_GUARD,
+            useClass: FleetRunOrgPinGuard,
         },
         // EW-P1-2 — integration keys (`ew_int_…`). Runs AFTER SessionScopeGuard
         // (the scope a slug resolved is visible) and BEFORE ScopeOwnershipGuard.

@@ -21,6 +21,7 @@ import {
 } from '@ever-works/contracts';
 import {
     InboxItemRepository,
+    type InboxOrganizationPin,
     type ListInboxDecisionsOptions,
 } from '../database/repositories/inbox-item.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -84,6 +85,11 @@ export interface ListInboxOptions {
     taskId?: string;
     /** Only items from this producer — `fleet-run` for the fleet filter (slice AU). */
     sourceType?: InboxItemSourceType;
+    /**
+     * Works-security (run-token scope) — only items of this Organization
+     * (`null` = no Organization). `undefined` = every Organization, as before.
+     */
+    organizationId?: string | null;
     limit?: number;
     offset?: number;
 }
@@ -193,19 +199,37 @@ export class InboxService implements InboxProducer {
         userId: string,
         options: ListInboxOptions = {},
     ): Promise<{ items: InboxItemDto[]; total: number; unreadCount: number }> {
+        // The Organization pin narrows the badge count exactly like the list,
+        // and only when one is asked for: the default call shape is unchanged.
+        const pin =
+            options.organizationId !== undefined
+                ? { organizationId: options.organizationId }
+                : undefined;
         const [{ rows, total }, unreadCount] = await Promise.all([
             this.items.listForUser(userId, options),
-            this.items.countUnreadForUser(userId),
+            pin
+                ? this.items.countUnreadForUser(userId, pin)
+                : this.items.countUnreadForUser(userId),
         ]);
         return { items: rows.map(toInboxItemDto), total, unreadCount };
     }
 
-    async unreadCount(userId: string): Promise<number> {
-        return this.items.countUnreadForUser(userId);
+    /** `pin` (works-security, run-token scope): see {@link ListInboxOptions.organizationId}. */
+    async unreadCount(userId: string, pin?: InboxOrganizationPin): Promise<number> {
+        return pin
+            ? this.items.countUnreadForUser(userId, pin)
+            : this.items.countUnreadForUser(userId);
     }
 
-    async getForUser(id: string, userId: string): Promise<InboxItemDto | null> {
-        const row = await this.items.findOwned(id, userId);
+    /** `pin` (works-security, run-token scope): an item of another Organization reads as missing. */
+    async getForUser(
+        id: string,
+        userId: string,
+        pin?: InboxOrganizationPin,
+    ): Promise<InboxItemDto | null> {
+        const row = pin
+            ? await this.items.findOwned(id, userId, pin)
+            : await this.items.findOwned(id, userId);
         return row ? toInboxItemDto(row) : null;
     }
 
