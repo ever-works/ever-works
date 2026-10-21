@@ -113,6 +113,9 @@ The whole surface is gated by `FLEET_ENABLED` on the API. When it is off, every 
 
 ## Health signals
 
+> The per-check-in health snapshot (CPU, memory, disk, GPU, load, uptime, pending reboot, failed services),
+> its history, **Refresh now** and **Wake** are described in [Computer health](./fleet-health.md).
+
 `status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
 
 ### Worker state

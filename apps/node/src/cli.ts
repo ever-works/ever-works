@@ -7,10 +7,12 @@ import {
 	createDiskProbe,
 	createHealthProbeIo,
 	createSecretStore,
+	createWakeSender,
 	createResourceProbe,
 	currentEnvironment,
 	defaultConfigPath,
 	isExecutableFile,
+	readNetworkInterfaces,
 	resolveEntryPath,
 	restrictFileToOwnerWindows,
 	statModelCliFile,
@@ -44,7 +46,11 @@ function buildDeps(): CliDeps {
 			// compatibility probe, so an upgraded CLI is re-probed at once.
 			statFile: statModelCliFile,
 			// Computer health (FL-03): the snapshot every heartbeat carries.
-			health: createHealthProbeIo(runner)
+			health: createHealthProbeIo(runner),
+			// Computer health, second phase (FL-03): the primary interface for
+			// Wake-on-LAN (read under `--manage` only) and the packet sender.
+			network: readNetworkInterfaces,
+			wakeSender: createWakeSender()
 		},
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),

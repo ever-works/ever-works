@@ -183,6 +183,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet',
 				// The hub is the app's view of the same registry — read it right after.
 				'features/fleet-hub',
+				// What each computer in the hub reports, its history, wake and refresh.
+				'features/fleet-health',
 				// What each computer lets the platform do, and the one link it keeps.
 				'features/fleet-node-link',
 				'features/integrations',

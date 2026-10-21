@@ -853,6 +853,14 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the consents, should an enrolling node send them.
             consents: body.consents,
+            // Computer health, second phase (FL-03): never sent at enrol; validated by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
+            // Sessions on computers (FL-04): forwarded like every declared field
+            // (the conformance spec pins enroll and heartbeat to the DTO).
+            daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): likewise.
+            selfUpdate: body.selfUpdate,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -900,6 +908,10 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
+            // Computer health, second phase (FL-03): hardware address and network
+            // identity (`--manage` only), validated and owner-salted by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
             // Sessions on computers (FL-04): the session daemon's health.
             daemon: body.daemon,
             // Fleet node link (FL-02 T-25): the opt-in self-update report.

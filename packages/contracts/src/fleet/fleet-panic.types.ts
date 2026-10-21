@@ -131,6 +131,12 @@ export type FleetAuditAction =
 	 */
 	| 'node.policy.change'
 	/**
+	 * Computer health (FL-03, CONTRACTS §7) — someone woke an offline computer
+	 * through a sibling on its network. One row per attempt; details carry
+	 * `target`, `via` (the sibling's id) and `outcome` (`sent` · `refused`).
+	 */
+	| 'node.wake'
+	/**
 	 * Sessions on computers (FL-04, CONTRACTS §7) — every row carries
 	 * `family: 'sessions'`, `target` (the session id), `requestedBy`,
 	 * `confirmationClass` and `outcome`; never terminal bytes, typed input
@@ -189,6 +195,7 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.link.disconnect',
 	'node.link.channel-open',
 	'node.policy.change',
+	'node.wake',
 	'node.session.start',
 	'node.session.attach',
 	'node.session.input',

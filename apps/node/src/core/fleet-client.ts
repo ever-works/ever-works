@@ -467,6 +467,18 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 			usageScan: source.consents.usageScan === true
 		};
 	}
+	// Computer health, second phase (FL-03): the hardware address and the
+	// opaque network identity, both or neither (`describeSelf` validated them).
+	if (typeof source.macAddress === 'string' && typeof source.lanId === 'string') {
+		out.macAddress = source.macAddress;
+		out.lanId = source.lanId;
+	}
+	// Sessions on computers (FL-04): the session daemon's report, already
+	// normalised by `describeSelf` — without this line the runtime computed it
+	// and the wire never carried it (the conformance spec pins the projection).
+	if (source.daemon !== undefined) {
+		out.daemon = source.daemon;
+	}
 	// Fleet node link (FL-02 T-25): the self-update report, already normalised
 	// by `describeSelf`; copied as is. Heartbeat-only in practice.
 	if (source.selfUpdate !== undefined) {
