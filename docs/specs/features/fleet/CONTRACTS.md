@@ -36,6 +36,11 @@ no tokens (§2.2); command and schedule messages (§3.3); operation states incl.
 FL-12…FL-15 routes (§11.2); R-41 (ready-only roots, `--code-folder`). Per-schedule grace and
 failure thresholds stay fixed (§6) until the owner asks for editors.
 
+**Revision 7 (2026-10-21)** — FL-04 P1 (lane-log decision 3): the heartbeat `daemon` block gains `storage`
+(§1.1); the `session` family opens with an optional `kind`, gains the `session.screen` verb, the platform→node
+channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
+`session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
@@ -113,7 +118,7 @@ All other heartbeat payload additions are optional fields (old nodes omit them):
 | `macAddress`, `lanId`                                                                         | FL-03 | wake                                                                                              |
 | `timeZone` (IANA)                                                                             | FL-13 | schedules                                                                                         |
 | `helperTrust`                                                                                 | FL-07 | R-8                                                                                               |
-| `daemon { state, reason?, sessions, hooks? }`                                                 | FL-04 | session daemon health (`state`: `running · stopped · failed`)                                     |
+| `daemon { state, reason?, sessions, storage?, hooks? }`                                       | FL-04 | session daemon health (`state`: `running · stopped · failed`; `storage`: `ok · failing`, spec U15) |
 | `helper { trust, version?, verifiedAt? }`, `displays[]`, `desktopReasons[]`, `helperEvents[]` | FL-07 | native helper state, display list, why the Desktop source is unavailable, recent admission events |
 
 ### 1.2 Capability tags (advertised by the node; `cap:` requirements on jobs — existing mechanism)
@@ -243,7 +248,7 @@ state-changing requests, leave processes running), `link.resume`, and `link.drai
 
 | Family     | Opens with                                                                                   | Messages (JSON on the channel)                                                                                                                                                                                                                                        | Consent                      |
 | ---------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `session`  | `{ sessionId, mode: 'viewer'\|'driver' }`                                                    | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`; node→platform (channel 0): `session.list`, `session.event`, `session.status`, `session.attention` | work / manage                |
+| `session`  | `{ sessionId, mode: 'viewer'\|'driver', kind?: 'owner'\|'agent' }`                            | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`, `session.screen`; platform→node (channel 0): `session.ack { sessionIds }`; node→platform (channel 0): `session.list { sessions[], daemon }`, `session.event` (optional `reason`, e.g. on `exited`), `session.status`, `session.attention`; node→viewer on the channel: `session.notice` (`paused · resumed · drain · slow-viewer · size · replay`) | work (Agent) / manage (owner) |
 | `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                         | attend                       |
 | `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                     | manage                       |
 | `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                  | manage (see §2.1 for family) |
@@ -263,6 +268,14 @@ the node went away mid-operation; never reported as `done`).
 **Consent exceptions per verb.** The `machine` family needs `manage` except `health.now`, which is
 allowed on any open link (R-31). The link implementation keeps these exceptions in one table
 (`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code.
+
+**Session family details (FL-04, revision 7).** `kind` on the open lets the node check the consent before
+the channel opens (`--manage` for owner sessions, `--work` for Agent sessions, R-5) and again against the
+daemon's own record. Every session `start`/`end`/`rename`/`restart`/`resize`/`input`/`screen` request uses a
+short-lived channel of its own; an attached viewer holds one channel for its life. `session.ack` tells the
+daemon the platform holds an ended session's last screen, so it may forget it. `session.list` (after every
+`link.ready`) carries the daemon health block of §1.1. `session.event exited` may carry `reason` (one of the
+§4.2 `endedReason` values, e.g. `drain`, `kill-switch`) when the daemon ended the process itself.
 
 ### 3.4 Viewer side (browser → platform)
 
@@ -302,6 +315,7 @@ allowed values validated in code, as existing fleet columns are.
 | `providerMachineRef`    | text null                                   | provider's own id                                                                              | FL-17 |
 | `providerMeta`          | jsonb null                                  | region, size, hourly rate, created at, power timeline, idle policy, cost snapshot (no secrets) | FL-17 |
 | `virtualMeta`           | jsonb null                                  | system, image, CPUs, memory, disk (survives job-body purge)                                    | FL-16 |
+| `sessionDaemon`         | simple-json null                            | the session daemon block of the latest beat (§1.1), for the computer page and the start gate  | FL-04 |
 
 ### 4.2 `FleetSession` (new, table `fleet_sessions`, FL-04 slot 00; FL-05 slot 00 adds the last five rows)
 
@@ -328,6 +342,8 @@ allowed values validated in code, as existing fleet columns are.
 | `startedAt`, `endedAt` | timestamptz                                                                    |                                                                                                                                      |
 | `endedReason`          | enum null `user · agent · exit · node-restart · timeout · kill-switch · drain` |                                                                                                                                      |
 | `recordingState`       | enum `off · recording · stored`                                                | R-9                                                                                                                                  |
+| `exitCode`             | integer null                                                                   | the process exit code when the daemon saw one (revision 7)                                                                           |
+| `startedBy`            | varchar(80)                                                                    | `user:<id>` or `agent:<id>` — who started it, the §2.3 `requestedBy` shape (revision 7)                                              |
 | `costCents`            | integer null                                                                   | created by FL-20's `1796200000000-AddFleetSessionUsage`, not FL-04's slot; mirrored from the Run; filled by FL-20 for owner sessions |
 | `tokens`               | jsonb null                                                                     | FL-20                                                                                                                                |
 | `attention`            | jsonb null `{ key, reason, prompt, options[], raisedAt, acknowledgedAt }`      | §5.2 (FL-05)                                                                                                                         |

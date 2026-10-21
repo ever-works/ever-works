@@ -63,6 +63,7 @@ import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import { randomUUID } from 'node:crypto';
 import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
+import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -352,6 +353,20 @@ export class TaskTransitionService {
             throw new ForbiddenException(
                 `Task ${task.id} is waiting for its owner (label '${AWAITING_OWNER_LABEL}'): an agent cannot move it. The owner starts it.`,
             );
+        }
+        // Works-security (2026-10-18) — a blocked Task waits for a person, so no
+        // agent-driven move (the `transitionTask` tool, a run's finisher, the
+        // workspace finalize, a fleet run's token) lifts the block. The
+        // platform's auto-unblock restore is not an agent move. See
+        // `agent-block-lift.ts`.
+        if (
+            task.status === TaskStatus.BLOCKED &&
+            to !== TaskStatus.BLOCKED &&
+            opts.actorType === 'agent' &&
+            opts.automaticRestore !== true &&
+            !agentMayLiftBlock()
+        ) {
+            throw new ForbiddenException(agentBlockLiftRefusal(task.id));
         }
         const from = task.status;
         if (!ALLOWED[from]?.includes(to)) {

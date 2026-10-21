@@ -25,6 +25,8 @@ export * from './task-pr-status-sync.task';
 export * from './fleet-job-lease-sweeper.task';
 // Computer health (FL-03) — hourly roll-up and retention of the health history.
 export * from './fleet-health-rollup.task';
+// Sessions on computers (FL-04) — sessions that never confirmed their start end `unconfirmed`.
+export * from './fleet-session-sweeper.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

@@ -594,6 +594,16 @@ export interface GitPullRequestStatus {
 	 * reported none, `undefined` that this read did not report it.
 	 */
 	readonly headRepoFullName?: string | null;
+	/**
+	 * The head BRANCH name (`pr.head.ref`), as the provider reports it.
+	 * Optional and additive (works-security 2026-10-18): the merge gate
+	 * merges a Task's pull request by NUMBER after every gate judged the
+	 * Task's BRANCH, so it refuses a pull request whose live head branch is
+	 * not the Task's recorded one. `null` when the provider reported none,
+	 * `undefined` when this read did not report it (the gate then keeps its
+	 * previous behaviour).
+	 */
+	readonly headRef?: string | null;
 }
 
 // ── Workflow runs (release promotion lane, self-build slice AI) ─────

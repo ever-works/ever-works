@@ -1,10 +1,16 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import {
+	reservedTaskLabelChanges,
+	reservedTaskLabelRefusal,
+	taskReservedLabelsEnforced,
+	TASK_RESERVED_LABELS_ENFORCED_ENV
+} from '@ever-works/contracts';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import type { z } from 'zod';
 import { OpenApiLoaderService, type OpenApiOperation } from './openapi-loader.service.js';
 import { SchemaConverterService } from './schema-converter.service.js';
 import { ApiClientService } from '../api-client/api-client.service.js';
-import { toMcpError } from '../api-client/api-error.js';
+import { ApiError, toMcpError } from '../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../api-client/fence-untrusted.js';
 import { WHITELIST, type WhitelistEntry } from './whitelist.js';
 import {
@@ -43,6 +49,43 @@ function sanitizeSpecDescription(value: string): string {
 		return cleaned;
 	}
 	return `${cleaned.slice(0, MAX_SPEC_DESCRIPTION_LENGTH)}…`;
+}
+
+/**
+ * Works-security (2026-10-18) — refuse a `create_task` / `update_task` call
+ * whose `labels` would add or remove a RESERVED Task label. `update` reads the
+ * Task first (the PATCH replaces the whole list, so a list that merely omits
+ * `awaiting-owner` would strip it). Throws an {@link ApiError} 403, which the
+ * handler turns into an MCP error result; nothing is written.
+ */
+async function refuseReservedTaskLabelChange(
+	apiClient: ApiClientService,
+	mode: 'create' | 'update',
+	args: Record<string, unknown>,
+	bodyParams: Record<string, unknown>
+): Promise<void> {
+	if (bodyParams.labels === undefined) return;
+	if (!taskReservedLabelsEnforced(process.env[TASK_RESERVED_LABELS_ENFORCED_ENV])) return;
+	const after = Array.isArray(bodyParams.labels)
+		? (bodyParams.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+		: bodyParams.labels === null
+			? null
+			: [];
+	let before: string[] = [];
+	if (mode === 'update') {
+		const id = typeof args.id === 'string' || typeof args.id === 'number' ? `${args.id}` : '';
+		if (!id) throw new ApiError(400, 'update_task needs the Task id to check its labels.');
+		const current = await apiClient.request<{ labels?: unknown } | null>(
+			'GET',
+			`/tasks/${encodeURIComponent(id)}`
+		);
+		before = Array.isArray(current?.labels)
+			? (current!.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+			: [];
+	}
+	const change = reservedTaskLabelChanges(before, after);
+	if (change.added.length === 0 && change.removed.length === 0) return;
+	throw new ApiError(403, reservedTaskLabelRefusal('An MCP tool call', change));
 }
 
 @Injectable()
@@ -229,6 +272,10 @@ export class ToolRegistrationService {
 				const queryString = queryParams.toString();
 				if (queryString) {
 					requestPath += `?${queryString}`;
+				}
+
+				if (entry.reservedTaskLabels) {
+					await refuseReservedTaskLabelChange(apiClient, entry.reservedTaskLabels, args, bodyParams);
 				}
 
 				const hasBody = Object.keys(bodyParams).length > 0;

@@ -10,7 +10,16 @@ import {
 import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
-import type { GateStatus, TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
+import {
+    reservedTaskLabelChanges,
+    reservedTaskLabelRefusal,
+    taskReservedLabelsEnforced,
+    TASK_RESERVED_LABELS_ENFORCED_ENV,
+    type GateStatus,
+    type ReservedTaskLabelChange,
+    type TaskAcceptanceCheck,
+    type TaskExtraRepo,
+} from '@ever-works/contracts';
 import { normalizeTaskExtraRepos } from './task-extra-repos';
 import {
     Task,
@@ -18,6 +27,7 @@ import {
     TaskStatus,
     type TaskActorType,
     type TaskAuthorType,
+    type TaskOrigin,
 } from '../entities/task.entity';
 import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
@@ -91,6 +101,59 @@ import { isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
  */
 export interface CreateTaskOptions {
     readonly withinCreate?: (task: Task, manager?: EntityManager) => Promise<void>;
+    /**
+     * Works-security (2026-10-18) — the caller is NOT a person: a fleet-run
+     * token, an integration key or an agent tool. The write may not add any
+     * RESERVED label (`awaiting-owner`, `app-provision`, `release:*`,
+     * `provision-attempt-*` — `@ever-works/contracts` `isReservedTaskLabel`);
+     * `who` names the caller in the refusal. Absent = a person or platform code,
+     * which keep full control. Off with `TASK_RESERVED_LABELS_ENFORCED=false`.
+     */
+    readonly restrictReservedLabels?: ReservedLabelRestriction;
+}
+
+/** Options of {@link TasksService.update}. */
+export interface UpdateTaskOptions {
+    /** As {@link CreateTaskOptions.restrictReservedLabels}: no reserved label may be added OR removed. */
+    readonly restrictReservedLabels?: ReservedLabelRestriction;
+}
+
+/** Who is restricted, for the refusal sentence ("A fleet-run credential", "An agent"). */
+export interface ReservedLabelRestriction {
+    readonly who: string;
+}
+
+/**
+ * A restricted caller tried to add or remove a reserved Task label. A 403:
+ * the request is well-formed, the caller is just not allowed to make it.
+ * `change` names the labels, for callers that re-map the envelope (the
+ * integrations API answers `422 domain_rule`).
+ */
+export class ReservedTaskLabelError extends ForbiddenException {
+    constructor(
+        readonly change: ReservedTaskLabelChange,
+        who: string,
+    ) {
+        super(reservedTaskLabelRefusal(who, change));
+        this.name = 'ReservedTaskLabelError';
+    }
+}
+
+/**
+ * Throw {@link ReservedTaskLabelError} when a restricted caller's label write
+ * would add or remove a reserved label. No-op for an unrestricted caller, a
+ * write that does not touch labels, or with enforcement switched off.
+ */
+export function assertReservedLabelsUnchanged(
+    before: readonly string[] | null | undefined,
+    after: readonly string[] | null | undefined,
+    restriction: ReservedLabelRestriction | null | undefined,
+): void {
+    if (!restriction) return;
+    if (!taskReservedLabelsEnforced(process.env[TASK_RESERVED_LABELS_ENFORCED_ENV])) return;
+    const change = reservedTaskLabelChanges(before, after);
+    if (change.added.length === 0 && change.removed.length === 0) return;
+    throw new ReservedTaskLabelError(change, restriction.who);
 }
 
 export interface CreateTaskInput {
@@ -153,6 +216,13 @@ export interface CreateTaskInput {
      * without it (the parent is loaded for the scope check anyway).
      */
     derivedFromPrivate?: boolean;
+    /**
+     * Works-security (2026-10-18) — which platform flow filed this Task
+     * (`Task.origin`). SERVER-WRITTEN ONLY, like `delegationDepth`: absent from
+     * every DTO and from {@link UpdateTaskInput}, so nothing outside platform
+     * code can claim a provenance an authorization decision reads.
+     */
+    origin?: TaskOrigin | null;
 }
 
 export interface UpdateTaskInput {
@@ -852,6 +922,9 @@ export class TasksService {
         await this.assertScopeReachable(userId, input, ownershipScope);
         this.assertTitle(input.title);
         if (input.description) assertNoSecrets(input.description, 'task.description');
+        // Works-security — a restricted caller files no Task already carrying a
+        // control-signal label (a hold, a release marker, a retry counter).
+        assertReservedLabelsUnchanged([], input.labels ?? [], options.restrictReservedLabels);
 
         // Validate parent cycle (root task has no parent).
         // Review-fix C8: also walk the parent chain to bound depth +
@@ -951,6 +1024,7 @@ export class TasksService {
                         maxGateAttempts: input.maxGateAttempts ?? null,
                         extraRepos,
                         delegationDepth: input.delegationDepth ?? null,
+                        origin: input.origin ?? null,
                         scheduledAt: input.scheduledAt ?? null,
                         scheduleClaimedAt: null,
                         dueAt: input.dueAt ?? null,
@@ -992,9 +1066,14 @@ export class TasksService {
         id: string,
         input: UpdateTaskInput,
         ownershipScope?: OwnershipScope,
+        options: UpdateTaskOptions = {},
     ): Promise<Task> {
         const task = await this.getOne(userId, id, ownershipScope);
         const patch: Partial<Task> = {};
+        // Works-security — compared against the row as it is NOW: a restricted
+        // caller may neither strip `awaiting-owner` / `release:revert` nor add
+        // a control label. Ordinary labels stay freely editable.
+        assertReservedLabelsUnchanged(task.labels, input.labels, options.restrictReservedLabels);
 
         if (input.title !== undefined) {
             this.assertTitle(input.title);

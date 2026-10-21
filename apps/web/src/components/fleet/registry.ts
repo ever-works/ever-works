@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
-import type { FleetActionFamily, FleetNodeView } from '@ever-works/contracts';
-import { isNeedsALookRoute } from '@ever-works/contracts';
+import type { FleetActionFamily, FleetNodeView, FleetViewerRole } from '@ever-works/contracts';
+import { fleetFamilyAllows, isNeedsALookRoute } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 
 /**
@@ -310,6 +310,44 @@ export interface FleetAddComputerItemRegistration {
 export interface FleetComputerActionProps {
     node: FleetNodeView;
     flags: FleetFeatureFlags;
+    /**
+     * The viewer's role on this computer (`node.viewerRole`, `owner` when the
+     * row carries none). Always set by the computer page; optional so a
+     * component's own specs may leave it out.
+     */
+    viewerRole?: FleetViewerRole;
+    /**
+     * Whether the action's `family` admits the viewer — the page's mirror of
+     * the server's check ({@link computerActionAllowed}), so the component can
+     * render itself disabled with the reason instead of offering an act the
+     * server will refuse. The server still decides; this never grants
+     * anything. Always set by the computer page.
+     */
+    allowed?: boolean;
+}
+
+/**
+ * Whether `family` admits the viewer of `node` (CONTRACTS §2.1): the owner
+ * always, an organisation role when the computer's policy for that family
+ * includes it. A row without `viewerRole` is the owner's own (`GET /nodes`).
+ */
+export function computerActionAllowed(node: FleetNodeView, family: FleetActionFamily): boolean {
+    const role: FleetViewerRole = node.viewerRole ?? 'owner';
+    return role === 'owner' || fleetFamilyAllows(node, role, family);
+}
+
+/** The props the computer page hands one registered action. */
+export function computerActionProps(
+    node: FleetNodeView,
+    flags: FleetFeatureFlags,
+    action: Pick<FleetComputerActionRegistration, 'family'>,
+): Required<FleetComputerActionProps> {
+    return {
+        node,
+        flags,
+        viewerRole: node.viewerRole ?? 'owner',
+        allowed: computerActionAllowed(node, action.family),
+    };
 }
 
 /**
@@ -353,8 +391,28 @@ export function getAddComputerItems(flags: FleetFeatureFlags): FleetAddComputerI
         .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
-/** Add an act to every computer page's header or ⋯ menu. */
+/**
+ * Add an act to every computer page's header or ⋯ menu. Registering the same
+ * id twice keeps the last (hot reload). Two mistakes that would otherwise
+ * ship nothing visible fail at import time instead: `replaces` on a menu
+ * entry (only the header has placeholders), and a second action taking a
+ * header placeholder another action already took (only one can render).
+ */
 export function registerComputerAction(registration: FleetComputerActionRegistration): void {
+    if (registration.replaces && registration.placement !== 'header') {
+        throw new Error(
+            `Fleet computer action "${registration.id}" replaces "${registration.replaces}", which only a header action can`,
+        );
+    }
+    if (registration.replaces) {
+        for (const other of computerActions.values()) {
+            if (other.id !== registration.id && other.replaces === registration.replaces) {
+                throw new Error(
+                    `Fleet computer action "${registration.id}" replaces "${registration.replaces}", already taken by "${other.id}"`,
+                );
+            }
+        }
+    }
     computerActions.set(registration.id, registration);
 }
 

@@ -445,9 +445,14 @@ Assert-False $passwordlessIdentity.RequiresPassword 'a gMSA or built-in identity
 
 # Logging parity is part of the plan, not an afterthought.
 $planSettings = @($freshPlan | Where-Object { $_.Kind -eq 'nssm' -and $_.Arguments[0] -eq 'set' } | ForEach-Object { $_.Arguments[2] })
-foreach ($required in @('Application', 'AppParameters', 'AppDirectory', 'Start', 'AppStdout', 'AppStderr', 'AppStopMethodConsole', 'AppExit', 'AppRestartDelay')) {
+foreach ($required in @('Application', 'AppParameters', 'AppDirectory', 'Start', 'AppStdout', 'AppStderr', 'AppStopMethodConsole', 'AppExit', 'AppRestartDelay', 'AppKillProcessTree')) {
     Assert-True ($planSettings -contains $required) "the plan must still set $required"
 }
+# Sessions on computers (FL-04): a service restart must not kill the session
+# daemon (and with it every session) the node started.
+$treeKill = @($freshPlan | Where-Object { $_.Kind -eq 'nssm' -and $_.Arguments[0] -eq 'set' -and $_.Arguments[2] -eq 'AppKillProcessTree' })
+Assert-Equal $treeKill.Count 1 'the plan sets AppKillProcessTree exactly once'
+Assert-Equal $treeKill[0].Arguments[3] '0' 'the service must not kill the session daemon on stop'
 # The identity is no longer an nssm call at all: NSSM takes the password as a
 # command-line argument, which process-creation telemetry records.
 Assert-False ($planSettings -contains 'ObjectName') 'the password must not reach nssm as an ObjectName argument'
