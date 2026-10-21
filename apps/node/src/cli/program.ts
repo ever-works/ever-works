@@ -839,14 +839,16 @@ export interface PolicyCommandOptions {
 	allowSkipPermissions?: string;
 	allowShellCommands?: string;
 	restrictedMode?: string;
+	allowMcpBridge?: string;
 }
 
-/** One line: both control-18 switches, in words. */
+/** One line: every local execution-policy switch, in words. */
 export function describeExecutionPolicy(policy: NodeExecutionPolicy): string {
 	return (
 		`skip-permissions ${policy.allowSkipPermissions ? 'ALLOWED' : 'refused'}, ` +
 		`node-run shell commands ${policy.allowShellCommands ? 'ALLOWED' : 'refused'}, ` +
-		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}`
+		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}, ` +
+		`platform MCP bridge ${policy.allowMcpBridge ? 'allowed' : 'REFUSED'}`
 	);
 }
 
@@ -872,17 +874,19 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 	const skip = parsePolicySwitch('--allow-skip-permissions', options.allowSkipPermissions);
 	const shell = parsePolicySwitch('--allow-shell-commands', options.allowShellCommands);
 	const restricted = parsePolicySwitch('--restricted-mode', options.restrictedMode);
-	if (skip === undefined && shell === undefined && restricted === undefined) {
+	const mcpBridge = parsePolicySwitch('--allow-mcp-bridge', options.allowMcpBridge);
+	if (skip === undefined && shell === undefined && restricted === undefined && mcpBridge === undefined) {
 		deps.out(`policy       ${describeExecutionPolicy(current)}`);
 		deps.out(
-			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off`.'
+			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off --allow-mcp-bridge on|off`.'
 		);
 		return;
 	}
 	const next: NodeExecutionPolicy = {
 		allowSkipPermissions: skip ?? current.allowSkipPermissions,
 		allowShellCommands: shell ?? current.allowShellCommands,
-		restrictedMode: restricted ?? current.restrictedMode
+		restrictedMode: restricted ?? current.restrictedMode,
+		allowMcpBridge: mcpBridge ?? current.allowMcpBridge
 	};
 	await saveConfig(
 		deps.fs,
@@ -908,6 +912,12 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 		deps.out(
 			'Note: Claude Code restricted mode is OFF — runs keep the baseline isolation (no repository settings, no ' +
 				'hooks) but get the command-running built-ins back and read your ~/.claude/settings.json.'
+		);
+	}
+	if (!next.allowMcpBridge) {
+		deps.out(
+			'Note: the platform MCP bridge is OFF — jobs whose Agent has external tools enabled are refused on this ' +
+				'machine instead of running with platform tools.'
 		);
 	}
 	deps.out('Restart the node service for a running worker to apply the change.');
@@ -1802,6 +1812,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--restricted-mode <on|off>',
 			'Run Claude Code with --restricted when it supports it (no shell tools, no settings files). Default on.'
+		)
+		.option(
+			'--allow-mcp-bridge <on|off>',
+			'Let jobs start the platform MCP bridge (platform tools for the model, run-scoped credential). Default on.'
 		)
 		.action(async (options: PolicyCommandOptions) => {
 			await runPolicy(deps, options);

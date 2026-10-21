@@ -13,6 +13,7 @@ import {
 	samePath,
 	type FleetWorkspaceLease
 } from './fleet-task-workspace';
+import { HARDENED_DIRTY_STATUS_ARGS, statusHardeningEnv } from './status-hardening';
 
 /**
  * Workspace inventory — everything the node can find out about the
@@ -419,8 +420,18 @@ async function scanWorktree(
 		record.intentPending = (await lstatOrNull(intentPath(record.poolPath, record.bindingKey))) !== null;
 	}
 	if (record.owned) {
-		const status = await git(['status', '--porcelain', '--untracked-files=all'], worktreePath, context);
-		record.dirty = status.code === 0 ? status.stdout.trim().length > 0 : 'unknown';
+		// works-security (node 0.2.7): no fsmonitor, filter driver, hook or
+		// submodule work-tree status runs on this scan (status-hardening.ts).
+		// An overlay that cannot be computed is `unknown`, which keeps the tree.
+		const hardening = await statusHardeningEnv(worktreePath, context.signal).catch((error: unknown) => {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (context.signal?.aborted) throw error;
+			return null;
+		});
+		const status = hardening
+			? await git(HARDENED_DIRTY_STATUS_ARGS, worktreePath, context, { env: hardening })
+			: null;
+		record.dirty = status && status.code === 0 ? status.stdout.trim().length > 0 : 'unknown';
 	}
 	return record;
 }
@@ -649,7 +660,7 @@ async function git(
 	args: readonly string[],
 	cwd: string,
 	context: ScanContext,
-	options: { timeoutMs?: number } = {}
+	options: { timeoutMs?: number; env?: Readonly<Record<string, string>> } = {}
 ): Promise<GitResult> {
 	const signals: AbortSignal[] = [];
 	if (context.signal) signals.push(context.signal);
@@ -658,7 +669,7 @@ async function git(
 	try {
 		const { error, stdout, stderr } = await execFileWithVerifiedCancellation('git', args, {
 			cwd,
-			env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+			env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...options.env },
 			windowsHide: true,
 			maxBuffer: 16 * 1024 * 1024,
 			...(signal ? { signal } : {})

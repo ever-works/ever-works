@@ -52,7 +52,7 @@ ever-works-node status
 ever-works-node capabilities
 ever-works-node doctor [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--offline] [--json]
 ever-works-node gc [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--dry-run] [--offline]
-ever-works-node policy [--allow-skip-permissions on|off] [--allow-shell-commands on|off] [--restricted-mode on|off]
+ever-works-node policy [--allow-skip-permissions on|off] [--allow-shell-commands on|off] [--restricted-mode on|off] [--allow-mcp-bridge on|off]
 ```
 
 - **`enroll`** consumes a one-time token from the platform's Fleet page (`POST /api/fleet/enroll`)
@@ -76,8 +76,11 @@ ever-works-node policy [--allow-skip-permissions on|off] [--allow-shell-commands
   `--allow-skip-permissions` (run the model CLI with its permission checks off) and
   `--allow-shell-commands` (run a job's setup, command steps and acceptance checks, and lease
   `acceptance-checks` jobs — repository code, after a model step possibly code the model wrote).
-  `--restricted-mode` (default **on**) adds Claude Code's `--restricted` when supported. A job that
-  needs a switch that is off is refused before anything is provisioned, naming the switch. Restart the service after a change. See the fleet session trust model, control 18.
+  `--restricted-mode` (default **on**) adds Claude Code's `--restricted` when supported.
+  `--allow-mcp-bridge` (default **on**, since 0.2.7) decides whether a job may start the platform MCP
+  bridge — platform tools for the model under a run-scoped credential; with it off, a job whose
+  Agent has external tools enabled is refused instead of running with them. A job that
+  needs a switch that is off is refused before anything is provisioned, naming the switch. Restart the service after a change. See the fleet session trust model, controls 18 and 22.
 - **`unenroll`** retires the machine — `POST /api/fleet/unenroll` deletes the registration, then the
   local credential is erased. The local erase happens **even if the API call fails**: a
   decommissioned laptop holding a live fleet secret is the worse outcome.
@@ -210,6 +213,19 @@ engine than the one an operator chose is how a check passes for the wrong reason
   claim and re-offers the work. Shutdown drains in-flight jobs so their verdicts are reported
   rather than abandoned.
 - A real `User-Agent` is always sent — the production API edge answers default/absent agents with 403.
+- **0.2.7 (works-security):** fleet commit messages never carry a CI-skip directive (`[skip ci]`,
+  `[ci skip]`, `[no ci]`, `[skip actions]`, `[actions skip]`, `skip-checks: true` — a Task title is
+  the commit subject, and those would switch the PR's GitHub Actions off); every checkout-type Git
+  command the node runs (provision `fetch` / `worktree add`, read-only mount `reset --hard` /
+  `clean`) runs no repository hook, fsmonitor or filter driver — **LFS files therefore arrive as
+  pointer files** in a fleet worktree — and the finalize commit only runs filter drivers the
+  operator defined; the node proves a worktree's `.git` still points at its own gitdir before its own
+  Git touches it; the MCP bridge has a local switch (`policy --allow-mcp-bridge`); and the Windows
+  health / capability probes start `powershell`, `where`, `icacls` and `nvidia-smi` from absolute
+  paths without `cmd.exe`, never searching the current directory. A Codex run also reports, in
+  its containment block, a repository-local `.codex/config.toml` / `.codex/hooks.json` in the
+  checkout (`codex-repository-config`) and native Windows without your `[windows] sandbox` setting
+  (`codex-windows-sandbox`) — disclosures only, no run is refused. Trust model controls 20–24.
 
 ## Commands (development)
 

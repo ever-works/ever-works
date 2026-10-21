@@ -350,7 +350,9 @@ const COMMIT_MESSAGE_EXPORTS = [
 	'isFleetCommitType',
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
-	'retypeFleetCommitMessage'
+	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective'
 ] as const;
 
 // Computer health (FL-03) — `fleet-node-health.types.ts`, pinned in
@@ -639,6 +641,8 @@ const FUNCTION_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective',
 	'sanitizeFleetNodeHealthSnapshot',
 	'hasFleetNodeHealthReading',
 	'isFleetNodeHealthStale',
@@ -791,7 +795,10 @@ describe('fleet barrel', () => {
 		// → 400 with viewers on a link channel (FL-02 P1b): the nineteen symbols
 		// of `fleet-link-viewer.types.ts` — a NEW module, so the witness table
 		// below gains a row.
-		expect(Object.keys(fleet)).toHaveLength(400);
+		// → 402 with the CI-skip neutraliser (works-security, node 0.2.7):
+		// `neutralizeCiSkipDirectives` + `containsCiSkipDirective` in
+		// `fleet-commit-message.types.ts`, an existing module — no new witness row.
+		expect(Object.keys(fleet)).toHaveLength(402);
 	});
 
 	it.each([

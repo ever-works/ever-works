@@ -57,6 +57,23 @@ export interface WorkspaceProvisionSpec {
 		readonly branch?: string;
 		readonly mountDir: string;
 	}[];
+	/**
+	 * Neutralise repository-supplied Git behaviour on EVERY git command the
+	 * provision runs (fetch, ownership probes, `worktree add` / checkout,
+	 * removals): `core.hooksPath` → an empty dir (no `post-checkout` /
+	 * `reference-transaction` hook), `core.fsmonitor=false`, every filter
+	 * driver's `smudge` / `clean` / `process` emptied with `required=false`
+	 * (LFS content lands as pointer files; `GIT_LFS_SKIP_SMUDGE=1`),
+	 * `protocol.ext.allow=never`, `submodule.recurse=false`. Carried in the
+	 * child's environment only, never written to config.
+	 *
+	 * The provision-side twin of {@link WorkspaceFinalizeOptions.hardenRepoHooks}
+	 * (works-security, fleet node 0.2.7): the fleet node sets both, because its
+	 * checkout is attacker-authored; the cloud runner leaves both unset and its
+	 * provision is byte-for-byte unchanged. Optional and additive: a provider
+	 * that predates it ignores it.
+	 */
+	readonly hardenRepoHooks?: boolean;
 }
 
 export interface WorkspaceHandle {

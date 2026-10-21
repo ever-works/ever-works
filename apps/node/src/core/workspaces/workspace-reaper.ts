@@ -14,6 +14,7 @@ import {
 	removeMountLink,
 	samePath
 } from './fleet-task-workspace';
+import { HARDENED_DIRTY_STATUS_ARGS, statusHardeningEnv } from './status-hardening';
 import {
 	FLEET_WORKSPACE_INTENTS_DIR,
 	hasFleetExcludedOutput,
@@ -441,7 +442,15 @@ async function removeWorktree(
 		if ((await exists(join(gitDir, 'index.lock'))) || (await exists(join(gitDir, 'HEAD.lock')))) {
 			return { ok: false, reason: 'git lock file appeared' };
 		}
-		const status = await gitOutput(['status', '--porcelain', '--untracked-files=all'], record.path, deps.signal);
+		// works-security (node 0.2.7): the same hardened dirty check as the
+		// scan (status-hardening.ts) — no fsmonitor, filter driver, hook or
+		// submodule work-tree status runs as the machine owner here.
+		const hardening = await statusHardeningEnv(record.path, deps.signal).catch((error: unknown) => {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			return null;
+		});
+		if (hardening === null) return { ok: false, reason: 'working tree state could not be re-read' };
+		const status = await gitOutput(HARDENED_DIRTY_STATUS_ARGS, record.path, deps.signal, hardening);
 		if (status === null) return { ok: false, reason: 'working tree state could not be re-read' };
 		if (status.trim().length > 0) return { ok: false, reason: 'uncommitted changes appeared' };
 		// Neither of these is visible to `git status` — the node's own
@@ -566,12 +575,13 @@ async function isPlainDirectory(path: string): Promise<boolean> {
 async function gitOutput(
 	args: readonly string[],
 	cwd: string,
-	signal: AbortSignal | undefined
+	signal: AbortSignal | undefined,
+	extraEnv?: Readonly<Record<string, string>>
 ): Promise<string | null> {
 	try {
 		const { error, stdout } = await execFileWithVerifiedCancellation('git', args, {
 			cwd,
-			env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+			env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...extraEnv },
 			windowsHide: true,
 			maxBuffer: 16 * 1024 * 1024,
 			...(signal ? { signal } : {})

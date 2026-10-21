@@ -26,6 +26,7 @@ import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { defaultRepositoryLayerFs } from './executors/codex-repository-layers';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
@@ -1160,6 +1161,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// CLI's startup exit. Wired here for the same reason as
 						// above — a hand-built `io` never reads a developer's PC.
 						managedMcpConfigFs: defaultSessionConfigFs,
+						// works-security finding 5 (node 0.2.7): lstat-only presence
+						// checks of a checkout's own `.codex/` layers, so a Codex run
+						// whose repository carries one says so in its containment
+						// block. Never opens a file; wired here like the two above.
+						repositoryLayerFs: defaultRepositoryLayerFs,
 						// Self-build slice AU — this node's enrollment id, from the
 						// LOCAL config, so a job offering an earlier CLI session can
 						// tell whether that session lives on this machine. Never

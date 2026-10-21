@@ -45,6 +45,8 @@
  * reader cannot distinguish from ours is worse than no trailer at all.
  */
 
+import { neutralizeCiSkipDirectives } from './fleet-commit-message.types.js';
+
 /**
  * Capability tag a node advertises when it can perform a SCOPED push:
  * `git` resolves and its version accepts environment-carried
@@ -431,5 +433,8 @@ export function composeFleetPushCommitMessage(input: { message: string; attribut
 	if (attribution?.runId) {
 		trailers.push(`Ever-Works-Run: ${requireIdentifier(attribution.runId, 'runId')}`);
 	}
-	return `${message}\n\n${trailers.join('\n')}`;
+	// The trailer block carries operator-chosen NAMES (node, agent), so the
+	// finished message — not just the payload half — goes through the CI-skip
+	// neutraliser: an Agent named `[skip ci]` must not switch the PR's CI off.
+	return neutralizeCiSkipDirectives(`${message}\n\n${trailers.join('\n')}`);
 }
