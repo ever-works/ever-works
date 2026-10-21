@@ -13157,7 +13157,8 @@
             "copy": "Copy",
             "copied": "Copied",
             "copyFailed": "Could not copy. Select the command and copy it yourself.",
-            "copyLabel": "Copy the command that turns on {consent}"
+            "copyLabel": "Copy the command that turns on {consent}",
+            "trayHint": "{consent} is off. Turn it on from the Ever Works Desktop Node tray on {name}."
         },
         "errors": {
             "notFound": "This is not here any more.",
@@ -13179,6 +13180,24 @@
             "relayUnavailable": "The relay bus is unavailable. Try again in a moment.",
             "tryAgain": "Try again",
             "follow": "Follow again"
+        },
+        "upgrade": {
+            "heading": "Node version",
+            "required": "Upgrade required",
+            "runs": "{name} runs ever-works-node {version}.",
+            "runsUnknown": "{name} has not reported its node version.",
+            "needs": "This deployment needs {floor} or newer.",
+            "body": "It keeps reporting health but takes no work until it is upgraded.",
+            "current": "It meets this deployment’s minimum ({floor}).",
+            "runThis": "Run this on {name}:",
+            "thenRestart": "Then restart the node service on {name}.",
+            "copyLabel": "Copy the upgrade command",
+            "selfUpdateOff": "Self-update: off on this computer. Start it with --auto-update to let it upgrade itself when the platform asks.",
+            "selfUpdateOn": "Self-update: on — it upgrades itself when the platform asks.",
+            "selfUpdateUnknown": "Self-update: not reported by this node version.",
+            "selfUpdateFailed": "Self-update failed on {name} at {time} — run the command yourself.",
+            "selfUpdateFailedReason": "Reason: {error}",
+            "updated": "Last self-update: from {from}, {time}."
         },
         "computer": {
             "tabsLabel": "Computer",

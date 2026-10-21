@@ -77,6 +77,12 @@ import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
 import { DaemonControlClient } from '../core/sessions/daemon-client';
 import { resolveSessionDaemonPaths } from '../core/sessions/daemon/daemon-paths';
 import { installDaemonProcessHandlers, runSessionDaemon } from '../core/sessions/daemon/daemon-main';
+import {
+	SELF_UPDATE_EXIT_CODE,
+	SelfUpdateController,
+	readSelfUpdateRecord,
+	writeSelfUpdateRecord
+} from '../core/link/self-update';
 
 /**
  * `ever-works-node` CLI.
@@ -163,6 +169,12 @@ export interface CliDeps {
 	restrictFile?: (file: string) => Promise<void> | void;
 	/** The session daemon's own entry (the hidden subcommand); a seam for the CLI spec. */
 	runSessionDaemon?: typeof runSessionDaemon;
+	/**
+	 * Fleet node link (FL-02 T-25) — the running binary's real path, so the
+	 * opt-in self-update can tell an `npm install -g` install (which it
+	 * upgrades) from anything else (which it refuses). Unset → refused.
+	 */
+	entryPath?: string | null;
 }
 
 /**
@@ -407,6 +419,13 @@ export interface StartCommandOptions {
 	 * independent of `--work` and `--attend`.
 	 */
 	manage?: boolean;
+	/**
+	 * Fleet node link (FL-02 T-25) — let this machine upgrade itself when the
+	 * platform raises its version floor or names a recommended version: it
+	 * waits for running jobs, installs through npm, and exits 75 so its
+	 * service manager starts the new binary. Off by default (report only).
+	 */
+	autoUpdate?: boolean;
 }
 
 /**
@@ -493,6 +512,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const workerEnabled = options.work === true;
 	const attendEnabled = options.attend === true;
 	const manageEnabled = options.manage === true;
+	// Fleet node link (FL-02 T-25): the opt-in self-update. Built after the
+	// runtime (it needs the lanes to know when the machine is idle), reached
+	// through these closures from the heartbeat.
+	const autoUpdate = options.autoUpdate === true;
+	let selfUpdate: SelfUpdateController | null = null;
+	let restartForUpdate: string | null = null;
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
@@ -593,7 +618,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					}
 				}
 			: {}),
-		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {})
+		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {}),
+		// Fleet node link (FL-02 T-25): the self-update's report rides every
+		// beat, and every accepted beat's version verdict reaches it.
+		selfUpdateReport: () => selfUpdate?.report() ?? null,
+		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response)
 	});
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
@@ -607,6 +636,29 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, present only
+	// when a kind registered for it has its consent on (none in FL-02).
+	const managementWorker = runtime.management?.worker ?? null;
+	selfUpdate = new SelfUpdateController({
+		enabled: autoUpdate,
+		currentVersion: deps.io.version,
+		runner: deps.io.runner,
+		logger: deps.io.logger,
+		platform: deps.platform,
+		entryPath: deps.entryPath ?? null,
+		// Never kills work: an upgrade waits until no lane runs a job.
+		isIdle: () =>
+			[worker, attendedWorker, managementWorker].every(
+				(lane) => !lane || lane.getState().activeJobIds.length === 0
+			),
+		requestRestart: (to) => {
+			restartForUpdate = to;
+			requestShutdown();
+		},
+		persist: (record) => writeSelfUpdateRecord(deps.fs, deps.configPath, record),
+		previous: await readSelfUpdateRecord(deps.fs, deps.configPath),
+		...(deps.now ? { now: deps.now } : {})
+	});
 	// One line per ACCEPTED beat. The loop patches its state more than once per
 	// beat (`connected`, then the next attempt's delay) and every patch
 	// notifies, so keying on the state alone logged each beat twice. Keyed on
@@ -662,11 +714,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					: 'Live view enabled — terminal only: no browser was found here to show a screen'
 			);
 		}
+		if (managementWorker) {
+			await managementWorker.start();
+			deps.out(
+				`Management lane enabled — leasing [${(runtime.management?.kinds ?? []).join(', ')}] one at a time, outside --concurrency`
+			);
+		}
 	};
 	let lanesStarted: Promise<void> = Promise.resolve();
 	let laneStartFailed = false;
 	let laneStartFailure: unknown = undefined;
-	if (worker || attendedWorker) {
+	if (worker || attendedWorker || managementWorker) {
 		if (loop.getState().state === 'connected') {
 			await startLanes();
 		} else {
@@ -776,6 +834,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		}
 		await attendedWorker.stop();
 	}
+	if (managementWorker) {
+		// Drains like the work lane: a machine job in flight finishes and reports.
+		await managementWorker.stop();
+	}
 	if (worker) {
 		// Drains: stops leasing at once, then WAITS for the jobs already
 		// running so their verdicts reach the platform instead of being
@@ -785,6 +847,14 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out(`Worker host stopped (completed ${state.completed}, failed ${state.failed}).`);
 	}
 	deps.out('Stopped.');
+	// Fleet node link (FL-02 T-25): a self-update installed a new binary; exit
+	// 75 so the service manager starts it.
+	if (restartForUpdate !== null) {
+		throw new CliError(
+			`Restarting into ever-works-node ${restartForUpdate} (self-update) — exit ${SELF_UPDATE_EXIT_CODE} asks the service manager to start the new binary.`,
+			SELF_UPDATE_EXIT_CODE
+		);
+	}
 	if (laneStartFailed) {
 		throw new CliError(
 			`Worker lanes failed to start after the first accepted heartbeat: ${describeError(laneStartFailure)}`,
@@ -1750,6 +1820,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--manage',
 			'Allow managing this machine from the dashboard — owner sessions, logs, services, Docker, processes, ports, files, commands, schedules (off by default; independent of --work and --attend)'
+		)
+		.option(
+			'--auto-update',
+			'Upgrade this node itself when the platform raises its minimum version or names a recommended one (waits for running jobs; npm installs only; off by default)'
 		)
 		.option(
 			'-c, --concurrency <count>',

@@ -8,10 +8,12 @@ import {
 	normalizeFleetLanId,
 	normalizeFleetMacAddress,
 	FLEET_SESSIONS_CAPABILITY,
+	normalizeFleetNodeSelfUpdate,
 	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
 	type FleetConsents,
 	type FleetNodeHealthSnapshot,
+	type FleetNodeSelfUpdateReport,
 	type FleetSessionDaemonReport
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
@@ -556,6 +558,12 @@ export interface SelfDescriptionTelemetry {
 	 * neither `--manage` nor `--work`, which then reports no `daemon` block.
 	 */
 	sessionDaemon?: () => FleetSessionDaemonReport | null;
+	/**
+	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report (on or
+	 * off, and its last outcome). Heartbeat only, in the newest strip tier;
+	 * null or a throw leaves the field ABSENT.
+	 */
+	selfUpdate?: () => FleetNodeSelfUpdateReport | null;
 }
 
 /**
@@ -697,6 +705,12 @@ export async function describeSelf(
 	// only) for the reason above: a wire payload, never a spread.
 	const daemon = normalizeFleetSessionDaemonReport(await resolveTelemetry(telemetry.sessionDaemon));
 	if (daemon) description.daemon = daemon;
+	// Fleet node link (FL-02 T-25): the self-update report, re-read through the
+	// contracts normaliser at the wire boundary for the same reason.
+	const selfUpdate = normalizeFleetNodeSelfUpdate(await resolveTelemetry(telemetry.selfUpdate));
+	if (selfUpdate) {
+		description.selfUpdate = selfUpdate;
+	}
 	return description;
 }
 

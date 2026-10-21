@@ -10,7 +10,7 @@ export type ComputerTabPlaceholderState =
     | { kind: 'not-shipped'; epic: string }
     | { kind: 'switched-off'; epic: string }
     | { kind: 'kind-cannot' }
-    | { kind: 'consent-missing'; consent: FleetTabConsent; command: string };
+    | { kind: 'consent-missing'; consent: FleetTabConsent; command: string; via?: 'tray' };
 
 /**
  * Fleet hub (FL-01, FR-18 – FR-20, spec §5.9) — what a computer-page tab
@@ -35,6 +35,8 @@ export function ComputerTabPlaceholder({
     state: ComputerTabPlaceholderState;
 }) {
     const t = useTranslations('fleet.computer');
+    // FL-02 desktop parity: the tray sentence for a desktop app.
+    const tc = useTranslations('fleet.consents');
     const [copied, setCopied] = useState(false);
     const label = t(`tabs.${tab}`);
 
@@ -89,7 +91,15 @@ export function ComputerTabPlaceholder({
                     {t('placeholder.kindCannot')}
                 </p>
             )}
-            {state.kind === 'consent-missing' && (
+            {state.kind === 'consent-missing' && state.via === 'tray' && (
+                <p
+                    className="text-sm font-medium text-text dark:text-text-dark"
+                    data-testid="fleet-computer-consent-tray"
+                >
+                    {tc('trayHint', { consent: tc(state.consent), name: nodeName })}
+                </p>
+            )}
+            {state.kind === 'consent-missing' && state.via !== 'tray' && (
                 <>
                     <p className="text-sm font-medium text-text dark:text-text-dark">
                         {t('placeholder.consentMissing', {

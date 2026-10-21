@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
 	AuthenticateRequest,
 	ConnectionStatusView,
+	DesktopConsentsView,
 	DesktopNodeBridge,
 	EnrollRequest,
 	LogEntry
@@ -29,6 +30,8 @@ const bridge: DesktopNodeBridge = {
 	getStatus: () => ipcRenderer.invoke('node:status'),
 	getLogs: () => ipcRenderer.invoke('node:logs'),
 	unenroll: () => ipcRenderer.invoke('node:unenroll'),
+	getConsents: () => ipcRenderer.invoke('consents:get'),
+	setConsents: (next: DesktopConsentsView) => ipcRenderer.invoke('consents:set', next),
 	onStatus: (listener: (status: ConnectionStatusView) => void) => {
 		const handler = (_event: unknown, status: ConnectionStatusView) => listener(status);
 		ipcRenderer.on('node:status-event', handler);

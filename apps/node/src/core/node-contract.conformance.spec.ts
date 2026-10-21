@@ -148,7 +148,8 @@ describe('what the node actually puts on the wire', () => {
 		// network identity, sent only under `--manage`.
 		// 15 → 16 with FL-04: the session daemon's report, sent by a process
 		// that may host sessions (`--manage` or `--work`).
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(16);
+		// 16 → 17 with FL-02 T-25: the opt-in self-update report.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(17);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -258,7 +259,9 @@ describe('what the node actually puts on the wire', () => {
 			macAddress: 'aa:bb:cc:dd:ee:f0',
 			lanId: 'a1b2c3d4e5f60718',
 			// Sessions on computers (FL-04).
-			daemon: { state: 'running', sessions: 0 }
+			daemon: { state: 'running', sessions: 0 },
+			// Fleet node link (FL-02 T-25).
+			selfUpdate: { enabled: false }
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(

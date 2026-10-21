@@ -44,6 +44,7 @@ import {
     fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
+    normalizeFleetNodeSelfUpdate,
     normalizeFleetNodeWorkerState,
     normalizeFleetSessionDaemonReport,
     sanitizeFleetNodeHealthSnapshot,
@@ -274,6 +275,12 @@ export interface EnrollInput {
      * stored report alone like every other telemetry field.
      */
     daemon?: unknown;
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * report. Untrusted: normalized here; absent leaves the stored report
+     * alone like every other telemetry field.
+     */
+    selfUpdate?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -751,6 +758,8 @@ export class FleetService {
         // Sessions on computers (FL-04): the session daemon's health, as reported.
         const daemonReport = normalizeFleetSessionDaemonReport(refresh.daemon);
         if (daemonReport) patch.sessionDaemon = daemonReport;
+        // Fleet node link (FL-02 T-25): the self-update report, likewise.
+        applyReportedSelfUpdate(node, refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -2245,6 +2254,9 @@ export class FleetService {
             previewProfileEnabled: Boolean(node.previewProfileEnabled),
             // Sessions on computers (FL-04). Null = never reported.
             sessionDaemon: normalizeFleetSessionDaemonReport(node.sessionDaemon),
+            // Fleet node link (FL-02 T-25). Omitted when never reported, so a
+            // view of a daemon older than the field is exactly what it was.
+            ...selfUpdateView(node),
         };
     }
 }
@@ -2358,6 +2370,29 @@ function applyReportedConsents(
     if (!fleetConsentsDiffer(before, after)) return null;
     patch.consents = after;
     return { before, after };
+}
+
+/** Fleet node link (FL-02 T-25) — the stored self-update report as a view field, or nothing. */
+function selfUpdateView(node: FleetNode): Pick<FleetNodeView, 'selfUpdate'> {
+    const report = normalizeFleetNodeSelfUpdate(node.selfUpdate);
+    return report ? { selfUpdate: report } : {};
+}
+
+/**
+ * Fleet node link (FL-02 T-25) — fold a beat's self-update report into the
+ * patch: normalized (only known fields, bounded), written only when it
+ * differs from the stored one, and left alone when the beat carried none.
+ */
+function applyReportedSelfUpdate(
+    node: FleetNode,
+    refresh: EnrollInput,
+    patch: Partial<FleetNode>,
+): void {
+    const after = normalizeFleetNodeSelfUpdate(refresh.selfUpdate);
+    if (after === null) return;
+    const before = normalizeFleetNodeSelfUpdate(node.selfUpdate);
+    if (before && JSON.stringify(before) === JSON.stringify(after)) return;
+    patch.selfUpdate = after;
 }
 
 /**

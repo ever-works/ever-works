@@ -38,3 +38,24 @@ export function readNodeConsents(
 export function nodeReportedConsents(node: { consents?: unknown }): boolean {
     return normalizeFleetConsents(node.consents) !== null;
 }
+
+/**
+ * Fleet node link (FL-02 T-26, CONTRACTS R-10) — true when a desktop-app
+ * computer runs a build with the consents wiring (wizard step, tray toggles,
+ * the node link): it has opened a link (connected now, or reconnecting), or
+ * it reports live viewing or management on. Until then a desktop app cannot
+ * give `--attend` / `--manage`, and the hub says "not available on this kind
+ * of computer yet" instead of a command it would not honour. Such a computer
+ * turns a consent on from its tray, never with a command line.
+ */
+export function desktopHasConsentWiring(node: {
+    kind?: string;
+    link?: { state?: string } | null;
+    consents?: unknown;
+}): boolean {
+    if (node.kind !== 'desktop-node') return false;
+    const state = node.link?.state;
+    if (state === 'connected' || state === 'reconnecting') return true;
+    const reported = normalizeFleetConsents(node.consents);
+    return Boolean(reported && (reported.attend || reported.manage));
+}

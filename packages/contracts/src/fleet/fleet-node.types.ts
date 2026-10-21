@@ -383,6 +383,15 @@ export interface FleetNodeSelfDescription {
 	 * `consents`, so an older platform only loses the daemon line.
 	 */
 	daemon?: FleetSessionDaemonReport;
+	/**
+	 * Fleet node link (FL-02, spec FR-37, FR-38, U16) — what this daemon's
+	 * opt-in self-update (`ever-works-node start --auto-update`) is doing:
+	 * whether it is on, and the outcome of its last attempt. Heartbeat only,
+	 * in the node's newest strip tier: a platform older than the field 400s
+	 * the beat once and the node retries without it. Read it through
+	 * {@link normalizeFleetNodeSelfUpdate}.
+	 */
+	selfUpdate?: FleetNodeSelfUpdateReport;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -555,6 +564,14 @@ export interface FleetNodeView {
 	 * it right now. Absent on a build without the link and on cluster rows.
 	 */
 	link?: FleetNodeLinkView;
+	/**
+	 * Fleet node link (FL-02, spec §5.4, U16) — the node's self-update as its
+	 * last heartbeat reported it, or null when it never reported one (a
+	 * daemon older than the field). Shown on the computer's Settings tab:
+	 * "Self-update: off on this computer", or "Self-update failed on build-02
+	 * at 09:12 — run the command yourself".
+	 */
+	selfUpdate?: FleetNodeSelfUpdateReport | null;
 
 	/**
 	 * Computer health (FL-03) — the latest snapshot the node reported, stamped
@@ -772,6 +789,63 @@ export const FLEET_DEFAULT_MIN_NODE_VERSION = '0.1.0';
  * same thing. Followed by a service restart on that machine.
  */
 export const FLEET_NODE_UPGRADE_COMMAND = 'npm install -g ever-works-node@latest';
+
+// ─── Node lifecycle: opt-in self-update (FL-02 T-25) ────────────────────────
+
+/**
+ * What a node's opt-in self-update reports on its heartbeat (FL-02 FR-37,
+ * FR-38, U16). Counts and instants only: `error` is a short, platform-written
+ * class of failure (`npm install exited 1`, `installer unknown`), never an
+ * installer's own output, which can carry local paths.
+ */
+export interface FleetNodeSelfUpdateReport {
+	/** True when this process was started with `--auto-update`. */
+	enabled: boolean;
+	/** ISO instant of the last FAILED attempt, or null. */
+	failedAt?: string | null;
+	/** Why it failed, one short sentence ({@link FLEET_SELF_UPDATE_MAX_ERROR_LENGTH}), or null. */
+	error?: string | null;
+	/** The version (or `latest`) the last attempt targeted, or null. */
+	targetVersion?: string | null;
+	/** ISO instant of the last SUCCESSFUL self-update (the restart that followed it), or null. */
+	updatedAt?: string | null;
+	/** The version that update came from, or null. */
+	fromVersion?: string | null;
+}
+
+/** Longest `error` a self-update report keeps. */
+export const FLEET_SELF_UPDATE_MAX_ERROR_LENGTH = 200;
+
+function selfUpdateString(value: unknown, max: number): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	if (trimmed.length === 0) return null;
+	return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
+}
+
+function selfUpdateInstant(value: unknown): string | null {
+	if (typeof value !== 'string' || value.length > 40) return null;
+	const at = Date.parse(value);
+	return Number.isFinite(at) ? new Date(at).toISOString() : null;
+}
+
+/**
+ * Read a self-update report off the wire or a stored column: `null` when it
+ * is not an object; otherwise `enabled` only when literally `true`, each
+ * instant re-serialised or dropped, each string bounded. Never throws.
+ */
+export function normalizeFleetNodeSelfUpdate(value: unknown): FleetNodeSelfUpdateReport | null {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+	const record = value as Record<string, unknown>;
+	return {
+		enabled: record.enabled === true,
+		failedAt: selfUpdateInstant(record.failedAt),
+		error: selfUpdateString(record.error, FLEET_SELF_UPDATE_MAX_ERROR_LENGTH),
+		targetVersion: selfUpdateString(record.targetVersion, FLEET_MAX_VERSION_LENGTH),
+		updatedAt: selfUpdateInstant(record.updatedAt),
+		fromVersion: selfUpdateString(record.fromVersion, FLEET_MAX_VERSION_LENGTH)
+	};
+}
 
 /** Most `cliVersions` entries one beat may carry — one per pinned provider, with room to grow. */
 export const FLEET_MAX_CLI_VERSIONS = 8;

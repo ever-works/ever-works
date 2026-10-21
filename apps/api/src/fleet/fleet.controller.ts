@@ -859,6 +859,8 @@ export class FleetController {
             // Sessions on computers (FL-04): forwarded like every declared field
             // (the conformance spec pins enroll and heartbeat to the DTO).
             daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): likewise.
+            selfUpdate: body.selfUpdate,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -912,6 +914,8 @@ export class FleetController {
             lanId: body.lanId,
             // Sessions on computers (FL-04): the session daemon's health.
             daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): the opt-in self-update report.
+            selfUpdate: body.selfUpdate,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

@@ -73,15 +73,19 @@ export interface HeartbeatCapableClient {
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
 	// NEWEST first. Computer health, second phase (FL-03): the primary
 	// interface's hardware address and the opaque network identity, sent only
-	// under `--manage` for Wake-on-LAN. Their own tier, newer than the
-	// snapshot: a platform that stores the snapshot but predates wake costs
-	// exactly these two fields, and the snapshot keeps flowing.
+	// under `--manage` for Wake-on-LAN. Their own tier, newest of all (it
+	// reached `develop` after FL-02's self-update report): a platform that
+	// knows every older field but predates wake costs exactly these two.
 	['macAddress', 'lanId'],
+	// Fleet node link (FL-02 T-25): the opt-in self-update's
+	// report. Its own tier, newer than FL-04's daemon line (it reached
+	// `develop` after it): a platform that knows the daemon line but not this
+	// field costs the node exactly this one field.
+	['selfUpdate'],
 	// Sessions on computers (FL-04): the session daemon's health.
-	// A platform that predates it answers 400; the node strips this tier (after
-	// the wake pair above, which is newer still) and keeps beating — losing only
-	// the daemon line, never its health or consents. Newer than the health
-	// snapshot: FL-03 reached `develop` first.
+	// A platform that predates it answers 400; the node strips this tier
+	// and keeps beating — losing only the daemon line, never its health or
+	// consents. Newer than the health snapshot: FL-03 reached `develop` first.
 	['daemon'],
 	// Computer health (FL-03): the health snapshot. Its own
 	// tier, so a platform that predates it costs exactly this one field —
@@ -471,6 +475,9 @@ function describeStrippedTiers(tiers: number): string {
 	}
 	if (dropped.has('daemon')) {
 		return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
+	}
+	if (dropped.has('selfUpdate')) {
+		return 'Platform rejected the self-update report; it predates it. Still reporting everything else; the report stays off until this node restarts.';
 	}
 	return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
 }

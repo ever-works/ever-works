@@ -181,7 +181,35 @@ export interface EnrollRequest {
 	capabilities?: string[];
 	/** Resource ceilings this machine enforces on itself (A16). */
 	limits?: NodeResourceLimits;
+	/**
+	 * Fleet node link (FL-02 T-26) — what this computer lets Ever Works do,
+	 * chosen in the wizard. Omitted = {@link DEFAULT_DESKTOP_CONSENTS}.
+	 */
+	consents?: DesktopConsentsView;
 }
+
+/**
+ * Fleet node link (FL-02 T-26, spec §5.5, FR-39, CONTRACTS §1.1) — the three
+ * consents the desktop app offers, the same ones `ever-works-node start
+ * --work --attend --manage` gives on the command line (the usage-scan consent
+ * arrives with FL-20). Process-scoped in the node core, so changing one
+ * restarts the connection.
+ */
+export interface DesktopConsentsView {
+	/** Run work for my agents (lease jobs). */
+	work: boolean;
+	/** Allow live viewing from the dashboard (screen, desktop). */
+	attend: boolean;
+	/** Allow managing this computer (logs, services, files, commands…). */
+	manage: boolean;
+}
+
+/**
+ * What an existing install runs with until its owner chooses: work on (a
+ * desktop node exists to DO work, as it always did), live viewing and
+ * management off.
+ */
+export const DEFAULT_DESKTOP_CONSENTS: DesktopConsentsView = { work: true, attend: false, manage: false };
 
 export interface EnrollOutcome {
 	ok: boolean;
@@ -220,6 +248,8 @@ export const IpcChannels = {
 	getStatus: 'node:status',
 	getLogs: 'node:logs',
 	unenroll: 'node:unenroll',
+	getConsents: 'consents:get',
+	setConsents: 'consents:set',
 	statusEvent: 'node:status-event',
 	logEvent: 'node:log-event'
 } as const;
@@ -245,6 +275,10 @@ export interface DesktopNodeBridge {
 	getStatus(): Promise<ConnectionStatusView>;
 	getLogs(): Promise<LogEntry[]>;
 	unenroll(): Promise<void>;
+	/** Fleet node link (FL-02 T-26) — what this computer lets Ever Works do. */
+	getConsents(): Promise<DesktopConsentsView>;
+	/** Change them; the connection restarts so the node reports the new set. */
+	setConsents(next: DesktopConsentsView): Promise<DesktopConsentsView>;
 	onStatus(listener: (status: ConnectionStatusView) => void): () => void;
 	onLog(listener: (entry: LogEntry) => void): () => void;
 }

@@ -560,7 +560,8 @@
 			"consents",
 			"macAddress",
 			"lanId",
-			"daemon"
+			"daemon",
+			"selfUpdate"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -579,7 +580,8 @@
 			"consents",
 			"macAddress",
 			"lanId",
-			"daemon"
+			"daemon",
+			"selfUpdate"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -604,7 +606,8 @@
 				"consents",
 				"macAddress",
 				"lanId",
-				"daemon"
+				"daemon",
+				"selfUpdate"
 			],
 			"heartbeat": [
 				"platform",
@@ -628,7 +631,8 @@
 				"consents",
 				"macAddress",
 				"lanId",
-				"daemon"
+				"daemon",
+				"selfUpdate"
 			]
 		}
 	},

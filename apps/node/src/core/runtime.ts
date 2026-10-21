@@ -23,6 +23,15 @@ import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
+import { ComputerLegBroker } from './link/computer-leg';
+import {
+	MANAGEMENT_LANE_CONCURRENCY,
+	MANAGEMENT_LANE_IDLE_POLL_MS,
+	MANAGEMENT_LANE_LEASE_TTL_SEC,
+	planManagementLane,
+	type ManagementLanePlan,
+	type ManagementLaneTables
+} from './management-lane';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -46,7 +55,7 @@ import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
-import type { FleetConsents, FleetNodeHealthSnapshot } from '@ever-works/contracts';
+import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
@@ -437,6 +446,17 @@ export interface NodeRuntime {
 		/** The capture backend this machine selected, or null (terminal-only views). */
 		captureBackend: CaptureBackend | null;
 	};
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane, present
+	 * only when a kind registered for it has its consent on here (none do in
+	 * FL-02: the kind list ships empty). Its own worker loop, one job at a
+	 * time, outside `--concurrency`; the shell starts and drains it with the
+	 * other lanes.
+	 */
+	management?: {
+		worker: WorkerLoop;
+		kinds: FleetJobKind[];
+	};
 }
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
@@ -571,6 +591,28 @@ export interface CreateNodeRuntimeOptions {
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
 	persistLinkState?: (record: NodeLinkRecord) => Promise<void> | void;
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane's kinds,
+	 * consents and executors. Defaults to the compile-time tables (empty in
+	 * FL-02); a test or an embedder passes its own.
+	 */
+	managementLane?: ManagementLaneTables;
+	/**
+	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
+	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
+	 * embedder without self-update leaves it unset and the field is absent.
+	 */
+	selfUpdateReport?: () => FleetNodeSelfUpdateReport | null;
+	/**
+	 * Called with every ACCEPTED heartbeat's version verdict (the floor,
+	 * whether this daemon is below it, the recommended version) — what the
+	 * self-update decides on. Never able to fail the beat.
+	 */
+	onHeartbeatAccepted?: (response: {
+		minNodeVersion?: string;
+		upgradeRequired?: boolean;
+		recommendedNodeVersion?: string;
+	}) => void;
 
 	/**
 	 * Sessions on computers (FL-04) — how to run this build's hidden
@@ -779,9 +821,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
 	// comes and goes with the daemon (FR-10).
+	// Fleet node link (FL-02 T-22): a live view's inbound leg rides the link
+	// when the shell runs one — the broker matches the `desktop` channels the
+	// platform opens to the views that asked (the legacy leg stays the fallback).
+	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
+		...(computerLegs ? { computerLegs } : {}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -808,6 +855,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		return tags.length > 0 ? { ...rest, linkModuleTags: tags } : rest;
 	};
 	telemetry.consents = () => consents;
+	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
+	// The management lane (CONTRACTS R-34): which of its kinds this process may
+	// lease, and every kind it owns — the work lane below never leases those.
+	const managementPlan = planManagementLane(consents, options.managementLane);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
 	let lastDescribedCapabilities: readonly string[] = [];
@@ -854,12 +905,31 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			upgradeRequired?: boolean;
 			limitCeiling?: NodeLimitCeiling;
 			node?: { modelThrottles?: unknown };
+			recommendedNodeVersion?: string;
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
 			throttleTarget?.(response.node?.modelThrottles);
 			// Fleet node link (FL-02): the first accepted beat opens it (FR-1).
 			startLink?.();
+			// Fleet node link (FL-02 T-25): the self-update decides on the verdict.
+			if (options.onHeartbeatAccepted) {
+				try {
+					options.onHeartbeatAccepted({
+						...(response.minNodeVersion !== undefined ? { minNodeVersion: response.minNodeVersion } : {}),
+						...(response.upgradeRequired !== undefined
+							? { upgradeRequired: response.upgradeRequired }
+							: {}),
+						...(response.recommendedNodeVersion !== undefined
+							? { recommendedNodeVersion: response.recommendedNodeVersion }
+							: {})
+					});
+				} catch (error) {
+					io.logger.warn(
+						`Heartbeat listener failed: ${error instanceof Error ? error.message : String(error)}`
+					);
+				}
+			}
 		}
 	};
 
@@ -908,6 +978,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.link = link;
 		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
 		sessions?.module.bindLink(link);
+		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
 			if (runtime.loop.acceptsField('consents')) {
@@ -979,6 +1050,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				const excluded: FleetJobKind[] = [];
 				if (options.attendEnabled) excluded.push('computer-session');
 				if (!executionPolicy.allowShellCommands) excluded.push('acceptance-checks');
+				// Fleet node link (CONTRACTS R-34): machine jobs belong to the
+				// management lane alone, whatever this process's consents.
+				for (const kind of managementPlan.ownedKinds) if (!excluded.includes(kind)) excluded.push(kind);
 				return excluded.length > 0 ? { excludeKinds: excluded } : {};
 			})(),
 			// Fleet usage limits: the CLIs an agent-task can run with here, so a
@@ -1293,7 +1367,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	}
 
 	if (attendedCapture) {
-		const lane = createAttendedLane(config, io, options, environment, jobClientFor(), attendedCapture);
+		const lane = createAttendedLane(
+			config,
+			io,
+			options,
+			environment,
+			jobClientFor(),
+			attendedCapture,
+			computerLegs
+		);
 		runtime.attended = lane;
 		// The live-view lane leases through the same endpoint, so the same
 		// floor refuses it; hold it with the work lane.
@@ -1305,7 +1387,47 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		};
 	}
 
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, only when
+	// one of its kinds has its consent on here. None do in FL-02.
+	if (managementPlan.kinds.length > 0) {
+		const management = createManagementLane(io, options, jobClientFor(), managementPlan);
+		runtime.management = management;
+		// It leases through the same endpoint, so the same version floor holds it.
+		holdableLanes.push(management.worker);
+		management.worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
+		runtime.jobClient ??= jobClientFor();
+	}
+
 	return runtime;
+}
+
+/**
+ * Fleet node link (FL-02, T-27, CONTRACTS R-34) — the management lane, a
+ * sibling of {@link createAttendedLane}: its own worker loop leasing ONLY the
+ * planned kinds, one job at a time and outside `--concurrency` (the work
+ * lane's limits are not shared), on a slow idle poll. Each planned kind's
+ * executor is registered from the plan.
+ */
+function createManagementLane(
+	io: NodeIo,
+	options: CreateNodeRuntimeOptions,
+	jobClient: FleetJobClient,
+	plan: ManagementLanePlan
+): NonNullable<NodeRuntime['management']> {
+	const worker = new WorkerLoop({
+		client: jobClient,
+		logger: io.logger,
+		limits: clampResourceLimits({ maxConcurrentJobs: MANAGEMENT_LANE_CONCURRENCY }),
+		leaseTtlSec: MANAGEMENT_LANE_LEASE_TTL_SEC,
+		idlePollMs: MANAGEMENT_LANE_IDLE_POLL_MS,
+		kinds: [...plan.kinds],
+		...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
+		...(io.scheduler ? { scheduler: io.scheduler } : {}),
+		...(io.now ? { now: io.now } : {}),
+		...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
+	});
+	for (const executor of plan.executors) worker.register(executor.kind, executor.run);
+	return { worker, kinds: [...plan.kinds] };
 }
 
 /** `2 concurrent job(s), CPU < 80%, no memory ceiling` — for the log line a ceiling change writes. */
@@ -1364,7 +1486,8 @@ function createAttendedLane(
 	options: CreateNodeRuntimeOptions,
 	environment: CapabilityEnvironment,
 	jobClient: FleetJobClient,
-	capture: AttendedCapture
+	capture: AttendedCapture,
+	computerLegs: ComputerLegBroker | null = null
 ): NonNullable<NodeRuntime['attended']> {
 	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
@@ -1407,7 +1530,10 @@ function createAttendedLane(
 				webSocketFactory,
 				logger: io.logger,
 				platform: environment.platform,
-				profileFs
+				profileFs,
+				// Fleet node link (FL-02 T-22): the view's leg over the link, when there is one.
+				...(computerLegs ? { linkLegs: computerLegs } : {}),
+				...(options.env ? { env: options.env } : {})
 			},
 			signal
 		)

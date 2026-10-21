@@ -13,6 +13,7 @@ import {
 	defaultConfigPath,
 	isExecutableFile,
 	readNetworkInterfaces,
+	resolveEntryPath,
 	restrictFileToOwnerWindows,
 	statModelCliFile,
 	systemFetch
@@ -72,7 +73,9 @@ function buildDeps(): CliDeps {
 		// Sessions on computers (FL-04): the session daemon is this same CLI
 		// (a hidden subcommand), run by the same Node binary.
 		...(process.argv[1] ? { sessionDaemonCommand: { command: process.execPath, args: [process.argv[1]] } } : {}),
-		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {})
+		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {}),
+		// Fleet node link (FL-02 T-25): what `--auto-update` identifies the install by.
+		entryPath: resolveEntryPath()
 	};
 }
 
