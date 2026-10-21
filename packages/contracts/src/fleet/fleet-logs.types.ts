@@ -171,7 +171,7 @@ export interface FleetLogSource {
 	kind: FleetLogSourceKind;
 	/** "System journal", "/var/log/syslog", "acme-api", "nginx.service". */
 	label: string;
-	/** Tree group under its kind: the root a file sits under; empty for the others. */
+	/** Tree group under its kind: the root a file sits under; a container's Compose project; empty otherwise. */
 	group: string;
 	/** False: listed but cannot be opened (`root-only`, `needs-admin`, `gone`). */
 	readable: boolean;

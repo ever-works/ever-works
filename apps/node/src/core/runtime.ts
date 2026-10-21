@@ -974,7 +974,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			io.logs ??
 			createNodeLogIo({
 				platform,
-				runner: io.runner,
+				// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+				// `docker ps --format` carries braces, quotes and tabs `cmd.exe` would mangle.
+				runner: createMachineCommandRunner(),
 				homedir,
 				user,
 				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
