@@ -561,7 +561,8 @@
 			"macAddress",
 			"lanId",
 			"daemon",
-			"selfUpdate"
+			"selfUpdate",
+			"timeZone"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -581,7 +582,8 @@
 			"macAddress",
 			"lanId",
 			"daemon",
-			"selfUpdate"
+			"selfUpdate",
+			"timeZone"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -607,7 +609,8 @@
 				"macAddress",
 				"lanId",
 				"daemon",
-				"selfUpdate"
+				"selfUpdate",
+				"timeZone"
 			],
 			"heartbeat": [
 				"platform",
@@ -632,7 +635,8 @@
 				"macAddress",
 				"lanId",
 				"daemon",
-				"selfUpdate"
+				"selfUpdate",
+				"timeZone"
 			]
 		}
 	},

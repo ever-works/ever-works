@@ -20,6 +20,7 @@ import { InboundTriggersService } from '../triggers/inbound-triggers.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { SchedulesService } from './schedules.service';
+import { NODE_SCHEDULE_PORT, type NodeScheduleControl } from './node-schedule.port';
 import {
     MISSION_PAUSE_NOT_ACKNOWLEDGED,
     SCHEDULE_ALREADY_RUNNING,
@@ -83,6 +84,7 @@ const SOURCE_TYPES: readonly ScheduleSourceType[] = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    'node_schedule',
 ];
 
 /** Split `${sourceType}:${ownerKey}`; null when the shape is wrong. */
@@ -116,7 +118,10 @@ function refusalCode(reason: ScheduleControlReasonKey | undefined): string {
  *    dispatcher through the configured heartbeat trigger binding;
  *  - Mission tick → `MissionsService` (pausing asks first, because it pauses
  *    the whole Mission; run-now raises Ideas, not a Run);
- *  - inbound Trigger → `InboundTriggersService`.
+ *  - inbound Trigger → `InboundTriggersService`;
+ *  - Command schedule on a computer (FL-13) → `FleetScheduleService` through
+ *    `NODE_SCHEDULE_PORT` (Run now is class `confirm`: without `confirm` it
+ *    answers the CONTRACTS §8 `confirmation_required` envelope).
  *
  * Every dependency is @Optional(): a reduced module graph answers 503 for
  * the control it cannot perform instead of failing to boot.
@@ -136,14 +141,45 @@ export class ScheduleControlService {
         @Optional() private readonly missions?: MissionsService,
         @Optional() private readonly inboundTriggers?: InboundTriggersService,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // Schedules on computers (FL-13). Appended LAST + @Optional(): unbound,
+        // a Command schedule's controls answer 503 like any missing service.
+        @Optional()
+        @Inject(NODE_SCHEDULE_PORT)
+        private readonly nodeSchedules?: NodeScheduleControl,
     ) {}
 
-    async runNow(ctx: ScheduleControlContext, id: string): Promise<ScheduleRunNowResult> {
+    async runNow(
+        ctx: ScheduleControlContext,
+        id: string,
+        opts: { confirm?: boolean } = {},
+    ): Promise<ScheduleRunNowResult> {
         const { parsed, row } = await this.resolve(ctx, id);
         this.assertAllowed(row, 'runNow');
         const scope = { tenantId: ctx.tenantId, organizationId: ctx.organizationId };
 
         switch (parsed.sourceType) {
+            case 'node_schedule': {
+                const control = this.require(this.nodeSchedules, 'schedules on computers');
+                const started = await control.runNow(
+                    parsed.ownerKey,
+                    { userId: ctx.userId },
+                    opts.confirm === true,
+                );
+                await this.logActivity(ctx, row, ActivityActionType.SCHEDULE_EXECUTED, {
+                    control: 'runNow',
+                    runId: started.runId,
+                });
+                return {
+                    kind: 'run',
+                    scheduleId: row.id,
+                    runIds: [started.runId],
+                    parked: false,
+                    queuedReason: null,
+                    taskId: null,
+                    // The machine's clock is not moved by a Run now (FR-19).
+                    nextRunAt: row.nextRunAt,
+                };
+            }
             case 'recurring_task': {
                 const tasks = this.require(this.tasks, 'recurring tasks');
                 const result = await tasks.runRecurringNow(ctx.userId, parsed.ownerKey, scope);
@@ -261,6 +297,11 @@ export class ScheduleControlService {
         const scope = { tenantId: ctx.tenantId, organizationId: ctx.organizationId };
 
         switch (parsed.sourceType) {
+            case 'node_schedule':
+                await this.require(this.nodeSchedules, 'schedules on computers').pause(parsed.ownerKey, {
+                    userId: ctx.userId,
+                });
+                break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').pauseRecurrence(
                     ctx.userId,
@@ -308,6 +349,11 @@ export class ScheduleControlService {
         const scope = { tenantId: ctx.tenantId, organizationId: ctx.organizationId };
 
         switch (parsed.sourceType) {
+            case 'node_schedule':
+                await this.require(this.nodeSchedules, 'schedules on computers').resume(parsed.ownerKey, {
+                    userId: ctx.userId,
+                });
+                break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').resumeRecurrence(
                     ctx.userId,

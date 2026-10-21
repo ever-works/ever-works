@@ -73,6 +73,7 @@ import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
+import { buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -107,6 +108,7 @@ import {
     requiredCredentialsForTool,
 } from '../policy/tool-credentials';
 import type {
+    FleetToolAnnotation,
     SubAgentDelegationResult,
     SubAgentScope,
     ToolGrantDecision,
@@ -182,6 +184,8 @@ export interface AgentToolDescriptor<TArgs = unknown, TResult = unknown> {
         required: string[];
     };
     invoke: (args: TArgs) => Promise<TResult | { error: string }>;
+    /** FL-19 (spec FR-2) — optional fleet tool annotation; see `TaskToolDescriptor.annotations`. */
+    annotations?: FleetToolAnnotation;
 }
 
 /**
@@ -655,6 +659,18 @@ export class AgentToolService {
                     }),
                 );
             }
+            // FL-19 — the tools the catalogue owns itself: `fleet_status` (when the API
+            // binds its status reader), `fleet_nodes_list|get`, `fleet_operations_get|list`
+            // (when the node link's operations registry is bound). All read-only.
+            add('fleet-core', () =>
+                buildFleetCoreTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleet.service,
+                    status: fleet.status ?? null,
+                    operations: fleet.operations ?? null,
+                }),
+            );
             // Logs on computers (FL-08): the read-only log tools, when bound.
             if (fleet.logs) {
                 const logs = fleet.logs;
@@ -850,7 +866,11 @@ export class AgentToolService {
             );
         }
 
-        return out;
+        // FL-19 (spec FR-2, FR-5, FR-25) — every catalogued `fleet_*` tool leaves the
+        // assembly annotated, with the no-credits sentence, its results secret-scanned
+        // and its refusals typed. Anything else (and the legacy `list_fleet_nodes`) is
+        // returned untouched.
+        return out.map((tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor);
     }
 
     /**

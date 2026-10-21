@@ -7,6 +7,7 @@ import { environmentsAPI } from '@/lib/api/environments';
 import { AgentCapabilitiesClient } from '@/components/agents/AgentCapabilitiesClient';
 import { loadAgentFleet } from './agent-fleet-data';
 import { loadAgentAccessLevels } from './agent-access-levels-data';
+import { loadAgentFleetTools } from './agent-fleet-tools-data';
 
 type Params = Promise<{ id: string; locale: string }>;
 
@@ -26,6 +27,8 @@ type Params = Promise<{ id: string; locale: string }>;
  *  - Environment — the published Environment this agent runs in;
  *  - Execution — the preferred Fleet node (agent-to-node affinity) and
  *    the account's execution routing, read-only with a link to change it;
+ *  - Fleet tools (FL-19) — per tool family, may this Agent read / act on my
+ *    computers, and which gate refuses when not;
  *  - Init Script — advisory v1 bootstrap script;
  *  - Permissions summary — read-only, editable in Settings.
  *
@@ -57,6 +60,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         environments,
         fleet,
         accessLevels,
+        fleetTools,
     ] = await Promise.all([
         agentsAPI.getCapabilities(id),
         agentsAPI.listSkills(id).catch(() => ({ data: [] })),
@@ -76,6 +80,8 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         loadAgentFleet(id).catch(() => null),
         // AW-15 — providers that declare access levels + this agent's level.
         loadAgentAccessLevels(id).catch(() => []),
+        // FL-19 — what this Agent may read and do on my computers, per tool family.
+        loadAgentFleetTools(id).catch(() => ({ kind: 'error' as const })),
     ]);
 
     return (
@@ -102,6 +108,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
             }))}
             fleet={fleet}
             accessLevels={accessLevels}
+            fleetTools={fleetTools}
         />
     );
 }

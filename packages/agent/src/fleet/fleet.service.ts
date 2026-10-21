@@ -47,6 +47,7 @@ import {
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
     normalizeFleetNodeSelfUpdate,
+    isFleetTimeZone,
     normalizeFleetNodeWorkerState,
     normalizeFleetSessionDaemonReport,
     sanitizeFleetNodeHealthSnapshot,
@@ -293,6 +294,12 @@ export interface EnrollInput {
      * alone like every other telemetry field.
      */
     selfUpdate?: unknown;
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §1.1) — the machine's IANA time
+     * zone. Untrusted: kept only when `isFleetTimeZone` accepts it; absent or
+     * unusable leaves the stored zone alone.
+     */
+    timeZone?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -772,6 +779,10 @@ export class FleetService {
         if (daemonReport) patch.sessionDaemon = daemonReport;
         // Fleet node link (FL-02 T-25): the self-update report, likewise.
         applyReportedSelfUpdate(node, refresh, patch);
+        // Schedules on computers (FL-13): the machine's time zone, when it changed.
+        if (isFleetTimeZone(refresh.timeZone) && node.timeZone !== refresh.timeZone) {
+            patch.timeZone = refresh.timeZone;
+        }
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -2331,6 +2342,8 @@ export class FleetService {
             macAddress: maskFleetMacAddress(node.macAddress),
             lanId: normalizeFleetLanId(node.lanId),
             lastWakeAttemptAt: node.lastWakeAttemptAt ? toIso(node.lastWakeAttemptAt) : null,
+            // Schedules on computers (FL-13): the zone the machine's schedules fire in.
+            timeZone: node.timeZone ?? null,
             canWake: null,
             // Fleet hub (FL-01): the owner's star and the policy in force,
             // every family filled in (the legacy column read through as

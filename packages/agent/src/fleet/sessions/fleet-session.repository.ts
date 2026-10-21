@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, LessThan, Not, Repository } from 'typeorm';
 import { FLEET_SESSION_RECENT_FOLDERS, type FleetSessionKind } from '@ever-works/contracts';
 import { advisoryLockObjectId } from '../../database/repositories/agent-run.repository';
+import { AgentRun } from '../../entities/agent-run.entity';
 import { FleetSession } from '../../entities/fleet-session.entity';
 
 /**
@@ -21,6 +22,11 @@ export interface FleetSessionListQuery {
     limit?: number;
     /** `<lastActivityAt ISO>|<id>` of the last row of the previous page. */
     cursor?: string;
+    /**
+     * FL-15 P1: only sessions whose Run works on this Task (the Task page's
+     * Computer block, `GET /api/fleet/sessions?taskId=&limit=1`).
+     */
+    taskId?: string;
 }
 
 export const FLEET_SESSION_LIST_DEFAULT_LIMIT = 50;
@@ -101,6 +107,11 @@ export class FleetSessionRepository {
         });
     }
 
+    /** Live AGENT sessions on a node (FL-15: a Task hand-off needs a free slot, spec U5). */
+    async countLiveAgentForNode(nodeId: string): Promise<number> {
+        return this.repository.count({ where: { nodeId, kind: 'agent', state: Not('ended') } });
+    }
+
     /** The folders of the node's most recent sessions, newest first, distinct (spec FR-15). */
     async recentFolders(
         nodeId: string,
@@ -142,6 +153,13 @@ export class FleetSessionRepository {
         if (query.agentId)
             builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
         if (query.since) builder.andWhere('session.createdAt >= :since', { since: query.since });
+        if (query.taskId) {
+            // A session knows its Run, a Run knows its Task (spec §7): no column of its own.
+            builder.innerJoin(AgentRun, 'run', 'run.id = session.agentRunId').andWhere(
+                'run.taskId = :taskId',
+                { taskId: query.taskId },
+            );
+        }
         const cursor = parseCursor(query.cursor);
         if (cursor) {
             builder.andWhere(
@@ -177,6 +195,84 @@ export class FleetSessionRepository {
     async updateIfLive(id: string, patch: Partial<FleetSession>): Promise<boolean> {
         const result = await this.repository.update({ id, state: Not('ended') }, patch);
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Write a patch only while the session is in one of `states` (FL-05: the
+     * idle floor never moves a session that changed meanwhile). False when it
+     * was not.
+     */
+    async updateIfState(
+        id: string,
+        states: readonly FleetSession['state'][],
+        patch: Partial<FleetSession>,
+    ): Promise<boolean> {
+        const result = await this.repository.update({ id, state: In([...states]) }, patch);
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * FL-05's idle floor: `working` / `done` sessions with no activity since
+     * before `cutoff`, oldest first (the node's own 30-minute clock is primary).
+     */
+    async findIdleCandidates(cutoff: Date, limit = 200): Promise<FleetSession[]> {
+        return this.repository.find({
+            where: { state: In(['working', 'done']), lastActivityAt: LessThan(cutoff) },
+            order: { lastActivityAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /**
+     * FL-05 P3 — the board: every LIVE session on these nodes (optionally one
+     * Agent's or one kind), most recently moved first. Sorted again by the
+     * caller (Postgres and SQLite order NULLs differently).
+     */
+    async listLiveForBoard(
+        nodeIds: readonly string[],
+        query: { agentId?: string; kind?: FleetSessionKind } = {},
+        limit = 400,
+    ): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        const builder = this.repository
+            .createQueryBuilder('session')
+            .where({ nodeId: In([...nodeIds]) })
+            .andWhere('session.state <> :ended', { ended: 'ended' });
+        if (query.kind) builder.andWhere('session.kind = :kind', { kind: query.kind });
+        if (query.agentId) builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
+        return builder
+            .orderBy('session.stateChangedAt', 'DESC')
+            .addOrderBy('session.lastActivityAt', 'DESC')
+            .take(limit)
+            .getMany();
+    }
+
+    /** FL-05's "needs a look" producer: sessions waiting on someone, on these nodes. */
+    async findNeedsYouForNodes(nodeIds: readonly string[], limit = 200): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        return this.repository.find({
+            where: { nodeId: In([...nodeIds]), state: 'needs_you' },
+            order: { stateChangedAt: 'DESC' },
+            take: limit,
+        });
+    }
+
+    /** FL-05: sessions on these nodes that ended without a result (a restart) since `since`. */
+    async findUnconfirmedEndedSince(
+        nodeIds: readonly string[],
+        since: Date,
+        limit = 500,
+    ): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        return this.repository
+            .createQueryBuilder('session')
+            .where({ nodeId: In([...nodeIds]) })
+            .andWhere('session.state = :ended', { ended: 'ended' })
+            .andWhere('session.outcome = :unconfirmed', { unconfirmed: 'unconfirmed' })
+            .andWhere('session.endedAt >= :since', { since })
+            .orderBy('session.endedAt', 'DESC')
+            .take(limit)
+            .getMany();
     }
 
     /** Owner sessions still `starting` since before `cutoff` (the sweeper). */

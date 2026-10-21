@@ -19,6 +19,8 @@ export {
     type ScheduleRepairInput,
 } from './schedule-health.service';
 export { buildScheduleControls } from './schedule-controls';
+// Schedules on computers (FL-13) — the port the `node_schedule` source reads and controls through.
+export * from './node-schedule.port';
 export * from './schedule-control.codes';
 export {
     describeCron,

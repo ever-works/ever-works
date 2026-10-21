@@ -1051,7 +1051,8 @@
                 "rejected": "Rejected.",
                 "escalationResolved": "Escalation resolved.",
                 "alreadyDecided": "This was already decided elsewhere.",
-                "recorded": "Reply recorded."
+                "recorded": "Reply recorded.",
+                "sessionAnswered": "Answer sent to the session."
             },
             "toast": {
                 "archived": "Message archived.",
@@ -1137,6 +1138,10 @@
                 },
                 "loadMore": "Load {count} more",
                 "loadMoreError": "Could not load more decisions."
+            },
+            "sessionSource": {
+                "badge": "From a session",
+                "open": "Open session"
             }
         },
         "connectGithub": {
@@ -3953,6 +3958,7 @@
             },
             "sourceTypes": {
                 "inboundTrigger": "Inbound trigger",
+                "nodeSchedule": "Computer",
                 "recurringTask": "Recurring task",
                 "agentHeartbeat": "Agent heartbeat",
                 "workSchedule": "Work schedule",
@@ -3997,6 +4003,7 @@
                 "openMission": "Open the mission",
                 "openWork": "Open the work",
                 "openTriggers": "Open the triggers",
+                "openComputer": "Open the computer",
                 "seePastRuns": "See past runs",
                 "seeIdeasRaised": "See the ideas it raised"
             },
@@ -4010,7 +4017,9 @@
                 "ownerInactive": "The owner is not active",
                 "noAgent": "No agent is assigned to this schedule",
                 "noAuthoredForm": "This schedule has no authored form to copy or move",
-                "notAvailableYet": "Not available for this schedule yet"
+                "notAvailableYet": "Not available for this schedule yet",
+                "nodeOffline": "The computer is offline",
+                "consentMissing": "The computer was not started with --manage"
             },
             "nextReasons": {
                 "paused": "Paused — the cadence is kept",
@@ -4051,7 +4060,10 @@
                     "pastOneShot": "Its one-time slot is in the past",
                     "unparseable": "Its cadence cannot be read",
                     "noAgent": "No agent is assigned to run it",
-                    "ownerArchived": "The agent that runs it is archived or gone"
+                    "ownerArchived": "The agent that runs it is archived or gone",
+                    "consentMissing": "Its computer was not started with --manage",
+                    "nodeRemoved": "Its computer was removed — move it to another one",
+                    "nodeUnsupported": "The node on its computer is too old — update it"
                 },
                 "repairs": {
                     "clearEndDate": "No end date",
@@ -4060,6 +4072,7 @@
             },
             "runNow": {
                 "queuedToast": "Running now. This does not change the next scheduled fire.",
+                "confirmOnComputer": "Run \"{name}\" on its computer now? These are real machines, not a sandbox.",
                 "parkedToast": "Queued behind other runs. This does not change the next scheduled fire.",
                 "creditsToast": "Your credit balance cannot cover another run right now.",
                 "missionTickToast": "Running one tick now. A tick raises ideas rather than a run — open the mission to see what it raised.",
@@ -4113,7 +4126,8 @@
                 "log": "Log",
                 "schedules": "Schedules",
                 "feed": "Live Feed",
-                "runs": "Runs"
+                "runs": "Runs",
+                "sessions": "Sessions"
             },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -6338,7 +6352,8 @@
                 "missionTick": "mission tick",
                 "sourceValidation": "source check",
                 "dataSync": "data sync",
-                "inboundTrigger": "trigger"
+                "inboundTrigger": "trigger",
+                "nodeSchedule": "computer schedule"
             },
             "todayTitle": "Today",
             "ranAt": "ran at {time}",
@@ -12821,6 +12836,183 @@
         }
     },
     "fleet": {
+        "tools": {
+            "capabilities": {
+                "title": "Fleet tools",
+                "description": "{agent} can reach your computers through tools. What {agent} may do depends on three things: its tool grants, its trust ladder, and what each computer's owner allows.",
+                "noCredential": "Tools never carry a credential. {agent} acts through the platform; the platform asks the computer.",
+                "error": "Could not read {agent}'s fleet permissions.",
+                "retry": "Retry",
+                "empty": "You have no computers yet.",
+                "addComputer": "Add computer",
+                "stopped": "All computers are stopped: every act is refused until the stop is cleared under Settings → Fleet. Reads keep working.",
+                "comingSoon": "Coming soon",
+                "change": "Change",
+                "computerRefuses": "this computer refuses",
+                "yes": "Yes",
+                "no": "No",
+                "columns": {
+                    "family": "Family",
+                    "read": "Read",
+                    "act": "Act",
+                    "whyNot": "Why not"
+                },
+                "rungs": {
+                    "auto": "Auto",
+                    "ask": "Ask",
+                    "draft": "Draft"
+                },
+                "gates": {
+                    "killSwitch": "Stopped",
+                    "workspacePause": "Workspace paused",
+                    "agentPause": "Agent paused",
+                    "grants": "Denied",
+                    "ladder": "Off",
+                    "caps": "Limit reached",
+                    "audience": "Owner",
+                    "consent": "Consent"
+                },
+                "families": {
+                    "status": "Status",
+                    "nodes": "Computers",
+                    "sessions": "Sessions",
+                    "desktop": "Desktop",
+                    "logs": "Logs",
+                    "services": "Services",
+                    "processes": "Processes",
+                    "docker": "Docker",
+                    "ports": "Ports",
+                    "files": "Files",
+                    "commands": "Commands",
+                    "schedules": "Schedules",
+                    "checkouts": "Checkouts",
+                    "tasks": "Tasks",
+                    "virtual": "Virtual computers",
+                    "cloud": "Cloud computers",
+                    "runners": "Actions runners",
+                    "usage": "Usage",
+                    "operations": "Operations"
+                }
+            }
+        },
+        "gitIdentity": {
+            "card": {
+                "title": "Git on {node}",
+                "refresh": "Read again",
+                "loading": "Reading the git settings…",
+                "name": "Name",
+                "email": "Email",
+                "helper": "Helper",
+                "set": "set",
+                "notSet": "not set",
+                "none": "none",
+                "canPushYes": "Ever Works can push for agents: yes — {repositories}",
+                "canPushNo": "Ever Works can push for agents: no — {reason}",
+                "useMine": "Use my Ever Works identity",
+                "fixHint": "Sets name and email in this computer’s global Git config. Nothing else changes.",
+                "fixHintIncomplete": "Name or email is not set. This sets both in this computer’s global Git config; nothing else changes."
+            },
+            "confirm": {
+                "name": "Name",
+                "email": "Email",
+                "nothingElse": "Only user.name and user.email change. No credential, token or helper is written.",
+                "cancel": "Cancel",
+                "set": "Set identity"
+            },
+            "warnings": {
+                "accountEmail": "Your account email will appear in public commits."
+            },
+            "errors": {
+                "failed": "The git identity could not be set.",
+                "readFailed": "The git settings could not be read.",
+                "needsManage": "Start the node with --manage on {node} to read its git settings."
+            },
+            "line": {
+                "loading": "Reading git on {node}…",
+                "needsManage": "Git on {node}: needs --manage to check",
+                "unknown": "Git on {node}: could not be checked",
+                "summary": "Git on {node}   name {name} · email {email} · Ever Works can push for agents {push}"
+            }
+        },
+        "taskHandoff": {
+            "button": "Fix with an agent on this computer",
+            "palette": "Fix {slug} with an agent on a computer",
+            "dialog": {
+                "title": "Fix with an agent on this computer",
+                "subtitle": "{slug} · {title}",
+                "killSwitch": "All computers are stopped. Clear it under Settings → Fleet to start sessions.",
+                "loadFailed": "Your computers could not be read.",
+                "computer": "Computer",
+                "agent": "Agent",
+                "checkout": "Checkout",
+                "firstMessage": "First message",
+                "firstMessageHint": "Edit it before the session starts; it is the session’s first turn.",
+                "noComputer": "No computer can run {agent} right now.",
+                "runWithAgentHint": "Use Run with agent to run this Task in the cloud instead.",
+                "noAgent": "No Agent is assigned to this Task and its Work has no default Agent.",
+                "online": "online",
+                "offlineShort": "offline",
+                "pinned": "pinned",
+                "pinNote": "{agent} is pinned to {node}. Change that on {agent}’s Capabilities tab.",
+                "creatingCheckout": "Preparing the checkout on {node}…",
+                "checkoutFailed": "The checkout could not be made.",
+                "checkoutNotReady": "The checkout is {state}, not ready. Look at it on the computer’s Checkouts tab.",
+                "waiting": "Waiting for {node} to start the session…",
+                "notStartedYet": "{node} has not started the session yet.",
+                "keepWaiting": "Keep waiting",
+                "openSession": "Open session",
+                "started": "{agent} is working on {node}.",
+                "busy": "{agent} is already working on this Task.",
+                "alreadyWorking": "{agent} is already working on this Task in a session.",
+                "failed": "The session could not start.",
+                "close": "Close",
+                "cancel": "Cancel",
+                "start": "Start session",
+                "starting": "Starting…"
+            },
+            "sources": {
+                "assignee": "Assigned",
+                "task": "Task agent",
+                "workDefault": "Work default"
+            },
+            "reasons": {
+                "offline": "Offline",
+                "needsWork": "Needs --work on {node}",
+                "missingCli": "{agent} needs {cli}",
+                "noSlot": "No free agent slot",
+                "notPinned": "Not {agent}’s pinned computer",
+                "killSwitch": "All computers are stopped",
+                "noAccess": "Not one of your computers"
+            },
+            "checkout": {
+                "label": "Checkout",
+                "worktree": "New worktree of {path} on {branch}",
+                "worktreeNoBranch": "New worktree of {path}",
+                "existing": "{path} itself",
+                "clone": "Fresh clone of {repository}",
+                "noMatching": "{node} has no checkout of {repository} yet; a fresh clone makes one.",
+                "noRepository": "This Task’s Work has no repository: start in a checkout on the computer, or in the home folder.",
+                "none": "None (home folder)"
+            },
+            "cost": "Starts a session with {agent}’s model ({model}) on {node}; its cost appears on the session and on {slug}.",
+            "costNoModel": "Starts a session with {agent}’s model on {node}; its cost appears on the session and on {slug}.",
+            "block": {
+                "title": "Computer",
+                "empty": "No session on a computer yet",
+                "unknownNode": "a computer",
+                "unknownAgent": "an Agent",
+                "endedAgo": "ended {ago} ago",
+                "ended": "ended",
+                "open": "Open",
+                "end": "End",
+                "offlineAgo": "{node} is offline — last seen {ago} ago",
+                "offline": "{node} is offline",
+                "noPr": "no PR yet"
+            },
+            "chip": {
+                "title": "Task {slug}: {title}"
+            }
+        },
         "checkouts": {
             "hub": {
                 "title": "Checkouts on every computer",
@@ -13572,6 +13764,143 @@
                 "back": "Back to Fleet"
             }
         },
+        "schedules": {
+            "tab": {
+                "zones": "{computer} keeps time in {zone} · you are in {viewerZone}",
+                "zonesUnknown": "{computer} has not reported its time zone yet, so its times read UTC · you are in {viewerZone}",
+                "new": "New schedule",
+                "needsManage": "Schedules need management switched on — run `ever-works-node start --manage` on {computer}.",
+                "unsupportedKind": "Schedules are not available on this kind of node yet.",
+                "emptyTitle": "Nothing is scheduled on {computer}",
+                "emptyExample": "For example: run the tests every weekday at 02:00, or pull every checkout every 30 minutes.",
+                "noCredits": "A command schedule runs on your computer — it spends no model tokens or credits."
+            },
+            "glyphs": {
+                "active": "Active",
+                "running": "Running",
+                "paused": "Paused",
+                "neverRuns": "Never runs"
+            },
+            "row": {
+                "next": "next {computer}",
+                "nextTwoZones": "next {computer} ({viewer} yours)",
+                "noNext": "no fire scheduled",
+                "running": "running",
+                "paused": "paused by you",
+                "pausedFailures": "Paused after 5 failures in a row",
+                "last": "last {status}"
+            },
+            "statuses": {
+                "running": "running",
+                "done": "✓",
+                "failed": "✗ failed",
+                "timeout": "✗ timed out",
+                "skippedOverlap": "⊘ skipped",
+                "skippedOffline": "⊘ skipped"
+            },
+            "sync": {
+                "synced": "Synced to {computer}",
+                "pending": "Will sync when {computer} is back",
+                "unsupported": "NEVER RUNS · update the node on {computer}",
+                "refused": "The computer refused this schedule"
+            },
+            "reasons": {
+                "offline": "{computer} is offline — Run now needs it online"
+            },
+            "actions": {
+                "runNow": "Run now",
+                "pause": "Pause",
+                "resume": "Resume",
+                "edit": "Edit",
+                "duplicate": "Duplicate",
+                "delete": "Delete"
+            },
+            "confirmRun": "Run \"{name}\" on {computer} now? These are real machines, not a sandbox.",
+            "runStarted": "\"{name}\" is running. The next scheduled fire does not move.",
+            "confirmDelete": "Delete \"{name}\" on {computer}? It stops on the computer; its {runs, plural, one {# run stays} other {# runs stay}} readable for 30 days.",
+            "errors": {
+                "load": "Could not read the schedules of this computer.",
+                "run": "Could not run this schedule.",
+                "pause": "Could not pause this schedule. Nothing was changed.",
+                "resume": "Could not resume this schedule. Nothing was changed.",
+                "delete": "Could not delete this schedule. Nothing was changed."
+            },
+            "dialog": {
+                "title": "New schedule on {computer}",
+                "editTitle": "Edit schedule on {computer}",
+                "copyOf": "{name} (copy)",
+                "name": "Name",
+                "namePlaceholder": "Nightly tests",
+                "computer": "Computer",
+                "notThisKind": "not available on this kind of node",
+                "keepsTime": "keeps time in {zone}",
+                "keepsUtc": "has not reported its time zone — times read UTC",
+                "command": "Command",
+                "folder": "Folder",
+                "folderPlaceholder": "home (~), a checkout, or a path",
+                "when": "When",
+                "next": "Next:",
+                "twoZones": "{computer} ({viewer} yours)",
+                "runsAs": "Runs as the machine owner in their login shell. No input is possible.",
+                "noCredits": "It spends no model tokens or credits.",
+                "sandbox": "These are real machines, not a sandbox.",
+                "cancel": "Cancel",
+                "create": "Create",
+                "save": "Save",
+                "back": "Back",
+                "createConfirmed": "Create it",
+                "saveConfirmed": "Save it",
+                "failed": "Could not save this schedule. Nothing was changed.",
+                "confirmRunsAs": "Runs in {shell} as the machine owner, from {folder}, with no input.",
+                "confirmWhen": "When: {cadence}, on the computer's clock.",
+                "confirm": {
+                    "create": "Schedule \"{name}\" on {computer}?",
+                    "update": "Change what \"{name}\" runs on {computer}?",
+                    "move": "Move \"{name}\" to {computer}?",
+                    "delete": "Delete \"{name}\" on {computer}?",
+                    "run": "Run \"{name}\" on {computer} now?"
+                }
+            },
+            "cadence": {
+                "forms": {
+                    "every": "Every N minutes",
+                    "hourly": "Hourly",
+                    "daily": "Daily",
+                    "weekdays": "Weekdays",
+                    "days": "Specific days",
+                    "cron": "Cron (advanced)"
+                },
+                "minutes": "minutes",
+                "at": "at",
+                "cronLabel": "Cron expression (minute hour day month weekday)",
+                "daysLabel": "Days of the week",
+                "days": {
+                    "sun": "Sun",
+                    "mon": "Mon",
+                    "tue": "Tue",
+                    "wed": "Wed",
+                    "thu": "Thu",
+                    "fri": "Fri",
+                    "sat": "Sat"
+                }
+            },
+            "history": {
+                "title": "Runs on {computer}, newest first (the last 30 are kept there)",
+                "loading": "Reading the runs…",
+                "empty": "No runs yet.",
+                "failed": "Could not read the runs.",
+                "removedComputer": "a removed computer",
+                "twoZones": "{computer} ({viewer} yours)",
+                "runNow": "Run now",
+                "running": "running",
+                "timeout": "ended at 6 h (timeout)",
+                "failedReason": "failed ({reason})",
+                "exit": "exit {code}",
+                "output": "output",
+                "fullOutput": "Open full output",
+                "truncated": "the middle is kept on the computer"
+            }
+        },
         "commands": {
             "title": "Run a command",
             "description": "One command, the computers it should run on, and what each one said.",
@@ -13586,7 +13915,8 @@
                 "folder": "Folder",
                 "folderPlaceholder": "home (~)",
                 "run": "Run on {count}",
-                "runNone": "Run"
+                "runNone": "Run",
+                "scheduleThis": "Schedule this…"
             },
             "picker": {
                 "label": "On",
@@ -13708,7 +14038,17 @@
                 "offlineNever": "{node} is offline. Sessions it had are listed below with their last screens.",
                 "retry": "Retry",
                 "copy": "Copy",
-                "copied": "Copied"
+                "copied": "Copied",
+                "withQualifier": "{state} · {qualifier}",
+                "reasonPermission": "permission",
+                "reasonQuestion": "question",
+                "reasonBlocked": "blocked",
+                "reasonFailed": "failed",
+                "outcomeSuccess": "success",
+                "outcomeFailure": "failed",
+                "outcomeCancelled": "cancelled",
+                "outcomeInterrupted": "stopped",
+                "outcomeUnconfirmed": "no result"
             },
             "tab": {
                 "live": "Live",
@@ -13866,7 +14206,8 @@
                 "pane": "Terminal of {title} on {node}. {role}.",
                 "newSessionMenu": "New session on {node}",
                 "state": "State: {state}",
-                "card": "{title} on {node}, {state}"
+                "card": "{title} on {node}, {state}",
+                "cardFull": "{who}, {title}, {state}, on {node}"
             },
             "agentBlock": {
                 "title": "Sessions",
@@ -13893,6 +14234,106 @@
                 "position": "Position {at} of {total}",
                 "close": "Close",
                 "failed": "The recording could not be loaded."
+            },
+            "card": {
+                "you": "You: {text}",
+                "agent": "{who}: {text}",
+                "agentFallback": "Agent",
+                "exited": "exited with code {code}",
+                "unconfirmed": "{node} restarted before this finished",
+                "needsYouNoPrompt": "Waiting for you — open the session to see what it asks",
+                "waiting": "waiting {span}",
+                "doneAgo": "done {span} ago",
+                "workingFor": "working {span}",
+                "idleFor": "idle {span}",
+                "endedAgo": "ended {span} ago",
+                "startingFor": "starting {span}",
+                "fromScreen": "from the screen",
+                "openRun": "Open the Run"
+            },
+            "statusSource": {
+                "hooks": "Status from {provider}'s hooks",
+                "partial": "Status from the screen for permission prompts — update {provider} on {node} for exact status",
+                "codex": "Status from the screen — Codex reports only when a turn ends",
+                "screen": "Status from the screen",
+                "fromScreen": "from the screen",
+                "shell": "Shell — no agent status",
+                "notifyReplaced": "Your own Codex notify command is not run in this session",
+                "noTokens": "Status spends no model tokens"
+            },
+            "hookHealth": {
+                "badToken": "Something on {node} is posting to the hook endpoint with a bad token ({count} in the last minute)",
+                "spooled": "{count} hook events are spooled on {node} and will be applied when the node is up"
+            },
+            "attention": {
+                "asks": "Asks: {prompt}",
+                "fallbackLabel": "Waiting for your answer",
+                "escDeny": "Esc = Deny",
+                "escKeep": "Esc keeps the prompt",
+                "orType": "or type an answer",
+                "send": "Send",
+                "killSwitch": "Paused by the fleet stop — answers are not sent",
+                "alreadyAnswered": "Already answered in the terminal",
+                "unreachable": "{node} is unreachable — the answer will not be sent",
+                "failed": "The answer was not sent",
+                "retry": "Retry",
+                "peopleOnly": "Permission prompts are answered by people"
+            },
+            "board": {
+                "heading": "Sessions",
+                "needsYou": "Needs you",
+                "working": "Working",
+                "done": "Done",
+                "idle": "Idle",
+                "emptyNeedsYou": "Nothing needs you",
+                "emptyWorking": "Nothing working",
+                "emptyDone": "Nothing finished today",
+                "emptyIdle": "Nothing idle",
+                "empty": "No sessions yet. Start one on a computer and it shows up here with what it needs from you.",
+                "newSession": "Start a session on a computer",
+                "toggleBoard": "Board",
+                "toggleList": "List",
+                "filterAgent": "Agent",
+                "filterComputer": "Computer",
+                "filterKind": "Kind",
+                "filterState": "State",
+                "allAgents": "All agents",
+                "allComputers": "All computers",
+                "allKinds": "All kinds",
+                "allStates": "All states",
+                "loadFailed": "The sessions could not be loaded.",
+                "moved": "{title} moved to {column}."
+            },
+            "list": {
+                "day": "Day",
+                "week": "Week",
+                "you": "You",
+                "shells": "Shells",
+                "anAgent": "An Agent",
+                "dayHeading": "{period} · {who} ({count})",
+                "weekHeading": "Week of {period} · {who} ({count})",
+                "answer": "Answer",
+                "reasons": {
+                    "exit": "exit {code}",
+                    "user": "ended by a person",
+                    "agent": "ended by its Agent",
+                    "nodeRestart": "the computer restarted",
+                    "timeout": "timed out",
+                    "killSwitch": "the fleet stop",
+                    "drain": "drained"
+                }
+            },
+            "byComputer": {
+                "online": "online",
+                "offline": "offline",
+                "sessions": "{count, plural, one {# session} other {# sessions}}",
+                "manageOnly": "Agents need work switched on here",
+                "newSession": "New session",
+                "noComputers": "No computers yet — add one under Fleet → Computers."
+            },
+            "palette": {
+                "needsYou": "Needs you",
+                "recent": "Recent sessions"
             }
         },
         "actions": {

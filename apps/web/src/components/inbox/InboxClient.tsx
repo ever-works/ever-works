@@ -41,6 +41,7 @@ import {
 } from '@/app/actions/dashboard/inbox';
 import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
+import { InboxSessionSource } from './InboxSessionSource';
 import { InboxReplyComposer } from './InboxReplyComposer';
 import { InboxSourceFilter, InboxTabs, type InboxView } from './InboxTabs';
 
@@ -329,6 +330,7 @@ export function InboxClient({
                                         {/* Slice Q — "From your fleet" chip on a question
                                             a run on the owner's own machine asked. */}
                                         <InboxFleetSource item={item} compact />
+                                        <InboxSessionSource item={item} compact />
                                         <ShowDateTime value={item.createdAt} />
                                     </div>
                                 </button>
@@ -404,6 +406,7 @@ export function InboxClient({
                                     question uses: the answer resumes the parked run on
                                     that branch. */}
                                 <InboxFleetSource item={active} />
+                                <InboxSessionSource item={active} />
                             </div>
 
                             {isAwaitingReply(active) && (
@@ -467,5 +470,6 @@ const ROUTED_MESSAGE_KEY = {
     rejected: 'routed.rejected',
     'escalation-resolved': 'routed.escalationResolved',
     'already-decided': 'routed.alreadyDecided',
+    'session-answered': 'routed.sessionAnswered',
     none: 'routed.recorded',
 } as const satisfies Record<InboxReplyRouted, string>;

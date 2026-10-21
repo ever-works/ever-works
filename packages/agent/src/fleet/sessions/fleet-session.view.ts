@@ -1,4 +1,9 @@
-import type { FleetSessionView } from '@ever-works/contracts';
+import {
+    parseFleetSessionAttention,
+    parseFleetSessionHooks,
+    parseFleetSessionLastEvidence,
+    type FleetSessionView,
+} from '@ever-works/contracts';
 import type { FleetSession } from '../../entities/fleet-session.entity';
 
 const iso = (value: Date | string | null | undefined): string | null => {
@@ -43,6 +48,13 @@ export function toFleetSessionView(
         createdAt: iso(row.createdAt) ?? new Date(0).toISOString(),
         updatedAt: iso(row.updatedAt) ?? iso(row.createdAt) ?? new Date(0).toISOString(),
     };
+    // FL-05 (CONTRACTS §4.2): re-read through the shared parsers — a column
+    // written by an older node release never reaches a surface half-formed.
+    view.attention = row.attention ? parseFleetSessionAttention(row.attention) : null;
+    view.stateChangedAt = iso(row.stateChangedAt) ?? iso(row.lastActivityAt) ?? view.createdAt;
+    view.hooks = row.hooks ? parseFleetSessionHooks(row.hooks) : null;
+    view.lastEvidence = row.lastEvidence ? parseFleetSessionLastEvidence(row.lastEvidence) : null;
+    view.boundaryUntil = iso(row.boundaryUntil);
     if (options.includeScreen) view.lastScreen = row.lastScreen ?? null;
     return view;
 }

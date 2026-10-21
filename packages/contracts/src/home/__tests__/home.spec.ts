@@ -25,8 +25,9 @@ describe('home contract', () => {
 	});
 
 	it('names every one of the seven schedule kinds', () => {
-		expect(HOME_SCHEDULE_KINDS).toHaveLength(7);
-		expect(new Set(HOME_SCHEDULE_KINDS).size).toBe(7);
+		// Eight since FL-13 added `node_schedule` (a Command scheduled on a computer).
+		expect(HOME_SCHEDULE_KINDS).toHaveLength(8);
+		expect(new Set(HOME_SCHEDULE_KINDS).size).toBe(8);
 	});
 
 	describe('parseHomeBlockIds', () => {

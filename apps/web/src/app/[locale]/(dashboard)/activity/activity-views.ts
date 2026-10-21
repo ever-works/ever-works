@@ -13,11 +13,14 @@
  *                  with `view=runs` and the whole view state carried over.
  *  - `feed`      — the narrated Live Feed.
  *  - `schedules` — what will run without you.
+ *  - `sessions`  — (FL-05) every session on your computers, on a board by what
+ *                  it needs from you (Needs you · Working · Done · Idle) or as a
+ *                  list; shown only while `FLEET_SESSIONS_ENABLED` is on.
  *
  * The order is deliberate: the record first, then the executions inside it,
- * then the narration, then the forecast.
+ * then the narration, then the forecast — and the live sessions last.
  */
-export const ACTIVITY_VIEWS = ['log', 'runs', 'feed', 'schedules'] as const;
+export const ACTIVITY_VIEWS = ['log', 'runs', 'feed', 'schedules', 'sessions'] as const;
 
 export type ActivityView = (typeof ACTIVITY_VIEWS)[number];
 
@@ -38,4 +41,6 @@ export const ACTIVITY_VIEW_KEYS: Record<string, ActivityView> = {
     r: 'runs',
     f: 'feed',
     s: 'schedules',
+    // FL-05 (spec FR-52): `n` — what needs you now.
+    n: 'sessions',
 };

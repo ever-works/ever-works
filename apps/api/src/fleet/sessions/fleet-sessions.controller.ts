@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Get,
@@ -22,9 +23,12 @@ import {
     type FleetSessionListQuery,
 } from '@ever-works/agent/fleet';
 import {
+    FLEET_SESSION_ANSWERS_PER_MINUTE,
     FLEET_SESSION_ATTACHES_PER_MINUTE,
     FLEET_SESSION_STARTS_PER_MINUTE,
     isFleetSessionLive,
+    type FleetSessionAnswerResponse,
+    type FleetSessionBoardResponse,
     type FleetSessionAttachTokenResponse,
     type FleetSessionRecordingManifest,
     type FleetSessionRecordingPage,
@@ -35,12 +39,13 @@ import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
+    AnswerFleetSessionDto,
     EndFleetSessionDto,
     FleetSessionAttachTokenDto,
     FleetSessionRecordingDto,
     FleetSessionRecordingQueryDto,
     ListFleetSessionsQueryDto,
-    RenameFleetSessionDto,
+    PatchFleetSessionDto,
     RestartFleetSessionDto,
     StartFleetSessionDto,
 } from './dto/fleet-session.dto';
@@ -58,6 +63,7 @@ function listQuery(query: ListFleetSessionsQueryDto): FleetSessionListQuery {
     if (query.state) out.state = query.state;
     if (query.kind) out.kind = query.kind;
     if (query.agentId) out.agentId = query.agentId;
+    if (query.taskId) out.taskId = query.taskId;
     if (query.limit !== undefined) out.limit = query.limit;
     if (query.cursor) out.cursor = query.cursor;
     if (query.since) {
@@ -154,6 +160,7 @@ export class FleetSessionsController {
             ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
             ...(body.checkoutId !== undefined ? { checkoutId: body.checkoutId } : {}),
             ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
+            ...(body.taskId !== undefined ? { taskId: body.taskId } : {}),
             ...(body.cols !== undefined ? { cols: body.cols } : {}),
             ...(body.rows !== undefined ? { rows: body.rows } : {}),
         }));
@@ -169,7 +176,15 @@ export class FleetSessionsController {
     async list(
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListFleetSessionsQueryDto,
-    ): Promise<FleetSessionListResponse> {
+    ): Promise<FleetSessionListResponse | FleetSessionBoardResponse> {
+        // FL-05 P3: the Sessions board — the four columns instead of a page.
+        if (query.view === 'board') {
+            return this.sessions.board(actorOf(auth), {
+                ...(query.nodeId ? { nodeId: query.nodeId } : {}),
+                ...(query.agentId ? { agentId: query.agentId } : {}),
+                ...(query.kind ? { kind: query.kind } : {}),
+            });
+        }
         return this.sessions.listPage(actorOf(auth), {
             ...listQuery(query),
             ...(query.nodeId ? { nodeId: query.nodeId } : {}),
@@ -193,15 +208,49 @@ export class FleetSessionsController {
     }
 
     @Patch('sessions/:id')
-    @ApiOperation({ summary: 'Rename a session (1–200 characters). The computer keeps the new title too.' })
+    @ApiOperation({
+        summary:
+            'Rename a session ({ title }, 1–200 characters — the computer keeps the new title too), or acknowledge what it asks ({ acknowledge: <attention key> }: clears unread, never the prompt).',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async rename(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: RenameFleetSessionDto,
+        @Body() body: PatchFleetSessionDto,
     ): Promise<FleetSessionView> {
+        // FL-05: the same PATCH acknowledges (plan §5) — exactly one of the two.
+        if (typeof body?.acknowledge === 'string' && body.title === undefined) {
+            return this.sessions.acknowledge(id, actorOf(auth), body.acknowledge);
+        }
+        if (typeof body?.title !== 'string' || body.acknowledge !== undefined) {
+            throw new BadRequestException('Send either a title or an acknowledge key.');
+        }
         return this.sessions.rename(id, actorOf(auth), body.title);
+    }
+
+    @Post('sessions/:id/answer')
+    @ApiOperation({
+        summary:
+            'Answer what a session asks (a question or a permission prompt): one of the options the CLI showed, or a free text for a question that takes one. The computer types it as the CLI expects. Refused invalid once answered (in the terminal too), unreachable while the computer is away (the prompt stays), kill_switch under the fleet stop.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: FLEET_SESSION_ANSWERS_PER_MINUTE, ttl: 60_000 } })
+    async answer(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AnswerFleetSessionDto,
+    ): Promise<FleetSessionAnswerResponse> {
+        return this.sessions.answer(
+            id,
+            actorOf(auth),
+            {
+                key: body.key,
+                ...(body.optionId !== undefined ? { optionId: body.optionId } : {}),
+                ...(body.text !== undefined ? { text: body.text } : {}),
+            },
+            body.source ?? 'card',
+        );
     }
 
     @Post('sessions/:id/end')

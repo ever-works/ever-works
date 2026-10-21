@@ -75,11 +75,14 @@ import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
 import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
 import { FleetCommandsApiModule } from './fleet/commands/fleet-commands-api.module';
+import { FleetSchedulesApiModule } from './fleet/schedules/fleet-schedules-api.module';
 import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
+import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
+import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
@@ -323,6 +326,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FleetSessionsApiModule,
         // Commands on computers (FL-12) — one command line, N computers (FLEET_COMMANDS_ENABLED).
         FleetCommandsApiModule,
+        // Schedules on computers (FL-13): the schedule link adapter, the node_schedule source, the reconcile pass.
+        FleetSchedulesApiModule,
         // Services, Docker, Compose and processes on computers (FL-09) — the
         // machine-action routes and the node-link adapter. Dark unless
         // FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
@@ -331,6 +336,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // the node link: the checkout routes, the link adapter and listener,
         // and the reconcile fallback. Dark unless FLEET_CHECKOUTS_ENABLED.
         FleetCheckoutsApiModule,
+        // Tasks on computers (FL-15) — "Fix with an agent on this computer": the
+        // hand-off options read (the start is FL-04's, with `taskId`). Dark
+        // unless FLEET_SESSIONS_ENABLED and FLEET_CHECKOUTS_ENABLED.
+        FleetTasksApiModule,
         // Virtual computers (FL-16) — Containers (and, later, Windows VMs) created
         // on a computer of the Fleet: the routes, the host-facing token mint and
         // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
@@ -341,6 +350,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FleetPortsApiModule,
         // Logs on computers (FL-08): /api/fleet/nodes/:id/logs/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
         FleetLogsApiModule,
+        // Agent, MCP & CLI surface (FL-19): GET /api/fleet/status and /api/fleet/tools/gate, and
+        // the status reader behind the `fleet_status` Agent tool (FLEET_ENABLED-gated).
+        FleetToolsApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,

@@ -802,6 +802,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
 			'commands'
 		),
+		// Schedules on computers (FL-13): the machine's own schedules, their runs and outputs, beside the config.
+		scheduleDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'schedules'
+		),
 		// Fleet node link (FL-02 T-25): the self-update's report rides every
 		// beat, and every accepted beat's version verdict reaches it.
 		selfUpdateReport: () => selfUpdate?.report() ?? null,
@@ -822,6 +827,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
 	runtime.sessions?.supervisor.start();
+	// Session status (FL-05): the hook endpoint, its file and client — before the
+	// first session starts, so its hooks have somewhere to go.
+	void runtime.sessions?.status?.start();
 	if (workerEnabled) {
 		// Node lifecycle (slice AR): say at startup what each pinned CLI is
 		// and whether this node can drive it — the first place an operator
@@ -1014,6 +1022,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// Sessions (FL-04): let go of the daemon — never stop it. Every session
 	// keeps running and the next node process finds them all.
 	runtime.sessions?.module.dispose();
+	await runtime.sessions?.status?.stop().catch(() => undefined);
 	runtime.sessions?.supervisor.stop();
 	loop.stop();
 	await loop.settled();

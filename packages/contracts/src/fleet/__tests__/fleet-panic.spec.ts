@@ -108,6 +108,9 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.port.open',
 	'node.port.preview.open',
 	'node.port.preview.close',
+	// Tasks on computers (FL-15, CONTRACTS §7).
+	'node.git.identity.set',
+	// Virtual computers (FL-16, CONTRACTS §7).
 	'node.vm.create',
 	'node.vm.start',
 	'node.vm.stop',

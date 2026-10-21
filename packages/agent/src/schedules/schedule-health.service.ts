@@ -33,7 +33,14 @@ const MONTH_MAX_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const MONTH_SAFE_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** How a source expresses its cadence. */
-export type ScheduleCadenceKind = 'cron' | 'rrule' | 'interval' | 'work-cadence' | 'event';
+export type ScheduleCadenceKind =
+    | 'cron'
+    | 'rrule'
+    | 'interval'
+    | 'work-cadence'
+    | 'event'
+    /** FL-13: a Command schedule's cadence, validated when it was saved (`parseFleetScheduleCadence`). */
+    | 'node-cadence';
 
 /** Everything the verdict needs to know about one Schedule. */
 export interface ScheduleHealthInput {
@@ -57,6 +64,12 @@ export interface ScheduleHealthInput {
     requiresAgent?: boolean;
     /** At least one usable Agent resolved. Only read when `requiresAgent`. */
     agentResolved?: boolean;
+    /**
+     * FL-13: why the computer a Command schedule runs on would never run it
+     * (no `--manage`, removed, an older node), as `FleetScheduleService`
+     * judged it; null when it can.
+     */
+    nodeNeverRuns?: 'consent-missing' | 'node-removed' | 'node-unsupported' | null;
     now: Date;
 }
 
@@ -68,6 +81,11 @@ const REPAIR_CLASS: Record<ScheduleHealthReason, ScheduleRepairClass> = {
     'no-agent': 'choice',
     'owner-archived': 'choice',
     unparseable: 'none',
+    // FL-13 (spec FR-21): only the computer's owner can switch --manage on or
+    // update the node; a removed computer's schedule can be moved.
+    'consent-missing': 'none',
+    'node-removed': 'choice',
+    'node-unsupported': 'none',
 };
 
 const REASON_KEY: Record<ScheduleHealthReason, string> = {
@@ -78,6 +96,9 @@ const REASON_KEY: Record<ScheduleHealthReason, string> = {
     unparseable: 'unparseable',
     'no-agent': 'noAgent',
     'owner-archived': 'ownerArchived',
+    'consent-missing': 'consentMissing',
+    'node-removed': 'nodeRemoved',
+    'node-unsupported': 'nodeUnsupported',
 };
 
 export function repairClassFor(reason: ScheduleHealthReason): ScheduleRepairClass {
@@ -154,6 +175,8 @@ export function evaluateScheduleHealth(input: ScheduleHealthInput): ScheduleHeal
     const { now } = input;
     if (input.paused || input.ownerCompleted) return ok(now);
     if (input.ownerArchived) return flagged('owner-archived', now);
+    // FL-13: the machine decides whether a Command schedule can run at all.
+    if (input.nodeNeverRuns) return flagged(input.nodeNeverRuns, now);
 
     if (input.cadenceKind === 'cron') {
         if (!input.cadence) return flagged('unparseable', now);

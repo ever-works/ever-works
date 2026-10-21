@@ -484,6 +484,10 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.selfUpdate !== undefined) {
 		out.selfUpdate = source.selfUpdate;
 	}
+	// Schedules on computers (FL-13): the machine's time zone, validated by `describeSelf`.
+	if (typeof source.timeZone === 'string') {
+		out.timeZone = source.timeZone;
+	}
 	return out;
 }
 

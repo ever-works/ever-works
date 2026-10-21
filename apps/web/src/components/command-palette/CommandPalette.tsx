@@ -51,6 +51,8 @@ import {
     useFleetMachineFactsEnabled,
     useFleetVirtualEnabled,
 } from '@/components/fleet/FleetHubFlagProvider';
+import { useFleetPaletteSessions } from './hooks/use-fleet-palette-sessions';
+import { paletteSessionsFrom } from './registry/palette-sessions';
 import {
     buildPaletteSections,
     filterLabel,
@@ -264,6 +266,12 @@ export function CommandPalette({
     const fleetVirtualEnabled = useFleetVirtualEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
+    // FL-05 (FR-46): the sessions waiting on the person open the empty palette.
+    const fleetSessionBoard = useFleetPaletteSessions(open, fleetHubEnabled);
+    const paletteSessions = useMemo(
+        () => paletteSessionsFrom(fleetSessionBoard, fleetComputers, t),
+        [fleetSessionBoard, fleetComputers, t],
+    );
     const screens = useMemo(
         () => [
             ...screensFor(appPath, { fleetHubEnabled }),
@@ -290,8 +298,9 @@ export function CommandPalette({
                 recents,
                 response,
                 settled,
+                sessions: paletteSessions,
             }),
-        [t, query, filter, commandContext, commands, screens, recents, response, settled],
+        [t, query, filter, commandContext, commands, screens, recents, response, settled, paletteSessions],
     );
     const rows = useMemo(() => flattenRows(sections), [sections]);
 

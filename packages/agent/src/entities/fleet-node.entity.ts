@@ -691,6 +691,17 @@ export class FleetNode {
     lastWakeAttemptAt?: Date | null;
 
     /**
+     * Schedules on computers (FL-13, CONTRACTS §4.1) — the IANA time zone the
+     * machine reports on every heartbeat (`Europe/Paris`); Command schedules
+     * on it fire on that wall clock. NULL = never reported (a daemon older
+     * than the field): schedules then read UTC. Validated with
+     * `isFleetTimeZone` before it is written.
+     * Migration: `1796130100000-AddFleetNodeTimeZone`.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    timeZone?: string | null;
+
+    /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — what this machine's owner
      * switched on when starting the node: `{ work, attend, manage, usageScan }`,
      * as the last heartbeat reported it. NULL = never reported (a daemon

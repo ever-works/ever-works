@@ -42,7 +42,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-type OwnerEntryKey = 'openTask' | 'openAgent' | 'openMission' | 'openWork' | 'openTriggers';
+type OwnerEntryKey =
+    | 'openTask'
+    | 'openAgent'
+    | 'openMission'
+    | 'openWork'
+    | 'openTriggers'
+    | 'openComputer';
 
 /** What the owner entry opens, named per source (never a generic "Open"). */
 export function ownerEntryKey(schedule: Pick<ScheduleEntry, 'sourceType'>): OwnerEntryKey {
@@ -55,6 +61,8 @@ export function ownerEntryKey(schedule: Pick<ScheduleEntry, 'sourceType'>): Owne
             return 'openMission';
         case 'inbound_trigger':
             return 'openTriggers';
+        case 'node_schedule':
+            return 'openComputer';
         default:
             return 'openWork';
     }
@@ -75,6 +83,9 @@ function historyLink(
             return { key: 'seePastRuns', href: `/agents/${schedule.ownerId}/activity` };
         case 'mission_tick':
             return { key: 'seeIdeasRaised', href: `/missions/${schedule.ownerId}` };
+        case 'node_schedule':
+            // FL-13: the history lives on the computer's Schedules tab.
+            return { key: 'seePastRuns', href: schedule.ownerLink };
         default:
             return null;
     }
@@ -129,7 +140,12 @@ export function ScheduleRowMenu({
 
     const runNow = () =>
         startTransition(async () => {
-            const response = await runScheduleNow(schedule.id);
+            // FL-13 (FR-25): a Command schedule runs on a real machine — ask first.
+            const isNodeSchedule = schedule.sourceType === 'node_schedule';
+            if (isNodeSchedule && !window.confirm(t('runNow.confirmOnComputer', { name: schedule.ownerName }))) {
+                return;
+            }
+            const response = await runScheduleNow(schedule.id, { confirm: isNodeSchedule });
             if (response.ok) {
                 announceRun(response.result);
                 onChanged?.();
