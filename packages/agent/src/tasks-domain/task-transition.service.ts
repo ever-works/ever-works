@@ -38,6 +38,11 @@ import { TaskNotificationService } from './task-notification.service';
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { describeTaskPatch } from '../domain-events/domain-event-task-fields';
 import { TaskRunDenormService } from './task-run-denorm.service';
+import {
+    isFleetSessionScheduleTask,
+    TASK_SESSION_SCHEDULE_DISPATCHER,
+    type TaskSessionScheduleDispatcher,
+} from './task-session-schedule.port';
 // Value import (not `import type`): Nest resolves the @Optional() class
 // injection below via emitted design:paramtypes metadata, which needs the
 // real class reference. No cycle: run-dispatch-gate.service imports only
@@ -337,6 +342,13 @@ export class TaskTransitionService {
         // same transaction as the status compare-and-set. Appended LAST +
         // @Optional (positional-spec arity rule); absent, nothing is recorded.
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // Schedules on computers (FL-13 P2, spec FR-8) — one fire of an
+        // Agent-session schedule starts as an Agent SESSION on the pinned
+        // computer. Appended LAST + @Optional (positional-spec arity rule);
+        // absent, such a Task dispatches like any other.
+        @Optional()
+        @Inject(TASK_SESSION_SCHEDULE_DISPATCHER)
+        private readonly sessionSchedules?: TaskSessionScheduleDispatcher,
     ) {}
 
     /**
@@ -1384,6 +1396,13 @@ export class TaskTransitionService {
                 parked: false,
                 error: 'agent-not-found',
             };
+        }
+        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
+        // session on the computer the Agent is pinned to — the Fleet starts it
+        // (its own Run, trigger `session`, linked to this Task). Ownership was
+        // checked just above, at the one dispatch choke point.
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            return this.sessionSchedules.dispatch(task, agentId);
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;

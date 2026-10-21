@@ -141,6 +141,24 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_operations_list: "a person's long operations",
 	fleet_nodes_git_identity_get: "a computer's git identity",
 	fleet_tasks_handoff_options: "a person's computers, checkouts and agents for a Task",
+	// FL-19 P2 — the catalogue's acts on MCP: every one changes a computer.
+	fleet_services_action: 'starts and stops services on a computer',
+	fleet_processes_signal: 'signals processes on a computer',
+	fleet_docker_container_action: 'starts, stops and removes containers on a computer',
+	fleet_docker_image_action: 'removes images on a computer',
+	fleet_docker_compose_action: 'brings Compose projects up and down on a computer',
+	fleet_nodes_wake: 'wakes a computer',
+	fleet_nodes_git_identity_set: "writes a computer's git identity",
+	fleet_operations_cancel: "stops a person's operation",
+	// FL-11 / FL-16 tools that landed beside FL-19 P2 without a run-token decision.
+	fleet_files_roots: "a computer's shared folders",
+	fleet_files_list: "the files on a person's computer",
+	fleet_files_stat: "the files on a person's computer",
+	fleet_virtual_list: "a person's virtual computers",
+	fleet_virtual_options: 'what a computer can host',
+	fleet_virtual_create: 'creates a virtual computer',
+	fleet_virtual_power: 'starts and stops a virtual computer',
+	fleet_virtual_destroy: 'destructive: destroys a virtual computer',
 	// FL-05 P2: typing an answer into a person's session prompt.
 	fleet_sessions_answer: "answers a prompt in a person's session"
 };

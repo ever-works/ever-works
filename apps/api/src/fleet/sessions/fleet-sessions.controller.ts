@@ -14,6 +14,7 @@ import {
     Query,
     Res,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -57,6 +58,7 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
 import { FleetSessionAttachService } from './fleet-session-attach.service';
 import { FleetSessionPresenceService } from './fleet-session-presence.service';
 import { FleetSessionRecordingService } from './fleet-session-recording.service';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetSessionActor {
     return { userId: auth.userId };
@@ -100,6 +102,9 @@ function listQuery(query: ListFleetSessionsQueryDto): FleetSessionListQuery {
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetSessionsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetSessionsController {
     constructor(
         private readonly sessions: FleetSessionService,

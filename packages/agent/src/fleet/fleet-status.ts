@@ -1,5 +1,6 @@
 import type {
     FleetKillSwitchState,
+    FleetNodeWakeResult,
     FleetNodeView,
     FleetOperationCancelResult,
     FleetOperationState,
@@ -89,3 +90,15 @@ export interface FleetOperationsToolPort {
     ): FleetOperationView[];
     requestCancel?(operationId: string, userId: string): Promise<FleetOperationCancelResult>;
 }
+
+/**
+ * FL-19 P2 — `fleet_nodes_wake` (FL-03's row): the API's wake route as the
+ * Agent's owner (visibility, the target's `machines` audience, the stop
+ * switch, 3 tries in 5 minutes, the audit row — all the route's own). Bound by
+ * the API under {@link FLEET_WAKE_TOOL_PORT}.
+ */
+export interface FleetWakeToolPort {
+    wake(userId: string, nodeId: string): Promise<FleetNodeWakeResult>;
+}
+
+export const FLEET_WAKE_TOOL_PORT = 'FLEET_WAKE_TOOL_PORT' as const;

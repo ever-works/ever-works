@@ -522,11 +522,17 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 	}),
 
 	// ── files (FL-11) ──
-	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
-		route: GET('/api/fleet/nodes/{id}/files'),
+	// P1 (FL-11 lane log decision 15): the roots read joins the family, and the list's route is the
+	// one FL-11 built (`…/files/list` — `…/files` is the family's prefix, not a route).
+	read('fleet_files_roots', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/roots'),
+		cli: 'fleet files roots'
+	}),
+	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/list'),
 		cli: 'fleet files list'
 	}),
-	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
+	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/files/stat'),
 		cli: 'fleet files stat'
 	}),
@@ -567,24 +573,24 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet commands cancel'
 	}),
 
-	// ── schedules (FL-13) ──
-	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	// ── schedules (FL-13 P2: live — `apps/api/src/fleet/schedules/fleet-schedules.controller.ts`) ──
+	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules'),
 		cli: 'fleet schedules list'
 	}),
-	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules get'
 	}),
-	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}/runs'),
 		cli: 'fleet schedules runs'
 	}),
-	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: POST('/api/fleet/schedules'),
 		cli: 'fleet schedules create'
 	}),
-	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: PATCH('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules update'
 	}),
@@ -593,19 +599,19 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'schedules',
 		'FL-13',
 		'FLEET_COMMANDS_ENABLED',
-		'planned',
+		'live',
 		confirm('write.destructive'),
 		{ route: DELETE('/api/fleet/schedules/{id}'), cli: 'fleet schedules delete' }
 	),
-	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('machine.run'), {
+	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('machine.run'), {
 		route: POST('/api/fleet/schedules/{id}/run'),
 		cli: 'fleet schedules run'
 	}),
-	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/pause'),
 		cli: 'fleet schedules pause'
 	}),
-	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/resume'),
 		cli: 'fleet schedules resume'
 	}),
@@ -664,35 +670,38 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet tasks handoff-options'
 	}),
 
-	// ── virtual (FL-16) ──
-	read('fleet_virtual_list', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', {
+	// ── virtual (FL-16) ── P1 shipped: Containers. A create, a stop and a destroy are held for
+	// the owner's approval by the Agent tools (`agent-fleet-virtual-tools.ts`).
+	read('fleet_virtual_list', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/nodes/{id}/virtual'),
 		cli: 'fleet virtual list'
 	}),
-	read('fleet_virtual_options', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', {
+	read('fleet_virtual_options', 'view', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', {
 		phase: 'P3',
-		route: GET('/api/fleet/providers'),
+		route: GET('/api/fleet/nodes/{id}/virtual/options'),
 		cli: 'fleet virtual options'
 	}),
-	act('fleet_virtual_create', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_virtual_create', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', confirm('machine.admin'), {
 		phase: 'P3',
 		route: POST('/api/fleet/nodes/{id}/virtual'),
 		cli: 'fleet virtual create',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
-	act('fleet_virtual_power', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_virtual_power', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', confirm('machine.admin'), {
 		phase: 'P3',
-		route: POST('/api/fleet/nodes/{id}/virtual/{vmId}/power'),
+		route: POST('/api/fleet/nodes/{id}/virtual/{childId}/power'),
 		cli: 'fleet virtual power',
 		waitable: true,
-		confirmationNote: 'plain to start; confirm to stop'
+		confirmationNote: 'plain to start; confirm to stop (an Agent\'s stop is held for the owner)'
 	}),
-	act('fleet_virtual_destroy', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'planned', typed('write.destructive'), {
+	act('fleet_virtual_destroy', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', typed('write.destructive'), {
 		phase: 'P3',
-		route: DELETE('/api/fleet/nodes/{id}/virtual/{vmId}'),
+		route: POST('/api/fleet/nodes/{id}/virtual/{childId}/destroy'),
 		cli: 'fleet virtual destroy',
-		waitable: true
+		waitable: true,
+		alwaysHeld: true
 	}),
 
 	// ── cloud (FL-17) ──

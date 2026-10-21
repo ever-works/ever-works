@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
+import type { FleetNodeOrigin, FleetNodeVirtualKind, FleetVirtualMeta } from '@ever-works/contracts';
 import {
     FleetNode,
     FleetNodeKind,
@@ -19,6 +20,12 @@ export interface CreateFleetNodeData {
     /** When the credential above was minted — drives token expiry. */
     credentialIssuedAt?: Date | null;
     capabilities?: string[];
+    /** Virtual computers (FL-16): `virtual` for a child; absent = the column default (`enrolled`). */
+    origin?: FleetNodeOrigin;
+    /** Virtual computers (FL-16): the host a child runs on. */
+    hostNodeId?: string | null;
+    virtualKind?: FleetNodeVirtualKind | null;
+    virtualMeta?: FleetVirtualMeta | null;
 }
 
 /** Columns the enroll CAS is allowed to stamp alongside the flip. */
@@ -232,6 +239,26 @@ export class FleetNodeRepository {
 
     async update(id: string, patch: Partial<FleetNode>): Promise<void> {
         await this.repository.update(id, patch);
+    }
+
+    /**
+     * Virtual computers (FL-16) — every child of these hosts, whoever owns it
+     * (a child is owned by its host's owner, but the read is by host so a
+     * host's limit and its delete guard never miss one). Empty input → [].
+     */
+    async findByHostNodeIds(hostNodeIds: readonly string[]): Promise<FleetNode[]> {
+        const ids = [...new Set(hostNodeIds.filter((id) => typeof id === 'string' && id.length > 0))];
+        if (ids.length === 0) return [];
+        return this.repository.find({ where: { hostNodeId: In(ids) }, order: { name: 'ASC' } });
+    }
+
+    /** Virtual computers (FL-16) — every child of any host (the reconcile sweep), bounded. */
+    async findVirtualChildren(limit = 2000): Promise<FleetNode[]> {
+        return this.repository.find({
+            where: { hostNodeId: Not(IsNull()) },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
     }
 
     /**

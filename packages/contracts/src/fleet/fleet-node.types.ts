@@ -41,6 +41,7 @@ import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access
 
 import type { FleetConsents, FleetNodeLinkView } from './fleet-link.types.js';
 import type { FleetSessionDaemonReport } from './fleet-sessions.types.js';
+import type { FleetNodeOrigin, FleetNodeVirtualView } from './fleet-virtual.types.js';
 
 /**
  * App shape of a fleet node.
@@ -392,6 +393,16 @@ export interface FleetNodeSelfDescription {
 	 * {@link normalizeFleetNodeSelfUpdate}.
 	 */
 	selfUpdate?: FleetNodeSelfUpdateReport;
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §1.1, §4.1) — the machine's IANA
+	 * time zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, e.g.
+	 * `Europe/Paris`). Command schedules fire on the machine's own wall clock,
+	 * so the platform shows both this zone and the viewer's. Heartbeat only,
+	 * in the node's NEWEST strip tier: a platform older than the field 400s
+	 * the beat once and the node retries without it. Validated with
+	 * `isFleetTimeZone`; an unusable value is dropped, never a 400.
+	 */
+	timeZone?: string;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -590,6 +601,12 @@ export interface FleetNodeView {
 	/** Computer health (FL-03, second phase) — the stored (owner-salted) network identity, or null. Owner only. */
 	lanId?: string | null;
 	/**
+	 * Schedules on computers (FL-13, CONTRACTS §4.1) — the IANA time zone the
+	 * machine last reported, or null when it never did (a daemon older than
+	 * the field). Command schedules on it fire in this zone.
+	 */
+	timeZone?: string | null;
+	/**
 	 * Computer health (FL-03, second phase) — the sibling an offline computer
 	 * can be woken through right now, or null when it cannot (not offline, no
 	 * hardware address, no online sibling advertising `wake` on its network).
@@ -628,6 +645,18 @@ export interface FleetNodeView {
 	hostNodeId?: string | null;
 	/** Virtual computers (FL-16) — what kind of child this is. Null / absent for an ordinary machine. */
 	virtualKind?: FleetNodeVirtualKind | null;
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §4.1) — how this Node came into
+	 * being: `enrolled` (a person ran `enroll`), `virtual` (created on a host,
+	 * FL-16) or `cloud` (FL-17). Absent on an older API build = `enrolled`.
+	 */
+	origin?: FleetNodeOrigin;
+	/**
+	 * Virtual computers (FL-16) — a child's system, size, create phase and
+	 * machine state (`FleetNodeVirtualView`), or null / absent for every
+	 * Node that is not `origin: 'virtual'`. Owner and shared views alike.
+	 */
+	virtual?: FleetNodeVirtualView | null;
 	/**
 	 * Sessions on computers (FL-04) — the session daemon as the node last
 	 * reported it (heartbeat `daemon`), or null when it never reported one.

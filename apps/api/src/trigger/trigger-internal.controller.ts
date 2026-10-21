@@ -75,6 +75,7 @@ import {
     FleetJobService,
     FleetNodeHealthService,
     FleetSessionSweepService,
+    FleetVirtualReconcileService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
@@ -735,6 +736,11 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetCheckoutReconcileService?: FleetCheckoutReconcileService,
+        // Virtual computers (FL-16) — backs the `fleet-virtual-reconcile` cron:
+        // the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetVirtualReconcileService?: FleetVirtualReconcileService,
     ) {}
 
     onModuleInit() {
@@ -878,6 +884,14 @@ export class TriggerInternalController implements OnModuleInit {
                       reconcile: () => this.fleetCheckoutReconcileService!.reconcile(),
                       purgeBin: () => this.fleetCheckoutReconcileService!.purgeBin(),
                   }
+                : undefined,
+            // Virtual computers (FL-16) — `fleet-virtual-reconcile` calls
+            // `reconcile()` here, and only that: `FleetVirtualReconcileService`
+            // is a one-member facade over `FleetVirtualService` (whose create /
+            // destroy / token mint must never reach the worker). `undefined` (a
+            // loud "Unknown remote target") when virtual computers are not mounted.
+            FleetVirtualReconcileService: this.fleetVirtualReconcileService
+                ? { reconcile: () => this.fleetVirtualReconcileService!.reconcile() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

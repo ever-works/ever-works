@@ -1,4 +1,5 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { fleetScheduleCadenceRaw } from '@ever-works/contracts';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
     Repository,
@@ -10,6 +11,7 @@ import {
     type FindOptionsOrder,
     type FindOptionsWhere,
 } from 'typeorm';
+import { config } from '../config';
 import { Task } from '../entities/task.entity';
 import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
@@ -17,6 +19,9 @@ import { WorkSchedule } from '../entities/work-schedule.entity';
 import { Work } from '../entities/work.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
+import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
+import { FleetNode } from '../entities/fleet-node.entity';
+import { isFleetSessionScheduleTask } from '../tasks-domain/task-session-schedule.port';
 import { WorkScheduleStatus } from '../entities/types';
 import {
     describeCron,
@@ -33,6 +38,7 @@ import {
     type ScheduleHealthInput,
 } from './schedule-health.service';
 import { buildScheduleControls } from './schedule-controls';
+import { NODE_SCHEDULE_PORT, type NodeScheduleSource } from './node-schedule.port';
 import type {
     ScheduleHealthReason,
     ScheduleHealthSummary,
@@ -90,6 +96,8 @@ const SOURCE_TYPES: ScheduleSourceType[] = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    // Schedules on computers (FL-13): Command schedules, read through `NODE_SCHEDULE_PORT`.
+    'node_schedule',
 ];
 
 const STATUSES: ScheduleStatus[] = ['active', 'paused', 'disabled', 'error', 'ended'];
@@ -160,9 +168,10 @@ function decodeCursor(raw: string | null | undefined): PageCursor | null {
 /**
  * Schedules ("Cadence") aggregation service (spec §4.3).
  *
- * Read-only. Projects the seven scheduled sources — recurring Tasks, Agent
+ * Read-only. Projects the eight scheduled sources — recurring Tasks, Agent
  * heartbeats, Work schedules, Mission ticks, item source-validation,
- * data-sync polling, and inbound triggers — into one unified
+ * data-sync polling, inbound triggers and (FL-13) Command schedules on the
+ * person's computers — into one unified
  * `ScheduleView[]`, scoped to the
  * caller exactly like every other Tier A read (userId + active
  * Organization; personal scope filters `organizationId IS NULL`).
@@ -197,6 +206,21 @@ export class SchedulesService {
         @Optional()
         @InjectRepository(TaskAssignee)
         private readonly taskAssigneeRepo?: Repository<TaskAssignee>,
+        // Schedules on computers (FL-13) — the `node_schedule` source. Appended
+        // LAST + @Optional(): unbound (no Fleet in this process) the source
+        // contributes no rows, and every positional construction compiles.
+        @Optional()
+        @Inject(NODE_SCHEDULE_PORT)
+        private readonly nodeScheduleSource?: NodeScheduleSource,
+        // Schedules on computers (FL-13 P2, FR-2) — the computer chip of a
+        // recurring Task whose Agent is pinned (R-29: affinity is the pin).
+        // Appended LAST + @Optional(): unbound, no chip.
+        @Optional()
+        @InjectRepository(FleetAgentNodeAffinity)
+        private readonly affinityRepo?: Repository<FleetAgentNodeAffinity>,
+        @Optional()
+        @InjectRepository(FleetNode)
+        private readonly fleetNodeRepo?: Repository<FleetNode>,
     ) {}
 
     async getSchedules(
@@ -206,6 +230,16 @@ export class SchedulesService {
         const now = new Date();
         const { rows } = await this.collect(scope, now, 'capped');
         let views = rows.map((row) => narrowScheduleView(row.view));
+        if (filters.nodeId) {
+            // FL-13 `?node=`: the flat row has no node field, so match on the full rows.
+            const wanted = filters.nodeId.toLowerCase();
+            const onNode = new Set(
+                rows
+                    .filter((row) => (row.view.nodeId ?? '').toLowerCase() === wanted)
+                    .map((row) => row.view.id),
+            );
+            views = views.filter((view) => onNode.has(view.id));
+        }
 
         if (filters.sourceType) {
             views = views.filter((view) => view.sourceType === filters.sourceType);
@@ -356,6 +390,9 @@ export class SchedulesService {
             if (filters.ownerType && view.ownerType !== filters.ownerType) return false;
             if (filters.enabledOnly && !view.enabled) return false;
             if (filters.agentId && view.agentId !== filters.agentId) return false;
+            if (filters.nodeId && (view.nodeId ?? '').toLowerCase() !== filters.nodeId.toLowerCase()) {
+                return false;
+            }
             if (filters.status && view.status !== filters.status) return false;
             if (filters.health === 'ok' && view.health?.ok === false) return false;
             if (filters.health === 'never-runs' && view.health?.ok !== false) return false;
@@ -385,16 +422,25 @@ export class SchedulesService {
         mode: SourceReadMode,
     ): Promise<Collected> {
         const degraded: ScheduleSourceType[] = [];
-        const [tasks, agents, workSchedules, missions, sourceValidation, dataSync, triggers] =
-            await Promise.all([
-                this.recurringTasks(scope, now, degraded, mode),
-                this.agentHeartbeats(scope, degraded, mode),
-                this.workSchedules(scope, degraded, mode),
-                this.missionTicks(scope, now, degraded, mode),
-                this.sourceValidation(scope, degraded, mode),
-                this.dataSync(scope, now, degraded, mode),
-                this.inboundTriggers(scope, degraded, mode),
-            ]);
+        const [
+            tasks,
+            agents,
+            workSchedules,
+            missions,
+            sourceValidation,
+            dataSync,
+            triggers,
+            nodeSchedules,
+        ] = await Promise.all([
+            this.recurringTasks(scope, now, degraded, mode),
+            this.agentHeartbeats(scope, degraded, mode),
+            this.workSchedules(scope, degraded, mode),
+            this.missionTicks(scope, now, degraded, mode),
+            this.sourceValidation(scope, degraded, mode),
+            this.dataSync(scope, now, degraded, mode),
+            this.inboundTriggers(scope, degraded, mode),
+            this.nodeSchedules(scope, degraded),
+        ]);
 
         const rows = [
             ...tasks,
@@ -404,6 +450,7 @@ export class SchedulesService {
             ...sourceValidation,
             ...dataSync,
             ...triggers,
+            ...nodeSchedules,
         ];
         for (const row of rows) {
             const health = evaluateScheduleHealth({ ...row.facts, now });
@@ -414,6 +461,7 @@ export class SchedulesService {
                 pausedAt: row.view.pausedAt ?? null,
                 health,
                 ownerStatus: row.ownerStatus,
+                nodeLinkUp: row.view.nodeSchedule?.linkUp,
             });
         }
         return { rows, degraded };
@@ -568,7 +616,7 @@ export class SchedulesService {
             ]);
 
             const nowMs = now.getTime();
-            return rows.map((task) => {
+            const projected = rows.map((task) => {
                 const exhausted =
                     task.recurrenceMaxOccurrences != null &&
                     task.recurrenceOccurredCount >= task.recurrenceMaxOccurrences;
@@ -640,6 +688,8 @@ export class SchedulesService {
                     },
                 };
             });
+            await this.attachComputerChips(scope, projected, rows);
+            return projected;
         } catch (error) {
             this.warn('recurring_task', error, degraded);
             return [];
@@ -1013,6 +1063,118 @@ export class SchedulesService {
             }));
         } catch (error) {
             this.warn('inbound_trigger', error, degraded);
+            return [];
+        }
+    }
+
+    /**
+     * Schedules on computers (FL-13 P2, FR-2, CONTRACTS R-29) — a recurring
+     * Task whose Agent is pinned to a computer keeps its `recurring_task`
+     * source and gains the computer chip (`nodeId`, `nodeName`,
+     * `nodeTimeZone`); an Agent-session schedule (the Schedules dialog's
+     * label) is also marked `agentSession`. Affinity is Organization-scoped, so
+     * a personal scope has none. Best-effort: a failed lookup adds no chip and
+     * never fails the source.
+     */
+    private async attachComputerChips(
+        scope: ScheduleScope,
+        projected: ProjectedRow[],
+        tasks: Task[],
+    ): Promise<void> {
+        const sessionTaskIds = new Set(tasks.filter((task) => isFleetSessionScheduleTask(task)).map((task) => task.id));
+        for (const row of projected) {
+            if (sessionTaskIds.has(row.view.ownerId)) row.view.agentSession = true;
+        }
+        if (!this.affinityRepo || !this.fleetNodeRepo || !scope.organizationId) return;
+        const agentIds = [
+            ...new Set(projected.map((row) => row.view.agentId).filter((id): id is string => Boolean(id))),
+        ];
+        if (agentIds.length === 0) return;
+        try {
+            const nodeByAgent = new Map<string, string>();
+            for (const ids of chunked(agentIds, MAX_PER_SOURCE)) {
+                const affinities = await this.affinityRepo.find({
+                    where: { userId: scope.userId, organizationId: scope.organizationId, agentId: In(ids) },
+                });
+                for (const affinity of affinities ?? []) nodeByAgent.set(affinity.agentId, affinity.nodeId);
+            }
+            const nodeIds = [...new Set(nodeByAgent.values())];
+            if (nodeIds.length === 0) return;
+            const nodes = new Map<string, Pick<FleetNode, 'id' | 'name' | 'timeZone'>>();
+            for (const ids of chunked(nodeIds, MAX_PER_SOURCE)) {
+                const found = await this.fleetNodeRepo.find({
+                    where: { id: In(ids) },
+                    select: { id: true, name: true, timeZone: true },
+                });
+                for (const node of found ?? []) nodes.set(node.id, node);
+            }
+            for (const row of projected) {
+                const nodeId = row.view.agentId ? nodeByAgent.get(row.view.agentId) : undefined;
+                const node = nodeId ? nodes.get(nodeId) : undefined;
+                if (!node) continue;
+                row.view.nodeId = node.id;
+                row.view.nodeName = node.name;
+                row.view.nodeTimeZone = node.timeZone ?? null;
+            }
+        } catch (error) {
+            this.logger.warn(`Schedules computer chips failed: ${String(error)}`);
+        }
+    }
+
+    /**
+     * Schedules on computers (FL-13, R-2) — the person's Command schedules,
+     * read through `NODE_SCHEDULE_PORT` (`FleetScheduleService`). A schedule
+     * is its author's and its computer's, not a workspace's: like the
+     * person's Commands it shows in every scope (lane-log decision 6).
+     * `ownerId` is the Command id, so `node_schedule:<id>` resolves like every
+     * other row; `ownerLink` is the computer's Schedules tab.
+     */
+    private async nodeSchedules(
+        scope: ScheduleScope,
+        degraded: ScheduleSourceType[],
+    ): Promise<ProjectedRow[]> {
+        // The flag hides the source, not only the routes (FL-13 definition of done).
+        if (!this.nodeScheduleSource || !config.fleet.isCommandsEnabled()) return [];
+        try {
+            const schedules = await this.nodeScheduleSource.listForUser({ userId: scope.userId });
+            return schedules.map((schedule) => {
+                const paused = !schedule.enabled;
+                const view: ScheduleView = {
+                    id: schedule.scheduleId,
+                    sourceType: 'node_schedule',
+                    ownerType: 'node',
+                    ownerId: schedule.id,
+                    ownerName: schedule.name,
+                    ownerLink: `/fleet/computers/${encodeURIComponent(schedule.nodeId)}?tab=schedules`,
+                    cadenceRaw: fleetScheduleCadenceRaw(schedule.cadence),
+                    cadenceHuman: schedule.cadenceHuman,
+                    nextRunAt: schedule.nextRunAt,
+                    lastRunAt: schedule.lastRunAt,
+                    lastRunStatus: schedule.lastRun?.status ?? null,
+                    status: paused ? 'paused' : 'active',
+                    enabled: schedule.enabled,
+                    agentId: null,
+                    agentName: null,
+                    pausedAt: schedule.pausedAt,
+                    nextRunReasonKey: paused ? 'paused' : schedule.nextRunAt ? null : 'notScheduledYet',
+                    nodeId: schedule.nodeId,
+                    nodeName: schedule.nodeName,
+                    nodeTimeZone: schedule.nodeTimeZone,
+                    nodeSchedule: schedule,
+                };
+                return {
+                    view,
+                    facts: {
+                        sourceType: 'node_schedule' as const,
+                        cadenceKind: 'node-cadence' as const,
+                        cadence: view.cadenceRaw,
+                        paused,
+                        nodeNeverRuns: schedule.neverRuns?.reason ?? null,
+                    },
+                };
+            });
+        } catch (error) {
+            this.warn('node_schedule', error, degraded);
             return [];
         }
     }

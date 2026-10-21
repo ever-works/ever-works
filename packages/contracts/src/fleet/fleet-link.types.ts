@@ -541,6 +541,8 @@ export const FLEET_LINK_MACHINE_VERB_ACTION_FAMILY: Readonly<Record<string, Flee
 	'wake.send': 'machines',
 	// CONTRACTS §3.3 (rev 4): `logs.sources` is a machine verb (a list needs no open channel).
 	logs: 'logs',
+	// FL-11: `files.roots` is a machine verb (the same precedent); the rest rides a `files` channel.
+	files: 'files',
 	services: 'services',
 	docker: 'docker',
 	compose: 'docker',

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import type { ScheduleOwnerType, ScheduleSourceType } from '@ever-works/agent/schedules';
 
 const SOURCE_TYPES = [
@@ -11,9 +11,10 @@ const SOURCE_TYPES = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    'node_schedule',
 ] as const;
 
-const OWNER_TYPES = ['task', 'agent', 'work', 'mission', 'trigger'] as const;
+const OWNER_TYPES = ['task', 'agent', 'work', 'mission', 'trigger', 'node'] as const;
 
 /**
  * Query filters for `GET /api/schedules`. Validated by the global
@@ -55,4 +56,11 @@ export class ScheduleQueryDto {
     })
     @IsBoolean()
     enabledOnly?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Schedules on computers (FL-13): only the schedules that run on this computer',
+    })
+    @IsOptional()
+    @IsUUID()
+    node?: string;
 }

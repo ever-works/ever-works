@@ -12,6 +12,8 @@ import {
 } from '@/app/actions/dashboard/agent-approvals';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { FleetActionDecisionCard } from './FleetActionDecisionCard';
+import { FLEET_TOOL_CALL_KIND, isFleetActionDecisionPayload } from './fleet-action-decision.shared';
 
 interface ApprovalsQueueProps {
     initialApprovals: AgentActionProposal[];
@@ -29,6 +31,8 @@ interface ApprovalsQueueProps {
 const INDIVIDUAL_OTHER_KINDS: ReadonlySet<string> = new Set([
     'agent-file-edit',
     'agent-escalation-resolution',
+    // FL-19 P2 — an Agent's held act on a computer: a person reads it, never "approve all".
+    FLEET_TOOL_CALL_KIND,
 ]);
 
 function requiresIndividualDecision(p: AgentActionProposal): boolean {
@@ -47,6 +51,8 @@ function ProposalDetail({
 }) {
     const payload = proposal.payload ?? {};
     if (proposal.actionType !== 'other') return null;
+    // FL-19 P2 / FL-09 — an Agent's act on a computer waiting for a person (spec §5.2).
+    if (isFleetActionDecisionPayload(payload)) return <FleetActionDecisionCard proposal={proposal} />;
     const body = typeof payload.body === 'string' ? payload.body : null;
     if (payload.kind === 'agent-file-edit' && body !== null) {
         return (

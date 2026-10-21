@@ -131,6 +131,42 @@ after it finished (`fleetSessionBoardColumn`); the list is the existing paged `G
 view is `sessions` (key `n`) and exists only while `FLEET_SESSIONS_ENABLED` is on; its address-bar state is `mode`
 (`board|list`), `g` (`day|week`), `agent`, `node`, `kind`, `state`.
 
+**Revision 17 (2026-10-21)** — FL-13 P1 (lane log `docs/internal/fleet/lanes/FL-13.md`): the `schedule` family's
+messages are written down in `packages/contracts/src/fleet/fleet-schedules.types.ts` — `schedule.sync { generation,
+definitions[] }` answered `{ generation, held, refused, next, timeZone }`, `schedule.runs { since }` answered `{ runs,
+more, timeZone }` (each run `{ runId, scheduleId, scheduledFor, startedAt, endedAt, status, failedReason, exitCode,
+head, tail, truncated, capped, bytes, kept, trigger }`), `schedule.runNow { id, runId }` answered `{ runId, startedAt }`;
+one short-lived channel per request. A schedule's ONE computer is `nodeIds[0]`. A schedule's run keeps the machine's run
+id as its `fleet_command_runs` id (reconciliation is an upsert by it). Schedule routes are FL-12's paths (`POST
+/commands` with `cadence` + `name` → 201, `PATCH` / `DELETE /commands/:id`, `/commands/:id/runs?limit≤30`); Run now /
+Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes `{ confirm }` (other sources ignore it).
+`ScheduleOwnerType` gains `node`; the heartbeat's newest strip tier is `timeZone`; the node advertises `schedules`
+under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
+`invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
+
+**Revision 18 (2026-10-21)** — FL-15 (lane log `docs/internal/fleet/lanes/FL-15.md`): `FleetSessionStartRequest`
+gains `taskId?` (an Agent session's Run carries the Task; refused `busy` while the same Agent works it, `invalid` off
+the Agent's pinned computer, `limit_exceeded` with no free agent slot) and `checkoutId` is now honoured (a `ready`,
+host-isolated checkout on the same computer; its path is the folder); `GET /sessions?taskId=`; `FleetSessionView.task?`
+(`FleetSessionTaskRef { id, slug, title }`); the hand-off's closed reason set gains `no-access`
+(`FLEET_HANDOFF_REASONS`, owner question Q1); `git.identity` / `git.setIdentity` reply `{ name, email, helper, readAt
+[, fields] }` with `{ set, value? }` fields, set takes `{ name, email }` only; audit `node.git.identity.set` details
+`{ fields, emailSource }` (never the email); event matchers gain `audience { me: review-requested | assigned |
+authored }`; `POST /api/inbound-triggers/presets/github-for-me`; `github.pr` events for `review_requested`,
+`review_request_removed`, `assigned`, `unassigned`, `ready_for_review`, `reopened`, `closed` with `requestedReviewer`,
+`assignee`, `assignees`, `author`, `headRef`, `headRepo`, `fork`, `maintainerCanModify`. Shapes in
+`packages/contracts/src/fleet/fleet-task-handoff.types.ts`.
+
+**Revision 19 (2026-10-21)** — FL-13 P2 (lane log decisions 18–24): §11.2 gains `/schedules`, `/schedules/:id`
+(GET, PATCH, DELETE), `/schedules/:id/runs`, `/schedules/:id/run|pause|resume` (the routes FL-19's catalogue names; the
+`fleet_schedules_*` rows are `live`), `/nodes/:id/schedules/pause-all` + `/resume-all { breakerAt }` (the breaker scope
+"this computer": one `pausedAt` instant per Pause all, 15-minute Undo, cap 500) and `/nodes/:id/schedules/agents`
+beside `/nodes/:id/schedules/agent-session`. An Agent-session schedule is a recurring Task (R-29) whose labels carry
+`fleet:session-schedule`, `fleet:provider:<claude-code|codex>` and optionally `fleet:checkout:<uuid>`; each fire is
+started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDULE_DISPATCHER` as an FL-04 Agent session
+on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
+'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

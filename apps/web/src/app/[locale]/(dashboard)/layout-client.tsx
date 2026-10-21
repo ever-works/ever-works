@@ -90,6 +90,8 @@ interface DashboardLayoutClientProps {
     fleetHubEnabled?: boolean;
     /** Logs on computers (FL-08): `FLEET_MACHINE_FACTS_ENABLED` with the hub — "Logs on <computer>" in the palette. */
     fleetMachineFactsEnabled?: boolean;
+    /** Virtual computers (FL-16): `FLEET_VIRTUAL_ENABLED` with the hub — "New virtual computer" in the palette. */
+    fleetVirtualEnabled?: boolean;
 }
 
 /**
@@ -130,6 +132,7 @@ export function DashboardLayoutClient({
     appLauncherEnabled = false,
     fleetHubEnabled = false,
     fleetMachineFactsEnabled = false,
+    fleetVirtualEnabled = false,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -488,7 +491,11 @@ export function DashboardLayoutClient({
     return (
         <BackgroundActivityProvider>
             <ChatProvider>
-                <FleetHubFlagProvider enabled={fleetHubEnabled} machineFacts={fleetMachineFactsEnabled}>
+                <FleetHubFlagProvider
+                    enabled={fleetHubEnabled}
+                    machineFacts={fleetMachineFactsEnabled}
+                    virtual={fleetVirtualEnabled}
+                >
                     <CommandPaletteProvider>
                         {/*
                       APW-11 T14/T15 — one App Launcher per dashboard shell. The

@@ -151,6 +151,16 @@ export function buildFleetSessionTools(args: {
                 },
                 title: { type: 'string', description: 'Optional title (1–200 characters).' },
                 restartOf: { type: 'string', description: 'Optional: an ended session of yours to start again.' },
+                taskId: {
+                    type: 'string',
+                    description:
+                        'FL-15: the Task this session works on. Your Run carries it (its history, the board and its chat follow). Refused busy while you already work it, and on a computer other than the one you are pinned to. See fleet_tasks_handoff_options.',
+                },
+                checkoutId: {
+                    type: 'string',
+                    description:
+                        'FL-15: start in this ready checkout on the computer (its folder replaces cwd). Make a new worktree or clone with fleet_checkouts_create first.',
+                },
             },
             required: ['nodeId', 'provider', 'cwd', 'firstMessage'],
         },
@@ -162,6 +172,8 @@ export function buildFleetSessionTools(args: {
                 firstMessage?: string;
                 title?: string;
                 restartOf?: string;
+                taskId?: string;
+                checkoutId?: string;
             };
             if (!isFleetAgentSessionProvider(a.provider)) {
                 return { error: { code: 'invalid', hint: 'provider is claude-code or codex' } } as unknown;
@@ -179,8 +191,11 @@ export function buildFleetSessionTools(args: {
                     firstMessage: String(a.firstMessage ?? '').slice(0, FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH),
                     agentId: args.agentId,
                     ...(a.title ? { title: String(a.title) } : {}),
+                    // FL-15 P1/P3: the one start tool takes the Task and the checkout (spec FR-21).
+                    ...(a.taskId ? { taskId: String(a.taskId) } : {}),
+                    ...(a.checkoutId ? { checkoutId: String(a.checkoutId) } : {}),
                 });
-                return { session: compact(view) };
+                return { session: compact(view), ...(view.task ? { task: view.task } : {}) };
             } catch (error) {
                 return refusal(error);
             }

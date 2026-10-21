@@ -1,34 +1,53 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     Query,
     Res,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { FleetCommandService, type FleetCommandActor } from '@ever-works/agent/fleet';
+import {
+    fleetCommandError,
+    FleetCommandService,
+    FleetScheduleService,
+    type FleetCommandActor,
+} from '@ever-works/agent/fleet';
 import {
     FLEET_COMMAND_RECENT,
     FLEET_COMMAND_RUNS_PER_MINUTE,
+    FLEET_SCHEDULE_HISTORY,
+    FLEET_SCHEDULE_WRITES_PER_MINUTE,
     type FleetCommandLastRunResponse,
     type FleetCommandListResponse,
     type FleetCommandRunView,
     type FleetCommandView,
+    type FleetScheduleView,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { ListFleetCommandsQueryDto, RunFleetCommandDto } from './dto/fleet-commands.dto';
+import {
+    DeleteFleetScheduleDto,
+    ListFleetCommandRunsQueryDto,
+    ListFleetCommandsQueryDto,
+    RunFleetCommandDto,
+    UpdateFleetScheduleDto,
+} from './dto/fleet-commands.dto';
 import { FleetCommandsEnabledGuard } from './fleet-commands-enabled.guard';
 import { FleetCommandLinkAdapter } from './fleet-command-link.adapter';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetCommandActor {
     return { userId: auth.userId };
@@ -55,14 +74,28 @@ function actorOf(auth: AuthenticatedUser): FleetCommandActor {
  * output download (`GET /commands/:id/runs/:runId/output`, streamed from the
  * computer over a `command` channel — lane-log decision 14) and a computer's
  * last run (`GET /nodes/:id/commands/last`).
+ *
+ * Schedules on computers (FL-13, plan §5): a Command WITH a cadence is a
+ * schedule, served on the same paths by `FleetScheduleService` — `POST
+ * /commands` with `cadence` + `name` (201), `PATCH /commands/:id` (edit or
+ * move), `DELETE /commands/:id` (soft delete, `confirm`), and `GET
+ * /commands/:id` · `/commands/:id/runs` answer a schedule's view and its
+ * last 30 runs. Run now, Pause and Resume ride the Schedules routes
+ * (`/api/schedules/node_schedule:<id>/…`), one control path for every source.
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetCommandsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetCommandsController {
     constructor(
         private readonly commands: FleetCommandService,
         private readonly link: FleetCommandLinkAdapter,
+        // Schedules on computers (FL-13), from the global `FleetSchedulesApiModule`.
+        // Appended LAST + @Optional(): unbound, a cadence is refused as before.
+        @Optional() private readonly schedules?: FleetScheduleService,
     ) {}
 
     @Post('commands')
@@ -75,7 +108,21 @@ export class FleetCommandsController {
     async run(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: RunFleetCommandDto,
-    ): Promise<FleetCommandView> {
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<FleetCommandView | FleetScheduleView> {
+        if (body.cadence !== undefined && body.cadence !== null && this.schedules) {
+            // A Command with a cadence is a Schedule on ONE computer (FL-13).
+            const created = await this.schedules.create(actorOf(auth), {
+                name: body.name ?? '',
+                ...(body.nodeId !== undefined ? { nodeId: body.nodeId } : { nodeIds: body.nodeIds }),
+                command: body.command,
+                ...(body.cwd !== undefined ? { cwd: body.cwd } : {}),
+                cadence: body.cadence,
+                ...(body.confirm !== undefined ? { confirm: body.confirm } : {}),
+            });
+            res.status(HttpStatus.CREATED);
+            return created;
+        }
         return this.commands.run(actorOf(auth), {
             command: body.command,
             nodeIds: body.nodeIds,
@@ -110,8 +157,48 @@ export class FleetCommandsController {
     async get(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<FleetCommandView> {
+    ): Promise<FleetCommandView | FleetScheduleView> {
+        if (this.schedules && (await this.schedules.isOwnSchedule(id, actorOf(auth)))) {
+            return this.schedules.get(id, actorOf(auth));
+        }
         return this.commands.get(id, actorOf(auth));
+    }
+
+    @Patch('commands/:id')
+    @ApiOperation({
+        summary:
+            "Edit one of my Command schedules (FL-13): name, command, folder, cadence, or `nodeId` to move it to another computer. A move or a change of what runs needs `confirm: true` (409 `confirmation_required` otherwise). The computer's copy is re-synced.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
+    async update(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: UpdateFleetScheduleDto,
+    ): Promise<FleetScheduleView> {
+        return this.requireSchedules().update(id, actorOf(auth), {
+            ...(body.name !== undefined ? { name: body.name } : {}),
+            ...(body.nodeId !== undefined ? { nodeId: body.nodeId } : {}),
+            ...(body.command !== undefined ? { command: body.command } : {}),
+            ...(body.cwd !== undefined ? { cwd: body.cwd } : {}),
+            ...(body.cadence !== undefined ? { cadence: body.cadence } : {}),
+            ...(body.confirm !== undefined ? { confirm: body.confirm } : {}),
+        });
+    }
+
+    @Delete('commands/:id')
+    @ApiOperation({
+        summary:
+            'Delete one of my Command schedules (FL-13). Needs `confirm: true` (409 `confirmation_required` with its name and run count otherwise). It stops on the computer; its run history stays readable for 30 days.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: DeleteFleetScheduleDto,
+    ): Promise<FleetScheduleView> {
+        return this.requireSchedules().remove(id, actorOf(auth), body?.confirm === true);
     }
 
     @Get('commands/:id/runs')
@@ -121,7 +208,12 @@ export class FleetCommandsController {
     async runs(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: ListFleetCommandRunsQueryDto,
     ): Promise<FleetCommandRunView[]> {
+        if (this.schedules && (await this.schedules.isOwnSchedule(id, actorOf(auth)))) {
+            // A schedule's history (FL-13, FR-20): newest first, at most 30.
+            return this.schedules.runs(id, actorOf(auth), query.limit ?? FLEET_SCHEDULE_HISTORY);
+        }
         return this.commands.runs(id, actorOf(auth));
     }
 
@@ -189,6 +281,11 @@ export class FleetCommandsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<FleetCommandLastRunResponse> {
         return { last: await this.commands.lastRunForNode(id, actorOf(auth)) };
+    }
+
+    private requireSchedules(): FleetScheduleService {
+        if (!this.schedules) throw fleetCommandError('not_found', 'no such schedule');
+        return this.schedules;
     }
 
     @Post('commands/:id/cancel')

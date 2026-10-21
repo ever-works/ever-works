@@ -14,6 +14,7 @@ import {
     CalendarX,
     ArrowUpRight,
     Webhook,
+    Monitor,
     type LucideProps,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -32,7 +33,8 @@ export type SourceLabelKey =
     | 'missionTick'
     | 'sourceValidation'
     | 'dataSync'
-    | 'inboundTrigger';
+    | 'inboundTrigger'
+    | 'nodeSchedule';
 
 export const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: SourceLabelKey }> =
     {
@@ -43,6 +45,8 @@ export const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey:
         source_validation: { icon: ShieldCheck, labelKey: 'sourceValidation' },
         data_sync: { icon: RefreshCw, labelKey: 'dataSync' },
         inbound_trigger: { icon: Webhook, labelKey: 'inboundTrigger' },
+        // Schedules on computers (FL-13).
+        node_schedule: { icon: Monitor, labelKey: 'nodeSchedule' },
     };
 
 export const SOURCE_ORDER: ScheduleSourceType[] = [
@@ -53,6 +57,7 @@ export const SOURCE_ORDER: ScheduleSourceType[] = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    'node_schedule',
 ];
 
 export const STATUS_STYLES: Record<ScheduleStatus, string> = {

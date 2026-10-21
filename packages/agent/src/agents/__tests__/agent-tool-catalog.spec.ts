@@ -111,7 +111,8 @@ function makeFullService(): AgentToolService {
                 checkouts: { service: stub() },
                 logs: { reader: stub() },
                 status: stub(),
-                operations: stub(),
+                operations: { requestCancel: async () => stub() },
+                wake: stub(),
             },
             fleetSessions: { service: stub() },
             fleetCommands: { service: stub() },
@@ -184,6 +185,8 @@ describe('buildAgentToolCatalog', () => {
         expect(names).toContain('fleet_logs_read');
         expect(names).toContain('fleet_nodes_health');
         expect(names).toContain('fleet_ports_list');
+        expect(names).toContain('fleet_nodes_wake');
+        expect(names).toContain('fleet_operations_cancel');
     });
 
     it('computes the permission gate the assembly actually applies', () => {

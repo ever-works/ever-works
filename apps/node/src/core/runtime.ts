@@ -29,9 +29,16 @@ import {
 	MANAGEMENT_LANE_IDLE_POLL_MS,
 	MANAGEMENT_LANE_LEASE_TTL_SEC,
 	planManagementLane,
+	type ManagementLaneExecutor,
 	type ManagementLanePlan,
 	type ManagementLaneTables
 } from './management-lane';
+import { abortableSleep, createVirtualExecutors } from './executors/virtual';
+import { createVirtualModule } from './link/modules/virtual';
+import { defaultStdinRunner } from './link/modules/virtual/host';
+import { defaultVirtualStateFs, VirtualState } from './link/modules/virtual/state';
+import type { SecretStore } from './secret-store';
+import { kvmUsable, WindowsPasswordStore } from './link/modules/virtual/windows';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -61,13 +68,20 @@ import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { resolveAllowedRoots } from './link/allowed-roots';
-import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import {
+	composeNodeLinkModules,
+	createHealthLinkModule,
+	createMachineFactModules,
+	type WakeSender
+} from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createCommandModule } from './link/modules/command';
+import { createScheduleModule, type ScheduleModule } from './link/modules/schedule';
 import { CommandOutputStore } from './link/modules/command/command-output-store';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
 import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
@@ -171,6 +185,12 @@ export interface NodeIo {
 	 * (`createNodeLogIo`) for a `--manage` process.
 	 */
 	logs?: LogIo;
+	/**
+	 * Files on computers (FL-11) — what the `files` link module reads and
+	 * writes the machine through. Optional: absent, the runtime binds the real
+	 * one (`createNodeFilesIo`) for a `--manage` process.
+	 */
+	files?: FilesIo;
 }
 
 /**
@@ -651,6 +671,20 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	managementLane?: ManagementLaneTables;
 	/**
+	 * Virtual computers (FL-16) — the host's virtual data folder
+	 * (`<config dir>/virtual`). With it, `--manage` and a Linux or macOS host,
+	 * the `virtual` link module (`vm.list`, `vm.status`, the `virtual-host` tag)
+	 * and the management lane's `vm-create` / `vm-control` executors are
+	 * composed. Absent (the desktop shell, tests, embedders): neither is.
+	 */
+	virtualDataDir?: string;
+	/**
+	 * Virtual computers, phase 2 — where Windows VM passwords are kept: the
+	 * node's OS keychain. Null / absent: the documented owner-only file
+	 * fallback under the virtual data folder (announced once).
+	 */
+	virtualSecrets?: SecretStore | null;
+	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
 	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
 	 * embedder without self-update leaves it unset and the field is absent.
@@ -688,6 +722,13 @@ export interface CreateNodeRuntimeOptions {
 	 * output is kept.
 	 */
 	commandOutputDir?: string;
+	/**
+	 * Schedules on computers (FL-13) — where the machine keeps its Command
+	 * schedules, their clock state, their last 30 runs and outputs
+	 * (`<configDir>/schedules`). With `--manage`, the schedule loop starts
+	 * whether or not the link is up. Absent: no schedules on this process.
+	 */
+	scheduleDir?: string;
 	/**
 	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
 	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
@@ -1051,6 +1092,35 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			}
 		});
 	}
+	// Files on computers (FL-11): the `files` link module — the `files`
+	// family, the `files.roots` verb and the `files` tag — for a `--manage`
+	// process only. The allowed roots (R-18, R-39, R-41) are re-resolved on
+	// every request: ready checkouts, the workspace root and the
+	// `--files-root` folders — never the home directory, never a log folder.
+	let filesLinkModule: FilesLinkModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		const filesIo = io.files ?? createNodeFilesIo({ platform, homedir });
+		filesLinkModule = createFilesLinkModule({
+			io: filesIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				return resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'files',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? []
+					},
+					filesIo
+				);
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -1059,8 +1129,68 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// when the shell runs one — the broker matches the `desktop` channels the
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
+	// Schedules on computers (FL-13): the `schedule` family and the machine's own
+	// timer loop, for a process started with --manage. The loop starts now —
+	// independent of the link (FR-12) — and follows the kill switch once a
+	// link is bound below.
+	const scheduleModule: ScheduleModule | null =
+		consents.manage && options.scheduleDir
+			? createScheduleModule({
+					consents,
+					dir: options.scheduleDir,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					env: process.env,
+					...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+					timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+					logger: io.logger
+				})
+			: null;
+	if (scheduleModule) {
+		void scheduleModule
+			.start()
+			.catch((error: unknown) =>
+				io.logger.warn(`Schedules could not start: ${error instanceof Error ? error.message : String(error)}`)
+			);
+	}
+	// Virtual computers (FL-16): a host started with --manage on Linux or macOS,
+	// with a virtual data folder, reads its children (`vm.*`) and builds them
+	// (the management lane's executors, below). Never on Windows (spec U4).
+	const virtualState =
+		consents.manage &&
+		options.virtualDataDir?.startsWith('/') &&
+		(io.environment.platform === 'linux' || io.environment.platform === 'darwin')
+			? new VirtualState(options.virtualDataDir)
+			: null;
+	// Windows VMs (P2): the KVM probe (re-read every beat — a group change needs no
+	// restart) and the generated passwords (this host's keychain, or the owner-only
+	// file fallback the store announces).
+	const virtualKvm = (): boolean => kvmUsable({ platform: io.environment.platform, arch: io.environment.arch });
+	const virtualPasswords = virtualState
+		? new WindowsPasswordStore(
+				virtualState.root,
+				defaultVirtualStateFs,
+				options.virtualSecrets ?? null,
+				(message) => io.logger.warn(message)
+			)
+		: null;
+	const virtualModule = virtualState
+		? createVirtualModule({
+				state: virtualState,
+				kvm: virtualKvm,
+				env: options.env ?? process.env,
+				passwords: virtualPasswords
+			})
+		: null;
 	const linkModules = composeNodeLinkModules({
-		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
+		extra: [
+			healthLinkModule,
+			...(logsLinkModule ? [logsLinkModule] : []),
+			...(filesLinkModule ? [filesLinkModule] : []),
+			...(virtualModule ? [virtualModule] : []),
+			...(options.linkModules ?? [])
+		],
 		...(sessions ? { session: sessions.module } : {}),
 		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
 		...(consents.manage
@@ -1073,10 +1203,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						env: process.env,
 						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						// FL-13: a schedule's run keeps its full output in the schedule's ring.
+						...(scheduleModule ? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) } : {}),
 						logger: io.logger
 					})
 				}
 			: {}),
+		...(scheduleModule ? { schedule: scheduleModule } : {}),
 		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
@@ -1122,9 +1255,35 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	};
 	telemetry.consents = () => consents;
 	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
+	// Schedules on computers (FL-13): the zone this machine's schedules fire in.
+	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
-	const managementPlan = planManagementLane(consents, options.managementLane);
+	const virtualExecutors: ManagementLaneExecutor[] = virtualState
+		? createVirtualExecutors({
+				state: virtualState,
+				runner: createMachineCommandRunner(),
+				stdin: defaultStdinRunner,
+				// Built lazily: the shared job client exists once the lanes do.
+				client: () => jobClientFor(),
+				nodeVersion: io.version,
+				nodeMajor: Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10),
+				apiUrl: apiBase.url,
+				env: options.env ?? process.env,
+				sleep: abortableSleep,
+				now: io.now ?? Date.now,
+				logger: io.logger,
+				nodeName: config.name?.trim() || 'this computer',
+				platform: io.environment.platform,
+				arch: io.environment.arch,
+				kvm: virtualKvm,
+				passwords: virtualPasswords
+			})
+		: [];
+	const managementPlan = planManagementLane(
+		consents,
+		options.managementLane ?? (virtualExecutors.length > 0 ? { executors: virtualExecutors } : undefined)
+	);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
 	let lastDescribedCapabilities: readonly string[] = [];
@@ -1246,6 +1405,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions?.module.bindLink(link);
 		// Session status (FL-05): `session.status` / `session.attention` ride this link too.
 		sessions?.status?.bindLink(link);
+		// Schedules (FL-13): the kill switch and drain reach the machine's own loop.
+		scheduleModule?.bindLink(link);
 		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {

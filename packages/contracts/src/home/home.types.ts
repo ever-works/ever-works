@@ -155,7 +155,9 @@ export type HomeScheduleKind =
 	| 'mission_tick'
 	| 'source_validation'
 	| 'data_sync'
-	| 'inbound_trigger';
+	| 'inbound_trigger'
+	/** Schedules on computers (FL-13): a Command scheduled on one of the person's computers. */
+	| 'node_schedule';
 
 export const HOME_SCHEDULE_KINDS: readonly HomeScheduleKind[] = [
 	'recurring_task',
@@ -164,7 +166,8 @@ export const HOME_SCHEDULE_KINDS: readonly HomeScheduleKind[] = [
 	'mission_tick',
 	'source_validation',
 	'data_sync',
-	'inbound_trigger'
+	'inbound_trigger',
+	'node_schedule'
 ];
 
 /** Disabled and ended schedules never reach Home; paused and errored ones do. */

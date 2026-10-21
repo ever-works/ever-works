@@ -1,4 +1,5 @@
 import 'server-only';
+import type { FleetScheduleView } from '@ever-works/contracts';
 import { serverFetch } from './server-api';
 
 /** Which scheduling mechanism a row projects from (mirrors the API contract). */
@@ -9,9 +10,11 @@ export type ScheduleSourceType =
     | 'mission_tick'
     | 'source_validation'
     | 'data_sync'
-    | 'inbound_trigger';
+    | 'inbound_trigger'
+    /** Schedules on computers (FL-13): a Command scheduled on one of the person's computers. */
+    | 'node_schedule';
 
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger';
+export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger' | 'node';
 
 export type ScheduleStatus = 'active' | 'paused' | 'disabled' | 'error' | 'ended';
 
@@ -42,6 +45,13 @@ export interface ScheduleEntry {
     controls?: ScheduleControls;
     pausedAt?: string | null;
     nextRunReasonKey?: ScheduleNextRunReasonKey | null;
+    // Schedules on computers (FL-13) — workspace reads only.
+    nodeId?: string | null;
+    nodeName?: string | null;
+    nodeTimeZone?: string | null;
+    nodeSchedule?: FleetScheduleView;
+    /** FL-13 P2: a recurring Task the Schedules dialog made — each fire is an Agent session on `nodeId`. */
+    agentSession?: boolean;
 }
 
 export type ScheduleNextRunReasonKey =
@@ -59,7 +69,10 @@ export type ScheduleHealthReason =
     | 'past-one-shot'
     | 'unparseable'
     | 'no-agent'
-    | 'owner-archived';
+    | 'owner-archived'
+    | 'consent-missing'
+    | 'node-removed'
+    | 'node-unsupported';
 
 export type ScheduleRepairClass = 'automatic' | 'choice' | 'none';
 
@@ -71,7 +84,10 @@ export type ScheduleHealthReasonKey =
     | 'pastOneShot'
     | 'unparseable'
     | 'noAgent'
-    | 'ownerArchived';
+    | 'ownerArchived'
+    | 'consentMissing'
+    | 'nodeRemoved'
+    | 'nodeUnsupported';
 
 export interface ScheduleHealth {
     ok: boolean;
@@ -93,7 +109,9 @@ export type ScheduleControlReasonKey =
     | 'ownerInactive'
     | 'noAgent'
     | 'noAuthoredForm'
-    | 'notAvailableYet';
+    | 'notAvailableYet'
+    | 'nodeOffline'
+    | 'consentMissing';
 
 export interface ScheduleControls {
     runNow: boolean;
@@ -216,9 +234,13 @@ export const schedulesAPI = {
     getHealth: async (): Promise<ScheduleHealthSummary> =>
         serverFetch<ScheduleHealthSummary>('/schedules/health'),
 
-    runNow: async (id: string): Promise<ScheduleRunNowResult> =>
+    runNow: async (id: string, options: { confirm?: boolean } = {}): Promise<ScheduleRunNowResult> =>
         serverFetch<ScheduleRunNowResult>(`/schedules/${encodeURIComponent(id)}/run-now`, {
             method: 'POST',
+            // FL-13: a Command schedule on a computer runs only with `confirm` (FR-25).
+            ...(options.confirm
+                ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) }
+                : {}),
         }),
 
     pause: async (id: string, acknowledgeMissionPause = false): Promise<ScheduleEntry> =>

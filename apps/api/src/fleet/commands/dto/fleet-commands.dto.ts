@@ -20,6 +20,8 @@ import {
     FLEET_COMMAND_MAX_NODES,
     FLEET_COMMAND_MAX_TIMEOUT_SEC,
     FLEET_COMMAND_RECENT,
+    FLEET_SCHEDULE_HISTORY,
+    FLEET_SCHEDULE_NAME_MAX_LENGTH,
 } from '@ever-works/contracts';
 
 /**
@@ -80,11 +82,90 @@ export class RunFleetCommandDto {
 
     @ApiProperty({
         required: false,
-        description: 'A cadence makes a Command a Schedule; refused on this route until Schedules arrive.',
+        description:
+            "A cadence makes the Command a Schedule on ONE computer (FL-13): `{ kind: 'interval'|'cron'|'daily'|'weekdays', expr?, at? }`, on the computer's own clock. Needs `name`.",
     })
     @IsOptional()
     @IsObject()
     cadence?: Record<string, unknown>;
+
+    @ApiProperty({
+        required: false,
+        description: `Schedules (FL-13): the schedule's name (1–${FLEET_SCHEDULE_NAME_MAX_LENGTH} characters). Required with \`cadence\`.`,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_SCHEDULE_NAME_MAX_LENGTH * 4)
+    name?: string;
+
+    @ApiProperty({
+        required: false,
+        description: 'Schedules (FL-13): the ONE computer, instead of a one-element `nodeIds`.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    nodeId?: string;
+}
+
+/**
+ * Body for `PATCH /api/fleet/commands/:id` (FL-13) — edit a Command schedule:
+ * every field but the kind. `nodeId` moves it to another computer; a move or
+ * a change of what runs (command, folder) needs `confirm: true`.
+ */
+export class UpdateFleetScheduleDto {
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_SCHEDULE_NAME_MAX_LENGTH * 4)
+    name?: string;
+
+    @ApiProperty({ required: false, description: 'Move it to this computer.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    nodeId?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_COMMAND_MAX_LENGTH * 8)
+    command?: string;
+
+    @ApiProperty({ required: false, nullable: true, description: "`null` or '' = the machine owner's home." })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_COMMAND_CWD_MAX_LENGTH * 4)
+    cwd?: string | null;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsObject()
+    cadence?: Record<string, unknown>;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
+/** Body for `DELETE /api/fleet/commands/:id` (FL-13): CONTRACTS §2.2 class `confirm`. */
+export class DeleteFleetScheduleDto {
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
+/** Query for `GET /api/fleet/commands/:id/runs` (a schedule's history: at most 30). */
+export class ListFleetCommandRunsQueryDto {
+    @ApiProperty({ required: false, minimum: 1, maximum: FLEET_SCHEDULE_HISTORY, default: FLEET_SCHEDULE_HISTORY })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(FLEET_SCHEDULE_HISTORY)
+    limit?: number;
 }
 
 /** Query for `GET /api/fleet/commands`. */

@@ -7,7 +7,9 @@ import './fl-05-sessions.server';
 import './fl-14-checkouts';
 import './fl-10-ports.server';
 import './fl-12-commands.server';
+import './fl-13-schedules';
 import './fl-08-logs.server';
+import './fl-11-files.server';
 
 /**
  * Fleet hub (FL-01, README D9) — where Fleet modules register what renders ON
@@ -22,6 +24,7 @@ import './fl-08-logs.server';
  * (`./fl-05-sessions.server`); FL-14's hub and
  * computer Checkouts tabs (`./fl-14-checkouts`); FL-09's Services and
  * Processes tabs (`./fl-09-machine`); FL-10's Ports tab (`./fl-10-ports.server`); FL-12's
- * hub Commands tab (`./fl-12-commands.server`); FL-08's Logs tab (`./fl-08-logs.server`).
+ * hub Commands tab (`./fl-12-commands.server`); FL-13's Schedules tab (`./fl-13-schedules`); FL-08's Logs tab
+ * (`./fl-08-logs.server`); FL-11's Files tab (`./fl-11-files.server`).
  */
 export {};
