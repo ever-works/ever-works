@@ -191,6 +191,21 @@ export type FleetAuditAction =
 	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
 	| 'node.command.cancel'
 	/**
+	 * Schedules on computers (FL-13, CONTRACTS §7) — one row per change of a
+	 * Schedule, with `family: 'schedules'`, `target` (the Command id of a
+	 * Command schedule, the Task id of an Agent-session schedule),
+	 * `requestedBy`, `confirmationClass` and `outcome`; never the command
+	 * line and never output. A run the machine made on its own clock is
+	 * written as `node.command.run` with `requestedBy: schedule:<commandId>`
+	 * when it is reconciled (spec FR-27).
+	 */
+	| 'node.schedule.create'
+	| 'node.schedule.update'
+	| 'node.schedule.delete'
+	| 'node.schedule.run'
+	| 'node.schedule.pause'
+	| 'node.schedule.resume'
+	/**
 	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
 	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
 	 * `family`, `target` (service name, container or image id, project, pid),
@@ -243,7 +258,13 @@ export type FleetAuditAction =
 	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
 	| 'node.port.preview.open'
 	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
-	| 'node.port.preview.close';
+	| 'node.port.preview.close'
+	/**
+	 * Tasks on computers (FL-15 P2, CONTRACTS §7) — **Use my Ever Works
+	 * identity** set a computer's global git `user.name` / `user.email`.
+	 * `details.fields` names what was set; never the email value (spec FR-15).
+	 */
+	| 'node.git.identity.set';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -303,6 +324,12 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.clip.paste',
 	'node.command.run',
 	'node.command.cancel',
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
 	'node.service.start',
 	'node.service.stop',
 	'node.service.restart',
@@ -329,7 +356,8 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.checkout.restore',
 	'node.port.open',
 	'node.port.preview.open',
-	'node.port.preview.close'
+	'node.port.preview.close',
+	'node.git.identity.set'
 ];
 
 /**

@@ -71,7 +71,11 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Computer health, second phase (FL-03): the primary
+	// NEWEST first. Schedules on computers (FL-13): the machine's IANA time
+	// zone. Its own tier, newest of all (it reached `develop` after FL-03's
+	// wake pair): a platform that predates schedules costs exactly this field.
+	['timeZone'],
+	// Computer health, second phase (FL-03): the primary
 	// interface's hardware address and the opaque network identity, sent only
 	// under `--manage` for Wake-on-LAN. Their own tier, newest of all (it
 	// reached `develop` after FL-02's self-update report): a platform that
@@ -478,6 +482,12 @@ function describeStrippedTiers(tiers: number): string {
 	}
 	if (dropped.has('selfUpdate')) {
 		return 'Platform rejected the self-update report; it predates it. Still reporting everything else; the report stays off until this node restarts.';
+	}
+	if (dropped.has('macAddress')) {
+		return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
+	}
+	if (dropped.has('timeZone')) {
+		return "Platform rejected the time zone; it predates schedules on computers. Still reporting everything else; schedules show this computer's times in UTC until this node restarts.";
 	}
 	return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
 }

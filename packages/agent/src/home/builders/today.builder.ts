@@ -38,6 +38,8 @@ export function homeScheduleKind(sourceType: ScheduleSourceType): HomeScheduleKi
             return 'data_sync';
         case 'inbound_trigger':
             return 'inbound_trigger';
+        case 'node_schedule':
+            return 'node_schedule';
     }
 }
 

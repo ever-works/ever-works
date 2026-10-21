@@ -15,6 +15,7 @@ import {
 import type { AgentActionRiskFlag } from '@/lib/api/agent-approvals';
 import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
+import { InboxSessionSource } from './InboxSessionSource';
 import { InboxReplyComposer } from './InboxReplyComposer';
 
 /** What happened to the work behind an answer given in this session. */
@@ -123,6 +124,7 @@ export function InboxDecisionDetail({
                     <ShowDateTime value={decision.createdAt} />
                 </p>
                 <InboxFleetSource item={decision} />
+                <InboxSessionSource item={decision} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

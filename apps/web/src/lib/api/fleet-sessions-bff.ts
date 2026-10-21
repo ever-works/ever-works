@@ -1,4 +1,5 @@
 import {
+    FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
     FLEET_SESSION_KINDS,
@@ -71,6 +72,8 @@ export function sanitizeStartBody(raw: Record<string, unknown>): Partial<FleetSe
     if (isUuid(raw.checkoutId)) body.checkoutId = raw.checkoutId;
     else if (isUuid(raw.newWorktreeOf)) body.newWorktreeOf = raw.newWorktreeOf;
     if (isUuid(raw.restartOf)) body.restartOf = raw.restartOf;
+    // FL-15 P1: the Task an Agent session works on.
+    if (isUuid(raw.taskId)) body.taskId = raw.taskId;
     return { ...body, ...size(raw) };
 }
 
@@ -78,6 +81,48 @@ export function sanitizeStartBody(raw: Record<string, unknown>): Partial<FleetSe
 export function sanitizeRenameBody(raw: Record<string, unknown>): { title?: string } {
     const title = text(raw.title, FLEET_SESSION_TITLE_MAX_LENGTH);
     return title === undefined ? {} : { title };
+}
+
+/**
+ * FL-05: the PATCH body — a rename (`title`) or an acknowledgement (`acknowledge`,
+ * an attention key the reader saw); a title wins when both are sent.
+ */
+export function sanitizePatchBody(raw: Record<string, unknown>): { title?: string } | { acknowledge: string } {
+    const renamed = sanitizeRenameBody(raw);
+    if (renamed.title !== undefined) return renamed;
+    const key = text(raw.acknowledge, 200);
+    return key === undefined ? {} : { acknowledge: key };
+}
+
+const ANSWER_SOURCES = ['card', 'detail', 'inbox', 'decisions'] as const;
+
+/**
+ * FL-05: the answer body — the attention key, then EXACTLY one of an option
+ * id or a free text, and where it was answered from. Null when it is not one
+ * (the route answers 400). The text is passed through as typed: it goes into
+ * the session and is never stored.
+ */
+export function sanitizeAnswerBody(
+    raw: Record<string, unknown>,
+): { key: string; optionId?: string; text?: string; source?: (typeof ANSWER_SOURCES)[number] } | null {
+    const key = text(raw.key, 200);
+    if (key === undefined) return null;
+    const optionId =
+        typeof raw.optionId === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(raw.optionId) ? raw.optionId : undefined;
+    const answerText =
+        typeof raw.text === 'string' && raw.text.trim().length > 0 && raw.text.length <= FLEET_SESSION_ANSWER_TEXT_MAX_CHARS
+            ? raw.text
+            : undefined;
+    if ((optionId === undefined) === (answerText === undefined)) return null;
+    const source = (ANSWER_SOURCES as readonly string[]).includes(raw.source as string)
+        ? (raw.source as (typeof ANSWER_SOURCES)[number])
+        : undefined;
+    return {
+        key,
+        ...(optionId !== undefined ? { optionId } : {}),
+        ...(answerText !== undefined ? { text: answerText } : {}),
+        ...(source ? { source } : {}),
+    };
 }
 
 /** The end body: only `confirm: true` survives (CONTRACTS §2.2 class `confirm`). */
@@ -106,11 +151,14 @@ export function sanitizeRecordingBody(raw: Record<string, unknown>): { on: boole
 const LIST_STATES = ['live', 'ended'] as const;
 
 /**
- * The list query, rebuilt (`state`, `kind`, `nodeId`, `agentId`, `since`,
+ * The list query, rebuilt (`state`, `kind`, `nodeId`, `agentId`, `taskId`, `since`,
  * `limit`, `cursor`), as a `?…` string (empty when nothing survived).
  */
 export function sanitizeListQuery(params: URLSearchParams): string {
     const out = new URLSearchParams();
+    // FL-05 P3: the board's four columns instead of a page.
+    const view = params.get('view');
+    if (view === 'board' || view === 'list') out.set('view', view);
     const state = params.get('state');
     if (state && (LIST_STATES as readonly string[]).includes(state)) out.set('state', state);
     const kind = params.get('kind');
@@ -119,6 +167,9 @@ export function sanitizeListQuery(params: URLSearchParams): string {
     if (isUuid(nodeId)) out.set('nodeId', nodeId);
     const agentId = params.get('agentId');
     if (isUuid(agentId)) out.set('agentId', agentId);
+    // FL-15 P1: the Task page's Computer block reads the Task's sessions.
+    const taskId = params.get('taskId');
+    if (isUuid(taskId)) out.set('taskId', taskId);
     const since = params.get('since');
     if (since && since.length <= 40 && !Number.isNaN(Date.parse(since))) out.set('since', since);
     const limit = Number(params.get('limit'));

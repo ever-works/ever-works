@@ -6,7 +6,11 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { FleetCommandRequester, FleetCommandState } from '@ever-works/contracts';
+import type {
+    FleetCommandRequester,
+    FleetCommandState,
+    FleetSchedulePausedReason,
+} from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -19,7 +23,8 @@ import { PortableDateColumn } from './_types';
  * FL-13 owns; this table already carries `cadence`, `name`, `enabled`,
  * `lastRunAt` and `nextRunAt` so FL-13 adds Schedules without a second table
  * (FL-13's slot `1796130000000` adds `pausedAt`, `pausedReason`,
- * `syncGeneration`, `syncedGeneration` and `deletedAt`).
+ * `syncGeneration`, `syncedGeneration` and `deletedAt`). A Schedule's ONE
+ * computer is `nodeIds[0]`; its writer is `FleetScheduleService`.
  *
  * `command` is stored REDACTED when the platform's secret scanner trips on it
  * (spec FR-13); the node received the line as typed. Which Agent asked for an
@@ -34,6 +39,7 @@ import { PortableDateColumn } from './_types';
 @Entity({ name: 'fleet_commands' })
 @Index('idx_fleet_commands_user_created', ['userId', 'createdAt'])
 @Index('idx_fleet_commands_user_state', ['userId', 'state'])
+@Index('idx_fleet_commands_schedule', ['userId', 'enabled'])
 export class FleetCommand {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -89,6 +95,30 @@ export class FleetCommand {
     /** Schedules only (FL-13). */
     @PortableDateColumn({ nullable: true })
     nextRunAt?: Date | null;
+
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §4.4) — when the schedule was
+     * paused, null while it runs. The cadence is kept (resume re-arms from now).
+     * Migration: `1796130000000-AddFleetCommandCadence`.
+     */
+    @PortableDateColumn({ nullable: true })
+    pausedAt?: Date | null;
+
+    /** `user · failures · breaker` (CONTRACTS §4.4), validated in code; null while it runs. */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    pausedReason?: FleetSchedulePausedReason | null;
+
+    /** What the platform last sent the machine: grows by one on every change of the node's set. */
+    @Column({ type: 'int', default: 0 })
+    syncGeneration: number;
+
+    /** What the machine acknowledged applying (`schedule.sync` reply); below `syncGeneration` = pending. */
+    @Column({ type: 'int', default: 0 })
+    syncedGeneration: number;
+
+    /** Soft delete of a schedule (spec U13): its run history stays readable for 30 days. */
+    @PortableDateColumn({ nullable: true })
+    deletedAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

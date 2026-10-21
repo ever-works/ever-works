@@ -21,7 +21,15 @@ import { fleetSessionError, readFleetSessionError } from './sessions/fleet-sessi
  *  - `fleet_sessions_rename` — state-changing (`plain`);
  *  - `fleet_sessions_end` — destructive (`confirm`): needs `confirm: true`,
  *    else the CONTRACTS §2.2 `confirmation_required` envelope with the
- *    sentence to show.
+ *    sentence to show;
+ *  - (FL-05 P2) `fleet_sessions_question` — read-only: what a session asks
+ *    right now (prompt, options, reason, where it was read) — ANY session the
+ *    owner may see, so one Agent can see what another waits on (spec S13);
+ *  - (FL-05 P2) `fleet_sessions_answer` — `confirm` class (FL-19 catalogue
+ *    §9.1): answers a session's QUESTION with an option or a text; a
+ *    permission prompt is refused `permission_denied` unconditionally
+ *    (people only), and another session's question only when the Agent's
+ *    owner switched on "may answer other sessions" (CONTRACTS R-32).
  *
  * Every refusal answers the CONTRACTS §8 envelope (`{ error: { code, hint } }`)
  * so the model reads a reason it can act on. Every act runs through
@@ -56,7 +64,10 @@ function compact(view: FleetSessionView) {
 }
 
 export interface FleetSessionsToolService {
-    service: Pick<FleetSessionService, 'listPage' | 'get' | 'start' | 'restart' | 'rename' | 'end' | 'sendInput'>;
+    service: Pick<
+        FleetSessionService,
+        'listPage' | 'get' | 'start' | 'restart' | 'rename' | 'end' | 'sendInput' | 'question' | 'answer'
+    >;
 }
 
 export function buildFleetSessionTools(args: {
@@ -248,6 +259,81 @@ export function buildFleetSessionTools(args: {
             }
         },
     } satisfies TaskToolDescriptor<{ sessionId?: string; confirm?: boolean }, unknown>);
+
+    // ─── FL-05 P2 — what a session asks, and answering it ──────────────────
+
+    out.push({
+        name: 'fleet_sessions_question',
+        description:
+            'Read-only. What a session on a computer is waiting for right now: the prompt, its options, whether it takes free text, and why it waits (question, permission, blocked). Works for any session you may see, not only yours. Null when nothing waits.',
+        parameters: {
+            type: 'object',
+            properties: { sessionId: { type: 'string', description: 'The session id.' } },
+            required: ['sessionId'],
+        },
+        invoke: async (raw) => {
+            const a = (raw ?? {}) as { sessionId?: string };
+            try {
+                return await args.service.question(String(a.sessionId ?? ''), actor);
+            } catch (error) {
+                return refusal(error);
+            }
+        },
+    } satisfies TaskToolDescriptor<{ sessionId?: string }, unknown>);
+
+    out.push({
+        name: 'fleet_sessions_answer',
+        description:
+            'Answer a QUESTION a session is waiting on: one of its options (optionId) or, when it takes one, a free text. Permission prompts are answered by people only and are refused. Answering another Agent\u2019s session needs your owner to have switched on "may answer other sessions" for you. Call with confirm: true once you are sure; without it you get the sentence to confirm.',
+        parameters: {
+            type: 'object',
+            properties: {
+                sessionId: { type: 'string', description: 'The session id.' },
+                key: { type: 'string', description: 'The attention key fleet_sessions_question gave.' },
+                optionId: { type: 'string', description: 'One of the options (or give text).' },
+                text: { type: 'string', description: 'A free-text answer, when the question takes one.' },
+                confirm: { type: 'boolean', description: 'true once the answer is decided.' },
+            },
+            required: ['sessionId', 'key'],
+        },
+        invoke: async (raw) => {
+            const a = (raw ?? {}) as {
+                sessionId?: string;
+                key?: string;
+                optionId?: string;
+                text?: string;
+                confirm?: boolean;
+            };
+            try {
+                const asked = await args.service.question(String(a.sessionId ?? ''), actor);
+                if (a.confirm !== true) {
+                    const choice =
+                        typeof a.optionId === 'string'
+                            ? asked.attention?.options.find((option) => option.id === a.optionId)?.label ?? a.optionId
+                            : 'your text';
+                    return {
+                        error: {
+                            code: 'confirmation_required',
+                            hint: `Answer "${asked.attention?.prompt ?? 'this prompt'}" with ${choice}?`,
+                            details: { class: 'confirm' },
+                        },
+                    } as unknown;
+                }
+                return await args.service.answer(
+                    String(a.sessionId ?? ''),
+                    actor,
+                    {
+                        key: String(a.key ?? ''),
+                        ...(typeof a.optionId === 'string' ? { optionId: a.optionId } : {}),
+                        ...(typeof a.text === 'string' ? { text: a.text } : {}),
+                    },
+                    'tool',
+                );
+            } catch (error) {
+                return refusal(error);
+            }
+        },
+    } satisfies TaskToolDescriptor<Record<string, unknown>, unknown>);
 
     return out;
 }

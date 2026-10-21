@@ -71,6 +71,12 @@ export interface CommandModuleOptions {
 	extraRoots?: readonly string[];
 	/** The last 30 runs' full output; absent = none kept. */
 	store?: CommandOutputStore | null;
+	/**
+	 * Schedules on computers (FL-13): where else a run's full output may be
+	 * kept — a schedule's own ring of 30 — for "Open full output" on a
+	 * schedule's run (`command.read`). Null when no store holds it.
+	 */
+	findStore?: (runId: string) => Promise<CommandOutputStore | null>;
 	logger?: Logger;
 	/** Test seams. */
 	start?: typeof startCommand;
@@ -242,20 +248,26 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 
 		/** Stream one run's kept output: the reply (its size), `DATA` chunks, `END`, then close. */
 		async function read(requestId: unknown, runId: string): Promise<void> {
-			if (!options.store) {
+			let store: CommandOutputStore | null = options.store ?? null;
+			if ((!store || !(await store.has(runId))) && options.findStore) {
+				// FL-13: a schedule's run keeps its output in the schedule's own ring.
+				const other = await options.findStore(runId).catch(() => null);
+				if (other) store = other;
+			}
+			if (!store) {
 				reply(requestId, {
 					error: makeFleetLinkError('not_found', `${options.nodeName} keeps no full output of commands`)
 				});
 				return;
 			}
-			const stream = await options.store.read(runId);
+			const stream = await store.read(runId);
 			if (!stream) {
 				reply(requestId, {
 					error: makeFleetLinkError('not_found', `the full output of this run is no longer on ${options.nodeName}`)
 				});
 				return;
 			}
-			reply(requestId, { result: { bytes: await options.store.size(runId) } });
+			reply(requestId, { result: { bytes: await store.size(runId) } });
 			for await (const raw of stream as AsyncIterable<Buffer>) {
 				if (closed) {
 					stream.destroy();

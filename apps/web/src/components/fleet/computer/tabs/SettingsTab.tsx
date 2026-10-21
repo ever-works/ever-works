@@ -8,6 +8,7 @@ import { PolicyFamiliesEditor } from '../PolicyFamiliesEditor';
 import { ComputerMachineSettings } from '../ComputerMachineSettings';
 import { UpgradeRequiredSection } from '../../link/UpgradeRequiredSection';
 import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
+import { GitIdentityCard } from '../../git/GitIdentityCard';
 
 /**
  * Fleet hub (FL-01, spec §5.10) — a computer's Settings tab, FL-01's part:
@@ -21,6 +22,7 @@ import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
  */
 export default function SettingsTab({
     node,
+    flags,
     machine,
 }: FleetComputerTabProps & {
     machine?: { apiBaseUrl: string; desktopDownloadUrl: string; nodeDownloadUrl: string };
@@ -33,6 +35,8 @@ export default function SettingsTab({
             <PolicyFamiliesEditor node={node} />
             {/* Servers and ports (FL-10): the preview browser switch, owner only. */}
             {isOwner && <PreviewBrowserSwitch node={node} />}
+            {/* Tasks on computers (FL-15 P2): Git on <computer>, behind FLEET_CHECKOUTS_ENABLED. */}
+            {flags?.FLEET_CHECKOUTS_ENABLED === true && <GitIdentityCard node={node} />}
             {isOwner && machine && <ComputerMachineSettings node={node} {...machine} />}
             {isOwner && !machine && (
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">

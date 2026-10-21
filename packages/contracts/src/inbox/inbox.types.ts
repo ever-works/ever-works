@@ -29,7 +29,16 @@ export type InboxItemStatus = 'open' | 'answered' | 'archived';
 
 export const INBOX_ITEM_STATUSES: readonly InboxItemStatus[] = ['open', 'answered', 'archived'];
 
-export type InboxItemSourceType = 'agent-run' | 'escalation' | 'proposal' | 'system' | 'work' | 'fleet-run';
+export type InboxItemSourceType =
+	| 'agent-run'
+	| 'escalation'
+	| 'proposal'
+	| 'system'
+	| 'work'
+	| 'fleet-run'
+	// FL-05 (CONTRACTS R-12): a session on a computer that needs you — a question or a
+	// permission request (the Decision), or a blocked / failed notice.
+	| 'fleet-session';
 
 /** Appended in the order they shipped — the web spec pins the sequence. */
 export const INBOX_ITEM_SOURCE_TYPES: readonly InboxItemSourceType[] = [
@@ -38,7 +47,8 @@ export const INBOX_ITEM_SOURCE_TYPES: readonly InboxItemSourceType[] = [
 	'proposal',
 	'system',
 	'work',
-	'fleet-run'
+	'fleet-run',
+	'fleet-session'
 ];
 
 /**
@@ -56,12 +66,31 @@ export interface InboxItemSourceMeta {
 	prUrl?: string | null;
 	/** Set when the model asked from a mounted repository (`.mounts/<dir>`). */
 	mountDir?: string | null;
+	/** FL-05 — the session a `fleet-session` item is about. */
+	sessionId?: string | null;
+	sessionTitle?: string | null;
+	/** `claude-code` · `codex` · … — rendered as the CLI's name. */
+	provider?: string | null;
+	/** The attention key (CONTRACTS §5.2): one identity for the card, this item and the notification. */
+	attentionKey?: string | null;
 }
 
 /** Cap on every `InboxItemSourceMeta` string field. */
 export const INBOX_SOURCE_META_MAX_FIELD_CHARS = 300;
 
-const INBOX_SOURCE_META_FIELDS = ['nodeId', 'nodeName', 'branch', 'taskTitle', 'prUrl', 'mountDir'] as const;
+const INBOX_SOURCE_META_FIELDS = [
+	'nodeId',
+	'nodeName',
+	'branch',
+	'taskTitle',
+	'prUrl',
+	'mountDir',
+	// FL-05 — appended, never reordered.
+	'sessionId',
+	'sessionTitle',
+	'provider',
+	'attentionKey'
+] as const;
 
 /** Hard caps applied by writers (DoS + prompt-log guard). */
 export const INBOX_MAX_TITLE_CHARS = 300;

@@ -148,7 +148,21 @@ function stubDomainSources(): AgentDomainToolSources {
         ingest: { repository: stub() },
         digest: { digestService: stub() },
         meetings: { repository: stub() },
-        fleet: { service: stub() },
+        // FL-19 — every fleet sub-source, so the Capabilities tab lists every fleet
+        // tool the production bundle can offer (services, processes, Docker, ports
+        // and previews, health, checkouts, logs, status, operations). The tunnel
+        // stub answers "on" because its tools are only BUILT while the flag is on.
+        fleet: {
+            service: stub(),
+            machine: stub(),
+            ports: stub(),
+            portTunnels: { isEnabled: () => true } as never,
+            health: { service: stub(), history: stub(), needsALook: stub() },
+            checkouts: { service: stub() },
+            logs: { reader: stub() },
+            status: stub(),
+            operations: stub(),
+        },
         fleetSessions: { service: stub() },
         fleetCommands: { service: stub() },
         prReview: { prReviewService: stub() },
