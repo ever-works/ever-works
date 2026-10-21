@@ -21,6 +21,7 @@ import {
     isFleetSessionKind,
     isFleetSessionLive,
     isFleetSessionStartableProvider,
+    parseFleetSessionContainerShell,
     type FleetAgentSessionResult,
     type FleetAuditAction,
     type FleetSessionEndedReason,
@@ -340,6 +341,14 @@ export class FleetSessionService {
         if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
         }
+        // Shell inside a container (FL-09 P3): an owner shell session only, its target validated.
+        const container =
+            request.container !== undefined ? parseFleetSessionContainerShell(request.container) : null;
+        if (request.container !== undefined && (!container || request.provider !== 'shell')) {
+            throw fleetSessionError('invalid', 'a shell inside a container needs a container and bash or sh', {
+                field: 'container',
+            });
+        }
         if (request.newWorktreeOf || request.checkoutId) {
             throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
                 field: 'checkout',
@@ -423,6 +432,7 @@ export class FleetSessionService {
                     rows: size.rows,
                     startedBy: requestedBy,
                     ...(firstMessage?.trim() ? { firstMessage } : {}),
+                    ...(container ? { container } : {}),
                     ...(options.restartOf ? { restartOf: options.restartOf.daemonSessionId } : {}),
                 },
                 caller,

@@ -126,10 +126,14 @@ import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/in
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
+    FleetCommandService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetModule,
+    FleetPortsService,
+    FleetCheckoutService,
+    FleetPortTunnelService,
     FleetService,
     FleetSessionService,
 } from '@ever-works/agent/fleet';
@@ -2124,6 +2128,20 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED
                 // off) the six tools are simply not offered.
                 { token: FleetSessionService, optional: true },
+                // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortsService, optional: true },
+                // Checkouts on computers (FL-14 P2) — backs the `fleet_checkouts_*`
+                // tools. APPENDED LAST (positional), optional: unbound (checkouts not
+                // mounted), the tools are simply not offered.
+                { token: FleetCheckoutService, optional: true },
+                // Commands on computers (FL-12 P2) — backs `fleet_commands_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the four
+                // tools are not offered; `fleet_commands_run` only ever files an approval.
+                { token: FleetCommandService, optional: true },
+                // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortTunnelService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2149,6 +2167,10 @@ async function assertRealWriteTarget(
                 approvals?: AgentApprovalsService | null,
                 fleetMachine?: FleetMachineActionsService | null,
                 fleetSessions?: FleetSessionService | null,
+                fleetPorts?: FleetPortsService | null,
+                checkouts?: FleetCheckoutService | null,
+                fleetCommands?: FleetCommandService | null,
+                fleetPortTunnels?: FleetPortTunnelService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2169,9 +2191,18 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet, ...(fleetMachine ? { machine: fleetMachine } : {}) },
+                fleet: {
+                    service: fleet,
+                    ...(checkouts ? { checkouts: { service: checkouts } } : {}),
+                    ...(fleetMachine ? { machine: fleetMachine } : {}),
+                    ...(fleetPorts ? { ports: fleetPorts } : {}),
+                    ...(fleetPortTunnels ? { portTunnels: fleetPortTunnels } : {}),
+                },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
+                ...(fleetCommands && config.fleet.isCommandsEnabled()
+                    ? { fleetCommands: { service: fleetCommands } }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.

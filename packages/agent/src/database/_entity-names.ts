@@ -109,6 +109,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ExternalRecordLink',
     'FleetAgentNodeAffinity',
     'FleetAudit',
+    // Commands on computers (FL-12) — one-off Commands and their runs
+    'FleetCommand',
+    'FleetCommandRun',
     // Checkouts on computers (FL-14) — clones and worktrees on a Node
     'FleetCheckout',
     // Fleet local-runner routing — local-vs-cloud execution preference
@@ -121,6 +124,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'FleetNode',
     // Computer health (FL-03) — raw and hourly health history per node
     'FleetNodeHealthSample',
+    // Servers and ports (FL-10 P2) — preview tunnels (owner-only, time-boxed grants)
+    'FleetPortTunnel',
     // Sessions on computers (FL-04) — persistent processes on a Node
     'FleetSession',
     'GitHubAppInstallation',

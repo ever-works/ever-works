@@ -361,11 +361,25 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 				return;
 			}
 			try {
+				// Shell inside a container (FL-09 P3, FR-35): the same owner shell session,
+				// running `docker exec -it` (the Docker CLI, never its socket) instead of the
+				// login shell. The container and shell were validated by the params parser.
+				const command = parsed.container
+					? [
+							'docker',
+							'exec',
+							'-it',
+							'-e',
+							'TERM=xterm-256color',
+							parsed.container.container,
+							parsed.container.shell
+						]
+					: composed.launch.command;
 				const started = await supervisor.request<{ pid: number | null }>('start', {
 					sessionId: params.sessionId,
 					kind: parsed.kind,
 					provider: parsed.provider,
-					command: composed.launch.command,
+					command,
 					cwd: composed.launch.cwd,
 					env: composed.launch.env,
 					cols: parsed.cols,
@@ -374,7 +388,7 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 					startedBy: parsed.startedBy
 				});
 				reply(requestId, { result: { daemonSessionId: params.sessionId, pid: started?.pid ?? null } });
-				const typed = composed.launch.typeAfterStart;
+				const typed = parsed.container ? undefined : composed.launch.typeAfterStart;
 				if (typed) {
 					setTimer(() => {
 						void supervisor

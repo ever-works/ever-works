@@ -55,17 +55,30 @@ import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoo
 import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
-import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
+import { HeadlessBrowserCaptureBackend, HeadlessPreviewBrowser } from './screen/headless-browser-backend';
 import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
+import { resolveAllowedRoots } from './link/allowed-roots';
 import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createCommandModule } from './link/modules/command';
+import { CommandOutputStore } from './link/modules/command/command-output-store';
+import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
+import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
+import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import { createCheckoutsModule } from './link/modules/checkouts';
 import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
+import {
+	createCheckoutCredentialClient,
+	type CheckoutCredentialFetch
+} from './link/modules/checkouts/checkout-credential';
 import type { ConnectFn } from './sessions/daemon-client';
 import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
@@ -75,7 +88,7 @@ import { resolveHookPaths } from './sessions/hook-client';
 import { SessionHookOverlay } from './sessions/hook-overlay';
 import { SessionStatusPipeline } from './sessions/session-status';
 import { spawn as spawnProcess } from 'node:child_process';
-import { homedir as osHomedir } from 'node:os';
+import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -152,6 +165,12 @@ export interface NodeIo {
 	 * is not offered on the link.
 	 */
 	wakeSender?: WakeSender;
+	/**
+	 * Logs on computers (FL-08) — what the `logs` link module reads the machine
+	 * through. Optional: absent, the runtime binds the real one
+	 * (`createNodeLogIo`) for a `--manage` process.
+	 */
+	logs?: LogIo;
 }
 
 /**
@@ -604,6 +623,18 @@ export interface CreateNodeRuntimeOptions {
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
 	/**
+	 * Servers and ports (FL-10) — where the owner-level preview browser profile
+	 * lives; defaults to `~/.ever-works/preview-profile` (R-3), beside the Agent
+	 * profiles, never inside them.
+	 */
+	previewProfileRoot?: string;
+	/**
+	 * Servers and ports (FL-10) — the opener behind "Open on the desktop".
+	 * Undefined = the system opener when this process runs in a desktop session
+	 * with `--attend`; null = none (FL-07's helper binds its own when it lands).
+	 */
+	portsDesktopOpener?: DesktopUrlOpener | null;
+	/**
 	 * Services and processes (FL-09) — replaces the machine-facts modules the
 	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
 	 * or fakes so no real `systemctl` / `ps` runs.
@@ -649,8 +680,21 @@ export interface CreateNodeRuntimeOptions {
 	sessionDaemonConnect?: ConnectFn;
 	/** FL-05's per-session hook overlay; FL-04 ships none. */
 	sessionHookOverlay?: HookOverlayPort;
-	/** Folders besides home that owner sessions may start in. */
+	/** Folders besides home that owner sessions may start in (and Commands may run in, FL-12). */
 	sessionExtraRoots?: readonly string[];
+	/**
+	 * Commands on computers (FL-12) — where the last 30 runs' full output is
+	 * kept (`<configDir>/commands`). Absent: commands still run, no full
+	 * output is kept.
+	 */
+	commandOutputDir?: string;
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
+	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
+	 * tab lists log files under them (and FL-11's Files tab will browse them).
+	 * Process-scoped, like `--manage`; never the home directory as a whole.
+	 */
+	filesRoots?: readonly string[];
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 	/**
@@ -884,6 +928,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// The daemon block carries the hook counters (CONTRACTS §1.1, FL-05 FR-6).
 		telemetry.sessionDaemon = () => ({ ...supervisor.report(), hooks: statusPipeline.hooksReport() });
 	}
+	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
+	// preview source, for a process started with `--manage`. The preview
+	// browser is the probed one in an owner-level profile beside — never
+	// inside — the Agent profiles (R-3); without a browser it refuses with the
+	// sentence spec U10 gives. Open on the desktop uses the system opener only
+	// when the node itself runs in a desktop session with `--attend`, until
+	// FL-07's helper binds its own.
+	let portsModule: PortsModule | null = null;
+	if (consents.manage) {
+		const previewWebSockets =
+			options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+		const browserPath = io.environment.browserPath;
+		const restrictPreview =
+			options.restrictProfileDir ??
+			(io.environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+		const previewFs = createAgentProfileFs();
+		const preview = new PreviewBrowserManager({
+			starter: browserPath
+				? new HeadlessPreviewBrowser({ browserPath, webSocketFactory: previewWebSockets })
+				: null,
+			root: options.previewProfileRoot ?? defaultPreviewProfileRoot(options.env ?? process.env),
+			mkdir: (path) => previewFs.mkdir(path),
+			...(restrictPreview ? { restrictToOwner: restrictPreview } : {}),
+			nodeName: config.name?.trim() || 'this computer',
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		portsModule = createPortsModule({
+			// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+			// `docker ps --format` carries braces and tabs a shell would split.
+			runner: createMachineCommandRunner(),
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			nodeName: config.name?.trim() || 'this computer',
+			attend: consents.attend,
+			desktopOpener:
+				options.portsDesktopOpener !== undefined
+					? options.portsDesktopOpener
+					: consents.attend && io.environment.hasDisplay
+						? createSystemBrowserOpener(io.runner, io.environment.platform)
+						: null,
+			preview,
+			logger: io.logger,
+			...(io.now ? { now: io.now } : {})
+		});
+	}
 	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
 	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
 	const checkoutsModule =
@@ -896,10 +987,68 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					nodeName: config.name?.trim() || 'this computer',
 					platform: io.environment.platform,
 					...(options.checkoutsGit ? { git: options.checkoutsGit } : {}),
+					// FL-14 P2: the operation-scoped git credential a checkout Ever Works
+					// made authenticates with (never the machine's own helper).
+					credentials: createCheckoutCredentialClient({
+						apiUrl: apiBase.url,
+						nodeId: config.nodeId,
+						secret: config.secret,
+						fetchFn: io.fetchFn as unknown as CheckoutCredentialFetch,
+						userAgent,
+						protect: (token) => io.logger.protect(token),
+						unprotect: (token) => io.logger.unprotect(token)
+					}),
 					reaperMaxAgeMs: (config.workspaceGc?.maxAgeDays ?? DEFAULT_WORKSPACE_MAX_AGE_DAYS) * 86_400_000,
 					logger: io.logger
 				})
 			: undefined;
+	// Logs on computers (FL-08): the `logs` link module — the `logs` family,
+	// the `logs.sources` verb and the `logs` tag — for a `--manage` process
+	// only. The allowed roots (R-18, R-41) are re-resolved on every request:
+	// the standard log directories, ready checkouts (FL-14's registry), the
+	// workspace root and the `--files-root` folders, never the home directory.
+	let logsLinkModule: NodeModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		let user = 'this user';
+		try {
+			user = osUserInfo().username || user;
+		} catch {
+			// no passwd entry: the hint names no account
+		}
+		const logIo =
+			io.logs ??
+			createNodeLogIo({
+				platform,
+				// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+				// `docker ps --format` carries braces, quotes and tabs `cmd.exe` would mangle.
+				runner: createMachineCommandRunner(),
+				homedir,
+				user,
+				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
+			});
+		logsLinkModule = createLogsLinkModule({
+			io: logIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				const resolved = await resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'logs',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? [],
+						logDirs: standardLogDirs(platform, homedir)
+					},
+					logIo.fs
+				);
+				return resolved.roots;
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -909,12 +1058,41 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
-		extra: [healthLinkModule, ...(options.linkModules ?? [])],
+		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
+		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
+		...(consents.manage
+			? {
+					command: createCommandModule({
+						consents,
+						nodeName: config.name?.trim() || 'this computer',
+						platform: io.environment.platform,
+						homedir: osHomedir(),
+						env: process.env,
+						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						logger: io.logger
+					})
+				}
+			: {}),
+		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		// FL-09 — services and processes (their verbs need --manage on this machine).
-		machineFacts: options.machineFactModules ?? createMachineFactModules(),
+		machineFacts:
+			options.machineFactModules ??
+			createMachineFactModules({
+				docker: {
+					// A bind mount may come only from this computer's shared folders (R-18, R-39).
+					allowedRoots: async () =>
+						resolveAllowedRoots({
+							workspaceRoot,
+							checkouts: checkoutsModule ? await checkoutsModule.readyPaths() : [],
+							purpose: 'files',
+							platform: io.environment.platform
+						})
+				}
+			}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),

@@ -151,25 +151,25 @@
 
 ## P2.A — Docker module
 
-- [ ] **T-20**. Add `packages/contracts/src/fleet/fleet-docker.types.ts` (containers, images, run
+- [x] **T-20**. Add `packages/contracts/src/fleet/fleet-docker.types.ts` (containers, images, run
       request, compose shapes, name/ref patterns); export.
     - **Test**: `fleet-docker.spec.ts`.
-- [ ] **T-21**. Write `apps/node/src/core/link/modules/docker/docker-cli.ts` (argv builders, JSON-line
+- [x] **T-21**. Write `apps/node/src/core/link/modules/docker/docker-cli.ts` (argv builders, JSON-line (`modules/docker.ts` + `machine-facts/docker-cli.ts`)
       parsers, PATH lookup only), `containers.ts`, `images.ts`.
     - **Test**: `docker-cli.spec.ts`, `containers.spec.ts`, `images.spec.ts` (Engine + Desktop fixtures).
-- [ ] **T-22**. Write `run-request.ts` (allow-listed flags; mounts under FL-08's allowed roots or
+- [x] **T-22**. Write `run-request.ts` (allow-listed flags; mounts under FL-08's allowed roots or (`machine-facts/docker-ops.ts`, `stream.ts`; the run refusals live in the contracts validator; operations are FL-02's — decision 17)
       named volumes; refuse privileged / host namespaces / cap-add / socket; env names on argv,
       values through the child's environment) and `operations.ts` (FL-02 runner adapter, pull
       percent parser, last-20 records ≤ 1 MiB).
     - **Test**: `run-request.spec.ts` (every refusal; argv never contains a value), `operations.spec.ts`.
-- [ ] **T-23**. Write `apps/node/src/core/link/modules/docker/index.ts` (`docker.containers|images`,
+- [x] **T-23**. Write `apps/node/src/core/link/modules/docker/index.ts` (`docker.containers|images`,
       `docker.container.action` start/stop/restart/remove, `docker.run`, `docker.image.pull|remove|prune`);
       register when `docker` is detected.
     - **Test**: `index.spec.ts` — daemon down → `operation_failed` hint; remove in-use image → `busy`.
 
 ## P2.B — Docker API and service
 
-- [ ] **T-24**. Write `packages/agent/src/fleet/docker/fleet-docker.service.ts` and
+- [x] **T-24**. Write `packages/agent/src/fleet/docker/fleet-docker.service.ts` and (methods on `FleetMachineActionsService`, `FleetDockerController`)
       `apps/api/src/fleet/docker/fleet-docker.controller.ts` + `dto/` (routes per plan §5 — pull is
       `POST /nodes/:id/docker/images`, remove `POST …/images/:iid/remove`, prune
       `DELETE …/images?unused=true`, all §11.2 paths; container `remove` requires `confirmName`;
@@ -179,7 +179,7 @@
 
 ## P2.C — Docker web and Runs here
 
-- [ ] **T-25**. Write `apps/web/src/components/fleet/docker/` — `DockerTab.tsx`, `ContainersList.tsx`,
+- [x] **T-25**. Write `apps/web/src/components/fleet/docker/` — `DockerTab.tsx`, `ContainersList.tsx`, (`components/fleet/docker/`; `OperationCard` in `components/fleet/machine/`)
       `ImagesList.tsx`, `RunContainerDialog.tsx` (masked values, root-limited volume picker, command
       preview, disk-free line, cloud billing line via FL-17 `providerMeta`), `docker.shared.ts`,
       `docker-tab.registry.ts` (tab through `registerComputerTab`, palette through FL-01's
@@ -190,7 +190,7 @@
 
 ## P2.D — Docker tools, i18n, e2e
 
-- [ ] **T-26**. Write `packages/agent/src/fleet/docker/agent-fleet-docker-tools.ts`
+- [x] **T-26**. Write `packages/agent/src/fleet/docker/agent-fleet-docker-tools.ts` (tools + held Approvals; MCP entries deferred with P1's — owner question 2; Playwright: follow-up)
       (`fleet_docker_containers_list`, `fleet_docker_container_action`, `fleet_docker_run`,
       `fleet_docker_images_list`, `fleet_docker_image_action`; annotations per plan §9; Approvals for
       `remove`/`prune` below trust); MCP whitelist entries; `fleet.docker.*` i18n;
@@ -201,19 +201,19 @@
 
 ## P3.A — Compose module and API
 
-- [ ] **T-27**. Write `apps/node/src/core/link/modules/docker/compose.ts` (`compose ls`, `config`, `ps`
+- [x] **T-27**. Write `apps/node/src/core/link/modules/docker/compose.ts` (`compose ls`, `config`, `ps` (`machine-facts/compose.ts`, verbs in `modules/docker.ts`)
       merge into `FleetComposeDescription`; `filesMissing`; actions up/down/restart/pull as
       operations, optional `service`; `down` never passes `-v`) and wire `compose.list|describe|action`
       in `docker/index.ts`.
     - **Test**: `compose.spec.ts` — depends_on conditions, missing files → Down only, argv never has `-v`.
-- [ ] **T-28**. Extend `fleet-docker.service.ts` / `fleet-docker.controller.ts` with the compose
+- [x] **T-28**. Extend `fleet-docker.service.ts` / `fleet-docker.controller.ts` with the compose (`execInContainer` starts the owner Session through `FleetSessionService.start` with a container target)
       routes (plan §5: `GET /nodes/:id/docker/compose[?project=]`, `POST …/compose/:project/:action`)
       and `exec` (`{ sessionId }` via FL-04 `FleetSessionService.startOwner`).
     - **Test**: service/controller specs; e2e compose lifecycle with the fake peer.
 
 ## P3.B — Compose web
 
-- [ ] **T-29**. Write `ComposeList.tsx`, `ComposeProject.tsx`, `ComposePicture.tsx` (SVG),
+- [x] **T-29**. Write `ComposeList.tsx`, `ComposeProject.tsx`, `ComposePicture.tsx` (SVG), (`ComposeView.tsx` holds the picture and the service table; Logs links to the Logs tab)
       `compose-layout.ts` (layered DAG, deterministic), `ComposeServiceTable.tsx` under
       `apps/web/src/components/fleet/docker/`; **Logs** view calls FL-08's `openMergedLogs`.
     - **Test**: `compose-layout.unit.spec.ts` (layering, cycle tolerance, stable order),
@@ -221,24 +221,24 @@
 
 ## P3.C — Shell inside
 
-- [ ] **T-30**. Write `apps/node/src/core/link/modules/docker/exec-session.ts` (shell detection inside the
+- [x] **T-30**. Write `apps/node/src/core/link/modules/docker/exec-session.ts` (shell detection inside the (no node `exec-session.ts`: the session module runs `docker exec` from the validated `container` param — decision 21)
       image; daemon start request `['docker','exec','-it',id,shell]`, kind owner, title
       `Shell · inside <name>`); add **Shell inside ▾** to `ContainersList.tsx`, the picture and the
       service table, opening the Session via FL-04's terminal route; audit `node.docker.container.exec` + `node.session.start`.
     - **Test**: `exec-session.spec.ts`; e2e: shell appears on the Sessions tab and ends with the Session.
-- [ ] **T-31**. Add `fleet_docker_compose_list`, `fleet_docker_compose_describe`,
+- [x] **T-31**. Add `fleet_docker_compose_list`, `fleet_docker_compose_describe`, (compose tools; `fleet_docker_exec` not offered to Agents — owner question 6)
       `fleet_docker_compose_action`, `fleet_docker_exec` to `agent-fleet-docker-tools.ts` and the MCP whitelist; `fleet.docker.compose.*`
       i18n; finish `flow-fleet-docker.spec.ts` (P3 part).
     - **Test**: tool spec; whitelist spec; e2e.
 
 ## Docs and rollout
 
-- [ ] **T-32**. Write `docs/features/fleet-services-docker.md` (the three tabs, the root rule and how
+- [x] **T-32**. Write `docs/features/fleet-services-docker.md` (the three tabs, the root rule and how
       to pre-authorise `sudo -n` for the node's user, blast-radius sentences, Docker CLI-only policy
       and refused run options, Compose views, shell inside, Agent tools); add after `'features/fleet'`
       in `apps/docs/sidebarsPlatform.ts` (`:183`, after FL-08's entry) and a row in `docs/features/index.md`.
     - **Test**: `pnpm --filter ever-works-docs build` — no broken links.
-- [ ] **T-33**. Update [`../TRACKER.md`](../TRACKER.md) FL-09 row and the `Status` fields of the three
+- [x] **T-33**. Update [`../TRACKER.md`](../TRACKER.md) FL-09 row and the `Status` fields of the three (TRACKER row; the CONTRACTS §10 rows were already in revision 4)
       documents; add the CONTRACTS §10 rows raised in spec §8b in the same PR.
     - **Test**: docs build clean; the banned-terms grep over this folder prints nothing.
 - [ ] **T-34**. Run `pnpm format && pnpm lint && pnpm test && pnpm build`; run the banned-terms grep over

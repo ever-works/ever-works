@@ -16,6 +16,7 @@ import {
     Monitor,
     ListChecks,
     Plug,
+    ScrollText,
     Server,
     Settings,
     Sparkles,
@@ -363,14 +364,30 @@ export const FLEET_HUB_SCREENS: readonly PaletteScreen[] = [
  */
 export function fleetComputerScreens(
     computers: ReadonlyArray<{ id: string; name: string }>,
+    options: { logs?: boolean } = {},
 ): PaletteScreen[] {
-    return computers.map((computer) => ({
+    const screens: PaletteScreen[] = computers.map((computer) => ({
         id: `fleet.computer.${computer.id}`,
         href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
         icon: Monitor,
         title: (t: PaletteTranslator) => t('fleet.palette.goToComputer', { name: computer.name }),
         breadcrumb: fleet,
     }));
+    // Logs on computers (FL-08, FR-33): "Logs on <computer>" for every
+    // computer the viewer may see, opening its Logs tab — only while machine
+    // facts are on (the tab is not registered otherwise).
+    if (options.logs) {
+        for (const computer of computers) {
+            screens.push({
+                id: `fleet.computer.${computer.id}.logs`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'logs'),
+                icon: ScrollText,
+                title: (t: PaletteTranslator) => t('fleet.logs.palette', { name: computer.name }),
+                breadcrumb: fleet,
+            });
+        }
+    }
+    return screens;
 }
 
 /**
@@ -403,6 +420,26 @@ export function fleetComputerMachineScreens(
         }
     }
     return out;
+}
+
+/**
+ * Servers and ports (FL-10, FR-21) — "Ports on <computer>" for every computer
+ * the viewer may see that advertises `ports` (a node only does under
+ * `--manage`), opening its Ports tab.
+ */
+export function fleetComputerPortsScreens(
+    computers: ReadonlyArray<{ id: string; name: string; capabilities?: readonly string[] }>,
+): PaletteScreen[] {
+    // Like FL-09's rows: only a computer that advertises the tag (`ports`, under `--manage`).
+    return computers
+        .filter((computer) => computer.capabilities?.includes('ports') ?? false)
+        .map((computer) => ({
+        id: `fleet.computer.${computer.id}.ports`,
+        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
+        icon: Monitor,
+        title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
+        breadcrumb: fleet,
+    }));
 }
 
 /** What decides which screens exist beyond the fixed list. */

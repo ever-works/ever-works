@@ -611,6 +611,53 @@ export const WHITELIST: WhitelistEntry[] = [
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
 
+	// Checkouts on computers (6) — FL-14, `apps/api/src/fleet/checkouts/
+	// fleet-checkouts.controller.ts`, the same names as the Agent tools
+	// (CONTRACTS §11.3). Pull, push, archive and delete answer
+	// `confirmation_required` first; the caller repeats with `confirm` /
+	// `confirmName` (CONTRACTS §2.2). The node-facing credential route
+	// (`/api/fleet/checkouts/{id}/credential`) is deliberately NOT exposed.
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts',
+		toolName: 'fleet_checkouts_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/checkouts', toolName: 'fleet_checkouts_create' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/sync', toolName: 'fleet_checkouts_sync' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/archive', toolName: 'fleet_checkouts_archive' },
+	{
+		method: 'DELETE',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_delete',
+		annotations: { destructiveHint: true }
+	},
+
+	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
+	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
+	// read at most 500 secret-scanned lines of one. The read never follows; a
+	// `follow` argument is cut from the tool (the route refuses it anyway).
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/logs/sources',
+		toolName: 'fleet_logs_sources',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/logs/read',
+		toolName: 'fleet_logs_read',
+		annotations: { readOnlyHint: true },
+		omitArgs: ['follow']
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
@@ -635,6 +682,70 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/sessions/{id}/end',
 		toolName: 'fleet_sessions_end',
 		annotations: { destructiveHint: true }
+	},
+
+	// Commands on computers (4) — FL-12 P2, `apps/api/src/fleet/commands/fleet-commands.controller.ts`
+	// (dark unless FLEET_COMMANDS_ENABLED). One command line on one or more of the caller's computers, in
+	// the machine owner's login shell with no input. CONTRACTS §2.2 class `confirm`: without
+	// `confirm: true` the API answers `confirmation_required` with one line per computer; repeat the call
+	// with `confirm: true` once the person agreed. Output is read back with `fleet_commands_get`.
+	{
+		method: 'POST',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_run',
+		description:
+			"Run one shell command on one or more of my fleet computers, in the machine owner's login shell, as the owner, with no input (prompts fail). These are real machines, not a sandbox. Without confirm: true it answers confirmation_required with one line per computer (shell, folder, or why it cannot run); repeat with confirm: true once agreed. Answers one run per computer; read the output with fleet_commands_get.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands/{id}',
+		toolName: 'fleet_commands_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/commands/{id}/cancel',
+		toolName: 'fleet_commands_cancel',
+		annotations: { destructiveHint: false }
+	},
+
+	// Servers and ports (FL-10, CONTRACTS §2.1) — `apps/api/src/fleet/ports/fleet-ports.controller.ts`.
+	// The list is a read of the machine (nothing stored, nothing audited); open is
+	// not destructive — it opens the port's page ON the machine (its desktop or its
+	// preview browser) and is audited `node.port.open`. Dark unless
+	// FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/ports',
+		toolName: 'fleet_ports_list',
+		description:
+			'List the TCP ports a fleet computer is listening on, read on the machine: web servers first (title, status, program or container), other ports, hidden system ports. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/ports/{port}/open',
+		toolName: 'fleet_ports_open',
+		description:
+			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
+		annotations: { destructiveHint: false }
+	},
+	// FL-10 P2 — close a preview tunnel (dark unless FLEET_PORT_TUNNEL_ENABLED). Opening one is NOT
+	// exposed here: its answer carries a one-time address into the owner's tunnel, which a tool must
+	// never hold (spec U15); the in-platform Agent tool opens one without that address.
+	{
+		method: 'DELETE',
+		path: '/api/fleet/nodes/{id}/ports/{port}/preview',
+		toolName: 'fleet_ports_preview_close',
+		description: "Close the person's preview tunnel to a port on a fleet computer.",
+		annotations: { destructiveHint: false }
 	},
 
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the

@@ -27,6 +27,8 @@ export * from './agent-fleet-tools';
 export * from './agent-fleet-session-tools';
 // Computer health (FL-03 second phase) — the health / needs-a-look tool shapes for FL-19.
 export * from './agent-fleet-health-tools';
+// Logs on computers (FL-08) — the log tool shapes and the port the API binds.
+export * from './logs/agent-fleet-logs-tools';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
@@ -46,7 +48,10 @@ export { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 export { FleetAudit } from '../entities/fleet-audit.entity';
 // Sessions on computers (FL-04) — the session service, its policy and its node port.
 export * from './sessions';
+// Commands on computers (FL-12) — the command service, its policy and its node port.
+export * from './commands';
 // Machine actions (FL-09) — services, processes, Docker and Compose, and their node port.
 export * from './machine';
 // Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
 export * from './checkouts';
+export * from './ports';

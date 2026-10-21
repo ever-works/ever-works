@@ -157,6 +157,25 @@ export type FleetAuditAction =
 	| 'node.session.recording.start'
 	| 'node.session.recording.stop'
 	/**
+	 * Logs on computers (FL-08, CONTRACTS §7) — someone read a log source
+	 * (one row per open or one-shot read) or started following it. Details
+	 * carry `source` (the source id), `kind`, `requestedBy`, `lines`,
+	 * `redactions`, `confirmationClass: 'plain'` and `outcome`; never a log
+	 * line (spec FR-27).
+	 */
+	| 'node.logs.read'
+	| 'node.logs.follow'
+	/**
+	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
+	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
+	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
+	 * `outcome`, the exit code, the duration and whether output was truncated;
+	 * never the command's output and never the command line (spec FR-12, FR-13).
+	 */
+	| 'node.command.run'
+	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
+	| 'node.command.cancel'
+	/**
 	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
 	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
 	 * `family`, `target` (service name, container or image id, project, pid),
@@ -198,7 +217,18 @@ export type FleetAuditAction =
 	/** Moved to the bin (folder untouched). */
 	| 'node.checkout.archive'
 	/** Brought back from the bin. */
-	| 'node.checkout.restore';
+	| 'node.checkout.restore'
+	/**
+	 * Servers and ports (FL-10, CONTRACTS §7) — one row per **Open** (port,
+	 * `target: desktop | preview-profile`, program or container, requester,
+	 * class `plain`; never a URL query or page content). An open on the desktop
+	 * from the Ports tab writes only this, never FL-07's `node.desktop.openUrl`.
+	 */
+	| 'node.port.open'
+	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
+	| 'node.port.preview.open'
+	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
+	| 'node.port.preview.close';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -248,6 +278,10 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	'node.logs.read',
+	'node.logs.follow',
+	'node.command.run',
+	'node.command.cancel',
 	'node.service.start',
 	'node.service.stop',
 	'node.service.restart',
@@ -271,7 +305,10 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.checkout.delete',
 	'node.checkout.sync',
 	'node.checkout.archive',
-	'node.checkout.restore'
+	'node.checkout.restore',
+	'node.port.open',
+	'node.port.preview.open',
+	'node.port.preview.close'
 ];
 
 /**
