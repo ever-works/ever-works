@@ -766,6 +766,12 @@ export interface FleetCheckoutCreateRequest {
 	/** What a new branch starts from; the parent's branch (worktree) or the remote default (clone) when absent. */
 	baseRef?: string;
 	isolation?: FleetCheckoutIsolation;
+	/**
+	 * P3 (spec FR-32): folders of the parent checkout, ignored by git, that are
+	 * LINKED (never copied) into a new worktree — `node_modules`, `.env.local`, a
+	 * build cache. Relative paths inside the parent; worktrees only.
+	 */
+	sharedFolders?: string[];
 }
 
 /** `202` answer of create. */
@@ -795,6 +801,12 @@ export interface FleetCheckoutsCreateParams {
 	baseRef: string | null;
 	/** `task` for a checkout a Task run asked for (`--work` suffices); else a person or an Agent (`--manage`). */
 	createdBy: FleetCheckoutCreatedBy;
+	/** P3 (spec FR-31): `container` — every session and command for it runs in a container with the folder mounted. */
+	isolation?: FleetCheckoutIsolation;
+	/** The image a container-isolated checkout's sessions run in (the deployment's default, spec §8b). */
+	containerImage?: string;
+	/** P3 (spec FR-32): parent folders, ignored by git, linked into the new worktree. */
+	sharedFolders?: string[];
 }
 
 /** `checkouts.create` result. */
@@ -932,4 +944,30 @@ export function parseFleetCheckoutsDeleteResult(value: unknown): FleetCheckoutsD
 		removed: raw.removed === true,
 		branchKept: boundedString(raw.branchKept, FLEET_CHECKOUT_REF_MAX_LENGTH)
 	};
+}
+
+// ─── P3: container isolation, shared folders, the bin purge ─────────────────
+
+/** Most shared folders one new worktree links (spec FR-32). */
+export const FLEET_CHECKOUT_SHARED_FOLDERS_MAX = 16;
+
+/** Bin rows whose folder is gone are purged after this long (spec FR-33; rows only, never folders). */
+export const FLEET_CHECKOUT_BIN_PURGE_AFTER_MS = 30 * 24 * 60 * 60_000;
+
+/** The bin purge runs once a day, at 03:23 (plan §10). */
+export const FLEET_CHECKOUT_BIN_PURGE_CRON = '23 3 * * *';
+
+/**
+ * A shared folder a new worktree may link (spec FR-32): a RELATIVE path inside
+ * the parent checkout — no absolute path, no drive, no `..` segment, never
+ * `.git` — bounded. The node also checks git ignores it and that it exists.
+ */
+export function isFleetCheckoutSharedFolder(value: unknown): value is string {
+	if (typeof value !== 'string') return false;
+	const trimmed = value.trim();
+	if (trimmed.length === 0 || trimmed.length > 255 || trimmed.includes('\0')) return false;
+	if (trimmed.startsWith('/') || trimmed.startsWith('\\') || /^[A-Za-z]:/.test(trimmed)) return false;
+	const segments = trimmed.split(/[\\/]+/).filter((segment) => segment.length > 0);
+	if (segments.length === 0) return false;
+	return segments.every((segment) => segment !== '..' && segment !== '.' && segment !== '.git');
 }

@@ -874,7 +874,10 @@ export class TriggerInternalController implements OnModuleInit {
             // / sync must never reach the worker). `undefined` (a loud "Unknown
             // remote target") when checkouts are not mounted.
             FleetCheckoutReconcileService: this.fleetCheckoutReconcileService
-                ? { reconcile: () => this.fleetCheckoutReconcileService!.reconcile() }
+                ? {
+                      reconcile: () => this.fleetCheckoutReconcileService!.reconcile(),
+                      purgeBin: () => this.fleetCheckoutReconcileService!.purgeBin(),
+                  }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

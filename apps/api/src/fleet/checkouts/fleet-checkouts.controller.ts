@@ -177,6 +177,7 @@ export class FleetCheckoutsController {
             ...(body.branch !== undefined ? { branch: body.branch } : {}),
             ...(body.baseRef !== undefined ? { baseRef: body.baseRef } : {}),
             ...(body.isolation !== undefined ? { isolation: body.isolation } : {}),
+            ...(body.sharedFolders !== undefined ? { sharedFolders: body.sharedFolders } : {}),
         });
     }
 
