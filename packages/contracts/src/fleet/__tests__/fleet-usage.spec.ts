@@ -165,7 +165,12 @@ describe('list-price matching and pricing (R-30)', () => {
 		expect(findModelListPriceEntry(version, 'claude-sonnet-4-5-20250929')?.model).toBe('claude-sonnet-4-5');
 		expect(findModelListPriceEntry(version, 'gpt-5-codex')?.model).toBe('gpt-5-codex');
 		expect(findModelListPriceEntry(version, 'gpt-5')?.model).toBe('gpt-5');
+		expect(findModelListPriceEntry(version, 'gpt-5-2025-08-07')?.model).toBe('gpt-5');
+		expect(findModelListPriceEntry(version, 'claude-sonnet-4-5[1m]')?.model).toBe('claude-sonnet-4-5');
 		expect(findModelListPriceEntry(version, 'gpt-50')).toBeNull();
+		// A newer family member is never priced as an older one by guess.
+		expect(findModelListPriceEntry(version, 'claude-sonnet-4-5-6')).toBeNull();
+		expect(findModelListPriceEntry(version, 'gpt-5-mini')).toBeNull();
 		expect(findModelListPriceEntry(version, 'local-7b')).toBeNull();
 	});
 

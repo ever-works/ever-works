@@ -21,10 +21,13 @@ export interface ModelListPriceEntry {
 	model: string;
 	provider: FleetUsageProvider;
 	/**
-	 * Model ids this entry prices: an id matches when it EQUALS one of these or
-	 * starts with it followed by `-` (so `claude-sonnet-4-5-20250929` matches
-	 * `claude-sonnet-4-5`, and `gpt-5` never matches `gpt-5-codex`'s entry by
-	 * accident — the LONGEST match across the table wins).
+	 * Model ids this entry prices: an id matches when it EQUALS one of these, or
+	 * is one of these followed by a RELEASE suffix only — a date (`-20250929`,
+	 * `-2025-08-07`), `-latest`, an `@…` pin or a `[…]` context tag. So
+	 * `claude-sonnet-4-5-20250929` matches `claude-sonnet-4-5`, while
+	 * `claude-opus-4-6` does NOT match `claude-opus-4` (a newer model is never
+	 * priced as an older one by guess) and `gpt-50` never matches `gpt-5`.
+	 * The LONGEST match across the table wins.
 	 */
 	match: readonly string[];
 	/**
@@ -50,6 +53,9 @@ export interface ModelListPricing {
 	model: string;
 }
 
+/** What may follow a listed id and still be the same model: a release date, `-latest`, a pin or a context tag. */
+const RELEASE_SUFFIX = /^(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest|@\S*|\[[^\]]*\])(?:@\S*|\[[^\]]*\])?$/;
+
 /** The entry an id matches in one version (longest match wins), or null — never a guess. */
 export function findModelListPriceEntry(
 	version: ModelListPriceListVersion,
@@ -62,7 +68,7 @@ export function findModelListPriceEntry(
 	for (const entry of version.entries) {
 		for (const candidate of entry.match) {
 			const key = candidate.toLowerCase();
-			const hit = id === key || id.startsWith(`${key}-`) || id.startsWith(`${key}@`);
+			const hit = id === key || (id.startsWith(key) && RELEASE_SUFFIX.test(id.slice(key.length)));
 			if (hit && key.length > bestLength) {
 				best = entry;
 				bestLength = key.length;
