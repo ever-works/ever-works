@@ -323,6 +323,19 @@ export const config = {
             return undefined;
         },
         /**
+         * 2026-10-21 — `FLEET_PINNED_AGENT_HOLDS_FOR_NODE`. When on, a run whose Agent the
+         * owner pinned to a node (agent ↔ node affinity) is HELD for the fleet
+         * (`fleet-waiting`, `waiting-for-runner`) under `local-fallback` instead of being
+         * relocated to a cloud stand-in while that node cannot lease (prod T-45). An
+         * explicit `cloud` preference still runs in the cloud. Default OFF: the shipped
+         * `local-fallback` contract (relocate, notify `pinned-runner-offline`) stays the
+         * default until the owner flips it. App Works are held regardless (#2809, FR-12).
+         */
+        pinnedAgentHoldsForNode(): boolean {
+            const raw = (process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
          * Command template a node runs for one `agent-task` job.
          * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
          * each substituted with an id validated against a strict
@@ -1246,6 +1259,20 @@ export const config = {
              */
             cloudPushEnabled() {
                 return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';
+            },
+
+            /**
+             * 2026-10-21 — `APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`: before a Deployment reaches
+             * the cluster, read the image config's `User` from the registry (with the App's own
+             * pull credential) and refuse an image the kubelet would refuse under
+             * `runAsNonRoot` — `managed_root_forbidden` (root / no user) or
+             * `image_user_unverifiable` (a user NAME) — unless the component declares a numeric
+             * `runAsUser`. Without it the same refusal arrives only from the kubelet, after the
+             * namespace was prepared and a Job or a rollout waited. A registry that cannot be read
+             * is a warning (`image_user_unchecked`), never a refusal. Default OFF; read per call.
+             */
+            imageUserPrecheckEnabled() {
+                return process.env.APP_WORKS_IMAGE_USER_PRECHECK_ENABLED === 'true';
             },
 
             /**

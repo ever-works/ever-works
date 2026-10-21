@@ -1115,6 +1115,12 @@ export const appSpecJobSchema = z.strictObject({
         .max(3)
         .optional()
         .describe('Retries, 0–3 (§13:330); default: 0.'),
+    expectsWork: z
+        .boolean()
+        .optional()
+        .describe(
+            'The job must report the work it did on its termination message (/dev/termination-log); a job that exits 0 having reported nothing fails. Default: false.',
+        ),
 });
 
 /**

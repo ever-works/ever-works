@@ -759,6 +759,13 @@ export interface AppSpecJob {
 	timeoutSeconds?: number;
 	/** 0–3; `0` when absent. */
 	retries?: number;
+	/**
+	 * `false` when absent (additive, 2026-10-21). `true` declares that the job always does work (a
+	 * migration, a bootstrap) and reports it: it must write a non-empty line to its termination
+	 * message (`/dev/termination-log`, also `$EVER_WORKS_JOB_REPORT_PATH`), or the Deployment fails
+	 * the job "exited 0 but reported no work" rather than treating a no-op as a success.
+	 */
+	expectsWork?: boolean;
 }
 
 /**

@@ -34,6 +34,7 @@ describe('fleet routing — App Work cloud-fallback guard', () => {
         process.env = { ...originalEnv, EVER_WORKS_JOB_RUNTIME: 'node' };
         delete process.env.FLEET_NODE_RUNTIME_ENABLED;
         delete process.env.APP_WORKS_CLOUD_PUSH_ENABLED;
+        delete process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE;
     });
 
     afterAll(() => {
@@ -105,5 +106,42 @@ describe('fleet routing — App Work cloud-fallback guard', () => {
         });
 
         expect(decision.target).toBe('cloud');
+    });
+
+    describe('FLEET_PINNED_AGENT_HOLDS_FOR_NODE — a pinned Agent implies fleet routing (2026-10-21)', () => {
+        // The fixture's Agent is pinned to `node-1` (resolveAgentTaskTarget), with no free runner.
+        it('holds a pinned Agent of a non-App Work for its node when the flag is on', async () => {
+            process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE = 'true';
+
+            const decision = await router('local-fallback', 'repo').routeAgentTask(payload(), {
+                workId: WORK_ID,
+            });
+
+            expect(decision).toEqual({
+                target: 'fleet-waiting',
+                mode: 'local-fallback',
+                queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER,
+            });
+        });
+
+        it('still honours an explicit cloud preference for a pinned Agent', async () => {
+            process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE = 'true';
+
+            const decision = await router('cloud', 'repo').routeAgentTask(payload(), {
+                workId: WORK_ID,
+            });
+
+            expect(decision).toEqual({ target: 'cloud', mode: 'cloud' });
+        });
+
+        it('keeps the shipped local-fallback relocation while the flag is off', async () => {
+            delete process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE;
+
+            const decision = await router('local-fallback', 'repo').routeAgentTask(payload(), {
+                workId: WORK_ID,
+            });
+
+            expect(decision.target).toBe('cloud');
+        });
     });
 });
