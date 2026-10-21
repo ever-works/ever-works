@@ -39,12 +39,19 @@ function psQuote(value: string): string {
 }
 
 /** The PowerShell for one read: newest `max` events, oldest first, one JSON per line. */
-export function eventLogScript(options: EventLogReaderOptions, max: number, after?: string | null): string {
+export function eventLogScript(
+	options: EventLogReaderOptions,
+	max: number,
+	after?: string | null,
+	before?: string | null
+): string {
 	const conditions: string[] = [];
 	// The provider passed the contracts' pattern (no quote); the whole XPath is
 	// single-quoted for PowerShell below, which doubles its inner quotes.
 	if (options.provider) conditions.push(`Provider[@Name='${options.provider}']`);
 	if (after) conditions.push(`TimeCreated[@SystemTime>'${after}']`);
+	// P2 (`logs.earlier`): the page before the oldest event handed out.
+	if (before) conditions.push(`TimeCreated[@SystemTime<'${before}']`);
 	const xpath = conditions.length > 0 ? ` -FilterXPath ${psQuote(`*[System[${conditions.join(' and ')}]]`)}` : '';
 	return [
 		"$ErrorActionPreference = 'Stop'",
@@ -102,10 +109,11 @@ const UNAUTHORIZED = /unauthorized operation|access is denied/i;
 
 export function createEventLogReader(io: LogIo, options: EventLogReaderOptions): LogReader {
 	let newest: string | null = null;
+	let oldest: string | null = null;
 	const recent = new Set<string>();
 
-	const read = async (max: number, after: string | null) => {
-		const result = await collectChild(io, 'powershell.exe', powershellArgs(eventLogScript(options, max, after)), {
+	const read = async (max: number, after: string | null, before: string | null = null) => {
+		const result = await collectChild(io, 'powershell.exe', powershellArgs(eventLogScript(options, max, after, before)), {
 			max,
 			parse: parseEventLine,
 			timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
@@ -140,10 +148,11 @@ export function createEventLogReader(io: LogIo, options: EventLogReaderOptions):
 	};
 
 	return {
-		supportsEarlier: false,
+		supportsEarlier: true,
 		async tail(lines): Promise<LogBatch> {
 			const entries = await read(lines, null);
 			remember(entries);
+			oldest = entries[0]?.ts ?? null;
 			if (!newest) newest = new Date(io.now()).toISOString();
 			return { lines: entries.map(strip) };
 		},
@@ -176,6 +185,12 @@ export function createEventLogReader(io: LogIo, options: EventLogReaderOptions):
 					if (timer !== null) io.clearTimer(timer);
 				}
 			};
+		},
+		async earlier(lines) {
+			if (!oldest) return { lines: [], hasMore: false };
+			const entries = await read(lines, null, oldest);
+			if (entries.length > 0 && entries[0]!.ts) oldest = entries[0]!.ts;
+			return { lines: entries.map(strip), hasMore: entries.length >= lines };
 		}
 	};
 }

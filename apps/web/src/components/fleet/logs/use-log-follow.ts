@@ -51,6 +51,10 @@ export interface LogFollowState {
     loadingEarlier: boolean;
     earlierExhausted: boolean;
     earlierUnsupported: boolean;
+    /** Lines appended at the bottom since the viewer opened (the "N new lines" pill counts its growth). */
+    appended: number;
+    /** Lines an older page prepended last (P2: the viewer keeps its scroll position by this many rows). */
+    prepended: number;
 }
 
 const INITIAL: LogFollowState = {
@@ -71,6 +75,8 @@ const INITIAL: LogFollowState = {
     loadingEarlier: false,
     earlierExhausted: false,
     earlierUnsupported: false,
+    appended: 0,
+    prepended: 0,
 };
 
 export interface UseLogFollowInput {
@@ -135,7 +141,10 @@ export function useLogFollow(input: UseLogFollowInput) {
                         return { ...s, groupHint: notice.hint ?? null };
                     case 'gone':
                     case 'stopped':
-                        return { ...s, following: false, stopReason: notice.kind, stopHint: notice.hint ?? null };
+                        // In a merged view one source ending leaves the others following (P2).
+                        return sources.length > 1
+                            ? { ...s, stopHint: notice.hint ?? null }
+                            : { ...s, following: false, stopReason: notice.kind, stopHint: notice.hint ?? null };
                     case 'kill-switch':
                         return { ...s, following: false, phase: 'stopped', stopReason: 'kill-switch', stopHint: notice.hint ?? null };
                     case 'error':
@@ -164,11 +173,19 @@ export function useLogFollow(input: UseLogFollowInput) {
                     if (pausedRef.current && fresh.length > 0) heldWhilePaused.current.push(...fresh);
                     setState((s) => {
                         let window = s.window;
-                        if (earlier.length > 0) window = prependHeld(window, earlier);
-                        if (!pausedRef.current) window = appendHeld(window, fresh);
+                        let prepended = s.prepended;
+                        if (earlier.length > 0) {
+                            const before = window.lines.length;
+                            window = prependHeld(window, earlier);
+                            prepended = window.lines.length - before;
+                        }
+                        const appending = !pausedRef.current && fresh.length > 0;
+                        if (appending) window = appendHeld(window, fresh);
                         return {
                             ...s,
                             window,
+                            prepended,
+                            appended: appending ? s.appended + fresh.length : s.appended,
                             bytes: s.bytes + bytes,
                             redactions: s.redactions + redactions,
                             pausedCount: pausedRef.current ? s.pausedCount + fresh.length : s.pausedCount,
@@ -269,7 +286,13 @@ export function useLogFollow(input: UseLogFollowInput) {
         pausedRef.current = false;
         const held = heldWhilePaused.current;
         heldWhilePaused.current = [];
-        setState((s) => ({ ...s, paused: false, pausedCount: 0, window: appendHeld(s.window, held) }));
+        setState((s) => ({
+            ...s,
+            paused: false,
+            pausedCount: 0,
+            window: appendHeld(s.window, held),
+            appended: s.appended + held.length,
+        }));
     }, []);
 
     const stopFollowing = useCallback(() => {
@@ -284,7 +307,7 @@ export function useLogFollow(input: UseLogFollowInput) {
 
     const loadEarlier = useCallback((src = 0) => {
         socketRef.current?.earlier(src);
-        setState((s) => ({ ...s, loadingEarlier: true }));
+        setState((s) => ({ ...s, loadingEarlier: true, prepended: 0 }));
     }, []);
 
     return { state, pause, resume, reopen, stopFollowing, startFollowing, loadEarlier };

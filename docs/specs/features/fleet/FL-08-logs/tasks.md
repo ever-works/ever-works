@@ -6,7 +6,7 @@
 
 **Feature ID**: `FL-08-logs`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `In progress` — P1 built (lane L3, PR #2839; specs written, not run — Fast-build rule)
+**Status**: `In progress` — P1 merged (#2839), P2 built (lane L3; specs written, not run — Fast-build rule)
 **Last updated**: 2026-10-21
 
 ---
@@ -141,15 +141,15 @@
 
 ## P2 — Merged view, earlier, hand-offs
 
-- [ ] **T-18**. Extend `log-channel.ts` and `fleet-logs.types.ts` for `sources[]` (≤ 12): per-source
+- [x] **T-18**. Extend `log-channel.ts` and `fleet-logs.types.ts` for `sources[]` (≤ 12): per-source
       reader, timestamp merge, `src` index on each line; add `LogSourceChip.tsx` and the merged header
       to `LogViewer.tsx`.
     - **Test**: `log-channel.merge.spec.ts` (order by `ts`, late source joins, one gone),
       `LogViewer.unit.spec.tsx` chips.
-- [ ] **T-19**. Implement `logs.earlier` end to end (journal cursor, event `RecordId`, file backward
+- [x] **T-19**. Implement `logs.earlier` end to end (journal cursor, event `RecordId`, file backward
       scan; containers answer `hasMore: false`) and **Load 500 earlier** in `LogViewerToolbar.tsx`.
     - **Test**: reader specs for `earlier`; `LogViewer.unit.spec.tsx` prepend keeps scroll position.
-- [ ] **T-20**. Export `openLogsForSource(nodeId, sourceId)` and `openMergedLogs(nodeId, sourceIds)`
+- [x] **T-20**. Export `openLogsForSource(nodeId, sourceId)` and `openMergedLogs(nodeId, sourceIds)`
       from `apps/web/src/components/fleet/logs/logs-tab.registry.ts` for FL-09's **Open log** rows and
       Compose **Logs** entry (deep link `?tab=logs&source=…`).
     - **Test**: `logs-tab.registry.unit.spec.ts` deep-link parsing; FL-09's spec exercises the call.

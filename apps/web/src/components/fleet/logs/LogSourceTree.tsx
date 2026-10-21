@@ -23,10 +23,12 @@ export function LogSourceTree({
     onSelect,
 }: {
     sources: readonly FleetLogSource[];
-    selected: string | null;
+    /** The open source(s) — one, or a merged set (P2). */
+    selected: readonly string[];
     /** Permission denied (U4): every source greyed. */
     disabled?: boolean;
-    onSelect(id: string): void;
+    /** `additive`: ctrl/cmd-click — add the source to (or remove it from) the merged view. */
+    onSelect(id: string, additive: boolean): void;
 }) {
     const t = useTranslations('fleet.logs');
     const locale = useLocale();
@@ -52,7 +54,7 @@ export function LogSourceTree({
     };
 
     const item = (source: FleetLogSource) => {
-        const isSelected = source.id === selected;
+        const isSelected = selected.includes(source.id);
         const reason =
             source.unreadableReason === 'root-only'
                 ? t('sources.rootOnly')
@@ -96,7 +98,7 @@ export function LogSourceTree({
                     data-testid="fleet-logs-source"
                     data-source={source.id}
                     aria-current={isSelected ? 'true' : undefined}
-                    onClick={() => onSelect(source.id)}
+                    onClick={(event) => onSelect(source.id, event.ctrlKey || event.metaKey)}
                     className={`w-full flex items-center justify-between gap-2 px-2 py-1 rounded text-left text-xs transition-colors ${
                         isSelected
                             ? 'bg-primary/10 text-primary dark:text-primary-dark'
@@ -142,7 +144,7 @@ export function LogSourceTree({
             return;
         }
         setTypedError(false);
-        onSelect(id);
+        onSelect(id, false);
     };
 
     return (

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDown, Copy, Pause, Play, RotateCw } from 'lucide-react';
+import { ArrowDown, ArrowUpToLine, Copy, Pause, Play, RotateCw } from 'lucide-react';
 import type { FleetLogSource } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { CopyCommand } from '../link/CopyCommand';
@@ -10,6 +10,8 @@ import {
     filterHeld,
     formatLogTime,
     isAtBottom,
+    logChipClass,
+    logChipLabel,
     logFooterParts,
     logsCopyText,
     shouldStopFollowing,
@@ -35,16 +37,24 @@ export function LogViewer({
     nodeName,
     source,
     sources,
+    listed = [],
+    title = null,
 }: {
     nodeId: string;
     nodeName: string;
-    /** The source as listed (the header names it); null for a typed path not in the list. */
+    /** The source as listed (the header names it); null for a typed path not in the list, or a merged view. */
     source: FleetLogSource | null;
-    /** The ids to open (one; P2 a merged set). */
+    /** The ids to open (one; P2 a merged set of up to 12). */
     sources: readonly string[];
+    /** P2: the listed sources, to name a merged view's chips. */
+    listed?: readonly FleetLogSource[];
+    /** P2: a merged view's name (a Compose project). */
+    title?: string | null;
 }) {
     const t = useTranslations('fleet.logs');
-    const { state, pause, resume, reopen, startFollowing } = useLogFollow({ nodeId, sources });
+    const { state, pause, resume, reopen, startFollowing, loadEarlier } = useLogFollow({ nodeId, sources });
+    const merged = sources.length > 1;
+    const chips = useMemo(() => sources.map((id) => logChipLabel(id, listed)), [sources, listed]);
     const [filter, setFilter] = useState('');
     const [pinned, setPinned] = useState(true);
     const [newSinceUnpinned, setNewSinceUnpinned] = useState(0);
@@ -53,18 +63,29 @@ export function LogViewer({
     const [copied, setCopied] = useState<'selection' | 'all' | null>(null);
     const listRef = useRef<HTMLDivElement | null>(null);
     const filterRef = useRef<HTMLInputElement | null>(null);
-    const lastCount = useRef(0);
+    const lastAppended = useRef(0);
+    const lastFirstSeq = useRef<number | null>(null);
 
     const shown = useMemo(() => filterHeld(state.window.lines, filter), [state.window.lines, filter]);
     const label = source?.label ?? sources[0]?.replace(/^[a-z]+:/, '') ?? '';
     const kind = source?.kind ?? (sources[0]?.split(':', 1)[0] as FleetLogSource['kind'] | undefined) ?? 'file';
 
-    // Count what arrives while the view is not at the bottom (the pill).
+    // Count what arrives at the bottom while the view is not there (the pill).
     useEffect(() => {
-        const added = Math.max(0, shown.length - lastCount.current);
-        lastCount.current = shown.length;
+        const added = Math.max(0, state.appended - lastAppended.current);
+        lastAppended.current = state.appended;
         if (!pinned && added > 0) setNewSinceUnpinned((value) => value + added);
-    }, [shown.length, pinned]);
+    }, [state.appended, pinned]);
+
+    // P2: an older page prepended — keep the lines under the reader where they were.
+    useLayoutEffect(() => {
+        const first = state.window.lines[0]?.seq ?? null;
+        const list = listRef.current;
+        if (first !== lastFirstSeq.current && state.prepended > 0 && list && !pinned) {
+            list.scrollTop += state.prepended * ROW_HEIGHT;
+        }
+        lastFirstSeq.current = first;
+    }, [state.window.lines, state.prepended, pinned]);
 
     // Stay at the bottom while pinned and not paused.
     useLayoutEffect(() => {
@@ -195,7 +216,11 @@ export function LogViewer({
         >
             <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-border dark:border-border-dark">
                 <h3 className="text-sm font-medium text-text dark:text-text-dark truncate" data-testid="fleet-logs-viewer-title">
-                    {t('viewer.title', { source: label, kind: t(`kinds.${kind}`), node: nodeName })}
+                    {merged
+                        ? title
+                            ? t('viewer.mergedTitle', { title, count: sources.length, node: nodeName })
+                            : t('viewer.mergedTitleNoName', { count: sources.length, node: nodeName })
+                        : t('viewer.title', { source: label, kind: t(`kinds.${kind}`), node: nodeName })}
                 </h3>
                 {badge && (
                     <span className={`text-xs font-semibold shrink-0 ${badge.className}`} data-testid="fleet-logs-badge">
@@ -232,6 +257,16 @@ export function LogViewer({
                     <Button size="sm" variant="ghost" onClick={startFollowing} data-testid="fleet-logs-follow">
                         {t('viewer.follow')}
                     </Button>
+                )}
+                {!merged && state.loaded && (
+                    <EarlierControl
+                        supported={source ? source.supportsEarlier : kind === 'file'}
+                        container={kind === 'container'}
+                        loading={state.loadingEarlier}
+                        exhausted={state.earlierExhausted}
+                        unsupported={state.earlierUnsupported}
+                        onLoad={() => loadEarlier(0)}
+                    />
                 )}
                 <Button size="sm" variant="ghost" onClick={() => void copy('selection')} data-testid="fleet-logs-copy-selection">
                     <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
@@ -270,7 +305,12 @@ export function LogViewer({
                     >
                         <div style={{ height: shown.length * ROW_HEIGHT, position: 'relative' }}>
                             {visible.map((held: HeldLine, index: number) => (
-                                <LogRow key={held.seq} held={held} top={(start + index) * ROW_HEIGHT} />
+                                <LogRow
+                                    key={held.seq}
+                                    held={held}
+                                    top={(start + index) * ROW_HEIGHT}
+                                    chip={merged ? (chips[held.line.src] ?? '?') : null}
+                                />
                             ))}
                         </div>
                     </div>
@@ -296,7 +336,7 @@ export function LogViewer({
                             : state.stopReason === 'lost'
                               ? t('states.lost')
                               : state.stopReason === 'gone'
-                                ? t('notices.gone', { source: label })
+                                ? (state.stopHint ?? t('notices.gone', { source: label }))
                                 : (state.stopHint ?? t('notices.stopped', { source: label }))}
                     </p>
                     {state.stopReason === 'lost' && (
@@ -307,6 +347,16 @@ export function LogViewer({
                 </div>
             )}
 
+            {merged && !state.stopReason && state.stopHint && (
+                <p
+                    className="px-3 py-1.5 border-t border-border dark:border-border-dark text-xs text-text-muted dark:text-text-muted-dark"
+                    role="status"
+                    data-testid="fleet-logs-merged-notice"
+                >
+                    {state.stopHint}
+                </p>
+            )}
+
             <footer className="px-3 py-1.5 border-t border-border dark:border-border-dark text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-footer">
                 {footer.map((part) => t(`viewer.${part.key}`, part.values)).join(' · ')}
             </footer>
@@ -314,7 +364,46 @@ export function LogViewer({
     );
 }
 
-function LogRow({ held, top }: { held: HeldLine; top: number }) {
+/** P2 (FR-37): "Load 500 earlier", or why a source cannot page back. */
+function EarlierControl({
+    supported,
+    container,
+    loading,
+    exhausted,
+    unsupported,
+    onLoad,
+}: {
+    supported: boolean;
+    container: boolean;
+    loading: boolean;
+    exhausted: boolean;
+    unsupported: boolean;
+    onLoad(): void;
+}) {
+    const t = useTranslations('fleet.logs');
+    if (!supported || unsupported) {
+        return (
+            <span className="text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-no-earlier">
+                {container ? t('viewer.noEarlierContainer') : t('viewer.noEarlier')}
+            </span>
+        );
+    }
+    if (exhausted) {
+        return (
+            <span className="text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-no-earlier">
+                {t('viewer.noEarlier')}
+            </span>
+        );
+    }
+    return (
+        <Button size="sm" variant="ghost" onClick={onLoad} disabled={loading} data-testid="fleet-logs-load-earlier">
+            <ArrowUpToLine className="w-3 h-3 mr-1" aria-hidden="true" />
+            {loading ? t('viewer.loadingEarlier') : t('viewer.loadEarlier')}
+        </Button>
+    );
+}
+
+function LogRow({ held, top, chip }: { held: HeldLine; top: number; chip: string | null }) {
     const t = useTranslations('fleet.logs');
     const { line } = held;
     const tone =
@@ -330,6 +419,15 @@ function LogRow({ held, top }: { held: HeldLine; top: number }) {
             data-level={line.level}
         >
             <span className="shrink-0 text-text-muted dark:text-text-muted-dark select-none w-16">{formatLogTime(line.ts)}</span>
+            {chip !== null && (
+                <span
+                    className={`shrink-0 rounded px-1.5 select-none max-w-[8rem] truncate ${logChipClass(line.src)}`}
+                    title={chip}
+                    data-testid="fleet-logs-chip"
+                >
+                    {chip}
+                </span>
+            )}
             <span className="flex-1">{line.text}</span>
             {line.level !== 'info' && (
                 <span className="shrink-0 font-semibold select-none">
