@@ -20,6 +20,8 @@ export class FleetPortTunnelRepository {
     ) {}
 
     async insert(input: {
+        /** The tunnel id, chosen before the machine was asked (the channel carries it). */
+        id: string;
         ownerUserId: string;
         nodeId: string;
         port: number;
@@ -28,6 +30,7 @@ export class FleetPortTunnelRepository {
     }): Promise<FleetPortTunnel> {
         return this.repository.save(
             this.repository.create({
+                id: input.id,
                 ownerUserId: input.ownerUserId,
                 nodeId: input.nodeId,
                 port: input.port,
