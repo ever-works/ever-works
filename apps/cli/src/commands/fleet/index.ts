@@ -1,4 +1,21 @@
 import { Command } from 'commander';
+import {
+    commandsCancelCommand,
+    dockerComposeActionCommand,
+    dockerContainerCommand,
+    dockerImageRemoveCommand,
+    dockerPruneCommand,
+    dockerPullCommand,
+    nodesGitIdentitySetCommand,
+    nodesWakeCommand,
+    operationsCancelCommand,
+    portsOpenCommand,
+    portsPreviewCloseCommand,
+    processesSignalCommand,
+    servicesActionCommand,
+    sessionsEndCommand,
+    sessionsRenameCommand,
+} from './acts';
 import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { commandsGetCommand, commandsListCommand } from './commands-read';
@@ -30,8 +47,22 @@ export const fleetSessionCommand = new Command('session')
     .addCommand(questionCommand)
     .addCommand(answerCommand);
 
-// FL-19 T-10 — the reads beside FL-12's `fleet commands run`.
-commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand);
+// FL-19 T-10 — the reads beside FL-12's `fleet commands run`; P2 adds cancel.
+commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand).addCommand(commandsCancelCommand);
+
+// FL-19 P2 (T-16) — the acts, beside each family's reads, all through `--yes` / `--confirm-name`.
+fleetSessionCommand.addCommand(sessionsEndCommand).addCommand(sessionsRenameCommand);
+nodesCommand.addCommand(nodesWakeCommand).addCommand(nodesGitIdentitySetCommand);
+servicesCommand.addCommand(servicesActionCommand);
+processesCommand.addCommand(processesSignalCommand);
+dockerCommand
+    .addCommand(dockerContainerCommand)
+    .addCommand(dockerPullCommand)
+    .addCommand(dockerImageRemoveCommand)
+    .addCommand(dockerPruneCommand)
+    .addCommand(dockerComposeActionCommand);
+portsCommand.addCommand(portsOpenCommand).addCommand(portsPreviewCloseCommand);
+operationsCommand.addCommand(operationsCancelCommand);
 
 /**
  * `ever-works fleet <family> <verb> [--json]` (FL-19, CONTRACTS §11.3) — the
