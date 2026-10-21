@@ -28,6 +28,7 @@ import {
     FLEET_SESSION_STARTS_PER_MINUTE,
     isFleetSessionLive,
     type FleetSessionAnswerResponse,
+    type FleetSessionBoardResponse,
     type FleetSessionAttachTokenResponse,
     type FleetSessionRecordingManifest,
     type FleetSessionRecordingPage,
@@ -175,7 +176,15 @@ export class FleetSessionsController {
     async list(
         @CurrentUser() auth: AuthenticatedUser,
         @Query() query: ListFleetSessionsQueryDto,
-    ): Promise<FleetSessionListResponse> {
+    ): Promise<FleetSessionListResponse | FleetSessionBoardResponse> {
+        // FL-05 P3: the Sessions board — the four columns instead of a page.
+        if (query.view === 'board') {
+            return this.sessions.board(actorOf(auth), {
+                ...(query.nodeId ? { nodeId: query.nodeId } : {}),
+                ...(query.agentId ? { agentId: query.agentId } : {}),
+                ...(query.kind ? { kind: query.kind } : {}),
+            });
+        }
         return this.sessions.listPage(actorOf(auth), {
             ...listQuery(query),
             ...(query.nodeId ? { nodeId: query.nodeId } : {}),

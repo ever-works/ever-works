@@ -223,6 +223,30 @@ export class FleetSessionRepository {
         });
     }
 
+    /**
+     * FL-05 P3 — the board: every LIVE session on these nodes (optionally one
+     * Agent's or one kind), most recently moved first. Sorted again by the
+     * caller (Postgres and SQLite order NULLs differently).
+     */
+    async listLiveForBoard(
+        nodeIds: readonly string[],
+        query: { agentId?: string; kind?: FleetSessionKind } = {},
+        limit = 400,
+    ): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        const builder = this.repository
+            .createQueryBuilder('session')
+            .where({ nodeId: In([...nodeIds]) })
+            .andWhere('session.state <> :ended', { ended: 'ended' });
+        if (query.kind) builder.andWhere('session.kind = :kind', { kind: query.kind });
+        if (query.agentId) builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
+        return builder
+            .orderBy('session.stateChangedAt', 'DESC')
+            .addOrderBy('session.lastActivityAt', 'DESC')
+            .take(limit)
+            .getMany();
+    }
+
     /** FL-05's "needs a look" producer: sessions waiting on someone, on these nodes. */
     async findNeedsYouForNodes(nodeIds: readonly string[], limit = 200): Promise<FleetSession[]> {
         if (nodeIds.length === 0) return [];

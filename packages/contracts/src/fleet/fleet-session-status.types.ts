@@ -37,7 +37,8 @@ import {
 	isFleetSessionState,
 	type FleetSessionOutcome,
 	type FleetSessionProvider,
-	type FleetSessionState
+	type FleetSessionState,
+	type FleetSessionView
 } from './fleet-sessions.types.js';
 
 // ─── Limits and windows (CONTRACTS §10, §10.1, spec FR-4, FR-14, FR-34, FR-39) ───
@@ -1017,6 +1018,21 @@ export interface FleetSessionAcknowledgeRequest {
 export const FLEET_SESSION_BOARD_COLUMNS = ['needs_you', 'working', 'done', 'idle'] as const;
 
 export type FleetSessionBoardColumn = (typeof FLEET_SESSION_BOARD_COLUMNS)[number];
+
+/**
+ * `GET /api/fleet/sessions?view=board` (P3, spec FR-41 … FR-44): the four
+ * columns, each most-recently-moved first, of every live session on the
+ * computers the reader may see sessions on (or one computer, `nodeId`), with
+ * `done` sessions only for 24 h after they finished.
+ */
+export interface FleetSessionBoardResponse {
+	columns: Record<FleetSessionBoardColumn, FleetSessionView[]>;
+	/** ISO — when the platform read it. */
+	generatedAt: string;
+}
+
+/** Most live sessions one board read returns (the board's 200-session first paint, spec §6, with headroom). */
+export const FLEET_SESSION_BOARD_MAX = 400;
 
 /**
  * The column a session sits in, or null when it is not on the board: ended
