@@ -7,12 +7,18 @@ import {
     Param,
     ParseUUIDPipe,
     Post,
+    Put,
     UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { FleetSessionActionService, type FleetSessionActor } from '@ever-works/agent/fleet';
+import {
+    FleetAgentActionTemplatesService,
+    FleetSessionActionService,
+    type FleetSessionActor,
+} from '@ever-works/agent/fleet';
 import type {
+    FleetAgentActionTemplates,
     FleetSessionActionLedgerResponse,
     FleetSessionActionSendResponse,
     FleetSessionActionsResponse,
@@ -21,7 +27,11 @@ import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetSessionsEnabledGuard } from '../sessions/fleet-sessions-enabled.guard';
-import { ResendFleetSessionActionDto, SendFleetSessionActionDto } from './dto/fleet-session-git.dto';
+import {
+    ResendFleetSessionActionDto,
+    SendFleetSessionActionDto,
+    UpdateFleetAgentActionTemplatesDto,
+} from './dto/fleet-session-git.dto';
 
 function actorOf(auth: AuthenticatedUser): FleetSessionActor {
     return { userId: auth.userId };
@@ -39,7 +49,43 @@ function actorOf(auth: AuthenticatedUser): FleetSessionActor {
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetSessionsEnabledGuard)
 export class FleetSessionActionsController {
-    constructor(private readonly actions: FleetSessionActionService) {}
+    constructor(
+        private readonly actions: FleetSessionActionService,
+        private readonly templates: FleetAgentActionTemplatesService,
+    ) {}
+
+    @Get('agents/:agentId/action-templates')
+    @ApiOperation({
+        summary:
+            'An Agent’s own Fleet action templates and branch prefix, from its agent.yml, each beside the platform default (the instructions editor’s Fleet actions section).',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async readTemplates(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('agentId', ParseUUIDPipe) agentId: string,
+    ): Promise<FleetAgentActionTemplates> {
+        return this.templates.read(agentId, auth.userId);
+    }
+
+    @Put('agents/:agentId/action-templates')
+    @ApiOperation({
+        summary:
+            'Save an Agent’s Fleet action templates and branch prefix into its agent.yml (the rest of the file is kept; an empty template falls back to the default). A concurrent edit is refused with the etag, never overwritten.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async writeTemplates(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('agentId', ParseUUIDPipe) agentId: string,
+        @Body() body: UpdateFleetAgentActionTemplatesDto,
+    ): Promise<FleetAgentActionTemplates> {
+        return this.templates.write(agentId, auth.userId, {
+            ...(body.branchPrefix !== undefined ? { branchPrefix: body.branchPrefix } : {}),
+            ...(body.actions ? { actions: body.actions } : {}),
+            ...(body.expectedHash !== undefined ? { expectedHash: body.expectedHash } : {}),
+        });
+    }
 
     @Get('sessions/:id/actions')
     @ApiOperation({

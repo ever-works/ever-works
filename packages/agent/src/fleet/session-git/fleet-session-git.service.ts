@@ -12,6 +12,7 @@ import { FleetCheckoutService } from '../checkouts/fleet-checkout.service';
 import { fleetSessionError, readFleetSessionError } from '../sessions/fleet-session.errors';
 import { FleetSessionService, type FleetSessionActor } from '../sessions/fleet-session.service';
 import { FleetSessionTaskService } from '../sessions/fleet-session-task.service';
+import { readAgentFleetBlock } from './agent-fleet-block';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -87,7 +88,10 @@ export class FleetSessionGitService {
         if (agentId) {
             const agent = this.agents && UUID.test(agentId) ? await this.agents.findById(agentId) : null;
             if (!agent || agent.userId !== actor.userId) throw fleetSessionError('not_found', 'no such Agent');
-            prefix = fleetSessionBranchPrefix(agent.slug || agent.name);
+            // FL-06 P3 (FR-27): the Agent's own `fleet.branchPrefix`, else its slug.
+            prefix = fleetSessionBranchPrefix(
+                readAgentFleetBlock(agent.agentYml ?? null).block.branchPrefix ?? (agent.slug || agent.name),
+            );
             organizationId = agent.organizationId ?? null;
         } else {
             prefix = fleetSessionBranchPrefix(await this.handleOf(actor.userId));
