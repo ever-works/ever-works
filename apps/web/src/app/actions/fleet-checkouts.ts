@@ -2,6 +2,9 @@
 
 import { redirect } from 'next/navigation';
 import type {
+    FleetCheckoutCreateRequest,
+    FleetCheckoutCreateResponse,
+    FleetCheckoutDeleteRequest,
     FleetCheckoutListResponse,
     FleetCheckoutOperationResponse,
     FleetCheckoutState,
@@ -114,6 +117,35 @@ export async function archiveCheckoutAction(
     await ensureAuth();
     try {
         return { success: true, data: await fleetCheckoutsAPI.archive(id, confirm) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/** Create a checkout (FL-14 P2): a fresh clone or a worktree. */
+export async function createCheckoutAction(
+    body: FleetCheckoutCreateRequest,
+): Promise<CheckoutActionResult<FleetCheckoutCreateResponse>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetCheckoutsAPI.create(body) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/**
+ * Delete or forget a checkout (FL-14 P2). The first call without a
+ * confirmation answers `code: 'confirmation_required'` with the evidence in
+ * `details` (`class`, `uncommitted`, `unpushedCommits`, `name`, `summary`).
+ */
+export async function deleteCheckoutAction(
+    id: string,
+    body: FleetCheckoutDeleteRequest,
+): Promise<CheckoutActionResult<FleetCheckoutView | { forgotten: true; id: string }>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetCheckoutsAPI.remove(id, body) };
     } catch (error) {
         return refusal(error);
     }

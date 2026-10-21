@@ -1,5 +1,8 @@
 import 'server-only';
 import type {
+    FleetCheckoutCreateRequest,
+    FleetCheckoutCreateResponse,
+    FleetCheckoutDeleteRequest,
     FleetCheckoutListResponse,
     FleetCheckoutOperationResponse,
     FleetCheckoutState,
@@ -83,6 +86,24 @@ export const fleetCheckoutsAPI = {
             endpoint: `${BASE}/checkouts/${encodeURIComponent(id)}/archive`,
             data: { confirm },
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    create: async (body: FleetCheckoutCreateRequest) => {
+        return serverMutation<FleetCheckoutCreateResponse>({
+            endpoint: `${BASE}/checkouts`,
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    remove: async (id: string, body: FleetCheckoutDeleteRequest) => {
+        return serverMutation<FleetCheckoutView | { forgotten: true; id: string }>({
+            endpoint: `${BASE}/checkouts/${encodeURIComponent(id)}`,
+            data: body,
+            method: 'DELETE',
             wrapInData: false,
         });
     },

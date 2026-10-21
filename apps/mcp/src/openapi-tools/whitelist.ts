@@ -611,6 +611,34 @@ export const WHITELIST: WhitelistEntry[] = [
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
 
+	// Checkouts on computers (6) — FL-14, `apps/api/src/fleet/checkouts/
+	// fleet-checkouts.controller.ts`, the same names as the Agent tools
+	// (CONTRACTS §11.3). Pull, push, archive and delete answer
+	// `confirmation_required` first; the caller repeats with `confirm` /
+	// `confirmName` (CONTRACTS §2.2). The node-facing credential route
+	// (`/api/fleet/checkouts/{id}/credential`) is deliberately NOT exposed.
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts',
+		toolName: 'fleet_checkouts_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/checkouts', toolName: 'fleet_checkouts_create' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/sync', toolName: 'fleet_checkouts_sync' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/archive', toolName: 'fleet_checkouts_archive' },
+	{
+		method: 'DELETE',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_delete',
+		annotations: { destructiveHint: true }
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers

@@ -12839,7 +12839,14 @@
                 "archive": "Archive",
                 "restore": "Restore",
                 "archiveConfirm": "Move to bin",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "new": "New checkout",
+                "pull": "Pull",
+                "push": "Push",
+                "delete": "Delete",
+                "forget": "Forget",
+                "pullConfirm": "Pull",
+                "pushConfirm": "Push"
             },
             "bin": {
                 "toggle": "Bin ({count})",
@@ -12918,13 +12925,17 @@
                 "creating": "Still being created",
                 "busy": "Something is working in this checkout",
                 "folderRemoved": "The folder was removed; it cannot be restored",
-                "taskWorktree": "Task worktrees are kept in sync by their runs"
+                "taskWorktree": "Task worktrees are kept in sync by their runs",
+                "discovered": "A checkout found on this computer is only forgotten, never deleted"
             },
             "notices": {
                 "running": "Running on the computer…",
                 "fetchFailed": "Fetch failed (exit {code}): {line}",
                 "fetched": "Fetched",
-                "refreshed": "Refreshed"
+                "refreshed": "Refreshed",
+                "syncFailed": "{op} failed (exit {code}): {line}",
+                "pulled": "Pulled",
+                "pushed": "Pushed"
             },
             "gitLine": {
                 "detached": "detached",
@@ -12938,6 +12949,45 @@
                 "clean": "✓ clean",
                 "pr": "PR #{number} ({state})",
                 "notRead": "git line not read yet"
+            },
+            "confirmPull": "Pull {branch} on {name}? Fast-forward only.",
+            "confirmPush": "Push {branch} to {remote}?",
+            "newDialog": {
+                "title": "New checkout",
+                "where": "Computer",
+                "offline": "offline",
+                "needsManage": "needs --manage",
+                "how": "How",
+                "clone": "Fresh clone",
+                "worktree": "Worktree of a checkout here",
+                "repoUrl": "Repository URL",
+                "credentialNote": "A repository your GitHub App installation covers is cloned with a short-lived credential for this one operation; a public one without any.",
+                "parent": "Worktree of",
+                "chooseParent": "Choose a checkout…",
+                "branch": "Branch",
+                "branchPlaceholder": "proposed for you",
+                "branchNote": "A name already on the remote or on another checkout gets -2, -3, …",
+                "cost": "Uses disk on {name}. No tokens or credits.",
+                "costWithSize": "Uses disk on {name} (about {size}). No tokens or credits.",
+                "cancel": "Cancel",
+                "create": "Create",
+                "creating": "Creating…",
+                "failed": "The checkout could not be created."
+            },
+            "deleteDialog": {
+                "title": "Delete checkout",
+                "forgetTitle": "Forget checkout",
+                "wouldLose": "{what} would be lost.",
+                "lostFiles": "{count, plural, one {# uncommitted file} other {# uncommitted files}}",
+                "lostCommits": "{count, plural, one {# commit not on any remote} other {# commits not on any remote}}",
+                "and": " and ",
+                "cleanSummary": "Delete {path}? Nothing would be lost.",
+                "forgetSummary": "Forget {path}? The folder is not touched.",
+                "typeName": "Type {name} to confirm.",
+                "cancel": "Cancel",
+                "delete": "Delete",
+                "forget": "Forget",
+                "failed": "It could not be deleted."
             }
         },
         "palette": {
