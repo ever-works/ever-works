@@ -34,6 +34,11 @@ import {
 } from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
 import { hashNormalizedBody } from './kb-content-hash';
+import {
+    appContentWrite,
+    KB_LAST_CONTENT_WRITE_KEY,
+    type KbContentWrite,
+} from '../integrations-api/kb-content-provenance';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import type { KbConsolidationMarker } from './memory-consolidation';
 import type { EntityManager } from 'typeorm';
@@ -201,6 +206,15 @@ interface UpdateDocumentInput {
      * Never read from a request body.
      */
     reviewState?: KbReviewState;
+    /**
+     * Works-security lane (integration API gates, finding 2) — who wrote this
+     * content, set ONLY by the integration API (`kb-content-provenance.ts`).
+     * Stored under `metadata.lastContentWrite` when the edit changes content
+     * (title, description, body, class); a content edit WITHOUT it marks the
+     * content `principal: 'app'` (on a marked or `imported` document), so a
+     * person's edit in the app supersedes a key's. Never read from a request body.
+     */
+    contentWrite?: KbContentWrite;
 }
 
 interface ListOptions {
@@ -2421,7 +2435,9 @@ export class KnowledgeBaseService {
             revision: 1,
             revisionAt: new Date(),
             normalizedContentHash: hashNormalizedBody(body),
-            metadata: { body } as Record<string, unknown>,
+            // Caller metadata (the integration API's content-write marker) rides
+            // alongside the body, as on a Work document (`createDocument`).
+            metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
             // M7 — same review-gate derivation as `createDocument`: the
             // consolidation synthesis path passes `source: agent` so
             // LLM-merged docs land as `proposed` (review queue), while
@@ -4290,6 +4306,30 @@ export class KnowledgeBaseService {
                 ...(row.metadata ?? {}),
                 body: input.body,
             } as Record<string, unknown>;
+        }
+
+        // Works-security lane (integration API gates, finding 2) — the content
+        // write marker follows every CONTENT edit: the integration API's own
+        // (stamped as given), anyone else's (`principal: 'app'` — their content
+        // supersedes the key's). Written only where a marker can matter: a row
+        // that already has one, or an `imported` row (the pre-marker fallback
+        // reads those), so every other document's metadata is left as it was.
+        const changesContent =
+            input.title !== undefined ||
+            input.description !== undefined ||
+            input.body !== undefined ||
+            input.class !== undefined;
+        const existingMetadata = (patch.metadata ?? row.metadata ?? {}) as Record<string, unknown>;
+        if (
+            changesContent &&
+            (input.contentWrite ||
+                KB_LAST_CONTENT_WRITE_KEY in existingMetadata ||
+                row.source === KbDocumentSource.IMPORTED)
+        ) {
+            patch.metadata = {
+                ...existingMetadata,
+                [KB_LAST_CONTENT_WRITE_KEY]: input.contentWrite ?? appContentWrite(),
+            };
         }
 
         const revision = this.revisionPatch(row, {

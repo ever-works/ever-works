@@ -31,6 +31,7 @@ import {
     INBOX_ITEM_STATUSES,
     INBOX_MAX_OPTION_ID_CHARS,
     INBOX_MAX_REPLY_CHARS,
+    INTEGRATION_INDIVIDUAL_DECISION_SCOPE,
     INTEGRATION_MERGE_DECISION_SCOPE,
     type IntegrationInboxItemDto,
 } from '@ever-works/contracts';
@@ -208,15 +209,35 @@ export class IntegrationInboxController {
         // separate, opt-in `merges:decide` scope. Without it the approval is
         // untouched and stays pending for a decision in Ever Works.
         const proposalId = current.dto.proposalId ?? null;
+        const decisionScope = await this.inbox.decisionScopeOf(current.dto);
         if (
-            !principal.scopes.includes(INTEGRATION_MERGE_DECISION_SCOPE) &&
-            (await this.inbox.isMergeApproval(current.dto))
+            decisionScope === 'merge' &&
+            !principal.scopes.includes(INTEGRATION_MERGE_DECISION_SCOPE)
         ) {
             throw new IntegrationHttpException(
                 403,
                 'scope_missing',
                 `Deciding a merge approval needs the '${INTEGRATION_MERGE_DECISION_SCOPE}' scope on the integration key. The approval stays pending: decide it in Ever Works, or ask the tenant owner to grant '${INTEGRATION_MERGE_DECISION_SCOPE}' to this key.`,
                 { missing: [INTEGRATION_MERGE_DECISION_SCOPE], reason: 'merge_decision' },
+            );
+        }
+        // Works-security lane (integration API gates, finding 6) — the other
+        // approvals the platform never decides in bulk (`requiresIndividualDecision`):
+        // releasing a held Agent email draft to its recipient, an agent's rewrite
+        // of its own identity files (SOUL.md / AGENTS.md, trusted by every later
+        // run), an agent-proposed closure of an escalation. The act-as header is
+        // the key's to set, so relaying one needs the separate, opt-in
+        // `decisions:individual` scope (or `merges:decide`, the wider one).
+        if (
+            decisionScope === 'individual' &&
+            !principal.scopes.includes(INTEGRATION_INDIVIDUAL_DECISION_SCOPE) &&
+            !principal.scopes.includes(INTEGRATION_MERGE_DECISION_SCOPE)
+        ) {
+            throw new IntegrationHttpException(
+                403,
+                'scope_missing',
+                `Deciding this approval (an email-draft release, an agent identity-file edit or an agent-proposed escalation closure) needs the '${INTEGRATION_INDIVIDUAL_DECISION_SCOPE}' scope on the integration key. The approval stays pending: decide it in Ever Works, or ask the tenant owner to grant '${INTEGRATION_INDIVIDUAL_DECISION_SCOPE}' to this key.`,
+                { missing: [INTEGRATION_INDIVIDUAL_DECISION_SCOPE], reason: 'individual_decision' },
             );
         }
         const work = async (): Promise<{ status: number; body: IntegrationInboxReplyResult }> => {

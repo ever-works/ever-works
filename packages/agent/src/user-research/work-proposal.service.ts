@@ -1060,6 +1060,9 @@ export class WorkProposalService {
         userId: string,
         proposalId: string,
         patch: { title?: string; description?: string },
+        // Works-security lane (integration API gates, finding 5) — see
+        // `WorkProposalRepository.updateContent`. Optional and appended LAST.
+        editableStatuses?: readonly WorkProposalStatus[],
     ): Promise<WorkProposal | null> {
         const next: { title?: string; description?: string } = {};
         if (patch.title !== undefined) {
@@ -1072,7 +1075,7 @@ export class WorkProposalService {
             if (!description) throw new BadRequestException('description cannot be empty');
             next.description = description;
         }
-        return this.repo.updateContent(proposalId, userId, next);
+        return this.repo.updateContent(proposalId, userId, next, editableStatuses);
     }
 
     /**

@@ -135,14 +135,22 @@ change-feed head (`DomainEventFeedService.head()`, EW-P1-1, `'0'` while no event
 `org:read`, `org:write`, `members:read`, `members:write`, `agents:read`, `teams:read`, `teams:write`, `works:read`,
 `works:write`, `missions:read`, `missions:write`, `goals:read`, `goals:write`, `ideas:read`, `ideas:write`,
 `tasks:read`, `tasks:write`, `inbox:read`, `inbox:write`, `kb:read`, `kb:write`, `email:read`, `email:write`,
-`events:read`, `webhooks:manage`, `links:write`, `merges:decide`.
+`events:read`, `webhooks:manage`, `links:write`, `merges:decide`, `decisions:individual`.
 
-- The **"Ever Gauzy" preset** is every scope except `org:write`, `email:write` and `merges:decide` (opt-in).
+- The **"Ever Gauzy" preset** is every scope except `org:write`, `email:write`, `merges:decide` and
+  `decisions:individual` (opt-in).
 - **`merges:decide`** (works-security lane 3a, 2026-10-18) is the only scope that lets an integration relay a person's
   answer to a **merge approval** (a `merge_pull_request` proposal: an agent's pull request landing on a real branch, a
   release promotion or revert). Every other approval and escalation is relayed with `inbox:write` alone. Without it the
   reply answers `403 scope_missing` (`details.missing: ['merges:decide']`) and the approval stays pending for a decision
   in Ever Works. Granted like any scope, by ticking it when the key is created.
+- **`decisions:individual`** (works-security lane, integration API gates, 2026-10-18) lets an integration relay a
+  person's answer to the **other approvals the platform never decides in bulk** (`requiresIndividualDecision`):
+  releasing a held Agent email draft to its recipient, an agent's rewrite of its own identity files (SOUL.md /
+  AGENTS.md, trusted by every later run), an agent-proposed closure of an escalation. `merges:decide` covers them too.
+  Without either the reply answers `403 scope_missing` (`details.missing: ['decisions:individual']`) and the approval
+  stays pending. Questions, the owner's own escalations and ordinary approvals stay relayed with `inbox:write` alone.
+  An owner whose Gauzy Inbox relays these answers today grants it to that key.
 - **Never grantable:** `goals:activate`, `missions:activate`, `ideas:build` — they are not in the vocabulary (spend
   safety, decision D9).
 - Source of truth: `INTEGRATION_SCOPES` in `packages/contracts/src/integrations/integration-keys.types.ts`, mirrored by

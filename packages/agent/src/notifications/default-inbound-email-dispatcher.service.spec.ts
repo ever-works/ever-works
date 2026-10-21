@@ -343,6 +343,36 @@ describe('DefaultInboundEmailDispatcher', () => {
             });
             expect(unaligned.senderTrusted).toBe(false);
         });
+
+        // Works-security lane (integration API gates, finding 4) — an integration key
+        // writes From, Message-ID and every header of the mail it pushes: it is
+        // delivered (a Task is still spawned) but never wakes the Agent as trusted.
+        it('never trusts mail an integration pushed: listed sender or replayed platform Message-ID', async () => {
+            process.env.INBOUND_EMAIL_TRUSTED_SENDERS = '@partner.test';
+            const pushed = { metadata: { source: 'integration', integrationKeyId: 'key-1' } };
+            const listed = await spawnFrom('ops@partner.test', undefined, pushed);
+            expect(listed.senderTrusted).toBe(false);
+
+            const OTHER = 'ops@agents.acme.test';
+            const sentRow = () => {
+                messages.findByMessageIdHeaders.mockImplementation(async () => [
+                    {
+                        id: 'sent-1',
+                        direction: 'outbound',
+                        sentAt: new Date(),
+                        from: OTHER,
+                        toAddresses: [RECEIVING],
+                        messageIdHeader: 'm-9@agents.acme.test',
+                    },
+                ]);
+            };
+            const replayed = await spawnFrom(OTHER, sentRow, {
+                ...pushed,
+                messageIdHeader: 'm-9@agents.acme.test',
+            });
+            expect(replayed.senderTrusted).toBe(false);
+            expect(taskSpawner.spawnTaskForInboundEmail).toHaveBeenCalled();
+        });
     });
 
     // Review 2026-10-17 F15 (P1): an address can serve several agents; a push the
