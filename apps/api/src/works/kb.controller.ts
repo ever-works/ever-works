@@ -101,6 +101,17 @@ export function kbNonSessionWritesProposed(env: NodeJS.ProcessEnv = process.env)
 }
 
 /**
+ * `{ reviewState: 'proposed' }` for a non-session write while
+ * `KB_NON_SESSION_WRITES_PROPOSED` is on, else `{}` — for the routes that
+ * create a document from something other than a request body (uploads).
+ */
+function nonSessionKbReviewState(auth: AuthenticatedUser): { reviewState?: KbReviewState } {
+    return !isHumanSession(auth) && kbNonSessionWritesProposed()
+        ? { reviewState: 'proposed' as KbReviewState }
+        : {};
+}
+
+/**
  * What a KB create carries beyond its content: the machine-principal rule
  * above, the non-session rule, and the downgrade a client may ask for itself
  * (`reviewState: 'proposed'`, `source: 'agent'` — the DTO accepts nothing
@@ -664,6 +675,9 @@ export class KbController {
             // When set, the service derives the class from the extracted
             // text and `targetClass` becomes the fallback.
             autoClassify: body.autoClassify,
+            // Works-security (#2804 review): an upload is a KB write too — a
+            // non-session one lands `proposed` (`KB_NON_SESSION_WRITES_PROPOSED`).
+            ...nonSessionKbReviewState(auth),
         });
     }
 
@@ -780,6 +794,13 @@ export class KbController {
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
     ) {
-        return this.kb.retryUploadExtraction(workId, uploadId, auth.userId);
+        // Works-security (#2804 review): the re-created document follows the
+        // same non-session review rule as a fresh upload.
+        return this.kb.retryUploadExtraction(
+            workId,
+            uploadId,
+            auth.userId,
+            nonSessionKbReviewState(auth),
+        );
     }
 }

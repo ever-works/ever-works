@@ -222,6 +222,10 @@ describe('KbController — non-session KB writes land proposed', () => {
         kb = {
             createDocument: jest.fn().mockResolvedValue({ id: DOC_ID }),
             updateDocument: jest.fn().mockResolvedValue({ id: DOC_ID }),
+            createUpload: jest.fn().mockResolvedValue({ upload: { id: 'up-1' }, document: null }),
+            retryUploadExtraction: jest
+                .fn()
+                .mockResolvedValue({ upload: { id: 'up-1' }, document: null }),
         };
         controller = new KbController(kb as unknown as KnowledgeBaseService);
     });
@@ -269,6 +273,26 @@ describe('KbController — non-session KB writes land proposed', () => {
         expect(kb.updateDocument.mock.calls[0][3]).toEqual(
             expect.objectContaining({ body: 'x', reviewState: 'proposed' }),
         );
+    });
+
+    // Review of #2804: an upload creates a document too, so it follows the same rule.
+    it('a personal-key upload (and its retry) creates a proposed document; a session upload does not', async () => {
+        const file = {
+            buffer: Buffer.from('# Voice'),
+            originalname: 'voice.md',
+            mimetype: 'text/markdown',
+            size: 7,
+        } as Express.Multer.File;
+        await controller.createUpload(personalKey, WORK_ID, file, {} as never);
+        expect(kb.createUpload.mock.calls[0][0].reviewState).toBe('proposed');
+        await controller.createUpload(session, WORK_ID, file, {} as never);
+        expect(kb.createUpload.mock.calls[1][0].reviewState).toBeUndefined();
+        await controller.retryUploadExtraction(personalKey, WORK_ID, 'up-1');
+        expect(kb.retryUploadExtraction).toHaveBeenLastCalledWith(WORK_ID, 'up-1', 'u-1', {
+            reviewState: 'proposed',
+        });
+        await controller.retryUploadExtraction(session, WORK_ID, 'up-1');
+        expect(kb.retryUploadExtraction).toHaveBeenLastCalledWith(WORK_ID, 'up-1', 'u-1', {});
     });
 
     it('KB_NON_SESSION_WRITES_PROPOSED=false restores accepted-on-write for personal keys', async () => {
