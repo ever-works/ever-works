@@ -276,6 +276,8 @@ The API accepts `force: true` on a transition to bypass the approver gate and th
 
 ## Running a Task with an Agent
 
+To run it on a computer you choose — in a checkout you choose, as a session you can watch — use **Fix with an agent on this computer** instead; see [Tasks and GitHub on your computers](./fleet-tasks-and-github.md).
+
 There are two different paths that start a run, and they resolve the Agent differently.
 
 ### Run

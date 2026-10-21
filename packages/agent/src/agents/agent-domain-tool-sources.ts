@@ -11,6 +11,7 @@ import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
+import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
@@ -19,8 +20,10 @@ import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.ser
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
+import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
+import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -115,6 +118,11 @@ export interface AgentFleetToolSource {
      * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
      * Optional: unbound, those tools are simply not offered.
      */
+    /**
+     * Virtual computers (FL-16) — backs `fleet_virtual_*`. Optional: unbound (or
+     * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
+     */
+    virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'
@@ -163,6 +171,16 @@ export interface AgentFleetToolSource {
         reader: FleetLogsReaderPort;
     };
     /**
+     * Files on computers (FL-11) — when bound, the read-only
+     * `fleet_files_roots` / `fleet_files_list` / `fleet_files_stat` tools are
+     * offered (`buildFleetFilesTools`), reading through the API's node link.
+     * Optional and unbound by default: FL-19 owns the Agent catalogue and binds
+     * it (the API binds the port under `FLEET_FILES_READER`).
+     */
+    files?: {
+        reader: FleetFilesReaderPort;
+    };
+    /**
      * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status
      * service under `FLEET_STATUS_READER`. Unbound, the tool is not offered.
      */
@@ -172,6 +190,8 @@ export interface AgentFleetToolSource {
      * (FL-02). Unbound (no link in this context), the tools are not offered.
      */
     operations?: FleetOperationsToolPort;
+    /** FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the owner). Unbound, not offered. */
+    wake?: FleetWakeToolPort;
 }
 
 /**
@@ -181,6 +201,16 @@ export interface AgentFleetToolSource {
  */
 export interface AgentFleetCommandToolSource {
     service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
+}
+
+/**
+ * FL-15 P3 — Tasks on computers (`fleet/agent-fleet-task-tools.ts`): the
+ * hand-off options and the git identity check. Each half is optional; the
+ * builder offers nothing while FLEET_CHECKOUTS_ENABLED is off.
+ */
+export interface AgentFleetTaskToolSource {
+    handoff?: FleetTaskHandoffToolPort | null;
+    identity?: FleetGitIdentityToolPort | null;
 }
 
 /**
@@ -325,6 +355,8 @@ export interface AgentDomainToolSources {
     fleetSessions?: AgentFleetSessionToolSource;
     /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
     fleetCommands?: AgentFleetCommandToolSource;
+    /** FL-15 P3 — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_*`. */
+    fleetTasks?: AgentFleetTaskToolSource;
     /** FL-13 P2 — `fleet_schedules_*` (bound only while FLEET_COMMANDS_ENABLED is on). */
     fleetSchedules?: AgentFleetScheduleToolSource;
     prReview?: AgentPrReviewToolSource;

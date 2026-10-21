@@ -29,9 +29,14 @@ import {
 	MANAGEMENT_LANE_IDLE_POLL_MS,
 	MANAGEMENT_LANE_LEASE_TTL_SEC,
 	planManagementLane,
+	type ManagementLaneExecutor,
 	type ManagementLanePlan,
 	type ManagementLaneTables
 } from './management-lane';
+import { abortableSleep, createVirtualExecutors } from './executors/virtual';
+import { createVirtualModule } from './link/modules/virtual';
+import { defaultStdinRunner } from './link/modules/virtual/host';
+import { VirtualState } from './link/modules/virtual/state';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -61,8 +66,14 @@ import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { resolveAllowedRoots } from './link/allowed-roots';
-import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import {
+	composeNodeLinkModules,
+	createHealthLinkModule,
+	createMachineFactModules,
+	type WakeSender
+} from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -172,6 +183,12 @@ export interface NodeIo {
 	 * (`createNodeLogIo`) for a `--manage` process.
 	 */
 	logs?: LogIo;
+	/**
+	 * Files on computers (FL-11) — what the `files` link module reads and
+	 * writes the machine through. Optional: absent, the runtime binds the real
+	 * one (`createNodeFilesIo`) for a `--manage` process.
+	 */
+	files?: FilesIo;
 }
 
 /**
@@ -652,6 +669,14 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	managementLane?: ManagementLaneTables;
 	/**
+	 * Virtual computers (FL-16) — the host's virtual data folder
+	 * (`<config dir>/virtual`). With it, `--manage` and a Linux or macOS host,
+	 * the `virtual` link module (`vm.list`, `vm.status`, the `virtual-host` tag)
+	 * and the management lane's `vm-create` / `vm-control` executors are
+	 * composed. Absent (the desktop shell, tests, embedders): neither is.
+	 */
+	virtualDataDir?: string;
+	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
 	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
 	 * embedder without self-update leaves it unset and the field is absent.
@@ -1059,6 +1084,35 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			}
 		});
 	}
+	// Files on computers (FL-11): the `files` link module — the `files`
+	// family, the `files.roots` verb and the `files` tag — for a `--manage`
+	// process only. The allowed roots (R-18, R-39, R-41) are re-resolved on
+	// every request: ready checkouts, the workspace root and the
+	// `--files-root` folders — never the home directory, never a log folder.
+	let filesLinkModule: FilesLinkModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		const filesIo = io.files ?? createNodeFilesIo({ platform, homedir });
+		filesLinkModule = createFilesLinkModule({
+			io: filesIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				return resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'files',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? []
+					},
+					filesIo
+				);
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -1092,8 +1146,24 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				io.logger.warn(`Schedules could not start: ${error instanceof Error ? error.message : String(error)}`)
 			);
 	}
+	// Virtual computers (FL-16): a host started with --manage on Linux or macOS,
+	// with a virtual data folder, reads its children (`vm.*`) and builds them
+	// (the management lane's executors, below). Never on Windows (spec U4).
+	const virtualState =
+		consents.manage &&
+		options.virtualDataDir?.startsWith('/') &&
+		(io.environment.platform === 'linux' || io.environment.platform === 'darwin')
+			? new VirtualState(options.virtualDataDir)
+			: null;
+	const virtualModule = virtualState ? createVirtualModule({ state: virtualState }) : null;
 	const linkModules = composeNodeLinkModules({
-		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
+		extra: [
+			healthLinkModule,
+			...(logsLinkModule ? [logsLinkModule] : []),
+			...(filesLinkModule ? [filesLinkModule] : []),
+			...(virtualModule ? [virtualModule] : []),
+			...(options.linkModules ?? [])
+		],
 		...(sessions ? { session: sessions.module } : {}),
 		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
 		...(consents.manage
@@ -1162,7 +1232,26 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
-	const managementPlan = planManagementLane(consents, options.managementLane);
+	const virtualExecutors: ManagementLaneExecutor[] = virtualState
+		? createVirtualExecutors({
+				state: virtualState,
+				runner: createMachineCommandRunner(),
+				stdin: defaultStdinRunner,
+				// Built lazily: the shared job client exists once the lanes do.
+				client: () => jobClientFor(),
+				nodeVersion: io.version,
+				nodeMajor: Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10),
+				apiUrl: apiBase.url,
+				env: options.env ?? process.env,
+				sleep: abortableSleep,
+				now: io.now ?? Date.now,
+				logger: io.logger
+			})
+		: [];
+	const managementPlan = planManagementLane(
+		consents,
+		options.managementLane ?? (virtualExecutors.length > 0 ? { executors: virtualExecutors } : undefined)
+	);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
 	let lastDescribedCapabilities: readonly string[] = [];

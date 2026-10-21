@@ -123,7 +123,21 @@ export function isFleetJobActive(status: FleetJobStatus): boolean {
  * Task-run isolation inside its session daemon and holds the lease while the
  * session lives; the job completes with the exit evidence.
  */
-export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check' | 'computer-session' | 'agent-session';
+export type FleetJobKind =
+	| 'acceptance-checks'
+	| 'agent-task'
+	| 'browser-check'
+	| 'computer-session'
+	| 'agent-session'
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §12, R-34) — build a Container (or,
+	 * from phase 2, a Windows VM) on the host the job is pinned to, and hand
+	 * the guest its late-minted enrolment token. Leased by the host's
+	 * management lane under `--manage`, never by the work lane.
+	 */
+	| 'vm-create'
+	/** Virtual computers (FL-16) — start / stop / destroy (and, phase 3, resize / rebuild) one child. */
+	| 'vm-control';
 
 /** Canonical job-kind list. */
 export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
@@ -131,7 +145,9 @@ export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
 	'agent-task',
 	'browser-check',
 	'computer-session',
-	'agent-session'
+	'agent-session',
+	'vm-create',
+	'vm-control'
 ];
 
 /**
@@ -140,6 +156,13 @@ export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
  * the detector cannot drift.
  */
 export const FLEET_BROWSER_CAPABILITY = 'browser';
+
+/**
+ * Virtual computers (FL-16, CONTRACTS §1.2) — `/dev/kvm` is usable by the
+ * node's user on a Linux x86-64 host with Docker and `--manage`: Windows VMs
+ * are possible there.
+ */
+export const FLEET_KVM_CAPABILITY = 'kvm';
 
 // ─── The management lane (FL-02, CONTRACTS R-34) ────────────────────────────
 
@@ -155,7 +178,7 @@ export const FLEET_BROWSER_CAPABILITY = 'browser';
  * consent each needs in {@link FLEET_MANAGEMENT_LANE_CONSENT}. With an empty
  * list no node starts the lane.
  */
-export const FLEET_MANAGEMENT_LANE_KINDS: readonly FleetJobKind[] = [];
+export const FLEET_MANAGEMENT_LANE_KINDS: readonly FleetJobKind[] = ['vm-create', 'vm-control'];
 
 /** The consent a management-lane kind needs on the node (CONTRACTS R-34). */
 export type FleetManagementLaneConsent = Extract<FleetConsentKey, 'manage' | 'work' | 'usageScan'>;
@@ -165,7 +188,11 @@ export type FleetManagementLaneConsent = Extract<FleetConsentKey, 'manage' | 'wo
  * {@link FLEET_MANAGEMENT_LANE_KINDS} without an entry here needs `manage`
  * (the safest reading: machine jobs are management unless an epic says otherwise).
  */
-export const FLEET_MANAGEMENT_LANE_CONSENT: Readonly<Partial<Record<FleetJobKind, FleetManagementLaneConsent>>> = {};
+export const FLEET_MANAGEMENT_LANE_CONSENT: Readonly<Partial<Record<FleetJobKind, FleetManagementLaneConsent>>> = {
+	// Virtual computers (FL-16): VM creation on this host is the `manage` consent (CONTRACTS §1.1).
+	'vm-create': 'manage',
+	'vm-control': 'manage'
+};
 
 /** The consent a management-lane kind needs (`manage` when the table names none). */
 export function fleetManagementLaneConsentFor(
@@ -311,7 +338,14 @@ export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind,
 	// shortest existing default (the fallback an unknown kind fails closed to):
 	// the session sweeper ends one still waiting after ten minutes, and this
 	// queue SLA is only the backstop behind it.
-	'agent-session': 2 * 60 * 60
+	'agent-session': 2 * 60 * 60,
+	// Virtual computers (FL-16). The plan proposed an hour for a create and ten
+	// minutes for a control; like the live view and the Agent session they do
+	// NOT undercut the shortest existing default (the fallback an unknown kind
+	// fails closed to), so an older reader's "unknown kind" answer is unchanged.
+	// A control the owner no longer wants is cancelled with its child's row.
+	'vm-create': 2 * 60 * 60,
+	'vm-control': 2 * 60 * 60
 });
 
 /** Floor/ceiling clamps applied to any operator-supplied queued max age. */

@@ -639,6 +639,19 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Tasks on computers (3) — FL-15 (CONTRACTS §11.3). The hand-off options for a Task (read-only;
+	// the start itself is `fleet_sessions_start` with `taskId`), and a computer's global git
+	// identity: read, and "Use my Ever Works identity" (class `confirm`: the first call answers
+	// `confirmation_required` with what would be set; repeat with `confirm: true`).
+	// (The two reads — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_get` — sit in FL-19's block below.)
+	{ method: 'POST', path: '/api/fleet/nodes/{id}/git/identity', toolName: 'fleet_nodes_git_identity_set' },
+	// GitHub: things for me (FL-15 P3) — one event Trigger over GitHub events about me.
+	{
+		method: 'POST',
+		path: '/api/inbound-triggers/presets/github-for-me',
+		toolName: 'inbound_triggers_github_for_me'
+	},
+
 	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
 	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
 	// read at most 500 secret-scanned lines of one. The read never follows; a
@@ -656,6 +669,30 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'fleet_logs_read',
 		annotations: { readOnlyHint: true },
 		omitArgs: ['follow']
+	},
+
+	// Files on computers (3) — `apps/api/src/fleet/files/fleet-files.controller.ts`
+	// (FL-11 P1, CONTRACTS §11.3). All read-only: a computer's allowed roots, one
+	// folder's entries (flagged hidden / credential-shaped / link inside the root),
+	// one entry. No MCP tool downloads a file; copy and delete arrive with P2.
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/roots',
+		toolName: 'fleet_files_roots',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/list',
+		toolName: 'fleet_files_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/stat',
+		toolName: 'fleet_files_stat',
+		annotations: { readOnlyHint: true }
 	},
 
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
@@ -826,6 +863,52 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: false }
 	},
 
+	// Virtual computers (FL-16, plan §9, CONTRACTS §11.3) — `apps/api/src/fleet/virtual/fleet-virtual.controller.ts`.
+	// Same names as the in-platform Agent tools. Acts satisfy their confirmation class
+	// with the request fields (`confirm: true`, `confirmName`); without them the API
+	// answers 409 `confirmation_required` with the summary to show. Dark unless
+	// FLEET_VIRTUAL_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_list',
+		description:
+			'List the virtual computers (Containers, Windows VMs) a fleet computer hosts, with system, size, create phase and state, and the host memory net of what they reserve. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual/options',
+		toolName: 'fleet_virtual_options',
+		description:
+			'Which fleet computers can host a new virtual computer of a system (?system=), with free memory, free disk, KVM and why each other one cannot, plus the systems, sizes and the host "Choose for me" picks ({id} may be `auto`). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_create',
+		description:
+			'Create a Container on a fleet computer ({id}, or `auto` for the host with the most free memory). It uses that computer’s CPU, memory and disk; no credits are spent. Needs `confirm: true`; without it the answer is 409 with the host, CPUs, memory and disk to confirm.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/power',
+		toolName: 'fleet_virtual_power',
+		description:
+			'Start or stop a virtual computer (`action: start | stop`; stop needs `confirm: true` — a Container stops within 10 seconds).',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/destroy',
+		toolName: 'fleet_virtual_destroy',
+		description:
+			'Destroy a virtual computer: its machine and disk on the host, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name. Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
 	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each
@@ -918,6 +1001,59 @@ export const WHITELIST: WhitelistEntry[] = [
 		description:
 			'Where a Task could be fixed on one of my computers: the computers that can take it, the checkouts of its repository on each, and the agents available there. Start the session with fleet_sessions_start and the taskId. Read-only.',
 		annotations: { readOnlyHint: true }
+	},
+
+	// FL-19 P2 — the acts of the catalogue that had no MCP entry (CONTRACTS §2.2: a confirming act
+	// answers `confirmation_required` with the summary first; repeat with `confirm: true`,
+	// `confirmName`, or `acknowledgeBlastRadius: true` as the answer says — never a token). They act
+	// as the API-key user, so the computer's own audience is checked for that person (spec FR-18).
+	// `fleet_docker_run` stays off MCP: a run may carry secret values a person types (FL-09).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/services/{name}/{action}',
+		toolName: 'fleet_services_action',
+		description:
+			"Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/processes/{pid}/signal',
+		toolName: 'fleet_processes_signal',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/containers/{cid}/{action}',
+		toolName: 'fleet_docker_container_action',
+		description:
+			'Start, stop, restart, pause, unpause or remove one Docker container on one of my fleet computers. Class confirm (remove: confirm-destructive — send confirmName with the container name). Audited.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/images/{iid}/{action}',
+		toolName: 'fleet_docker_image_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/compose/{project}/{action}',
+		toolName: 'fleet_docker_compose_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/wake',
+		toolName: 'fleet_nodes_wake',
+		annotations: { destructiveHint: false }
+	},
+	{
+		method: 'DELETE',
+		path: '/api/fleet/operations/{id}',
+		toolName: 'fleet_operations_cancel',
+		description: 'Ask the computer to stop a long operation that is still running. It then reads cancelled.',
+		annotations: { destructiveHint: false }
 	},
 
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the

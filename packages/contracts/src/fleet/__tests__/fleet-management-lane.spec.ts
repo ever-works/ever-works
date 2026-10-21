@@ -9,12 +9,16 @@ import { FLEET_NO_CONSENTS } from '../fleet-link.types.js';
 
 /** Fleet node link (FL-02, T-27, CONTRACTS R-34) — the management lane's kind list and its consents. */
 describe('the management lane', () => {
-	it('ships with an empty kind list: no node starts the lane until an epic registers a kind', () => {
-		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual([]);
-		expect(FLEET_MANAGEMENT_LANE_CONSENT).toEqual({});
+	it('carries exactly the kinds epics registered: FL-16 adds vm-create and vm-control under --manage', () => {
+		// FL-02 shipped the list empty ("no node starts the lane until an epic
+		// registers a kind"); FL-16 is the first epic to register its kinds.
+		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual(['vm-create', 'vm-control']);
+		expect(FLEET_MANAGEMENT_LANE_CONSENT).toEqual({ 'vm-create': 'manage', 'vm-control': 'manage' });
 		expect(
 			fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, manage: true, usageScan: true })
-		).toEqual([]);
+		).toEqual(['vm-create', 'vm-control']);
+		// --work or --usage-scan alone never lease a VM job.
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, usageScan: true })).toEqual([]);
 	});
 
 	it('needs manage for a kind the table does not name (the safest reading)', () => {

@@ -41,6 +41,7 @@ import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access
 
 import type { FleetConsents, FleetNodeLinkView } from './fleet-link.types.js';
 import type { FleetSessionDaemonReport } from './fleet-sessions.types.js';
+import type { FleetNodeOrigin, FleetNodeVirtualView } from './fleet-virtual.types.js';
 
 /**
  * App shape of a fleet node.
@@ -644,6 +645,18 @@ export interface FleetNodeView {
 	hostNodeId?: string | null;
 	/** Virtual computers (FL-16) — what kind of child this is. Null / absent for an ordinary machine. */
 	virtualKind?: FleetNodeVirtualKind | null;
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §4.1) — how this Node came into
+	 * being: `enrolled` (a person ran `enroll`), `virtual` (created on a host,
+	 * FL-16) or `cloud` (FL-17). Absent on an older API build = `enrolled`.
+	 */
+	origin?: FleetNodeOrigin;
+	/**
+	 * Virtual computers (FL-16) — a child's system, size, create phase and
+	 * machine state (`FleetNodeVirtualView`), or null / absent for every
+	 * Node that is not `origin: 'virtual'`. Owner and shared views alike.
+	 */
+	virtual?: FleetNodeVirtualView | null;
 	/**
 	 * Sessions on computers (FL-04) — the session daemon as the node last
 	 * reported it (heartbeat `daemon`), or null when it never reported one.

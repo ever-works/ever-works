@@ -79,8 +79,10 @@ import { FleetSchedulesApiModule } from './fleet/schedules/fleet-schedules-api.m
 import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
 import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
+import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
+import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
 import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
@@ -339,12 +341,18 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // hand-off options read (the start is FL-04's, with `taskId`). Dark
         // unless FLEET_SESSIONS_ENABLED and FLEET_CHECKOUTS_ENABLED.
         FleetTasksApiModule,
+        // Virtual computers (FL-16) — Containers (and, later, Windows VMs) created
+        // on a computer of the Fleet: the routes, the host-facing token mint and
+        // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
+        FleetVirtualApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
         FleetPortsApiModule,
         // Logs on computers (FL-08): /api/fleet/nodes/:id/logs/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
         FleetLogsApiModule,
+        // Files on computers (FL-11): /api/fleet/nodes/:id/files/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
+        FleetFilesApiModule,
         // Agent, MCP & CLI surface (FL-19): GET /api/fleet/status and /api/fleet/tools/gate, and
         // the status reader behind the `fleet_status` Agent tool (FLEET_ENABLED-gated).
         FleetToolsApiModule,

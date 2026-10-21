@@ -359,6 +359,48 @@ export interface FleetHandoffTask {
 	repoUrl: string | null;
 	/** The issue or pull request the Task came from, when it names one. */
 	source: FleetTaskSourceLink | null;
+	/**
+	 * P3 (spec FR-20, S4, U8): the pull request a Task was made from — its head
+	 * branch is what the session checks out. Absent for every other Task.
+	 */
+	pullRequest?: FleetHandoffPullRequest | null;
+}
+
+/** A pull-request Task's head (spec FR-20). */
+export interface FleetHandoffPullRequest {
+	/** `owner/repo` of the pull request's base repository. */
+	repository: string;
+	number: number;
+	/** The head branch; null when the event that made the Task did not carry it. */
+	headRef: string | null;
+	/** `owner/repo` the head branch lives in (a fork's, or the base repository). */
+	headRepo: string | null;
+	fork: boolean;
+	maintainerCanModify: boolean;
+	/** A fork's branch the session may not push to (no maintainer edits, U8). */
+	readOnly: boolean;
+}
+
+/**
+ * Read the pull request a `github.pr` event payload describes (FL-15 P3, the
+ * intake's and the review bridge's shape), or null. A head repository other
+ * than the base makes it a fork; a fork without maintainer edits is
+ * read-only (spec FR-20, U8).
+ */
+export function fleetHandoffPullRequestFrom(payload: unknown): FleetHandoffPullRequest | null {
+	if (typeof payload !== 'object' || payload === null) return null;
+	const record = payload as Record<string, unknown>;
+	const repository = typeof record.repoFullName === 'string' ? record.repoFullName.trim() : '';
+	const number = typeof record.prNumber === 'number' && Number.isSafeInteger(record.prNumber) ? record.prNumber : NaN;
+	if (!/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(repository) || !(number > 0)) return null;
+	const headRef = typeof record.headRef === 'string' && record.headRef.trim() ? record.headRef.trim().slice(0, 255) : null;
+	const headRepo =
+		typeof record.headRepo === 'string' && /^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(record.headRepo.trim())
+			? record.headRepo.trim()
+			: null;
+	const fork = record.fork === true || (headRepo !== null && headRepo.toLowerCase() !== repository.toLowerCase());
+	const maintainerCanModify = record.maintainerCanModify === true;
+	return { repository, number, headRef, headRepo, fork, maintainerCanModify, readOnly: fork && !maintainerCanModify };
 }
 
 /** `GET /api/fleet/tasks/:taskId/handoff-options?agentId=` (CONTRACTS §11.2). */

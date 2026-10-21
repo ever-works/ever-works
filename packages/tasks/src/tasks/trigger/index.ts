@@ -29,6 +29,8 @@ export * from './fleet-health-rollup.task';
 export * from './fleet-session-sweeper.task';
 export * from './fleet-checkout-reconcile.task';
 export * from './fleet-checkout-bin-purge.task';
+// Virtual computers (FL-16) — mark children whose machine is gone and guests that never enrolled.
+export * from './fleet-virtual-reconcile.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).
