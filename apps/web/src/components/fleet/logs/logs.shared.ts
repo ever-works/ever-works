@@ -223,6 +223,20 @@ export function filterHeld(lines: readonly HeldLine[], filter: string): HeldLine
     return lines.filter((held) => fleetLogLineMatches(held.line, needle));
 }
 
+/**
+ * P3 (FR-39): the index of the first line stamped at or after `at` (both ISO,
+ * UTC), or -1 when none is — the viewer scrolls there and highlights it.
+ */
+export function firstHeldAtOrAfter(lines: readonly HeldLine[], at: string): number {
+    const target = Date.parse(at);
+    if (Number.isNaN(target)) return -1;
+    for (let index = 0; index < lines.length; index += 1) {
+        const ts = lines[index]!.line.ts;
+        if (ts && Date.parse(ts) >= target) return index;
+    }
+    return -1;
+}
+
 // ─── Follow state (FR-14 … FR-16) ───────────────────────────────────────────
 
 export type LogFollowPhase = 'connecting' | 'live' | 'reconnecting' | 'stopped' | 'error';
