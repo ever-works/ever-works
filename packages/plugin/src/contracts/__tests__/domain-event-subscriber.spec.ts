@@ -18,11 +18,13 @@ const subscriber = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('the domain-event-subscriber capability (EW-P1-1)', () => {
-	it('names the capability once, appended last to the table', () => {
+	it('names the capability once, appended last to the table (only FL-18 appended after it)', () => {
 		expect(DOMAIN_EVENT_SUBSCRIBER_CAPABILITY).toBe('domain-event-subscriber');
 		expect(PLUGIN_CAPABILITIES.DOMAIN_EVENT_SUBSCRIBER).toBe(DOMAIN_EVENT_SUBSCRIBER_CAPABILITY);
 		const keys = Object.keys(PLUGIN_CAPABILITIES);
-		expect(keys[keys.length - 1]).toBe('DOMAIN_EVENT_SUBSCRIBER');
+		// Actions runners (FL-18) is the one capability appended after it.
+		expect(keys[keys.length - 2]).toBe('DOMAIN_EVENT_SUBSCRIBER');
+		expect(keys[keys.length - 1]).toBe('ACTIONS_RUNNERS');
 		expect(ALL_PLUGIN_CAPABILITIES.filter((value) => value === 'domain-event-subscriber')).toHaveLength(1);
 		expect(isValidPluginCapability('domain-event-subscriber')).toBe(true);
 		// Near misses stay invalid: manifests are validated against this guard.

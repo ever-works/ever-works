@@ -141,7 +141,9 @@ const EXISTING_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
  */
 const LATER_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
 	// Domain events (EW-P1-1).
-	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber']
+	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber'],
+	// Actions runners on computers (FL-18).
+	['ACTIONS_RUNNERS', 'actions-runners']
 ];
 
 /** Every category that existed before T2, in the tuple's own order. T2 appends none. */
