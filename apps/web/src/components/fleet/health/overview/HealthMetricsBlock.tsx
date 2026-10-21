@@ -132,7 +132,9 @@ export default function HealthMetricsBlock({ nodes, flags }: FleetOverviewBlockP
                 refreshError={run?.error ?? null}
                 canWake={view?.wake?.available === true}
             />
-            {view?.wake && view.wake.reason !== 'not-offline' ? (
+            {/* Mounted whenever the answer carries `wake`: the panel renders nothing
+                for an awake computer, except right after a wake it is reporting on. */}
+            {view?.wake ? (
                 <WakePanel
                     key={node.id}
                     node={{ id: node.id, name: node.name }}
