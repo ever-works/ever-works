@@ -50,6 +50,10 @@ export const SELF_UPDATE_RETRY_LADDER_MS: readonly number[] = [
 /** The longest an install may run before it is called failed. */
 export const SELF_UPDATE_INSTALL_TIMEOUT_MS = 10 * 60_000;
 
+/** What a target may look like: `latest` or a bare version (the contracts version shape). */
+export const SELF_UPDATE_TARGET_PATTERN =
+	/^(?:latest|\d{1,9}\.\d{1,9}(?:\.\d{1,9})?(?:-[0-9A-Za-z.-]{1,64})?(?:\+[0-9A-Za-z.-]{1,64})?)$/;
+
 /** How long `npm root -g` may take. */
 export const SELF_UPDATE_DETECT_TIMEOUT_MS = 20_000;
 
@@ -310,6 +314,9 @@ export class SelfUpdateController {
 	/** Run one attempt now (tests await it; `onHeartbeat` starts it in the background). */
 	async attempt(target: string): Promise<'updated' | 'failed' | 'skipped'> {
 		if (this.busy) return 'skipped';
+		// Defence in depth: the target reaches a command line (a shell on
+		// Windows), so only `latest` or a bare version string ever does.
+		if (!SELF_UPDATE_TARGET_PATTERN.test(target)) return 'skipped';
 		this.attempting = true;
 		const from = this.options.currentVersion;
 		try {

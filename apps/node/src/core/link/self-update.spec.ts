@@ -277,3 +277,12 @@ describe('the self-update record', () => {
 		expect(await readSelfUpdateRecord(fs, '/etc/node.json')).toBeNull();
 	});
 });
+
+describe('the install target guard', () => {
+	it('never runs a target that is not latest or a bare version', async () => {
+		const c = controller();
+		expect(await c.instance.attempt('1.0.0 & calc')).toBe('skipped');
+		expect(await c.instance.attempt('$(id)')).toBe('skipped');
+		expect(c.calls).toEqual([]);
+	});
+});
