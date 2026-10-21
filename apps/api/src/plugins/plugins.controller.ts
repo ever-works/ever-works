@@ -19,6 +19,7 @@ import { AuthSessionGuard, CurrentUser } from '../auth';
 import { RefuseFleetRunGuard } from '../auth/guards/refuse-fleet-run.guard';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { WorkOwnershipService } from '@ever-works/agent/services';
+import { isAppWorkKind } from '@ever-works/contracts';
 import { appTargetChangeRequiresOwner, requireAppWorkOwnerSession } from '../works/app-owner-gate';
 import { PluginOperationsService, PluginInstallerService } from '@ever-works/agent/plugins';
 // EW-693 — catalog + install endpoints.
@@ -656,7 +657,8 @@ export class PluginsController {
         auth: AuthenticatedUser,
         ...bags: Array<Record<string, unknown> | null | undefined>
     ): Promise<void> {
-        if (!appTargetChangeRequiresOwner() || access?.work?.kind !== 'app') return;
+        // `isAppWorkKind` normalises case and whitespace, so a stored `App` / ` app ` is gated too.
+        if (!appTargetChangeRequiresOwner() || !isAppWorkKind(access?.work?.kind)) return;
         const touched = bags.some(
             (bag) =>
                 !!bag &&
