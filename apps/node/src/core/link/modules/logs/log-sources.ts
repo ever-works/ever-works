@@ -227,11 +227,15 @@ async function fileSources(io: LogIo, roots: readonly AllowedRoot[], signal?: Ab
 	return out;
 }
 
-/** `docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}'` → sources, running first. */
+/**
+ * `docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'`
+ * → sources, running first. A Compose container's `group` is its project (FL-08 P3b: the Docker tab's
+ * Compose **Logs** opens the project's containers merged; an older listing without the column has none).
+ */
 export function parseDockerPs(stdout: string): FleetLogSource[] {
 	const out: FleetLogSource[] = [];
 	for (const line of stdout.split(/\r?\n/)) {
-		const [names, state, status] = line.split('\t');
+		const [names, state, status, project] = line.split('\t');
 		const name = (names ?? '').split(',')[0]?.trim() ?? '';
 		if (!isFleetLogContainerKey(name)) continue;
 		const exit = /Exited \((-?\d+)\)/i.exec(status ?? '');
@@ -240,7 +244,7 @@ export function parseDockerPs(stdout: string): FleetLogSource[] {
 			id: fleetLogSourceId('container', name),
 			kind: 'container',
 			label: name,
-			group: '',
+			group: (project ?? '').trim().slice(0, 200),
 			readable: true,
 			state: label,
 			supportsEarlier: false
@@ -251,7 +255,9 @@ export function parseDockerPs(stdout: string): FleetLogSource[] {
 
 async function containerSources(io: LogIo): Promise<FleetLogSource[]> {
 	const result = await io.runner
-		.run('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.State}}\t{{.Status}}'], { timeoutMs: 5_000 })
+		.run('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'], {
+			timeoutMs: 5_000
+		})
 		.catch(() => null);
 	if (!result || result.code !== 0) return [];
 	return parseDockerPs(result.stdout);

@@ -113,6 +113,14 @@ describe('service and container listings', () => {
 		]);
 	});
 
+	it('docker ps: a Compose container is grouped under its project', () => {
+		const containers = parseDockerPs('acme-api\trunning\tUp 3 hours\tacme\nsolo\trunning\tUp 1 hour\t\n');
+		expect(containers.map((c) => [c.label, c.group])).toEqual([
+			['acme-api', 'acme'],
+			['solo', '']
+		]);
+	});
+
 	it('docker ps: running first, exit codes in the state', () => {
 		const containers = parseDockerPs('old-build\texited\tExited (1) 2 hours ago\nacme-api\trunning\tUp 3 hours\n');
 		expect(containers.map((c) => [c.label, c.state])).toEqual([

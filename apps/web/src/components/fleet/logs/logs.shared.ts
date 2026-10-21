@@ -133,6 +133,24 @@ export function logsDeepLinkSources(
     return one ? [one] : [];
 }
 
+/**
+ * FL-09's Compose **Logs** link (`?source=compose&project=<name>`): the project's
+ * containers as listed (their `group` is the project), at most
+ * {@link FLEET_LOGS_MAX_MERGED_SOURCES}, or null when the link names no project.
+ */
+export function composeDeepLinkProject(get: (name: string) => string | null): string | null {
+    if (get('source') !== 'compose') return null;
+    const project = get('project')?.trim() ?? '';
+    return project.length > 0 && project.length <= 200 ? project : null;
+}
+
+export function composeProjectSources(sources: readonly FleetLogSource[], project: string): string[] {
+    return sources
+        .filter((source) => source.kind === 'container' && source.group === project)
+        .map((source) => source.id)
+        .slice(0, FLEET_LOGS_MAX_MERGED_SOURCES);
+}
+
 /** Add or remove a source from a merged view (ctrl/cmd-click), never past the bound, never empty. */
 export function toggleMergedSource(current: readonly string[], id: string): string[] {
     if (current.includes(id)) {
