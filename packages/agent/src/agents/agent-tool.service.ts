@@ -67,9 +67,11 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
+import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -589,6 +591,7 @@ export class AgentToolService {
                     buildFleetPortsTools({
                         agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
                         service: ports,
+                        tunnels: fleet.portTunnels ?? null,
                     }),
                 );
             }
@@ -634,6 +637,17 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Logs on computers (FL-08): the read-only log tools, when bound.
+            if (fleet.logs) {
+                const logs = fleet.logs;
+                add('fleet-logs', () =>
+                    buildFleetLogsTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: logs.reader,
+                    }),
+                );
+            }
         }
 
         // FL-04 P2 — the Agent's own sessions on computers (start is always an
@@ -646,6 +660,26 @@ export class AgentToolService {
                     userId: agent.userId,
                     agentId: agent.id,
                     service: fleetSessions.service,
+                }),
+            );
+        }
+
+        // FL-12 P2 — Commands on computers. `fleet_commands_run` never runs a
+        // command itself: it files an approval the owner decides in My
+        // Decisions (fail-closed without the queue). Bound only while
+        // FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetCommands) {
+            const fleetCommands = sources.fleetCommands;
+            add('fleet-commands', () =>
+                buildFleetCommandTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
                 }),
             );
         }

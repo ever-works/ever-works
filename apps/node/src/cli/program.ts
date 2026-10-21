@@ -434,6 +434,33 @@ export interface StartCommandOptions {
 	 * `--workspace-root`.
 	 */
 	codeFolder?: string[];
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — a folder this machine shares
+	 * with the dashboard (repeatable): the Logs tab lists the log files under
+	 * it, beside the standard log directories and the workspace root. Absolute;
+	 * never a filesystem root (the home directory as a whole is refused by the
+	 * resolver). Process-scoped, like `--manage`.
+	 */
+	filesRoot?: string[];
+}
+
+/** Parse every `--files-root` (FL-08): absolute, not a filesystem root, de-duplicated. */
+export function parseFilesRoots(raw: readonly string[] | undefined, platform: string): string[] {
+	const out: string[] = [];
+	for (const entry of raw ?? []) {
+		const value = entry.trim();
+		if (value.length === 0) throw new CliError('--files-root must not be empty');
+		const path = platform === 'win32' ? win32 : posix;
+		if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+			throw new CliError(`--files-root must be an absolute directory (got "${entry}")`);
+		}
+		const normalized = path.resolve(value);
+		if (normalized === path.parse(normalized).root) {
+			throw new CliError(`--files-root cannot be a filesystem root (got "${entry}")`);
+		}
+		if (!out.includes(normalized)) out.push(normalized);
+	}
+	return out;
 }
 
 /**
@@ -529,6 +556,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// Usage errors first, before the config is even read.
 	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
 	const codeFolders = parseCodeFolders(options.codeFolder, deps.platform);
+	const filesRoots = parseFilesRoots(options.filesRoot, deps.platform);
 	const workspaceGcOverrides = parseWorkspaceGcFlags(options);
 	const stored = await requireConfig(deps);
 	// The reaper policy is persisted on `start` (see `StartCommandOptions`),
@@ -664,6 +692,8 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// link opens on the first accepted heartbeat when any of --work,
 		// --attend, --manage is on; its state is recorded for `status`.
 		manageEnabled,
+		// Logs on computers (FL-08): the folders this machine shares (R-18).
+		...(filesRoots.length > 0 ? { filesRoots } : {}),
 		nodeLink: true,
 		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record),
 		// Sessions on computers (FL-04): the session daemon, for a process that
@@ -1898,6 +1928,11 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--auto-update',
 			'Upgrade this node itself when the platform raises its minimum version or names a recommended one (waits for running jobs; npm installs only; off by default)'
+		)
+		.option(
+			'--files-root <dir>',
+			'With --manage: share this folder with the dashboard (the Logs tab lists the log files under it); repeatable',
+			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option(
 			'-c, --concurrency <count>',

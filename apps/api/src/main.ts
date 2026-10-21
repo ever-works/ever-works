@@ -23,6 +23,7 @@ import { assertProductionCorsConfig } from './cors-validation';
 import { config as appConfig } from './config/constants';
 import { config as agentConfig } from '@ever-works/agent/config';
 import { resolveTrustProxyHops } from './config/trust-proxy';
+import { FleetPreviewHostHandler } from './fleet/ports/preview-host.handler';
 
 async function bootstrap() {
     // The `.env` file is already loaded: `./load-env` (the first import above)
@@ -96,6 +97,18 @@ async function bootstrap() {
     // from X-Forwarded-For. The hop count is sanitised (garbage → default,
     // negatives → 0) so an operator typo can't widen trust to a spoofable header.
     app.set('trust proxy', resolveTrustProxyHops(process.env));
+
+    // Servers and ports, phase 2 (FL-10, CONTRACTS R-17) — the preview host
+    // (`FLEET_PREVIEW_HOST`). Mounted FIRST, before the body parsers and the
+    // router: a tunnelled request's body streams to the machine untouched, and
+    // on the preview host nothing ever reaches the platform's own routes. Every
+    // other host passes straight through. Absent module → nothing mounted.
+    try {
+        const previewHost = app.get(FleetPreviewHostHandler, { strict: false });
+        app.use(previewHost.middleware());
+    } catch {
+        // FleetPortsApiModule is not part of this application
+    }
 
     const captureRawBody = (
         req: IncomingMessage & { rawBody?: string },

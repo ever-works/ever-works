@@ -33,6 +33,8 @@ export function NewCheckoutDialog({
     const [repoUrl, setRepoUrl] = useState('');
     const [parentId, setParentId] = useState('');
     const [branch, setBranch] = useState('');
+    const [container, setContainer] = useState(false);
+    const [shared, setShared] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +45,13 @@ export function NewCheckoutDialog({
     const parent = parents.find((row) => row.id === parentId) ?? null;
     const size = formatCheckoutSize(parent?.sizeBytes ?? null);
     const ready = Boolean(node) && (how === 'clone' ? repoUrl.trim().length > 0 : Boolean(parent));
+    // Spec U11: container isolation needs Docker and is not offered on Windows.
+    const tags = node?.capabilities ?? [];
+    const containerReason = tags.includes('os:win32')
+        ? t('containerWindows')
+        : !tags.includes('docker')
+          ? t('containerNoDocker', { name: node?.name ?? '' })
+          : null;
 
     const submit = async () => {
         if (!ready || !node) return;
@@ -53,6 +62,12 @@ export function NewCheckoutDialog({
             source: how === 'clone' ? { kind: 'clone', repoUrl: repoUrl.trim() } : { kind: 'worktree', parentCheckoutId: parentId },
         };
         if (branch.trim()) request.branch = branch.trim();
+        if (container && !containerReason) request.isolation = 'container';
+        const folders = shared
+            .split(',')
+            .map((folder) => folder.trim())
+            .filter((folder) => folder.length > 0);
+        if (how === 'worktree' && folders.length > 0) request.sharedFolders = folders;
         const result = await createCheckoutAction(request);
         setBusy(false);
         if (result.success) {
@@ -151,6 +166,32 @@ export function NewCheckoutDialog({
                     data-testid="fleet-new-checkout-branch"
                 />
                 <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('branchNote')}</span>
+            </label>
+            {how === 'worktree' ? (
+                <label className="flex flex-col gap-1">
+                    <span className="text-xs">{t('sharedFolders')}</span>
+                    <input
+                        className="rounded border border-border bg-transparent px-2 py-1 font-mono text-xs dark:border-border-dark"
+                        value={shared}
+                        onChange={(event) => setShared(event.target.value)}
+                        placeholder="node_modules, .env.local"
+                        data-testid="fleet-new-checkout-shared"
+                    />
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('sharedFoldersNote')}</span>
+                </label>
+            ) : null}
+            <label className="inline-flex items-center gap-2" title={containerReason ?? undefined}>
+                <input
+                    type="checkbox"
+                    checked={container && !containerReason}
+                    disabled={containerReason !== null}
+                    onChange={(event) => setContainer(event.target.checked)}
+                    data-testid="fleet-new-checkout-container"
+                />
+                <span>{t('container')}</span>
+                {containerReason ? (
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{containerReason}</span>
+                ) : null}
             </label>
             {error ? (
                 <p role="alert" className="text-xs text-red-600 dark:text-red-400">

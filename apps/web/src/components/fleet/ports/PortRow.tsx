@@ -19,7 +19,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { portAddress, programLine, reasonKey } from './ports.shared';
+import { portAddress, programLine, reasonKey, tunnelFor } from './ports.shared';
+import { TunnelRowState } from './TunnelRowState';
 
 /**
  * Servers and ports (FL-10, spec §5.1) — one row of the Ports tab:
@@ -41,6 +42,7 @@ export function PortRow({
     selected,
     onOpen,
     onRemoveWatch,
+    onTunnelChange,
 }: {
     port: FleetListeningPort;
     list: FleetPortsListResponse;
@@ -50,6 +52,8 @@ export function PortRow({
     selected?: boolean;
     onOpen: (port: FleetListeningPort, target: FleetPortOpenTarget) => void;
     onRemoveWatch?: (port: number) => void;
+    /** Phase 2: a preview tunnel opened or closed — re-read the list. */
+    onTunnelChange?: () => void;
 }) {
     const t = useTranslations('fleet.ports');
 
@@ -139,6 +143,14 @@ export function PortRow({
             {port.stopped && <span className="text-xs font-medium">{t('stopped')}</span>}
 
             <span className="ml-auto flex items-center gap-1">
+                {isWeb && list.tunnel?.available && (
+                    <TunnelRowState
+                        nodeId={nodeId}
+                        port={port}
+                        tunnel={tunnelFor(list, port.port)}
+                        onChange={() => onTunnelChange?.()}
+                    />
+                )}
                 {isWeb && list.canOpen && (
                     <>
                         <Button

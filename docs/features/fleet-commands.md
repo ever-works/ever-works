@@ -76,7 +76,29 @@ after that the run ends as _"Connection lost"_ — the full output stays on the 
 The platform stores the first and the last 64 KiB of each run's output (the card says _"first 64 KiB and last 64 KiB
 shown"_ when there was more), so a card from yesterday can be read when the computer is off. The computer itself
 keeps the full output of its last 30 runs in its node folder (`commands/`, readable only by its owner). **Recent**
-holds your last eight commands; each opens with its stored cards. You see only the commands you ran.
+holds your last eight commands; each opens with its stored cards, and **↻** (or **Run again** on an open command)
+fills the composer with it and asks for the confirmation again. You see only the commands you ran. The stored head
+and tail are cleared 30 days after a run ended (`FLEET_JOB_RETENTION_DAYS`); the run itself stays in the history.
+
+When **Checkouts** are on, the folder field offers the picked computers' checkouts.
+
+## From a computer's page
+
+A computer's **⋯** menu has **Run a command…**, which opens the Commands tab with only that computer picked. Its
+**Overview** shows the last command you ran there: _"Last command: `uptime` · ✓ 0.8 s · 3 min ago"_.
+
+**Open full output** on a card downloads everything the computer kept of that run (up to 10 MiB), read from the
+computer itself — so it needs the computer online (_"The full output is on build-02, which is offline"_ otherwise).
+
+## Agents
+
+An Agent has four tools: `fleet_commands_run`, `fleet_commands_list`, `fleet_commands_get` and
+`fleet_commands_cancel`. **An Agent never runs a command by itself**: `fleet_commands_run` files a request in your
+**My Decisions** naming the computers and the command, and only your approval runs it — as that Agent, through every
+check above, with `agent:<id>` in each audit row. The Agent then reads what each computer printed with
+`fleet_commands_list` (it sees only the commands Agents asked for). Without the approval queue the tool refuses. The
+same four names are offered to MCP clients, which confirm like the hub (`confirm: true` after the
+`confirmation_required` summary).
 
 ## From the command line
 
@@ -101,5 +123,7 @@ timed out.
 | GET    | `/api/fleet/commands/:id`            | One command with every computer's run (read once a second while one runs)                  |
 | GET    | `/api/fleet/commands/:id/runs`       | Its runs                                                                                   |
 | POST   | `/api/fleet/commands/:id/cancel`     | Stop it on every computer it still runs on                                                 |
+| GET    | `/api/fleet/commands/:id/runs/:runId/output` | One computer's full output, downloaded from the computer (`text/plain` attachment) |
+| GET    | `/api/fleet/nodes/:id/commands/last` | Your latest run on that computer, or `{ last: null }`                                      |
 
 Every refusal is `{ error: { code, hint, details } }` with the codes above.

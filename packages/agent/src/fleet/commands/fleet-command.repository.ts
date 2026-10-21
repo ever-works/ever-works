@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
-import { FLEET_COMMAND_RECENT } from '@ever-works/contracts';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
+import { FLEET_COMMAND_RECENT, type FleetCommandRequester } from '@ever-works/contracts';
 import { FleetCommand } from '../../entities/fleet-command.entity';
 import { FleetCommandRun } from '../../entities/fleet-command-run.entity';
 
@@ -33,10 +33,22 @@ export class FleetCommandRepository {
         return this.commands.findOne({ where: { id } });
     }
 
-    /** A person's most recent one-off Commands (Recent, spec FR-17). */
-    async listRecentForUser(userId: string, limit: number = FLEET_COMMAND_RECENT): Promise<FleetCommand[]> {
+    /**
+     * A person's most recent one-off Commands (Recent, spec FR-17); with
+     * `requestedBy`, only those a person (`user`) or an Agent (`agent`) asked
+     * for (the Agent tools read the latter, FL-12 P2).
+     */
+    async listRecentForUser(
+        userId: string,
+        limit: number = FLEET_COMMAND_RECENT,
+        options: { requestedBy?: FleetCommandRequester } = {},
+    ): Promise<FleetCommand[]> {
         return this.commands.find({
-            where: { userId, cadence: IsNull() },
+            where: {
+                userId,
+                cadence: IsNull(),
+                ...(options.requestedBy ? { requestedBy: options.requestedBy } : {}),
+            },
             order: { createdAt: 'DESC' },
             take: Math.min(50, Math.max(1, Math.floor(limit))),
         });
@@ -76,5 +88,29 @@ export class FleetCommandRepository {
 
     async updateCommand(id: string, patch: Partial<FleetCommand>): Promise<void> {
         await this.commands.update({ id }, patch);
+    }
+
+    /**
+     * Retention (FL-12 P3, T-27): NULL the stored head and tail of up to
+     * `batchSize` ended runs whose end is older than `cutoff`, keeping the
+     * rows (status, exit code, timings, the refusal). Answers how many it
+     * cleared; a run still running is never touched.
+     */
+    async purgeEndedOutputs(cutoff: Date, batchSize: number): Promise<number> {
+        const rows = await this.runs.find({
+            select: { id: true },
+            where: [
+                { status: Not('running'), endedAt: LessThan(cutoff), outputHead: Not(IsNull()) },
+                { status: Not('running'), endedAt: LessThan(cutoff), outputTail: Not(IsNull()) },
+            ],
+            order: { endedAt: 'ASC' },
+            take: Math.max(1, Math.floor(batchSize)),
+        });
+        if (rows.length === 0) return 0;
+        await this.runs.update(
+            { id: In(rows.map((row) => row.id)) },
+            { outputHead: null, outputTail: null },
+        );
+        return rows.length;
     }
 }

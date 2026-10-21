@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-14-checkouts`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft` — P1 merged (#2833), P2 built (#2840); nothing run yet — see `docs/internal/fleet/lanes/FL-14.md`
+**Status:** `Draft` — P1 merged (#2833), P2 merged (#2840), P3 built; nothing run yet — see `docs/internal/fleet/lanes/FL-14.md`
 **Last updated:** 2026-10-21
 
 ---
@@ -183,21 +183,21 @@
 
 ## P3 — Isolation, sharing, purge
 
-- [ ] **T-29**. Create `apps/node/src/core/link/modules/checkouts/checkout-container.ts` (`docker run` wrapper;
+- [x] **T-29**. Create `apps/node/src/core/link/modules/checkouts/checkout-container.ts` (`docker run` wrapper;
       refuse on `os:win32` or no `docker`) and let FL-04's daemon spawn sessions through it when
       `isolation = 'container'`.
       **Test**: `checkout-container.spec.ts` — argv, mount, refusal matrix.
-- [ ] **T-30**. Shared folders per repository Work: `sharedFolders: string[]` in the Work's
+- [x] **T-30**. Shared folders per repository Work: `sharedFolders: string[]` in the Work's
       fleet settings (additive JSON on the existing Work settings column), linked (junction on
       win32) into new worktrees by `checkout-operations.ts`.
       **Test**: extend `checkout-operations.spec.ts` — link created, never copied, gitignored check.
-- [ ] **T-31**. Create `packages/tasks/src/tasks/trigger/fleet-checkout-bin-purge.task.ts` (daily,
+- [x] **T-31**. Create `packages/tasks/src/tasks/trigger/fleet-checkout-bin-purge.task.ts` (daily,
       30 d, deleted rows only).
       **Test**: `packages/tasks/src/__tests__/fleet-checkout-bin-purge.task.spec.ts`.
 
 ## P4 — Docs and rollout
 
-- [ ] **T-32**. Write `docs/features/fleet-checkouts.md` (discovery, code folders, create, sync,
+- [x] **T-32**. Write `docs/features/fleet-checkouts.md` (discovery, code folders, create, sync,
       delete safety, bin, credentials model); add to `apps/docs/sidebarsPlatform.ts` next to
       `'features/fleet'` (`:183`); cross-link from `docs/features/fleet.md`.
       **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.

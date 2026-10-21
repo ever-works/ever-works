@@ -74,24 +74,24 @@
 
 ## P2 — Agent tool, computer page, operations
 
-- [ ] **T-20**. Extend `packages/agent/src/fleet/agent-fleet-tools.ts` with `fleet_commands_run` (destructive, `confirmationClass: 'confirm'`, AW-24 `machine.run`), `fleet_commands_get`, `fleet_commands_list` (read-only), through the FL-19 gate helper `packages/agent/src/fleet/fleet-tool-gate.ts`.
+- [x] **T-20**. Extend `packages/agent/src/fleet/agent-fleet-tools.ts` with `fleet_commands_run` (destructive, `confirmationClass: 'confirm'`, AW-24 `machine.run`), `fleet_commands_get`, `fleet_commands_list` (read-only), through the FL-19 gate helper `packages/agent/src/fleet/fleet-tool-gate.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/agent-fleet-tools.spec.ts` — refusal outside the audience; `requestedBy: agent:<id>` in the audit row.
-- [ ] **T-21**. Add MCP whitelist entries `fleet_commands_run`, `fleet_commands_get`, `fleet_commands_list`, `fleet_commands_cancel` (CONTRACTS §11.3 names) in `apps/mcp/src/openapi-tools/whitelist.ts` (annotations per plan §9).
+- [x] **T-21**. Add MCP whitelist entries `fleet_commands_run`, `fleet_commands_get`, `fleet_commands_list`, `fleet_commands_cancel` (CONTRACTS §11.3 names) in `apps/mcp/src/openapi-tools/whitelist.ts` (annotations per plan §9).
       **Test**: `apps/mcp/src/openapi-tools/__tests__/whitelist.spec.ts` — entries resolve against the OpenAPI spec.
-- [ ] **T-22**. Add `⋯ › Run a command…` to the computer page header (FL-01's `apps/web/src/components/fleet/computer/ComputerActionsMenu.tsx`) linking to `/fleet/commands?node=<id>`; show "Last command" on the Overview tab.
+- [x] **T-22**. Add `⋯ › Run a command…` to the computer page header (FL-01's `apps/web/src/components/fleet/computer/ComputerActionsMenu.tsx`) linking to `/fleet/commands?node=<id>`; show "Last command" on the Overview tab.
       **Test**: extend `apps/web/e2e/flow-fleet-commands.spec.ts`.
-- [ ] **T-23**. Implement `POST /commands/:id/runs/:runId/output` as an FL-02 operation; node `command.output`; download response with `Content-Disposition: attachment`, `nosniff`.
+- [x] **T-23**. Implement `POST /commands/:id/runs/:runId/output` as an FL-02 operation; node `command.output`; download response with `Content-Disposition: attachment`, `nosniff`.
       **Test**: controller spec — offline node → `unreachable` with last-seen hint.
-- [ ] **T-24**. Implement cancel end to end (controller → bridge → node → `EXIT 130` → `node.command.cancel`); the run ends as spec §8b's default says (`failed`, `failedReason` null, Command `state: cancelled`) until CONTRACTS §4.4 names a value; add `fleet_commands_cancel` to the Agent tools.
+- [x] **T-24**. Implement cancel end to end (controller → bridge → node → `EXIT 130` → `node.command.cancel`); the run ends as spec §8b's default says (`failed`, `failedReason` null, Command `state: cancelled`) until CONTRACTS §4.4 names a value; add `fleet_commands_cancel` to the Agent tools.
       **Test**: service and channel specs extended.
 
 ## P3 — Folder picker, re-run, hand-over
 
-- [ ] **T-25**. Folder picker from FL-14 checkouts in `CommandComposer.tsx` (falls back to a path field when FL-14 is off).
+- [x] **T-25**. Folder picker from FL-14 checkouts in `CommandComposer.tsx` (falls back to a path field when FL-14 is off).
       **Test**: `CommandComposer.unit.spec.tsx`.
-- [ ] **T-26**. Re-run from Recent (opens the confirm dialog pre-filled).
+- [x] **T-26**. Re-run from Recent (opens the confirm dialog pre-filled).
       **Test**: Playwright extension.
-- [ ] **T-27**. Retention sweep for `fleet_command_runs` bodies in `apps/api/src/fleet/fleet-job-retention.service.ts` (null head/tail after 30 days, keep rows).
+- [x] **T-27**. Retention sweep for `fleet_command_runs` bodies in `apps/api/src/fleet/fleet-job-retention.service.ts` (null head/tail after 30 days, keep rows).
       **Test**: extend its spec.
 
 ## Docs and rollout
@@ -110,6 +110,12 @@
   node `command.spec.ts`, web `commands.shared.unit.spec.ts`, CLI `command-output.spec.ts`). T-07's confirmation
   lives in the service (`FleetCommandService.run`) and the policy's `fleetCommandTargetSummary`, not a separate
   file. T-19 (Playwright), T-30 (format / lint / test / build) are the owner's stabilisation pass.
+
+- P2 (#2846): T-20…T-24. T-20's run is always held for the owner's approval (lane-log decision 15); T-23 is a
+  streamed download, not an FL-02 operation (decision 14); specs `agent-fleet-command-tools.spec.ts` (not run).
+
+- P3: T-25 (a `datalist` of the picked computers' ready checkouts, lane-log decision 18), T-26 (decision 19),
+  T-27 (`purgeExpiredCommandOutputs`, decision 20); spec `fleet-command-retention.spec.ts` (not run).
 
 ## Definition of done
 

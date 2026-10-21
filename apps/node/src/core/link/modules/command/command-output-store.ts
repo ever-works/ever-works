@@ -81,6 +81,17 @@ export class CommandOutputStore {
 		}
 	}
 
+	/** The size of one run's kept output in bytes (0 when it is gone). */
+	async size(runId: string): Promise<number> {
+		const file = this.pathFor(runId);
+		if (!file) return 0;
+		try {
+			return (await fsp.stat(file)).size;
+		} catch {
+			return 0;
+		}
+	}
+
 	/** A stream of one run's output (P2 "Open full output"), or null when it is gone. */
 	async read(runId: string): Promise<ReadStream | null> {
 		if (!(await this.has(runId))) return null;

@@ -12967,6 +12967,11 @@
                 "branch": "Branch",
                 "branchPlaceholder": "proposed for you",
                 "branchNote": "A name already on the remote or on another checkout gets -2, -3, …",
+                "container": "Run sessions in a container (the folder mounted at /workspace)",
+                "containerWindows": "Not available on Windows computers",
+                "containerNoDocker": "Needs Docker on {name}",
+                "sharedFolders": "Shared folders (linked, not copied)",
+                "sharedFoldersNote": "Folders of the parent git ignores, e.g. node_modules — linked into the new worktree.",
                 "cost": "Uses disk on {name}. No tokens or credits.",
                 "costWithSize": "Uses disk on {name} (about {size}). No tokens or credits.",
                 "cancel": "Cancel",
@@ -13635,7 +13640,10 @@
                 "copied": "Copied",
                 "fullOutput": "Open full output",
                 "fullOutputSoon": "The full output is kept on the computer; opening it arrives soon",
-                "fullOutputOffline": "The full output is on {name}, which is offline"
+                "fullOutputOffline": "The full output is on {name}, which is offline",
+                "fullOutputNone": "The computer did not keep the full output of this run",
+                "fullOutputLoading": "Reading…",
+                "fullOutputFailed": "The full output could not be read."
             },
             "summary": {
                 "running": "{running} of {total} running",
@@ -13655,6 +13663,21 @@
                 "generic": "The command could not be sent.",
                 "withHint": "{hint}",
                 "network": "Ever Works could not be reached. Try again."
+            },
+            "menu": {
+                "runCommand": "Run a command…",
+                "notAllowed": "The owner of {name} has not allowed you to run commands on it"
+            },
+            "last": {
+                "label": "Last command:",
+                "ago": "{time} ago",
+                "open": "Commands"
+            },
+            "rerun": {
+                "action": "Run again",
+                "label": "Run {command} again",
+                "redacted": "The stored command was redacted — type it again to run it.",
+                "none": "None of these computers can take a command right now."
             }
         },
         "sessions": {
@@ -14087,6 +14110,126 @@
                 "body": "Lets Open show a page in a browser profile on this computer that no agent uses.",
                 "saved": "Saved.",
                 "failed": "Could not switch the preview browser."
+            },
+            "tunnel": {
+                "button": "Preview in my browser",
+                "previewing": "previewing",
+                "timeLeft": "{time} left",
+                "requests": "{count, plural, one {# request} other {# requests}}",
+                "reopen": "Open",
+                "close": "Close preview",
+                "copyLink": "Copy link",
+                "copied": "Link copied — it opens in this browser only",
+                "limit": "You already have 4 previews open — close one.",
+                "limitRow": ":{port} ({left} left)",
+                "failed": "Could not open the preview",
+                "openedByAgent": "opened by an agent for you",
+                "egressBilled": "Egress on this cloud computer is billed by its provider."
+            }
+        },
+        "logs": {
+            "palette": "Logs on {name}",
+            "groups": {
+                "system": "System",
+                "files": "Files",
+                "containers": "Containers",
+                "services": "Services",
+                "withCount": "{group} ({count})"
+            },
+            "kinds": {
+                "system": "system log",
+                "file": "file",
+                "container": "container",
+                "service": "service"
+            },
+            "sources": {
+                "title": "Sources",
+                "refresh": "Refresh the list of logs",
+                "every": "{seconds} s",
+                "loading": "Asking {node} for its logs…",
+                "rootOnly": "root only",
+                "needsAdmin": "needs administrator",
+                "gone": "gone",
+                "failed": "failed",
+                "openFile": "Open a file…",
+                "openFilePlaceholder": "Open a file… e.g. /var/log/nginx/error.log",
+                "openFileNotAbsolute": "Type a full path, starting with / or a drive letter.",
+                "outsideRoots": "That path is outside the folders this computer shares"
+            },
+            "viewer": {
+                "title": "{source} · {kind} · {node}",
+                "pick": "Pick a log on the left to read it.",
+                "live": "● LIVE",
+                "reconnecting": "○ RECONNECTING",
+                "pause": "Pause",
+                "resume": "Resume",
+                "follow": "Follow",
+                "following": "Following",
+                "notFollowing": "Not following — scroll to the bottom to follow again.",
+                "filterPlaceholder": "filter…",
+                "copySelection": "Copy selection",
+                "copyAllShown": "Copy all shown",
+                "copied": "Copied",
+                "download": "Download shown lines",
+                "jumpToLatest": "↓ {count} new lines — jump to latest",
+                "reopen": "Reopen",
+                "loadEarlier": "Load 500 earlier",
+                "loadingEarlier": "Loading earlier lines…",
+                "noEarlier": "No earlier lines",
+                "noEarlierContainer": "Container logs keep no earlier lines here — the Docker log driver bounds them",
+                "levelError": "✖ error",
+                "levelWarning": "⚠ warn",
+                "footerFollowing": "Following",
+                "footerPaused": "Paused · {count} new lines",
+                "footerFiltered": "showing {shown} of {held} lines · filter: {filter}",
+                "footerHeld": "{count} lines held",
+                "footerBytes": "{bytes} read",
+                "footerRedactions": "{count, plural, one {# redaction} other {# redactions}}",
+                "footerDropped": "Skipped {count} lines — the log is faster than the link",
+                "footerDiscarded": "{count} older lines discarded (5 000 held at most)",
+                "mergedTitle": "{title} · {count} sources · {node}",
+                "mergedTitleNoName": "{count} logs merged · {node}",
+                "mergedHint": "Ctrl- or ⌘-click a source to add it to this view (up to 12)."
+            },
+            "notices": {
+                "groupMembership": "Only this user's entries. To see the whole system log, run on {node}:",
+                "groupMembershipAfter": "and sign in again.",
+                "gone": "{source} is gone",
+                "stopped": "{source} stopped",
+                "fastLog": "Skipped {count} lines — the log is faster than the link"
+            },
+            "states": {
+                "loading": "Asking {node} for the last 500 lines…",
+                "loadingSlow": "{node} has not answered yet. It may be busy.",
+                "loadingAbandoned": "{node} did not answer",
+                "error": "Could not read {source} on {node}",
+                "listError": "Could not list the logs on {node}.",
+                "tryAgain": "Try again",
+                "empty": "Nothing to read on {node} yet",
+                "emptyBody": "No log files under this computer's shared folders, no containers, and the system log is not readable by the node's user. Share a folder with --files-root, or install Docker, and come back.",
+                "offline": "{node} is offline — last seen {relative}.",
+                "offlineNever": "{node} is offline.",
+                "unreachable": "{node} is not connected right now.",
+                "consentMissing": "Logs need machine management switched on for this computer.",
+                "consentCommand": "Run this on {node}:",
+                "permissionDenied": "Only the owner of {node} can read its logs.",
+                "desktopNode": "Not available on this kind of node yet.",
+                "killSwitch": "Following stopped — all computers are stopped.",
+                "killSwitchTab": "All computers are stopped. Logs open again once the stop is cleared.",
+                "lost": "Lost the live feed — reopen to continue."
+            },
+            "a11y": {
+                "sources": "Log sources",
+                "region": "Log: {source}",
+                "following": "Following",
+                "paused": "Paused, {count} new lines"
+            },
+            "shortcuts": {
+                "filter": "Focus the filter",
+                "pause": "Pause or resume",
+                "latest": "Jump to latest",
+                "clear": "Clear the filter",
+                "copy": "Copy the selection"
             }
         },
         "operations": {

@@ -16,6 +16,7 @@ import {
     Monitor,
     ListChecks,
     Plug,
+    ScrollText,
     Server,
     Settings,
     Sparkles,
@@ -363,14 +364,30 @@ export const FLEET_HUB_SCREENS: readonly PaletteScreen[] = [
  */
 export function fleetComputerScreens(
     computers: ReadonlyArray<{ id: string; name: string }>,
+    options: { logs?: boolean } = {},
 ): PaletteScreen[] {
-    return computers.map((computer) => ({
+    const screens: PaletteScreen[] = computers.map((computer) => ({
         id: `fleet.computer.${computer.id}`,
         href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
         icon: Monitor,
         title: (t: PaletteTranslator) => t('fleet.palette.goToComputer', { name: computer.name }),
         breadcrumb: fleet,
     }));
+    // Logs on computers (FL-08, FR-33): "Logs on <computer>" for every
+    // computer the viewer may see, opening its Logs tab — only while machine
+    // facts are on (the tab is not registered otherwise).
+    if (options.logs) {
+        for (const computer of computers) {
+            screens.push({
+                id: `fleet.computer.${computer.id}.logs`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'logs'),
+                icon: ScrollText,
+                title: (t: PaletteTranslator) => t('fleet.logs.palette', { name: computer.name }),
+                breadcrumb: fleet,
+            });
+        }
+    }
+    return screens;
 }
 
 /**

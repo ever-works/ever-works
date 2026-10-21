@@ -1,6 +1,11 @@
 'use client';
 
-import type { FleetCommandListResponse, FleetCommandRunRequest, FleetCommandView } from '@ever-works/contracts';
+import type {
+    FleetCommandLastRunResponse,
+    FleetCommandListResponse,
+    FleetCommandRunRequest,
+    FleetCommandView,
+} from '@ever-works/contracts';
 import { browserApiFetch } from '@/lib/api/browser-api';
 import { readCommandError, type CommandErrorRead } from './commands.shared';
 
@@ -50,4 +55,40 @@ export const commandsClient = {
     recent: (limit = 8) => call<FleetCommandListResponse>(`/api/fleet/commands?limit=${limit}`, { method: 'GET' }),
     cancel: (commandId: string) =>
         call<FleetCommandView>(`/api/fleet/commands/${encodeURIComponent(commandId)}/cancel`, { method: 'POST' }),
+    /** P2 — a computer's last run of the person's Commands (its Overview). */
+    lastForNode: (nodeId: string) =>
+        call<FleetCommandLastRunResponse>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/commands/last`, {
+            method: 'GET',
+        }),
+    /**
+     * P2 — "Open full output": the computer's full output of one run as a
+     * Blob (read from the machine), or the refusal (offline, no longer kept).
+     */
+    fullOutput: async (
+        commandId: string,
+        runId: string,
+        fetchImpl: typeof fetch = browserApiFetch,
+    ): Promise<{ ok: true; blob: Blob; filename: string } | { ok: false; error: CommandErrorRead }> => {
+        try {
+            const response = await fetchImpl(
+                `/api/fleet/commands/${encodeURIComponent(commandId)}/runs/${encodeURIComponent(runId)}/output`,
+                { method: 'GET', cache: 'no-store' },
+            );
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                let body: unknown = null;
+                try {
+                    body = text ? JSON.parse(text) : null;
+                } catch {
+                    body = null;
+                }
+                return { ok: false, error: readCommandError(response.status, body) };
+            }
+            const disposition = response.headers.get('content-disposition') ?? '';
+            const match = /filename="([^"]+)"/.exec(disposition);
+            return { ok: true, blob: await response.blob(), filename: match?.[1] ?? 'command-output.log' };
+        } catch {
+            return { ok: false, error: { code: 'network', hint: null, details: {}, status: 0 } };
+        }
+    },
 };

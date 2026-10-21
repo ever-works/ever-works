@@ -6,6 +6,7 @@ import {
 } from '@ever-works/contracts';
 import type { TaskToolDescriptor } from '../../tasks-domain/agent-task-tools';
 import { readFleetPortsError } from './fleet-ports.errors';
+import type { FleetPortTunnelService } from './fleet-port-tunnel.service';
 import type { FleetPortsService } from './fleet-ports.service';
 
 /**
@@ -46,6 +47,8 @@ function failure(error: unknown): { error: string; code?: string } {
 export function buildFleetPortsTools(args: {
     agent: { id: string; userId: string; name?: string | null };
     service: Pick<FleetPortsService, 'list' | 'open'>;
+    /** Phase 2 — `fleet_ports_preview_open|close`; absent (or the flag off), they are not offered. */
+    tunnels?: Pick<FleetPortTunnelService, 'open' | 'closeForUser' | 'isEnabled'> | null;
 }): TaskToolDescriptor[] {
     const actor = {
         kind: 'agent' as const,
@@ -132,6 +135,66 @@ export function buildFleetPortsTools(args: {
             }
         },
     } satisfies TaskToolDescriptor<FleetPortsOpenToolArgs, Record<string, unknown>>);
+
+    const tunnels = args.tunnels;
+    if (tunnels && tunnels.isEnabled()) {
+        out.push({
+            name: 'fleet_ports_preview_open',
+            description:
+                "Open a preview of a fleet computer's web server for your OWNER to see in their own browser: an owner-only, time-boxed link (closes after 10 idle minutes or 60 minutes; at most 4 per person). Not destructive; audited. You cannot open the link yourself — tell your owner to choose Preview in my browser on the computer's Ports tab, where it is already open.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    nodeId: { type: 'string', description: 'The computer (fleet node id).' },
+                    port: { type: 'integer', description: 'The listening port, 1–65535.' },
+                },
+                required: ['nodeId', 'port'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { nodeId?: string; port?: number };
+                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+                const port = Number(a.port);
+                if (!isFleetPortNumber(port)) return { error: 'port must be a number from 1 to 65535' };
+                try {
+                    const { tunnel } = await tunnels.open(a.nodeId, port, actor);
+                    // Never a hand-off: an Agent is never given a way into the tunnel (spec U15).
+                    return {
+                        opened: true,
+                        url: tunnel.url,
+                        endsAt: tunnel.endsAt,
+                        forOwner: 'Your owner opens it from the Ports tab (Preview in my browser) — the link works only in their browser.',
+                    };
+                } catch (error) {
+                    return failure(error);
+                }
+            },
+        } satisfies TaskToolDescriptor<{ nodeId?: string; port?: number }, Record<string, unknown>>);
+
+        out.push({
+            name: 'fleet_ports_preview_close',
+            description: "Close the preview of a fleet computer's port that was opened for your owner.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    nodeId: { type: 'string', description: 'The computer (fleet node id).' },
+                    port: { type: 'integer', description: 'The port whose preview to close.' },
+                },
+                required: ['nodeId', 'port'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { nodeId?: string; port?: number };
+                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+                const port = Number(a.port);
+                if (!isFleetPortNumber(port)) return { error: 'port must be a number from 1 to 65535' };
+                try {
+                    await tunnels.closeForUser(a.nodeId, port, actor);
+                    return { closed: true };
+                } catch (error) {
+                    return failure(error);
+                }
+            },
+        } satisfies TaskToolDescriptor<{ nodeId?: string; port?: number }, Record<string, unknown>>);
+    }
 
     return out;
 }

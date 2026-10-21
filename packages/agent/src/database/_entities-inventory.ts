@@ -159,6 +159,7 @@ import { ComputerSession } from '../entities/computer-session.entity';
 import { FleetSession } from '../entities/fleet-session.entity';
 import { FleetCommand } from '../entities/fleet-command.entity';
 import { FleetCommandRun } from '../entities/fleet-command-run.entity';
+import { FleetPortTunnel } from '../entities/fleet-port-tunnel.entity';
 import { FleetCheckout } from '../entities/fleet-checkout.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
@@ -450,6 +451,7 @@ export const ENTITIES = [
     // computer each ran on.
     FleetCommand,
     FleetCommandRun,
+    FleetPortTunnel,
     // Checkouts on computers (FL-14) — clones and worktrees on a Node; one
     // row per (node, path).
     FleetCheckout,

@@ -46,6 +46,8 @@ export interface CheckoutRegistryEntry {
 	archived?: boolean;
 	/** A public repository Ever Works cloned with no credential (no installation covers it): reads stay anonymous. */
 	anonymous?: boolean;
+	/** P3: the image a container-isolated checkout's sessions and commands run in. */
+	containerImage?: string;
 }
 
 export interface CheckoutRegistryState {
@@ -95,7 +97,10 @@ export function parseCheckoutRegistry(text: string): CheckoutRegistryState | nul
 			isolation: isFleetCheckoutIsolation(entry.isolation) ? entry.isolation : 'host',
 			addedAt: typeof entry.addedAt === 'string' ? entry.addedAt : new Date(0).toISOString(),
 			...(entry.archived === true ? { archived: true } : {}),
-			...(entry.anonymous === true ? { anonymous: true } : {})
+			...(entry.anonymous === true ? { anonymous: true } : {}),
+			...(typeof entry.containerImage === 'string' && entry.containerImage.length <= 255
+				? { containerImage: entry.containerImage }
+				: {})
 		});
 		if (entries.length >= CHECKOUT_REGISTRY_MAX_ENTRIES) break;
 	}

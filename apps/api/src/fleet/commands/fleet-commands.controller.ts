@@ -8,14 +8,17 @@ import {
     ParseUUIDPipe,
     Post,
     Query,
+    Res,
     UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetCommandService, type FleetCommandActor } from '@ever-works/agent/fleet';
 import {
     FLEET_COMMAND_RECENT,
     FLEET_COMMAND_RUNS_PER_MINUTE,
+    type FleetCommandLastRunResponse,
     type FleetCommandListResponse,
     type FleetCommandRunView,
     type FleetCommandView,
@@ -25,6 +28,7 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { ListFleetCommandsQueryDto, RunFleetCommandDto } from './dto/fleet-commands.dto';
 import { FleetCommandsEnabledGuard } from './fleet-commands-enabled.guard';
+import { FleetCommandLinkAdapter } from './fleet-command-link.adapter';
 
 function actorOf(auth: AuthenticatedUser): FleetCommandActor {
     return { userId: auth.userId };
@@ -47,13 +51,19 @@ function actorOf(auth: AuthenticatedUser): FleetCommandActor {
  * as unknown (spec §8b default).
  *
  * Output is read by polling `GET /commands/:id` while a run is live (lane-log
- * decision 1); the viewer socket of plan §5 is not built.
+ * decision 1); the viewer socket of plan §5 is not built. P2 adds the full
+ * output download (`GET /commands/:id/runs/:runId/output`, streamed from the
+ * computer over a `command` channel — lane-log decision 14) and a computer's
+ * last run (`GET /nodes/:id/commands/last`).
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetCommandsEnabledGuard)
 export class FleetCommandsController {
-    constructor(private readonly commands: FleetCommandService) {}
+    constructor(
+        private readonly commands: FleetCommandService,
+        private readonly link: FleetCommandLinkAdapter,
+    ) {}
 
     @Post('commands')
     @ApiOperation({
@@ -113,6 +123,72 @@ export class FleetCommandsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<FleetCommandRunView[]> {
         return this.commands.runs(id, actorOf(auth));
+    }
+
+    @Get('commands/:id/runs/:runId/output')
+    @ApiOperation({
+        summary:
+            "Download one computer's FULL output of one of my Commands (up to 10 MiB), read from the computer, which keeps its last 30 runs. Needs the computer online (`unreachable` names when it was last seen).",
+    })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async output(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Res() res: Response,
+    ): Promise<void> {
+        const actor = actorOf(auth);
+        const { run, nodeName } = await this.commands.authorizeFullOutput(id, runId, actor);
+        // The file name is built from the platform's own ids and the computer's
+        // stored name, filtered to a safe alphabet — never from the request.
+        const safeName = nodeName.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 60) || 'computer';
+        let started = false;
+        const start = (bytes: number | null) => {
+            if (started) return;
+            started = true;
+            res.status(200);
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="${safeName}-${run.id.slice(0, 8)}.log"`,
+            );
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Cache-Control', 'no-store');
+            if (bytes !== null && bytes > 0) res.setHeader('X-Output-Bytes', String(bytes));
+        };
+        try {
+            await this.link.readOutput(
+                { nodeId: run.nodeId, commandId: id, runId: run.id, caller: { kind: 'user', userId: auth.userId } },
+                {
+                    bytes: (total) => start(total),
+                    data: (chunk) => {
+                        start(null);
+                        res.write(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
+                    },
+                },
+            );
+            start(null);
+            res.end();
+        } catch (error) {
+            // Before the first byte the refusal is the CONTRACTS §8 envelope (the
+            // exception filter renders it); after it, the download just ends short.
+            if (!started) throw error;
+            res.end();
+        }
+    }
+
+    @Get('nodes/:id/commands/last')
+    @ApiOperation({
+        summary:
+            'The latest run of my own Commands on one computer, for its Overview ("Last command"), or `{ last: null }`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async lastForNode(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<FleetCommandLastRunResponse> {
+        return { last: await this.commands.lastRunForNode(id, actorOf(auth)) };
     }
 
     @Post('commands/:id/cancel')
