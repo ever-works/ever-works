@@ -34,6 +34,8 @@ export * from './logs/agent-fleet-logs-tools';
 export * from './fleet-tool-gate';
 export * from './fleet-tool-factory';
 export * from './fleet-status';
+export * from './fleet-held-call';
+export * from './fleet-requested-by';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
