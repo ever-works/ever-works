@@ -19,6 +19,7 @@ import {
 import { osKeyOf } from '../fleet-os.shared';
 import '../modules';
 import {
+    computerActionProps,
     getComputerActions,
     type FleetComputerActionRegistration,
     type FleetFeatureFlags,
@@ -81,7 +82,7 @@ export function ComputerHeader({
             key={action.id}
             id={`action:${action.id}`}
             load={action.load}
-            props={{ node, flags }}
+            props={computerActionProps(node, flags, action)}
             loading={null}
             failed={null}
         />
