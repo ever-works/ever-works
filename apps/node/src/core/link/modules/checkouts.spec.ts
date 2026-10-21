@@ -132,14 +132,53 @@ describe('checkouts module (FL-14 T-11)', () => {
 		).rejects.toSatisfy((error: unknown) => error instanceof MachineVerbError && error.error.code === 'invalid');
 	});
 
-	it('answers pull and push unsupported until P2', async () => {
+	it('pulls fast-forward only on a clean discovered checkout, with the machine’s own git (spec FR-23)', async () => {
 		const module = build(MANAGE);
+		await module.machineVerbs!['checkouts.list'].run(context({ rescan: true }, MANAGE, 'checkouts.list'));
+		await module.machineVerbs!['checkouts.sync'].run(
+			context({ path: join(code, 'api'), op: 'pull' }, MANAGE, 'checkouts.sync')
+		);
+		expect(calls).toContainEqual(['pull', '--ff-only', '--no-rebase', 'origin']);
+	});
+
+	it('only forgets a discovered checkout, never deletes its folder (spec FR-25)', async () => {
+		const module = build(MANAGE);
+		await module.machineVerbs!['checkouts.list'].run(context({ rescan: true }, MANAGE, 'checkouts.list'));
+		const remove = module.machineVerbs!['checkouts.delete'];
 		await expect(
-			module.machineVerbs!['checkouts.sync'].run(
-				context({ path: join(code, 'api'), op: 'pull' }, MANAGE, 'checkouts.sync')
+			remove.run(context({ path: join(code, 'api'), mode: 'delete' }, MANAGE, 'checkouts.delete'))
+		).rejects.toSatisfy((error: unknown) => error instanceof MachineVerbError && error.error.code === 'invalid');
+		const forgotten = (await remove.run(
+			context({ path: join(code, 'api'), mode: 'forget' }, MANAGE, 'checkouts.delete')
+		)) as { removed: boolean };
+		expect(forgotten.removed).toBe(false);
+	});
+
+	it('refuses a create outside the checkouts root and a person’s create without --manage', async () => {
+		const module = build(MANAGE);
+		const create = module.machineVerbs!['checkouts.create'];
+		await expect(
+			create.run(
+				context(
+					{
+						checkoutId: '11111111-1111-1111-1111-111111111111',
+						path: join(code, 'api', 'inside-parent'),
+						source: { kind: 'worktree', parentPath: join(code, 'api') },
+						branch: 'nina/fix',
+						baseRef: null,
+						createdBy: 'user'
+					},
+					MANAGE,
+					'checkouts.create'
+				)
+			)
+		).rejects.toSatisfy((error: unknown) => error instanceof MachineVerbError && error.error.code === 'invalid');
+		await expect(
+			build(WORK_ONLY).machineVerbs!['checkouts.create'].run(
+				context({ createdBy: 'user' }, WORK_ONLY, 'checkouts.create')
 			)
 		).rejects.toSatisfy(
-			(error: unknown) => error instanceof MachineVerbError && error.error.code === 'unsupported_on_node'
+			(error: unknown) => error instanceof MachineVerbError && error.error.code === 'consent_missing'
 		);
 	});
 

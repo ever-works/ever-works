@@ -75,6 +75,19 @@ keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `ch
 `outputBytes`, `capped` (§4.4, FL-12's own slots); the per-computer refusal lives on the run row, the `failedReason`
 enum is unchanged.
 
+**Revision 12 (2026-10-21)** — FL-14 P2 (lane-log decisions 12–18): `checkouts.create` needs `work-or-manage` (a
+Task's checkout on `--work`, a person's or an Agent's on `--manage`, checked on the machine from `createdBy`);
+`checkouts.create { checkoutId, path, source: { kind: 'clone', repoUrl, credential? } | { kind: 'worktree',
+parentPath }, branch, baseRef, createdBy }` with the platform naming the exact path under the node's
+`checkoutsRoot`; `checkouts.delete { path, mode: 'preview'|'delete'|'forget', expected? }` answering
+`{ evidence: { uncommitted, unpushedCommits, hasLocks }, removed, branchKept }`; `checkouts.list` gains
+`archivedPaths` (the platform's bin, so archived checkouts are not roots, R-41); the scoped credential route is
+`POST /api/fleet/checkouts/:id/credential` (node-authenticated; §11.2's internal-prefix note stands for later moves).
+
+**Revision 13 (2026-10-21)** — FL-14 P3 (lane-log decisions 19–21): `checkouts.create` gains `isolation`,
+`containerImage` (the deployment default `FLEET_CHECKOUT_CONTAINER_IMAGE`) and `sharedFolders` (worktrees only, linked
+when git ignores them); the bin purge is the daily scheduled task `fleet-checkout-bin-purge` (`23 3 * * *`).
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

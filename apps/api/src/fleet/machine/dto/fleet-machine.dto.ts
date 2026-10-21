@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import {
     FLEET_PROCESS_SIGNALS,
     FLEET_SERVICE_MANAGERS,
@@ -90,6 +90,37 @@ export class FleetProcessSignalDto extends FleetActionConfirmDto {
     @ApiProperty({ enum: FLEET_PROCESS_SIGNALS, description: '`TERM` (Stop) or `KILL` (Kill).' })
     @IsIn([...FLEET_PROCESS_SIGNALS])
     signal!: FleetProcessSignal;
+}
+
+/**
+ * `POST …/docker/containers` — "Run a container" (FL-09 P2, FR-28). `request`
+ * is checked by the shared `validateFleetRunRequest` in the service and again
+ * on the machine (allow-listed fields only; no privileged mode, host
+ * namespaces, cap-add or socket mounts), so it is an object here.
+ */
+export class FleetRunContainerDto extends FleetActionConfirmDto {
+    @ApiProperty({
+        description:
+            '`{ image, name?, ports: [{host, container, proto?}], env: [{name, value}], volumes: [{source, target, readOnly?}], restart, command? }`. Environment values are never stored, logged or shown again.',
+    })
+    @IsObject()
+    request!: Record<string, unknown>;
+}
+
+/** `POST …/docker/images` — pull. */
+export class FleetPullImageDto extends FleetActionConfirmDto {
+    @ApiProperty({ description: 'The image reference (`redis:7`, `ghcr.io/acme/api:1.4`).', maxLength: 255 })
+    @IsString()
+    @MaxLength(255)
+    ref!: string;
+}
+
+/** `DELETE …/docker/images?unused=true` — prune. */
+export class FleetPruneImagesQueryDto {
+    @ApiProperty({ required: false, enum: ['true', 'false'] })
+    @IsOptional()
+    @IsIn(['true', 'false'])
+    unused?: 'true' | 'false';
 }
 
 /** The confirmation fields of a body, as the service reads them (only the three CONTRACTS fields). */

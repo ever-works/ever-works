@@ -14,6 +14,7 @@ import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
+import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
@@ -104,13 +105,20 @@ export interface AgentFleetToolSource {
      */
     ports?: Pick<FleetPortsService, 'list' | 'open'>;
     /**
-     * Services and processes on computers (FL-09) — backs
-     * `fleet_services_list|action` and `fleet_processes_list|signal`.
+     * Services, processes and Docker on computers (FL-09) — backs
+     * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
      * Optional: unbound, those tools are simply not offered.
      */
     machine?: Pick<
         FleetMachineActionsService,
-        'listServices' | 'serviceAction' | 'listProcesses' | 'signalProcess'
+        | 'listServices'
+        | 'serviceAction'
+        | 'listProcesses'
+        | 'signalProcess'
+        | 'listContainers'
+        | 'containerAction'
+        | 'listImages'
+        | 'pullImage'
     >;
     /**
      * Computer health (FL-03 second phase) — when bound, the read-only
@@ -122,6 +130,18 @@ export interface AgentFleetToolSource {
         service: Pick<FleetService, 'getVisibleForUser' | 'listVisibleForUser'>;
         history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
         needsALook?: Pick<NeedsALookService, 'forNodes'>;
+    };
+    /**
+     * Checkouts on computers (FL-14 P2, spec FR-29) — when bound, the
+     * `fleet_checkouts_*` tools are offered (`buildFleetCheckoutTools`), each
+     * act checked against the Node's `checkouts` audience for the Agent's
+     * owner and classified on the trust ladder (`safety/action-category.ts`).
+     */
+    checkouts?: {
+        service: Pick<
+            FleetCheckoutService,
+            'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
+        >;
     };
 }
 

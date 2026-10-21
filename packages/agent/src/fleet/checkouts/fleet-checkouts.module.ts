@@ -14,7 +14,7 @@ import { FleetCheckoutService } from './fleet-checkout.service';
  * The `fleet-checkout-reconcile` cron reaches the API over the internal
  * worker RPC, whose allow-list is derived from a service's prototype.
  * Exposing `FleetCheckoutService` itself would publish archive / sync to the
- * worker; this facade publishes exactly `reconcile()`.
+ * worker; this facade publishes exactly `reconcile()` and (P3) `purgeBin()`.
  */
 @Injectable()
 export class FleetCheckoutReconcileService {
@@ -24,6 +24,12 @@ export class FleetCheckoutReconcileService {
     async reconcile(): Promise<{ swept: number; asked: number }> {
         if (!config.fleet.isCheckoutsEnabled()) return { swept: 0, asked: 0 };
         return this.checkouts.reconcile();
+    }
+
+    /** P3 (spec FR-33): the daily bin purge — rows only, never folders. Off with the flag. */
+    async purgeBin(): Promise<{ purged: number }> {
+        if (!config.fleet.isCheckoutsEnabled()) return { purged: 0 };
+        return this.checkouts.purgeBin();
     }
 }
 

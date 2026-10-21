@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -19,6 +20,7 @@ import {
 } from '@ever-works/agent/fleet';
 import {
     FLEET_CHECKOUT_WRITES_PER_MINUTE,
+    type FleetCheckoutCreateResponse,
     type FleetCheckoutListResponse,
     type FleetCheckoutOperationResponse,
     type FleetCheckoutView,
@@ -29,6 +31,9 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
     ArchiveFleetCheckoutDto,
+    CreateFleetCheckoutDto,
+    DeleteFleetCheckoutDto,
+    DeleteFleetCheckoutQueryDto,
     ListFleetCheckoutsQueryDto,
     ListNodeCheckoutsQueryDto,
     SyncFleetCheckoutDto,
@@ -65,8 +70,9 @@ function listQuery(query: ListFleetCheckoutsQueryDto): FleetCheckoutListQuery & 
  * row. Every refusal is the CONTRACTS §8 envelope with its status, thrown by
  * the service and passed through untouched.
  *
- * Create (`POST /checkouts`) and delete (`DELETE /checkouts/:id`) arrive with
- * P2; pull and push answer `invalid` until then.
+ * P2 adds create (`POST /checkouts`), pull and push, and delete
+ * (`DELETE /checkouts/:id`, with FL-06's `?cleanUp=1` gate). The node-facing
+ * credential route lives in `FleetCheckoutsNodeController` (node-authenticated).
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
@@ -135,7 +141,7 @@ export class FleetCheckoutsController {
     @Post('checkouts/:id/sync')
     @ApiOperation({
         summary:
-            'Fetch a checkout on the computer (no confirmation; allowed while a session runs in it). Answers at once with the operation id when the computer is still fetching. Pull and push arrive with the next release.',
+            'Fetch, pull (fast-forward only) or push a checkout on the computer. Fetch needs no confirmation and is allowed while a session runs in it; pull and push need `confirm: true` (without it: `confirmation_required` naming the branch and remote) and wait for any session working in it. Answers at once with the operation id when the computer is still working.',
     })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: FLEET_CHECKOUT_WRITES_PER_MINUTE, ttl: 60_000 } })
@@ -148,6 +154,57 @@ export class FleetCheckoutsController {
             op: body.op,
             ...(body.confirm !== undefined ? { confirm: body.confirm } : {}),
         });
+    }
+
+    @Post('checkouts')
+    @ApiOperation({
+        summary:
+            'Create a checkout on a computer: a fresh clone (with a repository-scoped, short-lived credential when a GitHub App installation covers the repository) or a worktree of a checkout on the same computer, on a new branch made unique by the branch rule. Answers at once with the checkout in `creating` and the link operation id.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: FLEET_CHECKOUT_WRITES_PER_MINUTE, ttl: 60_000 } })
+    async create(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateFleetCheckoutDto,
+    ): Promise<FleetCheckoutCreateResponse> {
+        const source =
+            body.source.kind === 'worktree'
+                ? { kind: 'worktree' as const, parentCheckoutId: body.source.parentCheckoutId ?? '' }
+                : { kind: 'clone' as const, repoUrl: body.source.repoUrl ?? '' };
+        return this.checkouts.create(actorOf(auth), {
+            nodeId: body.nodeId,
+            source,
+            ...(body.branch !== undefined ? { branch: body.branch } : {}),
+            ...(body.baseRef !== undefined ? { baseRef: body.baseRef } : {}),
+            ...(body.isolation !== undefined ? { isolation: body.isolation } : {}),
+            ...(body.sharedFolders !== undefined ? { sharedFolders: body.sharedFolders } : {}),
+        });
+    }
+
+    @Delete('checkouts/:id')
+    @ApiOperation({
+        summary:
+            'Delete a checkout Ever Works created (its folder; a worktree keeps its branch) or forget one (`mode: forget`, row only). Without a confirmation the answer is 409 `confirmation_required` with what the computer says would be lost: `confirm: true` when nothing would be, else `confirmName` = the folder name. `?cleanUp=1` applies FL-06’s Clean up gate first.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: FLEET_CHECKOUT_WRITES_PER_MINUTE, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: DeleteFleetCheckoutDto,
+        @Query() query: DeleteFleetCheckoutQueryDto,
+    ): Promise<FleetCheckoutView | { forgotten: true; id: string }> {
+        return this.checkouts.remove(
+            id,
+            actorOf(auth),
+            {
+                ...(body?.mode ? { mode: body.mode } : {}),
+                ...(body?.confirm !== undefined ? { confirm: body.confirm } : {}),
+                ...(body?.confirmName !== undefined ? { confirmName: body.confirmName } : {}),
+                ...(body?.expected ? { expected: body.expected } : {}),
+            },
+            { cleanUp: query.cleanUp === true },
+        );
     }
 
     @Post('checkouts/:id/archive')

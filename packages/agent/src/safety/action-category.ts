@@ -56,6 +56,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     getSkillFile: 'read.internal',
     list_escalations: 'read.internal',
     list_fleet_nodes: 'read.internal',
+    // Checkouts on computers (FL-14 P2) — reads, then the acts on a machine.
+    fleet_checkouts_list: 'read.internal',
+    fleet_checkouts_get: 'read.internal',
     fleet_commands_list: 'read.internal',
     fleet_commands_get: 'read.internal',
     list_meetings: 'read.internal',
@@ -92,11 +95,15 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     run_workflow_graph: 'write.internal',
     // APW-08 T26 — files and starts an App Work change Task (the PR is reviewed before merge).
     request_app_change: 'write.internal',
+    fleet_checkouts_create: 'write.internal',
+    fleet_checkouts_sync: 'write.internal',
+    fleet_checkouts_archive: 'write.internal',
     'facade:memory-write': 'write.internal',
     'facade:knowledge-write': 'write.internal',
 
     // ── write.destructive — removing data with no preserved copy ──
     'facade:hard-delete': 'write.destructive',
+    fleet_checkouts_delete: 'write.destructive',
     'facade:force-push': 'write.destructive',
 
     // ── message.internal — workspace members and other agents ──
