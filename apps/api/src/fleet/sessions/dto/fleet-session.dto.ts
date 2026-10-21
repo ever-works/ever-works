@@ -14,6 +14,7 @@ import {
     MinLength,
 } from 'class-validator';
 import {
+    FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
     FLEET_SESSION_ATTACH_ROLES,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
@@ -127,6 +128,59 @@ export class RenameFleetSessionDto {
     @MinLength(1)
     @MaxLength(FLEET_SESSION_TITLE_MAX_LENGTH)
     title!: string;
+}
+
+/**
+ * Body for `PATCH /api/fleet/sessions/:id` (FL-05 widens FL-04's rename, plan
+ * §5): `{ title }` renames, `{ acknowledge: <attention key> }` marks the
+ * session's attention seen (FR-26). Exactly one of the two.
+ */
+export class PatchFleetSessionDto {
+    @ApiProperty({ required: false, minLength: 1, maxLength: FLEET_SESSION_TITLE_MAX_LENGTH })
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(FLEET_SESSION_TITLE_MAX_LENGTH)
+    title?: string;
+
+    @ApiProperty({
+        required: false,
+        maxLength: 200,
+        description: 'The attention key the reader saw (fleet-session:<id>:<reason>:<prompt>): clears unread, never the prompt.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    acknowledge?: string;
+}
+
+/** Body for `POST /api/fleet/sessions/:id/answer` (FL-05, plan §5, spec FR-28 … FR-31). */
+export class AnswerFleetSessionDto {
+    @ApiProperty({ maxLength: 200, description: 'The attention key being answered (it must still be current).' })
+    @IsString()
+    @MaxLength(200)
+    key!: string;
+
+    @ApiProperty({ required: false, maxLength: 64, description: 'One of the options the CLI showed.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    optionId?: string;
+
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
+        description: 'A free-text answer, for a question that takes one. Typed into the session; never stored.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_SESSION_ANSWER_TEXT_MAX_CHARS)
+    text?: string;
+
+    @ApiProperty({ required: false, enum: ['card', 'detail', 'inbox', 'decisions', 'cli'] })
+    @IsOptional()
+    @IsIn(['card', 'detail', 'inbox', 'decisions', 'cli'])
+    source?: 'card' | 'detail' | 'inbox' | 'decisions' | 'cli';
 }
 
 /** Body for `POST /api/fleet/sessions/:id/end` (CONTRACTS §2.2 class `confirm`). */

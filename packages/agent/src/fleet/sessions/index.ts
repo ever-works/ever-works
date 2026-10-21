@@ -12,3 +12,4 @@ export * from './fleet-session-recorder.port';
 // Session status, attention & board (FL-05).
 export * from './fleet-session-attention.port';
 export * from './fleet-session-state.service';
+export * from './fleet-session-attention.delivery';

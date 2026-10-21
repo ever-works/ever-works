@@ -9,6 +9,9 @@ import { FleetModule } from '../fleet.module';
 import { FleetSessionRepository } from './fleet-session.repository';
 import { FleetSessionService } from './fleet-session.service';
 import { FleetSessionStateService } from './fleet-session-state.service';
+import { FleetSessionAttentionDelivery } from './fleet-session-attention.delivery';
+import { FLEET_SESSION_ATTENTION_SINK } from './fleet-session-attention.port';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 /**
  * Sessions on computers (FL-04) — the sweeper's one-member facade.
@@ -40,13 +43,17 @@ export class FleetSessionSweepService {
     // P2: the Agent and its Run, for Agent sessions (repositories provided here
     // as FleetModule provides `ApiKeyRepository` — stateless, so a second
     // instance is harmless and this module needs no DatabaseModule).
-    imports: [FleetModule, TypeOrmModule.forFeature([FleetSession, Agent, AgentRun])],
+    // FL-05: the session notifications (`NotificationService`).
+    imports: [FleetModule, NotificationsModule, TypeOrmModule.forFeature([FleetSession, Agent, AgentRun])],
     providers: [
         FleetSessionRepository,
         FleetSessionService,
         FleetSessionSweepService,
-        // FL-05: the writer of what a machine reports about a session's status.
+        // FL-05: the writer of what a machine reports about a session's status,
+        // and where an attention edge is delivered (Inbox, notifications).
         FleetSessionStateService,
+        FleetSessionAttentionDelivery,
+        { provide: FLEET_SESSION_ATTENTION_SINK, useExisting: FleetSessionAttentionDelivery },
         AgentRepository,
         AgentRunRepository,
     ],
@@ -55,6 +62,7 @@ export class FleetSessionSweepService {
         FleetSessionService,
         FleetSessionSweepService,
         FleetSessionStateService,
+        FleetSessionAttentionDelivery,
     ],
 })
 export class FleetSessionsModule {}
