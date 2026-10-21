@@ -12852,6 +12852,9 @@
             "badge": "for me"
         },
         "tools": {
+            "palette": {
+                "forThisAgent": "Fleet tools for this Agent"
+            },
             "capabilities": {
                 "title": "Fleet tools",
                 "description": "{agent} can reach your computers through tools. What {agent} may do depends on three things: its tool grants, its trust ladder, and what each computer's owner allows.",
