@@ -27,7 +27,6 @@ import {
     type FleetCloudMeta,
     type FleetCloudOperationResponse,
     type FleetCloudOptionsView,
-    type FleetCloudPowerAction,
     type FleetCloudProvidersView,
     type FleetCloudSoftwareId,
     type FleetCloudUsageView,
