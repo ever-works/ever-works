@@ -692,6 +692,12 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: files.reader,
+                        // P2: copy and delete are held for the owner's approval.
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        proposals: sources.proposals ?? null,
                     }),
                 );
             }
@@ -897,7 +903,9 @@ export class AgentToolService {
         // assembly annotated, with the no-credits sentence, its results secret-scanned
         // and its refusals typed. Anything else (and the legacy `list_fleet_nodes`) is
         // returned untouched.
-        return out.map((tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor);
+        return out.map(
+            (tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor,
+        );
     }
 
     /**

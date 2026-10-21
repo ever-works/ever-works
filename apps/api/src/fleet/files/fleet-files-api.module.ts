@@ -5,6 +5,7 @@ import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { FleetClipController } from './fleet-clip.controller';
 import { FleetClipService } from './fleet-clip.service';
+import { FleetFilesProposalListener } from './fleet-files-proposal.listener';
 import { FleetFilesTransferService } from './fleet-files-transfer.service';
 import { FleetFilesController } from './fleet-files.controller';
 import { FleetFilesService } from './fleet-files.service';
@@ -34,6 +35,8 @@ import { FleetFilesService } from './fleet-files.service';
         FleetFilesService,
         FleetFilesTransferService,
         FleetClipService,
+        // P2: runs a held Agent copy / delete once a person approves it (CONTRACTS R-33).
+        FleetFilesProposalListener,
         { provide: FLEET_FILES_READER, useExisting: FleetFilesService },
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,

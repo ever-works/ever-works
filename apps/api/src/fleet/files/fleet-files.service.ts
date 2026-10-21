@@ -310,6 +310,12 @@ export class FleetFilesService implements FleetFilesReaderPort {
         caller: FleetLinkCaller,
         nodeId: string,
         input: { root: unknown; path?: unknown; entries: unknown; confirmName?: unknown },
+        /**
+         * P2 (FR-38, CONTRACTS R-33): a person approved an Agent's held delete in
+         * My Decisions — that approval IS the `confirm-destructive` confirmation,
+         * so no typed name is asked; an Agent's own `confirmName` never gets here.
+         */
+        options: { approvedProposalId?: string } = {},
     ): Promise<FleetFilesDeleteResult> {
         const location = parseFleetFilesLocation(input.root, input.path);
         const names = parseFleetFilesNames(input.entries, 'entries', 5000);
@@ -331,9 +337,10 @@ export class FleetFilesService implements FleetFilesReaderPort {
                 : fleetFileBaseName(location.path) ||
                   (await this.rootFolderName(caller, nodeId, location.root));
         const confirmed =
-            typeof input.confirmName === 'string' &&
-            expected !== null &&
-            input.confirmName === expected;
+            options.approvedProposalId !== undefined ||
+            (typeof input.confirmName === 'string' &&
+                expected !== null &&
+                input.confirmName === expected);
         if (!confirmed) {
             const where = location.path ? ` from ${location.path}` : '';
             throw fleetLinkError(
@@ -367,6 +374,9 @@ export class FleetFilesService implements FleetFilesReaderPort {
                 removed,
                 confirmationClass: 'confirm-destructive',
                 confirmed: true,
+                ...(options.approvedProposalId
+                    ? { approvedProposalId: options.approvedProposalId }
+                    : {}),
                 outcome: 'done',
             });
             return { transferId, removed };
@@ -417,6 +427,18 @@ export class FleetFilesService implements FleetFilesReaderPort {
         input: { root: string; path: string; name: string },
     ): Promise<FleetFileEntryView> {
         return this.statAs(
+            { kind: 'agent', agentId: caller.agentId, ownerUserId: caller.ownerUserId },
+            nodeId,
+            input,
+        );
+    }
+
+    listConflicts(
+        caller: FleetFilesAgentCaller,
+        nodeId: string,
+        input: { root: string; path: string; names: string[] },
+    ): Promise<FleetFileConflictView[]> {
+        return this.conflictsAs(
             { kind: 'agent', agentId: caller.agentId, ownerUserId: caller.ownerUserId },
             nodeId,
             input,
