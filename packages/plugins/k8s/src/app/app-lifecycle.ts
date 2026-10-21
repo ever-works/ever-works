@@ -991,6 +991,7 @@ export class AppLifecycle {
 			// `pause` records the running count before it scales to 0, so a resume that cannot read
 			// the App spec still restores the App's own size. A component already at 0 keeps the count
 			// an earlier pause recorded (a second pause must not overwrite it with 0).
+			// A resume drops the record: the App runs again, so the count must not outlive its pause.
 			const running = asReplicaCount(liveDeployment?.spec?.replicas);
 			const recordPrePause = pause && running > 0 ? { [APP_PRE_PAUSE_REPLICAS_ANNOTATION]: String(running) } : {};
 			await this.applyReplicas(
@@ -1000,7 +1001,8 @@ export class AppLifecycle {
 				target.replicas,
 				liveDeployment,
 				context,
-				recordPrePause
+				recordPrePause,
+				pause ? [] : [APP_PRE_PAUSE_REPLICAS_ANNOTATION]
 			);
 		}
 
@@ -1104,7 +1106,8 @@ export class AppLifecycle {
 		replicas: number,
 		liveDeployment: AppLiveDeployment | undefined,
 		context?: string,
-		extraAnnotations: Record<string, string> = {}
+		extraAnnotations: Record<string, string> = {},
+		dropAnnotations: readonly string[] = []
 	): Promise<void> {
 		const live =
 			liveDeployment ??
@@ -1136,7 +1139,7 @@ export class AppLifecycle {
 					// log targeting reads) would be pruned by the server-side apply.
 					...(live.metadata?.labels ? { labels: live.metadata.labels } : {}),
 					...(live.metadata?.annotations || Object.keys(extraAnnotations).length > 0
-						? { annotations: { ...(live.metadata?.annotations ?? {}), ...extraAnnotations } }
+						? { annotations: annotationsFor(live.metadata?.annotations, extraAnnotations, dropAnnotations) }
 						: {})
 				},
 				// The live spec carries selector + the full template; only the replica count changes.
@@ -2048,6 +2051,19 @@ function tlsMode(value: unknown): AppRenderInput['ingress']['tls'] | null {
 function asReplicaCount(value: unknown): number {
 	const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
 	return Math.max(0, count);
+}
+
+/** The live annotations with `extra` merged in and `drop` removed (a server-side apply prunes what it omits). */
+function annotationsFor(
+	live: Record<string, string> | undefined,
+	extra: Record<string, string>,
+	drop: readonly string[]
+): Record<string, string> {
+	const merged: Record<string, string> = { ...(live ?? {}), ...extra };
+	for (const name of drop) {
+		delete merged[name];
+	}
+	return merged;
 }
 
 /**

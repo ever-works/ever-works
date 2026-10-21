@@ -1323,6 +1323,9 @@ describe('scaleApp (FR-49, ACC-06-35)', () => {
 		const deployment = h.cluster.appliedOf('Deployment')[0];
 		expect([deployment.metadata.name, deployment.spec.replicas]).toEqual(['web', 2]);
 		expect(result.components.map((component) => component.name)).toEqual(['web']);
+		// The record does not outlive its pause; the deployment-id annotation is still carried.
+		expect(deployment.metadata.annotations[APP_PRE_PAUSE_REPLICAS_ANNOTATION]).toBeUndefined();
+		expect(deployment.metadata.annotations['ever-works.io/deployment-id']).toBeTruthy();
 	});
 
 	it('prefers the declared count over the recorded one, and ignores a recorded count out of range', async () => {
