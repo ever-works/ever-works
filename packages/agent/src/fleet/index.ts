@@ -29,6 +29,8 @@ export * from './agent-fleet-session-tools';
 export * from './agent-fleet-health-tools';
 // Logs on computers (FL-08) — the log tool shapes and the port the API binds.
 export * from './logs/agent-fleet-logs-tools';
+// Files on computers (FL-11) — the file tool shapes and the port the API binds.
+export * from './files/agent-fleet-files-tools';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';

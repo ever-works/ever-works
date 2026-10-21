@@ -79,6 +79,7 @@ import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module'
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
+import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
@@ -336,6 +337,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FleetPortsApiModule,
         // Logs on computers (FL-08): /api/fleet/nodes/:id/logs/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
         FleetLogsApiModule,
+        // Files on computers (FL-11): /api/fleet/nodes/:id/files/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
+        FleetFilesApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
