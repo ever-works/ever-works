@@ -222,6 +222,11 @@ export interface FleetCommandRunView {
 	outputBytes: number;
 	/** True when the machine still holds the full output (P2 "Open full output"). */
 	hasFullOutput: boolean;
+	/**
+	 * Running, but the platform holds no link to the computer right now (spec
+	 * U2: "the command may still be running there"); false otherwise.
+	 */
+	linkDown: boolean;
 }
 
 export interface FleetCommandSummary {
@@ -306,7 +311,7 @@ export interface FleetCommandListResponse {
  * 1.2 s", "2 running". Counts only; the words are the surface's own.
  */
 export function summarizeFleetCommandRuns(
-	runs: readonly Pick<FleetCommandRunView, 'status' | 'durationMs'>[]
+	runs: readonly { status: FleetCommandRunStatus; durationMs?: number | null }[]
 ): FleetCommandSummary {
 	const summary: FleetCommandSummary = {
 		total: runs.length,
@@ -330,7 +335,7 @@ export function summarizeFleetCommandRuns(
 
 /** The Command's own state from its runs (spec FR-4): running until every run ended. */
 export function fleetCommandStateFor(
-	runs: readonly Pick<FleetCommandRunView, 'status' | 'failedReason'>[],
+	runs: readonly { status: FleetCommandRunStatus }[],
 	cancelled = false
 ): FleetCommandState {
 	if (runs.length === 0) return 'queued';
@@ -340,7 +345,7 @@ export function fleetCommandStateFor(
 }
 
 /** The exit code the CLI answers with (spec FR-19): 0 · 1 any failed · 124 any timed out. */
-export function fleetCommandCliExitCode(runs: readonly Pick<FleetCommandRunView, 'status'>[]): 0 | 1 | 124 {
+export function fleetCommandCliExitCode(runs: readonly { status: FleetCommandRunStatus }[]): 0 | 1 | 124 {
 	if (runs.some((run) => run.status === 'timeout')) return 124;
 	if (runs.some((run) => run.status !== 'done')) return 1;
 	return 0;

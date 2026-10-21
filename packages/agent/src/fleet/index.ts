@@ -42,3 +42,5 @@ export { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 export { FleetAudit } from '../entities/fleet-audit.entity';
 // Sessions on computers (FL-04) — the session service, its policy and its node port.
 export * from './sessions';
+// Commands on computers (FL-12) — the command service, its policy and its node port.
+export * from './commands';
