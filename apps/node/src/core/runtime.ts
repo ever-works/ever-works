@@ -52,6 +52,8 @@ import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-so
 import { composeNodeLinkModules } from './link/modules';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createCheckoutsModule } from './link/modules/checkouts';
+import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
 import type { ConnectFn } from './sessions/daemon-client';
 import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
@@ -62,6 +64,7 @@ import { homedir as osHomedir } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	DEFAULT_WORKSPACE_MAX_AGE_DAYS,
 	effectiveMinFreeDiskBytes,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
@@ -574,6 +577,16 @@ export interface CreateNodeRuntimeOptions {
 	sessionExtraRoots?: readonly string[];
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
+	/**
+	 * Checkouts on computers (FL-14) — where the node-local checkout registry
+	 * lives (`checkouts.json` beside the config). Absent (the desktop shell,
+	 * tests, embedders): no checkouts module, so `checkouts.*` answers
+	 * `unsupported_on_node`. The code folders come from the stored config
+	 * (`start --code-folder`), never from the platform.
+	 */
+	checkoutsRegistryPath?: string;
+	/** Test seam: replace the checkouts module's git runner. */
+	checkoutsGit?: CheckoutGitRunner;
 }
 
 /**
@@ -729,6 +742,22 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions = { supervisor, module: sessionModule };
 		telemetry.sessionDaemon = () => supervisor.report();
 	}
+	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
+	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
+	const checkoutsModule =
+		options.checkoutsRegistryPath && (consents.manage || consents.work)
+			? createCheckoutsModule({
+					registryPath: options.checkoutsRegistryPath,
+					codeFolders: config.codeFolders ?? [],
+					workspaceRoot,
+					consents,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					...(options.checkoutsGit ? { git: options.checkoutsGit } : {}),
+					reaperMaxAgeMs: (config.workspaceGc?.maxAgeDays ?? DEFAULT_WORKSPACE_MAX_AGE_DAYS) * 86_400_000,
+					logger: io.logger
+				})
+			: undefined;
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -736,6 +765,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const linkModules = composeNodeLinkModules({
 		...(options.linkModules ? { extra: options.linkModules } : {}),
 		...(sessions ? { session: sessions.module } : {}),
+		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
