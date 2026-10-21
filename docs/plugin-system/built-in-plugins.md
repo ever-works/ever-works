@@ -1979,8 +1979,8 @@ first-boot script and keeps no password or key for any machine.
 
 ### DigitalOcean Machines (`digitalocean-machines`)
 
-| Setting         | Scope | Notes                                                                                                   |
-| --------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| Setting         | Scope | Notes                                                                                                    |
+| --------------- | ----- | -------------------------------------------------------------------------------------------------------- |
 | `apiToken`      | user  | Secret. A DigitalOcean personal access token with read and write scope; never returned after it is saved |
 | `defaultRegion` | user  | The region the New cloud computer dialog selects first (`nyc3`, `fra1`, …)                               |
 

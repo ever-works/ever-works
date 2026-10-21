@@ -43,6 +43,7 @@ import {
     fleetComputerPortsScreens,
     fleetComputerScreens,
     fleetVirtualScreens,
+    fleetCloudScreens,
     screensFor,
 } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
@@ -50,6 +51,7 @@ import {
     useFleetHubEnabled,
     useFleetMachineFactsEnabled,
     useFleetVirtualEnabled,
+    useFleetCloudEnabled,
 } from '@/components/fleet/FleetHubFlagProvider';
 import { useFleetPaletteSessions } from './hooks/use-fleet-palette-sessions';
 import { paletteSessionsFrom } from './registry/palette-sessions';
@@ -264,6 +266,7 @@ export function CommandPalette({
     const fleetHubEnabled = useFleetHubEnabled();
     const fleetMachineFactsEnabled = useFleetMachineFactsEnabled();
     const fleetVirtualEnabled = useFleetVirtualEnabled();
+    const fleetCloudEnabled = useFleetCloudEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
     // FL-05 (FR-46): the sessions waiting on the person open the empty palette.
@@ -282,8 +285,10 @@ export function CommandPalette({
             ...fleetComputerPortsScreens(fleetComputers),
             // Virtual computers (FL-16): "New virtual computer", "Start / Stop <name>".
             ...fleetVirtualScreens(fleetComputers, fleetVirtualEnabled),
+            // Cloud computers (FL-17): "New cloud computer", "Power off / on <name>".
+            ...fleetCloudScreens(fleetComputers, fleetCloudEnabled),
         ],
-        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetVirtualEnabled, fleetComputers],
+        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetVirtualEnabled, fleetCloudEnabled, fleetComputers],
     );
 
     const sections = useMemo(

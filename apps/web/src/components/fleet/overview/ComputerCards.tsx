@@ -22,6 +22,7 @@ import { osKeyOf } from '../fleet-os.shared';
 import { ComputerStateSentence } from '../health/ComputerStateSentence';
 import { HealthSparkline } from '../health/HealthSparkline';
 import { VirtualChildRow } from '../virtual/VirtualChildRow';
+import { CloudCardLine } from '../cloud/CloudCardLine';
 
 interface ComputerCardsProps {
     nodes: FleetNodeView[];
@@ -273,6 +274,8 @@ function ComputerCard({
             )}
             {/* FL-16: a virtual computer's system, size, state and create progress. */}
             {node.virtual ? <VirtualChildRow node={node} /> : null}
+            {/* FL-17: a cloud computer's provider, region, price and cost so far. */}
+            {node.cloud ? <CloudCardLine node={node} /> : null}
         </Link>
     );
 }
