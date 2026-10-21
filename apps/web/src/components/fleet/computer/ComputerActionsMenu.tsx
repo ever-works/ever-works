@@ -55,7 +55,7 @@ import {
     setFleetNodeFavoriteAction,
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
-import { getComputerActions, type FleetFeatureFlags } from '../registry';
+import { computerActionProps, getComputerActions, type FleetFeatureFlags } from '../registry';
 import { RegisteredComponent } from '../RegisteredComponent';
 import { captureFleetEvent } from '../fleet-telemetry';
 
@@ -410,7 +410,7 @@ export function ComputerActionsMenu({
                                 key={action.id}
                                 id={`menu:${action.id}`}
                                 load={action.load}
-                                props={{ node, flags }}
+                                props={computerActionProps(node, flags, action)}
                                 loading={null}
                                 failed={null}
                             />
