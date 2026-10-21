@@ -10,6 +10,7 @@ import {
     Query,
     Res,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -29,6 +30,7 @@ import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { ListFleetCommandsQueryDto, RunFleetCommandDto } from './dto/fleet-commands.dto';
 import { FleetCommandsEnabledGuard } from './fleet-commands-enabled.guard';
 import { FleetCommandLinkAdapter } from './fleet-command-link.adapter';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetCommandActor {
     return { userId: auth.userId };
@@ -59,6 +61,9 @@ function actorOf(auth: AuthenticatedUser): FleetCommandActor {
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetCommandsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetCommandsController {
     constructor(
         private readonly commands: FleetCommandService,
