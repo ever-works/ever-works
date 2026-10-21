@@ -64,7 +64,8 @@ export const schedulesClient = {
     create: (body: ScheduleCreateBody) =>
         call<FleetScheduleView>('/api/fleet/commands', {
             method: 'POST',
-            body: body as unknown as Record<string, unknown>,
+            // `nodeIds` too: the Command route's body always names its computers (FL-12's DTO).
+            body: { ...body, nodeIds: [body.nodeId] } as unknown as Record<string, unknown>,
         }),
     update: (id: string, body: FleetScheduleUpdateRequest) =>
         call<FleetScheduleView>(`/api/fleet/commands/${encodeURIComponent(id)}`, {

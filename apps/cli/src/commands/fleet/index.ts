@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
+import { schedulesCommand } from './schedule';
 import { attachCommand } from './session/attach';
 import { listCommand } from './session/list';
 
@@ -23,4 +24,6 @@ export const fleetCommand = new Command('fleet')
     .addCommand(fleetSessionCommand)
     .addCommand(commandsCommand)
     // Checkouts on computers (FL-14): `fleet checkouts list|get|create|sync|archive|delete` (alias `fleet checkout`).
-    .addCommand(checkoutsCommand);
+    .addCommand(checkoutsCommand)
+    // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
+    .addCommand(schedulesCommand);

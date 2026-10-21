@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import {
     FLEET_COMMAND_DEFAULT_TIMEOUT_SEC,
     FLEET_COMMAND_RECENT,
@@ -390,6 +391,18 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                     >
                         {chosen.length > 0 ? t('composer.run', { count: chosen.length }) : t('composer.runNone')}
                     </Button>
+                    {/* Schedules on computers (FL-13, spec §5.5): the same command, on a cadence, on ONE computer. */}
+                    {chosen.length === 1 && command.trim() ? (
+                        <Link
+                            href={`/fleet/computers/${encodeURIComponent(chosen[0])}?tab=schedules&command=${encodeURIComponent(command)}${
+                                cwd.trim() ? `&cwd=${encodeURIComponent(cwd.trim())}` : ''
+                            }`}
+                            className="self-center text-xs underline"
+                            data-testid="fleet-command-schedule-this"
+                        >
+                            {t('composer.scheduleThis')}
+                        </Link>
+                    ) : null}
                 </div>
 
                 <p className="mt-3 text-xs text-warning" data-testid="fleet-command-sandbox">
