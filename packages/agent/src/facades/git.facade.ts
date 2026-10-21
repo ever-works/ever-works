@@ -1871,6 +1871,27 @@ export class GitFacadeService implements IGitFacade {
         );
     }
 
+    /**
+     * Rewrite an open pull request's title and/or body (FL-06 spec FR-16).
+     * Never its state and never a merge. A provider without the capability is
+     * refused with `GitOperationNotSupportedError` (the method is read off the
+     * RESOLVED plugin — the lazy proxy over-reports optional methods).
+     */
+    async updatePullRequest(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        changes: { title?: string; body?: string },
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequest> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.updatePullRequest;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('updatePullRequest', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, changes, token);
+    }
+
     // ── APW-02 fork lifecycle (plan §4.2) ─────────────────────────────
     //
     // One method per new capability of the fork-lifecycle contract:
