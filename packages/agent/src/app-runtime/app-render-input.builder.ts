@@ -1376,6 +1376,9 @@ export function jobInputs(spec: AppSpec | null | undefined): AppJobInput[] {
                 ? { timeoutSeconds: Math.floor(job.timeoutSeconds) }
                 : {}),
             ...(isPositiveNumber(job?.retries) ? { retries: Math.floor(job.retries) } : {}),
+            // Additive and default-off: only an explicit `true` reaches the renderer, so every
+            // existing input (and its golden render) is byte-for-byte unchanged.
+            ...(job?.expectsWork === true ? { expectsWork: true } : {}),
         };
     });
 }

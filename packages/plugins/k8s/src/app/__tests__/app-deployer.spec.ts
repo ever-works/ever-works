@@ -1753,3 +1753,101 @@ describe('a Job whose pod can never start fails with the rollout’s own code (2
 		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'timeout' });
 	});
 });
+
+/* ------------------------------------------------------------------------- *
+ * `jobs[].expectsWork` — a Job that exits 0 having done nothing (2026-10-21)
+ * ------------------------------------------------------------------------- */
+
+describe('`jobs[].expectsWork`: a Job that exits 0 must also report the work it did', () => {
+	const MIGRATE_JOB = `job-migrate-${DEPLOYMENT_SHORT}`;
+
+	/** The Job controller's pod for `manifest`, its container terminated 0 with `message` (or none). */
+	const completedJobPod = (manifest: Json, message?: string): Json => ({
+		apiVersion: 'v1',
+		kind: 'Pod',
+		metadata: {
+			name: `${String(manifest.metadata?.name)}-q9w8e`,
+			namespace: NAMESPACE,
+			labels: {
+				...(manifest.spec?.template?.metadata?.labels ?? {}),
+				'batch.kubernetes.io/job-name': String(manifest.metadata?.name)
+			},
+			creationTimestamp: '2026-09-17T10:00:00.000Z',
+			ownerReferences: [{ apiVersion: 'batch/v1', kind: 'Job', name: manifest.metadata?.name }]
+		},
+		status: {
+			phase: 'Succeeded',
+			containerStatuses: [
+				{
+					name: 'web',
+					ready: false,
+					restartCount: 0,
+					state: { terminated: { reason: 'Completed', exitCode: 0, ...(message ? { message } : {}) } }
+				}
+			]
+		}
+	});
+
+	function migrate(job: Json, message?: string): Harness {
+		const h = harness({
+			change: (draft) => {
+				draft.jobs.unshift(preDeployJob(job));
+			}
+		});
+		h.cluster.onApply = (manifest) => {
+			if (manifest.kind === 'Job' && manifest.metadata?.name === MIGRATE_JOB) {
+				h.cluster.seed(completedJobPod(manifest, message));
+			}
+		};
+		return h;
+	}
+
+	it('fails a pre-deploy Job that declared `expectsWork` and reported nothing, before any Deployment write', async () => {
+		const h = migrate({ expectsWork: true });
+
+		const result = await h.deploy();
+
+		expect(result.outcome).toBe('failed');
+		expect(result.failure).toMatchObject({ phase: 'pre-deploy-jobs', code: 'job_failed' });
+		expect(result.failure?.message).toContain("Job 'migrate' exited 0 but reported no work");
+		expect(result.failure?.message).toContain('/dev/termination-log');
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'failed' });
+		expect(h.cluster.appliedNames().filter((name) => name.startsWith('Deployment/'))).toEqual([]);
+	});
+
+	it('passes a Job that declared `expectsWork` and reported its work', async () => {
+		const h = migrate({ expectsWork: true }, 'applied 3 migrations');
+
+		const result = await h.deploy();
+
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'succeeded' });
+		expect(result.failure?.phase).not.toBe('pre-deploy-jobs');
+	});
+
+	it('renders the report contract only for a Job that declares it', async () => {
+		const declared = migrate({ expectsWork: true }, 'ok');
+		await declared.deploy();
+		const container = declared.cluster.applied('Job').find((job) => job.metadata.name === MIGRATE_JOB)?.spec
+			.template.spec.containers[0];
+		expect(container.terminationMessagePath).toBe('/dev/termination-log');
+		expect(container.terminationMessagePolicy).toBe('File');
+		expect(container.env).toEqual(
+			expect.arrayContaining([{ name: 'EVER_WORKS_JOB_REPORT_PATH', value: '/dev/termination-log' }])
+		);
+
+		const silent = migrate({});
+		await silent.deploy();
+		const plain = silent.cluster.applied('Job').find((job) => job.metadata.name === MIGRATE_JOB)?.spec.template
+			.spec.containers[0];
+		expect(plain.terminationMessagePath).toBeUndefined();
+		expect(plain.env).toBeUndefined();
+	});
+
+	it('leaves a Job that does not declare `expectsWork` exactly as before (exit 0 is a success)', async () => {
+		const h = migrate({});
+
+		const result = await h.deploy();
+
+		expect(result.jobs[0]).toMatchObject({ name: 'migrate', status: 'succeeded' });
+	});
+});

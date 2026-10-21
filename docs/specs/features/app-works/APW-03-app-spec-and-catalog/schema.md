@@ -328,6 +328,7 @@ At most 10; `name` unique.
 | `http.expect.status` | int[]    | `[200, 201, 204]`          | 1–10 codes, 100–599.                                                                                                                                        |
 | `timeoutSeconds`     | integer  | `600`                      | 10–3600.                                                                                                                                                    |
 | `retries`            | integer  | `0`                        | 0–3.                                                                                                                                                        |
+| `expectsWork`        | boolean  | `false`                    | Additive. `true`: the job writes a report to `/dev/termination-log`; exit 0 with no report fails `job_failed` (reported no work).                           |
 
 ## 14. `cron[]`
 
