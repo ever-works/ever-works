@@ -123,6 +123,35 @@ export class FleetPruneImagesQueryDto {
     unused?: 'true' | 'false';
 }
 
+/** `GET …/docker/compose[?project=]` (FL-09 P3). */
+export class FleetComposeQueryDto {
+    @ApiProperty({ required: false, description: 'A project name: answer its description instead of the list.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    project?: string;
+}
+
+/** `POST …/docker/compose/:project/:action` — up · down · restart · pull, optionally one service. */
+export class FleetComposeActionDto extends FleetActionConfirmDto {
+    @ApiProperty({ required: false, description: 'One service of the project (up, restart, pull).', maxLength: 128 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    service?: string;
+}
+
+/**
+ * `POST …/docker/containers/:cid/:action` — the confirmation fields, plus
+ * `shell` for `exec` (Shell inside, an owner Session).
+ */
+export class FleetContainerExecDto extends FleetActionConfirmDto {
+    @ApiProperty({ enum: ['bash', 'sh'], default: 'sh' })
+    @IsOptional()
+    @IsIn(['bash', 'sh'])
+    shell?: 'bash' | 'sh';
+}
+
 /** The confirmation fields of a body, as the service reads them (only the three CONTRACTS fields). */
 export function confirmFieldsOf(body: FleetActionConfirmDto | null | undefined): FleetActionConfirmFields {
     const out: FleetActionConfirmFields = {};

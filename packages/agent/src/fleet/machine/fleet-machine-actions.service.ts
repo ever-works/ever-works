@@ -1,5 +1,12 @@
 import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
+    isFleetContainerShell,
+    type FleetComposeAction,
+    type FleetComposeDescription,
+    type FleetComposeListResult,
+    type FleetContainerExecResult,
+    type FleetContainerShell,
+    type FleetContainerShellsResult,
     FLEET_CONTAINER_ACTION_BASE_CLASS,
     fleetRunPreview,
     validateFleetRunRequest,
@@ -34,7 +41,9 @@ import {
     type FleetServiceScope,
     type FleetServicesListResult,
 } from '@ever-works/contracts';
+import { config } from '../../config';
 import { FleetAuditService } from '../fleet-audit.service';
+import { FleetSessionService } from '../sessions/fleet-session.service';
 import { fleetMachineError, FleetMachineException, readFleetMachineError } from './fleet-machine.errors';
 import {
     describeFleetMachineCaller,
@@ -136,6 +145,9 @@ export class FleetMachineActionsService {
     constructor(
         @Optional() @Inject(FLEET_MACHINE_NODE_PORT) private readonly node?: FleetMachineNodePort,
         @Optional() private readonly audit?: FleetAuditService,
+        // Shell inside a container (FL-09 P3): an owner Session (FL-04). @Optional(),
+        // appended LAST: unbound, "Shell inside" answers unsupported_on_node.
+        @Optional() private readonly sessions?: FleetSessionService,
     ) {}
 
     // ─── Services (P1) ────────────────────────────────────────────────────
@@ -362,6 +374,141 @@ export class FleetMachineActionsService {
             awaitOperationMs: 0,
             noOpResult: (result) => result.nothingToDo === true,
         });
+    }
+
+    // ─── Compose and Shell inside (P3) ─────────────────────────────────────
+
+    async listComposeProjects(nodeId: string, caller: FleetMachineCaller): Promise<FleetComposeListResult> {
+        return this.list<FleetComposeListResult>(nodeId, caller, 'compose.list', {});
+    }
+
+    async describeComposeProject(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        project: string,
+    ): Promise<FleetComposeDescription> {
+        return this.list<FleetComposeDescription>(nodeId, caller, 'compose.describe', { project });
+    }
+
+    /** Up / down / restart / pull one project (or one of its services), as an operation (FR-32). Down keeps named volumes (FR-34). */
+    async composeAction(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { project: string; action: FleetComposeAction; service?: string; fields?: FleetActionConfirmFields | null },
+    ): Promise<Record<string, unknown> | FleetOperationRef> {
+        const what = input.service ? `${input.service} of ${input.project}` : input.project;
+        return this.act<Record<string, unknown>>({
+            nodeId,
+            caller,
+            verb: 'compose.action',
+            family: 'docker',
+            auditAction: `node.compose.${input.action}` as FleetAuditAction,
+            target: input.project,
+            baseClass: 'confirm',
+            summary: (machine) =>
+                input.action === 'up'
+                    ? `Bring ${what} up on ${machine}?`
+                    : input.action === 'down'
+                      ? `Bring ${input.project} down on ${machine}? Its containers and networks are removed; named volumes are kept.`
+                      : input.action === 'restart'
+                        ? `Restart ${what} on ${machine}?`
+                        : `Pull the images of ${what} on ${machine}?`,
+            params: { project: input.project, action: input.action, ...(input.service ? { service: input.service } : {}) },
+            fields: input.fields,
+            awaitOperationMs: 0,
+            auditDetails: { project: input.project, ...(input.service ? { service: input.service } : {}) },
+        });
+    }
+
+    async containerShells(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        container: string,
+    ): Promise<FleetContainerShellsResult> {
+        return this.list<FleetContainerShellsResult>(nodeId, caller, 'docker.container.shells', { id: container });
+    }
+
+    /**
+     * Shell inside a container (FR-35): an ordinary OWNER Session (FL-04)
+     * whose process is `docker exec -it <container> <shell>`, titled
+     * "Shell · inside <container>". The `docker` family's gate runs first;
+     * then one `node.docker.container.exec` row (class `plain`) — and the
+     * Session's own `node.session.start` row, written by the session service.
+     * A person only: an Agent's shells are Agent sessions (FL-04 FR-51).
+     */
+    async execInContainer(
+        nodeId: string,
+        caller: Extract<FleetMachineCaller, { kind: 'user' }>,
+        input: { container: string; shell: FleetContainerShell },
+    ): Promise<FleetContainerExecResult> {
+        const port = this.port();
+        const requestedBy = describeFleetMachineCaller(caller);
+        const spec: ActSpec = {
+            nodeId,
+            caller,
+            verb: 'docker.container.action',
+            family: 'docker',
+            auditAction: 'node.docker.container.exec',
+            target: input.container,
+            baseClass: 'plain',
+            summary: () => '',
+            params: {},
+            auditDetails: { shell: input.shell },
+        };
+        let facts: FleetMachineNodeFacts | null = null;
+        try {
+            if (!isFleetContainerShell(input.shell)) {
+                throw fleetMachineError('invalid', 'shell must be bash or sh', { field: 'shell' });
+            }
+            if (!this.sessions || !config.fleet.isSessionsEnabled()) {
+                throw fleetMachineError('unsupported_on_node', 'sessions on computers are switched off on this deployment');
+            }
+            facts = await port.authorize({
+                nodeId,
+                verb: 'docker.container.action',
+                caller,
+                actionFamily: 'docker',
+                stateChanging: true,
+                target: input.container,
+            });
+            const listed = await this.listContainers(nodeId, caller);
+            const found = listed.containers.find(
+                (row) => row.id === input.container.slice(0, 12) || row.name === input.container,
+            );
+            if (!found) throw fleetMachineError('not_found', `${input.container} is not a container on ${facts.name}`);
+            if (found.state !== 'running') throw fleetMachineError('busy', `${found.name} is not running; start it first`);
+            const session = await this.sessions.start(
+                nodeId,
+                { userId: caller.userId },
+                {
+                    kind: 'owner',
+                    provider: 'shell',
+                    cwd: '~',
+                    title: `Shell · inside ${found.name}`,
+                    container: { container: found.id, shell: input.shell },
+                },
+            );
+            await this.record(spec, facts, {
+                requestedBy,
+                confirmationClass: 'plain',
+                outcome: 'ok',
+                container: found.name,
+                sessionId: session.id,
+            });
+            return { sessionId: session.id };
+        } catch (error) {
+            const refusal = readFleetMachineError(error);
+            if (refusal && refusal.code !== 'not_found') {
+                const owner = facts ?? (port.describe ? await port.describe(nodeId).catch(() => null) : null);
+                await this.record(spec, owner, {
+                    requestedBy,
+                    confirmationClass: 'plain',
+                    outcome: auditOutcomeOf(refusal.code),
+                    code: refusal.code,
+                });
+            }
+            throw error;
+        }
     }
 
     // ─── Shared ───────────────────────────────────────────────────────────

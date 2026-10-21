@@ -123,6 +123,9 @@ export interface AgentFleetToolSource {
         | 'containerAction'
         | 'listImages'
         | 'pullImage'
+        | 'listComposeProjects'
+        | 'describeComposeProject'
+        | 'composeAction'
     >;
     /**
      * Computer health (FL-03 second phase) — when bound, the read-only

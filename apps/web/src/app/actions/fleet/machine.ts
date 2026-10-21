@@ -4,7 +4,12 @@ import { redirect } from 'next/navigation';
 import {
     isFleetLinkErrorCode,
     type FleetActionConfirmFields,
+    type FleetComposeAction,
+    type FleetComposeDescription,
+    type FleetComposeListResult,
     type FleetContainerAction,
+    type FleetContainerExecResult,
+    type FleetContainerShellsResult,
     type FleetContainersListResult,
     type FleetImagesListResult,
     type FleetOperationView,
@@ -189,4 +194,44 @@ export async function cancelFleetOperationAction(
     operationId: string,
 ): Promise<FleetMachineResult<{ operation: FleetOperationView; sent: boolean }>> {
     return run(() => fleetMachineAPI.cancelOperation(operationId));
+}
+
+// ─── Compose and Shell inside (P3) ──────────────────────────────────────────
+
+export async function listFleetComposeAction(nodeId: string): Promise<FleetMachineResult<FleetComposeListResult>> {
+    return run(() => fleetMachineAPI.listCompose(nodeId));
+}
+
+export async function describeFleetComposeAction(
+    nodeId: string,
+    project: string,
+): Promise<FleetMachineResult<FleetComposeDescription>> {
+    return run(() => fleetMachineAPI.describeCompose(nodeId, project));
+}
+
+export async function fleetComposeAction(
+    nodeId: string,
+    input: { project: string; action: FleetComposeAction; service?: string; fields?: FleetActionConfirmFields },
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() =>
+        fleetMachineAPI.composeAction(nodeId, input.project, input.action, {
+            ...confirmOnly(input.fields),
+            ...(input.service ? { service: input.service } : {}),
+        }),
+    );
+}
+
+export async function fleetContainerShellsAction(
+    nodeId: string,
+    container: string,
+): Promise<FleetMachineResult<FleetContainerShellsResult>> {
+    return run(() => fleetMachineAPI.containerShells(nodeId, container));
+}
+
+/** Shell inside: starts an owner Session (FL-04) and answers its id for the session page. */
+export async function execInFleetContainerAction(
+    nodeId: string,
+    input: { container: string; shell: 'bash' | 'sh' },
+): Promise<FleetMachineResult<FleetContainerExecResult>> {
+    return run(() => fleetMachineAPI.execInContainer(nodeId, input.container, input.shell));
 }
