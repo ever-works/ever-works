@@ -100,71 +100,104 @@ export const updateItemTool = tool({
     },
 });
 
-export const generateItemsTool = tool({
-    description: [
-        'Generate or regenerate items for a Work.',
-        'For first-time: call listAvailablePipelines first to let user choose pipeline and providers.',
-        'For retries: just pass workId — reuses the previous config automatically.',
-        'Requires git provider connection.',
-    ].join(' '),
-    inputSchema: z.object({
-        workId: z.string().describe('Work ID'),
-        prompt: z
-            .string()
-            .optional()
-            .describe('What to generate. If omitted, reuses the original prompt.'),
-        providers: z
-            .record(z.string())
-            .optional()
-            .describe(
-                'Provider selections from user (e.g., { pipeline: "sim-ai", ai: "openrouter" }). Pass what the user chose from listAvailablePipelines.',
-            ),
-    }),
-    execute: async ({ workId, prompt, providers: userProviders }) => {
-        const [dirResponse, configResponse] = await Promise.all([
-            workAPI.get(workId).catch(() => null),
-            workAPI.getConfig(workId).catch(() => null),
-        ]);
+/**
+ * Works-security (2026-10-18): a generation run spends model credits and
+ * commits to the Work's repositories on the strength of a prompt the model
+ * wrote — the user's call, with the prompt on the card.
+ */
+export function createGenerateItemsTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Generate or regenerate items for a Work.',
+            'For first-time: call listAvailablePipelines first to let user choose pipeline and providers.',
+            'For retries: just pass workId — reuses the previous config automatically.',
+            'Requires git provider connection.',
+            'Starts a paid generation run — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            workId: z.string().describe('Work ID'),
+            prompt: z
+                .string()
+                .optional()
+                .describe('What to generate. If omitted, reuses the original prompt.'),
+            providers: z
+                .record(z.string())
+                .optional()
+                .describe(
+                    'Provider selections from user (e.g., { pipeline: "sim-ai", ai: "openrouter" }). Pass what the user chose from listAvailablePipelines.',
+                ),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ workId, prompt, providers, confirmed }) => {
+            const args: Record<string, unknown> = { workId };
+            if (prompt !== undefined) args.prompt = prompt;
+            if (providers !== undefined) args.providers = providers;
+            const card = requireUserConfirmation({
+                toolName: 'generateItems',
+                action: 'Generate items for a Work',
+                target: workId,
+                args,
+                confirmed,
+                userConfirmed,
+                preview: prompt,
+            });
+            if (card) return card;
+            return runGeneration(workId, prompt, providers);
+        },
+    });
+}
 
-        const workName = dirResponse?.work?.name ?? '';
-        const existingPrompt = configResponse?.config?.metadata?.initial_prompt;
-        const resolvedPrompt = prompt || existingPrompt || '';
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const generateItemsTool = createGenerateItemsTool();
 
-        if (!resolvedPrompt) {
-            return {
-                success: false,
-                error: 'No prompt provided and no previous prompt found. Please provide a prompt.',
-            };
-        }
+async function runGeneration(
+    workId: string,
+    prompt: string | undefined,
+    userProviders: Record<string, string> | undefined,
+) {
+    const [dirResponse, configResponse] = await Promise.all([
+        workAPI.get(workId).catch(() => null),
+        workAPI.getConfig(workId).catch(() => null),
+    ]);
 
-        // For retries: reuse last config. For new: use user choices or resolve defaults.
-        const lastRequest = configResponse?.config?.metadata?.last_request_data;
-        const resolvedProviders = userProviders ?? lastRequest?.providers;
-        const resolvedPluginConfig = lastRequest?.pluginConfig;
+    const workName = dirResponse?.work?.name ?? '';
+    const existingPrompt = configResponse?.config?.metadata?.initial_prompt;
+    const resolvedPrompt = prompt || existingPrompt || '';
 
-        // If no providers at all, resolve defaults
-        let finalProviders = resolvedProviders;
-        if (!finalProviders) {
-            const genConfig = await resolveGenerationConfig(workId);
-            finalProviders = genConfig.providers;
-        }
-
-        const result = await generateItems(workId, {
-            name: workName,
-            prompt: resolvedPrompt,
-            generation_method: undefined,
-            providers: finalProviders,
-            pluginConfig: resolvedPluginConfig,
-        });
-
+    if (!resolvedPrompt) {
         return {
-            success: result.success,
-            message: result.message,
-            error: result.error,
-            requiresGitProvider: result.requiresGitProvider,
+            success: false,
+            error: 'No prompt provided and no previous prompt found. Please provide a prompt.',
         };
-    },
-});
+    }
+
+    // For retries: reuse last config. For new: use user choices or resolve defaults.
+    const lastRequest = configResponse?.config?.metadata?.last_request_data;
+    const resolvedProviders = userProviders ?? lastRequest?.providers;
+    const resolvedPluginConfig = lastRequest?.pluginConfig;
+
+    // If no providers at all, resolve defaults
+    let finalProviders = resolvedProviders;
+    if (!finalProviders) {
+        const genConfig = await resolveGenerationConfig(workId);
+        finalProviders = genConfig.providers;
+    }
+
+    const result = await generateItems(workId, {
+        name: workName,
+        prompt: resolvedPrompt,
+        generation_method: undefined,
+        providers: finalProviders,
+        pluginConfig: resolvedPluginConfig,
+    });
+
+    return {
+        success: result.success,
+        message: result.message,
+        error: result.error,
+        requiresGitProvider: result.requiresGitProvider,
+    };
+}
 
 export const checkItemHealthTool = tool({
     description: 'Check if an item source URL is still accessible and valid.',

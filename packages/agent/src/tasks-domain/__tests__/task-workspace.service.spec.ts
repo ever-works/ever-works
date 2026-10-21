@@ -335,6 +335,7 @@ describe('TaskWorkspaceService', () => {
             // itself agent-driven so a red gate can never enter review here.
             expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review', {
                 actorType: 'agent',
+                ownRunTask: true,
             });
         });
 
@@ -362,6 +363,7 @@ describe('TaskWorkspaceService', () => {
                 );
                 expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
                     actorType: 'agent',
+                    ownRunTask: true,
                 });
                 // Nothing reached the remote, so no branch-guard marker is written.
                 expect(tasks.updateById).not.toHaveBeenCalledWith(
@@ -429,6 +431,7 @@ describe('TaskWorkspaceService', () => {
             );
             expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
                 actorType: 'agent',
+                ownRunTask: true,
             });
         });
 
@@ -466,6 +469,7 @@ describe('TaskWorkspaceService', () => {
             await svc.finalizeRun({ ...finalizeInput(), agentCanOpenPullRequests: false });
             expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review', {
                 actorType: 'agent',
+                ownRunTask: true,
             });
         });
 
@@ -475,7 +479,10 @@ describe('TaskWorkspaceService', () => {
             // Exactly one transition — the review-entry edge. A second
             // (duplicated) write here would double-fire the gates.
             expect(transitions.transition).toHaveBeenCalledTimes(1);
-            expect(transitions.transition.mock.calls[0][2]).toEqual({ actorType: 'agent' });
+            expect(transitions.transition.mock.calls[0][2]).toEqual({
+                actorType: 'agent',
+                ownRunTask: true,
+            });
         });
 
         it('an empty run still does NOT enter review — nothing to review', async () => {
@@ -499,6 +506,7 @@ describe('TaskWorkspaceService', () => {
             expect(transitions.transition).toHaveBeenCalledTimes(1);
             expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
                 actorType: 'agent',
+                ownRunTask: true,
             });
         });
     });

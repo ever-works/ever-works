@@ -623,6 +623,10 @@ export class TaskPrStatusService {
         try {
             await this.transitions.transition(task, TaskStatus.DONE, {
                 actorType: 'agent',
+                // Works-security: the platform completing the Task its own pull
+                // request belongs to — dependents are released as before (see
+                // `withAgentFanOutSuppressed`).
+                ownRunTask: true,
                 // Reviewer agent stage (review of Greptile P1-A on PR #2419):
                 // the approver gate binds agent decisions to the MERGED head —
                 // `refreshTask` assigned `prHeadSha` from the provider's answer
