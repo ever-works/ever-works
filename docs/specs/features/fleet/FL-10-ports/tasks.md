@@ -129,7 +129,7 @@
 
 ## P2.A — Entity and migration
 
-- [ ] **T-15**. Add `packages/agent/src/entities/fleet-port-tunnel.entity.ts` with exactly the
+- [x] **T-15**. Add `packages/agent/src/entities/fleet-port-tunnel.entity.ts` with exactly the
       CONTRACTS §4.9 columns (plan §4.1: `ownerUserId`, `nodeId`, `port`, `previewHost`, `state`,
       `openedAt`, `lastRequestAt`, `closedAt`, `closedReason`, `bytesIn`, `bytesOut`, `auditOpenId`,
       `auditCloseId`; plain varchar unions, `PortableDateColumn`, raw uuids, three indexes); register in
@@ -138,7 +138,7 @@
       `packages/agent/src/fleet/ports/fleet-port-tunnel.repository.ts` with a CAS `close(id, reason)`.
     - **Test**: `packages/agent/src/entities/__tests__/fleet-port-tunnel.entity.spec.ts`;
       repository spec (CAS close returns false on a closed row).
-- [ ] **T-16**. Author `apps/api/src/migrations/1796100000000-CreateFleetPortTunnels.ts` from
+- [x] **T-16**. Author `apps/api/src/migrations/1796100000000-CreateFleetPortTunnels.ts` from
       `apps/api/` (`pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateFleetPortTunnels`),
       shaped like `1795161700000-AddFleetModelUsageLimits.ts` (portable `TableColumn`, per-step
       guards, `down` drops only what `up` added; runs on SQLite and Postgres — CONTRACTS §4 storage
@@ -147,7 +147,7 @@
 
 ## P2.B — Node tunnel channel
 
-- [ ] **T-17**. Write `apps/node/src/core/link/modules/ports/tunnel.ts` (`tunnel` channel handler:
+- [x] **T-17**. Write `apps/node/src/core/link/modules/ports/tunnel.ts` (`tunnel` channel handler:
       `tunnel.request` envelope + `DATA` + `END` → `http.request` to `127.0.0.1:<port>` → `tunnel.response` + streamed `DATA` + `END`; `ACK` credits both ways; 60 s per request; byte counters; refuses
       a port not listening with `channel.refused { code: 'not_found' }`); wire `ports.preview` accept in
       `modules/ports/index.ts`.
@@ -156,7 +156,7 @@
 
 ## P2.C — Platform tunnel service, preview host, sweeper
 
-- [ ] **T-18**. Write `packages/agent/src/fleet/ports/fleet-port-tunnel.service.ts` (`open`: family
+- [x] **T-18**. Write `packages/agent/src/fleet/ports/fleet-port-tunnel.service.ts` (`open`: family
       `ports` → consent → kill switch → per-owner limit 4 → row → link `channel.open tunnel` → audit
       `node.port.preview.open` → stamp `auditOpenId`; `close(reason)` with `reason` ∈ §4.9's
       `idle · hard · user · node-offline · kill-switch`: CAS → link `CLOSE` → audit
@@ -165,7 +165,7 @@
       `touch(tunnelId, bytes)`).
     - **Test**: `fleet-port-tunnel.service.spec.ts` — limit, owner mismatch, exactly two audit rows per
       tunnel, every §4.9 close reason reachable, drain and link loss stored as `node-offline`.
-- [ ] **T-19**. Write `apps/api/src/fleet/ports/preview-host.middleware.ts` (mounted in
+- [x] **T-19**. Write `apps/api/src/fleet/ports/preview-host.middleware.ts` (mounted in
       `apps/api/src/main.ts` when `FLEET_PREVIEW_HOST` is set; exact `Host` match; `/p/:tunnelId/*` and
       sticky-cookie root-absolute routing; session cookie auth via the existing auth session store;
       `?t=` one-time hand-off fallback; strips `ew_*`/session cookies and `authorization`; forwards
@@ -174,12 +174,12 @@
       channel through FL-02's relay bus, replica-independent).
     - **Test**: `preview-host.middleware.spec.ts` (every branch), bridge spec; e2e
       `apps/api/test/fleet-ports.e2e-spec.ts` extended: a body served end to end through the fake peer.
-- [ ] **T-20**. Add tunnel routes to `fleet-ports.controller.ts` (POST/GET/DELETE `/nodes/:id/ports/:port/preview`)
+- [x] **T-20**. Add tunnel routes to `fleet-ports.controller.ts` (POST/GET/DELETE `/nodes/:id/ports/:port/preview`)
       behind `apps/api/src/fleet/guards/fleet-port-tunnel-enabled.guard.ts` (404 posture). FL-20's
       `GET /api/fleet/usage` is not changed by this epic; FL-20 adds a `tunnels` block from
       `FleetPortTunnelView` when it chooses (spec §8b).
     - **Test**: controller spec (404 with the flag off; `limit_exceeded` envelope).
-- [ ] **T-21**. Write `packages/tasks/src/tasks/trigger/fleet-port-tunnel-sweeper.task.ts` (cron
+- [x] **T-21**. Write `packages/tasks/src/tasks/trigger/fleet-port-tunnel-sweeper.task.ts` (cron
       `1/1 * * * *`; `idle` / `hard` (`openedAt` + 60 min) / `node-offline` / `kill-switch` closes through the service's CAS);
       register where `fleet-job-lease-sweeper.task.ts` is registered (same `TriggerInternalModule`
       caveat); dispatch port `FLEET_PORT_TUNNEL_SWEEPER_DISPATCHER` in `packages/agent/src/fleet/ports/`.
@@ -188,12 +188,12 @@
 
 ## P2.D — Web, tools, e2e
 
-- [ ] **T-22**. Add **Preview in my browser** to `PortRow.tsx` (opens the returned `url` in a new tab),
+- [x] **T-22**. Add **Preview in my browser** to `PortRow.tsx` (opens the returned `url` in a new tab),
       `TunnelRowState.tsx` (time left, requests, bytes, **Close preview**, **Copy link**, cloud egress
       line), limit dialog; BFF `.../ports/[port]/preview/route.ts`; `fleet.ports.tunnel.*` i18n;
       `isFleetPortTunnelEnabled()` in `apps/web/src/lib/fleet-flags.ts`.
     - **Test**: `TunnelRowState.unit.spec.tsx`; `PortsTab.unit.spec.tsx` button absent with flag off.
-- [ ] **T-23**. Add `fleet_ports_preview_open` / `fleet_ports_preview_close` to
+- [x] **T-23**. Add `fleet_ports_preview_open` / `fleet_ports_preview_close` to
       `agent-fleet-ports-tools.ts` (mint for the Agent's **owner**; return `url` for a person) and the
       MCP whitelist; write `apps/web/e2e/flow-fleet-ports-tunnel.spec.ts` (tunnel serves a page; 403 for
       another signed-in user; signed-out redirect; close).
