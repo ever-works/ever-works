@@ -639,6 +639,30 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Tasks on computers (3) — FL-15 (CONTRACTS §11.3). The hand-off options for a Task (read-only;
+	// the start itself is `fleet_sessions_start` with `taskId`), and a computer's global git
+	// identity: read, and "Use my Ever Works identity" (class `confirm`: the first call answers
+	// `confirmation_required` with what would be set; repeat with `confirm: true`).
+	{
+		method: 'GET',
+		path: '/api/fleet/tasks/{taskId}/handoff-options',
+		toolName: 'fleet_tasks_handoff_options',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/git/identity',
+		toolName: 'fleet_nodes_git_identity_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/nodes/{id}/git/identity', toolName: 'fleet_nodes_git_identity_set' },
+	// GitHub: things for me (FL-15 P3) — one event Trigger over GitHub events about me.
+	{
+		method: 'POST',
+		path: '/api/inbound-triggers/presets/github-for-me',
+		toolName: 'inbound_triggers_github_for_me'
+	},
+
 	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
 	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
 	// read at most 500 secret-scanned lines of one. The read never follows; a
