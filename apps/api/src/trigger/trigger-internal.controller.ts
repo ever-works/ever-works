@@ -70,7 +70,11 @@ import {
     TasksService,
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
-import { FleetJobService, FleetNodeHealthService } from '@ever-works/agent/fleet';
+import {
+    FleetJobService,
+    FleetNodeHealthService,
+    FleetSessionSweepService,
+} from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
@@ -720,6 +724,11 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetNodeHealthService?: FleetNodeHealthService,
+        // Sessions on computers (FL-04) — backs the `fleet-session-sweeper`
+        // cron: the worker proxy calls `sweepStale()`, the facade's only
+        // member. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetSessionSweepService?: FleetSessionSweepService,
     ) {}
 
     onModuleInit() {
@@ -843,6 +852,15 @@ export class TriggerInternalController implements OnModuleInit {
             // when the service is not bound.
             FleetNodeHealthService: this.fleetNodeHealthService
                 ? { rollupAndPrune: () => this.fleetNodeHealthService!.rollupAndPrune() }
+                : undefined,
+            // Sessions on computers (FL-04) — `fleet-session-sweeper` calls
+            // `sweepStale()` here, and only that: `FleetSessionSweepService` is
+            // already a one-member facade over `FleetSessionService` (whose
+            // start / end / rename must never reach the worker), so the derived
+            // allow-list is exactly `sweepStale`. `undefined` (a loud "Unknown
+            // remote target") when sessions are not mounted.
+            FleetSessionSweepService: this.fleetSessionSweepService
+                ? { sweepStale: () => this.fleetSessionSweepService!.sweepStale() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

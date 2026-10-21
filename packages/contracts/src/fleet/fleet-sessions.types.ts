@@ -199,6 +199,14 @@ export const FLEET_SESSION_DAEMON_IDLE_EXIT_MS = 5 * 60_000;
 /** A session still `starting` this long after it was asked for is ended `unconfirmed` (the sweeper). */
 export const FLEET_SESSION_STARTING_TIMEOUT_MS = 60_000;
 
+/**
+ * The session sweeper's schedule (CONTRACTS §10, plan §10): every five
+ * minutes at :04, :09, … (`4/5` in plan §10, spelt as a range every cron
+ * parser reads) — the Trigger.dev task and the API fallback cron
+ * read this one literal.
+ */
+export const FLEET_SESSION_SWEEP_CRON = '4-59/5 * * * *';
+
 /** Output activity is reported to the platform at most this often per session. */
 export const FLEET_SESSION_ACTIVITY_REPORT_MS = 30_000;
 
@@ -326,6 +334,18 @@ export interface FleetSessionStartRequest {
 	restartOf?: string;
 	cols?: number;
 	rows?: number;
+}
+
+/**
+ * `GET /api/fleet/nodes/:id/sessions` and `GET /api/fleet/sessions` — one page,
+ * most recently active first. `nextCursor` is the `cursor` of the next page
+ * (null on the last). The node route also answers the start dialog's
+ * `recentFolders` (spec FR-15), newest first.
+ */
+export interface FleetSessionListResponse {
+	sessions: FleetSessionView[];
+	nextCursor: string | null;
+	recentFolders?: string[];
 }
 
 /** `POST /api/fleet/sessions/:id/attach-token` (CONTRACTS §3.4). */

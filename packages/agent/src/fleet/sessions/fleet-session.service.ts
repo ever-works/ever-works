@@ -19,6 +19,7 @@ import {
     type FleetSessionEndedReason,
     type FleetSessionEventMessage,
     type FleetSessionListMessage,
+    type FleetSessionListResponse,
     type FleetSessionStartRequest,
     type FleetSessionStartableProvider,
     type FleetSessionView,
@@ -45,7 +46,13 @@ import {
     type FleetSessionPatch,
     type FleetSessionRowFacts,
 } from './fleet-session.policy';
-import { FleetSessionRepository, type FleetSessionListQuery } from './fleet-session.repository';
+import {
+    FLEET_SESSION_LIST_DEFAULT_LIMIT,
+    FLEET_SESSION_LIST_MAX_LIMIT,
+    fleetSessionCursor,
+    FleetSessionRepository,
+    type FleetSessionListQuery,
+} from './fleet-session.repository';
 import { toFleetSessionView } from './fleet-session.view';
 
 /**
@@ -187,6 +194,31 @@ export class FleetSessionService {
         const nodeIds = await this.visibleNodeIds(actor);
         const rows = await this.sessions.listForNodes(nodeIds, query);
         return rows.map((row) => toFleetSessionView(row));
+    }
+
+    /**
+     * One page for the REST list routes and the tools: the views, most
+     * recently active first, and the next page's cursor (null on the last).
+     * With `nodeId` the node's own audience check runs first (404 / 403);
+     * without it only the nodes the person may see sessions on are read.
+     */
+    async listPage(
+        actor: FleetSessionActor,
+        query: FleetSessionListQuery & { nodeId?: string } = {},
+    ): Promise<FleetSessionListResponse> {
+        const limit = Math.min(
+            FLEET_SESSION_LIST_MAX_LIMIT,
+            Math.max(1, Math.floor(query.limit ?? FLEET_SESSION_LIST_DEFAULT_LIMIT)),
+        );
+        const nodeIds = query.nodeId
+            ? [(await this.nodeFor(query.nodeId, actor)).node.id]
+            : await this.visibleNodeIds(actor);
+        const rows = await this.sessions.listForNodes(nodeIds, { ...query, limit });
+        const last = rows.length === limit ? rows[rows.length - 1] : undefined;
+        return {
+            sessions: rows.map((row) => toFleetSessionView(row)),
+            nextCursor: last ? fleetSessionCursor(last) : null,
+        };
     }
 
     /** The start dialog's "Recent" folders for a node (spec FR-15). */
@@ -445,8 +477,16 @@ export class FleetSessionService {
         id: string,
         actor: FleetSessionActor,
         size: { cols?: number; rows?: number } = {},
+        options: { expectNodeId?: string } = {},
     ): Promise<FleetSessionView> {
         const { session, node } = await this.resolve(id, actor);
+        // The start route's `restartOf` names the computer in its path too:
+        // a session of another computer is not this computer's to restart.
+        if (options.expectNodeId !== undefined && options.expectNodeId !== node.id) {
+            throw fleetSessionError('invalid', 'that session ran on another computer', {
+                field: 'restartOf',
+            });
+        }
         if (isFleetSessionLive(session.state)) {
             throw fleetSessionError('invalid', 'the session is still running; end it first', {
                 state: session.state,
