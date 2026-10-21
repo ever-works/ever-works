@@ -467,5 +467,6 @@ const ROUTED_MESSAGE_KEY = {
     rejected: 'routed.rejected',
     'escalation-resolved': 'routed.escalationResolved',
     'already-decided': 'routed.alreadyDecided',
+    'session-answered': 'routed.sessionAnswered',
     none: 'routed.recorded',
 } as const satisfies Record<InboxReplyRouted, string>;

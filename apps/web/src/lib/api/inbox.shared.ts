@@ -100,6 +100,8 @@ export type InboxReplyRouted =
     | 'rejected'
     | 'escalation-resolved'
     | 'already-decided'
+    // FL-05: the answer was typed into a session on a computer.
+    | 'session-answered'
     | 'none';
 
 /**
