@@ -156,6 +156,9 @@ const LIST_STATES = ['live', 'ended'] as const;
  */
 export function sanitizeListQuery(params: URLSearchParams): string {
     const out = new URLSearchParams();
+    // FL-05 P3: the board's four columns instead of a page.
+    const view = params.get('view');
+    if (view === 'board' || view === 'list') out.set('view', view);
     const state = params.get('state');
     if (state && (LIST_STATES as readonly string[]).includes(state)) out.set('state', state);
     const kind = params.get('kind');

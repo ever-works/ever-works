@@ -2,6 +2,7 @@
 
 import type {
     FleetSessionAnswerResponse,
+    FleetSessionBoardResponse,
     FleetSessionListResponse,
     FleetSessionRecordingManifest,
     FleetSessionRecordingPage,
@@ -94,6 +95,22 @@ export const sessionsClient = {
             method: 'POST',
             body: { on },
         }),
+    /** FL-05 P3: the board (four columns of live sessions), optionally one computer's / Agent's / kind's. */
+    board: (query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent' } = {}) => {
+        const params = new URLSearchParams({ view: 'board' });
+        if (query.nodeId) params.set('nodeId', query.nodeId);
+        if (query.agentId) params.set('agentId', query.agentId);
+        if (query.kind) params.set('kind', query.kind);
+        return call<FleetSessionBoardResponse>(`/api/fleet/sessions?${params.toString()}`, { method: 'GET' });
+    },
+    /** FL-05 P3: the list (live and ended), most recently active first. */
+    list: (query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent'; limit?: number } = {}) => {
+        const params = new URLSearchParams({ limit: String(query.limit ?? 200) });
+        if (query.nodeId) params.set('nodeId', query.nodeId);
+        if (query.agentId) params.set('agentId', query.agentId);
+        if (query.kind) params.set('kind', query.kind);
+        return call<FleetSessionListResponse>(`/api/fleet/sessions?${params.toString()}`, { method: 'GET' });
+    },
     /** FL-05 P2: answer what a session asks — one option, or a free text. */
     answer: (
         sessionId: string,

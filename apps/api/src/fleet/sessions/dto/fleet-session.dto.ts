@@ -215,6 +215,16 @@ export class RestartFleetSessionDto extends FleetSessionSizeDto {}
 
 /** Query for `GET /api/fleet/nodes/:id/sessions` and `GET /api/fleet/sessions`. */
 export class ListFleetSessionsQueryDto {
+    @ApiProperty({
+        required: false,
+        enum: ['board', 'list'],
+        description:
+            'FL-05: `board` answers the four columns (needs you · working · done · idle) of the live sessions instead of a page.',
+    })
+    @IsOptional()
+    @IsIn(['board', 'list'])
+    view?: 'board' | 'list';
+
     @ApiProperty({ required: false, enum: ['live', 'ended'] })
     @IsOptional()
     @IsIn(['live', 'ended'])

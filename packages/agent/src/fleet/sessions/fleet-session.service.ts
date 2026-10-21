@@ -11,6 +11,11 @@ import {
     FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
     FLEET_SESSION_IDLE_AFTER_MS,
     FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
+    FLEET_SESSION_BOARD_COLUMNS,
+    FLEET_SESSION_BOARD_MAX,
+    fleetSessionBoardColumn,
+    type FleetSessionBoardResponse,
+    type FleetSessionKind,
     isFleetSessionAttentionUnread,
     isFleetSessionDecisionReason,
     parseFleetSessionAttention,
@@ -346,6 +351,42 @@ export class FleetSessionService {
             );
         }
         return checkout;
+    }
+
+    /**
+     * FL-05 P3 — the Sessions board (spec FR-41 … FR-44, FR-48): every live
+     * session on the computers the person may see sessions on (or one, after
+     * its audience check), in the four columns, most recently moved first;
+     * `done` only for 24 h after it finished; ended sessions are list-only.
+     */
+    async board(
+        actor: FleetSessionActor,
+        query: { nodeId?: string; agentId?: string; kind?: FleetSessionKind } = {},
+    ): Promise<FleetSessionBoardResponse> {
+        const nodeIds = query.nodeId
+            ? [(await this.nodeFor(query.nodeId, actor)).node.id]
+            : await this.visibleNodeIds(actor);
+        const rows = await this.sessions.listLiveForBoard(
+            nodeIds,
+            {
+                ...(query.agentId ? { agentId: query.agentId } : {}),
+                ...(query.kind ? { kind: query.kind } : {}),
+            },
+            FLEET_SESSION_BOARD_MAX,
+        );
+        const now = this.now();
+        const columns: FleetSessionBoardResponse['columns'] = { needs_you: [], working: [], done: [], idle: [] };
+        const movedAt = (view: FleetSessionView) =>
+            Date.parse(view.stateChangedAt ?? view.lastActivityAt ?? view.createdAt) || 0;
+        for (const row of rows) {
+            const view = toFleetSessionView(row);
+            const column = fleetSessionBoardColumn(view, now);
+            if (column) columns[column].push(view);
+        }
+        for (const column of FLEET_SESSION_BOARD_COLUMNS) {
+            columns[column].sort((a, b) => movedAt(b) - movedAt(a));
+        }
+        return { columns, generatedAt: new Date(now).toISOString() };
     }
 
     /** The start dialog's "Recent" folders for a node (spec FR-15). */

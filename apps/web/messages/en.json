@@ -4118,7 +4118,8 @@
                 "log": "Log",
                 "schedules": "Schedules",
                 "feed": "Live Feed",
-                "runs": "Runs"
+                "runs": "Runs",
+                "sessions": "Sessions"
             },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -14071,6 +14072,62 @@
                 "failed": "The answer was not sent",
                 "retry": "Retry",
                 "peopleOnly": "Permission prompts are answered by people"
+            },
+            "board": {
+                "heading": "Sessions",
+                "needsYou": "Needs you",
+                "working": "Working",
+                "done": "Done",
+                "idle": "Idle",
+                "emptyNeedsYou": "Nothing needs you",
+                "emptyWorking": "Nothing working",
+                "emptyDone": "Nothing finished today",
+                "emptyIdle": "Nothing idle",
+                "empty": "No sessions yet. Start one on a computer and it shows up here with what it needs from you.",
+                "newSession": "Start a session on a computer",
+                "toggleBoard": "Board",
+                "toggleList": "List",
+                "filterAgent": "Agent",
+                "filterComputer": "Computer",
+                "filterKind": "Kind",
+                "filterState": "State",
+                "allAgents": "All agents",
+                "allComputers": "All computers",
+                "allKinds": "All kinds",
+                "allStates": "All states",
+                "loadFailed": "The sessions could not be loaded.",
+                "moved": "{title} moved to {column}."
+            },
+            "list": {
+                "day": "Day",
+                "week": "Week",
+                "you": "You",
+                "shells": "Shells",
+                "anAgent": "An Agent",
+                "dayHeading": "{period} · {who} ({count})",
+                "weekHeading": "Week of {period} · {who} ({count})",
+                "answer": "Answer",
+                "reasons": {
+                    "exit": "exit {code}",
+                    "user": "ended by a person",
+                    "agent": "ended by its Agent",
+                    "nodeRestart": "the computer restarted",
+                    "timeout": "timed out",
+                    "killSwitch": "the fleet stop",
+                    "drain": "drained"
+                }
+            },
+            "byComputer": {
+                "online": "online",
+                "offline": "offline",
+                "sessions": "{count, plural, one {# session} other {# sessions}}",
+                "manageOnly": "Agents need work switched on here",
+                "newSession": "New session",
+                "noComputers": "No computers yet — add one under Fleet → Computers."
+            },
+            "palette": {
+                "needsYou": "Needs you",
+                "recent": "Recent sessions"
             }
         },
         "actions": {
