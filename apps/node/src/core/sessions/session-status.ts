@@ -119,7 +119,10 @@ export class SessionStatusPipeline {
 		this.endpoint =
 			options.endpoint ??
 			new HookEndpoint({
-				isKnownSession: (sessionId) => this.sessions.has(sessionId),
+				// A session the node just launched (its overlay exists) is known before the
+				// daemon's `started` has been followed up — its first hook may beat that.
+				isKnownSession: (sessionId) =>
+					this.sessions.has(sessionId) || options.overlay.hooksFor(sessionId) !== null,
 				onEvent: (event) => this.onHookEvent(event),
 				now: this.now,
 				warn: (message) => options.logger?.warn(message)
@@ -243,7 +246,12 @@ export class SessionStatusPipeline {
 
 	// ─── Inputs ────────────────────────────────────────────────────────────
 
-	private onHookEvent(event: HookEndpointEvent): void {
+	private onHookEvent(event: HookEndpointEvent, retried = false): void {
+		if (!this.sessions.has(event.sessionId)) {
+			// Launched a moment ago: follow it first, then apply once (an unknown one is dropped, U3).
+			if (!retried) void this.track(event.sessionId).then(() => this.onHookEvent(event, true));
+			return;
+		}
 		void this.enqueue(event.sessionId, async () => {
 			const evidence = await normalizeHookEvent(event, {
 				homedir: this.options.homedir,
