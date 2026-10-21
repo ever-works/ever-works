@@ -10,6 +10,7 @@ import {
     type FleetVirtualCreateResponse,
     type FleetVirtualOperationResponse,
     type FleetVirtualOptionsView,
+    type FleetVirtualPasswordRevealResponse,
     type FleetVirtualPowerAction,
     type FleetVirtualSystemId,
 } from '@ever-works/contracts';
@@ -119,4 +120,16 @@ export async function retryFleetVirtualEnrollmentAction(
     childNodeId: string,
 ): Promise<FleetVirtualResult<FleetVirtualOperationResponse>> {
     return run(() => fleetVirtualAPI.retryEnrollment(hostNodeId, childNodeId));
+}
+
+/**
+ * Windows VMs (P2, FR-21) — the one-time password reveal. The dialog IS the
+ * `confirm` (its text says the reveal is recorded); the value goes straight
+ * back to the owner's browser and is never kept here.
+ */
+export async function revealFleetVirtualPasswordAction(
+    hostNodeId: string,
+    childNodeId: string,
+): Promise<FleetVirtualResult<FleetVirtualPasswordRevealResponse>> {
+    return run(() => fleetVirtualAPI.revealPassword(hostNodeId, childNodeId));
 }

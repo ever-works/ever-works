@@ -4,6 +4,7 @@ import {
     FLEET_VIRTUAL_MAX_PER_HOST,
     FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB,
     FLEET_KVM_CAPABILITY,
+    FLEET_VIRTUAL_WINDOWS_CAPABILITY,
     type FleetConsents,
     type FleetNodeHealthSnapshot,
     type FleetVirtualHostOption,
@@ -109,6 +110,8 @@ export function hostEligibility(input: HostEligibilityInput): FleetVirtualHostRe
     if (!consents.manage && !capabilities.includes('managed')) return 'consent-missing';
     if (!capabilities.includes('docker')) return 'no-docker';
     if (!capabilities.includes(FLEET_VIRTUAL_HOST_CAPABILITY)) return 'not-upgraded';
+    // Windows VMs (P2, lane decision 14): only with an installer image the host's operator configured.
+    if (system.kind === 'vm' && !capabilities.includes(FLEET_VIRTUAL_WINDOWS_CAPABILITY)) return 'no-windows-image';
     if (input.childCount >= FLEET_VIRTUAL_MAX_PER_HOST) return 'limit';
     return null;
 }
@@ -165,6 +168,8 @@ export function hostReasonHint(
             return `Only the owner of ${name} can create computers on it`;
         case 'not-upgraded':
             return `Update the Ever Works node on ${name} to create virtual computers on it`;
+        case 'no-windows-image':
+            return `No Windows installer image is configured on ${name}; set EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE there`;
     }
 }
 
@@ -226,6 +231,21 @@ export function stopSummary(kind: FleetVirtualKind, name: string): string {
     return kind === 'vm'
         ? `Stop ${name}? Windows is asked to shut down and gets up to 2 minutes. Sessions on it end.`
         : `Stop ${name}? The container stops within 10 seconds. Sessions on it end.`;
+}
+
+/**
+ * The Windows free-disk refusal (FR-18, U7), when the host's latest health
+ * sample says less than 30 GB is free; null when enough is free or unknown
+ * (the host re-checks before anything is pulled).
+ */
+export function windowsDiskShortfall(
+    health: FleetVirtualHostFacts['health'],
+    hostName: string,
+): string | null {
+    const free = health?.diskFreeMiB;
+    if (typeof free !== 'number' || !Number.isFinite(free)) return null;
+    if (free >= FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_MIB) return null;
+    return `Windows needs about ${FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB} GB free on ${hostName}; ${Math.floor(free / 1024)} GB is free`;
 }
 
 /** The destroy dialog's sentence (spec §5.6, FR-28). */

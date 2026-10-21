@@ -186,11 +186,29 @@ export function fleetVirtualSystem(id: unknown): FleetVirtualSystem | null {
 }
 
 /**
- * Windows VMs ship in phase 2 (spec §8b, plan §13): until then the Windows
- * systems are hidden from every surface and a create naming one is refused
- * `unsupported_on_node`. Phase 2 flips this one constant.
+ * Windows VMs ship in phase 2 (spec §8b, plan §13): before it the Windows
+ * systems were hidden from every surface. Phase 2 shipped them; a host offers
+ * them only when it advertises `kvm` AND a Windows installer image its
+ * operator configured (`virtual-windows`, lane decision 14).
  */
-export const FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED = false;
+export const FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED = true;
+
+/**
+ * Capability tag a host advertises when its operator configured a Windows
+ * installer image (`EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE`). Ever Works names
+ * no such image itself (spec §8b licensing question): every `vm-create` for a
+ * Windows system requires this tag beside `kvm` (lane decision 14).
+ */
+export const FLEET_VIRTUAL_WINDOWS_CAPABILITY = 'virtual-windows';
+
+/** The guest's local account the installer creates and the runtime runs as (FR-20, FR-25). */
+export const FLEET_VIRTUAL_WINDOWS_USERNAME = 'ever';
+
+/** Characters of a generated Windows password (FR-20). */
+export const FLEET_VIRTUAL_WINDOWS_PASSWORD_LENGTH = 24;
+
+/** How long a revealed password stays on screen (FR-21). */
+export const FLEET_VIRTUAL_PASSWORD_REVEAL_SEC = 60;
 
 /** The systems a surface offers right now (Windows only once phase 2 shipped them). */
 export function fleetVirtualOfferedSystems(vmSystemsShipped: boolean = FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED): FleetVirtualSystem[] {
@@ -286,7 +304,9 @@ export type FleetVirtualHostReason =
 	| 'unsupported-arch'
 	| 'desktop-node'
 	| 'permission-denied'
-	| 'not-upgraded';
+	| 'not-upgraded'
+	/** Windows VMs (P2): the host's operator configured no Windows installer image. */
+	| 'no-windows-image';
 
 export const FLEET_VIRTUAL_HOST_REASONS: readonly FleetVirtualHostReason[] = [
 	'offline',
@@ -299,7 +319,8 @@ export const FLEET_VIRTUAL_HOST_REASONS: readonly FleetVirtualHostReason[] = [
 	'unsupported-arch',
 	'desktop-node',
 	'permission-denied',
-	'not-upgraded'
+	'not-upgraded',
+	'no-windows-image'
 ];
 
 /** One Node in the host picker. */
@@ -583,6 +604,12 @@ export interface FleetVirtualMeta {
 	lastControlJobId: string | null;
 	/** When the guest asked for its enrolment token (U10's clock), or null. */
 	enrollRequestedAt: string | null;
+	/**
+	 * Windows VMs (P2): the host-loopback port of the installer's screen viewer
+	 * (`127.0.0.1:<port>` on the host only — "Watch the install" opens it ON the
+	 * host through FL-10's "open on the machine", FR-23). Absent for Containers.
+	 */
+	viewerPort?: number | null;
 }
 
 /** `FleetNodeView.virtual` — the block the nested row, Runs here and the child page read. */
@@ -598,6 +625,8 @@ export interface FleetNodeVirtualView {
 	activated: boolean | null;
 	error: string | null;
 	imageDigest: string | null;
+	/** Windows VMs (P2): the installer viewer's host-loopback port while it installs, or null. */
+	viewerPort?: number | null;
 	/** The host's name, when the reader may see the host (the label "Container on build-01"). */
 	hostName: string | null;
 }
@@ -614,6 +643,14 @@ export interface FleetVirtualProgressReport {
 	error?: string | null;
 	image?: { ref: string; digest: string | null } | null;
 	activated?: boolean | null;
+	/** Windows VMs (P2): the host-loopback port of the installer's viewer. */
+	viewerPort?: number | null;
+}
+
+/** `POST …/virtual/:childId/password/reveal` — the one-time reveal (FR-21). Never cached, never logged. */
+export interface FleetVirtualPasswordRevealResponse {
+	password: string;
+	expiresInSec: number;
 }
 
 /** The host's request for a child's one-time enrolment token (R-35, FR-14). */
