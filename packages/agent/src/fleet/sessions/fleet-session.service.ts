@@ -40,6 +40,7 @@ import {
 } from './fleet-session-node.port';
 import {
     applyFleetSessionEvent,
+    canAttachFleetSession,
     canStartFleetSession,
     endFleetSessionPatch,
     FLEET_SESSION_PROVIDER_LABELS,
@@ -609,6 +610,87 @@ export class FleetSessionService {
             outcome: reached ? 'ended' : 'ended-platform-side',
         });
         return toFleetSessionView(ended, { includeScreen: true });
+    }
+
+    // ─── Attach (FL-04 P1b) ────────────────────────────────────────────────
+
+    /**
+     * May this person attach in `role` (spec FR-21 … FR-26)? Existence and the
+     * `sessions` audience first (a stranger reads the 404 of an unknown id),
+     * then the policy: the kill switch (drivers only — a watcher reads the stop
+     * banner), an ended session (its page shows the last screen instead), the
+     * link, and the five-viewer cap over `attached` (who the caller's replica
+     * counts right now). Answers the session and its node; the API mints the
+     * viewer token through FL-02.
+     */
+    async authorizeAttach(
+        id: string,
+        actor: FleetSessionActor,
+        role: 'viewer' | 'driver',
+        attached: readonly string[],
+    ): Promise<{ session: FleetSession; node: FleetNode }> {
+        const { session, node } = await this.resolve(id, actor);
+        const refusal = canAttachFleetSession({
+            state: session.state,
+            killSwitchOn: await this.isStopped(),
+            linkConnected: this.node?.isConnected(node.id) ?? false,
+            nodeName: node.name,
+            attached,
+            role,
+        });
+        if (refusal) {
+            await this.record('node.session.attach', actor.userId, node, session.id, {
+                role,
+                confirmationClass: 'plain',
+                outcome: 'refused',
+                code: refusal.code,
+            });
+            throw fleetSessionError(refusal.code, refusal.hint, refusal.details);
+        }
+        return { session, node };
+    }
+
+    /**
+     * The live view's audit rows (spec FR-35): `node.session.attach` when a
+     * viewer's channel opened, and ONE `node.session.input` per driver span
+     * (its start, end and byte count — never a keystroke). Best effort: a
+     * session or node that is gone writes nothing.
+     */
+    async recordViewer(
+        action: 'node.session.attach' | 'node.session.input',
+        userId: string,
+        sessionId: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        try {
+            const session = await this.sessions.findById(sessionId);
+            if (!session) return;
+            const node = await this.nodes.findById(session.nodeId);
+            if (!node) return;
+            await this.record(action, userId, node, session.id, {
+                confirmationClass: 'plain',
+                ...details,
+            });
+        } catch (error) {
+            this.logger.debug(
+                `${action} audit for ${sessionId} failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /**
+     * Whether this person may still see the session (the live view's 30 s
+     * re-check). Only a refusal says no; a database that cannot answer right
+     * now keeps the viewer (the next tick asks again).
+     */
+    async canStillSee(id: string, actor: FleetSessionActor): Promise<boolean> {
+        try {
+            await this.resolve(id, actor);
+            return true;
+        } catch (error) {
+            const typed = readFleetSessionError(error);
+            return !(typed && (typed.code === 'not_found' || typed.code === 'permission_denied'));
+        }
     }
 
     // ─── What the node reports (channel 0) ─────────────────────────────────

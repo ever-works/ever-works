@@ -12,6 +12,7 @@ import {
     FLEET_LINK_VIEWER_FRAME_KINDS,
     FLEET_LINK_VIEWER_MAX_BUFFER_BYTES,
     FLEET_LINK_VIEWER_SLOW_BUFFER_BYTES,
+    fleetLinkDriverMaySend,
     fleetLinkViewerMaySend,
     type FleetLinkCloseReason,
     type FleetLinkError,
@@ -161,6 +162,16 @@ export class FleetLinkViewerBridge {
                 this.refuse();
                 return;
             }
+            // A driver of a family that narrows it (FL-04 `session`) sends only
+            // what a terminal does; starting, ending or renaming go through the
+            // platform's routes, with their confirmation and audit row.
+            if (
+                this.options.role === 'driver' &&
+                !fleetLinkDriverMaySend(this.options.family, message.type)
+            ) {
+                this.refuse('this goes through the platform, not the live view');
+                return;
+            }
             channel.sendJson(message);
             return;
         }
@@ -185,13 +196,13 @@ export class FleetLinkViewerBridge {
 
     // ─── Internals ─────────────────────────────────────────────────────────
 
-    private refuse(): void {
+    private refuse(hint = 'this view is read-only'): void {
         const now = this.now();
         if (now - this.lastRefusalAt < REFUSAL_INTERVAL_MS) return;
         this.lastRefusalAt = now;
         const refused: FleetLinkViewerRefused = {
             type: 'viewer.refused',
-            error: { code: 'permission_denied', hint: 'this view is read-only' },
+            error: { code: 'permission_denied', hint },
         };
         this.send(encodeFleetLinkControl(refused));
     }

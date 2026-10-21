@@ -11,6 +11,8 @@ import {
 	FLEET_LINK_VIEWER_SLOW_BUFFER_BYTES,
 	FLEET_LINK_VIEWER_TOKEN_RATE_LIMIT,
 	FLEET_LINK_VIEWER_TOKEN_TTL_SEC,
+	FLEET_LINK_DRIVER_JSON_TYPES,
+	fleetLinkDriverMaySend,
 	fleetLinkViewerKey,
 	fleetLinkViewerMaySend,
 	fleetLinkViewerPath,
@@ -75,6 +77,25 @@ describe('roles', () => {
 		expect(isFleetLinkViewerRole('driver')).toBe(true);
 		expect(isFleetLinkViewerRole('worker')).toBe(false);
 		expect(isFleetLinkViewerRole('owner')).toBe(false);
+	});
+
+	it('lets a session watcher attach and read the screen, never type (FL-04 P1b)', () => {
+		expect(fleetLinkViewerMaySend('session', 'session.attach')).toBe(true);
+		expect(fleetLinkViewerMaySend('session', 'session.screen')).toBe(true);
+		expect(fleetLinkViewerMaySend('session', 'session.resize')).toBe(false);
+		expect(fleetLinkViewerMaySend('session', 'session.end')).toBe(false);
+	});
+
+	it('keeps a session driver to the terminal verbs; other families forward everything (FL-04 P1b)', () => {
+		expect(Object.keys(FLEET_LINK_DRIVER_JSON_TYPES)).toEqual(['session']);
+		for (const verb of ['session.attach', 'session.input', 'session.resize', 'session.screen']) {
+			expect(fleetLinkDriverMaySend('session', verb)).toBe(true);
+		}
+		for (const verb of ['session.start', 'session.end', 'session.rename', 'session.restart', 'session.answer']) {
+			expect(fleetLinkDriverMaySend('session', verb)).toBe(false);
+		}
+		expect(fleetLinkDriverMaySend('session', 42)).toBe(false);
+		expect(fleetLinkDriverMaySend('desktop', 'desktop.openUrl')).toBe(true);
 	});
 
 	it('lets a read-only viewer send only view controls and credit', () => {

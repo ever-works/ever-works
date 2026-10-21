@@ -5,6 +5,8 @@ import type { FleetSessionService } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetSessionsController } from './fleet-sessions.controller';
 import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
+import type { FleetSessionAttachService } from './fleet-session-attach.service';
+import type { FleetSessionPresenceService } from './fleet-session-presence.service';
 
 const USER = { userId: 'user-1' } as never;
 const NODE_ID = '11111111-1111-4111-8111-111111111111';
@@ -19,6 +21,8 @@ const SESSION_ID = '22222222-2222-4222-8222-222222222222';
  */
 describe('FleetSessionsController', () => {
     let service: Record<string, jest.Mock>;
+    let attach: { mint: jest.Mock };
+    let presence: { presence: jest.Mock };
     let controller: FleetSessionsController;
     const saved = { ...process.env };
 
@@ -32,7 +36,20 @@ describe('FleetSessionsController', () => {
             rename: jest.fn(async () => ({ id: SESSION_ID })),
             end: jest.fn(async () => ({ id: SESSION_ID, state: 'ended' })),
         };
-        controller = new FleetSessionsController(service as unknown as FleetSessionService);
+        attach = {
+            mint: jest.fn(async () => ({
+                token: 't',
+                role: 'viewer',
+                expiresInSec: 60,
+                wsPath: `/ws/fleet/session/${SESSION_ID}`,
+            })),
+        };
+        presence = { presence: jest.fn(() => ({ attached: [], drivers: 0, watchers: 0 })) };
+        controller = new FleetSessionsController(
+            service as unknown as FleetSessionService,
+            attach as unknown as FleetSessionAttachService,
+            presence as unknown as FleetSessionPresenceService,
+        );
     });
 
     afterEach(() => {
@@ -53,6 +70,7 @@ describe('FleetSessionsController', () => {
             ['rename', RequestMethod.PATCH, 'sessions/:id'],
             ['end', RequestMethod.POST, 'sessions/:id/end'],
             ['restart', RequestMethod.POST, 'sessions/:id/restart'],
+            ['attachToken', RequestMethod.POST, 'sessions/:id/attach-token'],
         ];
         for (const [method, verb, path] of routes) {
             const handler = FleetSessionsController.prototype[method];
@@ -115,5 +133,20 @@ describe('FleetSessionsController', () => {
             { userId: 'user-1' },
             { since: new Date('2026-10-21T00:00:00.000Z'), nodeId: NODE_ID },
         );
+    });
+
+    it('mints the attach token as the signed-in person, in the role asked for (P1b)', async () => {
+        const grant = await controller.attachToken(USER, SESSION_ID, { role: 'driver' } as never);
+        expect(attach.mint).toHaveBeenCalledWith(SESSION_ID, { userId: 'user-1' }, 'driver');
+        expect(grant.wsPath).toBe(`/ws/fleet/session/${SESSION_ID}`);
+    });
+
+    it('adds who is attached to a live session, never to an ended one (P1b)', async () => {
+        service.get.mockResolvedValueOnce({ id: SESSION_ID, state: 'working' });
+        const live = await controller.get(USER, SESSION_ID);
+        expect(live.presence).toEqual({ attached: [], drivers: 0, watchers: 0 });
+        service.get.mockResolvedValueOnce({ id: SESSION_ID, state: 'ended' });
+        const ended = await controller.get(USER, SESSION_ID);
+        expect(ended.presence).toBeUndefined();
     });
 });
