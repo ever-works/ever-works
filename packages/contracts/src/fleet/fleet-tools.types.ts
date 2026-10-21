@@ -567,24 +567,24 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet commands cancel'
 	}),
 
-	// ── schedules (FL-13) ──
-	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	// ── schedules (FL-13 P2: live — `apps/api/src/fleet/schedules/fleet-schedules.controller.ts`) ──
+	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules'),
 		cli: 'fleet schedules list'
 	}),
-	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules get'
 	}),
-	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}/runs'),
 		cli: 'fleet schedules runs'
 	}),
-	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: POST('/api/fleet/schedules'),
 		cli: 'fleet schedules create'
 	}),
-	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: PATCH('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules update'
 	}),
@@ -593,19 +593,19 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'schedules',
 		'FL-13',
 		'FLEET_COMMANDS_ENABLED',
-		'planned',
+		'live',
 		confirm('write.destructive'),
 		{ route: DELETE('/api/fleet/schedules/{id}'), cli: 'fleet schedules delete' }
 	),
-	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('machine.run'), {
+	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('machine.run'), {
 		route: POST('/api/fleet/schedules/{id}/run'),
 		cli: 'fleet schedules run'
 	}),
-	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/pause'),
 		cli: 'fleet schedules pause'
 	}),
-	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/resume'),
 		cli: 'fleet schedules resume'
 	}),
