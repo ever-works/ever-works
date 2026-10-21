@@ -129,6 +129,7 @@ import {
     FleetJobService,
     FleetKillSwitchService,
     FleetModule,
+    FleetCheckoutService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
@@ -2113,6 +2114,10 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // Checkouts on computers (FL-14 P2) — backs the `fleet_checkouts_*`
+                // tools. APPENDED LAST (positional), optional: unbound (checkouts not
+                // mounted), the tools are simply not offered.
+                { token: FleetCheckoutService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2136,6 +2141,7 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                checkouts?: FleetCheckoutService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2156,7 +2162,10 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet },
+                fleet: {
+                    service: fleet,
+                    ...(checkouts ? { checkouts: { service: checkouts } } : {}),
+                },
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

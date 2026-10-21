@@ -11,6 +11,7 @@ import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
+import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
@@ -103,6 +104,18 @@ export interface AgentFleetToolSource {
         service: Pick<FleetService, 'getVisibleForUser' | 'listVisibleForUser'>;
         history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
         needsALook?: Pick<NeedsALookService, 'forNodes'>;
+    };
+    /**
+     * Checkouts on computers (FL-14 P2, spec FR-29) — when bound, the
+     * `fleet_checkouts_*` tools are offered (`buildFleetCheckoutTools`), each
+     * act checked against the Node's `checkouts` audience for the Agent's
+     * owner and classified on the trust ladder (`safety/action-category.ts`).
+     */
+    checkouts?: {
+        service: Pick<
+            FleetCheckoutService,
+            'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
+        >;
     };
 }
 

@@ -66,6 +66,7 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
+import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -587,6 +588,18 @@ export class AgentToolService {
                         service: health.service,
                         history: health.history,
                         ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
+            // Checkouts on computers (FL-14 P2): the checkout tools, when bound
+            // (and only while FLEET_CHECKOUTS_ENABLED is on — the builder reads it).
+            if (fleet.checkouts) {
+                const checkouts = fleet.checkouts;
+                add('fleet-checkouts', () =>
+                    buildFleetCheckoutTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        service: checkouts.service,
                     }),
                 );
             }
