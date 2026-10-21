@@ -227,7 +227,10 @@ describe('GoalsController — run-token scope (Goal fields, DoD sign-off)', () =
         it('lets the key re-save the list unchanged and add or reword open criteria', async () => {
             const { controller, orchestrator } = withCurrent();
             await controller.setDod(personalKey, GOAL, {
-                criteria: [...current.map((c) => ({ ...c })), { id: 'c', text: 'C', status: 'open' }],
+                criteria: [
+                    ...current.map((c) => ({ ...c })),
+                    { id: 'c', text: 'C', status: 'open' },
+                ],
             } as never);
             await controller.setDod(personalKey, GOAL, {
                 criteria: replaced('b', { text: 'B, reworded' }),
@@ -239,8 +242,14 @@ describe('GoalsController — run-token scope (Goal fields, DoD sign-off)', () =
             ['closes an open criterion', replaced('b', { status: 'done' })],
             ['waives an open criterion', replaced('b', { status: 'waived' })],
             ['approves a proposed criterion', replaced('p', { proposed: false })],
-            ['drops an open, approved criterion', current.filter((c) => c.id !== 'b').map((c) => ({ ...c }))],
-            ['adds a criterion already done', [...current.map((c) => ({ ...c })), { id: 'z', text: 'Z', status: 'done' }]],
+            [
+                'drops an open, approved criterion',
+                current.filter((c) => c.id !== 'b').map((c) => ({ ...c })),
+            ],
+            [
+                'adds a criterion already done',
+                [...current.map((c) => ({ ...c })), { id: 'z', text: 'Z', status: 'done' }],
+            ],
             ['clears the whole list', null],
         ])('requires a session when the replacement %s', async (_what, criteria) => {
             const { controller, orchestrator } = withCurrent();
@@ -279,7 +288,12 @@ describe('dodSignOffChanges', () => {
         expect(dodSignOffChanges(current, current)).toEqual([]);
         expect(dodSignOffChanges(current, [...current, { id: 'n', status: 'open' }])).toEqual([]);
         // Removing a closed or a proposed criterion signs nothing off.
-        expect(dodSignOffChanges(current, current.filter((c) => c.id !== 'a' && c.id !== 'p'))).toEqual([]);
+        expect(
+            dodSignOffChanges(
+                current,
+                current.filter((c) => c.id !== 'a' && c.id !== 'p'),
+            ),
+        ).toEqual([]);
         expect(
             dodSignOffChanges(current, [
                 { id: 'a', status: 'waived' },

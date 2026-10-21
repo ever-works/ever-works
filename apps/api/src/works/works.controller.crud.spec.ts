@@ -301,7 +301,14 @@ describe('WorksController — core CRUD endpoints', () => {
 
             it("narrows the list to the run token's Organization", async () => {
                 delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
-                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq('org-a'));
+                await controller.getWorks(
+                    auth,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    runReq('org-a'),
+                );
                 expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).toEqual(
                     expect.objectContaining({ organizationId: 'org-a' }),
                 );
@@ -309,18 +316,39 @@ describe('WorksController — core CRUD endpoints', () => {
 
             it('narrows a personal-scope run token to Works with no Organization', async () => {
                 delete process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED;
-                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq(null));
+                await controller.getWorks(
+                    auth,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    runReq(null),
+                );
                 const options = s.workQueryService.getWorks.mock.calls.at(-1)?.[0];
                 expect(options).toHaveProperty('organizationId', null);
             });
 
             it('leaves a session / personal key, and a switched-off pin, unfiltered', async () => {
-                await controller.getWorks(auth, undefined, undefined, undefined, undefined, {} as never);
+                await controller.getWorks(
+                    auth,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {} as never,
+                );
                 expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).not.toHaveProperty(
                     'organizationId',
                 );
                 process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = 'false';
-                await controller.getWorks(auth, undefined, undefined, undefined, undefined, runReq('org-a'));
+                await controller.getWorks(
+                    auth,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    runReq('org-a'),
+                );
                 expect(s.workQueryService.getWorks.mock.calls.at(-1)?.[0]).not.toHaveProperty(
                     'organizationId',
                 );

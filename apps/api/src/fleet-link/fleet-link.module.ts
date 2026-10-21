@@ -98,7 +98,9 @@ import { FleetOperationsService } from './fleet-operations.service';
                 if (dataSource) {
                     return new CacheEntryFleetLinkReplayGuard(dataSource.getRepository(CacheEntry));
                 }
-                return bus ? new RelayBusFleetLinkReplayGuard(bus) : new InProcessFleetLinkReplayGuard();
+                return bus
+                    ? new RelayBusFleetLinkReplayGuard(bus)
+                    : new InProcessFleetLinkReplayGuard();
             },
             inject: [
                 { token: RELAY_BUS, optional: true },

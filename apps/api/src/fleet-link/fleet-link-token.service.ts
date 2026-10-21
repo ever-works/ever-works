@@ -205,7 +205,9 @@ export class FleetLinkTokenService {
         if (credentialHash !== undefined) {
             claims.cred = fleetLinkCredentialGeneration(credentialHash);
         }
-        const { token, expiresInSec } = this.signer.mint(claims, { ttlSec: FLEET_LINK_TOKEN_TTL_SEC });
+        const { token, expiresInSec } = this.signer.mint(claims, {
+            ttlSec: FLEET_LINK_TOKEN_TTL_SEC,
+        });
         return { token, wsPath: FLEET_LINK_WS_PATH, expiresInSec };
     }
 

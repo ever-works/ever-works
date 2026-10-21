@@ -71,9 +71,9 @@ export class FleetRunOrgPinGuard implements CanActivate {
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         if (context.getType() !== 'http') return true;
-        const request = context.switchToHttp().getRequest<
-            MachinePrincipalRequest & { path?: unknown; url?: unknown }
-        >();
+        const request = context
+            .switchToHttp()
+            .getRequest<MachinePrincipalRequest & { path?: unknown; url?: unknown }>();
         const pin = fleetRunOrganizationPin(request);
         if (!pin) return true;
 

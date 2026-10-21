@@ -29,18 +29,30 @@ describe('FleetController — credential-minting routes are session-only', () =>
         ['POST /api/fleet/nodes/:id/rotate', FleetController.prototype.rotate],
     ] as const;
 
-    it.each(minting)('%s carries @SessionCredentialOnly and the guard that enforces it', (_route, handler) => {
-        expect(typeof Reflect.getMetadata(SESSION_CREDENTIAL_ONLY_KEY, handler)).toBe('string');
-        expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toContain(IntegrationForbiddenGuard);
-    });
+    it.each(minting)(
+        '%s carries @SessionCredentialOnly and the guard that enforces it',
+        (_route, handler) => {
+            expect(typeof Reflect.getMetadata(SESSION_CREDENTIAL_ONLY_KEY, handler)).toBe('string');
+            expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toContain(
+                IntegrationForbiddenGuard,
+            );
+        },
+    );
 
-    it.each(minting)('%s refuses a personal API key / fleet-run token, admits a session', (_route, handler) => {
-        expect(() => guard.canActivate(contextFor(handler, { userId: 'u1', authMethod: 'api-key' }))).toThrow(
-            ForbiddenException,
-        );
-        expect(() => guard.canActivate(contextFor(handler, { userId: 'u1' }))).toThrow(ForbiddenException);
-        expect(guard.canActivate(contextFor(handler, { userId: 'u1', authMethod: 'session' }))).toBe(true);
-    });
+    it.each(minting)(
+        '%s refuses a personal API key / fleet-run token, admits a session',
+        (_route, handler) => {
+            expect(() =>
+                guard.canActivate(contextFor(handler, { userId: 'u1', authMethod: 'api-key' })),
+            ).toThrow(ForbiddenException);
+            expect(() => guard.canActivate(contextFor(handler, { userId: 'u1' }))).toThrow(
+                ForbiddenException,
+            );
+            expect(
+                guard.canActivate(contextFor(handler, { userId: 'u1', authMethod: 'session' })),
+            ).toBe(true);
+        },
+    );
 
     it('names the refused action in the message', () => {
         try {
@@ -73,7 +85,10 @@ describe('FleetController — credential-minting routes are session-only', () =>
 
     it('leaves the read and revoke routes open to a personal key (no session-only metadata)', () => {
         expect(
-            Reflect.getMetadata(SESSION_CREDENTIAL_ONLY_KEY, FleetController.prototype.revokeEnrollmentToken),
+            Reflect.getMetadata(
+                SESSION_CREDENTIAL_ONLY_KEY,
+                FleetController.prototype.revokeEnrollmentToken,
+            ),
         ).toBeUndefined();
     });
 });

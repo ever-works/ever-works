@@ -149,7 +149,9 @@ describe('InboxController', () => {
             expect(service.unreadCount).toHaveBeenCalledWith('u1', { organizationId: 'org-a' });
 
             await controller.getOne(apiKey, 'i1', runReq('org-a'));
-            expect(service.getForUser).toHaveBeenCalledWith('i1', 'u1', { organizationId: 'org-a' });
+            expect(service.getForUser).toHaveBeenCalledWith('i1', 'u1', {
+                organizationId: 'org-a',
+            });
         });
 
         it('pins a personal-scope run token to items with no Organization', async () => {

@@ -137,7 +137,10 @@ describe('FleetRunOrgPinGuard', () => {
         const unbound = new FleetRunOrgPinGuard(undefined);
         await expect(
             unbound.canActivate(
-                contextFor({ path: `/api/works/${WORK_A}`, fleetRunCredential: runBinding('org-a') }),
+                contextFor({
+                    path: `/api/works/${WORK_A}`,
+                    fleetRunCredential: runBinding('org-a'),
+                }),
             ),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -152,7 +155,9 @@ describe('FleetRunOrgPinGuard', () => {
             ),
         ).resolves.toBe(true);
         await expect(
-            guard.canActivate(contextFor({ path: '/api/works', fleetRunCredential: runBinding('org-a') })),
+            guard.canActivate(
+                contextFor({ path: '/api/works', fleetRunCredential: runBinding('org-a') }),
+            ),
         ).resolves.toBe(true);
         expect(works.findByIdForAccess).not.toHaveBeenCalled();
     });
@@ -161,7 +166,10 @@ describe('FleetRunOrgPinGuard', () => {
         process.env.FLEET_RUN_TOKEN_ORG_PIN_ENFORCED = 'false';
         await expect(
             guard.canActivate(
-                contextFor({ path: `/api/works/${WORK_B}`, fleetRunCredential: runBinding('org-a') }),
+                contextFor({
+                    path: `/api/works/${WORK_B}`,
+                    fleetRunCredential: runBinding('org-a'),
+                }),
             ),
         ).resolves.toBe(true);
         expect(works.findByIdForAccess).not.toHaveBeenCalled();
@@ -194,7 +202,9 @@ describe('fleet-run-scope helpers', () => {
         expect(isFleetRunOrgPinEnforced({})).toBe(true);
         expect(isFleetRunOrgPinEnforced({ FLEET_RUN_TOKEN_ORG_PIN_ENFORCED: 'true' })).toBe(true);
         expect(isFleetRunOrgPinEnforced({ FLEET_RUN_TOKEN_ORG_PIN_ENFORCED: 'nope' })).toBe(true);
-        expect(isFleetRunOrgPinEnforced({ FLEET_RUN_TOKEN_ORG_PIN_ENFORCED: ' FALSE ' })).toBe(false);
+        expect(isFleetRunOrgPinEnforced({ FLEET_RUN_TOKEN_ORG_PIN_ENFORCED: ' FALSE ' })).toBe(
+            false,
+        );
         expect(isFleetRunOrgPinEnforced({ FLEET_RUN_TOKEN_ORG_PIN_ENFORCED: '0' })).toBe(false);
     });
 
@@ -204,7 +214,10 @@ describe('fleet-run-scope helpers', () => {
             organizationId: 'org-a',
         });
         expect(
-            fleetRunOrganizationPin({ fleetRunCredential: { ...runBinding(null), organizationId: '' } }, {}),
+            fleetRunOrganizationPin(
+                { fleetRunCredential: { ...runBinding(null), organizationId: '' } },
+                {},
+            ),
         ).toEqual({ organizationId: null });
         expect(
             fleetRunOrganizationPin(
@@ -215,11 +228,19 @@ describe('fleet-run-scope helpers', () => {
     });
 
     it('matches a record only inside the pin (null matches null only)', () => {
-        expect(isInsideOrganizationPin({ organizationId: 'org-a' }, { organizationId: 'org-a' })).toBe(true);
-        expect(isInsideOrganizationPin({ organizationId: 'org-b' }, { organizationId: 'org-a' })).toBe(false);
-        expect(isInsideOrganizationPin({ organizationId: null }, { organizationId: null })).toBe(true);
+        expect(
+            isInsideOrganizationPin({ organizationId: 'org-a' }, { organizationId: 'org-a' }),
+        ).toBe(true);
+        expect(
+            isInsideOrganizationPin({ organizationId: 'org-b' }, { organizationId: 'org-a' }),
+        ).toBe(false);
+        expect(isInsideOrganizationPin({ organizationId: null }, { organizationId: null })).toBe(
+            true,
+        );
         expect(isInsideOrganizationPin({}, { organizationId: null })).toBe(true);
-        expect(isInsideOrganizationPin({ organizationId: 'org-a' }, { organizationId: null })).toBe(false);
+        expect(isInsideOrganizationPin({ organizationId: 'org-a' }, { organizationId: null })).toBe(
+            false,
+        );
         expect(isInsideOrganizationPin(null, { organizationId: null })).toBe(false);
     });
 });

@@ -190,7 +190,9 @@ describe('KbController — machine-written documents are review-gated', () => {
             ).rejects.toBeInstanceOf(ForbiddenException);
         }
         await expect(
-            controller.updateDocument(integration, WORK_ID, DOC_ID, { status: 'archived' } as never),
+            controller.updateDocument(integration, WORK_ID, DOC_ID, {
+                status: 'archived',
+            } as never),
         ).rejects.toMatchObject({ status: 422 });
         expect(kb.updateDocument).not.toHaveBeenCalled();
         // A person (personal key or session) keeps it.

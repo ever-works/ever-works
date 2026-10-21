@@ -1042,8 +1042,15 @@ export class WorkRepository {
          */
         organizationId?: string | null;
     }): Promise<Work[]> {
-        const { userId, memberWorkIds = [], limit, offset, search, kind, organizationId } =
-            options || {};
+        const {
+            userId,
+            memberWorkIds = [],
+            limit,
+            offset,
+            search,
+            kind,
+            organizationId,
+        } = options || {};
 
         if (!userId) {
             return [];

@@ -201,17 +201,24 @@ export class InboxService implements InboxProducer {
     ): Promise<{ items: InboxItemDto[]; total: number; unreadCount: number }> {
         // The Organization pin narrows the badge count exactly like the list,
         // and only when one is asked for: the default call shape is unchanged.
-        const pin = options.organizationId !== undefined ? { organizationId: options.organizationId } : undefined;
+        const pin =
+            options.organizationId !== undefined
+                ? { organizationId: options.organizationId }
+                : undefined;
         const [{ rows, total }, unreadCount] = await Promise.all([
             this.items.listForUser(userId, options),
-            pin ? this.items.countUnreadForUser(userId, pin) : this.items.countUnreadForUser(userId),
+            pin
+                ? this.items.countUnreadForUser(userId, pin)
+                : this.items.countUnreadForUser(userId),
         ]);
         return { items: rows.map(toInboxItemDto), total, unreadCount };
     }
 
     /** `pin` (works-security, run-token scope): see {@link ListInboxOptions.organizationId}. */
     async unreadCount(userId: string, pin?: InboxOrganizationPin): Promise<number> {
-        return pin ? this.items.countUnreadForUser(userId, pin) : this.items.countUnreadForUser(userId);
+        return pin
+            ? this.items.countUnreadForUser(userId, pin)
+            : this.items.countUnreadForUser(userId);
     }
 
     /** `pin` (works-security, run-token scope): an item of another Organization reads as missing. */
