@@ -724,3 +724,201 @@ export function fleetCheckoutName(path: string): string {
 	while (start > 0 && path.charAt(start - 1) !== '/' && path.charAt(start - 1) !== '\\') start -= 1;
 	return path.slice(start, end) || path;
 }
+
+// ─── P2: create, delete, the operation-scoped credential ────────────────────
+
+/** `delete` removes the folder (a worktree keeps its branch); `forget` drops the row only (spec FR-25). */
+export const FLEET_CHECKOUT_DELETE_MODES = ['delete', 'forget'] as const;
+
+export type FleetCheckoutDeleteMode = (typeof FLEET_CHECKOUT_DELETE_MODES)[number];
+
+export function isFleetCheckoutDeleteMode(value: unknown): value is FleetCheckoutDeleteMode {
+	return typeof value === 'string' && (FLEET_CHECKOUT_DELETE_MODES as readonly string[]).includes(value);
+}
+
+/** What deleting would lose, computed on the node (spec FR-24) — twice: for the preview and again on execute. */
+export interface FleetCheckoutChangesEvidence {
+	/** Changed tracked files plus untracked files. */
+	uncommitted: number;
+	/** Commits on HEAD that no remote-tracking ref reaches. */
+	unpushedCommits: number;
+	/** A git lock file is present (another git command is running). */
+	hasLocks: boolean;
+}
+
+/** Where a new checkout comes from (spec FR-16). Container isolation is P3. */
+export type FleetCheckoutCreateSource =
+	| { kind: 'clone'; repoUrl: string }
+	| { kind: 'worktree'; parentCheckoutId: string };
+
+/** `POST /api/fleet/checkouts`. */
+export interface FleetCheckoutCreateRequest {
+	nodeId: string;
+	source: FleetCheckoutCreateSource;
+	/** The branch to check out (a worktree's new branch); proposed by the branch rule when absent (FR-18, FR-19). */
+	branch?: string;
+	/** What a new branch starts from; the parent's branch (worktree) or the remote default (clone) when absent. */
+	baseRef?: string;
+	isolation?: FleetCheckoutIsolation;
+}
+
+/** `202` answer of create. */
+export interface FleetCheckoutCreateResponse {
+	checkout: FleetCheckoutView;
+	operationId: string | null;
+}
+
+/** `DELETE /api/fleet/checkouts/:id` body (CONTRACTS §2.2: `confirm` or `confirmName`). */
+export interface FleetCheckoutDeleteRequest {
+	mode?: FleetCheckoutDeleteMode;
+	confirm?: boolean;
+	confirmName?: string;
+}
+
+/** `checkouts.create` params — the platform names the exact target path under the node's checkouts root. */
+export interface FleetCheckoutsCreateParams {
+	checkoutId: string;
+	path: string;
+	source: { kind: 'clone'; repoUrl: string } | { kind: 'worktree'; parentPath: string };
+	branch: string;
+	baseRef: string | null;
+	/** `task` for a checkout a Task run asked for (`--work` suffices); else a person or an Agent (`--manage`). */
+	createdBy: FleetCheckoutCreatedBy;
+}
+
+/** `checkouts.create` result. */
+export interface FleetCheckoutsCreateResult {
+	checkoutId: string;
+	path: string;
+	exitCode: number;
+	stderrHead: string | null;
+	checkout: FleetNodeCheckoutRecord | null;
+}
+
+/** `checkouts.delete` params: `preview` computes the evidence and changes nothing. */
+export interface FleetCheckoutsDeleteParams {
+	path: string;
+	mode: FleetCheckoutDeleteMode | 'preview';
+	/** The counts the person confirmed; the node refuses when the evidence grew since (plan §6). */
+	expected?: Pick<FleetCheckoutChangesEvidence, 'uncommitted' | 'unpushedCommits'>;
+	checkoutId?: string;
+}
+
+/** `checkouts.delete` result. */
+export interface FleetCheckoutsDeleteResult {
+	path: string;
+	mode: FleetCheckoutDeleteMode | 'preview';
+	evidence: FleetCheckoutChangesEvidence;
+	/** The folder is gone (delete); false for preview and forget. */
+	removed: boolean;
+	/** The branch a removed worktree kept. */
+	branchKept: string | null;
+}
+
+/** Access an operation-scoped git credential grants: `read` for clone/fetch/pull, `write` for push. */
+export const FLEET_CHECKOUT_CREDENTIAL_ACCESS = ['read', 'write'] as const;
+
+export type FleetCheckoutCredentialAccess = (typeof FLEET_CHECKOUT_CREDENTIAL_ACCESS)[number];
+
+export function isFleetCheckoutCredentialAccess(value: unknown): value is FleetCheckoutCredentialAccess {
+	return typeof value === 'string' && (FLEET_CHECKOUT_CREDENTIAL_ACCESS as readonly string[]).includes(value);
+}
+
+/**
+ * The answer to the node's `POST /api/fleet/checkouts/:id/credential` (spec
+ * FR-17): a GitHub App installation token narrowed to ONE repository, minted
+ * for one operation, injected into one git child's environment and revoked
+ * when the operation ends. Never stored on the machine, the row or a log.
+ */
+export interface FleetCheckoutCredentialResponse {
+	token: string;
+	username: string;
+	expiresAt: string;
+	/** `owner/repo` — the node verifies its remote names exactly this before use. */
+	repository: string;
+	access: FleetCheckoutCredentialAccess;
+}
+
+const BRANCH_FORBIDDEN = /[\u0000- \u007f~^:?*[\\]/;
+
+/**
+ * A branch name this program will hand to git: bounded, no option-looking
+ * leading `-`, none of the characters git refuses in a ref, no `..`, no
+ * `@{`, no trailing `/` or `.lock`.
+ */
+export function isFleetCheckoutBranchName(value: unknown): value is string {
+	if (typeof value !== 'string') return false;
+	if (value.length === 0 || value.length > FLEET_CHECKOUT_REF_MAX_LENGTH) return false;
+	if (value.startsWith('-') || value.startsWith('/') || value.endsWith('/') || value.endsWith('.')) return false;
+	if (value.endsWith('.lock') || value.includes('..') || value.includes('@{') || value.includes('//')) return false;
+	return !BRANCH_FORBIDDEN.test(value);
+}
+
+/**
+ * The branch rule (spec FR-19): a proposed name already on the remote or on
+ * any checkout row for that remote (the bin included) gets `-2`, `-3`, …
+ */
+export function proposeFleetCheckoutBranch(base: string, taken: Iterable<string>): string {
+	const used = new Set<string>();
+	for (const name of taken) used.add(name);
+	if (!used.has(base)) return base;
+	for (let suffix = 2; suffix < 10_000; suffix += 1) {
+		const candidate = `${base}-${suffix}`;
+		if (!used.has(candidate)) return candidate;
+	}
+	return `${base}-${Date.now()}`;
+}
+
+/** A folder name for a new checkout, from its branch: `nina/fix-login` → `fix-login`. */
+export function fleetCheckoutFolderName(branch: string): string {
+	const last = branch.split('/').filter((part) => part.length > 0).pop() ?? branch;
+	const slug = last
+		.replace(/[^A-Za-z0-9._-]+/g, '-')
+		.replace(/^[-.]+/, '')
+		.replace(/[-.]+$/, '')
+		.slice(0, 80);
+	return slug || 'checkout';
+}
+
+/** Evidence from the node, or null. */
+export function parseFleetCheckoutChangesEvidence(value: unknown): FleetCheckoutChangesEvidence | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const raw = value as Record<string, unknown>;
+	const uncommitted = count(raw.uncommitted);
+	const unpushedCommits = count(raw.unpushedCommits);
+	if (uncommitted === null || unpushedCommits === null) return null;
+	return { uncommitted, unpushedCommits, hasLocks: raw.hasLocks === true };
+}
+
+/** A `checkouts.create` result, or null. */
+export function parseFleetCheckoutsCreateResult(value: unknown): FleetCheckoutsCreateResult | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const raw = value as Record<string, unknown>;
+	if (!isCheckoutId(raw.checkoutId) || !isFleetCheckoutPath(raw.path)) return null;
+	if (typeof raw.exitCode !== 'number' || !Number.isInteger(raw.exitCode)) return null;
+	return {
+		checkoutId: raw.checkoutId,
+		path: raw.path,
+		exitCode: raw.exitCode,
+		stderrHead: boundedString(raw.stderrHead, FLEET_CHECKOUT_STDERR_HEAD_MAX_LENGTH),
+		checkout: parseFleetNodeCheckoutRecord(raw.checkout)
+	};
+}
+
+/** A `checkouts.delete` result, or null. */
+export function parseFleetCheckoutsDeleteResult(value: unknown): FleetCheckoutsDeleteResult | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const raw = value as Record<string, unknown>;
+	if (!isFleetCheckoutPath(raw.path)) return null;
+	const mode = raw.mode;
+	if (mode !== 'preview' && !isFleetCheckoutDeleteMode(mode)) return null;
+	const evidence = parseFleetCheckoutChangesEvidence(raw.evidence);
+	if (!evidence) return null;
+	return {
+		path: raw.path,
+		mode,
+		evidence,
+		removed: raw.removed === true,
+		branchKept: boundedString(raw.branchKept, FLEET_CHECKOUT_REF_MAX_LENGTH)
+	};
+}
