@@ -113,7 +113,6 @@ function makeFullService(): AgentToolService {
                 status: stub(),
                 operations: { requestCancel: async () => stub() },
                 wake: stub(),
-                gitIdentity: stub(),
             },
             fleetSessions: { service: stub() },
             fleetCommands: { service: stub() },
@@ -188,7 +187,6 @@ describe('buildAgentToolCatalog', () => {
         expect(names).toContain('fleet_ports_list');
         expect(names).toContain('fleet_nodes_wake');
         expect(names).toContain('fleet_operations_cancel');
-        expect(names).toContain('fleet_nodes_git_identity_set');
     });
 
     it('computes the permission gate the assembly actually applies', () => {

@@ -69,6 +69,19 @@ export interface InboundTriggerEventMatcher {
     kind?: string;
     /** Exact Work uuid the event was routed to. */
     workId?: string;
+    /**
+     * Tasks on computers (FL-15 P3, spec FR-18) — "GitHub events about me":
+     * review requested from me, assigned to me, pull requests I opened —
+     * evaluated against the Trigger OWNER's linked GitHub login (never a
+     * login from the event). Additive JSON key on the `simple-json` column:
+     * an older row without it behaves exactly as before.
+     */
+    audience?: InboundTriggerEventAudience;
+}
+
+/** The "about me" filter of an event matcher (FL-15 P3). */
+export interface InboundTriggerEventAudience {
+    me: Array<'review-requested' | 'assigned' | 'authored'>;
 }
 
 /**

@@ -27,7 +27,7 @@ import { FLEET_CLI_UUID, fleetUsage } from './fleet-output';
  *   fleet ports open <port> --on <computer> [--target desktop|preview-profile]
  *   fleet ports preview-close <port> --on <computer>
  *   fleet sessions end <id> · fleet sessions rename <id> <title>
- *   fleet nodes wake --on <computer> · fleet nodes git-identity-set --on <computer>
+ *   fleet nodes wake --on <computer>   (git identity: FL-15's `fleet nodes git-identity`)
  *   fleet commands cancel <id> · fleet operations cancel <id>
  */
 
@@ -296,16 +296,6 @@ export const nodesWakeCommand = new Command('wake')
             console.log(chalk.gray('Check in 20–60 seconds: ever-works fleet nodes health --on <computer>'));
         });
     });
-
-export const nodesGitIdentitySetCommand = withConfirmFlags(
-    new Command('git-identity-set')
-        .description('Set my own computer’s global git identity to my Ever Works identity')
-        .requiredOption('--on <computer>', 'The computer (id or name)'),
-).action(async (flags: ActFlags) => {
-    const json = flags.json === true;
-    const nodeId = await resolveFleetNodeId(json, flags.on);
-    await runFleetVerb(json, { method: 'POST', path: `/fleet/nodes/${nodeId}/git/identity` }, done('git identity set'), confirmOf(flags));
-});
 
 // ── commands / operations ──
 

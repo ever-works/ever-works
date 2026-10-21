@@ -871,6 +871,8 @@ export class FleetController {
             daemon: body.daemon,
             // Fleet node link (FL-02 T-25): likewise.
             selfUpdate: body.selfUpdate,
+            // Schedules on computers (FL-13): the machine's time zone, validated by the service.
+            timeZone: body.timeZone,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -926,6 +928,8 @@ export class FleetController {
             daemon: body.daemon,
             // Fleet node link (FL-02 T-25): the opt-in self-update report.
             selfUpdate: body.selfUpdate,
+            // Schedules on computers (FL-13): the machine's time zone, validated by the service.
+            timeZone: body.timeZone,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

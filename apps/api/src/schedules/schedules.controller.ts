@@ -26,7 +26,11 @@ import type {
     ScheduleView,
 } from '@ever-works/agent/schedules';
 import { ScheduleQueryDto } from './dto/schedules-query.dto';
-import { PauseScheduleDto, SchedulePageQueryDto } from './dto/schedules-page-query.dto';
+import {
+    PauseScheduleDto,
+    RunScheduleNowDto,
+    SchedulePageQueryDto,
+} from './dto/schedules-page-query.dto';
 import { ParseScheduleIdPipe } from './pipes/parse-schedule-id.pipe';
 
 /**
@@ -73,9 +77,14 @@ export class SchedulesController {
             sourceType?: ScheduleSourceType;
             ownerType?: ScheduleOwnerType;
             enabledOnly?: boolean;
+            nodeId?: string;
         } = {};
         if (query.sourceType) {
             filters.sourceType = query.sourceType;
+        }
+        if (query.node) {
+            // Schedules on computers (FL-13): `?node=<id>`.
+            filters.nodeId = query.node;
         }
         if (query.entityKind) {
             filters.ownerType = query.entityKind;
@@ -112,6 +121,7 @@ export class SchedulesController {
         if (query.status) filters.status = query.status;
         if (query.health) filters.health = query.health;
         if (query.q) filters.q = query.q;
+        if (query.node) filters.nodeId = query.node;
 
         return this.schedulesService.getPage(
             { userId: auth.userId, organizationId: this.scopeContext.getOrganizationId() },
@@ -146,8 +156,11 @@ export class SchedulesController {
     async runNow(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseScheduleIdPipe) id: string,
+        @Body() body: RunScheduleNowDto,
     ): Promise<ScheduleRunNowResult> {
-        return this.requireControls().runNow(this.context(auth), id);
+        return this.requireControls().runNow(this.context(auth), id, {
+            confirm: body?.confirm === true,
+        });
     }
 
     @Post(':id/pause')

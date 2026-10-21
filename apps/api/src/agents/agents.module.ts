@@ -130,9 +130,11 @@ import {
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
+    FleetVirtualService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
+    FleetGitIdentityService,
     FleetPortTunnelService,
     FleetService,
     FleetSessionService,
@@ -141,12 +143,14 @@ import {
     FLEET_LOGS_READER,
     FLEET_STATUS_READER,
     FLEET_WAKE_TOOL_PORT,
-    FleetGitIdentityService,
     type FleetLogsReaderPort,
     type FleetStatusReaderPort,
     type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
+// Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
+// (global through FleetTasksApiModule; optional below).
+import { FleetTaskHandoffService } from '../fleet/tasks/fleet-task-handoff.service';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { FleetOperationsService } from '../fleet-link/fleet-operations.service';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
@@ -2163,10 +2167,18 @@ async function assertRealWriteTarget(
                 //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
                 { token: FleetNodeHealthService, optional: true },
                 { token: NeedsALookService, optional: true },
-                // FL-19 P2 — `fleet_nodes_wake` (FL-03's route as the owner) and the FL-15 git
-                // identity tools. APPENDED LAST (positional), optional.
-                { token: FLEET_WAKE_TOOL_PORT, optional: true },
+                // Virtual computers (FL-16) — backs `fleet_virtual_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_VIRTUAL_ENABLED off) the
+                // five tools are not offered; create / stop / destroy only ever file an approval.
+                { token: FleetVirtualService, optional: true },
+                // Tasks on computers (FL-15 P3) — backs `fleet_tasks_handoff_options` and
+                // `fleet_nodes_git_identity_*`. APPENDED LAST (positional), optional:
+                // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
+                { token: FleetTaskHandoffService, optional: true },
                 { token: FleetGitIdentityService, optional: true },
+                // FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the Agent's owner).
+                // APPENDED LAST (positional), optional.
+                { token: FLEET_WAKE_TOOL_PORT, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2201,8 +2213,10 @@ async function assertRealWriteTarget(
                 fleetLogs?: FleetLogsReaderPort | null,
                 fleetHealth?: FleetNodeHealthService | null,
                 needsALook?: NeedsALookService | null,
+                fleetVirtual?: FleetVirtualService | null,
+                fleetTaskHandoff?: FleetTaskHandoffService | null,
+                fleetGitIdentity?: FleetGitIdentityService | null,
                 fleetWake?: FleetWakeToolPort | null,
-                gitIdentity?: FleetGitIdentityService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2247,14 +2261,27 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
-                    ...(gitIdentity && config.fleet.isCheckoutsEnabled() ? { gitIdentity } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
                     : {}),
                 ...(fleetCommands && config.fleet.isCommandsEnabled()
                     ? { fleetCommands: { service: fleetCommands } }
+                    : {}),
+                ...((fleetTaskHandoff || fleetGitIdentity) && config.fleet.isCheckoutsEnabled()
+                    ? {
+                          fleetTasks: {
+                              handoff: fleetTaskHandoff
+                                  ? {
+                                        options: (userId: string, taskId: string, agentId: string | null) =>
+                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                    }
+                                  : null,
+                              identity: fleetGitIdentity ?? null,
+                          },
+                      }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.

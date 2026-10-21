@@ -39,6 +39,7 @@ import {
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import {
+    createGithubForMeTriggerAction,
     createInboundTriggerAction,
     fireNowInboundTriggerAction,
     updateInboundTriggerAction,
@@ -50,6 +51,7 @@ import {
 } from '@/app/actions/dashboard/inbound-triggers';
 import type {
     CreateInboundTriggerInput,
+    InboundTriggerAudienceKind,
     InboundTriggerAutoStart,
     InboundTriggerEventMatcher,
     InboundTriggerMode,
@@ -85,6 +87,8 @@ interface TriggerFormState {
     matcherSource: string;
     matcherKind: string;
     matcherWorkId: string;
+    /** FL-15 P3: the "About me" group (empty = every matching event). */
+    aboutMe: InboundTriggerAudienceKind[];
     mode: InboundTriggerMode;
     agentPrompt: string;
     taskTitleTemplate: string;
@@ -116,6 +120,7 @@ const EMPTY_FORM: TriggerFormState = {
     matcherSource: '',
     matcherKind: '',
     matcherWorkId: '',
+    aboutMe: [],
     mode: 'single-task',
     agentPrompt: '',
     taskTitleTemplate: '',
@@ -167,7 +172,9 @@ function formToMatcher(form: TriggerFormState): InboundTriggerEventMatcher | und
     if (form.matcherSource.trim()) matcher.source = form.matcherSource.trim();
     if (form.matcherKind.trim()) matcher.kind = form.matcherKind.trim();
     if (form.matcherWorkId.trim()) matcher.workId = form.matcherWorkId.trim();
-    return Object.keys(matcher).length > 0 ? matcher : undefined;
+    if (Object.keys(matcher).length === 0) return undefined;
+    if (form.aboutMe.length > 0) matcher.audience = { me: [...form.aboutMe] };
+    return matcher;
 }
 
 function formFromTrigger(row: InboundTriggerView): TriggerFormState {
@@ -178,6 +185,7 @@ function formFromTrigger(row: InboundTriggerView): TriggerFormState {
         matcherSource: row.eventMatcher?.source ?? '',
         matcherKind: row.eventMatcher?.kind ?? '',
         matcherWorkId: row.eventMatcher?.workId ?? '',
+        aboutMe: row.eventMatcher?.audience?.me ?? [],
         mode: row.mode,
         agentPrompt: row.agentPrompt ?? '',
         taskTitleTemplate: row.taskTitleTemplate ?? '',
@@ -206,7 +214,9 @@ export function TaskTriggersClient({
     apiBaseUrl,
 }: TaskTriggersClientProps) {
     const t = useTranslations('dashboard.taskTriggers');
+    const tGithub = useTranslations('fleet.githubTrigger');
     const [triggers, setTriggers] = useState<InboundTriggerView[]>(initialTriggers);
+    const [presetBusy, setPresetBusy] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<InboundTriggerView | null>(null);
     const [form, setForm] = useState<TriggerFormState>(EMPTY_FORM);
@@ -324,6 +334,28 @@ export function TaskTriggersClient({
         }
     };
 
+    /** FL-15 P3 (spec FR-19, U11): **GitHub: things for me** in one click, with the defaults. */
+    const handleGithubForMe = async () => {
+        if (presetBusy) return;
+        setPresetBusy(true);
+        const res = await createGithubForMeTriggerAction({});
+        setPresetBusy(false);
+        if (res.success) {
+            setTriggers((prev) => [res.data.trigger, ...prev]);
+            toast.success(tGithub('preset.created'));
+        } else {
+            toast.error(res.error || tGithub('preset.failed'));
+        }
+    };
+
+    const toggleAboutMe = (kind: InboundTriggerAudienceKind) =>
+        setForm((prev) => ({
+            ...prev,
+            aboutMe: prev.aboutMe.includes(kind)
+                ? prev.aboutMe.filter((entry) => entry !== kind)
+                : [...prev.aboutMe, kind],
+        }));
+
     const handleToggle = async (row: InboundTriggerView) => {
         if (busyId) return;
         setBusyId(row.id);
@@ -409,10 +441,23 @@ export function TaskTriggersClient({
         <div data-testid="task-triggers">
             <div className="mb-4 flex items-center justify-between gap-3">
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('lead')}</p>
-                <Button size="sm" onClick={openCreate} data-testid="task-triggers-new">
-                    <Plus className="mr-1 h-4 w-4" />
-                    {t('new')}
-                </Button>
+                <div className="flex items-center gap-2">
+                    {/* FL-15 P3 (§5.5): the preset beside New trigger. */}
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void handleGithubForMe()}
+                        disabled={presetBusy}
+                        data-testid="task-triggers-github-for-me"
+                    >
+                        {presetBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                        {tGithub('preset.button')}
+                    </Button>
+                    <Button size="sm" onClick={openCreate} data-testid="task-triggers-new">
+                        <Plus className="mr-1 h-4 w-4" />
+                        {t('new')}
+                    </Button>
+                </div>
             </div>
 
             {triggers.length === 0 ? (
@@ -458,6 +503,14 @@ export function TaskTriggersClient({
                                             >
                                                 {row.name}
                                             </Link>
+                                            {row.eventMatcher?.audience ? (
+                                                <span
+                                                    className="rounded-full bg-primary-500/10 px-1.5 py-0.5 text-[10px] text-primary-600 dark:text-primary-400"
+                                                    data-testid={`task-trigger-for-me-${row.id}`}
+                                                >
+                                                    {tGithub('badge')}
+                                                </span>
+                                            ) : null}
                                         </div>
                                         {row.description ? (
                                             <p className="mt-0.5 max-w-72 truncate text-xs text-text-muted dark:text-text-muted-dark">
@@ -664,6 +717,28 @@ export function TaskTriggersClient({
                                 <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
                                     {t('form.matcherHint')}
                                 </p>
+                                {/* FL-15 P3 (§5.5): the About me group under the Event matcher. */}
+                                <fieldset className="mt-3" data-testid="task-trigger-form-about-me">
+                                    <legend className="mb-1 text-xs font-medium text-text-secondary dark:text-text-secondary-dark">
+                                        {tGithub('aboutMe.title')}
+                                    </legend>
+                                    <div className="flex flex-wrap gap-3">
+                                        {(['review-requested', 'assigned', 'authored'] as const).map((kind) => (
+                                            <label key={kind} className="inline-flex items-center gap-1.5 text-xs">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.aboutMe.includes(kind)}
+                                                    onChange={() => toggleAboutMe(kind)}
+                                                    data-testid={`task-trigger-form-about-me-${kind}`}
+                                                />
+                                                {tGithub(`aboutMe.${kind === 'review-requested' ? 'reviewRequested' : kind}`)}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                        {tGithub('aboutMe.hint')}
+                                    </p>
+                                </fieldset>
                             </div>
                         ) : null}
                         <div>

@@ -5,7 +5,6 @@ import {
     FLEET_HELD_CALL_FILER,
     FLEET_STATUS_READER,
     FLEET_WAKE_TOOL_PORT,
-    FleetGitModule,
     FleetModule as AgentFleetModule,
 } from '@ever-works/agent/fleet';
 import { PolicyModule } from '@ever-works/agent/policy';
@@ -37,9 +36,7 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
  */
 @Global()
 @Module({
-    // FleetGitModule (FL-15) is imported AND re-exported so `FleetGitIdentityService` reaches the
-    // api-side AgentsModule's tool sources through this global module (the Agent's git-identity tools).
-    imports: [AgentFleetModule, DatabaseModule, SafetyModule, PolicyModule, AgentApprovalsModule, FleetGitModule],
+    imports: [AgentFleetModule, DatabaseModule, SafetyModule, PolicyModule, AgentApprovalsModule],
     controllers: [FleetToolsController],
     providers: [
         FleetStatusService,
@@ -63,7 +60,6 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
         FleetHeldCallService,
         FLEET_HELD_CALL_FILER,
         FLEET_WAKE_TOOL_PORT,
-        FleetGitModule,
     ],
 })
 export class FleetToolsApiModule {}

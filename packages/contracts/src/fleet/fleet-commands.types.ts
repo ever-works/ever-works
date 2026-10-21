@@ -227,6 +227,12 @@ export interface FleetCommandRunView {
 	 * U2: "the command may still be running there"); false otherwise.
 	 */
 	linkDown: boolean;
+	/**
+	 * Schedules on computers (FL-13) — the fire a schedule's run belongs to
+	 * (ISO), null for a Run now and for one-off Commands. Absent on a
+	 * platform older than schedules.
+	 */
+	scheduledFor?: string | null;
 }
 
 export interface FleetCommandSummary {

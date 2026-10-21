@@ -66,12 +66,15 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
+import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
+import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
 import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
@@ -617,6 +620,23 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Virtual computers (FL-16): list / options read-only; a create, a stop and a
+            // destroy are held for the owner's approval (spec S9).
+            if (fleet.virtual) {
+                const virtual = fleet.virtual;
+                add('fleet-virtual', () =>
+                    buildFleetVirtualTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: virtual,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
             // Computer health (FL-03): the read-only health tools, when bound.
             if (fleet.health) {
                 const health = fleet.health;
@@ -653,14 +673,14 @@ export class AgentToolService {
                     operations: fleet.operations ?? null,
                 }),
             );
-            // FL-19 P2 — wake, cancel an operation, the FL-15 git identity (each when bound).
+            // FL-19 P2 — wake and cancel an operation (each when bound). The git identity
+            // tools are FL-15's own (`fleetTasks`), assembled below.
             add('fleet-acts', () =>
                 buildFleetActTools({
                     userId: agent.userId,
                     agentId: agent.id,
                     wake: fleet.wake ?? null,
                     operations: fleet.operations ?? null,
-                    gitIdentity: fleet.gitIdentity ?? null,
                 }),
             );
             // Logs on computers (FL-08): the read-only log tools, when bound.
@@ -671,6 +691,17 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: logs.reader,
+                    }),
+                );
+            }
+            // Files on computers (FL-11): the read-only file tools, when bound.
+            if (fleet.files) {
+                const files = fleet.files;
+                add('fleet-files', () =>
+                    buildFleetFilesTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: files.reader,
                     }),
                 );
             }
@@ -706,6 +737,20 @@ export class AgentToolService {
                             : null,
                     service: fleetCommands.service,
                     proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-15 P3 — Tasks on computers: the hand-off options (the start is
+        // `fleet_sessions_start` with `taskId`) and the git identity check.
+        if (sources.fleetTasks) {
+            const fleetTasks = sources.fleetTasks;
+            add('fleet-tasks', () =>
+                buildFleetTaskTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    handoff: fleetTasks.handoff ?? null,
+                    identity: fleetTasks.identity ?? null,
                 }),
             );
         }

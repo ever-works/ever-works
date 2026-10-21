@@ -1,6 +1,4 @@
 import type {
-    FleetGitIdentity,
-    FleetGitIdentitySetResult,
     FleetKillSwitchState,
     FleetNodeWakeResult,
     FleetNodeView,
@@ -104,21 +102,3 @@ export interface FleetWakeToolPort {
 }
 
 export const FLEET_WAKE_TOOL_PORT = 'FLEET_WAKE_TOOL_PORT' as const;
-
-/**
- * FL-19 P2 — `fleet_nodes_git_identity_get|set` (FL-15's rows): the agent-side
- * `FleetGitIdentityService`, called with the Agent as the caller (the owner's
- * own computers only for a set, class `confirm`).
- */
-export interface FleetGitIdentityToolPort {
-    read(
-        nodeId: string,
-        caller: { kind: 'agent'; agentId: string; ownerUserId: string },
-        options?: { fresh?: boolean },
-    ): Promise<FleetGitIdentity>;
-    set(
-        nodeId: string,
-        caller: { kind: 'agent'; agentId: string; ownerUserId: string },
-        request?: { confirm?: boolean },
-    ): Promise<FleetGitIdentitySetResult>;
-}

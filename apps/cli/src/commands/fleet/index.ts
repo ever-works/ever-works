@@ -6,7 +6,6 @@ import {
     dockerImageRemoveCommand,
     dockerPruneCommand,
     dockerPullCommand,
-    nodesGitIdentitySetCommand,
     nodesWakeCommand,
     operationsCancelCommand,
     portsOpenCommand,
@@ -18,6 +17,7 @@ import {
 } from './acts';
 import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
+import { schedulesCommand } from './schedule';
 import { commandsGetCommand, commandsListCommand } from './commands-read';
 import { dockerCommand, logsCommand, portsCommand, processesCommand, servicesCommand } from './machine';
 import { nodesCommand } from './nodes';
@@ -29,6 +29,7 @@ import { statusCommand } from './status';
 import { toolsCommand } from './tools';
 import { answerCommand } from './session/answer';
 import { questionCommand } from './session/question';
+import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -45,14 +46,19 @@ export const fleetSessionCommand = new Command('session')
     .addCommand(attachCommand)
     // FL-05 P2: what a session waits for, and answering it.
     .addCommand(questionCommand)
-    .addCommand(answerCommand);
+    .addCommand(answerCommand)
+    // FL-15 P3: hand a Task to an Agent session on a computer.
+    .addCommand(sessionStartCommand);
+
+// FL-15 P3 — `fleet nodes git-identity <nodeId> [--set [--confirm]]` on FL-19's `fleet nodes`.
+nodesCommand.addCommand(gitIdentityCommand);
 
 // FL-19 T-10 — the reads beside FL-12's `fleet commands run`; P2 adds cancel.
 commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand).addCommand(commandsCancelCommand);
 
 // FL-19 P2 (T-16) — the acts, beside each family's reads, all through `--yes` / `--confirm-name`.
 fleetSessionCommand.addCommand(sessionsEndCommand).addCommand(sessionsRenameCommand);
-nodesCommand.addCommand(nodesWakeCommand).addCommand(nodesGitIdentitySetCommand);
+nodesCommand.addCommand(nodesWakeCommand);
 servicesCommand.addCommand(servicesActionCommand);
 processesCommand.addCommand(processesSignalCommand);
 dockerCommand
@@ -97,4 +103,8 @@ export const fleetCommand = new Command('fleet')
     .addCommand(dockerCommand)
     .addCommand(portsCommand)
     .addCommand(operationsCommand)
-    .addCommand(toolsCommand);
+    .addCommand(toolsCommand)
+    // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
+    .addCommand(schedulesCommand)
+    // Tasks on computers (FL-15 P3): `fleet tasks handoff-options <taskId>`.
+    .addCommand(fleetTasksCommand);

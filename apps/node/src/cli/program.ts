@@ -1,5 +1,6 @@
 import { Command, CommanderError } from 'commander';
 import { homedir as osHomedir } from 'node:os';
+import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
@@ -106,6 +107,8 @@ import {
 
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
+/** A command line that cannot be run as written (`enroll` with both or neither of --token / --token-file). */
+export const EXIT_USAGE = 2;
 /** Not enrolled / no usable config — distinct so scripts can branch on it. */
 export const EXIT_NOT_ENROLLED = 3;
 
@@ -168,6 +171,8 @@ export interface CliDeps {
 	sessionDaemonCommand?: { command: string; args: string[] };
 	/** Owner-only ACL for a file on Windows (the session daemon's token). */
 	restrictFile?: (file: string) => Promise<void> | void;
+	/** Virtual computers (FL-16): the `enroll --token-file` reader (tests inject a fake). */
+	enrollTokenFileIo?: EnrollTokenFileIo;
 	/** The session daemon's own entry (the hidden subcommand); a seam for the CLI spec. */
 	runSessionDaemon?: typeof runSessionDaemon;
 	/**
@@ -225,7 +230,16 @@ async function requireConfig(deps: CliDeps): Promise<NodeConfig> {
 
 export interface EnrollCommandOptions {
 	apiUrl: string;
-	token: string;
+	/** The one-time token on the command line — or, instead, {@link tokenFile}. */
+	token?: string;
+	/**
+	 * Virtual computers (FL-16, CONTRACTS R-35, spec FR-14) — read the one-time
+	 * token from this file instead of the command line (where any user of the
+	 * machine can read it in the process list). The file is read once, trimmed
+	 * and DELETED; on POSIX it must belong to this user and be readable by no
+	 * one else (0600 or tighter). Exactly one of --token / --token-file.
+	 */
+	tokenFile?: string;
 	name?: string;
 	heartbeatInterval?: string;
 	/** Comma-separated capability opt-in (A15). Omitted = offer everything detected. */
@@ -343,7 +357,78 @@ function describeWorkspaceGc(policy: NodeWorkspaceGcPolicy): string {
 	return `max age ${policy.maxAgeDays} d, ${policy.maxCount === null ? 'no count budget' : `at most ${policy.maxCount}`}`;
 }
 
+/** What `--token-file` reads through (injected so the checks are testable without a disk). */
+export interface EnrollTokenFileIo {
+	/** `{ uid, mode }` of the file, or null when it does not exist. */
+	stat(path: string): Promise<{ uid: number; mode: number } | null>;
+	readFile(path: string): Promise<string | null>;
+	remove(path: string): Promise<void>;
+	/** The current user's uid (POSIX), or null where it does not apply. */
+	currentUid(): number | null;
+}
+
+function defaultEnrollTokenFileIo(deps: CliDeps): EnrollTokenFileIo {
+	return {
+		stat: async (path) => {
+			try {
+				const info = await statFile(path);
+				return { uid: info.uid, mode: info.mode };
+			} catch {
+				return null;
+			}
+		},
+		readFile: (path) => deps.fs.readFile(path),
+		remove: async (path) => {
+			if (deps.fs.remove) await deps.fs.remove(path);
+			else await removeFile(path).catch(() => undefined);
+		},
+		currentUid: () => (typeof process.getuid === 'function' ? process.getuid() : null)
+	};
+}
+
+/**
+ * The one-time token of `enroll` (CONTRACTS R-35): `--token`, or the contents
+ * of `--token-file` (read once, trimmed, then deleted — whether or not it
+ * held a usable token, so a token file never outlives the attempt). Both or
+ * neither is a usage error (exit 2). On POSIX a token file that another user
+ * owns, or that group / others may read, is refused before it is read.
+ */
+export async function resolveEnrollToken(
+	deps: CliDeps,
+	options: Pick<EnrollCommandOptions, 'token' | 'tokenFile'>,
+	io: EnrollTokenFileIo = deps.enrollTokenFileIo ?? defaultEnrollTokenFileIo(deps)
+): Promise<string> {
+	const hasToken = typeof options.token === 'string' && options.token.length > 0;
+	const hasFile = typeof options.tokenFile === 'string' && options.tokenFile.length > 0;
+	if (hasToken === hasFile) {
+		throw new CliError('enroll needs exactly one of --token <token> or --token-file <file>', EXIT_USAGE);
+	}
+	if (hasToken) return options.token as string;
+	const path = options.tokenFile as string;
+	const info = await io.stat(path);
+	if (!info) throw new CliError(`The token file ${path} does not exist`);
+	try {
+		if (deps.platform !== 'win32') {
+			const uid = io.currentUid();
+			if (uid !== null && info.uid !== uid) {
+				throw new CliError(`The token file ${path} belongs to another user; refusing to read it`);
+			}
+			if ((info.mode & 0o077) !== 0) {
+				throw new CliError(`The token file ${path} is readable by other users (it must be 0600); refusing to read it`);
+			}
+		}
+		const raw = await io.readFile(path);
+		const token = (raw ?? '').trim();
+		if (!token) throw new CliError(`The token file ${path} is empty`);
+		return token;
+	} finally {
+		// The file is spent either way: never leave a token behind.
+		await io.remove(path).catch(() => undefined);
+	}
+}
+
 export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): Promise<void> {
+	const token = await resolveEnrollToken(deps, options);
 	const heartbeatIntervalMs = parseIntervalSeconds(options.heartbeatInterval);
 	const capabilitySelection = parseCapabilityList(options.capabilities);
 	const limits = parseLimitFlags(options);
@@ -351,7 +436,7 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 	const config = await enrollNode({
 		...deps.io,
 		apiUrl: options.apiUrl,
-		token: options.token,
+		token,
 		kind: 'node',
 		...(options.name !== undefined ? { name: options.name } : {}),
 		...(heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs } : {}),
@@ -717,6 +802,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
 			'commands'
 		),
+		// Schedules on computers (FL-13): the machine's own schedules, their runs and outputs, beside the config.
+		scheduleDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'schedules'
+		),
 		// Fleet node link (FL-02 T-25): the self-update's report rides every
 		// beat, and every accepted beat's version verdict reaches it.
 		selfUpdateReport: () => selfUpdate?.report() ?? null,
@@ -726,7 +816,13 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		checkoutsRegistryPath: (deps.platform === 'win32' ? win32 : posix).join(
 			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
 			'checkouts.json'
-		)
+		),
+		// Virtual computers (FL-16): the children this host builds keep their
+		// folders (bootstrap, meta, the catalogue lock) beside the config. A
+		// Windows host never hosts virtual computers (spec U4).
+		...(deps.platform !== 'win32'
+			? { virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual') }
+			: {})
 	});
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
@@ -1875,7 +1971,11 @@ export function buildProgram(deps: CliDeps): Command {
 		.command('enroll')
 		.description('Enroll this machine using a one-time token from the Fleet settings page')
 		.requiredOption('-a, --api-url <url>', 'Platform API base URL (e.g. https://api.ever.works)')
-		.requiredOption('-t, --token <token>', 'One-time enrollment token (single-use, expires in 15 minutes)')
+		.option('-t, --token <token>', 'One-time enrollment token (single-use, expires in 15 minutes)')
+		.option(
+			'--token-file <file>',
+			'Read the one-time token from this file instead (owner-only, 0600; deleted after it is read). Exactly one of --token / --token-file'
+		)
 		.option('-n, --name <name>', 'Local display label (the platform assigns the authoritative name)')
 		.option(
 			'-i, --heartbeat-interval <seconds>',
@@ -1935,7 +2035,7 @@ export function buildProgram(deps: CliDeps): Command {
 		)
 		.option(
 			'--files-root <dir>',
-			'With --manage: share this folder with the dashboard (the Logs tab lists the log files under it); repeatable',
+			'With --manage: share this folder with the dashboard (the Files tab browses it, the Logs tab lists the log files under it); repeatable',
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option(

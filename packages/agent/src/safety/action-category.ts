@@ -66,6 +66,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // Checkouts on computers (FL-14 P2) — reads, then the acts on a machine.
     fleet_checkouts_list: 'read.internal',
     fleet_checkouts_get: 'read.internal',
+    // FL-15 P3 — Tasks on computers.
+    fleet_tasks_handoff_options: 'read.internal',
+    fleet_nodes_git_identity_get: 'read.internal',
     fleet_commands_list: 'read.internal',
     fleet_commands_get: 'read.internal',
     list_meetings: 'read.internal',
@@ -105,6 +108,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     fleet_checkouts_create: 'write.internal',
     fleet_checkouts_sync: 'write.internal',
     fleet_checkouts_archive: 'write.internal',
+    // FL-15 P3 — sets name + email only, on the owner's own computer, after `confirm`.
+    fleet_nodes_git_identity_set: 'write.internal',
     'facade:memory-write': 'write.internal',
     'facade:knowledge-write': 'write.internal',
 

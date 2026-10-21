@@ -10,6 +10,9 @@ import type {
     FleetNodeSelfUpdateReport,
     FleetNodeStatus,
     FleetNodeWorkerState,
+    FleetNodeOrigin,
+    FleetNodeVirtualKind,
+    FleetVirtualMeta,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
@@ -101,6 +104,9 @@ export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])
 @Index('idx_fleet_nodes_credential', ['enrollmentTokenHash'], { unique: true })
+// Virtual computers (FL-16): the hub nests children under their host and the
+// per-host limit counts them, both by this column.
+@Index('idx_fleet_nodes_host', ['hostNodeId'])
 export class FleetNode {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -122,6 +128,42 @@ export class FleetNode {
     /** 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled'. */
     @Column({ type: 'varchar', length: 16 })
     status: FleetNodeStatus;
+
+    /**
+     * Virtual computers (FL-16, CONTRACTS §4.1, R-35) — how this row came into
+     * being: `enrolled` (a person minted a token and ran `enroll`; every row
+     * written before the column existed), `virtual` (created on a host by
+     * `FleetVirtualService`) or `cloud` (FL-17's provider flow). Written once,
+     * at creation; `kind` is unchanged by it (R-4). Validated in code, stored
+     * as `varchar`. Migration: `1796160000000-AddFleetNodeVirtualFields`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'enrolled' })
+    origin: FleetNodeOrigin;
+
+    /**
+     * Virtual computers (FL-16) — the Node this one runs on. Written by
+     * `FleetVirtualService.create`; null for every machine enrolled on its own.
+     * Deliberately NOT a foreign key (history survives a host's deletion, the
+     * same rule as `fleet_jobs.nodeId`); the delete guards keep a host with
+     * children from being removed (spec FR-29).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    hostNodeId?: string | null;
+
+    /** Virtual computers (FL-16) — `vm` · `container`; null unless `origin` is `virtual`. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    virtualKind?: FleetNodeVirtualKind | null;
+
+    /**
+     * Virtual computers (FL-16, CONTRACTS §4.1 `virtualMeta`) — the child's
+     * system, size, image and its create phase / machine state as the host last
+     * reported them, so the row still says what it is after job bodies are
+     * purged. Written by `FleetVirtualService` (create, the host's progress
+     * reports, the reconcile sweep). Never a password, a token or a host path.
+     * `simple-json` in a `text` column like {@link consents}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    virtualMeta?: FleetVirtualMeta | null;
 
     /**
      * sha256 hex of the current credential — the one-time enrollment
@@ -647,6 +689,17 @@ export class FleetNode {
     /** Computer health (FL-03, wake) — the last wake attempt on this node. */
     @PortableDateColumn({ nullable: true })
     lastWakeAttemptAt?: Date | null;
+
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §4.1) — the IANA time zone the
+     * machine reports on every heartbeat (`Europe/Paris`); Command schedules
+     * on it fire on that wall clock. NULL = never reported (a daemon older
+     * than the field): schedules then read UTC. Validated with
+     * `isFleetTimeZone` before it is written.
+     * Migration: `1796130100000-AddFleetNodeTimeZone`.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    timeZone?: string | null;
 
     /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — what this machine's owner

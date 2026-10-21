@@ -8,6 +8,7 @@ import {
 	normalizeFleetLanId,
 	normalizeFleetMacAddress,
 	FLEET_SESSIONS_CAPABILITY,
+	isFleetTimeZone,
 	normalizeFleetNodeSelfUpdate,
 	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
@@ -564,6 +565,13 @@ export interface SelfDescriptionTelemetry {
 	 * null or a throw leaves the field ABSENT.
 	 */
 	selfUpdate?: () => FleetNodeSelfUpdateReport | null;
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §1.1) — the machine's IANA time
+	 * zone; its Command schedules fire on that clock. Heartbeat only, in the
+	 * newest strip tier; null, a throw or a value `isFleetTimeZone` refuses
+	 * leaves the field ABSENT.
+	 */
+	timeZone?: () => string | null;
 }
 
 /**
@@ -711,6 +719,9 @@ export async function describeSelf(
 	if (selfUpdate) {
 		description.selfUpdate = selfUpdate;
 	}
+	// Schedules on computers (FL-13): the zone, validated at the wire boundary.
+	const timeZone = await resolveTelemetry(telemetry.timeZone);
+	if (isFleetTimeZone(timeZone)) description.timeZone = timeZone;
 	return description;
 }
 

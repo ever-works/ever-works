@@ -189,18 +189,26 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-node-link',
 				// One command on several computers, from the hub or the CLI.
 				'features/fleet-commands',
+				// Commands on a computer's own clock (FL-13).
+				'features/fleet-schedules',
 				// Terminals that keep running on those computers (FL-04).
 				'features/fleet-sessions',
 				// What each session needs from you, answering it anywhere, the Sessions board (FL-05).
 				'features/fleet-session-status',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
+				// Tasks on computers (FL-15) — the hand-off, the Computer block, GitHub things for me, git identity.
+				'features/fleet-tasks-and-github',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
+				// Browsing and moving a computer's files through that link (FL-11).
+				'features/fleet-files',
 				// What runs on each computer — services, Docker, processes (FL-09).
 				'features/fleet-services-docker',
 				// What a computer serves, opened on it or previewed in your browser (FL-10).
 				'features/fleet-ports',
+				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
+				'features/fleet-virtual-computers',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

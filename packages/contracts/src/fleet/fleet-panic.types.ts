@@ -166,6 +166,21 @@ export type FleetAuditAction =
 	| 'node.logs.read'
 	| 'node.logs.follow'
 	/**
+	 * Files on computers (FL-11, CONTRACTS §7) — `list` (the first listing of
+	 * a root per person per visit), `read` (a download), `write` (an upload),
+	 * `copy` (P2, one row on each computer naming the other), `delete`.
+	 * Details carry `family: 'files'`, `root`, `path`, `entries`, `bytes`,
+	 * `requestedBy`, `confirmationClass`, `confirmed`, `peerNodeId` and
+	 * `outcome`; never a file's contents (spec FR-19).
+	 */
+	| 'node.files.list'
+	| 'node.files.read'
+	| 'node.files.write'
+	| 'node.files.copy'
+	| 'node.files.delete'
+	/** Paste into a desktop (FL-11 P2): the byte count only, never the text (FR-35). */
+	| 'node.clip.paste'
+	/**
 	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
 	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
 	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
@@ -175,6 +190,21 @@ export type FleetAuditAction =
 	| 'node.command.run'
 	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
 	| 'node.command.cancel'
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §7) — one row per change of a
+	 * Schedule, with `family: 'schedules'`, `target` (the Command id of a
+	 * Command schedule, the Task id of an Agent-session schedule),
+	 * `requestedBy`, `confirmationClass` and `outcome`; never the command
+	 * line and never output. A run the machine made on its own clock is
+	 * written as `node.command.run` with `requestedBy: schedule:<commandId>`
+	 * when it is reconciled (spec FR-27).
+	 */
+	| 'node.schedule.create'
+	| 'node.schedule.update'
+	| 'node.schedule.delete'
+	| 'node.schedule.run'
+	| 'node.schedule.pause'
+	| 'node.schedule.resume'
 	/**
 	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
 	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
@@ -234,7 +264,23 @@ export type FleetAuditAction =
 	 * identity** set a computer's global git `user.name` / `user.email`.
 	 * `details.fields` names what was set; never the email value (spec FR-15).
 	 */
-	| 'node.git.identity.set';
+	| 'node.git.identity.set'
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §7) — every row carries
+	 * `family: 'machines'`, the child as `target`, `requestedBy`,
+	 * `confirmationClass` and `outcome`, plus the system, CPUs, memory, disk
+	 * and image digest; never the guest password or an enrolment token.
+	 */
+	| 'node.vm.create'
+	| 'node.vm.start'
+	| 'node.vm.stop'
+	| 'node.vm.destroy'
+	/** A stopped virtual computer's CPUs / memory changed (P3). */
+	| 'node.vm.resize'
+	/** A Container recreated from the current catalogue image, keeping its home (P3). */
+	| 'node.vm.rebuild'
+	/** The one-time reveal of a Windows VM's generated password — `revealed: true`, never the value (P2). */
+	| 'node.vm.password.reveal';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -286,8 +332,20 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.recording.stop',
 	'node.logs.read',
 	'node.logs.follow',
+	'node.files.list',
+	'node.files.read',
+	'node.files.write',
+	'node.files.copy',
+	'node.files.delete',
+	'node.clip.paste',
 	'node.command.run',
 	'node.command.cancel',
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
 	'node.service.start',
 	'node.service.stop',
 	'node.service.restart',
@@ -315,7 +373,14 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.port.open',
 	'node.port.preview.open',
 	'node.port.preview.close',
-	'node.git.identity.set'
+	'node.git.identity.set',
+	'node.vm.create',
+	'node.vm.start',
+	'node.vm.stop',
+	'node.vm.destroy',
+	'node.vm.resize',
+	'node.vm.rebuild',
+	'node.vm.password.reveal'
 ];
 
 /**
