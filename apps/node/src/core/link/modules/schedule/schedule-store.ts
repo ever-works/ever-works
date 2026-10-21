@@ -46,6 +46,14 @@ export interface ScheduleStoreOptions {
 }
 
 const STATE_FILE = '_state.json';
+const ALIVE_FILE = '_alive.json';
+
+/**
+ * How fresh the loop's lease must be for `schedule-run` (the OS scheduler's
+ * entry, FL-13 P3) to leave a fire to it: the loop re-arms at least once a
+ * minute and writes the lease on every tick.
+ */
+export const SCHEDULE_LOOP_LEASE_MS = 150_000;
 
 export class ScheduleStore {
 	private readonly fs: NonNullable<ScheduleStoreOptions['fs']>;
@@ -124,6 +132,28 @@ export class ScheduleStore {
 		await this.writeSchedule(stored);
 	}
 
+	/** The loop is alive (FL-13 P3): `schedule-run` leaves fires to a process that wrote this lately. */
+	async touchAlive(now: number): Promise<void> {
+		await this.writeAtomic(path.join(this.options.dir, ALIVE_FILE), { pid: process.pid, at: now }).catch(
+			() => undefined
+		);
+	}
+
+	/** True when a LIVE node process wrote the lease within {@link SCHEDULE_LOOP_LEASE_MS}. */
+	async isLoopAlive(now: number, isPidAlive: (pid: number) => boolean = defaultPidAlive): Promise<boolean> {
+		try {
+			const raw = JSON.parse(await this.fs.readFile(path.join(this.options.dir, ALIVE_FILE), 'utf8')) as Record<
+				string,
+				unknown
+			>;
+			const at = typeof raw.at === 'number' ? raw.at : 0;
+			const pid = typeof raw.pid === 'number' ? raw.pid : 0;
+			return now - at <= SCHEDULE_LOOP_LEASE_MS && pid > 0 && pid !== process.pid && isPidAlive(pid);
+		} catch {
+			return false;
+		}
+	}
+
 	/** Remember the kill switch as told, so a restart without a link honours it. */
 	async setPaused(paused: boolean): Promise<void> {
 		const state = await this.readState();
@@ -186,5 +216,15 @@ export class ScheduleStore {
 				throw error;
 			});
 		return this.ready;
+	}
+}
+
+function defaultPidAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		// EPERM: the process exists but belongs to someone else — alive.
+		return (error as NodeJS.ErrnoException)?.code === 'EPERM';
 	}
 }

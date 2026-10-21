@@ -82,6 +82,11 @@ import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createCommandModule } from './link/modules/command';
 import { createScheduleModule, type ScheduleModule } from './link/modules/schedule';
+import {
+	createNativeScheduler,
+	isNodeRunningAsService,
+	type NativeScheduleEntry
+} from './link/modules/schedule/native-scheduler';
 import { CommandOutputStore } from './link/modules/command/command-output-store';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
 import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
@@ -730,6 +735,16 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	scheduleDir?: string;
 	/**
+	 * Schedules on computers (FL-13 P3) — `start --native-schedules`: when this
+	 * process does NOT run under a service manager, also hand every held
+	 * schedule to the operating system's scheduler (crontab block, LaunchAgents,
+	 * Task Scheduler folder), which starts `ever-works-node schedule-run <id>`
+	 * so a fire still runs while nobody has the node open. Opt-in.
+	 */
+	nativeSchedules?: boolean;
+	/** How the OS scheduler starts this build's CLI (the program and the arguments before `schedule-run <id>`). */
+	nativeScheduleCommand?: { file: string; args: string[] };
+	/**
 	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
 	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
 	 * tab lists log files under them (and FL-11's Files tab will browse them).
@@ -1133,6 +1148,40 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// timer loop, for a process started with --manage. The loop starts now —
 	// independent of the link (FR-12) — and follows the kill switch once a
 	// link is bound below.
+	// FL-13 P3: the OS-scheduler fallback, re-installed whenever the held set changes.
+	const nativeScheduler =
+		consents.manage &&
+		options.scheduleDir &&
+		options.nativeSchedules === true &&
+		options.nativeScheduleCommand &&
+		!isNodeRunningAsService(process.env, io.environment.platform)
+			? createNativeScheduler({
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					command: options.nativeScheduleCommand,
+					logger: io.logger
+				})
+			: null;
+	let lastNativeEntries = '';
+	const installNative = (entries: NativeScheduleEntry[]) => {
+		if (!nativeScheduler) return;
+		const key = JSON.stringify(entries);
+		if (key === lastNativeEntries) return;
+		lastNativeEntries = key;
+		void nativeScheduler
+			.install(entries)
+			.then((result) => {
+				for (const skipped of result.skipped) {
+					io.logger.warn(`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`);
+				}
+			})
+			.catch((error: unknown) => {
+				lastNativeEntries = '';
+				io.logger.warn(
+					`Schedules: the ${nativeScheduler.kind} fallback could not be updated: ${error instanceof Error ? error.message : String(error)}`
+				);
+			});
+	};
 	const scheduleModule: ScheduleModule | null =
 		consents.manage && options.scheduleDir
 			? createScheduleModule({
@@ -1144,7 +1193,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					env: process.env,
 					...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 					timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-					logger: io.logger
+					logger: io.logger,
+					...(nativeScheduler
+						? {
+								onHeld: (definitions) =>
+									installNative(
+										definitions.map((definition) => ({ id: definition.id, cadence: definition.cadence }))
+									)
+							}
+						: {})
 				})
 			: null;
 	if (scheduleModule) {
