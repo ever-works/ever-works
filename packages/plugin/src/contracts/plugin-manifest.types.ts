@@ -124,7 +124,17 @@ export const PLUGIN_CATEGORIES = [
 	// pinned by `__tests__/app-dependency-capability.spec.ts` (the pre-APW-07 slice
 	// and its order) and by `__tests__/identity-provider.interface.spec.ts` (where
 	// this member sits); a mid-tuple insertion still fails both.
-	'identity'
+	'identity',
+	// FL-17 (CONTRACTS R-15) — cloud computers: machine providers
+	// (`capabilities/machine-provider.interface.ts`). First plugin:
+	// `digitalocean-machines`. Appended **last**, and — like the three lines
+	// above — landed in the same change as its `CATEGORY_ICONS` /
+	// `CATEGORY_LABELS` entries in `apps/web/src/lib/utils/plugin-category-icons.ts`,
+	// because those maps are `Record<PluginCategory, …>`. The pinning specs that
+	// list the members later epics appended (`app-dependency-capability`,
+	// `apps-tier.types`, `build-capability`, `identity-provider.interface`) were
+	// extended with it in the same change.
+	'machine-provider'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];

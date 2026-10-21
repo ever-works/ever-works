@@ -147,7 +147,16 @@ export const PLUGIN_CAPABILITIES = {
 	// `capabilities/domain-event-subscriber.interface.ts`. Appended last, so
 	// every existing constant keeps its value and its position; no category is
 	// added (a subscriber plugin keeps the category of what it otherwise is).
-	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber'
+	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber',
+	// Cloud computers (FL-17, CONTRACTS R-15) — plugins that create, power and
+	// destroy machines at a cloud provider on the owner's own account and say
+	// what they cost (`IMachineProviderPlugin`). First plugin:
+	// `digitalocean-machines`. Consumed only through
+	// `MachineProviderFacadeService`; see
+	// `capabilities/machine-provider.interface.ts`. Appended **last**, so every
+	// existing constant keeps its value and its position, and landed in the same
+	// change as the `machine-provider` category in `plugin-manifest.types.ts`.
+	MACHINE_PROVIDER: 'machine-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];
