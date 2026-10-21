@@ -390,6 +390,10 @@ export interface FleetFilesOperationView {
 	nodeId: string;
 	/** Copy (P2): the other computer. */
 	peerNodeId: string | null;
+	/** Copy (P2): the other computer's name, for the strip ("build-01 → build-02"). */
+	peerNodeName?: string | null;
+	/** The computer `nodeId` names (the source of a copy). */
+	nodeName?: string | null;
 	/** What moves: one name, or "4 items". */
 	label: string;
 	root: string;

@@ -15253,7 +15253,8 @@
                 "titleMany": "{count, plural, one {# file looks like a credential file} other {# files look like credential files}} ({name}…). Download anyway?",
                 "body": "It is sent only to your browser.",
                 "cancel": "Cancel",
-                "confirm": "Download"
+                "confirm": "Download",
+                "titleCopy": "This looks like a credential file ({name}). Copy it anyway?"
             },
             "operations": {
                 "title": "Operations",
@@ -15268,7 +15269,8 @@
                 "interrupted": "Interrupted — {node} went offline after {moved}.",
                 "failed": "Failed — {hint}",
                 "starting": "Starting…",
-                "uploaded": "{count, plural, one {Uploaded # item} other {Uploaded # items}} — {replaced} replaced, {skipped} skipped."
+                "uploaded": "{count, plural, one {Uploaded # item} other {Uploaded # items}} — {replaced} replaced, {skipped} skipped.",
+                "copyTo": "⇄ {label} · {from} → {to}"
             },
             "footer": {
                 "roots": "Only these roots are visible on {node}: {list}.",
@@ -15301,6 +15303,49 @@
             "a11y": {
                 "operations": "File operations",
                 "notices": "File notices"
+            },
+            "copy": {
+                "title": "Copy {count, plural, one {# item} other {# items}} ({size}) from {node}",
+                "through": "Goes through Ever Works; {from} and {to} never talk to each other.",
+                "another": "the other computer",
+                "computer": "To computer",
+                "loading": "Reading your computers…",
+                "nodeUnavailable": "{name} — {reason}",
+                "reasons": {
+                    "desktopNode": "not available on this kind of computer yet",
+                    "offline": "offline",
+                    "unmanaged": "management off",
+                    "noFolders": "no shared folders"
+                },
+                "root": "Root",
+                "folder": "Folder",
+                "badFolder": "That path leaves its root",
+                "browse": "Folders",
+                "cancel": "Cancel",
+                "submit": "Check and copy",
+                "unreachable": "That computer could not be reached",
+                "started": "Copying {count, plural, one {# item} other {# items}} to {node}…"
+            }
+        },
+        "desktop": {
+            "paste": {
+                "allow": "Allow paste into this desktop",
+                "open": "Paste text…",
+                "shortcut": "Ctrl/⌘+Shift+V",
+                "takeControlFirst": "Take control first",
+                "switchOnFirst": "Switch on paste for this desktop first",
+                "pasted": "Pasted {size} on {node}.",
+                "title": "Paste text into {node}",
+                "body": "Goes to whatever has focus on {node}'s screen. Nothing is read back from that computer.",
+                "textLabel": "Text to paste",
+                "size": "{size} of {cap}",
+                "reread": "Read my clipboard again",
+                "secret": "This looks like it contains a secret. It is sent only to {node} and never stored.",
+                "tooLarge": "A paste carries at most 256 KB of text",
+                "clipboardDenied": "The browser did not share your clipboard — paste the text into the box instead.",
+                "cancel": "Cancel",
+                "paste": "Paste",
+                "failed": "The paste failed"
             }
         }
     }

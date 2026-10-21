@@ -75,6 +75,24 @@ export function filesTabCard(
     return null;
 }
 
+/**
+ * Why a computer cannot receive a copy (spec §5.5: listed greyed with the
+ * reason), or null when it can: a desktop node, offline, management off, or
+ * no folder it shares.
+ */
+export type CopyDestinationReason = 'desktopNode' | 'offline' | 'unmanaged' | 'noFolders';
+
+export function copyDestinationReason(
+    node: Pick<FleetNodeView, 'kind' | 'status'> & { capabilities?: readonly string[] | null },
+): CopyDestinationReason | null {
+    if (node.kind === 'desktop-node') return 'desktopNode';
+    if (node.status === 'offline') return 'offline';
+    const tags = node.capabilities ?? [];
+    if (!tags.includes('managed')) return 'unmanaged';
+    if (!tags.includes('files')) return 'noFolders';
+    return null;
+}
+
 // ─── Entries ────────────────────────────────────────────────────────────────
 
 /** True when opening the entry shows a folder (a folder, or a link to one that stays inside the root). */

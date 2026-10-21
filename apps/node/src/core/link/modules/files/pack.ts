@@ -54,6 +54,9 @@ export interface PackScan {
 	credentialShapedCount: number;
 }
 
+/** The partial folder an unpack writes into (`unpack.ts`): never part of a selection's walk. */
+const PARTIAL_PREFIX = '.ever-works-partial-';
+
 export const LIMIT_ENTRIES_HINT = `Select fewer than ${FLEET_FILES_LIMITS.maxEntries.toLocaleString('en-US')} items`;
 export const LIMIT_BYTES_HINT = 'One transfer moves at most 2 GiB — select less';
 
@@ -165,7 +168,10 @@ export async function scanSelection(
 			};
 			count(header);
 			scan.items.push({ abs, header });
-			const children = (await io.readdir(abs)).sort(compareFileNames);
+			// An unpack in progress (a copy into a folder of its own selection) is never re-read.
+			const children = (await io.readdir(abs))
+				.filter((child) => !child.startsWith(PARTIAL_PREFIX))
+				.sort(compareFileNames);
 			for (const child of children) await walk(api.join(abs, child), `${rel}/${child}`, false);
 			return;
 		}

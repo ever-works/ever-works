@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ComputerModule as AgentComputerModule } from '@ever-works/agent/computer';
 import { FLEET_FILES_READER, FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
+import { FleetClipController } from './fleet-clip.controller';
+import { FleetClipService } from './fleet-clip.service';
+import { FleetFilesProposalListener } from './fleet-files-proposal.listener';
 import { FleetFilesTransferService } from './fleet-files-transfer.service';
 import { FleetFilesController } from './fleet-files.controller';
 import { FleetFilesService } from './fleet-files.service';
@@ -14,19 +18,25 @@ import { FleetFilesService } from './fleet-files.service';
  *   - `FleetFilesService` — roots, list, stat, conflicts, delete, the list
  *     audit — and, under {@link FLEET_FILES_READER}, the port the Agent file
  *     tools read through (FL-19 assembles them);
- *   - `FleetFilesTransferService` — download (raw or zip), upload, the
- *     transfers the Operations strip reads, cancel.
+ *   - `FleetFilesTransferService` — download (raw or zip), upload, copy
+ *     between computers (P2), the transfers the Operations strip reads, cancel;
+ *   - `FleetClipController` / `FleetClipService` (P2) — paste into a live view
+ *     (`/api/fleet/nodes/:id/desktop/paste`, the per-view switch).
  *
  * `FleetLinkService` and `FleetOperationsService` come from the global
  * `FleetLinkApiModule`; `FleetService`, `FleetNodeRepository` and
  * `FleetAuditService` from the agent-side `FleetModule`.
  */
 @Module({
-    imports: [AgentFleetModule],
-    controllers: [FleetFilesController],
+    // The control arbiter (who holds control of a live view) for paste (P2).
+    imports: [AgentFleetModule, AgentComputerModule],
+    controllers: [FleetFilesController, FleetClipController],
     providers: [
         FleetFilesService,
         FleetFilesTransferService,
+        FleetClipService,
+        // P2: runs a held Agent copy / delete once a person approves it (CONTRACTS R-33).
+        FleetFilesProposalListener,
         { provide: FLEET_FILES_READER, useExisting: FleetFilesService },
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,

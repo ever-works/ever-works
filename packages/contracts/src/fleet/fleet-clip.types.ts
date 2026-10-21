@@ -39,9 +39,24 @@ export interface FleetClipOpenParams {
 	viewId: string;
 }
 
-/** `POST /api/fleet/nodes/:id/desktop/views/:viewId/clip`. */
+/**
+ * `POST /api/fleet/nodes/:id/desktop/paste` (the route FL-19's catalogue names
+ * for `fleet_desktop_paste`; plan §5's `/desktop/views/:viewId/clip` belongs to
+ * FL-07's view routes, which do not exist yet — lane log decision 17).
+ */
 export interface FleetClipPasteRequest {
+	/** The live view (computer session) the text goes into. */
+	viewId: string;
+	/** The Agent whose computer the view shows (the view's owner context). */
+	agentId: string;
 	text: string;
+}
+
+/** `PUT /api/fleet/nodes/:id/desktop/paste-switch`. */
+export interface FleetClipSwitchRequest {
+	viewId: string;
+	agentId: string;
+	allowed: boolean;
 }
 
 export interface FleetClipPasteResult {

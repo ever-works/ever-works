@@ -76,6 +76,7 @@ import {
 } from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
 import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
+import { createClipLinkModule, PasteTargets } from './link/modules/clip';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -1144,6 +1145,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// when the shell runs one — the broker matches the `desktop` channels the
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
+	// Paste into a desktop (FL-11 P2): live views register here; the `clip`
+	// family (under `--attend`) reaches them through their own injectors.
+	const pasteTargets = new PasteTargets();
+	const clipLinkModule = consents.attend
+		? createClipLinkModule({ targets: pasteTargets, nodeName: config.name?.trim() || 'this computer' })
+		: null;
 	// Schedules on computers (FL-13): the `schedule` family and the machine's own
 	// timer loop, for a process started with --manage. The loop starts now —
 	// independent of the link (FR-12) — and follows the kill switch once a
@@ -1245,6 +1252,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			healthLinkModule,
 			...(logsLinkModule ? [logsLinkModule] : []),
 			...(filesLinkModule ? [filesLinkModule] : []),
+			...(clipLinkModule ? [clipLinkModule] : []),
 			...(virtualModule ? [virtualModule] : []),
 			...(options.linkModules ?? [])
 		],
@@ -1259,9 +1267,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						homedir: osHomedir(),
 						env: process.env,
 						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
-						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						store: options.commandOutputDir
+							? new CommandOutputStore({ dir: options.commandOutputDir })
+							: null,
 						// FL-13: a schedule's run keeps its full output in the schedule's ring.
-						...(scheduleModule ? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) } : {}),
+						...(scheduleModule
+							? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) }
+							: {}),
 						logger: io.logger
 					})
 				}
@@ -2047,6 +2059,8 @@ function createAttendedLane(
 				profileFs,
 				// Fleet node link (FL-02 T-22): the view's leg over the link, when there is one.
 				...(computerLegs ? { linkLegs: computerLegs } : {}),
+				// FL-11 P2: a running view is reachable by a paste through its own injector.
+				pasteTargets,
 				...(options.env ? { env: options.env } : {})
 			},
 			signal

@@ -8,10 +8,12 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    IsUUID,
     Matches,
     Max,
     MaxLength,
     Min,
+    ValidateNested,
 } from 'class-validator';
 import {
     FLEET_FILES_LIMITS,
@@ -184,6 +186,69 @@ export class FleetFilesDeleteDto extends FleetFilesLocationQueryDto {
     @IsString()
     @MaxLength(FLEET_FILES_NAME_MAX_LENGTH)
     confirmName?: string;
+}
+
+/** Where a copy goes (P2): a computer, one of its roots, a folder under it. */
+export class FleetFilesCopyTargetDto {
+    @ApiProperty({ description: 'The destination computer.' })
+    @IsUUID()
+    nodeId!: string;
+
+    @ApiProperty({ description: 'A root id of the destination computer (its `files/roots`).' })
+    @IsString()
+    @Matches(ROOT_ID)
+    root!: string;
+
+    @ApiPropertyOptional({
+        description: 'A folder under that root, `/`-separated.',
+        maxLength: FLEET_FILES_PATH_MAX_LENGTH,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_FILES_PATH_MAX_LENGTH)
+    path?: string;
+}
+
+/** `POST /api/fleet/nodes/:id/files/copy` (P2). */
+export class FleetFilesCopyDto extends FleetFilesLocationQueryDto {
+    @ApiProperty({ type: [String], description: 'Entries of the source folder to copy.' })
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(FLEET_FILES_LIMITS.maxEntries)
+    @IsString({ each: true })
+    @MaxLength(FLEET_FILES_NAME_MAX_LENGTH, { each: true })
+    entries!: string[];
+
+    @ApiProperty({ type: FleetFilesCopyTargetDto })
+    @ValidateNested()
+    @Type(() => FleetFilesCopyTargetDto)
+    to!: FleetFilesCopyTargetDto;
+
+    @ApiPropertyOptional({
+        description: 'Replace every same-name entry at the destination (default: skip them).',
+    })
+    @IsOptional()
+    @IsBoolean()
+    replaceAll?: boolean;
+
+    @ApiPropertyOptional({
+        type: [String],
+        description: 'Same-name entries to replace (the rest are skipped).',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(FLEET_FILES_LIMITS.maxEntries)
+    @IsString({ each: true })
+    @MaxLength(FLEET_FILES_NAME_MAX_LENGTH, { each: true })
+    replace?: string[];
+
+    @ApiPropertyOptional({
+        description:
+            'Class `confirm`: needed when a credential-shaped file is inside the selection.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
 }
 
 /** `DELETE /api/fleet/nodes/:id/files/transfers/:transferId`. */
