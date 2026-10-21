@@ -18,6 +18,7 @@ import {
 import { posix } from 'node:path';
 import { WINDOWS_ENROLLED_MARKER, WINDOWS_READY_MARKER } from '../link/modules/virtual/windows';
 import { cleanUpWindows, handOverWindowsToken } from './vm-windows';
+import { rebuildContainer, resizeVirtual } from './vm-resize';
 
 /**
  * Virtual computers (FL-16, plan §6.1, T-17) — the host's `vm-control`
@@ -34,7 +35,7 @@ import { cleanUpWindows, handOverWindowsToken } from './vm-windows';
  *  - `retry-enrollment` — the guest is built but never enrolled (U10, FR-24):
  *               a fresh token is handed over; nothing is rebuilt.
  *
- * Resize and rebuild arrive with phase 3 and are refused here until then.
+ *  - `resize` / `rebuild` — phase 3 (`./vm-resize`).
  */
 
 const DOCKER_STEP_TIMEOUT_MS = 120_000;
@@ -138,8 +139,11 @@ export function createVmControlExecutor(deps: VirtualHostDeps) {
 					return { childNodeId: child, state: 'running' };
 				}
 				case 'resize':
+					// P3 (FR-38): a stopped machine's CPUs / memory.
+					return await resizeVirtual(deps, job, child);
 				case 'rebuild':
-					throw new VirtualHostError(`${action} is not available on this computer yet`);
+					// P3 (FR-39): a Container from the current catalogue image, keeping its home.
+					return await rebuildContainer(deps, job, child);
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

@@ -157,6 +157,26 @@ export function containerControlArgs(
 	}
 }
 
+/**
+ * Resize (P3, FR-38): `docker update` of a STOPPED Container's CPU and memory
+ * caps (swap equal to memory, so the cap is a cap).
+ */
+export function containerUpdateArgs(childNodeId: string, cpus: number, memoryGiB: number): string[] {
+	if (!isChildNodeId(childNodeId)) throw new Error('a virtual computer id must be a uuid');
+	if (!Number.isInteger(cpus) || cpus < 1 || cpus > 64) throw new Error('cpus out of range');
+	if (!Number.isInteger(memoryGiB) || memoryGiB < 1 || memoryGiB > 256) throw new Error('memory out of range');
+	return [
+		'update',
+		'--cpus',
+		String(cpus),
+		'--memory',
+		`${memoryGiB}g`,
+		'--memory-swap',
+		`${memoryGiB}g`,
+		fleetVirtualContainerName(childNodeId)
+	];
+}
+
 /** Every virtual computer's container on this machine, one JSON object per line. */
 export function containerListArgs(): string[] {
 	return ['ps', '-a', '--no-trunc', '--filter', `label=${VIRTUAL_CONTAINER_LABEL}=true`, '--format', '{{json .}}'];

@@ -645,9 +645,19 @@ export interface FleetVirtualProgressReport {
 	activated?: boolean | null;
 	/** Windows VMs (P2): the host-loopback port of the installer's viewer. */
 	viewerPort?: number | null;
+	/** Resize (P3): the size the machine now has. */
+	cpus?: number;
+	memoryGiB?: number;
 }
 
-/** `POST …/virtual/:childId/password/reveal` — the one-time reveal (FR-21). Never cached, never logged. */
+/** `PATCH …/virtual/:childId` — resize a STOPPED virtual computer (P3, FR-38). `confirm`-class. */
+export interface FleetVirtualResizeRequest {
+	cpus?: FleetVirtualCpus;
+	memoryGiB?: FleetVirtualMemoryGiB;
+	confirm?: boolean;
+}
+
+/** `POST …/password/reveal` — the one-time reveal (FR-21). Never cached, never logged. */
 export interface FleetVirtualPasswordRevealResponse {
 	password: string;
 	expiresInSec: number;

@@ -23,7 +23,8 @@ import { GUEST_HOME, GUEST_RUN } from './docker-args';
  *      --work --manage` (spec FR-15: no `--attend`).
  *
  * On a restart (the container is kept across Docker restarts) an enrolled guest
- * skips straight to step 5.
+ * skips straight to step 5; after a rebuild (a new container, the same home —
+ * P3) it reinstalls the runtime and then starts without asking for a token.
  */
 
 export interface ContainerBootstrapInput {
@@ -117,6 +118,10 @@ export function containerBootstrapScript(input: ContainerBootstrapInput): string
 		'if ! command -v ever-works-node >/dev/null 2>&1; then',
 		...install.map((line) => `  ${line}`),
 		`  npm install -g --no-fund --no-audit --loglevel=error ${input.runtimeSpec}`,
+		'fi',
+		'# A rebuilt container keeps its home: an enrolled guest starts at once (P3, FR-39).',
+		`if [ -f ${enrolled} ]; then`,
+		'  exec ever-works-node start --work --manage',
 		'fi',
 		`: > ${ready}`,
 		'# Wait for the host to hand over the one-time token (it asks for it only now).',
