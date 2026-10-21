@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { ENTITIES } from '@ever-works/agent/database';
 import { Task } from '@ever-works/agent/entities';
-import { AddTaskOrigin1796040000000 } from '../1796040000000-AddTaskOrigin';
+import { AddTaskOrigin1795169100000 } from '../1795169100000-AddTaskOrigin';
 
 /**
  * Works-security (2026-10-18) — `tasks.origin`, the server-written provenance
@@ -11,9 +11,9 @@ import { AddTaskOrigin1796040000000 } from '../1796040000000-AddTaskOrigin';
  * built from the `ENTITIES` inventory: dev and stage `synchronize` from the
  * entities while production runs this file, so both must agree.
  */
-describe('1796040000000-AddTaskOrigin', () => {
+describe('1795169100000-AddTaskOrigin', () => {
     let dataSource: DataSource;
-    const migration = new AddTaskOrigin1796040000000();
+    const migration = new AddTaskOrigin1795169100000();
 
     const columns = async (): Promise<Array<{ name: string; notnull: number; dflt_value: string | null }>> =>
         dataSource.query(`PRAGMA table_info("tasks")`);
