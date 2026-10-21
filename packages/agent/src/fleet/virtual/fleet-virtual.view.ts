@@ -52,6 +52,10 @@ export function normalizeVirtualMeta(raw: unknown): FleetVirtualMeta | null {
         createJobId: typeof meta.createJobId === 'string' ? meta.createJobId : null,
         lastControlJobId: typeof meta.lastControlJobId === 'string' ? meta.lastControlJobId : null,
         enrollRequestedAt: iso(meta.enrollRequestedAt),
+        viewerPort:
+            typeof meta.viewerPort === 'number' && Number.isInteger(meta.viewerPort) && meta.viewerPort > 0 && meta.viewerPort < 65536
+                ? meta.viewerPort
+                : null,
     };
 }
 
@@ -117,6 +121,8 @@ export function fleetVirtualViewOf(
         activated: meta.activated,
         error: state === 'failed' ? meta.error : null,
         imageDigest: meta.image?.digest ?? null,
+        // The installer's screen is worth opening only while Windows installs.
+        viewerPort: state === 'installing' || state === 'creating' || state === 'enrolling' ? (meta.viewerPort ?? null) : null,
         hostName,
     };
 }

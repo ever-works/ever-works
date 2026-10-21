@@ -7,6 +7,8 @@ import {
     nextFleetScheduleFire,
     previewFleetScheduleFires,
     describeFleetScheduleCadence,
+    FLEET_SCHEDULE_BREAKER_CAP,
+    FLEET_SCHEDULE_BREAKER_UNDO_MS,
     FLEET_SCHEDULE_DELETED_RETENTION_DAYS,
     FLEET_SCHEDULE_FAILURE_PAUSE,
     FLEET_SCHEDULE_HISTORY,
@@ -21,6 +23,8 @@ import {
     type FleetScheduleConfirmationDetails,
     type FleetScheduleCreateRequest,
     type FleetScheduleDefinition,
+    type FleetSchedulePauseAllConfirmation,
+    type FleetSchedulePauseAllResult,
     type FleetSchedulePausedReason,
     type FleetScheduleRunReport,
     type FleetScheduleUpdateRequest,
@@ -362,6 +366,122 @@ export class FleetScheduleService {
         this.syncInBackground(nodeId);
         const fresh = await this.schedules.find(command.id);
         return this.viewOf(fresh ?? command, node);
+    }
+
+    // ─── The breaker (FR-22, spec U14) ─────────────────────────────────────
+
+    /**
+     * "Pause all" on one computer: every live schedule on it that the person
+     * may pause — all of them for the computer's owner, the person's own for
+     * anyone else in its `schedules` audience — stamped `pausedReason:
+     * 'breaker'` with ONE instant, which is the key of the 15-minute Undo.
+     * Class `confirm`: without it the answer is `confirmation_required` with
+     * the count and the runs in flight (they finish; nothing new starts).
+     * Never deletes. At most 500 at once.
+     */
+    async pauseAllOnNode(
+        nodeId: string,
+        actor: FleetScheduleActor,
+        confirm: boolean,
+    ): Promise<FleetSchedulePauseAllResult> {
+        this.assertEnabled();
+        const node = await this.resolveNode(nodeId, actor);
+        const rows = (await this.schedules.listForNode(node.id)).filter(
+            (row) =>
+                !row.pausedAt &&
+                row.enabled !== false &&
+                (node.userId === actor.userId || row.userId === actor.userId),
+        );
+        if (rows.length > FLEET_SCHEDULE_BREAKER_CAP) {
+            throw fleetCommandError(
+                'limit_exceeded',
+                `at most ${FLEET_SCHEDULE_BREAKER_CAP} schedules are paused at once`,
+                { limit: FLEET_SCHEDULE_BREAKER_CAP },
+            );
+        }
+        const recent = await this.schedules.findRecentRunsFor(
+            rows.map((row) => row.id),
+            1,
+        );
+        const running = rows.filter((row) => recent.get(row.id)?.[0]?.status === 'running').length;
+        if (confirm !== true) {
+            const details: FleetSchedulePauseAllConfirmation = {
+                class: 'confirm',
+                action: 'pause-all',
+                nodeId: node.id,
+                nodeName: node.name,
+                count: rows.length,
+                running,
+            };
+            throw fleetCommandError(
+                'confirmation_required',
+                `Pause ${rows.length} schedule(s) on ${node.name}?`,
+                details as unknown as Record<string, unknown>,
+            );
+        }
+        this.assertRate(actor.userId);
+        this.noteWrite(actor.userId);
+        const breakerAt = new Date(Math.floor(this.now() / 1000) * 1000);
+        const generation = (await this.maxGeneration(node.id)) + 1;
+        for (const row of rows) {
+            await this.schedules.update(row.id, {
+                pausedAt: breakerAt,
+                pausedReason: 'breaker',
+                nextRunAt: null,
+                syncGeneration: generation,
+            });
+            await this.record('node.schedule.pause', actor, node, row.id, 'confirm', {
+                outcome: 'paused',
+                reason: 'breaker',
+                breakerAt: breakerAt.toISOString(),
+            });
+        }
+        if (rows.length > 0) this.syncInBackground(node.id);
+        return {
+            paused: rows.length,
+            running,
+            breakerAt: breakerAt.toISOString(),
+            undoUntil: new Date(breakerAt.getTime() + FLEET_SCHEDULE_BREAKER_UNDO_MS).toISOString(),
+        };
+    }
+
+    /** The breaker's Undo, within 15 minutes: resume exactly what that Pause all paused (and nothing paused since). */
+    async undoPauseAllOnNode(
+        nodeId: string,
+        actor: FleetScheduleActor,
+        breakerAtIso: string,
+    ): Promise<{ resumed: number }> {
+        this.assertEnabled();
+        const node = await this.resolveNode(nodeId, actor);
+        const breakerAt = Date.parse(breakerAtIso);
+        if (!Number.isFinite(breakerAt)) throw fleetCommandError('invalid', 'breakerAt is not an instant', { field: 'breakerAt' });
+        if (this.now() - breakerAt > FLEET_SCHEDULE_BREAKER_UNDO_MS) {
+            throw fleetCommandError('invalid', 'the 15 minutes to undo it have passed; resume the schedules one by one');
+        }
+        const rows = (await this.schedules.listForNode(node.id)).filter(
+            (row) =>
+                row.pausedReason === 'breaker' &&
+                row.pausedAt &&
+                Math.abs(toMs(row.pausedAt) - breakerAt) < 1000 &&
+                (node.userId === actor.userId || row.userId === actor.userId),
+        );
+        const generation = (await this.maxGeneration(node.id)) + 1;
+        for (const row of rows) {
+            const next = nextFleetScheduleFire(storedFleetScheduleCadence(row), node.timeZone ?? null, this.now());
+            await this.schedules.update(row.id, {
+                enabled: true,
+                pausedAt: null,
+                pausedReason: null,
+                nextRunAt: next === null ? null : new Date(next),
+                syncGeneration: generation,
+            });
+            await this.record('node.schedule.resume', actor, node, row.id, 'plain', {
+                outcome: 'resumed',
+                wasPausedFor: 'breaker',
+            });
+        }
+        if (rows.length > 0) this.syncInBackground(node.id);
+        return { resumed: rows.length };
     }
 
     // ─── Run now ───────────────────────────────────────────────────────────

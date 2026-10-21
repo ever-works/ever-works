@@ -2,10 +2,12 @@ import {
     Body,
     Controller,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     Query,
     Req,
@@ -18,6 +20,7 @@ import type {
     FleetVirtualCreateResponse,
     FleetVirtualOperationResponse,
     FleetVirtualOptionsView,
+    FleetVirtualPasswordRevealResponse,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
@@ -28,6 +31,8 @@ import {
     FleetVirtualDestroyDto,
     FleetVirtualOptionsQueryDto,
     FleetVirtualPowerDto,
+    FleetVirtualResizeDto,
+    FleetVirtualRevealDto,
     virtualConfirmFields,
 } from './dto/fleet-virtual.dto';
 import { FleetVirtualEnabledGuard } from './fleet-virtual-enabled.guard';
@@ -164,6 +169,65 @@ export class FleetVirtualController {
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'destroy a virtual computer', REFUSAL_WHY);
         return this.virtual.destroy({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+    }
+
+    @Patch('nodes/:id/virtual/:childId')
+    @ApiOperation({
+        summary:
+            'Resize a STOPPED virtual computer (CPUs 2 / 4 / 8, memory 4 / 8 / 16 GB). Refused `busy` while it runs. Send `confirm: true`. Answers 202.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async resize(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualResizeDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualOperationResponse> {
+        refuseMachinePrincipalAction(auth, req, 'resize a virtual computer', REFUSAL_WHY);
+        return this.virtual.resize({ kind: 'user', userId: auth.userId }, id, childId, {
+            cpus: body.cpus,
+            memoryGiB: body.memoryGiB,
+            fields: virtualConfirmFields(body),
+        });
+    }
+
+    @Post('nodes/:id/virtual/:childId/rebuild')
+    @ApiOperation({
+        summary:
+            'Rebuild a Container from the current catalogue image, keeping its home folder and its Fleet registration. Send `confirm: true`. Answers 202.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    async rebuild(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualRevealDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualOperationResponse> {
+        refuseMachinePrincipalAction(auth, req, 'rebuild a virtual computer', REFUSAL_WHY);
+        return this.virtual.rebuild({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+    }
+
+    @Post('nodes/:id/virtual/:childId/password/reveal')
+    @ApiOperation({
+        summary:
+            'Reveal a Windows VM’s generated password once (owner only; never an Agent). It is read from the host’s keychain over the node link and never stored or logged by Ever Works; the audit log records who revealed it. Send `confirm: true`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Header('Cache-Control', 'no-store')
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    async revealPassword(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualRevealDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualPasswordRevealResponse> {
+        refuseMachinePrincipalAction(auth, req, 'reveal a virtual computer’s password', REFUSAL_WHY);
+        return this.virtual.revealPassword({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
     }
 
     @Post('nodes/:id/virtual/:childId/retry-enrollment')

@@ -201,6 +201,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-tasks-and-github',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
+				// Browsing and moving a computer's files through that link (FL-11).
+				'features/fleet-files',
 				// What runs on each computer — services, Docker, processes (FL-09).
 				'features/fleet-services-docker',
 				// What a computer serves, opened on it or previewed in your browser (FL-10).
@@ -208,6 +210,8 @@ const sidebars: SidebarsConfig = {
 				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
 				'features/fleet-virtual-computers',
 				'features/fleet-cloud-computers',
+				// What an Agent, the MCP server and the CLI may do on those computers, and the gates (FL-19).
+				'features/fleet-agent-tools',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

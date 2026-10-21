@@ -157,6 +157,14 @@ export type FleetAuditAction =
 	| 'node.session.recording.start'
 	| 'node.session.recording.stop'
 	/**
+	 * Session git & actions (FL-06, CONTRACTS §7): an action prompt was typed
+	 * into a session (`action`, a redacted 200-character `promptPreview`, the
+	 * delivery) — an owner session's ledger is read back from these rows (R-38).
+	 */
+	| 'node.session.action'
+	/** A pull request was opened or updated for a session's checkout (platform-side, never a merge). */
+	| 'node.session.pull-request.open'
+	/**
 	 * Logs on computers (FL-08, CONTRACTS §7) — someone read a log source
 	 * (one row per open or one-shot read) or started following it. Details
 	 * carry `source` (the source id), `kind`, `requestedBy`, `lines`,
@@ -165,6 +173,21 @@ export type FleetAuditAction =
 	 */
 	| 'node.logs.read'
 	| 'node.logs.follow'
+	/**
+	 * Files on computers (FL-11, CONTRACTS §7) — `list` (the first listing of
+	 * a root per person per visit), `read` (a download), `write` (an upload),
+	 * `copy` (P2, one row on each computer naming the other), `delete`.
+	 * Details carry `family: 'files'`, `root`, `path`, `entries`, `bytes`,
+	 * `requestedBy`, `confirmationClass`, `confirmed`, `peerNodeId` and
+	 * `outcome`; never a file's contents (spec FR-19).
+	 */
+	| 'node.files.list'
+	| 'node.files.read'
+	| 'node.files.write'
+	| 'node.files.copy'
+	| 'node.files.delete'
+	/** Paste into a desktop (FL-11 P2): the byte count only, never the text (FR-35). */
+	| 'node.clip.paste'
 	/**
 	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
 	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
@@ -325,8 +348,16 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	'node.session.action',
+	'node.session.pull-request.open',
 	'node.logs.read',
 	'node.logs.follow',
+	'node.files.list',
+	'node.files.read',
+	'node.files.write',
+	'node.files.copy',
+	'node.files.delete',
+	'node.clip.paste',
 	'node.command.run',
 	'node.command.cancel',
 	'node.schedule.create',

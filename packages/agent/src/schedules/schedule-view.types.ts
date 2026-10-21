@@ -118,6 +118,8 @@ export interface ScheduleView {
     nodeTimeZone?: string | null;
     /** A Command schedule's own facts (command, folder, sync state, failure streak, last run). */
     nodeSchedule?: FleetScheduleView;
+    /** FL-13 P2: a recurring Task the Schedules dialog made — each fire is an Agent session on {@link nodeId}. */
+    agentSession?: boolean;
 }
 
 /** Why a row has no next fire — see {@link ScheduleView.nextRunReasonKey}. */

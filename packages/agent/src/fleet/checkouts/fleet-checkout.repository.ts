@@ -36,6 +36,30 @@ export class FleetCheckoutRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    /** FL-06: the checkouts these sessions work in (one batched read for a page of session views). */
+    async findByIds(ids: readonly string[]): Promise<FleetCheckout[]> {
+        const wanted = [...new Set(ids.filter((id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
+        if (wanted.length === 0) return [];
+        return this.repository.find({ where: { id: In(wanted) } });
+    }
+
+    /**
+     * FL-06 (plan §10): ready rows whose git line carries a pull request and
+     * that changed since `since` — the enrichment keeps their pill fresh for a
+     * week after a session last used them. `gitLine` is `simple-json` text, so
+     * the match is on the serialized `"pr":{`.
+     */
+    async findWithPullRequestSince(since: Date, limit = 500): Promise<FleetCheckout[]> {
+        return this.repository
+            .createQueryBuilder('checkout')
+            .where('checkout.state = :state', { state: 'ready' })
+            .andWhere('checkout.updatedAt >= :since', { since })
+            .andWhere('checkout.gitLine LIKE :pr', { pr: '%"pr":{%' })
+            .orderBy('checkout.updatedAt', 'DESC')
+            .take(limit)
+            .getMany();
+    }
+
     async findByPath(nodeId: string, path: string): Promise<FleetCheckout | null> {
         return this.repository.findOne({ where: { nodeId, path } });
     }

@@ -405,7 +405,13 @@ export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLin
 	 * needs only `--work`; a person's or an Agent's needs `--manage`, which the
 	 * verb checks on the machine from `createdBy` and the platform narrows to.
 	 */
-	'checkouts.create': 'work-or-manage'
+	'checkouts.create': 'work-or-manage',
+	/**
+	 * Session git & actions (FL-06, spec §4.4): the Changes view of a Task's
+	 * worktree needs only `--work`; any other checkout's needs `--manage`,
+	 * which the verb checks on the machine and the platform narrows to.
+	 */
+	'checkouts.changes': 'work-or-manage'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */
@@ -535,6 +541,8 @@ export const FLEET_LINK_MACHINE_VERB_ACTION_FAMILY: Readonly<Record<string, Flee
 	'wake.send': 'machines',
 	// CONTRACTS §3.3 (rev 4): `logs.sources` is a machine verb (a list needs no open channel).
 	logs: 'logs',
+	// FL-11: `files.roots` is a machine verb (the same precedent); the rest rides a `files` channel.
+	files: 'files',
 	services: 'services',
 	docker: 'docker',
 	compose: 'docker',

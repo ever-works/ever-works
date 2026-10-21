@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { GitBranch, GitFork } from 'lucide-react';
 import type { FleetGitLine } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
+import { PrPill } from '../sessions/PrPill';
 
 /**
  * Checkouts on computers (FL-14, CONTRACTS §4.7, spec FR-8) — the one git line
@@ -60,11 +61,8 @@ export function GitLine({
                     ) : (
                         <span className="text-emerald-600 dark:text-emerald-400">{t('clean')}</span>
                     )}
-                    {line.pr ? (
-                        <a href={line.pr.url} target="_blank" rel="noreferrer" className="underline">
-                            {t('pr', { number: line.pr.number, state: line.pr.state })}
-                        </a>
-                    ) : null}
+                    {/* FL-06 (spec FR-8): the pull request pill — tone, checks, a validated link. */}
+                    {line.pr ? <PrPill pr={line.pr} /> : null}
                 </>
             ) : (
                 <span className="text-text-muted dark:text-text-muted-dark">{t('notRead')}</span>

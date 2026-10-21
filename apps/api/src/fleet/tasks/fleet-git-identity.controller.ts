@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetGitIdentityService } from '@ever-works/agent/fleet';
@@ -12,6 +12,7 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetCheckoutsEnabledGuard } from '../checkouts/fleet-checkouts-enabled.guard';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetGitIdentityQueryDto, SetFleetGitIdentityDto } from './dto/fleet-git-identity.dto';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 /**
  * Tasks on computers (FL-15 P2, CONTRACTS §11.2 `/nodes/:id/git/identity`) —
@@ -29,6 +30,9 @@ import { FleetGitIdentityQueryDto, SetFleetGitIdentityDto } from './dto/fleet-gi
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetCheckoutsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetGitIdentityController {
     constructor(private readonly identity: FleetGitIdentityService) {}
 

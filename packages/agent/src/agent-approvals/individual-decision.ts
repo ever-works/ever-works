@@ -3,6 +3,8 @@ import {
     AGENT_ESCALATION_RESOLUTION_PROPOSAL_KIND,
     AGENT_FILE_EDIT_PROPOSAL_KIND,
 } from '../agents/agent-proposal-kinds';
+// FL-19 P2 — a leaf (contracts only), like the kinds above.
+import { FLEET_TOOL_CALL_PROPOSAL_KIND } from '../fleet/fleet-held-call';
 
 /**
  * Proposals whose approval does something that cannot be undone, so bulk
@@ -25,6 +27,8 @@ export function requiresIndividualDecision(
     return (
         row.actionType === 'other' &&
         (row.payload?.kind === AGENT_FILE_EDIT_PROPOSAL_KIND ||
-            row.payload?.kind === AGENT_ESCALATION_RESOLUTION_PROPOSAL_KIND)
+            row.payload?.kind === AGENT_ESCALATION_RESOLUTION_PROPOSAL_KIND ||
+            // FL-19 P2 — an Agent's held act on a computer runs when approved: one at a time.
+            row.payload?.kind === FLEET_TOOL_CALL_PROPOSAL_KIND)
     );
 }

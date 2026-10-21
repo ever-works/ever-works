@@ -86,6 +86,30 @@ export class FleetVirtualPowerDto {
     confirm?: boolean;
 }
 
+export class FleetVirtualResizeDto {
+    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_CPU_CHOICES })
+    @IsOptional()
+    @IsIn([...FLEET_VIRTUAL_CPU_CHOICES])
+    cpus?: 2 | 4 | 8;
+
+    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_MEMORY_GIB_CHOICES })
+    @IsOptional()
+    @IsIn([...FLEET_VIRTUAL_MEMORY_GIB_CHOICES])
+    memoryGiB?: 4 | 8 | 16;
+
+    @ApiProperty({ required: false, description: 'Resize is `confirm`-class: send `confirm: true`.' })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
+export class FleetVirtualRevealDto {
+    @ApiProperty({ required: false, description: 'The reveal is `confirm`-class: send `confirm: true`.' })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
 export class FleetVirtualDestroyDto {
     @ApiProperty({ required: false, maxLength: 64, description: 'The virtual computer’s exact name (`confirm-destructive`).' })
     @IsOptional()
@@ -131,6 +155,22 @@ export class FleetVirtualProgressDto extends FleetVirtualHostJobDto {
     @IsOptional()
     @IsBoolean()
     activated?: boolean | null;
+
+    @ApiProperty({ required: false, description: 'Windows VMs: the host-loopback port of the installer viewer.' })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    viewerPort?: number | null;
+
+    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_CPU_CHOICES, description: 'Resize: the CPUs applied.' })
+    @IsOptional()
+    @IsIn([...FLEET_VIRTUAL_CPU_CHOICES])
+    cpus?: number;
+
+    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_MEMORY_GIB_CHOICES, description: 'Resize: the memory applied.' })
+    @IsOptional()
+    @IsIn([...FLEET_VIRTUAL_MEMORY_GIB_CHOICES])
+    memoryGiB?: number;
 }
 
 export function virtualConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {

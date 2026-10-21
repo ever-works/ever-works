@@ -23,6 +23,9 @@ import { relativeTime } from '../fleet-hub.shared';
 import { SessionComposer } from './SessionComposer';
 import { SessionEndDialog } from './SessionEndDialog';
 import { SessionFooter } from './SessionFooter';
+import { SessionActionsLedger } from './SessionActionsLedger';
+import { SessionActionsMenu } from './SessionActionsMenu';
+import { SessionGitPanel } from './SessionGitPanel';
 import { SessionHeader } from './SessionHeader';
 import { SessionRenameDialog } from './SessionRenameDialog';
 import { SessionReplayPlayer } from './SessionReplayPlayer';
@@ -73,6 +76,7 @@ export function SessionDetailClient({
     agentName?: string | null;
 }) {
     const t = useTranslations('fleet.sessions');
+    const tGit = useTranslations('fleet.sessionGit');
     const locale = useLocale();
     const router = useRouter();
     const nowMs = useNow(1_000);
@@ -90,6 +94,8 @@ export function SessionDetailClient({
     const [renaming, setRenaming] = useState(false);
     const [sheet, setSheet] = useState(false);
     const [starting, setStarting] = useState(false);
+    // FL-06: bumped after an action is sent, so the ledger re-reads.
+    const [ledgerKey, setLedgerKey] = useState(0);
     const rendererRef = useRef<TerminalRenderer | null>(null);
     // P3: `?rewatch=1` (the Run receipt's link) opens the player straight away.
     const searchParams = useSearchParams();
@@ -219,6 +225,39 @@ export function SessionDetailClient({
                 onRestart={() => void restart()}
                 onCopyLink={() => void copyLink()}
                 onShortcuts={() => setSheet(true)}
+                actionsSlot={
+                    // FL-06 (spec FR-12 … FR-18): the Actions menu (A, then 1–7).
+                    session.provider !== 'shell' ? (
+                        <SessionActionsMenu
+                            session={session}
+                            nodeName={nodeName}
+                            agentName={agentName}
+                            onSent={() => {
+                                setLedgerKey((key) => key + 1);
+                                window.setTimeout(() => void refresh(), 1_500);
+                            }}
+                        />
+                    ) : null
+                }
+                gitSlot={
+                    // FL-06 (spec FR-6 … FR-10): the git line, Changes, refresh.
+                    <SessionGitPanel
+                        session={session}
+                        now={now}
+                        offline={
+                            node && node.status !== 'online'
+                                ? {
+                                      hint: tGit('detail.offline', {
+                                          node: nodeName,
+                                          age: relativeTime(node.lastHeartbeatAt, now, locale) ?? '—',
+                                      }),
+                                  }
+                                : null
+                        }
+                        agentName={agentName}
+                        onRefreshed={() => void refresh()}
+                    />
+                }
             />
 
             <div ref={takeKeyboardRef} tabIndex={-1} className="sr-only">
@@ -338,6 +377,9 @@ export function SessionDetailClient({
                     <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
                 )
             )}
+
+            {/* FL-06 (spec FR-22): the actions sent so far, below the terminal. */}
+            {session.provider !== 'shell' ? <SessionActionsLedger sessionId={session.id} refreshKey={ledgerKey} /> : null}
 
             <SessionFooter
                 presence={session.presence}

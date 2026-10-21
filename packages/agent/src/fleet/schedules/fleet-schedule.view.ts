@@ -109,6 +109,7 @@ export function toFleetScheduleView(facts: FleetScheduleViewFacts): FleetSchedul
         lastRun,
         running: latest?.status === 'running',
         linkUp: facts.linkUp,
+        requestedBy: command.requestedBy === 'agent' ? 'agent' : 'user',
         failureStreak: fleetScheduleFailureStreak(counted as Array<{ status: FleetCommandRunStatus }>),
         syncState,
         syncError: facts.refusal,

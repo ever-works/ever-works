@@ -81,7 +81,7 @@ import {
     FleetSessionRepository,
     type FleetSessionListQuery,
 } from './fleet-session.repository';
-import { toFleetSessionView } from './fleet-session.view';
+import { toFleetSessionGitRef, toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
 import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
 import { FleetSessionStateService } from './fleet-session-state.service';
@@ -296,12 +296,39 @@ export class FleetSessionService {
         options: { includeScreen?: boolean } = {},
     ): Promise<FleetSessionView[]> {
         const views = rows.map((row) => toFleetSessionView(row, options));
+        // FL-06 (spec FR-1, FR-6): the checkout each session works in, with its git line.
+        await this.withGit(views);
         const runIds = rows.map((row) => row.agentRunId).filter((id): id is string => !!id);
         if (runIds.length === 0 || !this.taskRules) return views;
         const refs = await this.taskRules.refsForRuns(runIds);
         for (const view of views) {
             const ref = view.agentRunId ? refs.get(view.agentRunId) : undefined;
             if (ref) view.task = ref;
+        }
+        return views;
+    }
+
+    /**
+     * FL-06 (spec FR-1, FR-6): each view's checkout — its git line with the
+     * platform-resolved pull request (CONTRACTS §4.7) — in one batched read.
+     * A failed read leaves the git lines off, never the list.
+     */
+    private async withGit(views: FleetSessionView[]): Promise<FleetSessionView[]> {
+        const ids = views.map((view) => view.checkoutId).filter((id): id is string => !!id);
+        if (ids.length === 0 || !this.checkouts) return views;
+        try {
+            const rows = await this.checkouts.findByIds(ids);
+            const byId = new Map(rows.map((row) => [row.id, row]));
+            for (const view of views) {
+                const row = view.checkoutId ? byId.get(view.checkoutId) : undefined;
+                view.git = row ? toFleetSessionGitRef(row) : null;
+            }
+        } catch (error) {
+            this.logger.debug(
+                `Checkouts of ${ids.length} sessions could not be read: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
         }
         return views;
     }
@@ -378,8 +405,9 @@ export class FleetSessionService {
         const columns: FleetSessionBoardResponse['columns'] = { needs_you: [], working: [], done: [], idle: [] };
         const movedAt = (view: FleetSessionView) =>
             Date.parse(view.stateChangedAt ?? view.lastActivityAt ?? view.createdAt) || 0;
-        for (const row of rows) {
-            const view = toFleetSessionView(row);
+        // FL-06: board cards carry the git line through the shared card (spec §5.8).
+        const views = await this.withGit(rows.map((row) => toFleetSessionView(row)));
+        for (const view of views) {
             const column = fleetSessionBoardColumn(view, now);
             if (column) columns[column].push(view);
         }
@@ -863,6 +891,63 @@ export class FleetSessionService {
             to: at,
             bytes: Buffer.byteLength(data, 'utf8'),
             ...(actor.agentId ? { requestedBy: `agent:${actor.agentId}` } : {}),
+        });
+    }
+
+    /** FL-06: the platform holds this computer's link right now (spec U1). */
+    isReachable(nodeId: string): boolean {
+        return this.node?.isConnected(nodeId) ?? false;
+    }
+
+    /**
+     * FL-06 (spec FR-14, FR-24): type an action prompt into a live session —
+     * exactly what `sendInput` types (the agent's own permission prompts stay
+     * in force), with `source: 'action'` and the action id for the node's own
+     * log line. NO audit row here: the caller writes ONE `node.session.action`
+     * row with the delivery (spec FR-21). Resolves when the machine confirmed
+     * it typed the bytes; rejects with the CONTRACTS §8 refusal otherwise
+     * (`unreachable` when the link could not confirm it — "not delivered").
+     */
+    async typeAction(
+        session: FleetSession,
+        actor: FleetSessionActor,
+        data: string,
+        meta: { actionId: string; ledgerId?: string | null },
+    ): Promise<void> {
+        if (typeof data !== 'string' || data.length === 0 || data.length > 64 * 1024) {
+            throw fleetSessionError('invalid', 'the prompt is 1–64 KiB', { field: 'prompt' });
+        }
+        if (!isFleetSessionLive(session.state)) {
+            throw fleetSessionError('invalid', 'the session has ended; restart it first', { state: session.state });
+        }
+        // FL-05 (FR-30): an Agent never answers a permission prompt — and an action typed while
+        // one is open WOULD be read as the answer (spec U7), so an Agent's action waits for a person.
+        if (actor.agentId && session.state === 'needs_you') {
+            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            if (attention?.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+        }
+        if (await this.isStopped()) throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
+        if (!this.node?.isConnected(session.nodeId)) {
+            throw fleetSessionError('unreachable', 'the computer is not connected', { nodeId: session.nodeId });
+        }
+        await this.requireNode().request({
+            nodeId: session.nodeId,
+            sessionId: session.daemonSessionId,
+            kind: session.kind,
+            mode: 'driver',
+            verb: 'session.input',
+            params: {
+                data,
+                source: 'action',
+                actionId: meta.actionId,
+                ...(meta.ledgerId ? { ledgerId: meta.ledgerId } : {}),
+            },
+            caller: { kind: 'user', userId: actor.userId },
+            stateChanging: true,
         });
     }
 

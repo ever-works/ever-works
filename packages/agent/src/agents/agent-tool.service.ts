@@ -71,11 +71,13 @@ import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
+import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
-import { buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
+import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
+import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -690,6 +692,16 @@ export class AgentToolService {
                     operations: fleet.operations ?? null,
                 }),
             );
+            // FL-19 P2 — wake and cancel an operation (each when bound). The git identity
+            // tools are FL-15's own (`fleetTasks`), assembled below.
+            add('fleet-acts', () =>
+                buildFleetActTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    wake: fleet.wake ?? null,
+                    operations: fleet.operations ?? null,
+                }),
+            );
             // Logs on computers (FL-08): the read-only log tools, when bound.
             if (fleet.logs) {
                 const logs = fleet.logs;
@@ -698,6 +710,23 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: logs.reader,
+                    }),
+                );
+            }
+            // Files on computers (FL-11): the read-only file tools, when bound.
+            if (fleet.files) {
+                const files = fleet.files;
+                add('fleet-files', () =>
+                    buildFleetFilesTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: files.reader,
+                        // P2: copy and delete are held for the owner's approval.
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        proposals: sources.proposals ?? null,
                     }),
                 );
             }
@@ -732,6 +761,26 @@ export class AgentToolService {
                             ? runContext.runId
                             : null,
                     service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-13 P2 — Schedules on computers. Create, update, delete and run never
+        // act themselves: each files an approval the owner decides in My Decisions
+        // (fail-closed without the queue); pause and resume apply at once. Bound
+        // only while FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetSchedules) {
+            const fleetSchedules = sources.fleetSchedules;
+            add('fleet-schedules', () =>
+                buildFleetScheduleTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetSchedules.service,
                     proposals: sources.proposals ?? null,
                 }),
             );
@@ -903,7 +952,9 @@ export class AgentToolService {
         // assembly annotated, with the no-credits sentence, its results secret-scanned
         // and its refusals typed. Anything else (and the legacy `list_fleet_nodes`) is
         // returned untouched.
-        return out.map((tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor);
+        return out.map(
+            (tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor,
+        );
     }
 
     /**

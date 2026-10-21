@@ -12,6 +12,7 @@ import {
     Req,
     Res,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -49,6 +50,7 @@ import {
     FleetRunContainerDto,
 } from './dto/fleet-machine.dto';
 import { FleetMachineFactsEnabledGuard } from './fleet-machine-facts-enabled.guard';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 /** The part of Express's response this controller sets: 202 for an act that became an operation. */
 interface StatusResponse {
@@ -79,6 +81,9 @@ const REFUSAL_WHY = 'an Agent acts on Docker through its tools, where a risky ac
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetMachineFactsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetDockerController {
     constructor(private readonly machine: FleetMachineActionsService) {}
 

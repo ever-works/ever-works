@@ -99,6 +99,39 @@ export class FleetSessionRepository {
         });
     }
 
+    /**
+     * FL-06 (spec FR-7, FR-11): sessions that work in a checkout and are live,
+     * or stopped working since `stoppedSince` — the git-line cadence refreshes
+     * the first every minute and the second once, and the pull-request
+     * enrichment keeps both fresh. Newest activity first, bounded.
+     */
+    async findWithCheckoutForCadence(stoppedSince: Date, limit = 500): Promise<FleetSession[]> {
+        return this.repository
+            .createQueryBuilder('session')
+            .where('session.checkoutId IS NOT NULL')
+            .andWhere(
+                new Brackets((where) => {
+                    where
+                        .where('session.state != :ended', { ended: 'ended' })
+                        .orWhere('session.stateChangedAt >= :since', { since: stoppedSince });
+                }),
+            )
+            .orderBy('session.lastActivityAt', 'DESC')
+            .take(limit)
+            .getMany();
+    }
+
+    /** FL-06 (spec FR-18): the Agent session a Run belongs to (a run token names its Run). */
+    async findByAgentRunId(agentRunId: string): Promise<FleetSession | null> {
+        if (typeof agentRunId !== 'string' || !/^[0-9a-f-]{36}$/i.test(agentRunId)) return null;
+        return this.repository.findOne({ where: { agentRunId } });
+    }
+
+    /** FL-06 (spec FR-25): is a live session working in this checkout (Clean up waits for it)? */
+    async countLiveInCheckout(checkoutId: string): Promise<number> {
+        return this.repository.count({ where: { checkoutId, state: Not('ended') } });
+    }
+
     /** Live OWNER sessions on a node, oldest first (the limit and its refusal's list). */
     async findLiveOwnerForNode(nodeId: string): Promise<FleetSession[]> {
         return this.repository.find({

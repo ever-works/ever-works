@@ -10,6 +10,7 @@ import {
     Post,
     Query,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -39,6 +40,7 @@ import {
     SyncFleetCheckoutDto,
 } from './dto/fleet-checkout.dto';
 import { FleetCheckoutsEnabledGuard } from './fleet-checkouts-enabled.guard';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 function actorOf(auth: AuthenticatedUser): FleetCheckoutActor {
     return { userId: auth.userId };
@@ -77,6 +79,9 @@ function listQuery(query: ListFleetCheckoutsQueryDto): FleetCheckoutListQuery & 
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetCheckoutsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetCheckoutsController {
     constructor(private readonly checkouts: FleetCheckoutService) {}
 

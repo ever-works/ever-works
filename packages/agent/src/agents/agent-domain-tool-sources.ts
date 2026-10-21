@@ -15,14 +15,16 @@ import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service
 import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
+import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
 import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
+import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -175,6 +177,16 @@ export interface AgentFleetToolSource {
         reader: FleetLogsReaderPort;
     };
     /**
+     * Files on computers (FL-11) — when bound, the read-only
+     * `fleet_files_roots` / `fleet_files_list` / `fleet_files_stat` tools are
+     * offered (`buildFleetFilesTools`), reading through the API's node link.
+     * Optional and unbound by default: FL-19 owns the Agent catalogue and binds
+     * it (the API binds the port under `FLEET_FILES_READER`).
+     */
+    files?: {
+        reader: FleetFilesReaderPort;
+    };
+    /**
      * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status
      * service under `FLEET_STATUS_READER`. Unbound, the tool is not offered.
      */
@@ -184,6 +196,8 @@ export interface AgentFleetToolSource {
      * (FL-02). Unbound (no link in this context), the tools are not offered.
      */
     operations?: FleetOperationsToolPort;
+    /** FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the owner). Unbound, not offered. */
+    wake?: FleetWakeToolPort;
 }
 
 /**
@@ -203,6 +217,15 @@ export interface AgentFleetCommandToolSource {
 export interface AgentFleetTaskToolSource {
     handoff?: FleetTaskHandoffToolPort | null;
     identity?: FleetGitIdentityToolPort | null;
+}
+
+/**
+ * Schedules on computers (FL-13 P2) — the `schedules` tool family
+ * (`fleet/schedules/agent-fleet-schedule-tools.ts`). Create, update, delete and
+ * run only ever file an approval (`proposals`); the reads, pause and resume use this.
+ */
+export interface AgentFleetScheduleToolSource {
+    service: Pick<FleetScheduleService, 'listForUser' | 'get' | 'runs' | 'pause' | 'resume'>;
 }
 
 /** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
@@ -340,6 +363,8 @@ export interface AgentDomainToolSources {
     fleetCommands?: AgentFleetCommandToolSource;
     /** FL-15 P3 — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_*`. */
     fleetTasks?: AgentFleetTaskToolSource;
+    /** FL-13 P2 — `fleet_schedules_*` (bound only while FLEET_COMMANDS_ENABLED is on). */
+    fleetSchedules?: AgentFleetScheduleToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

@@ -14,6 +14,8 @@ import {
     FLEET_VIRTUAL_MEMORY_GIB_CHOICES,
     FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED,
     FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB,
+    FLEET_VIRTUAL_PASSWORD_REVEAL_SEC,
+    FLEET_VIRTUAL_WINDOWS_CAPABILITY,
     fleetMissingConfirmation,
     fleetVirtualCreateSummary,
     fleetVirtualOfferedSystems,
@@ -39,6 +41,7 @@ import {
     type FleetVirtualMeta,
     type FleetVirtualOperationResponse,
     type FleetVirtualOptionsView,
+    type FleetVirtualPasswordRevealResponse,
     type FleetVirtualProgressReport,
     type FleetVirtualSystem,
     type FleetVmControlAction,
@@ -76,6 +79,7 @@ import {
     netFreeMemoryMiB,
     reservedMemoryMiB,
     stopSummary,
+    windowsDiskShortfall,
 } from './fleet-virtual.policy';
 import { deriveVirtualState, fleetVirtualViewOf, normalizeVirtualMeta } from './fleet-virtual.view';
 
@@ -267,6 +271,12 @@ export class FleetVirtualService {
 
         // 1–3: existence, the kill switch, the host.
         const host = await this.resolveHostForCreate(caller, hostNodeIdOrAuto ?? input.hostNodeId ?? null, system);
+
+        // Windows (P2, FR-18, U7): refused before any download when the host says it lacks the disk.
+        if (system.kind === 'vm') {
+            const shortfall = windowsDiskShortfall(host.health ?? null, host.name);
+            if (shortfall) throw fleetMachineError('unsupported_on_node', shortfall, { reason: 'disk', hostNodeId: host.id });
+        }
 
         // 4: the request.
         const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -464,6 +474,97 @@ export class FleetVirtualService {
     }
 
     /**
+     * Resize (P3, spec FR-38, ACC-FL16-21): a STOPPED virtual computer's CPUs
+     * and memory, within the creation choices. Refused `busy` while it runs (or
+     * is being built, started, stopped or destroyed); `confirm`-class. The host
+     * applies it (`vm-control resize`) and reports the new size.
+     */
+    async resize(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+        childNodeId: string,
+        input: { cpus?: unknown; memoryGiB?: unknown; fields?: FleetActionConfirmFields | null },
+    ): Promise<FleetVirtualOperationResponse> {
+        this.requireEnabled();
+        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.resize');
+        const meta = normalizeVirtualMeta(child.virtualMeta);
+        if (input.cpus !== undefined && !isFleetVirtualCpus(input.cpus)) {
+            throw fleetMachineError('invalid', 'CPUs must be 2, 4 or 8', { field: 'cpus' });
+        }
+        if (input.memoryGiB !== undefined && !isFleetVirtualMemoryGiB(input.memoryGiB)) {
+            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', { field: 'memoryGiB' });
+        }
+        const cpus = isFleetVirtualCpus(input.cpus) ? input.cpus : (meta?.cpus ?? FLEET_VIRTUAL_DEFAULT_CPUS);
+        const memoryGiB = isFleetVirtualMemoryGiB(input.memoryGiB)
+            ? input.memoryGiB
+            : (meta?.memoryGiB ?? FLEET_VIRTUAL_DEFAULT_MEMORY_GIB);
+        const state = deriveVirtualState(child);
+        if (state !== 'stopped') {
+            throw fleetMachineError('busy', `${child.name} is ${state}; stop it first`, { state });
+        }
+        this.requireConfirmation(
+            'resize',
+            child.name,
+            `Resize ${child.name} to ${cpus} CPUs and ${memoryGiB} GB of memory? It uses the new size from its next start.`,
+            input.fields,
+        );
+        const job = await this.enqueueControl(host, child, 'resize', { cpus, memoryGiB });
+        await this.patchMeta(child, { lastControlJobId: job.id });
+        await this.record('node.vm.resize', caller, host, child.id, {
+            targetName: child.name,
+            requestedBy: describeFleetMachineCaller(caller),
+            confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.resize,
+            outcome: 'ok',
+            hostNodeId: host.id,
+            cpus,
+            memoryGiB,
+            jobId: job.id,
+        });
+        return { operationId: job.id, jobId: job.id };
+    }
+
+    /**
+     * Rebuild (P3, spec FR-39): a Container re-created from the catalogue's
+     * current image, keeping its Fleet registration and its home (its enrolment
+     * and files). A Windows VM is not rebuilt (`unsupported_on_node`). Refused
+     * `busy` while a Run or a session is live on it; `confirm`-class.
+     */
+    async rebuild(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+        childNodeId: string,
+        fields?: FleetActionConfirmFields | null,
+    ): Promise<FleetVirtualOperationResponse> {
+        this.requireEnabled();
+        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.rebuild');
+        if (child.virtualKind !== 'container') {
+            throw fleetMachineError('unsupported_on_node', 'only a Container is rebuilt from an image');
+        }
+        const state = deriveVirtualState(child);
+        if (state !== 'running' && state !== 'stopped') {
+            throw fleetMachineError('busy', `${child.name} is ${state}; wait for it to finish`, { state });
+        }
+        await this.assertNotWorking(child, caller, host);
+        this.requireConfirmation(
+            'rebuild',
+            child.name,
+            `Rebuild ${child.name} from the current image? Its home folder and its Fleet registration are kept; sessions on it end.`,
+            fields,
+        );
+        const job = await this.enqueueControl(host, child, 'rebuild');
+        await this.patchMeta(child, { state: 'starting', lastControlJobId: job.id });
+        await this.record('node.vm.rebuild', caller, host, child.id, {
+            targetName: child.name,
+            requestedBy: describeFleetMachineCaller(caller),
+            confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.rebuild,
+            outcome: 'ok',
+            hostNodeId: host.id,
+            jobId: job.id,
+        });
+        return { operationId: job.id, jobId: job.id };
+    }
+
+    /**
      * Retry enrolment (U10, FR-24): the guest is built but never heartbeated
      * (its token expired, the link dropped at the wrong moment). The host
      * re-requests a token for it and hands it over again — nothing is rebuilt.
@@ -490,6 +591,95 @@ export class FleetVirtualService {
             retryEnrollment: true,
         });
         return { operationId: job.id, jobId: job.id };
+    }
+
+    /**
+     * Copy password (P2, spec S7, FR-20, FR-21, U16) — the ONE way a Windows
+     * VM's generated password leaves its host: owner only (an Organization
+     * admin in the host's `machines` audience is still refused, the spec §8b
+     * default), never an Agent, `confirm`-class, refused under the kill switch,
+     * read from the host's keychain over the node link and handed back once.
+     * The audit row records `revealed: true` and who — never the value — and
+     * nothing here logs, stores or caches it.
+     */
+    async revealPassword(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+        childNodeId: string,
+        fields?: FleetActionConfirmFields | null,
+    ): Promise<FleetVirtualPasswordRevealResponse> {
+        this.requireEnabled();
+        if (caller.kind !== 'user') {
+            throw fleetMachineError('permission_denied', 'an Agent never sees a computer password');
+        }
+        const { node: host } = await this.resolve(hostNodeId, caller.userId, 'view');
+        const child = childNodeId ? await this.nodes.findById(childNodeId) : null;
+        if (!child || child.hostNodeId !== host.id) {
+            throw fleetMachineError('not_found', 'no such virtual computer on this computer');
+        }
+        if (child.userId !== caller.userId || host.userId !== caller.userId) {
+            await this.record('node.vm.password.reveal', caller, host, child.id, {
+                targetName: child.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                outcome: 'refused',
+                code: 'permission_denied',
+                hostNodeId: host.id,
+            });
+            throw fleetMachineError('permission_denied', `only ${host.name}'s owner can reveal it`, { ownerOnly: true });
+        }
+        if (child.virtualKind !== 'vm') {
+            throw fleetMachineError('unsupported_on_node', 'a Container has no generated password');
+        }
+        if (await this.isStopped()) throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
+        this.requireConfirmation(
+            'reveal',
+            child.name,
+            `Reveal the password of ${child.name}? It was generated on ${host.name} and is kept only there; revealing it is recorded in the audit log.`,
+            fields,
+        );
+        if (!this.link) throw fleetMachineError('unreachable', 'this deployment cannot reach computers');
+        let password: string | null = null;
+        try {
+            const reply = await this.link.request({
+                nodeId: host.id,
+                verb: 'vm.password.reveal',
+                caller,
+                actionFamily: 'machines',
+                stateChanging: true,
+                target: child.id,
+                params: { childId: child.id },
+                timeoutMs: 15_000,
+                // Never an operation: the value must not be parked in an operation record.
+                awaitOperationMs: 0,
+            });
+            const result = reply.result as { password?: unknown } | undefined;
+            if (reply.operationId === undefined && result && typeof result.password === 'string' && result.password) {
+                password = result.password;
+            }
+        } catch (error) {
+            const refusal = readFleetMachineError(error);
+            await this.record('node.vm.password.reveal', caller, host, child.id, {
+                targetName: child.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.reveal,
+                outcome: refusal?.code === 'operation_failed' ? 'failed' : 'refused',
+                code: refusal?.code ?? 'internal',
+                hostNodeId: host.id,
+            });
+            throw error;
+        }
+        if (!password) {
+            throw fleetMachineError('operation_failed', `${host.name} did not hand the password over`);
+        }
+        await this.record('node.vm.password.reveal', caller, host, child.id, {
+            targetName: child.name,
+            requestedBy: describeFleetMachineCaller(caller),
+            confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.reveal,
+            outcome: 'ok',
+            revealed: true,
+            hostNodeId: host.id,
+        });
+        return { password, expiresInSec: FLEET_VIRTUAL_PASSWORD_REVEAL_SEC };
     }
 
     // ─── Node-facing (host credential) ───────────────────────────────────
@@ -571,6 +761,13 @@ export class FleetVirtualService {
             };
         }
         if (typeof report.activated === 'boolean') next.activated = report.activated;
+        // Resize (P3): the size the host applied.
+        if (typeof report.cpus === 'number' && isFleetVirtualCpus(report.cpus)) next.cpus = report.cpus;
+        if (typeof report.memoryGiB === 'number' && isFleetVirtualMemoryGiB(report.memoryGiB)) next.memoryGiB = report.memoryGiB;
+        if (report.viewerPort === null) next.viewerPort = null;
+        else if (typeof report.viewerPort === 'number' && Number.isInteger(report.viewerPort)) {
+            if (report.viewerPort > 0 && report.viewerPort < 65536) next.viewerPort = report.viewerPort;
+        }
         const controlAction = job.kind === 'vm-control' ? (job.payload?.action as FleetVmControlAction | undefined) : undefined;
         if (controlAction === 'destroy' && next.state === 'gone') {
             await this.nodes.delete(child.id);
@@ -819,7 +1016,12 @@ export class FleetVirtualService {
         );
     }
 
-    private async enqueueControl(host: FleetNode, child: FleetNode, action: FleetVmControlAction) {
+    private async enqueueControl(
+        host: FleetNode,
+        child: FleetNode,
+        action: FleetVmControlAction,
+        extra: Partial<Pick<FleetVmControlPayload, 'cpus' | 'memoryGiB'>> = {},
+    ) {
         const meta = normalizeVirtualMeta(child.virtualMeta);
         const system = fleetVirtualSystem(meta?.systemId) ?? fleetVirtualOfferedSystems()[0];
         const payload: FleetVmControlPayload = {
@@ -829,6 +1031,7 @@ export class FleetVirtualService {
             kind: child.virtualKind === 'vm' ? 'vm' : 'container',
             systemId: system.id,
             action,
+            ...extra,
         };
         return this.jobs.enqueue({
             userId: host.userId,
@@ -966,7 +1169,10 @@ function metaOf(child: FleetNode): { virtualMeta: FleetVirtualMeta | null } {
 }
 
 function jobCapabilities(system: FleetVirtualSystem): string[] {
-    return system.kind === 'vm' ? [...BASE_JOB_CAPABILITIES, FLEET_KVM_CAPABILITY] : [...BASE_JOB_CAPABILITIES];
+    // A Windows VM also needs KVM and an installer image the host's operator configured (P2).
+    return system.kind === 'vm'
+        ? [...BASE_JOB_CAPABILITIES, FLEET_KVM_CAPABILITY, FLEET_VIRTUAL_WINDOWS_CAPABILITY]
+        : [...BASE_JOB_CAPABILITIES];
 }
 
 /** "2 h", "12 min" since an instant, or null. */

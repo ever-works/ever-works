@@ -21,6 +21,8 @@ import {
 import { SessionStateGlyph } from './SessionStateGlyph';
 import { SessionAttentionBox } from './SessionAttentionBox';
 import { SessionTaskChip } from '../tasks/SessionTaskChip';
+import { PrPill } from './PrPill';
+import { SessionGitLine } from './SessionGitLine';
 
 /**
  * The footer slots other epics fill (CONTRACTS §4.8, R-22), in their order:
@@ -194,8 +196,15 @@ export function SessionCard({
 
             <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted dark:text-text-muted-dark">
                 <span data-slot="computer">{nodeName}</span>
-                {slots?.gitLine && <span data-slot="gitLine">{slots.gitLine}</span>}
-                {slots?.prPill && <span data-slot="prPill">{slots.prPill}</span>}
+                {/* FL-06 (spec FR-6, FR-8): the checkout's git line and its pull request fill these slots. */}
+                {(slots?.gitLine || session.git) && (
+                    <span data-slot="gitLine">
+                        {slots?.gitLine ?? <SessionGitLine git={session.git} now={now} pill={false} />}
+                    </span>
+                )}
+                {(slots?.prPill || session.git?.gitLine?.pr) && (
+                    <span data-slot="prPill">{slots?.prPill ?? <PrPill pr={session.git?.gitLine?.pr ?? null} />}</span>
+                )}
                 {/* FL-15 P1 (spec FR-10): the Task this session's Run works on fills the taskChip slot. */}
                 {(slots?.taskChip || session.task) && (
                     <span data-slot="taskChip">

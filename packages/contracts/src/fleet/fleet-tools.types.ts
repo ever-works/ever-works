@@ -368,15 +368,11 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: POST('/api/fleet/nodes/{id}/desktop/displays'),
 		cli: 'fleet desktop set-display'
 	}),
-	act(
-		'fleet_desktop_display_add',
-		'desktop',
-		'FL-07',
-		'FLEET_DESKTOP_ENABLED',
-		'planned',
-		confirm('machine.admin'),
-		{ phase: 'P3', route: POST('/api/fleet/nodes/{id}/desktop/displays/virtual'), cli: 'fleet desktop display-add' }
-	),
+	act('fleet_desktop_display_add', 'desktop', 'FL-07', 'FLEET_DESKTOP_ENABLED', 'planned', confirm('machine.admin'), {
+		phase: 'P3',
+		route: POST('/api/fleet/nodes/{id}/desktop/displays/virtual'),
+		cli: 'fleet desktop display-add'
+	}),
 	act(
 		'fleet_desktop_display_remove',
 		'desktop',
@@ -390,11 +386,19 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 			cli: 'fleet desktop display-remove'
 		}
 	),
-	act('fleet_desktop_paste', 'desktop', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', plain('machine.admin', true), {
-		route: POST('/api/fleet/nodes/{id}/desktop/paste'),
-		cli: 'fleet desktop paste',
-		confirmationNote: 'denied unless a tool grant allows it (AW-15)'
-	}),
+	act(
+		'fleet_desktop_paste',
+		'desktop',
+		'FL-11',
+		'FLEET_MACHINE_FACTS_ENABLED',
+		'planned',
+		plain('machine.admin', true),
+		{
+			route: POST('/api/fleet/nodes/{id}/desktop/paste'),
+			cli: 'fleet desktop paste',
+			confirmationNote: 'denied unless a tool grant allows it (AW-15)'
+		}
+	),
 
 	// ── logs (FL-08) ──
 	read('fleet_logs_sources', 'logs', 'FL-08', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
@@ -522,11 +526,17 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 	}),
 
 	// ── files (FL-11) ──
-	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
-		route: GET('/api/fleet/nodes/{id}/files'),
+	// P1 (FL-11 lane log decision 15): the roots read joins the family, and the list's route is the
+	// one FL-11 built (`…/files/list` — `…/files` is the family's prefix, not a route).
+	read('fleet_files_roots', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/roots'),
+		cli: 'fleet files roots'
+	}),
+	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/list'),
 		cli: 'fleet files list'
 	}),
-	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
+	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/files/stat'),
 		cli: 'fleet files stat'
 	}),
@@ -538,11 +548,13 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: POST('/api/fleet/nodes/{id}/files/upload'),
 		cli: 'fleet files put'
 	}),
-	act('fleet_files_copy', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', confirm('machine.admin'), {
+	act('fleet_files_copy', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', confirm('machine.admin'), {
 		route: POST('/api/fleet/nodes/{id}/files/copy'),
-		cli: 'fleet files cp'
+		cli: 'fleet files cp',
+		// FL-11 P2 (lane log decision 18): an Agent's copy is held for a person, like its delete.
+		alwaysHeld: true
 	}),
-	act('fleet_files_delete', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', typed('write.destructive'), {
+	act('fleet_files_delete', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', typed('write.destructive'), {
 		route: POST('/api/fleet/nodes/{id}/files/delete'),
 		cli: 'fleet files rm',
 		alwaysHeld: true
@@ -567,24 +579,24 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet commands cancel'
 	}),
 
-	// ── schedules (FL-13) ──
-	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	// ── schedules (FL-13 P2: live — `apps/api/src/fleet/schedules/fleet-schedules.controller.ts`) ──
+	read('fleet_schedules_list', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules'),
 		cli: 'fleet schedules list'
 	}),
-	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_get', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules get'
 	}),
-	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', {
+	read('fleet_schedules_runs', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', {
 		route: GET('/api/fleet/schedules/{id}/runs'),
 		cli: 'fleet schedules runs'
 	}),
-	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_create', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: POST('/api/fleet/schedules'),
 		cli: 'fleet schedules create'
 	}),
-	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('agent.fanout'), {
+	act('fleet_schedules_update', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('agent.fanout'), {
 		route: PATCH('/api/fleet/schedules/{id}'),
 		cli: 'fleet schedules update'
 	}),
@@ -593,19 +605,19 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'schedules',
 		'FL-13',
 		'FLEET_COMMANDS_ENABLED',
-		'planned',
+		'live',
 		confirm('write.destructive'),
 		{ route: DELETE('/api/fleet/schedules/{id}'), cli: 'fleet schedules delete' }
 	),
-	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', confirm('machine.run'), {
+	act('fleet_schedules_run', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', confirm('machine.run'), {
 		route: POST('/api/fleet/schedules/{id}/run'),
 		cli: 'fleet schedules run'
 	}),
-	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_pause', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/pause'),
 		cli: 'fleet schedules pause'
 	}),
-	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'planned', plain('agent.fanout'), {
+	act('fleet_schedules_resume', 'schedules', 'FL-13', 'FLEET_COMMANDS_ENABLED', 'live', plain('agent.fanout'), {
 		route: POST('/api/fleet/schedules/{id}/resume'),
 		cli: 'fleet schedules resume'
 	}),
@@ -643,11 +655,19 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		confirm('machine.run', false),
 		{ route: POST('/api/fleet/checkouts/{id}/archive'), cli: 'fleet checkouts archive' }
 	),
-	act('fleet_checkouts_delete', 'checkouts', 'FL-14', 'FLEET_CHECKOUTS_ENABLED', 'live', confirm('write.destructive'), {
-		route: DELETE('/api/fleet/checkouts/{id}'),
-		cli: 'fleet checkouts delete',
-		confirmationNote: 'confirm; confirm-destructive when it has uncommitted changes'
-	}),
+	act(
+		'fleet_checkouts_delete',
+		'checkouts',
+		'FL-14',
+		'FLEET_CHECKOUTS_ENABLED',
+		'live',
+		confirm('write.destructive'),
+		{
+			route: DELETE('/api/fleet/checkouts/{id}'),
+			cli: 'fleet checkouts delete',
+			confirmationNote: 'confirm; confirm-destructive when it has uncommitted changes'
+		}
+	),
 	act(
 		'fleet_checkouts_open_pull_request',
 		'checkouts',
@@ -688,7 +708,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: POST('/api/fleet/nodes/{id}/virtual/{childId}/power'),
 		cli: 'fleet virtual power',
 		waitable: true,
-		confirmationNote: 'plain to start; confirm to stop (an Agent\'s stop is held for the owner)'
+		confirmationNote: "plain to start; confirm to stop (an Agent's stop is held for the owner)"
 	}),
 	act('fleet_virtual_destroy', 'machines', 'FL-16', 'FLEET_VIRTUAL_ENABLED', 'live', typed('write.destructive'), {
 		phase: 'P3',
@@ -889,7 +909,8 @@ export function withFleetToolNoCreditsSentence(description: string): string {
 export const FLEET_TOOL_COPY = Object.freeze({
 	noCredential: (agent: string) =>
 		`Tools never carry a credential. ${agent} acts through the platform; the platform asks the computer.`,
-	rungOff: (category: string, agent: string) => `'${category}' is Off for ${agent} — raise it on ${agent}'s Safety tab`,
+	rungOff: (category: string, agent: string) =>
+		`'${category}' is Off for ${agent} — raise it on ${agent}'s Safety tab`,
 	grantDenied: (tool: string, scope: string) => `${tool} is denied by a tool grant at ${scope} scope`,
 	audience: (computer: string, audience: string, family: string) =>
 		`ask the owner of ${computer} to allow ${audience}: ${family}`,
@@ -927,9 +948,9 @@ export function isFleetToolError(value: unknown): value is FleetToolError {
 	const error = (value as { error?: unknown }).error;
 	return Boolean(
 		error &&
-			typeof error === 'object' &&
-			typeof (error as { code?: unknown }).code === 'string' &&
-			typeof (error as { hint?: unknown }).hint === 'string'
+		typeof error === 'object' &&
+		typeof (error as { code?: unknown }).code === 'string' &&
+		typeof (error as { hint?: unknown }).hint === 'string'
 	);
 }
 
@@ -1135,9 +1156,10 @@ export function isFleetToolForbiddenPath(path: string): boolean {
 }
 
 /** MCP annotation of a row: `readOnlyHint` for reads, `destructiveHint` otherwise. */
-export function fleetToolMcpAnnotations(
-	entry: Pick<FleetToolCatalogueEntry, 'readOnly' | 'destructive'>
-): { readOnlyHint?: boolean; destructiveHint?: boolean } {
+export function fleetToolMcpAnnotations(entry: Pick<FleetToolCatalogueEntry, 'readOnly' | 'destructive'>): {
+	readOnlyHint?: boolean;
+	destructiveHint?: boolean;
+} {
 	if (entry.readOnly) return { readOnlyHint: true };
 	return { destructiveHint: entry.destructive === true };
 }

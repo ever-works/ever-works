@@ -6,6 +6,7 @@ import type {
     FleetVirtualCreateResponse,
     FleetVirtualOperationResponse,
     FleetVirtualOptionsView,
+    FleetVirtualPasswordRevealResponse,
     FleetVirtualPowerAction,
     FleetVirtualSystemId,
 } from '@ever-works/contracts';
@@ -48,6 +49,33 @@ export const fleetVirtualAPI = {
         serverMutation<FleetVirtualOperationResponse>({
             endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/destroy`,
             data: confirmName !== undefined ? { confirmName } : {},
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    /** Resize (P3): a stopped machine's CPUs / memory — `confirm: true`. */
+    resize: async (hostNodeId: string, childNodeId: string, body: { cpus?: number; memoryGiB?: number }) =>
+        serverMutation<FleetVirtualOperationResponse>({
+            endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}`,
+            data: { ...body, confirm: true },
+            method: 'PATCH',
+            wrapInData: false,
+        }),
+
+    /** Rebuild (P3): a Container from the current image, keeping its home — `confirm: true`. */
+    rebuild: async (hostNodeId: string, childNodeId: string) =>
+        serverMutation<FleetVirtualOperationResponse>({
+            endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/rebuild`,
+            data: { confirm: true },
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    /** Windows VMs (P2): the one-time password reveal — `confirm: true`, owner only, never cached. */
+    revealPassword: async (hostNodeId: string, childNodeId: string) =>
+        serverMutation<FleetVirtualPasswordRevealResponse>({
+            endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/password/reveal`,
+            data: { confirm: true },
             method: 'POST',
             wrapInData: false,
         }),

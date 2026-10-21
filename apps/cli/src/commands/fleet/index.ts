@@ -1,4 +1,20 @@
 import { Command } from 'commander';
+import {
+    commandsCancelCommand,
+    dockerComposeActionCommand,
+    dockerContainerCommand,
+    dockerImageRemoveCommand,
+    dockerPruneCommand,
+    dockerPullCommand,
+    nodesWakeCommand,
+    operationsCancelCommand,
+    portsOpenCommand,
+    portsPreviewCloseCommand,
+    processesSignalCommand,
+    servicesActionCommand,
+    sessionsEndCommand,
+    sessionsRenameCommand,
+} from './acts';
 import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { schedulesCommand } from './schedule';
@@ -14,6 +30,7 @@ import { toolsCommand } from './tools';
 import { answerCommand } from './session/answer';
 import { questionCommand } from './session/question';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
+import { virtualCommand } from './virtual';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -37,8 +54,22 @@ export const fleetSessionCommand = new Command('session')
 // FL-15 P3 — `fleet nodes git-identity <nodeId> [--set [--confirm]]` on FL-19's `fleet nodes`.
 nodesCommand.addCommand(gitIdentityCommand);
 
-// FL-19 T-10 — the reads beside FL-12's `fleet commands run`.
-commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand);
+// FL-19 T-10 — the reads beside FL-12's `fleet commands run`; P2 adds cancel.
+commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand).addCommand(commandsCancelCommand);
+
+// FL-19 P2 (T-16) — the acts, beside each family's reads, all through `--yes` / `--confirm-name`.
+fleetSessionCommand.addCommand(sessionsEndCommand).addCommand(sessionsRenameCommand);
+nodesCommand.addCommand(nodesWakeCommand);
+servicesCommand.addCommand(servicesActionCommand);
+processesCommand.addCommand(processesSignalCommand);
+dockerCommand
+    .addCommand(dockerContainerCommand)
+    .addCommand(dockerPullCommand)
+    .addCommand(dockerImageRemoveCommand)
+    .addCommand(dockerPruneCommand)
+    .addCommand(dockerComposeActionCommand);
+portsCommand.addCommand(portsOpenCommand).addCommand(portsPreviewCloseCommand);
+operationsCommand.addCommand(operationsCancelCommand);
 
 /**
  * `ever-works fleet <family> <verb> [--json]` (FL-19, CONTRACTS §11.3) — the
@@ -77,4 +108,6 @@ export const fleetCommand = new Command('fleet')
     // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
     .addCommand(schedulesCommand)
     // Tasks on computers (FL-15 P3): `fleet tasks handoff-options <taskId>`.
-    .addCommand(fleetTasksCommand);
+    .addCommand(fleetTasksCommand)
+    // Virtual computers (FL-16 P3): `fleet virtual list|options|create|start|stop|power|resize|rebuild|destroy`.
+    .addCommand(virtualCommand);

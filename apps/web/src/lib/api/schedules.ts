@@ -50,6 +50,8 @@ export interface ScheduleEntry {
     nodeName?: string | null;
     nodeTimeZone?: string | null;
     nodeSchedule?: FleetScheduleView;
+    /** FL-13 P2: a recurring Task the Schedules dialog made — each fire is an Agent session on `nodeId`. */
+    agentSession?: boolean;
 }
 
 export type ScheduleNextRunReasonKey =

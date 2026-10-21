@@ -19,6 +19,9 @@ import { WorkSchedule } from '../entities/work-schedule.entity';
 import { Work } from '../entities/work.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
+import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
+import { FleetNode } from '../entities/fleet-node.entity';
+import { isFleetSessionScheduleTask } from '../tasks-domain/task-session-schedule.port';
 import { WorkScheduleStatus } from '../entities/types';
 import {
     describeCron,
@@ -209,6 +212,15 @@ export class SchedulesService {
         @Optional()
         @Inject(NODE_SCHEDULE_PORT)
         private readonly nodeScheduleSource?: NodeScheduleSource,
+        // Schedules on computers (FL-13 P2, FR-2) — the computer chip of a
+        // recurring Task whose Agent is pinned (R-29: affinity is the pin).
+        // Appended LAST + @Optional(): unbound, no chip.
+        @Optional()
+        @InjectRepository(FleetAgentNodeAffinity)
+        private readonly affinityRepo?: Repository<FleetAgentNodeAffinity>,
+        @Optional()
+        @InjectRepository(FleetNode)
+        private readonly fleetNodeRepo?: Repository<FleetNode>,
     ) {}
 
     async getSchedules(
@@ -604,7 +616,7 @@ export class SchedulesService {
             ]);
 
             const nowMs = now.getTime();
-            return rows.map((task) => {
+            const projected = rows.map((task) => {
                 const exhausted =
                     task.recurrenceMaxOccurrences != null &&
                     task.recurrenceOccurredCount >= task.recurrenceMaxOccurrences;
@@ -676,6 +688,8 @@ export class SchedulesService {
                     },
                 };
             });
+            await this.attachComputerChips(scope, projected, rows);
+            return projected;
         } catch (error) {
             this.warn('recurring_task', error, degraded);
             return [];
@@ -1050,6 +1064,60 @@ export class SchedulesService {
         } catch (error) {
             this.warn('inbound_trigger', error, degraded);
             return [];
+        }
+    }
+
+    /**
+     * Schedules on computers (FL-13 P2, FR-2, CONTRACTS R-29) — a recurring
+     * Task whose Agent is pinned to a computer keeps its `recurring_task`
+     * source and gains the computer chip (`nodeId`, `nodeName`,
+     * `nodeTimeZone`); an Agent-session schedule (the Schedules dialog's
+     * label) is also marked `agentSession`. Affinity is Organization-scoped, so
+     * a personal scope has none. Best-effort: a failed lookup adds no chip and
+     * never fails the source.
+     */
+    private async attachComputerChips(
+        scope: ScheduleScope,
+        projected: ProjectedRow[],
+        tasks: Task[],
+    ): Promise<void> {
+        const sessionTaskIds = new Set(tasks.filter((task) => isFleetSessionScheduleTask(task)).map((task) => task.id));
+        for (const row of projected) {
+            if (sessionTaskIds.has(row.view.ownerId)) row.view.agentSession = true;
+        }
+        if (!this.affinityRepo || !this.fleetNodeRepo || !scope.organizationId) return;
+        const agentIds = [
+            ...new Set(projected.map((row) => row.view.agentId).filter((id): id is string => Boolean(id))),
+        ];
+        if (agentIds.length === 0) return;
+        try {
+            const nodeByAgent = new Map<string, string>();
+            for (const ids of chunked(agentIds, MAX_PER_SOURCE)) {
+                const affinities = await this.affinityRepo.find({
+                    where: { userId: scope.userId, organizationId: scope.organizationId, agentId: In(ids) },
+                });
+                for (const affinity of affinities ?? []) nodeByAgent.set(affinity.agentId, affinity.nodeId);
+            }
+            const nodeIds = [...new Set(nodeByAgent.values())];
+            if (nodeIds.length === 0) return;
+            const nodes = new Map<string, Pick<FleetNode, 'id' | 'name' | 'timeZone'>>();
+            for (const ids of chunked(nodeIds, MAX_PER_SOURCE)) {
+                const found = await this.fleetNodeRepo.find({
+                    where: { id: In(ids) },
+                    select: { id: true, name: true, timeZone: true },
+                });
+                for (const node of found ?? []) nodes.set(node.id, node);
+            }
+            for (const row of projected) {
+                const nodeId = row.view.agentId ? nodeByAgent.get(row.view.agentId) : undefined;
+                const node = nodeId ? nodes.get(nodeId) : undefined;
+                if (!node) continue;
+                row.view.nodeId = node.id;
+                row.view.nodeName = node.name;
+                row.view.nodeTimeZone = node.timeZone ?? null;
+            }
+        } catch (error) {
+            this.logger.warn(`Schedules computer chips failed: ${String(error)}`);
         }
     }
 

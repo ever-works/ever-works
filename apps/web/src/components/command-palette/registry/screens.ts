@@ -401,6 +401,8 @@ const FLEET_MACHINE_TABS = [
     { tag: 'services', tab: 'services', key: 'fleet.palette.servicesOn' },
     { tag: 'docker', tab: 'docker', key: 'fleet.palette.dockerOn' },
     { tag: 'processes', tab: 'processes', key: 'fleet.palette.processesOn' },
+    // Files on computers (FL-11, spec §5.9): "Files on <name>" for a computer with an allowed root.
+    { tag: 'files', tab: 'files', key: 'fleet.palette.filesOn' },
 ] as const;
 
 export function fleetComputerMachineScreens(
@@ -434,12 +436,12 @@ export function fleetComputerPortsScreens(
     return computers
         .filter((computer) => computer.capabilities?.includes('ports') ?? false)
         .map((computer) => ({
-        id: `fleet.computer.${computer.id}.ports`,
-        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
-        icon: Monitor,
-        title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
-        breadcrumb: fleet,
-    }));
+            id: `fleet.computer.${computer.id}.ports`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
+            icon: Monitor,
+            title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
+            breadcrumb: fleet,
+        }));
 }
 
 /**
@@ -610,13 +612,48 @@ const WORK_SUBPAGES: readonly WorkScreenBuilder[] = [
     },
 ];
 
+/** FL-19 (spec §5.4) — the Agent whose pages are open (`/agents/<uuid>…`, any locale prefix), or null. */
+export function getAgentIdFromPath(pathname: string): string | null {
+    const match =
+        /(?:^|\/)agents\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$|\?|#)/i.exec(
+            pathname,
+        );
+    return match ? match[1] : null;
+}
+
+/**
+ * FL-19 (spec §5.4) — "Fleet tools for this Agent": the Capabilities tab's Fleet tools block of the
+ * Agent being viewed (what it may read and do on my computers, and which gate refuses).
+ */
+export function agentFleetToolsScreens(
+    pathname: string,
+    options: { fleetEnabled?: boolean } = {},
+): PaletteScreen[] {
+    if (options.fleetEnabled === false) return [];
+    const agentId = getAgentIdFromPath(pathname);
+    if (!agentId) return [];
+    return [
+        {
+            id: `agent.fleetTools.${agentId}`,
+            href: `${ROUTES.DASHBOARD_AGENT_CAPABILITIES(agentId)}#fleet-tools`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.tools.palette.forThisAgent'),
+            breadcrumb: (t: PaletteTranslator) => [t('dashboard.sidebar.navigation.agents')],
+        },
+    ];
+}
+
 /**
  * The screens available from `pathname`: every dashboard screen, plus the
- * sub-pages of the Work being viewed when the operator is inside one.
+ * sub-pages of the Work being viewed when the operator is inside one, plus
+ * (FL-19) the Agent's Fleet tools when an Agent's pages are open.
  */
 export function screensFor(pathname: string, options: ScreensForOptions = {}): PaletteScreen[] {
     const workId = getWorkIdFromPath(pathname);
-    const screens = dashboardScreens(options);
+    const screens = [
+        ...dashboardScreens(options),
+        ...agentFleetToolsScreens(pathname, { fleetEnabled: options.fleetHubEnabled }),
+    ];
     if (!workId) return screens;
     return [
         ...screens,

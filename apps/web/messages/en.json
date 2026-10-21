@@ -12852,6 +12852,9 @@
             "badge": "for me"
         },
         "tools": {
+            "palette": {
+                "forThisAgent": "Fleet tools for this Agent"
+            },
             "capabilities": {
                 "title": "Fleet tools",
                 "description": "{agent} can reach your computers through tools. What {agent} may do depends on three things: its tool grants, its trust ladder, and what each computer's owner allows.",
@@ -12907,6 +12910,32 @@
                     "runners": "Actions runners",
                     "usage": "Usage",
                     "operations": "Operations"
+                }
+            },
+            "decision": {
+                "expiresIn": "Expires in {hours} h {minutes} m",
+                "expired": "Older than 24 hours: approving it runs nothing — the Agent must ask again.",
+                "details": "What it would call ({tool})",
+                "rungs": {
+                    "ask": "Ask",
+                    "draft": "Draft"
+                },
+                "categories": {
+                    "machineAdmin": "Change a computer",
+                    "machineRun": "Run commands on a computer",
+                    "writeDestructive": "Delete things",
+                    "writeInternal": "Change things inside the workspace",
+                    "agentFanout": "Hire agents and set schedules",
+                    "publishExternal": "Publish outside the workspace",
+                    "spendMetered": "Spend credits",
+                    "other": "Act on a computer"
+                },
+                "reasons": {
+                    "blastRadius": "The computer warned this could cut it off from Ever Works.",
+                    "kill": "Force-stopping a process is decided by a person.",
+                    "destructive": "This removes something and cannot be undone.",
+                    "run": "Starting a container is decided by a person.",
+                    "other": "This waits for a person."
                 }
             }
         },
@@ -13030,6 +13059,173 @@
             "pr": {
                 "head": "Pull request #{number} · checks out its branch {branch}",
                 "forkReadOnly": "From a fork — {agent} can review and comment but not push"
+            }
+        },
+        "sessionGit": {
+            "gitLine": {
+                "noCheckout": "Not in a checkout",
+                "worktreeOf": "Worktree of {folder}",
+                "folderGone": "the folder is gone"
+            },
+            "prPill": {
+                "label": "PR #{number} {state}",
+                "states": {
+                    "open": "open",
+                    "draft": "draft",
+                    "merged": "merged",
+                    "closed": "closed"
+                },
+                "checks": {
+                    "passing": "checks passing",
+                    "failing": "checks failing",
+                    "pending": "checks running",
+                    "none": "no checks reported"
+                },
+                "unknown": "PR: unknown (GitHub unreachable {minutes} min)",
+                "stale": "GitHub unreachable {minutes} min"
+            },
+            "detail": {
+                "changes": "Changes",
+                "refreshTitle": "Recompute the git line on the computer now",
+                "offline": "{node} is offline (last seen {age})"
+            },
+            "changes": {
+                "title": "Changes",
+                "refresh": "Refresh",
+                "close": "Close",
+                "loading": "Reading the changes on the computer…",
+                "clean": "Nothing uncommitted.",
+                "summary": "{files, plural, one {# changed file} other {# changed files}}, not committed yet",
+                "binary": "binary",
+                "noPatch": "No patch shown for this file.",
+                "fileCut": "… cut at 64 KiB",
+                "refreshesWhile": "Refreshes every 10 s while {who} works",
+                "refreshesWhileSession": "Refreshes every 10 s while the session works",
+                "refreshOnDemand": "Refresh it with ↻",
+                "omitted": "{files, plural, one {# file} other {# files}} omitted ({size})",
+                "seePullRequest": "see the pull request",
+                "status": {
+                    "modified": "modified",
+                    "added": "added",
+                    "deleted": "deleted",
+                    "renamed": "renamed",
+                    "copied": "copied",
+                    "untracked": "new",
+                    "conflicted": "conflict",
+                    "typeChanged": "type changed"
+                }
+            },
+            "where": {
+                "checkoutLabel": "Checkout on {node}",
+                "noCheckout": "None — use the folder below",
+                "modeLabel": "Where the session works",
+                "existing": "Existing checkout",
+                "worktree": "New worktree",
+                "clone": "Fresh clone",
+                "existingNote": "The session works in this checkout as it is.",
+                "existingAgentNote": "The Agent works in this checkout as it is — another agent there would overwrite its changes.",
+                "worktreeNote": "A new worktree of this checkout, on its own branch: ready in seconds, shares history with it.",
+                "cloneNote": "A fresh clone of the same repository, on its own branch, in its own folder."
+            },
+            "branch": {
+                "label": "Branch",
+                "checking": "Checking the branch…",
+                "neverUsed": "never used before on {repository}",
+                "suffixed": "{base} exists — using {branch}",
+                "taskBranch": "the Task’s own branch",
+                "edited": "your branch — it is checked again when the worktree is made",
+                "invalid": "git does not accept this branch name",
+                "remoteUnchecked": "the remote could not be asked",
+                "failed": "The branch could not be proposed"
+            },
+            "errorTitles": {
+                "notFound": "Not found",
+                "invalid": "Not possible",
+                "unreachable": "Not connected",
+                "consentMissing": "Not allowed on this computer",
+                "permissionDenied": "Not allowed",
+                "killSwitch": "All computers are stopped",
+                "limitExceeded": "Too many at once",
+                "busy": "Busy",
+                "operationFailed": "It did not finish",
+                "internal": "Something went wrong"
+            },
+            "actions": {
+                "button": "Actions",
+                "loading": "Reading what this session can do…",
+                "theAgent": "the agent",
+                "shellNote": "A shell session has no agent to prompt — use Changes and Clean up.",
+                "notInCheckout": "This session is not in a checkout",
+                "none": "Nothing to offer right now.",
+                "unresolved": "{count, plural, one {# unresolved} other {# unresolved}}",
+                "protectedShort": "pushes to a protected branch",
+                "hidden": "{action} is not available: {reason}",
+                "labels": {
+                    "commit": "Commit",
+                    "commitPush": "Commit and push",
+                    "pullRequest": "Open a pull request",
+                    "update": "Update the pull request #{number}",
+                    "review": "Review the changes",
+                    "fixComments": "Fix the review comments",
+                    "resolveConflicts": "Resolve conflicts",
+                    "recap": "Write a recap"
+                },
+                "reasons": {
+                    "shellSession": "a shell session has no agent to prompt",
+                    "ended": "the session has ended — restart it",
+                    "notInCheckout": "this session is not in a checkout",
+                    "noBranch": "the checkout is not on a branch",
+                    "defaultBranch": "not on {branch}",
+                    "protectedBranch": "{branch} is protected",
+                    "noOpenPullRequest": "there is no open pull request",
+                    "noUnresolvedComments": "no review comment is unresolved",
+                    "mergeable": "the pull request merges cleanly"
+                }
+            },
+            "sheet": {
+                "title": "{action} — {who} on {node}",
+                "yourSession": "your session",
+                "theAgent": "the agent",
+                "promptLabel": "The prompt typed into the session",
+                "ownTemplate": "{who}’s own template",
+                "defaultTemplate": "The Ever Works template",
+                "stillAsks": "{who} still asks before running anything you have not allowed.",
+                "stillAsksOwner": "The CLI still asks before running anything you have not allowed.",
+                "costAgent": "Uses {who}’s model; shown in Actions so far with its cost.",
+                "costOwner": "Runs on your own login; your session’s total cost is shown in Actions so far.",
+                "pushesProtected": "This pushes straight to {branch}.",
+                "readAsAnswer": "{who} is waiting for an answer — your action will be read as the answer.",
+                "cancel": "Cancel",
+                "send": "Send",
+                "sending": "Sending…",
+                "sent": "{action} sent",
+                "notDelivered": "Not delivered — {node} did not confirm it. Send it again from Actions so far."
+            },
+            "pullRequestDialog": {
+                "titleOpen": "Open a pull request",
+                "titleUpdate": "Update the pull request #{number}",
+                "branchLine": "{branch} into {base}",
+                "notPushed": "The branch is not pushed yet — push it first, or the pull request cannot be opened.",
+                "titleLabel": "Title",
+                "bodyLabel": "Description",
+                "draft": "Draft",
+                "byPlatform": "Opened by Ever Works through the GitHub App as you.",
+                "cancel": "Cancel",
+                "submitOpen": "Open the pull request",
+                "submitUpdate": "Update it",
+                "working": "Working…",
+                "opened": "Pull request #{number} opened",
+                "updated": "Pull request #{number} updated"
+            },
+            "ledger": {
+                "title": "Actions so far",
+                "costUnknown": "cost unknown",
+                "sessionTotalOnly": "session total only",
+                "cost": "≈ {tokens} tokens · {cost}",
+                "notDelivered": "not delivered",
+                "pending": "sending…",
+                "resend": "Send again",
+                "stillNotDelivered": "Still not delivered — the computer did not confirm it."
             }
         },
         "checkouts": {
@@ -13211,7 +13407,8 @@
             "servicesOn": "Services on {name}",
             "dockerOn": "Docker on {name}",
             "processesOn": "Processes on {name}",
-            "portsOn": "Ports on {name}"
+            "portsOn": "Ports on {name}",
+            "filesOn": "Files on {name}"
         },
         "nav": {
             "label": "Fleet"
@@ -13784,6 +13981,23 @@
             }
         },
         "schedules": {
+            "unattendedCredentialNote": "Runs happen on {computer} using the Claude Code or Codex sign-in — or the API key — that is set up on that computer. Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a look until someone signs in on {computer} again.",
+            "agentSessions": {
+                "title": "Agent sessions",
+                "row": "{agent} · {cadence}",
+                "next": "next {when}",
+                "paused": "paused",
+                "openTask": "Open the task",
+                "costNote": "Each run appears in Runs with its cost like any other run."
+            },
+            "breaker": {
+                "pauseAll": "Pause all",
+                "confirm": "Pause {count, plural, one {# schedule} other {# schedules}} on {computer}? {running, plural, =0 {Nothing is running.} one {# run in flight finishes; nothing new starts.} other {# runs in flight finish; nothing new starts.}} Nothing is deleted.",
+                "done": "Paused {count, plural, one {# schedule} other {# schedules}} on {computer}.",
+                "undo": "Undo",
+                "undone": "Resumed {count, plural, one {# schedule} other {# schedules}}.",
+                "failed": "Could not pause the schedules on this computer."
+            },
             "tab": {
                 "zones": "{computer} keeps time in {zone} · you are in {viewerZone}",
                 "zonesUnknown": "{computer} has not reported its time zone yet, so its times read UTC · you are in {viewerZone}",
@@ -13845,6 +14059,22 @@
                 "delete": "Could not delete this schedule. Nothing was changed."
             },
             "dialog": {
+                "runs": "Runs",
+                "kindCommand": "A command",
+                "kindAgent": "An Agent session",
+                "agent": "Agent",
+                "agentReasons": {
+                    "pinnedElsewhere": "pinned to another computer",
+                    "notPinned": "not pinned to this computer — pin them on their Capabilities tab",
+                    "needsOrganization": "pinning needs an Organization"
+                },
+                "noPinnedAgent": "No Agent is pinned to {computer}. Pin one on its Capabilities tab first.",
+                "prompt": "Prompt",
+                "promptPlaceholder": "Triage the new issues in acme/api and label them",
+                "provider": "Agent CLI",
+                "checkout": "Checkout",
+                "checkoutHome": "home (~)",
+                "credentialTitle": "Sign-in on the computer",
                 "title": "New schedule on {computer}",
                 "editTitle": "Edit schedule on {computer}",
                 "copyOf": "{name} (copy)",
@@ -14098,6 +14328,8 @@
                 "inFolder": "in this folder",
                 "newWorktree": "in a new worktree of {checkout}",
                 "worktreeLater": "New worktrees arrive with Checkouts",
+                "checkoutNotReady": "The new checkout is {state}; it did not become ready",
+                "creatingCheckout": "Creating the checkout on {node}…",
                 "notInstalled": "not installed on {node}",
                 "firstMessage": "First message",
                 "firstMessageHint": "Typed into {provider} when it starts. Optional for your own sessions.",
@@ -14910,7 +15142,8 @@
                 "unsupportedArch": "Not available on {name}'s processor",
                 "desktopNode": "Not available on this kind of node yet",
                 "permissionDenied": "Only the owner of {name} can create computers on it",
-                "notUpgraded": "Update the Ever Works node on {name} to create virtual computers on it"
+                "notUpgraded": "Update the Ever Works node on {name} to create virtual computers on it",
+                "noWindowsImage": "No Windows installer image is configured on {name}"
             },
             "progress": {
                 "label": "Progress",
@@ -14970,10 +15203,226 @@
                 "confirm": "Destroy",
                 "started": "{name} is being destroyed"
             },
+            "password": {
+                "button": "Copy password",
+                "title": "Password for {name}",
+                "description": "Generated on {host} when the VM was created and kept only there. Revealing it is recorded in the audit log.",
+                "reveal": "Reveal once",
+                "show": "Show",
+                "hide": "Hide",
+                "copy": "Copy",
+                "copied": "Password copied",
+                "copyFailed": "The password could not be copied.",
+                "hidesIn": "Hides in {seconds} s",
+                "close": "Close",
+                "failed": "The password could not be revealed."
+            },
+            "resize": {
+                "button": "Resize…",
+                "title": "Resize {name}",
+                "description": "It uses the new size from its next start.",
+                "cpus": "CPUs",
+                "memory": "Memory",
+                "cancel": "Cancel",
+                "apply": "Resize",
+                "started": "Resizing {name}",
+                "failed": "It could not be resized."
+            },
+            "rebuild": {
+                "button": "Rebuild…",
+                "title": "Rebuild {name}?",
+                "body": "Re-creates the container from the current image. Its home folder and its Fleet registration are kept; sessions on it end.",
+                "confirm": "Rebuild",
+                "started": "Rebuilding {name}"
+            },
+            "watch": {
+                "button": "Watch the install",
+                "opened": "The installer's screen opened on {host}",
+                "failed": "The installer's screen could not be opened."
+            },
+            "activation": {
+                "note": "Windows stays unactivated until you add a product key inside Windows. Ever Works ships no key."
+            },
             "palette": {
                 "newVirtual": "New virtual computer",
                 "start": "Start {name}",
                 "stop": "Stop {name}"
+            }
+        },
+        "files": {
+            "roots": {
+                "label": "Root",
+                "checkout": "{name} (checkout)",
+                "workspace": "Workspace root",
+                "loading": "Reading the folders on {node}…"
+            },
+            "breadcrumb": {
+                "label": "Folder",
+                "top": "Top of {root}",
+                "up": "Up one folder"
+            },
+            "hidden": "Hidden files",
+            "refresh": "Refresh",
+            "loading": "Listing {folder}…",
+            "grid": {
+                "label": "Files in {folder}",
+                "name": "Name",
+                "size": "Size",
+                "modified": "Modified",
+                "kind": "Kind",
+                "select": "Select {name}",
+                "selectAll": "Select all",
+                "parent": "Up one folder",
+                "empty": "This folder is empty.",
+                "truncated": "Showing the first {shown} of {total} items. Select fewer than 5,000 items at a time.",
+                "open": "Open {name}",
+                "kinds": {
+                    "file": "file",
+                    "folder": "folder",
+                    "link": "link",
+                    "other": "other"
+                },
+                "flags": {
+                    "credential": "credential-shaped",
+                    "linkInside": "link (stays inside the root)",
+                    "linkOutside": "points outside the root",
+                    "linkBroken": "broken link"
+                },
+                "keyboardHint": "Arrow keys move, Space selects, Enter opens, Backspace goes up."
+            },
+            "actions": {
+                "selected": "{count, plural, one {# selected} other {# selected}} · {size}",
+                "download": "Download",
+                "upload": "Upload files",
+                "uploadFolder": "Upload a folder",
+                "copy": "Copy to another computer…",
+                "copySoon": "Copying between computers arrives next",
+                "delete": "Delete",
+                "tooMany": "Select fewer than 5,000 items",
+                "checking": "Checking…",
+                "dropHint": "Drop files here to upload them into {folder}"
+            },
+            "conflicts": {
+                "title": "{count} of {total} items already exist in {folder}",
+                "line": "{size} · modified {when} on {node}",
+                "replace": "Replace",
+                "skip": "Skip",
+                "others": "{count, plural, =0 {} one {The other item is new.} other {The other # items are new.}}",
+                "cancel": "Cancel",
+                "skipAll": "Skip all",
+                "replaceAll": "Replace all",
+                "upload": "Upload",
+                "tooManyChoices": "Too many individual choices — use Replace all or Skip all."
+            },
+            "delete": {
+                "titleOne": "Delete {name} from {node}?",
+                "titleMany": "Delete {count} items from {folder} on {node}?",
+                "body": "This cannot be undone.",
+                "typeOne": "Type its name to confirm:",
+                "typeMany": "Type the folder's name ({name}) to confirm:",
+                "cancel": "Cancel",
+                "confirm": "Delete",
+                "working": "Deleting…",
+                "done": "{count, plural, one {Deleted # item.} other {Deleted # items.}}"
+            },
+            "credential": {
+                "title": "This looks like a credential file ({name}). Download it anyway?",
+                "titleMany": "{count, plural, one {# file looks like a credential file} other {# files look like credential files}} ({name}…). Download anyway?",
+                "body": "It is sent only to your browser.",
+                "cancel": "Cancel",
+                "confirm": "Download",
+                "titleCopy": "This looks like a credential file ({name}). Copy it anyway?"
+            },
+            "operations": {
+                "title": "Operations",
+                "download": "⬇ {label} → your browser",
+                "upload": "⬆ {label} → {node}",
+                "copy": "⇄ {label} · {from} → {to}",
+                "running": "{percent}% · {speed}/s",
+                "runningNoTotal": "{moved} · {speed}/s",
+                "cancel": "Cancel",
+                "done": "Done — {size} in {seconds} s",
+                "cancelled": "Cancelled — {moved} moved; nothing partial was left on {node}.",
+                "interrupted": "Interrupted — {node} went offline after {moved}.",
+                "failed": "Failed — {hint}",
+                "starting": "Starting…",
+                "uploaded": "{count, plural, one {Uploaded # item} other {Uploaded # items}} — {replaced} replaced, {skipped} skipped.",
+                "copyTo": "⇄ {label} · {from} → {to}"
+            },
+            "footer": {
+                "roots": "Only these roots are visible on {node}: {list}.",
+                "checkouts": "{count, plural, one {# checkout} other {# checkouts}}",
+                "workspace": "the workspace root",
+                "howRoots": "How roots work",
+                "cost": "Transfers spend no credits; this one has moved {current} through Ever Works. Today: {today}.",
+                "costIdle": "Transfers spend no credits. Today: {today} through Ever Works."
+            },
+            "states": {
+                "offline": "{node} is offline — last heard from {relative}",
+                "offlineNever": "{node} is offline",
+                "consentMissing": "Machine management is switched off on {node}",
+                "consentCommand": "Run this on {node}:",
+                "noRoots": "{node} has no folders Ever Works may show",
+                "noRootsCommand": "Add one on {node}:",
+                "permissionDenied": "Only the owner of {node} can browse its files",
+                "desktopNode": "Not available on this kind of computer yet",
+                "killSwitch": "All computers are stopped",
+                "unreachable": "{node} could not be reached",
+                "listError": "{node} could not list this folder",
+                "tryAgain": "Try again"
+            },
+            "errors": {
+                "entries": "Select fewer than 5,000 items",
+                "bytes": "One transfer moves at most 2 GB — select less",
+                "name": "{name} has a name this computer cannot take",
+                "generic": "Something went wrong: {hint}"
+            },
+            "a11y": {
+                "operations": "File operations",
+                "notices": "File notices"
+            },
+            "copy": {
+                "title": "Copy {count, plural, one {# item} other {# items}} ({size}) from {node}",
+                "through": "Goes through Ever Works; {from} and {to} never talk to each other.",
+                "another": "the other computer",
+                "computer": "To computer",
+                "loading": "Reading your computers…",
+                "nodeUnavailable": "{name} — {reason}",
+                "reasons": {
+                    "desktopNode": "not available on this kind of computer yet",
+                    "offline": "offline",
+                    "unmanaged": "management off",
+                    "noFolders": "no shared folders"
+                },
+                "root": "Root",
+                "folder": "Folder",
+                "badFolder": "That path leaves its root",
+                "browse": "Folders",
+                "cancel": "Cancel",
+                "submit": "Check and copy",
+                "unreachable": "That computer could not be reached",
+                "started": "Copying {count, plural, one {# item} other {# items}} to {node}…"
+            }
+        },
+        "desktop": {
+            "paste": {
+                "allow": "Allow paste into this desktop",
+                "open": "Paste text…",
+                "shortcut": "Ctrl/⌘+Shift+V",
+                "takeControlFirst": "Take control first",
+                "switchOnFirst": "Switch on paste for this desktop first",
+                "pasted": "Pasted {size} on {node}.",
+                "title": "Paste text into {node}",
+                "body": "Goes to whatever has focus on {node}'s screen. Nothing is read back from that computer.",
+                "textLabel": "Text to paste",
+                "size": "{size} of {cap}",
+                "reread": "Read my clipboard again",
+                "secret": "This looks like it contains a secret. It is sent only to {node} and never stored.",
+                "tooLarge": "A paste carries at most 256 KB of text",
+                "clipboardDenied": "The browser did not share your clipboard — paste the text into the box instead.",
+                "cancel": "Cancel",
+                "paste": "Paste",
+                "failed": "The paste failed"
             }
         },
         "cloud": {

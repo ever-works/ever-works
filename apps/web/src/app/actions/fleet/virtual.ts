@@ -10,6 +10,7 @@ import {
     type FleetVirtualCreateResponse,
     type FleetVirtualOperationResponse,
     type FleetVirtualOptionsView,
+    type FleetVirtualPasswordRevealResponse,
     type FleetVirtualPowerAction,
     type FleetVirtualSystemId,
 } from '@ever-works/contracts';
@@ -119,4 +120,36 @@ export async function retryFleetVirtualEnrollmentAction(
     childNodeId: string,
 ): Promise<FleetVirtualResult<FleetVirtualOperationResponse>> {
     return run(() => fleetVirtualAPI.retryEnrollment(hostNodeId, childNodeId));
+}
+
+/**
+ * Windows VMs (P2, FR-21) — the one-time password reveal. The dialog IS the
+ * `confirm` (its text says the reveal is recorded); the value goes straight
+ * back to the owner's browser and is never kept here.
+ */
+export async function revealFleetVirtualPasswordAction(
+    hostNodeId: string,
+    childNodeId: string,
+): Promise<FleetVirtualResult<FleetVirtualPasswordRevealResponse>> {
+    return run(() => fleetVirtualAPI.revealPassword(hostNodeId, childNodeId));
+}
+
+/** Resize (P3, FR-38): a stopped virtual computer's CPUs / memory. The dialog is the confirmation. */
+export async function resizeFleetVirtualAction(
+    hostNodeId: string,
+    childNodeId: string,
+    size: { cpus?: 2 | 4 | 8; memoryGiB?: 4 | 8 | 16 },
+): Promise<FleetVirtualResult<FleetVirtualOperationResponse>> {
+    const body: { cpus?: number; memoryGiB?: number } = {};
+    if (size.cpus) body.cpus = size.cpus;
+    if (size.memoryGiB) body.memoryGiB = size.memoryGiB;
+    return run(() => fleetVirtualAPI.resize(hostNodeId, childNodeId, body));
+}
+
+/** Rebuild (P3, FR-39): a Container from the current image, keeping its home. The dialog is the confirmation. */
+export async function rebuildFleetVirtualAction(
+    hostNodeId: string,
+    childNodeId: string,
+): Promise<FleetVirtualResult<FleetVirtualOperationResponse>> {
+    return run(() => fleetVirtualAPI.rebuild(hostNodeId, childNodeId));
 }
