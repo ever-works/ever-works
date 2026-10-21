@@ -191,6 +191,7 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                             opening={opening === port.port}
                             selected={port.port === selectedPort}
                             onOpen={(row, target) => void open(row, target)}
+                            onTunnelChange={() => void reload()}
                         />
                     ))}
                     {groups.other.length > 0 && (

@@ -133,6 +133,7 @@ import {
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
+    FleetPortTunnelService,
     FleetService,
     FleetSessionService,
 } from '@ever-works/agent/fleet';
@@ -2138,6 +2139,9 @@ async function assertRealWriteTarget(
                 // (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the four
                 // tools are not offered; `fleet_commands_run` only ever files an approval.
                 { token: FleetCommandService, optional: true },
+                // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortTunnelService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2166,6 +2170,7 @@ async function assertRealWriteTarget(
                 fleetPorts?: FleetPortsService | null,
                 checkouts?: FleetCheckoutService | null,
                 fleetCommands?: FleetCommandService | null,
+                fleetPortTunnels?: FleetPortTunnelService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2191,6 +2196,7 @@ async function assertRealWriteTarget(
                     ...(checkouts ? { checkouts: { service: checkouts } } : {}),
                     ...(fleetMachine ? { machine: fleetMachine } : {}),
                     ...(fleetPorts ? { ports: fleetPorts } : {}),
+                    ...(fleetPortTunnels ? { portTunnels: fleetPortTunnels } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

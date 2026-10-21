@@ -45,7 +45,7 @@ import {
     screensFor,
 } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
-import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
+import { useFleetHubEnabled, useFleetMachineFactsEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import {
     buildPaletteSections,
     filterLabel,
@@ -255,18 +255,19 @@ export function CommandPalette({
     }, [commandContext, response]);
     // Fleet hub (FL-01, FR-13): the hub's screens exist only while it is on.
     const fleetHubEnabled = useFleetHubEnabled();
+    const fleetMachineFactsEnabled = useFleetMachineFactsEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
     const screens = useMemo(
         () => [
             ...screensFor(appPath, { fleetHubEnabled }),
-            ...fleetComputerScreens(fleetComputers),
+            ...fleetComputerScreens(fleetComputers, { logs: fleetMachineFactsEnabled }),
             // FL-09 (FR-23): "Services on <name>", "Docker on <name>", "Processes on <name>".
             ...fleetComputerMachineScreens(fleetComputers),
             // Servers and ports (FL-10): "Ports on <computer>".
             ...fleetComputerPortsScreens(fleetComputers),
         ],
-        [appPath, fleetHubEnabled, fleetComputers],
+        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetComputers],
     );
 
     const sections = useMemo(

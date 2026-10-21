@@ -193,6 +193,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-sessions',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
+				// Reading a computer's logs through that link.
+				'features/fleet-logs',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

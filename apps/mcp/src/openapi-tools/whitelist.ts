@@ -639,6 +639,25 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
+	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
+	// read at most 500 secret-scanned lines of one. The read never follows; a
+	// `follow` argument is cut from the tool (the route refuses it anyway).
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/logs/sources',
+		toolName: 'fleet_logs_sources',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/logs/read',
+		toolName: 'fleet_logs_read',
+		annotations: { readOnlyHint: true },
+		omitArgs: ['follow']
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
@@ -716,6 +735,16 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'fleet_ports_open',
 		description:
 			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
+		annotations: { destructiveHint: false }
+	},
+	// FL-10 P2 — close a preview tunnel (dark unless FLEET_PORT_TUNNEL_ENABLED). Opening one is NOT
+	// exposed here: its answer carries a one-time address into the owner's tunnel, which a tool must
+	// never hold (spec U15); the in-platform Agent tool opens one without that address.
+	{
+		method: 'DELETE',
+		path: '/api/fleet/nodes/{id}/ports/{port}/preview',
+		toolName: 'fleet_ports_preview_close',
+		description: "Close the person's preview tunnel to a port on a fleet computer.",
 		annotations: { destructiveHint: false }
 	},
 
