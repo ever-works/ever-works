@@ -522,11 +522,17 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 	}),
 
 	// ── files (FL-11) ──
-	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
-		route: GET('/api/fleet/nodes/{id}/files'),
+	// P1 (FL-11 lane log decision 15): the roots read joins the family, and the list's route is the
+	// one FL-11 built (`…/files/list` — `…/files` is the family's prefix, not a route).
+	read('fleet_files_roots', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/roots'),
+		cli: 'fleet files roots'
+	}),
+	read('fleet_files_list', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
+		route: GET('/api/fleet/nodes/{id}/files/list'),
 		cli: 'fleet files list'
 	}),
-	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'planned', {
+	read('fleet_files_stat', 'files', 'FL-11', 'FLEET_MACHINE_FACTS_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/files/stat'),
 		cli: 'fleet files stat'
 	}),

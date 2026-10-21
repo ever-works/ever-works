@@ -12836,6 +12836,21 @@
         }
     },
     "fleet": {
+        "githubTrigger": {
+            "preset": {
+                "button": "GitHub: things for me",
+                "created": "Trigger created: review requests, assignments and your pull requests now become Tasks in the Backlog.",
+                "failed": "The GitHub trigger could not be created."
+            },
+            "aboutMe": {
+                "title": "About me",
+                "reviewRequested": "Review requested from me",
+                "assigned": "Assigned to me",
+                "authored": "My pull requests",
+                "hint": "Matched against the GitHub account linked to you. Leave all unchecked to match every event."
+            },
+            "badge": "for me"
+        },
         "tools": {
             "capabilities": {
                 "title": "Fleet tools",
@@ -12892,6 +12907,32 @@
                     "runners": "Actions runners",
                     "usage": "Usage",
                     "operations": "Operations"
+                }
+            },
+            "decision": {
+                "expiresIn": "Expires in {hours} h {minutes} m",
+                "expired": "Older than 24 hours: approving it runs nothing — the Agent must ask again.",
+                "details": "What it would call ({tool})",
+                "rungs": {
+                    "ask": "Ask",
+                    "draft": "Draft"
+                },
+                "categories": {
+                    "machineAdmin": "Change a computer",
+                    "machineRun": "Run commands on a computer",
+                    "writeDestructive": "Delete things",
+                    "writeInternal": "Change things inside the workspace",
+                    "agentFanout": "Hire agents and set schedules",
+                    "publishExternal": "Publish outside the workspace",
+                    "spendMetered": "Spend credits",
+                    "other": "Act on a computer"
+                },
+                "reasons": {
+                    "blastRadius": "The computer warned this could cut it off from Ever Works.",
+                    "kill": "Force-stopping a process is decided by a person.",
+                    "destructive": "This removes something and cannot be undone.",
+                    "run": "Starting a container is decided by a person.",
+                    "other": "This waits for a person."
                 }
             }
         },
@@ -13011,6 +13052,10 @@
             },
             "chip": {
                 "title": "Task {slug}: {title}"
+            },
+            "pr": {
+                "head": "Pull request #{number} · checks out its branch {branch}",
+                "forkReadOnly": "From a fork — {agent} can review and comment but not push"
             }
         },
         "checkouts": {
@@ -13192,7 +13237,8 @@
             "servicesOn": "Services on {name}",
             "dockerOn": "Docker on {name}",
             "processesOn": "Processes on {name}",
-            "portsOn": "Ports on {name}"
+            "portsOn": "Ports on {name}",
+            "filesOn": "Files on {name}"
         },
         "nav": {
             "label": "Fleet"
@@ -14978,6 +15024,137 @@
                 "newVirtual": "New virtual computer",
                 "start": "Start {name}",
                 "stop": "Stop {name}"
+            }
+        },
+        "files": {
+            "roots": {
+                "label": "Root",
+                "checkout": "{name} (checkout)",
+                "workspace": "Workspace root",
+                "loading": "Reading the folders on {node}…"
+            },
+            "breadcrumb": {
+                "label": "Folder",
+                "top": "Top of {root}",
+                "up": "Up one folder"
+            },
+            "hidden": "Hidden files",
+            "refresh": "Refresh",
+            "loading": "Listing {folder}…",
+            "grid": {
+                "label": "Files in {folder}",
+                "name": "Name",
+                "size": "Size",
+                "modified": "Modified",
+                "kind": "Kind",
+                "select": "Select {name}",
+                "selectAll": "Select all",
+                "parent": "Up one folder",
+                "empty": "This folder is empty.",
+                "truncated": "Showing the first {shown} of {total} items. Select fewer than 5,000 items at a time.",
+                "open": "Open {name}",
+                "kinds": {
+                    "file": "file",
+                    "folder": "folder",
+                    "link": "link",
+                    "other": "other"
+                },
+                "flags": {
+                    "credential": "credential-shaped",
+                    "linkInside": "link (stays inside the root)",
+                    "linkOutside": "points outside the root",
+                    "linkBroken": "broken link"
+                },
+                "keyboardHint": "Arrow keys move, Space selects, Enter opens, Backspace goes up."
+            },
+            "actions": {
+                "selected": "{count, plural, one {# selected} other {# selected}} · {size}",
+                "download": "Download",
+                "upload": "Upload files",
+                "uploadFolder": "Upload a folder",
+                "copy": "Copy to another computer…",
+                "copySoon": "Copying between computers arrives next",
+                "delete": "Delete",
+                "tooMany": "Select fewer than 5,000 items",
+                "checking": "Checking…",
+                "dropHint": "Drop files here to upload them into {folder}"
+            },
+            "conflicts": {
+                "title": "{count} of {total} items already exist in {folder}",
+                "line": "{size} · modified {when} on {node}",
+                "replace": "Replace",
+                "skip": "Skip",
+                "others": "{count, plural, =0 {} one {The other item is new.} other {The other # items are new.}}",
+                "cancel": "Cancel",
+                "skipAll": "Skip all",
+                "replaceAll": "Replace all",
+                "upload": "Upload",
+                "tooManyChoices": "Too many individual choices — use Replace all or Skip all."
+            },
+            "delete": {
+                "titleOne": "Delete {name} from {node}?",
+                "titleMany": "Delete {count} items from {folder} on {node}?",
+                "body": "This cannot be undone.",
+                "typeOne": "Type its name to confirm:",
+                "typeMany": "Type the folder's name ({name}) to confirm:",
+                "cancel": "Cancel",
+                "confirm": "Delete",
+                "working": "Deleting…",
+                "done": "{count, plural, one {Deleted # item.} other {Deleted # items.}}"
+            },
+            "credential": {
+                "title": "This looks like a credential file ({name}). Download it anyway?",
+                "titleMany": "{count, plural, one {# file looks like a credential file} other {# files look like credential files}} ({name}…). Download anyway?",
+                "body": "It is sent only to your browser.",
+                "cancel": "Cancel",
+                "confirm": "Download"
+            },
+            "operations": {
+                "title": "Operations",
+                "download": "⬇ {label} → your browser",
+                "upload": "⬆ {label} → {node}",
+                "copy": "⇄ {label} · {from} → {to}",
+                "running": "{percent}% · {speed}/s",
+                "runningNoTotal": "{moved} · {speed}/s",
+                "cancel": "Cancel",
+                "done": "Done — {size} in {seconds} s",
+                "cancelled": "Cancelled — {moved} moved; nothing partial was left on {node}.",
+                "interrupted": "Interrupted — {node} went offline after {moved}.",
+                "failed": "Failed — {hint}",
+                "starting": "Starting…",
+                "uploaded": "{count, plural, one {Uploaded # item} other {Uploaded # items}} — {replaced} replaced, {skipped} skipped."
+            },
+            "footer": {
+                "roots": "Only these roots are visible on {node}: {list}.",
+                "checkouts": "{count, plural, one {# checkout} other {# checkouts}}",
+                "workspace": "the workspace root",
+                "howRoots": "How roots work",
+                "cost": "Transfers spend no credits; this one has moved {current} through Ever Works. Today: {today}.",
+                "costIdle": "Transfers spend no credits. Today: {today} through Ever Works."
+            },
+            "states": {
+                "offline": "{node} is offline — last heard from {relative}",
+                "offlineNever": "{node} is offline",
+                "consentMissing": "Machine management is switched off on {node}",
+                "consentCommand": "Run this on {node}:",
+                "noRoots": "{node} has no folders Ever Works may show",
+                "noRootsCommand": "Add one on {node}:",
+                "permissionDenied": "Only the owner of {node} can browse its files",
+                "desktopNode": "Not available on this kind of computer yet",
+                "killSwitch": "All computers are stopped",
+                "unreachable": "{node} could not be reached",
+                "listError": "{node} could not list this folder",
+                "tryAgain": "Try again"
+            },
+            "errors": {
+                "entries": "Select fewer than 5,000 items",
+                "bytes": "One transfer moves at most 2 GB — select less",
+                "name": "{name} has a name this computer cannot take",
+                "generic": "Something went wrong: {hint}"
+            },
+            "a11y": {
+                "operations": "File operations",
+                "notices": "File notices"
             }
         }
     }

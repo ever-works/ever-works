@@ -10,6 +10,7 @@ import {
     Query,
     Req,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -34,6 +35,7 @@ import {
     ListFleetServicesQueryDto,
 } from './dto/fleet-machine.dto';
 import { FleetMachineFactsEnabledGuard } from './fleet-machine-facts-enabled.guard';
+import { FleetConfirmationInterceptor } from '../tools/fleet-confirmation.interceptor';
 
 /**
  * Services on computers (FL-09 P1, plan §5, CONTRACTS §11.2) — the REST
@@ -55,6 +57,9 @@ import { FleetMachineFactsEnabledGuard } from './fleet-machine-facts-enabled.gua
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard, FleetMachineFactsEnabledGuard)
+// FL-19 (CONTRACTS §2.2) — one `confirmation_required` answer for every caller: the class from
+// the catalogue, the hint that says what to send; token-style fields are ignored.
+@UseInterceptors(FleetConfirmationInterceptor)
 export class FleetServicesController {
     constructor(private readonly machine: FleetMachineActionsService) {}
 

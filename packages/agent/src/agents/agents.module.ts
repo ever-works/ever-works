@@ -48,6 +48,7 @@ import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { AgentEscalationService } from './agent-escalation.service';
 import { AgentProposalExecutionListener } from './agent-proposal-execution.listener';
+import { FleetHeldCallListener } from './fleet-held-call.listener';
 import { EscalationConfidenceService } from './escalation-confidence';
 import { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
 import { WorkflowAiDecisionAdapter } from './workflow-ai-decision.adapter';
@@ -199,6 +200,9 @@ import { FacadesModule } from '../facades/facades.module';
         // proposal (`resolve_escalation`, `editAgentFile`) once a person
         // decides it in the approvals queue. Nothing else applies them.
         AgentProposalExecutionListener,
+        // FL-19 P2 - runs a held fleet act (`fleet-tool-call` Decision) once a person
+        // approves it, through the Agent's own assembled tools. Nothing else runs them.
+        FleetHeldCallListener,
         // Judgment layer G3 - scores the confidence column on every
         // escalation (AI judge through the AI facade, deterministic
         // table otherwise). FacadesModule is already imported above, so

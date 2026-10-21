@@ -130,6 +130,19 @@ Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes 
 under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
 `invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
 
+**Revision 18 (2026-10-21)** — FL-15 (lane log `docs/internal/fleet/lanes/FL-15.md`): `FleetSessionStartRequest`
+gains `taskId?` (an Agent session's Run carries the Task; refused `busy` while the same Agent works it, `invalid` off
+the Agent's pinned computer, `limit_exceeded` with no free agent slot) and `checkoutId` is now honoured (a `ready`,
+host-isolated checkout on the same computer; its path is the folder); `GET /sessions?taskId=`; `FleetSessionView.task?`
+(`FleetSessionTaskRef { id, slug, title }`); the hand-off's closed reason set gains `no-access`
+(`FLEET_HANDOFF_REASONS`, owner question Q1); `git.identity` / `git.setIdentity` reply `{ name, email, helper, readAt
+[, fields] }` with `{ set, value? }` fields, set takes `{ name, email }` only; audit `node.git.identity.set` details
+`{ fields, emailSource }` (never the email); event matchers gain `audience { me: review-requested | assigned |
+authored }`; `POST /api/inbound-triggers/presets/github-for-me`; `github.pr` events for `review_requested`,
+`review_request_removed`, `assigned`, `unassigned`, `ready_for_review`, `reopened`, `closed` with `requestedReviewer`,
+`assignee`, `assignees`, `author`, `headRef`, `headRepo`, `fork`, `maintainerCanModify`. Shapes in
+`packages/contracts/src/fleet/fleet-task-handoff.types.ts`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

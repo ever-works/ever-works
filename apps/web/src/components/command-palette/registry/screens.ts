@@ -401,6 +401,8 @@ const FLEET_MACHINE_TABS = [
     { tag: 'services', tab: 'services', key: 'fleet.palette.servicesOn' },
     { tag: 'docker', tab: 'docker', key: 'fleet.palette.dockerOn' },
     { tag: 'processes', tab: 'processes', key: 'fleet.palette.processesOn' },
+    // Files on computers (FL-11, spec §5.9): "Files on <name>" for a computer with an allowed root.
+    { tag: 'files', tab: 'files', key: 'fleet.palette.filesOn' },
 ] as const;
 
 export function fleetComputerMachineScreens(
@@ -434,12 +436,12 @@ export function fleetComputerPortsScreens(
     return computers
         .filter((computer) => computer.capabilities?.includes('ports') ?? false)
         .map((computer) => ({
-        id: `fleet.computer.${computer.id}.ports`,
-        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
-        icon: Monitor,
-        title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
-        breadcrumb: fleet,
-    }));
+            id: `fleet.computer.${computer.id}.ports`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
+            icon: Monitor,
+            title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
+            breadcrumb: fleet,
+        }));
 }
 
 /**

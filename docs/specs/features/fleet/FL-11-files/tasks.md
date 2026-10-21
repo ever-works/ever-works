@@ -32,7 +32,7 @@
 
 ## P1.A — Contracts
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-files.types.ts` (`FLEET_FILES_CAPABILITY`,
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-files.types.ts` (`FLEET_FILES_CAPABILITY`,
       `FleetFileRootView`, `FleetFileEntryView`, `FleetFileListView`, `FleetFileConflictView`,
       `FLEET_FILE_CONFLICT_POLICIES`, `FleetFilesOperationView`, `FLEET_FILES_LIMITS`,
       `FLEET_CREDENTIAL_FILE_PATTERNS`, `isCredentialShapedName`) and
@@ -45,13 +45,13 @@
 
 ## P1.B — Node files module
 
-- [ ] **T-02**. `apps/node/src/core/link/modules/files/path-guard.ts`: `resolveInsideRoot(root, rel, io)` over the shared resolver's `isUnderAllowedRoot` (T-03), `lstat` walk per component,
+- [x] **T-02**. `apps/node/src/core/link/modules/files/path-guard.ts`: `resolveInsideRoot(root, rel, io)` over the shared resolver's `isUnderAllowedRoot` (T-03), `lstat` walk per component,
       link-target check, UNC refusal; typed refusals `escape | link-escape | not-found`. Never a
       second canonicalisation rule.
       **Test**: `apps/node/src/core/link/modules/files/path-guard.spec.ts` — `..`, absolute, `C:\`,
       `\\server\share`, link out of root, link inside root, case-insensitive match on `win32` via
       injected platform.
-- [ ] **T-03** (parallel). Import the shared resolver `apps/node/src/core/link/allowed-roots.ts`
+- [x] **T-03** (parallel). Import the shared resolver `apps/node/src/core/link/allowed-roots.ts`
       (CONTRACTS R-39; create it with FL-08's API `resolveAllowedRoots({ checkouts, workspaceRoot, extraRoots })` / `isUnderAllowedRoot(path)` only if neither FL-08 nor FL-14 has landed it):
       roots from the checkout registry (FL-14; fallback: worktree pool entries under the workspace
       root from `apps/node/src/core/workspaces/fleet-task-workspace.ts`), the workspace root, and
@@ -60,24 +60,24 @@
       `--workspace-root` absolute-path parser, unless already present; `doctor` prints roots.
       **Test**: `apps/node/src/core/link/allowed-roots.spec.ts` (extend, do not duplicate);
       `apps/node/src/cli/program.files-root.spec.ts` (relative path is a usage error, exit 2).
-- [ ] **T-04**. `apps/node/src/core/link/modules/files/list.ts` (`files.list`/`files.stat`:
+- [x] **T-04**. `apps/node/src/core/link/modules/files/list.ts` (`files.list`/`files.stat`:
       `readdir` `withFileTypes`, `lstat` per entry, 5 000 cap + `truncated`, hidden filter per OS,
       flags `credentialShaped`, `linkInsideRoot`) and `credential-shaped.ts` (re-export from
       contracts).
       **Test**: `list.spec.ts` — cap, hidden per platform, flags, a 5 001-entry fixture truncates.
-- [ ] **T-05**. `apps/node/src/core/link/modules/files/pack.ts`: tar (`tar-stream`) of the selection, in-set
+- [x] **T-05**. `apps/node/src/core/link/modules/files/pack.ts`: tar (`tar-stream`) of the selection, in-set
       links as links, out-of-set links skipped and counted, `DATA` ≤ 64 KiB, sender window 8 MiB
       from `ACK`, `END` + `operation.done`; refuses > 5 000 entries or > 2 GiB **before** the first
       byte.
       **Test**: `pack.spec.ts` — tar listing equals the selection; link rules; a slow ACK pauses the
       sender at exactly one window; limits refuse before any `DATA`.
-- [ ] **T-06**. `apps/node/src/core/link/modules/files/unpack.ts`: extract into `<dest>/.ever-works-partial-<opId>/`,
+- [x] **T-06**. `apps/node/src/core/link/modules/files/unpack.ts`: extract into `<dest>/.ever-works-partial-<opId>/`,
       per-entry policy (`skip` default, `replace`), rename on `END`, remove the partial dir on
       `CLOSE`/cancel/failure, `ACK` as consumed; `delete.ts`: canonical check per entry, `fs.rm`
       recursive, never follows links out of root.
       **Test**: `unpack.spec.ts` — no partial file after cancel/interrupt/failure; `skip` leaves the
       original byte-identical; `delete.spec.ts` — link target outside root untouched.
-- [ ] **T-07**. `apps/node/src/core/link/modules/files.ts` — the `files` `NodeModule` (D8, CONTRACTS
+- [x] **T-07**. `apps/node/src/core/link/modules/files.ts` — the `files` `NodeModule` (D8, CONTRACTS
       R-40) wiring T-02…T-06, with one entry in `apps/node/src/core/link/modules/index.ts`; `files`
       tag from its `tags(env)` (iff `--manage` and roots non-empty); the channel handler implementing
       plan §6.3 (every request answered with its `requestId`; limits before the first byte; `CLOSE`
@@ -87,7 +87,7 @@
 
 ## P1.C — Platform: service, transfer bridge, API
 
-- [ ] **T-08**. `packages/agent/src/fleet/files/fleet-files.service.ts`: audience check
+- [x] **T-08**. `packages/agent/src/fleet/files/fleet-files.service.ts`: audience check
       (`FleetAccessService.assertFamily(node, userId, 'files')`, FL-01), consent check from
       `FleetNode.consents`, kill switch, credential gate (people: `confirmation_required` class
       `confirm` until `confirm: true`; Agents: `permission_denied`), delete gate
@@ -97,7 +97,7 @@
       `entries`, `bytes`, `requestedBy`, `confirmed`.
       **Test**: `packages/agent/src/fleet/files/__tests__/fleet-files.service.spec.ts` — every
       code with hint; audience matrix; Agent download of `.env` refused; list audited once.
-- [ ] **T-09**. `apps/api/src/fleet/files/fleet-files-transfer.service.ts`: opens `files.pack` /
+- [x] **T-09**. `apps/api/src/fleet/files/fleet-files-transfer.service.ts`: opens `files.pack` /
       `files.unpack` channels through the FL-02 relay bus; download → raw body for one file, zip
       (`archiver`, `store`) for several/folders, `Content-Disposition: attachment`,
       `X-Content-Type-Options: nosniff`, `X-Fleet-Operation-Id`; ACKs as the HTTP response drains
@@ -105,7 +105,7 @@
       `files.unpack`; cancel/kill switch → `CLOSE` within 5 s.
       **Test**: `fleet-files-transfer.service.spec.ts` — raw vs zip; platform buffer ≤ 8 MiB with a
       stalled client; cancel closes the channel; kill switch cancels; zip entries equal the tar.
-- [ ] **T-10**. `apps/api/src/fleet/files/fleet-files.controller.ts` (`/api/fleet/nodes/:id/files/*`:
+- [x] **T-10**. `apps/api/src/fleet/files/fleet-files.controller.ts` (`/api/fleet/nodes/:id/files/*`:
       roots, list, stat, download, conflicts, upload, copy stub returning `unsupported_on_node` until
       P2, delete) with `dto/fleet-files.dto.ts`; module imported in `apps/api/src/api.module.ts`;
       `FleetEnabledGuard` + `FLEET_MACHINE_FACTS_ENABLED`; throttles per plan §5.
@@ -114,30 +114,30 @@
 
 ## P1.D — Web
 
-- [ ] **T-11**. Register the tab in `apps/web/src/components/fleet/registry.ts` _(FL-01)_; create
+- [x] **T-11**. Register the tab in `apps/web/src/components/fleet/registry.ts` _(FL-01)_; create
       `apps/web/src/components/fleet/files/FilesTab.tsx`, `FilesRootPicker.tsx`, `FilesBreadcrumb.tsx`,
       `FilesGrid.tsx` (`role="grid"`, `Space`/`Enter`/`Backspace`, multi-select), `FilesActionBar.tsx`,
       `FilesUnavailableCard.tsx` (spec §5.7 variants), `files.shared.ts` (pure: sort, size format,
       conflict merge, limits, `ew:fleet:files:hidden`), `use-files-api.ts`.
       **Test**: `files.shared.unit.spec.ts`, `FilesGrid.unit.spec.tsx` (keyboard model, selection
       cap), `FilesUnavailableCard.unit.spec.tsx` (one card per reason; commands present).
-- [ ] **T-12**. Dialogs: `FilesConflictDialog.tsx` (per-entry Replace/Skip, Skip default, Replace
+- [x] **T-12**. Dialogs: `FilesConflictDialog.tsx` (per-entry Replace/Skip, Skip default, Replace
       all), `FilesDeleteDialog.tsx` (exact-name match enables; parent-folder name for several),
       `FilesCredentialConfirm.tsx`; `FilesOperationsStrip.tsx` reading FL-02 operations (percent,
       speed, Cancel, end notices with bytes).
       **Test**: `FilesConflictDialog.unit.spec.tsx`, `FilesDeleteDialog.unit.spec.tsx`,
       `FilesOperationsStrip.unit.spec.tsx` (three end notices verbatim).
-- [ ] **T-13**. BFF streaming proxies `apps/web/src/app/api/fleet/nodes/[id]/files/{roots,list,stat,download,conflicts,upload,delete}/route.ts`
+- [x] **T-13**. BFF streaming proxies `apps/web/src/app/api/fleet/nodes/[id]/files/{roots,list,stat,download,conflicts,upload,delete}/route.ts`
       (download pipes the body; upload forwards multipart; ids checked; codes pass through).
       **Test**: route unit specs — no buffering of the body; codes preserved.
-- [ ] **T-14**. i18n: `fleet.computer.tabs.files` and the `fleet.files.*` groups from plan §8 in
+- [x] **T-14**. i18n: `fleet.computer.tabs.files` and the `fleet.files.*` groups from plan §8 in
       `apps/web/messages/en.json`; footer strings (roots line, _"Transfers spend no credits…"_).
       **Test**: no literal user-visible string in `apps/web/src/components/fleet/files/`; no leaf
       key with a literal `.`; hydration spec green.
 
 ## P1.E — Tools, e2e, close P1
 
-- [ ] **T-15**. Read-only tools `fleet_files_list`, `fleet_files_stat` in
+- [x] **T-15**. Read-only tools `fleet_files_list`, `fleet_files_stat` in
       `packages/agent/src/fleet/agent-fleet-files-tools.ts`; MCP whitelist entries in
       `apps/mcp/src/openapi-tools/whitelist.ts` with `readOnly: true`; results enter the Run receipt
       with size and tokens.
@@ -203,7 +203,7 @@
 
 ## Docs & rollout
 
-- [ ] **T-24**. User doc `docs/features/fleet-files.md` (allowed roots and the flag, what is never
+- [x] **T-24**. User doc `docs/features/fleet-files.md` (allowed roots and the flag, what is never
       visible, transfers and their limits, conflicts, credential-shaped names, delete, copy between
       computers, paste and its guards, what it costs); add to `apps/docs/sidebarsPlatform.ts`;
       cross-link from `docs/features/fleet.md`.

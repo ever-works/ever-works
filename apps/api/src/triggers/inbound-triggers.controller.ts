@@ -27,7 +27,11 @@ import type {
     InboundTriggerView,
     TestFireInboundTriggerResult,
 } from '@ever-works/agent/triggers';
-import { CreateInboundTriggerDto, UpdateInboundTriggerDto } from './dto/inbound-trigger.dto';
+import {
+    CreateInboundTriggerDto,
+    GithubForMePresetDto,
+    UpdateInboundTriggerDto,
+} from './dto/inbound-trigger.dto';
 
 /**
  * Inbound Triggers ("Trigger Schedules") — signed webhook/API triggers.
@@ -98,6 +102,28 @@ export class InboundTriggersController {
         @Body() dto: CreateInboundTriggerDto,
     ): Promise<{ trigger: InboundTriggerView; secret: string }> {
         return this.triggers.create(this.scope(auth), dto);
+    }
+
+    @Post('presets/github-for-me')
+    @ApiBearerAuth('JWT-auth')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'GitHub: things for me — one Trigger over GitHub events about me',
+        description:
+            'FL-15: creates an event-sourced Trigger whose matcher is "GitHub events about me" (review requested from me, assigned to me, my pull requests — by my linked GitHub login), parked in the Backlog unless autoStart is always, optionally assigned to an Agent. A second event about the same pull request or issue posts on its Task instead of making another. 400 without a linked GitHub account.',
+    })
+    @ApiResponse({ status: 201, description: 'Trigger created; secret returned once' })
+    @ApiResponse({ status: 400, description: 'No linked GitHub account, or a foreign Agent' })
+    async createGithubForMe(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: GithubForMePresetDto,
+    ): Promise<{ trigger: InboundTriggerView; secret: string }> {
+        return this.triggers.createGithubForMe(this.scope(auth), {
+            audience: dto.audience ?? null,
+            agentId: dto.agentId ?? null,
+            autoStart: dto.autoStart ?? null,
+        });
     }
 
     @Get(':id')

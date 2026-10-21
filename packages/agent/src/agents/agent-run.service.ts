@@ -51,6 +51,9 @@ import { filterSkillsByToolGrants } from '../policy/skill-activation';
 import { withRunSuppression } from '../skills/skill-readiness.ladder';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
+// FL-19 P2 — a held fleet act files a Decision. A LEAF module (contracts only), so the
+// run loop does not gain the fleet module's runtime graph.
+import { FLEET_HELD_CALL_FILER, type FleetHeldCallFiler } from '../fleet/fleet-held-call';
 import { fenceUntrusted, neutralizeUntrustedLine } from '../utils/untrusted-content';
 // Session detail (Feature K) — timeline capture: redacted, size-capped
 // previews of tool args/results + message rows at turn boundaries.
@@ -155,6 +158,8 @@ export interface AgentRunSafetySubject {
     agentId: string;
     tenantId: string | null;
     organizationId: string | null;
+    /** FL-19 — the Agent's display name, for the Decision a held fleet act files. */
+    agentName?: string | null;
 }
 
 export interface AgentRunBudgetCheck {
@@ -303,6 +308,13 @@ export class AgentRunService {
         @Optional()
         @Inject(SAFETY_GATE)
         private readonly safetyGate?: SafetyGate,
+        // FL-19 P2 (spec S3, CONTRACTS R-33) — when the ladder HOLDS a state-changing
+        // fleet tool, file the Decision the owner approves (`fleet-tool-call`
+        // proposal). Trailing + `@Optional()`: unbound, a hold answers exactly as
+        // before (held, nothing filed).
+        @Optional()
+        @Inject(FLEET_HELD_CALL_FILER)
+        private readonly fleetHeldCalls?: FleetHeldCallFiler,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -1140,6 +1152,7 @@ export class AgentRunService {
                             agentId: agent.id,
                             tenantId: agent.tenantId ?? null,
                             organizationId: agent.organizationId ?? null,
+                            agentName: agent.name ?? null,
                         },
                     );
                     // Security (prompt-injection): tool results frequently
@@ -1584,11 +1597,41 @@ export class AgentRunService {
             .catch(() => undefined);
 
         if (verdict.decision === 'held') {
+            // FL-19 P2 — a held fleet act becomes a Decision in My Decisions; approving
+            // it runs exactly this call. Best-effort: a filer failure keeps the plain hold.
+            let decisionId: string | null = null;
+            if (this.fleetHeldCalls) {
+                try {
+                    const filed = await this.fleetHeldCalls.file({
+                        userId: subject.userId,
+                        agentId: subject.agentId,
+                        agentName: subject.agentName ?? null,
+                        runId,
+                        tool: call.name,
+                        args: call.args,
+                        category: verdict.category,
+                        rung: verdict.rung,
+                    });
+                    decisionId = filed?.decisionId ?? null;
+                } catch (err) {
+                    this.logger.warn(
+                        `Held fleet call "${call.name}" on run ${runId} could not file its Decision: ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                    );
+                }
+            }
             return {
                 held: true,
                 reason: verdict.summary,
                 category: verdict.category,
                 rung: verdict.rung,
+                ...(decisionId
+                    ? {
+                          decisionId,
+                          hint: 'held for the owner in My Decisions; approving it runs this call — do not call it again',
+                      }
+                    : {}),
                 // Said explicitly so the model does not retry a send that is
                 // waiting for a person — a retry loop against a hold is the
                 // failure mode this wording exists to prevent.

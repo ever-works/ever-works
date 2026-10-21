@@ -29,11 +29,15 @@ export * from './agent-fleet-session-tools';
 export * from './agent-fleet-health-tools';
 // Logs on computers (FL-08) — the log tool shapes and the port the API binds.
 export * from './logs/agent-fleet-logs-tools';
+// Files on computers (FL-11) — the file tool shapes and the port the API binds.
+export * from './files/agent-fleet-files-tools';
 // FL-19 — the Agent half of the fleet tool catalogue: the gate's published rule,
 // the descriptor decoration + FL-19's own tools, and `fleet_status`'s composition.
 export * from './fleet-tool-gate';
 export * from './fleet-tool-factory';
 export * from './fleet-status';
+export * from './fleet-held-call';
+export * from './fleet-requested-by';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
@@ -63,6 +67,8 @@ export * from './machine';
 export * from './checkouts';
 // Tasks on computers (FL-15 P2) — a computer's global git identity.
 export * from './git';
+// Tasks on computers (FL-15 P3) — the hand-off and identity Agent tools.
+export * from './agent-fleet-task-tools';
 export * from './ports';
 // Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
 export * from './virtual';

@@ -2039,7 +2039,7 @@ export function buildProgram(deps: CliDeps): Command {
 		)
 		.option(
 			'--files-root <dir>',
-			'With --manage: share this folder with the dashboard (the Logs tab lists the log files under it); repeatable',
+			'With --manage: share this folder with the dashboard (the Files tab browses it, the Logs tab lists the log files under it); repeatable',
 			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.option(

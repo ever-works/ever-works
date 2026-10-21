@@ -29,6 +29,8 @@ export function CheckoutChoice({
     const matching = step?.matching ?? [];
     const others = step?.others ?? [];
     const hasRepository = !!task.repoUrl;
+    // P3 (FR-20): FL-14's new worktree cuts a NEW branch, so a pull request's head is cloned instead.
+    const allowWorktree = !task.pullRequest?.headRef;
 
     const option = (
         key: string,
@@ -76,7 +78,7 @@ export function CheckoutChoice({
         <div role="radiogroup" aria-label={t('label')} className="space-y-1.5" data-testid="fleet-handoff-checkouts">
             {hasRepository ? (
                 <>
-                    {matching.map(worktree)}
+                    {allowWorktree && matching.map(worktree)}
                     {matching.map(existing)}
                     {option(
                         'clone',
