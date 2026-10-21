@@ -32,29 +32,29 @@
 
 ## P1.A — Contracts
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-machine-actions.types.ts` (confirmation
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-machine-actions.types.ts` (confirmation
       classes, `FleetBlastRadius`, `FleetActionConfirmFields` — the CONTRACTS §2.2 fields `confirm`,
       `confirmName`, `acknowledgeBlastRadius` — `FleetRootRequirement`, `FleetOperationRef`)
       and export from `packages/contracts/src/fleet/index.ts`.
     - **Test**: `packages/contracts/src/fleet/__tests__/fleet-machine-actions.spec.ts`.
-- [ ] **T-02**. Add `fleet-services.types.ts` and `fleet-processes.types.ts` under
+- [x] **T-02**. Add `fleet-services.types.ts` and `fleet-processes.types.ts` under
       `packages/contracts/src/fleet/` (types, `FLEET_SERVICE_ACTIONS`, strict name patterns,
       `FLEET_PROCESS_LIST_MAX = 300`, signals).
     - **Test**: `fleet-services.spec.ts`, `fleet-processes.spec.ts` — patterns reject `;`, `|`, `$(`,
       backticks, newlines, leading `-`.
-- [ ] **T-03**. Add the 19 §7 audit members to `FleetAuditAction` / `FLEET_AUDIT_ACTIONS` in
+- [x] **T-03**. Add the 19 §7 audit members to `FleetAuditAction` / `FLEET_AUDIT_ACTIONS` in (capability constants live beside their types — lane log decision 12)
       `packages/contracts/src/fleet/fleet-panic.types.ts` and `FLEET_SERVICES_CAPABILITY`,
       `FLEET_PROCESSES_CAPABILITY` to `fleet-jobs.types.ts`.
     - **Test**: extend `fleet-panic.spec.ts` and the jobs spec.
 
 ## P1.B — Shared node pieces
 
-- [ ] **T-04**. Write `apps/node/src/core/link/modules/shared/root-runner.ts`
+- [x] **T-04**. Write `apps/node/src/core/link/modules/shared/root-runner.ts`
       (`runPossiblyAsRoot`, `sudo -n` refusal detection, Windows admin probe, exact-command rendering
       for both OS families, 60 s per-argv probe cache).
     - **Test**: `root-runner.spec.ts` — refusal text variants → `{ refused: 'root-required', command }`;
       never passes `-S`/a password.
-- [ ] **T-05**. Write `apps/node/src/core/link/modules/shared/argv-safety.ts` and
+- [x] **T-05**. Write `apps/node/src/core/link/modules/shared/argv-safety.ts` and (files under `modules/machine-facts/` per R-40 — decision 1; the eslint rule is a follow-up)
       `blast-radius.ts` (per-OS pattern table incl. the node's own unit/label/service name from
       install info; sentences per kind); add an eslint `no-restricted-syntax` rule for `docker.sock`
       strings and `child_process.exec` under `apps/node/src/core/link/modules/**` in `apps/node/eslint.config.*`.
@@ -63,13 +63,13 @@
 
 ## P1.C — Services module
 
-- [ ] **T-06**. Write `apps/node/src/core/link/modules/services/systemd-manager.ts` (JSON list with
+- [x] **T-06**. Write `apps/node/src/core/link/modules/services/systemd-manager.ts` (JSON list with
       text fallback, `--user`, enablement, `MainPID`, actions via root-runner).
     - **Test**: `systemd-manager.spec.ts` with fixtures under `modules/services/__fixtures__/`.
-- [ ] **T-07** _(parallel)_. Write `launchd-manager.ts` (`launchctl print` parser, Homebrew JSON,
+- [x] **T-07** _(parallel)_. Write `launchd-manager.ts` (`launchctl print` parser, Homebrew JSON,
       at-boot semantics) and `windows-services.ts` (CIM JSON, actions, StartupType).
     - **Test**: `launchd-manager.spec.ts`, `windows-services.spec.ts`.
-- [ ] **T-08**. Write `apps/node/src/core/link/modules/services/index.ts` (`createServicesModule`:
+- [x] **T-08**. Write `apps/node/src/core/link/modules/services/index.ts` (`createServicesModule`: (`failedServices` already fed on Linux by FL-03 — decision 11)
       detect manager, `services.list` with ordering/CPU/mem via the processes module, `services.action`,
       `failedCount()`); register with one entry in FL-02's compile-time module array
       `apps/node/src/core/link/modules/index.ts`; advertise
@@ -80,21 +80,21 @@
 
 ## P1.D — Processes module
 
-- [ ] **T-09**. Write `apps/node/src/core/link/modules/processes/process-list.ts` (per-OS parsers, top
+- [x] **T-09**. Write `apps/node/src/core/link/modules/processes/process-list.ts` (per-OS parsers, top
       300, CPU% of one core, run time, command truncated 200 + `redactSecrets`) and
       `self-protection.ts` (own pid chain, daemon pid, pid 1).
     - **Test**: `process-list.spec.ts` (Linux/macOS/Windows fixtures; redaction), `self-protection.spec.ts`.
-- [ ] **T-10** _(parallel)_. Write `gpu-stats.ts` extending `apps/node/src/core/gpu-probe.ts`
+- [x] **T-10** _(parallel)_. Write `gpu-stats.ts` extending `apps/node/src/core/gpu-probe.ts`
       vendors with utilisation/memory readers (nvidia-smi query, AMD sysfs, Apple
       `system_profiler` with `utilizationPercent: null`).
     - **Test**: `gpu-stats.spec.ts` — Apple yields null utilisation, never 0.
-- [ ] **T-11**. Write `apps/node/src/core/link/modules/processes/index.ts` (`processes.list`,
+- [x] **T-11**. Write `apps/node/src/core/link/modules/processes/index.ts` (`processes.list`,
       `processes.signal` with protection + root rule); register; advertise `processes` under `manage`.
     - **Test**: `index.spec.ts` — protected pid → `invalid`; other user → root rule; TERM/KILL argv.
 
 ## P1.E — Platform guard and API
 
-- [ ] **T-12**. Write `packages/agent/src/fleet/machine-actions/machine-action.guard.ts`
+- [x] **T-12**. Write `packages/agent/src/fleet/machine-actions/machine-action.guard.ts` (as `FleetMachineActionsService` in `packages/agent/src/fleet/machine/` — the link gate, the confirmation, the audit row)
       (consent → family via FL-01 `assertFamily` → kill switch → CONTRACTS §2.2 field check:
       `confirm: true`, `confirmName` for `confirm-destructive`, `acknowledgeBlastRadius: true` for
       `blast-radius` → typed refusal values) and `machine-action.audit.ts` (row builder: name, target,
@@ -102,11 +102,11 @@
     - **Test**: `machine-actions/__tests__/machine-action.guard.spec.ts` — every CONTRACTS §8 code;
       a missing field → `confirmation_required` with the class (and the sentence for
       `blast-radius`); audit details pass `REDACTED_KEY_RE`.
-- [ ] **T-13**. Write `packages/agent/src/fleet/services/fleet-services.service.ts` and
+- [x] **T-13**. Write `packages/agent/src/fleet/services/fleet-services.service.ts` and
       `packages/agent/src/fleet/processes/fleet-processes.service.ts` (list via link, action via guard,
       audit, the node's root refusal surfaced as `root_required` (409) with the command as `hint`).
     - **Test**: `services/__tests__/fleet-services.service.spec.ts`, `processes/__tests__/fleet-processes.service.spec.ts`.
-- [ ] **T-14**. Write `apps/api/src/fleet/services/fleet-services.controller.ts` + `dto/`,
+- [x] **T-14**. Write `apps/api/src/fleet/services/fleet-services.controller.ts` + `dto/`, (controllers in `apps/api/src/fleet/machine/`; controller specs and the e2e are a follow-up)
       `apps/api/src/fleet/processes/fleet-processes.controller.ts` + `dto/`; register in
       `apps/api/src/fleet/fleet.module.ts`; guards `FleetEnabledGuard`, `FleetMachineFactsEnabledGuard`;
       throttles per plan §5; Swagger.
@@ -115,18 +115,18 @@
 
 ## P1.F — Web
 
-- [ ] **T-15**. Write shared components under `apps/web/src/components/fleet/shared/`:
+- [x] **T-15**. Write shared components under `apps/web/src/components/fleet/shared/`: (`components/fleet/machine/`)
       `ConfirmActionDialog.tsx` (four classes; red "anyway" button; typed-name gate),
       `RootRequiredDialog.tsx`, `machine-actions.shared.ts`; add `OperationCard.tsx` + `use-operation.ts`
       only if FL-02 did not ship them.
     - **Test**: `ConfirmActionDialog.unit.spec.tsx`, `machine-actions.shared.unit.spec.ts`.
-- [ ] **T-16**. Write `apps/web/src/components/fleet/services/` — `ServicesTab.tsx`, `ServiceRow.tsx`,
+- [x] **T-16**. Write `apps/web/src/components/fleet/services/` — `ServicesTab.tsx`, `ServiceRow.tsx`,
       `services.shared.ts`, `services-tab.registry.ts` (FL-01 entry `{ id: 'services', labelKey, order, epic, flag, consent: 'manage', load }`; palette "Services on <computer>" in FL-01's
       `apps/web/src/components/command-palette/registry/sections.ts`); BFF routes
       `apps/web/src/app/api/fleet/nodes/[id]/services/route.ts` and `.../services/[name]/[action]/route.ts`.
       Every state of spec §5.9; **Log** row action deep-links through FL-08's `openLogsForSource`.
     - **Test**: `services.shared.unit.spec.ts` (ordering), `ServicesTab.unit.spec.tsx` (states, risk markers).
-- [ ] **T-17** _(parallel)_. Write `apps/web/src/components/fleet/processes/` — `ProcessesTab.tsx`,
+- [x] **T-17** _(parallel)_. Write `apps/web/src/components/fleet/processes/` — `ProcessesTab.tsx`,
       `GpuStrip.tsx`, `ProcessTable.tsx`, `SignalDialog.tsx`, `processes.shared.ts`,
       `processes-tab.registry.ts`; BFF `.../processes/route.ts`, `.../processes/[pid]/signal/route.ts`.
     - **Test**: `processes.shared.unit.spec.ts`, `ProcessesTab.unit.spec.tsx` (protected rows have
@@ -134,14 +134,14 @@
 
 ## P1.G — Tools, i18n, e2e
 
-- [ ] **T-18**. Write `packages/agent/src/fleet/services/agent-fleet-services-tools.ts` and
+- [x] **T-18**. Write `packages/agent/src/fleet/services/agent-fleet-services-tools.ts` and (Agent tools + held Approvals; MCP entries deferred — owner question 2)
       `packages/agent/src/fleet/processes/agent-fleet-processes-tools.ts` (annotations per plan §9;
       blast-radius / KILL below trust level → `agent_action_proposals` row `fleet_machine_action`
       (CONTRACTS R-33); approval re-runs with the §2.2 confirmation fields); concatenate beside
       `buildFleetTools`; add MCP whitelist
       entries in `apps/mcp/src/openapi-tools/whitelist.ts`.
     - **Test**: both tool specs; whitelist spec.
-- [ ] **T-19**. Add i18n groups `fleet.services.*`, `fleet.processes.*`, `fleet.actions.*`,
+- [x] **T-19**. Add i18n groups `fleet.services.*`, `fleet.processes.*`, `fleet.actions.*`, (i18n; Playwright specs are a follow-up)
       `fleet.operations.*`, `fleet.computer.tabs.{services,processes}` to `apps/web/messages/en.json`;
       write `apps/web/e2e/flow-fleet-services.spec.ts`, `flow-fleet-processes.spec.ts`,
       `flow-fleet-machine-actions-contract.spec.ts`.

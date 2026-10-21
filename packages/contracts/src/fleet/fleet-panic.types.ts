@@ -157,6 +157,34 @@ export type FleetAuditAction =
 	| 'node.session.recording.start'
 	| 'node.session.recording.stop'
 	/**
+	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
+	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
+	 * `family`, `target` (service name, container or image id, project, pid),
+	 * `requestedBy`, `confirmationClass`, `outcome`, `blastRadiusKind` when the
+	 * node warned and `rootRequired`; never an environment value, a command
+	 * line or command output (spec FR-18, FR-29).
+	 */
+	| 'node.service.start'
+	| 'node.service.stop'
+	| 'node.service.restart'
+	| 'node.service.enable'
+	| 'node.service.disable'
+	| 'node.docker.container.start'
+	| 'node.docker.container.stop'
+	| 'node.docker.container.restart'
+	| 'node.docker.container.remove'
+	| 'node.docker.container.run'
+	| 'node.docker.container.exec'
+	| 'node.docker.image.pull'
+	| 'node.docker.image.remove'
+	| 'node.docker.image.prune'
+	| 'node.compose.up'
+	| 'node.compose.down'
+	| 'node.compose.restart'
+	| 'node.compose.pull'
+	/** A Stop (SIGTERM) or Kill (SIGKILL) sent to one process; `details.signal` names which. */
+	| 'node.process.signal'
+	/**
 	 * Checkouts on computers (FL-14, CONTRACTS §7) — every row carries
 	 * `family: 'checkouts'`, `target` (the checkout's path), `requestedBy`,
 	 * `confirmationClass` and `outcome`; never a credential or a remote URL
@@ -220,6 +248,25 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	'node.service.start',
+	'node.service.stop',
+	'node.service.restart',
+	'node.service.enable',
+	'node.service.disable',
+	'node.docker.container.start',
+	'node.docker.container.stop',
+	'node.docker.container.restart',
+	'node.docker.container.remove',
+	'node.docker.container.run',
+	'node.docker.container.exec',
+	'node.docker.image.pull',
+	'node.docker.image.remove',
+	'node.docker.image.prune',
+	'node.compose.up',
+	'node.compose.down',
+	'node.compose.restart',
+	'node.compose.pull',
+	'node.process.signal',
 	'node.checkout.create',
 	'node.checkout.delete',
 	'node.checkout.sync',

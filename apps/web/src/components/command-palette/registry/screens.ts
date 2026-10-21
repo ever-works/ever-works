@@ -373,6 +373,38 @@ export function fleetComputerScreens(
     }));
 }
 
+/**
+ * Services, Docker and processes (FL-09, FR-23) — "Services on <name>",
+ * "Docker on <name>" and "Processes on <name>" for every computer the viewer
+ * may see that advertises the matching tag (a node only does under
+ * `--manage`), each opening that computer's tab. Docker's tab arrives with
+ * FL-09 P2; until then its row opens the tab's placeholder.
+ */
+const FLEET_MACHINE_TABS = [
+    { tag: 'services', tab: 'services', key: 'fleet.palette.servicesOn' },
+    { tag: 'docker', tab: 'docker', key: 'fleet.palette.dockerOn' },
+    { tag: 'processes', tab: 'processes', key: 'fleet.palette.processesOn' },
+] as const;
+
+export function fleetComputerMachineScreens(
+    computers: ReadonlyArray<{ id: string; name: string; capabilities?: readonly string[] }>,
+): PaletteScreen[] {
+    const out: PaletteScreen[] = [];
+    for (const computer of computers) {
+        for (const entry of FLEET_MACHINE_TABS) {
+            if (!computer.capabilities?.includes(entry.tag)) continue;
+            out.push({
+                id: `fleet.computer.${computer.id}.${entry.tab}`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, entry.tab),
+                icon: Monitor,
+                title: (t: PaletteTranslator) => t(entry.key, { name: computer.name }),
+                breadcrumb: fleet,
+            });
+        }
+    }
+    return out;
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */

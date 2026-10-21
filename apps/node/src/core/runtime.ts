@@ -60,7 +60,7 @@ import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport 
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
-import { composeNodeLinkModules, createHealthLinkModule, type WakeSender } from './link/modules';
+import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
@@ -591,6 +591,12 @@ export interface CreateNodeRuntimeOptions {
 	nodeLink?: boolean;
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
+	/**
+	 * Services and processes (FL-09) — replaces the machine-facts modules the
+	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
+	 * or fakes so no real `systemctl` / `ps` runs.
+	 */
+	machineFactModules?: readonly NodeModule[];
 	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
@@ -860,6 +866,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(sessions ? { session: sessions.module } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
+		// FL-09 — services and processes (their verbs need --manage on this machine).
+		machineFacts: options.machineFactModules ?? createMachineFactModules(),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),

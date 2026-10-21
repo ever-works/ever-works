@@ -12940,7 +12940,10 @@
             }
         },
         "palette": {
-            "goToComputer": "Go to computer {name}"
+            "goToComputer": "Go to computer {name}",
+            "servicesOn": "Services on {name}",
+            "dockerOn": "Docker on {name}",
+            "processesOn": "Processes on {name}"
         },
         "nav": {
             "label": "Fleet"
@@ -13699,6 +13702,147 @@
                 "title": "Sessions",
                 "empty": "{agent} has no sessions on your computers yet.",
                 "loadFailed": "The sessions could not be loaded."
+            }
+        },
+        "actions": {
+            "cancel": "Cancel",
+            "anyway": "{action} anyway",
+            "typeNameToConfirm": "Type {name} to confirm:",
+            "rootRequired": {
+                "title": "{name} needs your password for this",
+                "body": "Ever Works never asks for it. Run this on {name}:",
+                "help": "Or allow the node’s user to run it without a password — see “Root actions” in the Fleet docs.",
+                "windowsTitle": "{name} needs administrator rights for this",
+                "windowsBody": "Run in an elevated PowerShell on {name}:",
+                "windowsHelp": "Or run the node as an administrator — see “Root actions” in the Fleet docs.",
+                "copy": "Copy the command",
+                "close": "Close"
+            },
+            "states": {
+                "asking": "Asking {name}…",
+                "slow": "{name} has not answered yet. It may be busy.",
+                "offline": "{name} is offline. Try again when it is back.",
+                "consentMissing": "Machine management is switched off on {name}, so its {family} cannot be shown. Run this there:",
+                "permissionDenied": "Only the owner of {name} can see or change its {family}.",
+                "killSwitch": "All computers are stopped. Live actions are paused until the stop is cleared under Settings → Fleet.",
+                "killSwitchLastKnown": "All computers are stopped — showing the last answer. Actions are paused.",
+                "lastKnown": "{name} did not answer the last refresh — showing the last answer.",
+                "unsupported": "{name} cannot do this yet.",
+                "notFound": "This computer is not here any more.",
+                "failed": "Could not read {family} on {name}.",
+                "tryAgain": "Try again"
+            }
+        },
+        "services": {
+            "title": "Services",
+            "family": "services",
+            "heading": "{count, plural, one {Service (#)} other {Services (#)}}",
+            "find": "Find a service…",
+            "order": "failed first · system + user",
+            "refresh": "Refresh now",
+            "every30s": "every 30 s",
+            "ownerOnly": "Only the owner of {name} can change its services.",
+            "noManager": "{name} has no service manager Ever Works understands. Its Processes and Docker tabs still work.",
+            "empty": "No services Ever Works can list on {name}.",
+            "noMatch": "No service matches.",
+            "listError": "Could not list {manager} services on {name}: “{message}”",
+            "userScope": "(user)",
+            "working": "working…",
+            "exited": "exited {code}",
+            "atBoot": "at boot",
+            "atLogin": "at login",
+            "manual": "manual",
+            "more": "More for {name}",
+            "enableAtBoot": "Start at boot",
+            "disableAtBoot": "Do not start at boot",
+            "log": "Log",
+            "copyName": "Copy unit name",
+            "copied": "Copied {name}.",
+            "copyFailed": "Could not copy.",
+            "thisNodeTooltip": "This is the Ever Works node itself. Ever Works will not stop it from here.",
+            "riskTooltip": "Stopping this could cut {name} off from Ever Works.",
+            "stillWorking": "{name} is still changing; the list will show it when it is done.",
+            "done": "{action}: {name} is now {state}.",
+            "actionFailed": "That did not work on the computer.",
+            "actionFailedWith": "That did not work: {hint}",
+            "act": {
+                "start": "Start",
+                "stop": "Stop",
+                "restart": "Restart",
+                "enable": "Start at boot",
+                "disable": "Do not start at boot"
+            },
+            "risk": {
+                "node": "this node",
+                "network": "network",
+                "ssh": "remote access",
+                "vpn": "private network",
+                "docker": "Docker"
+            },
+            "states": {
+                "running": "running",
+                "failed": "failed",
+                "inactive": "inactive",
+                "activating": "starting…",
+                "deactivating": "stopping…",
+                "unknown": "unknown"
+            },
+            "columns": {
+                "name": "Name",
+                "state": "State",
+                "since": "Since · boot",
+                "cpu": "CPU",
+                "memory": "Memory",
+                "actions": "Actions"
+            },
+            "dialog": {
+                "title": "{action} {name} on {machine}?",
+                "enableTitle": "Start {name} at boot on {machine}?",
+                "disableTitle": "Stop starting {name} at boot on {machine}?",
+                "restartBody": "{name} will be unavailable for a moment.",
+                "stopBody": "{name} stops until someone starts it again."
+            }
+        },
+        "processes": {
+            "title": "Processes",
+            "family": "processes",
+            "busiest": "Processes · busiest of {count} by CPU",
+            "largest": "Processes · largest of {count} by memory",
+            "find": "Find a process…",
+            "sortBy": "Sort by",
+            "every5s": "every 5 s",
+            "ownerOnly": "Only the owner of {name} can stop its processes.",
+            "stop": "Stop",
+            "kill": "Kill",
+            "stopping": "stopping…",
+            "stillRunning": "still running — Kill?",
+            "stillRunningHint": "A process that is still running {seconds} seconds after Stop offers Kill.",
+            "gone": "{name} ({pid}) has stopped.",
+            "signalFailed": "The signal could not be sent.",
+            "signalFailedWith": "The signal could not be sent: {hint}",
+            "protectedNode": "this node",
+            "protectedInit": "not from here",
+            "columns": {
+                "pid": "PID",
+                "name": "Name",
+                "cpu": "CPU",
+                "memory": "Memory",
+                "owner": "Owner",
+                "runtime": "Run time",
+                "command": "Command",
+                "actions": "Actions"
+            },
+            "gpu": {
+                "title": "GPUs",
+                "label": "GPU",
+                "numbered": "GPU {index}",
+                "shared": "{memory} shared",
+                "utilizationUnavailable": "utilisation unavailable"
+            },
+            "dialog": {
+                "stopTitle": "Send SIGTERM to {name} ({pid}) on {machine}?",
+                "killTitle": "Send SIGKILL to {name} ({pid}) on {machine}?",
+                "killBody": "It cannot save its work."
             }
         }
     }
