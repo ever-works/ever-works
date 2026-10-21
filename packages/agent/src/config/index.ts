@@ -323,6 +323,19 @@ export const config = {
             return undefined;
         },
         /**
+         * 2026-10-21 — `FLEET_PINNED_AGENT_HOLDS_FOR_NODE`. When on, a run whose Agent the
+         * owner pinned to a node (agent ↔ node affinity) is HELD for the fleet
+         * (`fleet-waiting`, `waiting-for-runner`) under `local-fallback` instead of being
+         * relocated to a cloud stand-in while that node cannot lease (prod T-45). An
+         * explicit `cloud` preference still runs in the cloud. Default OFF: the shipped
+         * `local-fallback` contract (relocate, notify `pinned-runner-offline`) stays the
+         * default until the owner flips it. App Works are held regardless (#2809, FR-12).
+         */
+        pinnedAgentHoldsForNode(): boolean {
+            const raw = (process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
          * Command template a node runs for one `agent-task` job.
          * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
          * each substituted with an id validated against a strict
