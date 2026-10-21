@@ -43,6 +43,7 @@ export function PortRow({
     onOpen,
     onRemoveWatch,
     onTunnelChange,
+    onWatch,
 }: {
     port: FleetListeningPort;
     list: FleetPortsListResponse;
@@ -54,6 +55,8 @@ export function PortRow({
     onRemoveWatch?: (port: number) => void;
     /** Phase 2: a preview tunnel opened or closed — re-read the list. */
     onTunnelChange?: () => void;
+    /** Phase 3: watch this server — say so when it stops. */
+    onWatch?: (port: number) => void;
 }) {
     const t = useTranslations('fleet.ports');
 
@@ -208,6 +211,9 @@ export function PortRow({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => void copy()}>{t('copyAddress')}</DropdownMenuItem>
+                        {onWatch && !port.stopped && (
+                            <DropdownMenuItem onClick={() => onWatch(port.port)}>{t('watch')}</DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
                             <Link href={ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'processes')}>

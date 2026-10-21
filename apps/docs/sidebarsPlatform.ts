@@ -197,6 +197,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-logs',
 				// What runs on each computer — services, Docker, processes (FL-09).
 				'features/fleet-services-docker',
+				// What a computer serves, opened on it or previewed in your browser (FL-10).
+				'features/fleet-ports',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.
