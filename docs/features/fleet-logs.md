@@ -89,6 +89,17 @@ container removed or stopped), the others keep following.
 It works for the system journal, the Windows event logs and files; container logs are bounded by Docker's log
 driver and say so, and the macOS unified log has no earlier page here.
 
+### From a failed service, and keeping a copy
+
+On the **Services** tab, a failed service's **Log** opens the Logs tab on that service **positioned at the time it
+failed**: the first line at or after the failure is highlighted, and the viewer pages back on its own (up to four
+pages) when the failure is older than the last 500 lines. A "needs a look" item for failed services joins once
+the hub has a kind for it.
+
+**Download shown lines** saves the lines on screen — after the filter — as a plain-text file named
+`<computer>-<source>-<time>.log`. The file is made in your browser from what the viewer already holds (lines
+already secret-scanned on the machine); nothing is stored on the platform.
+
 ### Limits and what happens at them
 
 - Live lines arrive at no more than **1 MiB/s**. A log that writes faster has its oldest unsent lines dropped

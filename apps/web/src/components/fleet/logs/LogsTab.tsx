@@ -39,6 +39,9 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
           )
         : [];
     const linkedTitle = search?.get('title')?.slice(0, 80) ?? null;
+    // P3 (FR-39): `?at=<iso>` positions the first-opened view at that time (a failed service).
+    const linkedAtRaw = search?.get('at') ?? null;
+    const linkedAt = linkedAtRaw && !Number.isNaN(Date.parse(linkedAtRaw)) ? new Date(Date.parse(linkedAtRaw)).toISOString() : null;
     const [list, setList] = useState<FleetLogSourcesResponse | null>(null);
     const [error, setError] = useState<LogsError | null>(null);
     const [loading, setLoading] = useState(true);
@@ -141,6 +144,7 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
                         sources={selected}
                         listed={sources}
                         title={selected.length > 1 ? linkedTitle : null}
+                        at={linkedAt && selected.join('|') === linked.join('|') ? linkedAt : null}
                     />
                 ) : list && sources.length === 0 ? (
                     <LogsEmpty nodeName={node.name} />
