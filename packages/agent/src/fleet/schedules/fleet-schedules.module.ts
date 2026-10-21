@@ -4,6 +4,7 @@ import { FleetCommand } from '../../entities/fleet-command.entity';
 import { FleetCommandRun } from '../../entities/fleet-command-run.entity';
 import { FleetModule } from '../fleet.module';
 import { FleetScheduleNeedsALookProducer } from './fleet-schedule-needs-a-look.producer';
+import { FleetScheduleProposalListener } from './fleet-schedule-proposal.listener';
 import { FleetScheduleRepository } from './fleet-schedule.repository';
 import { FleetScheduleService } from './fleet-schedule.service';
 
@@ -21,7 +22,13 @@ import { FleetScheduleService } from './fleet-schedule.service';
  */
 @Module({
     imports: [FleetModule, TypeOrmModule.forFeature([FleetCommand, FleetCommandRun])],
-    providers: [FleetScheduleRepository, FleetScheduleService, FleetScheduleNeedsALookProducer],
+    // P2: an approved Agent schedule write is applied by `FleetScheduleProposalListener`.
+    providers: [
+        FleetScheduleRepository,
+        FleetScheduleService,
+        FleetScheduleNeedsALookProducer,
+        FleetScheduleProposalListener,
+    ],
     exports: [FleetScheduleRepository, FleetScheduleService],
 })
 export class FleetSchedulesModule {}

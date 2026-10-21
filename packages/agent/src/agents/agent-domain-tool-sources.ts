@@ -13,6 +13,7 @@ import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
+import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
@@ -182,6 +183,15 @@ export interface AgentFleetCommandToolSource {
     service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
 }
 
+/**
+ * Schedules on computers (FL-13 P2) — the `schedules` tool family
+ * (`fleet/schedules/agent-fleet-schedule-tools.ts`). Create, update, delete and
+ * run only ever file an approval (`proposals`); the reads, pause and resume use this.
+ */
+export interface AgentFleetScheduleToolSource {
+    service: Pick<FleetScheduleService, 'listForUser' | 'get' | 'runs' | 'pause' | 'resume'>;
+}
+
 /** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
 export interface AgentFleetSessionToolSource {
     service: FleetSessionsToolService['service'];
@@ -315,6 +325,8 @@ export interface AgentDomainToolSources {
     fleetSessions?: AgentFleetSessionToolSource;
     /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
     fleetCommands?: AgentFleetCommandToolSource;
+    /** FL-13 P2 — `fleet_schedules_*` (bound only while FLEET_COMMANDS_ENABLED is on). */
+    fleetSchedules?: AgentFleetScheduleToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

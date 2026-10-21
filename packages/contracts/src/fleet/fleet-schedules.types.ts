@@ -100,6 +100,32 @@ export const FLEET_SCHEDULE_DELETED_RETENTION_DAYS = 30;
 /** Runs one `schedule.runs` answer carries at most (`more: true` past it). */
 export const FLEET_SCHEDULE_RUNS_PAGE = 500;
 
+/** The breaker's "Pause all on this computer" can be undone this long (FR-22, AW-10's 15 minutes). */
+export const FLEET_SCHEDULE_BREAKER_UNDO_MS = 15 * 60_000;
+
+/** The breaker pauses at most this many schedules at once (FR-22, AW-10's cap). */
+export const FLEET_SCHEDULE_BREAKER_CAP = 500;
+
+/** `POST /api/fleet/nodes/:id/schedules/pause-all` (FL-13 P2) — what the breaker did. */
+export interface FleetSchedulePauseAllResult {
+	paused: number;
+	/** Of those, how many had a run in flight (it finishes; nothing new starts). */
+	running: number;
+	/** The instant the breaker stamped (`pausedAt`), the key of its Undo. */
+	breakerAt: string;
+	undoUntil: string;
+}
+
+/** `details` of the breaker's `confirmation_required` (FR-22: the count and the runs in flight). */
+export interface FleetSchedulePauseAllConfirmation {
+	class: 'confirm';
+	action: 'pause-all';
+	nodeId: string;
+	nodeName: string;
+	count: number;
+	running: number;
+}
+
 /** The kill switch stops the node's loop and its in-flight runs within this (FR-17). */
 export const FLEET_SCHEDULE_KILL_SWITCH_STOP_MS = 10_000;
 
@@ -1040,6 +1066,8 @@ export interface FleetScheduleView {
 	running: boolean;
 	/** The platform holds the computer's link right now (Run now needs it, FR-19). */
 	linkUp: boolean;
+	/** Who asked for it (`agent` = an Agent's write a person approved, FL-13 P2). */
+	requestedBy?: 'user' | 'agent';
 	/** Consecutive failed runs, newest first (resets on a success). */
 	failureStreak: number;
 	syncState: FleetScheduleSyncState;

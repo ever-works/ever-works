@@ -9,6 +9,9 @@ import {
 import { NODE_SCHEDULE_PORT } from '@ever-works/agent/schedules';
 import { FleetScheduleLinkAdapter, FleetScheduleLinkListener } from './fleet-schedule-link.adapter';
 import { FleetScheduleReconcileCronService } from './fleet-schedule-reconcile-cron.service';
+import { FleetNodeSchedulesController, FleetSchedulesController } from './fleet-schedules.controller';
+import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
+import { FleetCommandsEnabledGuard } from '../commands/fleet-commands-enabled.guard';
 
 /**
  * Schedules on computers (FL-13) — the API half:
@@ -35,7 +38,12 @@ import { FleetScheduleReconcileCronService } from './fleet-schedule-reconcile-cr
 @Global()
 @Module({
     imports: [FleetSchedulesModule, DatabaseModule],
+    // P2: the resource routes the FL-19 catalogue names, and the breaker.
+    controllers: [FleetSchedulesController, FleetNodeSchedulesController],
     providers: [
+        // Guards are ordinary providers so Nest can inject them.
+        FleetEnabledGuard,
+        FleetCommandsEnabledGuard,
         FleetScheduleLinkAdapter,
         { provide: FLEET_SCHEDULE_NODE_PORT, useExisting: FleetScheduleLinkAdapter },
         { provide: NODE_SCHEDULE_PORT, useExisting: FleetScheduleService },

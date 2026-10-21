@@ -127,6 +127,7 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
     FleetCommandService,
+    FleetScheduleService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
@@ -2160,6 +2161,10 @@ async function assertRealWriteTarget(
                 //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
                 { token: FleetNodeHealthService, optional: true },
                 { token: NeedsALookService, optional: true },
+                // Schedules on computers (FL-13 P2) — backs `fleet_schedules_*`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
+                // tools are not offered; create/update/delete/run only ever file an approval.
+                { token: FleetScheduleService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2194,6 +2199,7 @@ async function assertRealWriteTarget(
                 fleetLogs?: FleetLogsReaderPort | null,
                 fleetHealth?: FleetNodeHealthService | null,
                 needsALook?: NeedsALookService | null,
+                fleetSchedules?: FleetScheduleService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2244,6 +2250,9 @@ async function assertRealWriteTarget(
                     : {}),
                 ...(fleetCommands && config.fleet.isCommandsEnabled()
                     ? { fleetCommands: { service: fleetCommands } }
+                    : {}),
+                ...(fleetSchedules && config.fleet.isCommandsEnabled()
+                    ? { fleetSchedules: { service: fleetSchedules } }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
