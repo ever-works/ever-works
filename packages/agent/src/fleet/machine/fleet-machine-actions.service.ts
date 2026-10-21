@@ -1,5 +1,14 @@
 import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
+    FLEET_CONTAINER_ACTION_BASE_CLASS,
+    fleetRunPreview,
+    validateFleetRunRequest,
+    type FleetContainerAction,
+    type FleetContainersListResult,
+    type FleetImagePruneResult,
+    type FleetImagePullResult,
+    type FleetImageRemoveResult,
+    type FleetImagesListResult,
     fleetEffectiveConfirmationClass,
     fleetMissingConfirmation,
     FLEET_SERVICE_ACTION_BASE_CLASS,
@@ -111,6 +120,8 @@ interface ActSpec {
     timeoutMs?: number;
     /** 0 for an act that is ALWAYS an operation (a pull, Compose up): answer its id at once. */
     awaitOperationMs?: number;
+    /** True for a result the node did NOT act on (a prune with nothing to remove, U15): no audit row. */
+    noOpResult?: (result: Record<string, unknown>) => boolean;
 }
 
 /** The outcome an error code is audited as: `failed` when the machine ran it and it failed. */
@@ -204,6 +215,152 @@ export class FleetMachineActionsService {
             params: { pid: input.pid, signal: input.signal },
             fields: input.fields,
             auditDetails: { signal: name },
+        });
+    }
+
+    // ─── Docker (P2) ───────────────────────────────────────────────────────
+
+    async listContainers(nodeId: string, caller: FleetMachineCaller): Promise<FleetContainersListResult> {
+        return this.list<FleetContainersListResult>(nodeId, caller, 'docker.containers', {});
+    }
+
+    async listImages(nodeId: string, caller: FleetMachineCaller): Promise<FleetImagesListResult> {
+        return this.list<FleetImagesListResult>(nodeId, caller, 'docker.images', {});
+    }
+
+    /**
+     * Start / stop / restart / remove one container. Remove is
+     * `confirm-destructive`: `confirmName` must be the container's NAME, which
+     * the machine is asked for first (a caller may name it by id).
+     */
+    async containerAction(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { container: string; action: FleetContainerAction; fields?: FleetActionConfirmFields | null },
+    ): Promise<Record<string, unknown> | FleetOperationRef> {
+        let name = input.container;
+        if (input.action === 'remove') {
+            const listed = await this.listContainers(nodeId, caller);
+            const found = listed.containers.find(
+                (row) => row.id === input.container.slice(0, 12) || row.name === input.container,
+            );
+            if (!found) throw fleetMachineError('not_found', `${input.container} is not a container on this computer`);
+            name = found.name;
+        }
+        const verbWord = `${input.action[0].toUpperCase()}${input.action.slice(1)}`;
+        return this.act<Record<string, unknown>>({
+            nodeId,
+            caller,
+            verb: 'docker.container.action',
+            family: 'docker',
+            auditAction: `node.docker.container.${input.action}` as FleetAuditAction,
+            target: input.container,
+            confirmTarget: name,
+            baseClass: FLEET_CONTAINER_ACTION_BASE_CLASS[input.action],
+            summary: (machine) => `${verbWord} ${name} on ${machine}?`,
+            params: { id: input.container, action: input.action },
+            fields: input.fields,
+            auditDetails: { container: name },
+        });
+    }
+
+    /**
+     * Run a container (FR-28): validated here AND on the machine; the audit
+     * row and the confirmation carry the image, the name, the ports and the
+     * environment variable NAMES — never a value (FR-29). An operation.
+     */
+    async runContainer(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { request: unknown; fields?: FleetActionConfirmFields | null },
+    ): Promise<Record<string, unknown> | FleetOperationRef> {
+        const validated = validateFleetRunRequest(input.request);
+        if (!validated.ok) {
+            throw fleetMachineError('invalid', validated.hint, { field: validated.field });
+        }
+        const request = validated.request;
+        return this.act<Record<string, unknown>>({
+            nodeId,
+            caller,
+            verb: 'docker.run',
+            family: 'docker',
+            auditAction: 'node.docker.container.run',
+            target: request.name ?? request.image,
+            baseClass: 'confirm',
+            summary: (machine) => `Run ${request.image}${request.name ? ` as ${request.name}` : ''} on ${machine}?`,
+            preview: fleetRunPreview(request),
+            params: { request },
+            fields: input.fields,
+            awaitOperationMs: 0,
+            auditDetails: {
+                image: request.image,
+                ...(request.name ? { name: request.name } : {}),
+                ports: request.ports.map((port) => `${port.host}:${port.container}/${port.proto ?? 'tcp'}`),
+                envVarNames: request.env.map((variable) => variable.name),
+                volumeTargets: request.volumes.map((volume) => volume.target),
+                restart: request.restart,
+            },
+        });
+    }
+
+    async pullImage(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { ref: string; fields?: FleetActionConfirmFields | null },
+    ): Promise<FleetImagePullResult | FleetOperationRef> {
+        return this.act<FleetImagePullResult>({
+            nodeId,
+            caller,
+            verb: 'docker.image.pull',
+            family: 'docker',
+            auditAction: 'node.docker.image.pull',
+            target: input.ref,
+            baseClass: 'confirm',
+            summary: (machine) => `Pull ${input.ref} on ${machine}?`,
+            params: { ref: input.ref },
+            fields: input.fields,
+            awaitOperationMs: 0,
+        });
+    }
+
+    async removeImage(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { id: string; fields?: FleetActionConfirmFields | null },
+    ): Promise<FleetImageRemoveResult | FleetOperationRef> {
+        return this.act<FleetImageRemoveResult>({
+            nodeId,
+            caller,
+            verb: 'docker.image.remove',
+            family: 'docker',
+            auditAction: 'node.docker.image.remove',
+            target: input.id,
+            baseClass: 'confirm',
+            summary: (machine) => `Remove image ${input.id} from ${machine}?`,
+            params: { id: input.id },
+            fields: input.fields,
+        });
+    }
+
+    /** "Remove unused" (`docker image prune -a`); a prune with nothing to remove runs nothing and writes no row (U15). */
+    async pruneImages(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        input: { fields?: FleetActionConfirmFields | null } = {},
+    ): Promise<FleetImagePruneResult | FleetOperationRef> {
+        return this.act<FleetImagePruneResult>({
+            nodeId,
+            caller,
+            verb: 'docker.image.prune',
+            family: 'docker',
+            auditAction: 'node.docker.image.prune',
+            target: 'unused-images',
+            baseClass: 'confirm',
+            summary: (machine) => `Remove every unused image from ${machine}?`,
+            params: {},
+            fields: input.fields,
+            awaitOperationMs: 0,
+            noOpResult: (result) => result.nothingToDo === true,
         });
     }
 
@@ -338,6 +495,7 @@ export class FleetMachineActionsService {
         }
 
         const result = (reply.result ?? {}) as T & { blastRadius?: unknown; viaRoot?: unknown };
+        if (spec.noOpResult?.(result as Record<string, unknown>)) return result;
         const blastRadius: FleetBlastRadius | null = asFleetBlastRadius(result.blastRadius);
         await this.record(spec, facts, {
             requestedBy,
