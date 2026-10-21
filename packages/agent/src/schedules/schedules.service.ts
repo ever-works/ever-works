@@ -11,6 +11,7 @@ import {
     type FindOptionsOrder,
     type FindOptionsWhere,
 } from 'typeorm';
+import { config } from '../config';
 import { Task } from '../entities/task.entity';
 import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
@@ -1064,7 +1065,8 @@ export class SchedulesService {
         scope: ScheduleScope,
         degraded: ScheduleSourceType[],
     ): Promise<ProjectedRow[]> {
-        if (!this.nodeScheduleSource) return [];
+        // The flag hides the source, not only the routes (FL-13 definition of done).
+        if (!this.nodeScheduleSource || !config.fleet.isCommandsEnabled()) return [];
         try {
             const schedules = await this.nodeScheduleSource.listForUser({ userId: scope.userId });
             return schedules.map((schedule) => {

@@ -28,6 +28,7 @@ import {
 } from '@ever-works/contracts';
 import type { FleetCommand } from '../../entities/fleet-command.entity';
 import type { FleetCommandRun } from '../../entities/fleet-command-run.entity';
+import { config } from '../../config';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import { INBOX_PRODUCER, type InboxProducer } from '../../inbox/inbox-producer.port';
 import { redactSecrets } from '../../utils/secret-scan';
@@ -319,6 +320,7 @@ export class FleetScheduleService {
         actor: FleetScheduleActor,
         reason: FleetSchedulePausedReason = 'user',
     ): Promise<FleetScheduleView> {
+        this.assertEnabled();
         const command = await this.resolveOwn(id, actor);
         const node = await this.nodes.findById(this.nodeIdOf(command));
         if (command.deletedAt) throw fleetCommandError('not_found', 'this schedule was deleted');
@@ -333,6 +335,7 @@ export class FleetScheduleService {
 
     /** Resume (spec S5, class `plain`): the next fire is computed from now; missed fires are not replayed. */
     async resume(id: string, actor: FleetScheduleActor): Promise<FleetScheduleView> {
+        this.assertEnabled();
         const command = await this.resolveOwn(id, actor);
         const node = await this.nodes.findById(this.nodeIdOf(command));
         if (command.deletedAt) throw fleetCommandError('not_found', 'this schedule was deleted');
@@ -373,6 +376,7 @@ export class FleetScheduleService {
         actor: FleetScheduleActor,
         confirm: boolean,
     ): Promise<{ runId: string; startedAt: string; nextRunAt: string | null; view: FleetScheduleView }> {
+        this.assertEnabled();
         const command = await this.resolveOwn(id, actor);
         if (command.deletedAt) throw fleetCommandError('not_found', 'this schedule was deleted');
         const node = await this.nodes.findById(this.nodeIdOf(command));
@@ -709,6 +713,15 @@ export class FleetScheduleService {
     }
 
     // ─── Internals ─────────────────────────────────────────────────────────
+
+    /**
+     * Run now, Pause and Resume also arrive through the Schedules routes, which
+     * `FleetCommandsEnabledGuard` does not cover: with `FLEET_COMMANDS_ENABLED`
+     * off a schedule is as unknown as a missing one (the 404 the guard answers).
+     */
+    private assertEnabled(): void {
+        if (!config.fleet.isCommandsEnabled()) throw fleetCommandError('not_found', 'no such schedule');
+    }
 
     private async applyPause(
         command: FleetCommand,
