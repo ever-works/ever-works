@@ -441,6 +441,15 @@ export interface AppDeployRequest {
     headCommitSha?: string | null;
     /** An idempotency key the dispatch carries (APW-05's build event id, an op `requestId`). */
     requestId?: string | null;
+    /**
+     * Security (sec/app-works-gates, 2026-10-18) — `true` only when `userId` asked from a signed-in
+     * browser session (set by the API's deploy and rollback routes; never by an API key, an agent,
+     * a listener or a Build). Persisted on the row as `appRender.requestedByHumanSession` and read by
+     * the worker's pull-credential gate: on a your-cluster target the owner's git token may be the
+     * image-pull fallback only for a Deployment the Work owner requested from a session (and only
+     * while `APP_PULL_OWNER_TOKEN_FALLBACK=true`). Absent ⇒ `false` — fail closed.
+     */
+    requestedByHumanSession?: boolean;
 }
 
 /** What the row will store, echoed so a caller needs no second read (§2.2:156-158, §7.1). */
@@ -767,6 +776,8 @@ export class AppDeployRequestService {
         trigger?: AppDeployTrigger;
         provider?: string | null;
         requestId?: string | null;
+        /** Security (sec/app-works-gates) — see {@link AppDeployRequest.requestedByHumanSession}. */
+        requestedByHumanSession?: boolean;
     }): Promise<{ status: 'pending'; deploymentId: string }> {
         const result = await this.request({ ...input, trigger: input?.trigger ?? 'manual' });
         if (result.status === 'refused') throw new AppDeployRefusedError(result);
@@ -1386,6 +1397,11 @@ export function rowDraft(
     const render: Record<string, unknown> = {
         specCommitSha: stored.specCommitSha,
         skipPreDeployJobs: stored.skipPreDeployJobs,
+        // Security (sec/app-works-gates) — always written, `true` only for a literal `true` that
+        // comes WITH a person: a session flag without a `userId` describes nobody. The worker's
+        // pull-credential gate reads it back off this row (`findRequester`), never off the payload.
+        requestedByHumanSession:
+            request?.requestedByHumanSession === true && Boolean(request?.userId),
     };
 
     if (stored.rollback) {

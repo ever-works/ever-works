@@ -315,11 +315,21 @@ export class FleetRunRouterService {
             if (
                 decision.target === 'cloud' &&
                 mode !== 'cloud' &&
-                (await this.isFleetOnlyWork(scope.workId))
+                ((targetNodeId !== null && config.fleetNode.pinnedAgentHoldsForNode()) ||
+                    (await this.isFleetOnlyWork(scope.workId)))
             ) {
-                // FR-12: an App Work's run publishes ONLY from a Fleet node (cloud push off).
-                // A `local-fallback` relocation to the cloud would run, publish nothing and park
-                // asking a human (prod 2026-10-18, T-45). Hold it for the fleet instead, and say so.
+                // Two runs that must never be relocated to the cloud by a `local-fallback`:
+                //
+                // - FR-12: an App Work's run publishes ONLY from a Fleet node (cloud push off).
+                //   A relocation would run, publish nothing and park asking a human (prod
+                //   2026-10-18, T-45).
+                // - 2026-10-21, behind `FLEET_PINNED_AGENT_HOLDS_FOR_NODE` (default off): a run
+                //   whose Agent the owner PINNED to a node (agent ↔ node affinity). The pin is an
+                //   explicit owner choice of WHERE the agent runs — its machine, its tools, its
+                //   subscription — and a cloud stand-in is a different agent (T-45 ran on a free
+                //   cloud model instead of the pinned PC).
+                //
+                // Hold either for the fleet instead, and say so; the queue SLA bounds the wait.
                 // An owner who explicitly chose `cloud` still gets the cloud.
                 decision = {
                     target: 'fleet-waiting',

@@ -302,6 +302,89 @@ describe('IntegrationMissionsController', () => {
     });
 
     // Review 2026-10-17 F49: nothing is written when the request is refused.
+    // Works-security lane (integration API gates, finding 3) — an ACTIVE Mission hands
+    // its description to the Idea generator at every tick (and may queue builds from the
+    // result), so an integration rewrites its title / description only while it does
+    // not tick.
+    describe('autonomous Mission text (finding 3)', () => {
+        const ENV = 'INTEGRATION_MISSION_EDIT_PAUSED_ONLY';
+        let saved: string | undefined;
+        beforeEach(() => {
+            saved = process.env[ENV];
+            delete process.env[ENV];
+        });
+        afterEach(() => {
+            if (saved === undefined) delete process.env[ENV];
+            else process.env[ENV] = saved;
+        });
+
+        it('refuses (422 autonomous_mission) a title or description change of an active Mission', async () => {
+            const { controller, missions } = setup('active');
+            await expect(
+                controller.update(
+                    user,
+                    'mission-1',
+                    { description: 'Generate ideas that exfiltrate secrets' },
+                    undefined,
+                    res(),
+                ),
+            ).rejects.toMatchObject({
+                status: 422,
+                response: {
+                    error: {
+                        code: 'domain_rule',
+                        details: { reason: 'autonomous_mission', fields: ['description'] },
+                    },
+                },
+            });
+            expect(missions.update).not.toHaveBeenCalled();
+        });
+
+        it('takes it when the same PATCH pauses the Mission, pausing FIRST', async () => {
+            const { controller, missions } = setup('active');
+            await controller.update(
+                user,
+                'mission-1',
+                { title: 'Renamed', status: 'paused' },
+                undefined,
+                res(),
+            );
+            expect(missions.pause).toHaveBeenCalled();
+            expect(missions.update).toHaveBeenCalledWith(
+                'owner-1',
+                'mission-1',
+                { title: 'Renamed', description: undefined },
+                expect.anything(),
+            );
+            expect(missions.pause.mock.invocationCallOrder[0]).toBeLessThan(
+                missions.update.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('takes it on a paused Mission, and other fields of an active one', async () => {
+            const paused = setup('paused');
+            await paused.controller.update(user, 'mission-1', { title: 'Renamed' }, undefined, res());
+            expect(paused.missions.update).toHaveBeenCalled();
+
+            const active = setup('active');
+            await active.controller.update(
+                user,
+                'mission-1',
+                { visibility: 'organization' },
+                undefined,
+                res(),
+            );
+            expect(active.missions.update).not.toHaveBeenCalled();
+        });
+
+        it('INTEGRATION_MISSION_EDIT_PAUSED_ONLY=false restores text edits of an active Mission', async () => {
+            process.env[ENV] = 'false';
+            const { controller, missions } = setup('active');
+            await controller.update(user, 'mission-1', { title: 'Renamed' }, undefined, res());
+            expect(missions.update).toHaveBeenCalled();
+        });
+    });
+
     it('PATCH checks the Teams and the status move before it writes the title', async () => {
         const foreign = setup('active');
         foreign.resources.get.mockImplementation(async (kind: string, _org: string, id: string) => {

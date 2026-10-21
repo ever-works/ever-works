@@ -18,12 +18,17 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * been added by anyone. A provisioning Task that was still open at deploy time
  * loses the exemption; restarting provisioning files a new Task that has it.
  *
+ * Timestamp `1795169100000`: first merged as `1796040000000`, which is fleet
+ * epic FL-04's reserved slot (`docs/specs/features/fleet/CONTRACTS.md` §13,
+ * `CreateFleetSessions`). Renumbered out of the fleet range; a database that
+ * already ran it under the old name runs this one as a no-op (the guard below).
+ *
  * Forward-only with a per-step guard so a partially applied database
  * converges; portable `TableColumn` DDL (Postgres in prod, better-sqlite3 in
  * CI / e2e).
  */
-export class AddTaskOrigin1796040000000 implements MigrationInterface {
-    name = 'AddTaskOrigin1796040000000';
+export class AddTaskOrigin1795169100000 implements MigrationInterface {
+    name = 'AddTaskOrigin1795169100000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const tasks = await queryRunner.getTable('tasks');

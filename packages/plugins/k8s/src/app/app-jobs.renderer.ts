@@ -440,11 +440,39 @@ export function renderCommandJob(
 				// The container mounts the §4.4 `/tmp` emptyDir when its root filesystem is read-only,
 				// so the pod must declare it: without it the API server refused the Job with 422
 				// `volumeMounts[0].name: Not found: "tmp"` (prod Deployment e4b65cbd, 2026-10-18).
-				spec: jobPodSpec(input, component, commandContainer(input, component, job?.command, options), {
-					volumes: tmpVolumes(input, component)
-				})
+				spec: jobPodSpec(
+					input,
+					component,
+					withWorkReport(commandContainer(input, component, job?.command, options), job),
+					{ volumes: tmpVolumes(input, component) }
+				)
 			}
 		}
+	};
+}
+
+/** Where a job that declares `expectsWork` reports the work it did — the kubelet's default path. */
+export const APP_JOB_REPORT_PATH = '/dev/termination-log';
+/** The env var that names {@link APP_JOB_REPORT_PATH} inside the job's container. */
+export const APP_JOB_REPORT_PATH_ENV = 'EVER_WORKS_JOB_REPORT_PATH';
+
+/**
+ * `jobs[].expectsWork` (additive, default off): pin the termination-message contract the deployer
+ * reads back — `File` policy at {@link APP_JOB_REPORT_PATH} — and name the path in the container's
+ * env, so the job's script can write its one-line report without knowing the kubelet default.
+ * A job that does not declare it is returned untouched (its render stays byte-for-byte the same).
+ */
+function withWorkReport(container: Record<string, unknown>, job: AppJobInput): Record<string, unknown> {
+	if (job?.expectsWork !== true) {
+		return container;
+	}
+	const env = Array.isArray(container.env) ? [...(container.env as unknown[])] : [];
+	env.push({ name: APP_JOB_REPORT_PATH_ENV, value: APP_JOB_REPORT_PATH });
+	return {
+		...container,
+		env,
+		terminationMessagePath: APP_JOB_REPORT_PATH,
+		terminationMessagePolicy: 'File'
 	};
 }
 

@@ -101,6 +101,8 @@ import {
 	type AppRenderedObject
 } from './app-manifest.renderer.js';
 import {
+	APP_JOB_REPORT_PATH,
+	APP_JOB_REPORT_PATH_ENV,
 	APP_JOB_RUNS_KEPT,
 	APP_RUNNER_CONTAINER_NAME,
 	APP_RUNNER_DEADLINE_EXTRA_S,
@@ -1088,7 +1090,9 @@ export class AppDeployer {
 				const podFailure = waited.podFailure ?? null;
 				const message = podFailure
 					? jobPodFailureMessage(entry, podFailure)
-					: jobFailureMessage(entry, waited.result);
+					: waited.noWork
+						? jobNoWorkMessage(entry, waited.noWork)
+						: jobFailureMessage(entry, waited.result);
 				if (!warnOnly) {
 					return {
 						phase: state.phase,
@@ -1165,7 +1169,7 @@ export class AppDeployer {
 		state: RunState,
 		entry: AppJobPlanEntry,
 		plan: { objects: AppRenderedObject[] }
-	): Promise<{ result: AppJobResult; stop: WaitStop; podFailure?: AppPodFailure }> {
+	): Promise<{ result: AppJobResult; stop: WaitStop; podFailure?: AppPodFailure; noWork?: string }> {
 		const appliedAt = this.now();
 		const name = String(entry.name ?? '');
 		const timeoutMs = jobTimeoutMs(plan, entry);
@@ -1218,6 +1222,18 @@ export class AppDeployer {
 			podFailure = lastStuck;
 		}
 
+		// `jobs[].expectsWork` (additive, default off): a Job that exits 0 is a success only when it
+		// also REPORTED the work it did on its termination message. A migrate/bootstrap script whose
+		// entry point never ran exits 0 having done nothing, and that used to pass as a success until
+		// a later smoke check failed for an unrelated-looking reason (prod fixture, 2026-10-18).
+		let noWork: string | null = null;
+		if (status === 'succeeded' && stop === 'ok' && entry.kind === 'command' && expectsWork(state, name)) {
+			noWork = await this.missingWorkReport(state, entry);
+			if (noWork) {
+				status = 'failed';
+			}
+		}
+
 		// A runner Job's report is the pod's log (§4.8); a command Job has none.
 		const read =
 			entry.kind === 'runner' ? await this.readRunnerPod(state, name) : { records: [] as AppRunnerRecord[] };
@@ -1233,7 +1249,38 @@ export class AppDeployer {
 			...('logRef' in read && read.logRef ? { logRef: read.logRef } : {})
 		};
 
-		return { result, stop, ...(podFailure ? { podFailure } : {}) };
+		return { result, stop, ...(podFailure ? { podFailure } : {}), ...(noWork ? { noWork } : {}) };
+	}
+
+	/**
+	 * `null` when the succeeded Job's container wrote a non-empty termination message; otherwise the
+	 * one-line reason the Job counts as having done no work. Fail-closed: a Job that declared
+	 * `expectsWork` and whose report cannot be read is not passed as a success.
+	 */
+	private async missingWorkReport(state: RunState, entry: AppJobPlanEntry): Promise<string | null> {
+		let pods: AppRolloutPod[];
+		try {
+			pods = await this.api.listObjects<AppRolloutPod>(
+				state.kubeconfig,
+				'v1',
+				'Pod',
+				state.namespace,
+				`${APP_LABEL_JOB}=${String(entry.name ?? '')}`,
+				state.context
+			);
+		} catch (err) {
+			return `its pods could not be listed to read the report (${messageOf(err)})`;
+		}
+		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
+		if (own.length === 0) {
+			return 'its pod was already gone, so no report could be read';
+		}
+		const reported = own.some((pod) =>
+			(pod?.status?.containerStatuses ?? []).some(
+				(status) => String(status?.state?.terminated?.message ?? '').trim().length > 0
+			)
+		);
+		return reported ? null : `it wrote nothing to ${APP_JOB_REPORT_PATH}`;
 	}
 
 	/**
@@ -2183,6 +2230,20 @@ function jobTimeoutMs(plan: { objects: AppRenderedObject[] }, entry: AppJobPlanE
 	const seconds =
 		typeof declared === 'number' && Number.isFinite(declared) && declared > 0 ? declared : JOB_TIMEOUT_FALLBACK_S;
 	return (seconds + JOB_TIMEOUT_SLACK_S) * 1_000;
+}
+
+/** A Job that declared `expectsWork`, exited 0, and reported nothing (`jobs[].expectsWork`). */
+function jobNoWorkMessage(entry: AppJobPlanEntry, reason: string): string {
+	return (
+		`Job '${entry.name}' exited 0 but reported no work: ${reason}. A job with \`expectsWork: true\` must ` +
+		`write a one-line report to ${APP_JOB_REPORT_PATH} ($${APP_JOB_REPORT_PATH_ENV}) — check that its entry ` +
+		`point actually ran.`
+	);
+}
+
+/** True when the render input's job of this name declares `expectsWork: true`. */
+function expectsWork(state: RunState, name: string): boolean {
+	return (state.input?.jobs ?? []).some((job) => job?.name === name && job?.expectsWork === true);
 }
 
 function jobFailureMessage(entry: AppJobPlanEntry, result: AppJobResult): string {

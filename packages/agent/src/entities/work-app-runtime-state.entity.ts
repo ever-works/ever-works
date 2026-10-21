@@ -312,6 +312,27 @@ export interface AppRuntimeTargetSettings {
     primaryDomain?: string | null;
     autoDeploy?: boolean | null;
     previews?: boolean | null;
+    /**
+     * Works-security (2026-10-18) — who last saved the your-cluster credential and whether the
+     * owner has confirmed it (`app-owner-gates.ts`). Written only by `AppTargetService`; never
+     * accepted from `PUT app-target` (its parser whitelists the keys above) and never returned
+     * in `GET app-target`'s `settings`. Ids and timestamps only — never a credential.
+     */
+    clusterCredential?: AppClusterCredentialProvenance | null;
+}
+
+/** Provenance of a Work's your-cluster credential (kubeconfig or kube context). */
+export interface AppClusterCredentialProvenance {
+    /** The member who saved it; `null` when unknown. */
+    savedByUserId?: string | null;
+    /** Whether that member was the Work's owner when they saved it. */
+    savedByOwner?: boolean | null;
+    /** ISO timestamp of the save. */
+    savedAt?: string | null;
+    /** The owner who confirmed a credential someone else saved (or one of unknown origin). */
+    ownerConfirmedByUserId?: string | null;
+    /** ISO timestamp of that confirmation; cleared by every new save. */
+    ownerConfirmedAt?: string | null;
 }
 
 /** §7.2's `ingressAddress` bag — what a cluster check or a reconcile observed. */

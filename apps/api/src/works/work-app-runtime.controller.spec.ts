@@ -20,7 +20,8 @@ import { WorkAppRuntimeController } from './work-app-runtime.controller';
  * routes. The service is a fake: what it decides is `app-target.service.spec.ts`'s subject.
  */
 describe('WorkAppRuntimeController', () => {
-    const auth = { userId: 'u-1' } as never;
+    // A signed-in owner — the works-security owner gates are `app-works-owner-gates.spec.ts`'s.
+    const auth = { userId: 'u-1', authMethod: 'session' } as never;
     const WORK_ID = '00000000-0000-4000-8000-000000000001';
 
     function build(kind = 'app', deny?: Error) {
@@ -31,8 +32,9 @@ describe('WorkAppRuntimeController', () => {
             }),
             ensureCanEdit: jest.fn(async () => {
                 if (deny) throw deny;
-                return { work: { id: WORK_ID, kind } };
+                return { work: { id: WORK_ID, kind }, role: 'owner' };
             }),
+            ensureIsOwner: jest.fn(async () => ({ work: { id: WORK_ID, kind }, role: 'owner' })),
         };
         const targets = {
             getTarget: jest.fn(async () => ({ target: 'your-cluster' })),
@@ -44,6 +46,12 @@ describe('WorkAppRuntimeController', () => {
                 dispatched: true,
             })),
             getStatus: jest.fn(async () => ({ state: 'live' })),
+            pendingTargetChange: jest.fn(async () => ({
+                targetChanges: true,
+                namespaceChanges: false,
+            })),
+            clusterCredentialNeedsOwnerConfirmation: jest.fn(async () => false),
+            confirmClusterCredential: jest.fn(async () => true),
             rollback: jest.fn(async () => ({
                 ok: true,
                 result: {
@@ -83,9 +91,12 @@ describe('WorkAppRuntimeController', () => {
             controller.checkAppTarget(auth, WORK_ID, { kubeconfig: 'apiVersion: v1' }, response),
         ).resolves.toEqual({ status: 'accepted', requestId: 'req-1', dispatched: true });
         expect(response.status).toHaveBeenCalledWith(HttpStatus.ACCEPTED);
-        expect(targets.check).toHaveBeenCalledWith(WORK_ID, 'u-1', {
-            kubeconfig: 'apiVersion: v1',
-        });
+        expect(targets.check).toHaveBeenCalledWith(
+            WORK_ID,
+            'u-1',
+            { kubeconfig: 'apiVersion: v1' },
+            { isOwner: true },
+        );
     });
 
     it('answers one 404 for a missing or invisible Work, and 404 notAppWork for a website', async () => {

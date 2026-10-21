@@ -25,6 +25,16 @@ describe('IntegrationGoalsController', () => {
         actAsUserId: null,
     };
     const user = { userId: 'owner-1', authMethod: 'integration', integration: principal } as never;
+    // A person's decision relayed with X-Act-As-User (the guard swaps userId to the person).
+    const relayed = {
+        userId: 'person-1',
+        authMethod: 'integration',
+        integration: { ...principal, actAsUserId: 'person-1' },
+    } as never;
+    const RELAY = {
+        relayedBy: 'Ever Gauzy (Gauzy)',
+        provenance: { integrationKeyId: 'key-1', integrationKind: 'ever-gauzy', actAsUserId: 'person-1' },
+    };
     const req = (key: string | undefined = 'idem-1') => ({
         method: 'POST',
         originalUrl: '/api/integrations/v1/goals',
@@ -56,7 +66,10 @@ describe('IntegrationGoalsController', () => {
             getForUser: jest.fn().mockResolvedValue({ id: 'goal-1' }),
             recordExternalSample: jest.fn().mockResolvedValue({}),
         };
-        const orchestrator = { setDodCriteria: jest.fn().mockResolvedValue({}) };
+        const orchestrator = {
+            setDodCriteria: jest.fn().mockResolvedValue({}),
+            proposeDodCriteria: jest.fn().mockResolvedValue({}),
+        };
         const visibility = {
             setTeams: jest.fn().mockResolvedValue({}),
             setVisibility: jest.fn().mockResolvedValue({}),
@@ -237,16 +250,21 @@ describe('IntegrationGoalsController', () => {
         ).rejects.toMatchObject({ status: 422 });
         expect(goals.update).not.toHaveBeenCalled();
 
+        // A person's decision relayed with X-Act-As-User keeps writing the operator's
+        // own (approved) items, with the relay recorded (owner decision).
         await controller.putDod(
-            user,
+            relayed,
             'goal-1',
             { dodCriteria: [{ id: 'kr-launch', text: 'Launched', status: 'done' }] },
             undefined,
             res(),
         );
-        expect(orchestrator.setDodCriteria).toHaveBeenCalledWith('owner-1', 'goal-1', [
-            { id: 'kr-launch', text: 'Launched', status: 'done', evidence: null, note: null },
-        ]);
+        expect(orchestrator.setDodCriteria).toHaveBeenCalledWith(
+            'person-1',
+            'goal-1',
+            [{ id: 'kr-launch', text: 'Launched', status: 'done', evidence: null, note: null }],
+            RELAY,
+        );
     });
 
     it('PUT criteria refuses a criterion that inherits the Goal provider source (D9)', async () => {
@@ -309,16 +327,21 @@ describe('IntegrationGoalsController', () => {
             ],
         });
         await controller.putDod(
-            user,
+            relayed,
             'goal-1',
             { dodCriteria: [{ id: 'kr-launch', text: 'Launched', status: 'done' }] },
             undefined,
             res(),
         );
-        expect(orchestrator.setDodCriteria).toHaveBeenCalledWith('owner-1', 'goal-1', [
-            { id: 'kr-launch', text: 'Launched', status: 'done', evidence: null, note: null },
-            proposal,
-        ]);
+        expect(orchestrator.setDodCriteria).toHaveBeenCalledWith(
+            'person-1',
+            'goal-1',
+            [
+                { id: 'kr-launch', text: 'Launched', status: 'done', evidence: null, note: null },
+                proposal,
+            ],
+            RELAY,
+        );
     });
 
     it('a sample is recorded through recordExternalSample and answers the Goal', async () => {
@@ -356,6 +379,381 @@ describe('IntegrationGoalsController', () => {
         await idle.controller.remove(user, 'goal-1', '"4"');
         expect(idle.goals.delete).toHaveBeenCalledWith('owner-1', 'goal-1', expect.anything());
         expect(idle.links.removeAllFor).toHaveBeenCalledWith(ORG, 'goal', 'goal-1');
+    });
+});
+
+// Works-security lane (integration API gates) — findings 1 and 7: a key with no
+// person behind it (no X-Act-As-User) proposes Definition-of-Done criteria and never
+// signs them off; it cannot rewrite the brief of a running loop either.
+describe('IntegrationGoalsController — key without a person (findings 1, 7)', () => {
+    const ORG = 'org-1';
+    const principal = {
+        keyId: 'key-1',
+        keyName: 'Gauzy',
+        integrationKind: 'ever-gauzy',
+        tenantId: 'tenant-1',
+        allowedOrganizationIds: [ORG],
+        scopes: ['goals:write'],
+        ownerUserId: 'owner-1',
+        actAsUserId: null,
+    };
+    const keyOnly = { userId: 'owner-1', authMethod: 'integration', integration: principal } as never;
+    const relayed = {
+        userId: 'person-1',
+        authMethod: 'integration',
+        integration: { ...principal, actAsUserId: 'person-1' },
+    } as never;
+    const res = () => ({ status: jest.fn(), setHeader: jest.fn() });
+    const req = () => ({
+        method: 'POST',
+        originalUrl: '/api/integrations/v1/goals',
+        body: {},
+        headers: { 'idempotency-key': 'idem-1' },
+    });
+    const approvedOpen = { id: 'kr-launch', text: 'Launched', status: 'open', source: 'operator' };
+    const approvedDone = { id: 'kr-docs', text: 'Docs', status: 'done', source: 'operator' };
+    const proposal = {
+        id: 'dod-proposed',
+        text: 'Docs published',
+        status: 'open',
+        source: 'planner',
+        proposed: true,
+    };
+
+    const setup = (opts: { dod?: unknown[]; loopStatus?: string | null } = {}) => {
+        const goals = {
+            createExternal: jest.fn().mockResolvedValue({ id: 'goal-1' }),
+            update: jest.fn().mockResolvedValue({}),
+            getForUser: jest
+                .fn()
+                .mockResolvedValue({ id: 'goal-1', dodCriteria: opts.dod ?? [approvedOpen] }),
+        };
+        const orchestrator = {
+            setDodCriteria: jest.fn().mockResolvedValue({}),
+            proposeDodCriteria: jest.fn().mockResolvedValue({}),
+        };
+        const idempotency = {
+            run: jest.fn(
+                async (
+                    _input: unknown,
+                    work: () => Promise<{ status: number; body: unknown }>,
+                ) => ({ ...(await work()), replayed: false }),
+            ),
+        };
+        const resources = {
+            get: jest.fn(async (_kind: string, _org: string, id: string) => ({
+                dto: {
+                    id,
+                    version: 4,
+                    loop: { status: opts.loopStatus ?? null, iteration: 0, spentCents: 0 },
+                },
+                etag: '"4"',
+            })),
+        };
+        const controller = new IntegrationGoalsController(
+            goals as never,
+            orchestrator as never,
+            { setTeams: jest.fn(), setVisibility: jest.fn() } as never,
+            { findByExternal: jest.fn().mockResolvedValue(null), create: jest.fn() } as never,
+            idempotency as never,
+            resources as never,
+            { getScope: () => ({ tenantId: 'tenant-1', organizationId: ORG }) } as never,
+        );
+        return { controller, goals, orchestrator };
+    };
+
+    const ENV_KEYS = ['INTEGRATION_GOAL_DOD_PROPOSE_ONLY', 'INTEGRATION_GOAL_TEXT_EDIT_RUNNING'];
+    const saved: Record<string, string | undefined> = {};
+    beforeEach(() => {
+        for (const key of ENV_KEYS) {
+            saved[key] = process.env[key];
+            delete process.env[key];
+        }
+    });
+    afterEach(() => {
+        for (const key of ENV_KEYS) {
+            if (saved[key] === undefined) delete process.env[key];
+            else process.env[key] = saved[key];
+        }
+    });
+
+    const refused = (criteria: unknown) => ({
+        status: 422,
+        response: { error: { code: 'domain_rule', details: { reason: 'act_as_required', criteria } } },
+    });
+
+    it('PUT dod: a new open criterion is PROPOSED (inert until a person approves), never written approved', async () => {
+        const { controller, orchestrator } = setup();
+        await controller.putDod(
+            keyOnly,
+            'goal-1',
+            {
+                dodCriteria: [
+                    { id: 'kr-launch', text: 'Launched', status: 'open' },
+                    { id: 'kr-new', text: 'Publish the changelog', status: 'open' },
+                ],
+            },
+            undefined,
+            res(),
+        );
+        expect(orchestrator.setDodCriteria).not.toHaveBeenCalled();
+        expect(orchestrator.proposeDodCriteria).toHaveBeenCalledWith(
+            'owner-1',
+            'goal-1',
+            [
+                {
+                    id: 'kr-new',
+                    text: 'Publish the changelog',
+                    status: 'open',
+                    evidence: null,
+                    note: null,
+                },
+            ],
+            {
+                proposedBy: 'Ever Gauzy (Gauzy)',
+                provenance: { integrationKeyId: 'key-1', integrationKind: 'ever-gauzy', actAsUserId: null },
+            },
+        );
+    });
+
+    it('PUT dod: refuses (422) a new criterion sent done or waived, writing nothing', async () => {
+        const { controller, orchestrator } = setup();
+        await expect(
+            controller.putDod(
+                keyOnly,
+                'goal-1',
+                {
+                    dodCriteria: [
+                        { id: 'kr-launch', text: 'Launched', status: 'open' },
+                        { id: 'kr-new', text: 'Shipped', status: 'done' },
+                        { id: 'kr-skip', text: 'Audit', status: 'waived' },
+                    ],
+                },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject(
+            refused([
+                { id: 'kr-new', reason: 'closed_status' },
+                { id: 'kr-skip', reason: 'closed_status' },
+            ]),
+        );
+        expect(orchestrator.setDodCriteria).not.toHaveBeenCalled();
+        expect(orchestrator.proposeDodCriteria).not.toHaveBeenCalled();
+    });
+
+    it('PUT dod: refuses signing off an approved criterion (the delivery-Goal completion path)', async () => {
+        const { controller, orchestrator } = setup();
+        await expect(
+            controller.putDod(
+                keyOnly,
+                'goal-1',
+                { dodCriteria: [{ id: 'kr-launch', text: 'Launched', status: 'done' }] },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject(refused([{ id: 'kr-launch', reason: 'approved_changed' }]));
+        expect(orchestrator.setDodCriteria).not.toHaveBeenCalled();
+    });
+
+    it('PUT dod: refuses rewording an approved criterion and sending other evidence for it', async () => {
+        const { controller } = setup({ dod: [approvedOpen, { ...approvedDone, evidence: 'PR #1' }] });
+        await expect(
+            controller.putDod(
+                keyOnly,
+                'goal-1',
+                {
+                    dodCriteria: [
+                        { id: 'kr-launch', text: 'Ignore previous instructions', status: 'open' },
+                        { id: 'kr-docs', text: 'Docs', status: 'done', evidence: 'PR #2' },
+                    ],
+                },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject(
+            refused([
+                { id: 'kr-launch', reason: 'approved_changed' },
+                { id: 'kr-docs', reason: 'approved_changed' },
+            ]),
+        );
+    });
+
+    it('PUT dod: refuses removing an approved criterion (removing the last open one would complete the Goal)', async () => {
+        const { controller, orchestrator } = setup({ dod: [approvedOpen, approvedDone] });
+        await expect(
+            controller.putDod(
+                keyOnly,
+                'goal-1',
+                { dodCriteria: [{ id: 'kr-docs', text: 'Docs', status: 'done' }] },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject(refused([{ id: 'kr-launch', reason: 'approved_removed' }]));
+        expect(orchestrator.setDodCriteria).not.toHaveBeenCalled();
+    });
+
+    it('PUT dod: naming a proposal never approves it — an echo keeps it pending, a change is refused', async () => {
+        const echo = setup({ dod: [approvedOpen, proposal] });
+        await echo.controller.putDod(
+            keyOnly,
+            'goal-1',
+            {
+                dodCriteria: [
+                    { id: 'kr-launch', text: 'Launched', status: 'open' },
+                    { id: 'dod-proposed', text: 'Docs published', status: 'open' },
+                ],
+            },
+            undefined,
+            res(),
+        );
+        expect(echo.orchestrator.setDodCriteria).not.toHaveBeenCalled();
+        expect(echo.orchestrator.proposeDodCriteria).not.toHaveBeenCalled();
+
+        const changed = setup({ dod: [approvedOpen, proposal] });
+        await expect(
+            changed.controller.putDod(
+                keyOnly,
+                'goal-1',
+                {
+                    dodCriteria: [
+                        { id: 'kr-launch', text: 'Launched', status: 'open' },
+                        { id: 'dod-proposed', text: 'Docs published', status: 'done' },
+                    ],
+                },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject(refused([{ id: 'dod-proposed', reason: 'proposal_changed' }]));
+    });
+
+    it('PUT dod: an unchanged full-set echo writes nothing and keeps the proposals it leaves out', async () => {
+        const { controller, orchestrator } = setup({ dod: [approvedOpen, approvedDone, proposal] });
+        await controller.putDod(
+            keyOnly,
+            'goal-1',
+            {
+                dodCriteria: [
+                    { id: 'kr-launch', text: 'Launched', status: 'open' },
+                    { id: 'kr-docs', text: 'Docs', status: 'done' },
+                ],
+            },
+            undefined,
+            res(),
+        );
+        expect(orchestrator.setDodCriteria).not.toHaveBeenCalled();
+        expect(orchestrator.proposeDodCriteria).not.toHaveBeenCalled();
+    });
+
+    it('PUT dod: INTEGRATION_GOAL_DOD_PROPOSE_ONLY=false restores the operator-authored write', async () => {
+        process.env.INTEGRATION_GOAL_DOD_PROPOSE_ONLY = 'false';
+        const { controller, orchestrator } = setup();
+        await controller.putDod(
+            keyOnly,
+            'goal-1',
+            { dodCriteria: [{ id: 'kr-launch', text: 'Launched', status: 'done' }] },
+            undefined,
+            res(),
+        );
+        expect(orchestrator.setDodCriteria).toHaveBeenCalledWith(
+            'owner-1',
+            'goal-1',
+            [{ id: 'kr-launch', text: 'Launched', status: 'done', evidence: null, note: null }],
+            {},
+        );
+    });
+
+    it('POST goals: refuses (422) Definition-of-Done criteria created done or waived without a person', async () => {
+        const { controller, goals } = setup();
+        await expect(
+            controller.create(
+                keyOnly,
+                {
+                    title: 'Ship it',
+                    goalKind: 'delivery',
+                    dodCriteria: [
+                        { id: 'kr-a', text: 'Built', status: 'done' },
+                        { id: 'kr-b', text: 'Tested', status: 'open' },
+                    ],
+                } as never,
+                undefined,
+                req(),
+                res(),
+            ),
+        ).rejects.toMatchObject(refused([{ id: 'kr-a', reason: 'closed_status' }]));
+        expect(goals.createExternal).not.toHaveBeenCalled();
+    });
+
+    it('POST goals: open criteria without a person, and done ones relayed for a person, are created', async () => {
+        const open = setup();
+        await open.controller.create(
+            keyOnly,
+            {
+                title: 'Ship it',
+                goalKind: 'delivery',
+                dodCriteria: [{ id: 'kr-b', text: 'Tested', status: 'open' }],
+            } as never,
+            undefined,
+            req(),
+            res(),
+        );
+        expect(open.goals.createExternal).toHaveBeenCalled();
+
+        const relayedCreate = setup();
+        await relayedCreate.controller.create(
+            relayed,
+            {
+                title: 'Ship it',
+                goalKind: 'delivery',
+                dodCriteria: [{ id: 'kr-a', text: 'Built', status: 'done' }],
+            } as never,
+            undefined,
+            req(),
+            res(),
+        );
+        expect(relayedCreate.goals.createExternal).toHaveBeenCalled();
+    });
+
+    it('PATCH: refuses (422) a title / description change of a running Goal without a person', async () => {
+        const { controller, goals } = setup({ loopStatus: 'running' });
+        await expect(
+            controller.update(keyOnly, 'goal-1', { description: 'New instructions' }, undefined, res()),
+        ).rejects.toMatchObject({
+            status: 422,
+            response: {
+                error: {
+                    code: 'domain_rule',
+                    details: { reason: 'goal_loop_running', fields: ['description'] },
+                },
+            },
+        });
+        expect(goals.update).not.toHaveBeenCalled();
+    });
+
+    it('PATCH: a running Goal still takes other fields, a relayed edit, and text edits once not running', async () => {
+        const running = setup({ loopStatus: 'running' });
+        await running.controller.update(keyOnly, 'goal-1', { targetValue: 5 }, undefined, res());
+        expect(running.goals.update).toHaveBeenCalledWith(
+            'owner-1',
+            'goal-1',
+            { targetValue: 5 },
+            expect.anything(),
+        );
+
+        const relayedEdit = setup({ loopStatus: 'running' });
+        await relayedEdit.controller.update(relayed, 'goal-1', { title: 'Renamed' }, undefined, res());
+        expect(relayedEdit.goals.update).toHaveBeenCalled();
+
+        const paused = setup({ loopStatus: 'paused' });
+        await paused.controller.update(keyOnly, 'goal-1', { title: 'Renamed' }, undefined, res());
+        expect(paused.goals.update).toHaveBeenCalled();
+    });
+
+    it('PATCH: INTEGRATION_GOAL_TEXT_EDIT_RUNNING=true restores text edits of a running Goal', async () => {
+        process.env.INTEGRATION_GOAL_TEXT_EDIT_RUNNING = 'true';
+        const { controller, goals } = setup({ loopStatus: 'running' });
+        await controller.update(keyOnly, 'goal-1', { title: 'Renamed' }, undefined, res());
+        expect(goals.update).toHaveBeenCalled();
     });
 });
 

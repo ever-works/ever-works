@@ -52,3 +52,6 @@ next-env.d.ts
 # `scripts/build-help-catalog.mjs --bodies` on every build and dev start.
 # Only the metadata catalog (src/lib/help/help-catalog.generated.ts) is committed.
 /public/help-content/
+
+# vitest JSON reporter output (local test runs)
+.vitest/

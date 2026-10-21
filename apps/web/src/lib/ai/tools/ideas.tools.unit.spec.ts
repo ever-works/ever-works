@@ -210,7 +210,7 @@ describe('ideas chat tools — Lifecycle', () => {
             queued: boolean;
             buildRequestId: string;
             idea: { id: string; status: string };
-        }>(buildIdea, { ideaId: 'i-1' });
+        }>(buildIdea, { ideaId: 'i-1', confirmed: true });
         expect(buildIdeaActionMock).toHaveBeenCalledWith('i-1');
         expect(result).toMatchObject({
             queued: true,
@@ -223,6 +223,7 @@ describe('ideas chat tools — Lifecycle', () => {
         dismissMock.mockResolvedValueOnce(undefined);
         const result = await run<{ dismissed: boolean; ideaId: string }>(dismissIdea, {
             ideaId: 'i-1',
+            confirmed: true,
         });
         expect(dismissMock).toHaveBeenCalledWith('i-1');
         expect(result).toEqual({ dismissed: true, ideaId: 'i-1' });
@@ -233,6 +234,7 @@ describe('ideas chat tools — Lifecycle', () => {
         const result = await run<{ ok: boolean; ideaId: string; workId: string }>(acceptIdea, {
             ideaId: 'i-1',
             workId: 'w-1',
+            confirmed: true,
         });
         expect(acceptMock).toHaveBeenCalledWith('i-1', 'w-1');
         expect(result).toEqual({ ok: true, ideaId: 'i-1', workId: 'w-1' });

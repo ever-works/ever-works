@@ -132,6 +132,7 @@ import type {
 } from '@ever-works/plugin';
 
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
+import { config } from '../config';
 import { APP_PROVISION_EVENTS_PORT } from '../app-works/app-fork-readiness.service';
 import {
     APP_DEPLOY_DISPATCHER,
@@ -143,6 +144,13 @@ import {
     type AppDeployPreconditionResult,
 } from './app-deploy-preconditions.service';
 import { APP_DEPENDENCIES_SERVICE } from './app-runtime-deletion.service';
+import {
+    APP_DEPLOY_WARNING_IMAGE_USER_UNCHECKED,
+    APP_IMAGE_USER_INSPECTOR,
+    judgeImageUser,
+    type AppImageUserInspector,
+    type AppImageUserVerdict,
+} from './app-image-user.inspector';
 import { APP_RUNTIME_EVENT_SINK, type AppRuntimeEventSink } from './ports';
 import {
     AppPublicSmokeService,
@@ -466,6 +474,22 @@ export interface AppDeployOrchestratorDeploymentStore extends AppDeployDeploymen
     } | null>;
     /** §5.6 steps 4–7. One call, so the phase and the state cannot drift apart. */
     update?(workId: string, deploymentId: string, patch: AppDeployRowUpdate): Promise<unknown>;
+    /**
+     * Security (sec/app-works-gates) — who requested this Deployment, from its OWN row: the
+     * `triggeredByUserId` column and `appRender.requestedByHumanSession` (written by T24's
+     * `rowDraft`). The pull-credential port gates the owner-token fallback on it. Unbound, or a
+     * row it cannot read, means "nobody" — fail closed.
+     */
+    findRequester?(deploymentId: string): Promise<AppDeployRequesterFacts | null>;
+}
+
+/** Security (sec/app-works-gates) — the requester facts of one Deployment row. */
+export interface AppDeployRequesterFacts {
+    workId?: string | null;
+    /** `null` for a Build- or event-triggered Deployment, which has no person behind it. */
+    triggeredByUserId?: string | null;
+    /** `true` only when that person asked from a signed-in browser session. */
+    requestedByHumanSession?: boolean | null;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -649,6 +673,12 @@ export class AppDeployOrchestrator {
         @Optional()
         @Inject(APP_DEPENDENCIES_SERVICE)
         private readonly dependencies?: AppDeployOrchestratorDependencyService,
+        // 2026-10-21 — the registry `USER` pre-check. Appended LAST and `@Optional()`, so every
+        // positional construction keeps its slots; absent (or the flag off) = no pre-check, and the
+        // kubelet stays the only judge, exactly as before.
+        @Optional()
+        @Inject(APP_IMAGE_USER_INSPECTOR)
+        private readonly imageUsers?: AppImageUserInspector,
     ) {}
 
     /**
@@ -807,6 +837,14 @@ export class AppDeployOrchestrator {
                             'above; this Deployment runs that digest.',
                     });
                 }
+            }
+
+            // ---- 3c · the image's USER, judged before the cluster is touched (2026-10-21) ---
+            const userVerdict = await this.checkImageUser(context, input);
+            if (userVerdict) {
+                await this.failRun(context, result, userVerdict.code, userVerdict.message);
+
+                return result;
             }
 
             // ---- 4 · the cluster call, with §5.6 step 4's hooks -----------------------------
@@ -1093,6 +1131,8 @@ export class AppDeployOrchestrator {
         );
         const isFirstDeploymentOnCluster =
             !text(state?.clusterFingerprint) || state?.clusterFingerprint !== fingerprint;
+        // Security (sec/app-works-gates) — from the Deployment's own row, never the job payload.
+        const requester = await this.readRequester(context);
 
         try {
             const answer = await this.renderer.build({
@@ -1105,6 +1145,8 @@ export class AppDeployOrchestrator {
                 isFirstDeploymentOnCluster,
                 skipPreDeployJobs: request?.skipPreDeployJobs === true,
                 preview: request?.preview ?? null,
+                requestedByUserId: requester.userId,
+                requestedByHumanSession: requester.humanSession,
             });
 
             context.warnings.push(...(answer.warnings ?? []));
@@ -1120,6 +1162,40 @@ export class AppDeployOrchestrator {
             return { input: answer.input, code: '', reason: '' };
         } catch (error) {
             return { input: null, code: 'spec_unavailable', reason: messageOf(error) };
+        }
+    }
+
+    /**
+     * Security (sec/app-works-gates) — the person behind this Deployment, as its own row records
+     * it. The job payload is deliberately NOT consulted (the API's dispatch carries no actor, and a
+     * dequeued row is dispatched by the worker itself). Every failure answers "nobody": no store,
+     * no member, a throw, or a row that belongs to another Work.
+     */
+    private async readRequester(
+        context: RunContext,
+    ): Promise<{ userId: string | null; humanSession: boolean }> {
+        const nobody = { userId: null, humanSession: false };
+        if (!this.deployments || typeof this.deployments.findRequester !== 'function') {
+            return nobody;
+        }
+
+        try {
+            const facts = await this.deployments.findRequester(context.deploymentId);
+            if (!facts) return nobody;
+            if (text(facts.workId) && text(facts.workId) !== context.workId) return nobody;
+
+            const userId = text(facts.triggeredByUserId) || null;
+            return {
+                userId,
+                humanSession: Boolean(userId) && facts.requestedByHumanSession === true,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Reading who requested App Deployment ${context.deploymentId} failed (` +
+                    `${messageOf(error)}); it is treated as requested by nobody.`,
+            );
+
+            return nobody;
         }
     }
 
@@ -1167,6 +1243,66 @@ export class AppDeployOrchestrator {
     /* ---------------------------------------------------------------------- *
      * §5.6 step 4 — the call, and its hooks
      * ---------------------------------------------------------------------- */
+
+    /**
+     * The registry `USER` pre-check (`APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`, default off): read
+     * the image config's `User` once and apply the kubelet's `runAsNonRoot` rule to every component
+     * (a command Job runs on its component's image and security context, so the components cover
+     * the jobs). The first component the kubelet would refuse ends the run with that refusal's own
+     * code; a read that could not complete is the warning `image_user_unchecked` and never a
+     * refusal. `null` = nothing to refuse (or the check is off / unbound).
+     */
+    private async checkImageUser(
+        context: RunContext,
+        input: AppRenderInput,
+    ): Promise<AppImageUserVerdict | null> {
+        if (!this.imageUsers || !config.everWorks.apps.imageUserPrecheckEnabled()) {
+            return null;
+        }
+        const reference = text(input?.image?.reference);
+        if (!reference) {
+            return null;
+        }
+        // The pod-level `runAsNonRoot` the renderer will emit (`app-security.ts`): always on the
+        // managed target, and on Your cluster unless the target's policy allows root.
+        const runAsNonRoot =
+            input?.ref?.target === 'ever-works-apps' || input?.policy?.allowRoot !== true;
+        if (!runAsNonRoot) {
+            return null;
+        }
+
+        let read: Awaited<ReturnType<AppImageUserInspector['readUser']>>;
+        try {
+            read = await this.imageUsers.readUser({
+                reference,
+                pull: input?.image?.pull ?? null,
+            });
+        } catch (error) {
+            read = { status: 'unavailable', reason: messageOf(error) };
+        }
+        if (read.status !== 'read') {
+            context.warnings.push({
+                code: APP_DEPLOY_WARNING_IMAGE_USER_UNCHECKED,
+                message:
+                    `The image's USER could not be read before the rollout (${read.reason}); ` +
+                    'the cluster will judge it.',
+            });
+            return null;
+        }
+
+        for (const component of input?.components ?? []) {
+            const verdict = judgeImageUser(read.user, {
+                runAsNonRoot,
+                runAsUser: component?.runAsUser ?? null,
+                component: text(component?.name) ?? '',
+                image: reference,
+            });
+            if (verdict) {
+                return verdict;
+            }
+        }
+        return null;
+    }
 
     private async deploy(
         access: AppDeployClusterAccess,

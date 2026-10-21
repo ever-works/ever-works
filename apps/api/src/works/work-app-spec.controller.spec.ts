@@ -1087,7 +1087,7 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             await classify('BUSL-1.1', 'amber');
             const controller = controllerWithLicences();
 
-            const answer = await controller.attestLicense({ userId: OWNER_ID } as never, WORK, {});
+            const answer = await controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {});
 
             expect(answer.attestation).toMatchObject({
                 userId: OWNER_ID,
@@ -1105,7 +1105,7 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: EDITOR_ID } as never, WORK, {}),
+                controller.attestLicense({ userId: EDITOR_ID, authMethod: 'session' } as never, WORK, {}),
             ).rejects.toMatchObject({ response: { code: 'ownerOnly' } });
         });
 
@@ -1114,7 +1114,7 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: OWNER_ID } as never, WORK, {}),
+                controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {}),
             ).rejects.toMatchObject({ response: { code: 'attestationNotRequired' } });
         });
 
@@ -1123,11 +1123,55 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: OWNER_ID } as never, WORK, {
+                controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {
                     spdx: 'MIT',
                     class: 'green',
                 }),
             ).rejects.toMatchObject({ response: { code: 'licenseChanged' } });
+        });
+
+        // Works-security (2026-10-18) — an attestation is a person's statement.
+        it("refuses the owner's personal API key, a fleet run and an integration key (APP_LICENSE_ATTEST_SESSION_ONLY)", async () => {
+            await classify('BUSL-1.1', 'amber');
+            const controller = controllerWithLicences();
+
+            await expect(
+                controller.attestLicense({ userId: OWNER_ID, authMethod: 'api-key' } as never, WORK, {}),
+            ).rejects.toMatchObject({ status: 403 });
+            await expect(
+                controller.attestLicense(
+                    {
+                        userId: OWNER_ID,
+                        authMethod: 'integration',
+                        integration: { keyId: 'k', scopes: [] },
+                    } as never,
+                    WORK,
+                    {},
+                ),
+            ).rejects.toMatchObject({ status: 422 });
+            // A missing stamp is not a person either.
+            await expect(
+                controller.attestLicense({ userId: OWNER_ID } as never, WORK, {}),
+            ).rejects.toMatchObject({ status: 403 });
+            expect((await storedState())?.attestation ?? null).toBeNull();
+        });
+
+        it('APP_LICENSE_ATTEST_SESSION_ONLY=false restores the personal-key attestation', async () => {
+            const previous = process.env.APP_LICENSE_ATTEST_SESSION_ONLY;
+            process.env.APP_LICENSE_ATTEST_SESSION_ONLY = 'false';
+            try {
+                await classify('BUSL-1.1', 'amber');
+                const controller = controllerWithLicences();
+                const answer = await controller.attestLicense(
+                    { userId: OWNER_ID, authMethod: 'api-key' } as never,
+                    WORK,
+                    {},
+                );
+                expect(answer.attestation).toMatchObject({ userId: OWNER_ID });
+            } finally {
+                if (previous === undefined) delete process.env.APP_LICENSE_ATTEST_SESSION_ONLY;
+                else process.env.APP_LICENSE_ATTEST_SESSION_ONLY = previous;
+            }
         });
 
         it('answers 404 for another account’s Work (ACC-03-41)', async () => {
@@ -1135,7 +1179,7 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: STRANGER_ID } as never, WORK, {}),
+                controller.attestLicense({ userId: STRANGER_ID, authMethod: 'session' } as never, WORK, {}),
             ).rejects.toMatchObject({ status: 404 });
         });
     });
