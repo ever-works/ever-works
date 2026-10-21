@@ -66,6 +66,7 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -578,6 +579,18 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+            // Computer health (FL-03): the read-only health tools, when bound.
+            if (fleet.health) {
+                const health = fleet.health;
+                add('fleet-health', () =>
+                    buildFleetHealthTools({
+                        userId: agent.userId,
+                        service: health.service,
+                        history: health.history,
+                        ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
         }
 
         // FL-04 P2 — the Agent's own sessions on computers (start is always an

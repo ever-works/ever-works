@@ -143,9 +143,11 @@ export interface NodeLink {
 	readonly modules: ComposedNodeModules;
 	/**
 	 * Send a family's own channel-0 message that belongs to no channel
-	 * (`session.list`, `session.event` — CONTRACTS §3.2–3.3). False when the
-	 * link is not connected (nothing is queued: the module re-reports what
-	 * matters after the next `link.ready`) or the message is over the cap.
+	 * (`session.list`, `session.event` — CONTRACTS §3.2–3.3; FL-02's
+	 * `computer.leg`). Only extension types — never the link's own `link.*`,
+	 * `channel.*` or `operation.*`. False when the link is not connected
+	 * (nothing is queued: the module re-reports what matters after the next
+	 * `link.ready`) or the message is over the cap.
 	 */
 	sendControl(message: FleetLinkExtensionMessage): boolean;
 }
@@ -259,16 +261,19 @@ class NodeLinkClient implements NodeLink {
 		return { ...this.state, openChannels: this.mux.size };
 	}
 
+	sendControl(message: FleetLinkExtensionMessage): boolean {
+		if (this.closed || this.state.phase !== 'connected') return false;
+		const type = typeof message?.type === 'string' ? message.type : '';
+		// Only a family's own types: the link's vocabulary is the link's to send.
+		if (!/^[a-z]/.test(type) || /^(link|channel|operation)\./.test(type)) return false;
+		return this.mux.sendControl(message);
+	}
+
 	onChange(listener: (state: NodeLinkState) => void): () => void {
 		this.listeners.add(listener);
 		return () => {
 			this.listeners.delete(listener);
 		};
-	}
-
-	sendControl(message: FleetLinkExtensionMessage): boolean {
-		if (this.state.phase !== 'connected') return false;
-		return this.mux.sendControl(message);
 	}
 
 	start(): void {

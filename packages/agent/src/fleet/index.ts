@@ -23,7 +23,10 @@ export * from './fleet-audit.service';
 // Fleet MCP bridge (self-build slice Z / EW-796) — run-scoped credentials.
 export * from './fleet-run-credential.service';
 export * from './agent-fleet-tools';
+// Sessions on computers (FL-04 P2) — the Agent's fleet_sessions_* tools.
 export * from './agent-fleet-session-tools';
+// Computer health (FL-03 second phase) — the health / needs-a-look tool shapes for FL-19.
+export * from './agent-fleet-health-tools';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
@@ -43,3 +46,5 @@ export { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 export { FleetAudit } from '../entities/fleet-audit.entity';
 // Sessions on computers (FL-04) — the session service, its policy and its node port.
 export * from './sessions';
+// Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
+export * from './checkouts';

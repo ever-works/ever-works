@@ -19,7 +19,8 @@ import { CapturePump } from '../screen/capture-pump';
 import type { WebSocketFactory } from '../screen/cdp-connection';
 import { ComputerFrameOutbox } from '../screen/frame-outbox';
 import { ComputerInputInjector } from '../screen/input-injector';
-import { openNodeLeg, type NodeLeg } from '../screen/node-leg';
+import { type NodeLeg } from '../screen/node-leg';
+import { openComputerSessionLeg, type ComputerLegBroker } from '../link/computer-leg';
 import { startNodeTerminalChannel, type NodeTerminalChannel } from '../screen/terminal-channel';
 
 /**
@@ -124,6 +125,14 @@ export interface ComputerSessionExecutorDeps {
 	 * but the Agent is not told it is paused.
 	 */
 	profileFs?: Pick<AgentProfileFs, 'writeTextFile' | 'rm'>;
+	/**
+	 * Fleet node link (FL-02 T-22) — the runtime's leg broker when the node
+	 * runs the link: the view's inbound leg then rides a `desktop` channel,
+	 * with the legacy socket leg as the fallback. Absent → the legacy leg.
+	 */
+	linkLegs?: ComputerLegBroker | null;
+	/** Read for `EVER_WORKS_NODE_LINK_LEGACY_LEG`; defaults to this process's environment. */
+	env?: Record<string, string | undefined>;
 }
 
 export interface ComputerSessionResult extends Record<string, unknown> {
@@ -241,7 +250,10 @@ export async function runComputerSessionJob(
 					...(logger ? { logger } : {})
 				});
 				injector = inputs;
-				leg = openNodeLeg({
+				leg = openComputerSessionLeg({
+					sessionId,
+					broker: deps.linkLegs ?? null,
+					...(deps.env ? { env: deps.env } : {}),
 					apiUrl: deps.apiUrl,
 					mintToken: () => deps.client.mintComputerWorkerToken(sessionId),
 					factory: deps.webSocketFactory,

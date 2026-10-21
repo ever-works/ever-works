@@ -398,19 +398,45 @@ export interface NodeExecutionPolicy {
 	 * isolation (`--setting-sources user` + no hooks) applies either way.
 	 */
 	restrictedMode: boolean;
+	/**
+	 * Start the platform MCP bridge (self-build slice Z) when a job asks for
+	 * it: a loopback proxy that gives the model the platform's run tools
+	 * (questions, Task updates, `create_task` …) authenticated with a
+	 * per-run credential. With this off, a job whose payload asks for the
+	 * bridge is REFUSED before anything is provisioned or spawned — the
+	 * payload alone no longer decides it (works-security, node 0.2.7).
+	 *
+	 * ON by default, unlike the two escalations above, because it is not
+	 * one: the bridge adds no capability ON THIS MACHINE (127.0.0.1 only, a
+	 * random per-run path, no shell, the credential never reaches the
+	 * child's argv / env / config), its tools act on the PLATFORM under the
+	 * run token's scope, and the platform already gates it twice (the
+	 * deployment switch and the Agent's `canCallExternalTools`), so an
+	 * ordinary run never asks for it. Turning it off is for an owner who
+	 * does not want a model on this PC to act on the platform at all — e.g.
+	 * so a prompt injection in a repository cannot create Tasks that come
+	 * back as new runs. Absent (every config written before this field)
+	 * means ON.
+	 */
+	allowMcpBridge: boolean;
 }
 
-/** What a machine that never ran `ever-works-node policy` enforces: both escalations OFF, restricted mode ON. */
+/**
+ * What a machine that never ran `ever-works-node policy` enforces: both
+ * escalations OFF, restricted mode ON, the platform MCP bridge allowed.
+ */
 export const DEFAULT_NODE_EXECUTION_POLICY: NodeExecutionPolicy = Object.freeze({
 	allowSkipPermissions: false,
 	allowShellCommands: false,
-	restrictedMode: true
+	restrictedMode: true,
+	allowMcpBridge: true
 });
 
 /**
  * The stored policy, always resolved toward the SAFER value: the two
  * escalations need a literal `true`, and restricted mode is off only on a
- * literal `false`.
+ * literal `false`. The MCP bridge keeps today's behaviour (allowed) unless
+ * the owner stored a literal `false`.
  */
 export function resolveNodeExecutionPolicy(
 	input: Partial<NodeExecutionPolicy> | null | undefined
@@ -419,7 +445,8 @@ export function resolveNodeExecutionPolicy(
 	return {
 		allowSkipPermissions: input.allowSkipPermissions === true,
 		allowShellCommands: input.allowShellCommands === true,
-		restrictedMode: input.restrictedMode !== false
+		restrictedMode: input.restrictedMode !== false,
+		allowMcpBridge: input.allowMcpBridge !== false
 	};
 }
 
@@ -479,6 +506,17 @@ export interface NodeConfig {
 	 * a config that never carried the key round-trips without it.
 	 */
 	workspaceRoot?: string;
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS R-41) — the folders this
+	 * machine's owner keeps code in, set with `start --code-folder <dir>`
+	 * (repeatable) and persisted here like `workspaceRoot`. Discovery walks
+	 * them (three folders deep) for git clones. Only ever absolute paths,
+	 * never a filesystem root or the home folder as a whole (spec FR-3); set
+	 * on the machine only — the platform never chooses them.
+	 *
+	 * Absent means "none listed": no discovery, only the Task worktrees.
+	 */
+	codeFolders?: string[];
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;

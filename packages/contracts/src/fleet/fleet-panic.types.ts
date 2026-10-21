@@ -131,6 +131,12 @@ export type FleetAuditAction =
 	 */
 	| 'node.policy.change'
 	/**
+	 * Computer health (FL-03, CONTRACTS §7) — someone woke an offline computer
+	 * through a sibling on its network. One row per attempt; details carry
+	 * `target`, `via` (the sibling's id) and `outcome` (`sent` · `refused`).
+	 */
+	| 'node.wake'
+	/**
 	 * Sessions on computers (FL-04, CONTRACTS §7) — every row carries
 	 * `family: 'sessions'`, `target` (the session id), `requestedBy`,
 	 * `confirmationClass` and `outcome`; never terminal bytes, typed input
@@ -149,7 +155,22 @@ export type FleetAuditAction =
 	/** A session was ended, with its reason. */
 	| 'node.session.end'
 	| 'node.session.recording.start'
-	| 'node.session.recording.stop';
+	| 'node.session.recording.stop'
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS §7) — every row carries
+	 * `family: 'checkouts'`, `target` (the checkout's path), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never a credential or a remote URL
+	 * with one (spec FR-28).
+	 */
+	| 'node.checkout.create'
+	/** A checkout was deleted (folder removed) or forgotten (row only). */
+	| 'node.checkout.delete'
+	/** Fetch, pull, push — and a person's rescan of the code folders. */
+	| 'node.checkout.sync'
+	/** Moved to the bin (folder untouched). */
+	| 'node.checkout.archive'
+	/** Brought back from the bin. */
+	| 'node.checkout.restore';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -189,6 +210,7 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.link.disconnect',
 	'node.link.channel-open',
 	'node.policy.change',
+	'node.wake',
 	'node.session.start',
 	'node.session.attach',
 	'node.session.input',
@@ -197,7 +219,12 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore'
 ];
 
 /**

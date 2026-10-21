@@ -17,6 +17,9 @@ import {
 	previousStep,
 	resolveApiUrl,
 	signInInputValid,
+	toggleWizardConsent,
+	WIZARD_CONSENT_CHOICES,
+	wizardConsents,
 	type WizardProgress,
 	type WizardStepId
 } from './steps';
@@ -148,7 +151,9 @@ export function WizardView({ bridge, onEnrolled }: WizardViewProps) {
 					: { token: progress.token ?? '' }),
 				...(name.trim() ? { name: name.trim() } : {}),
 				...(progress.capabilities ? { capabilities: progress.capabilities } : {}),
-				limits: normalizeLimits(limits)
+				limits: normalizeLimits(limits),
+				// Fleet node link (FL-02 T-26): what this computer lets Ever Works do.
+				consents: wizardConsents(progress)
 			});
 			if (!outcome.ok || !outcome.identity) {
 				setError(outcome.error ?? 'Enrollment failed.');
@@ -329,6 +334,24 @@ export function WizardView({ bridge, onEnrolled }: WizardViewProps) {
 
 				{step === 'capabilities' && (
 					<>
+						<fieldset className="field" data-testid="wizard-consents">
+							<legend>What may this computer do?</legend>
+							{WIZARD_CONSENT_CHOICES.map((choice) => (
+								<label className="field" key={choice.key}>
+									<span>
+										<input
+											type="checkbox"
+											checked={wizardConsents(progress)[choice.key]}
+											onChange={() =>
+												setProgress((current) => toggleWizardConsent(current, choice.key))
+											}
+										/>{' '}
+										{choice.label} <span className="muted">({choice.hint})</span>
+									</span>
+								</label>
+							))}
+							<p className="muted">Each can be changed later from the tray.</p>
+						</fieldset>
 						<p className="muted">
 							Pick what this machine offers the platform. Unchecking a capability means work that needs it
 							is never scheduled here — including after you install the tool later.

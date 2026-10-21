@@ -29,6 +29,8 @@ export interface FleetComputersTableFavorites {
     renderName?: (node: FleetNodeView) => ReactNode;
     /** An "Open page" action beside Details (spec §5.6). */
     renderOpen?: (node: FleetNodeView) => ReactNode;
+    /** FL-03 — the state's sentence under the status word (the hub only; Settings passes none). */
+    renderState?: (node: FleetNodeView) => ReactNode;
 }
 
 interface FleetComputersTableProps {
@@ -177,6 +179,9 @@ export function FleetComputersTable({
                                         })}
                                     </span>
                                 ))}
+                                {favorites?.renderState ? (
+                                    <div className="mt-1">{favorites.renderState(node)}</div>
+                                ) : null}
                             </td>
                             <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
                                 {node.platform ?? '-'}

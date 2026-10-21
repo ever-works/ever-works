@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } fro
 import {
 	FLEET_AGENT_TASK_META_DIR,
 	normalizeFleetRunEnvFileRefs,
+	neutralizeCiSkipDirectives,
 	normalizeFleetTaskWorkspaceMounts,
 	retypeFleetCommitMessage,
 	type FleetRunEnvFileRef,
@@ -13,7 +14,14 @@ import {
 	type FleetTaskWorkspaceMountSpec,
 	type FleetTaskWorkspaceSpec
 } from '@ever-works/contracts';
-import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
+import {
+	checkoutHardeningEnv,
+	emptyHooksDir,
+	execFileWithVerifiedCancellation,
+	FILTER_DRIVER_PROBE_ARGS,
+	LocalWorkspacePlugin,
+	parseFilterDriverConfig
+} from '@ever-works/local-workspace-plugin';
 import type {
 	IWorkspacePlugin,
 	WorkspaceCommitIdentity,
@@ -501,6 +509,15 @@ export interface FleetTaskWorkspaceProvisionerOptions {
 	readonly minFreeDiskBytes?: number | null;
 	/** Liveness oracle for the pid in a lease file; tests inject one. */
 	readonly isProcessAlive?: (pid: number) => boolean;
+	/**
+	 * Proof that a worktree's `.git` still points at its own private gitdir,
+	 * run before the node's own Git commands touch it (works-security, node
+	 * 0.2.7). Defaults to {@link assertLinkedWorktreePointer} whenever the
+	 * provider is the local-workspace one — the pool layout it proves is that
+	 * provider's — and to nothing for a custom provider (a test fake or an
+	 * embedder with its own layout) unless one is given here.
+	 */
+	readonly verifyWorktreePointer?: (worktreePath: string) => Promise<void>;
 	/** Wall clock for the usage/lease stamps; tests inject one. */
 	readonly now?: () => number;
 }
@@ -594,6 +611,7 @@ export async function assertWorkspaceDiskHeadroom(
 export class FleetTaskWorkspaceProvisioner {
 	private readonly rootPath: string;
 	private readonly plugin: FleetWorkspacePlugin;
+	private readonly verifyWorktreePointer: ((worktreePath: string) => Promise<void>) | null;
 	private readonly inspectHead: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
 	private readonly readOriginUrl: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
 	private readonly diskProbe: DiskProbeIo | undefined;
@@ -620,6 +638,9 @@ export class FleetTaskWorkspaceProvisioner {
 	constructor(options: FleetTaskWorkspaceProvisionerOptions) {
 		this.rootPath = validateRootPath(options.rootPath);
 		this.plugin = options.plugin ?? new LocalWorkspacePlugin();
+		this.verifyWorktreePointer =
+			options.verifyWorktreePointer ??
+			(this.plugin instanceof LocalWorkspacePlugin ? assertLinkedWorktreePointer : null);
 		this.inspectHead = options.inspectHead ?? inspectGitHead;
 		this.readOriginUrl = options.readOriginUrl ?? inspectGitOrigin;
 		this.diskProbe = options.diskProbe;
@@ -723,7 +744,7 @@ export class FleetTaskWorkspaceProvisioner {
 				// model left in it would survive into the next run — and be
 				// committed by the first run after `writable` flips to true.
 				if (!mount.writable && provisioned.reused) {
-					await resetReadOnlyMount(provisioned.path, signal);
+					await resetReadOnlyMount(provisioned.path, signal, this.verifyWorktreePointer);
 				}
 			} catch (error) {
 				if (error instanceof FleetTaskWorkspaceError && error.code !== 'cancelled') {
@@ -1070,6 +1091,12 @@ export class FleetTaskWorkspaceProvisioner {
 				branch: spec.branch,
 				bindingKey,
 				...(signal ? { signal } : {}),
+				// works-security finding 3 (node 0.2.7): the checkout is
+				// attacker-authored, so the provision's own git commands —
+				// `worktree add` above all — run no hook, no fsmonitor and no
+				// filter driver (git-lfs included) the repository or a
+				// previous run's pool config could name.
+				hardenRepoHooks: true,
 				settings: {
 					baseDir: repositoryRoot,
 					...(spec.depth === undefined ? {} : { fetchDepth: spec.depth })
@@ -1234,6 +1261,13 @@ export class FleetTaskWorkspaceProvisioner {
 		if (!isStrictDescendant(canonicalRoot, canonicalPath)) {
 			throw new FleetTaskWorkspaceError('path-collision', 'Task workspace escapes the configured root');
 		}
+		// works-security (node 0.2.7): the worktree's `.git` is a plain file the
+		// model could rewrite to `gitdir: <a directory it wrote>`, whose
+		// `config` would then decide what the node's own `add` / `commit` run
+		// (a filter driver, `commit.gpgSign` + `gpg.program`, …). Proven to
+		// point at this worktree's private gitdir in its own pool BEFORE any
+		// Git command touches it.
+		if (this.verifyWorktreePointer) await this.verifyWorktreePointer(canonicalPath);
 		throwIfCancelled(signal);
 
 		// Scoped push credentials (self-build slice AM). Resolved HERE —
@@ -1259,7 +1293,13 @@ export class FleetTaskWorkspaceProvisioner {
 				// abort that arrives mid-push is already too late: the remote may
 				// have accepted the ref before the kill landed.
 				{
-					commitMessage: authorization.commitMessage,
+					// works-security finding 1: no CI-skip directive (`[skip ci]`
+					// & co.) survives into a fleet commit, whichever route it
+					// came by — a Task title from an older planner, a trailer
+					// value. `commitMessageFor` below neutralises the re-typed
+					// message too; this covers the provider's fallback to
+					// `commitMessage` when the callback is not used.
+					commitMessage: neutralizeCiSkipDirectives(authorization.commitMessage),
 					push: opts.push,
 					// Self-build slice AL: a fleet checkout is attacker-authored
 					// and the model holds `acceptEdits` over it, so the node's own
@@ -1272,7 +1312,8 @@ export class FleetTaskWorkspaceProvisioner {
 					// docs-only change commits as `docs`, a tests-only one as
 					// `test`, whatever the Task title implied. Only the type token
 					// of the subject changes; the body and trailers are untouched.
-					commitMessageFor: (changedPaths, message) => retypeFleetCommitMessage(message, changedPaths),
+					commitMessageFor: (changedPaths, message) =>
+						neutralizeCiSkipDirectives(retypeFleetCommitMessage(message, changedPaths)),
 					...(signal ? { signal } : {}),
 					...(opts.publishFence ? { publishFence: opts.publishFence } : {}),
 					...(authorization.identity ? { identity: authorization.identity } : {}),
@@ -1900,10 +1941,15 @@ function redactToken(text: string, credential?: ScopedPushCredential): string {
 	return out;
 }
 
-function runGitOutput(args: string[], workspacePath: string, signal?: AbortSignal): Promise<string> {
+function runGitOutput(
+	args: string[],
+	workspacePath: string,
+	signal?: AbortSignal,
+	extraEnv?: Readonly<Record<string, string>>
+): Promise<string> {
 	return execFileWithVerifiedCancellation('git', args, {
 		cwd: workspacePath,
-		env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+		env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...extraEnv },
 		windowsHide: true,
 		maxBuffer: 1024 * 1024,
 		...(signal ? { signal } : {})
@@ -2018,14 +2064,104 @@ export async function removeMountLink(linkPath: string): Promise<void> {
  * dependencies — are kept, they are not content). Both commands run inside
  * the mount's own canonical worktree, never through the primary's link.
  */
-async function resetReadOnlyMount(mountPath: string, signal?: AbortSignal): Promise<void> {
+export async function resetReadOnlyMount(
+	mountPath: string,
+	signal?: AbortSignal,
+	verifyWorktreePointer: ((worktreePath: string) => Promise<void>) | null = assertLinkedWorktreePointer
+): Promise<void> {
 	try {
-		await runGitOutput(['reset', '--hard', '--quiet', 'HEAD'], mountPath, signal);
-		await runGitOutput(['clean', '-fdq'], mountPath, signal);
+		// works-security finding 3 (node 0.2.7): `reset --hard` writes files
+		// from the repository and `clean` walks it — both with the same
+		// hook / fsmonitor / filter-driver neutralisation a hardened provision
+		// gets, after the `.git` pointer is proven to be the mount's own.
+		if (verifyWorktreePointer) await verifyWorktreePointer(mountPath);
+		const hardening = await checkoutHardeningEnvFor(mountPath, signal);
+		await runGitOutput(['reset', '--hard', '--quiet', 'HEAD'], mountPath, signal, hardening);
+		await runGitOutput(['clean', '-fdq'], mountPath, signal, hardening);
 	} catch (error) {
+		if (error instanceof FleetTaskWorkspaceError && error.code === 'path-collision') throw error;
 		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
 		if (signal?.aborted) throw cancelledError();
 		throw new FleetTaskWorkspaceError('git-failed', 'Read-only mount could not be reset to its base commit');
+	}
+}
+
+/**
+ * The checkout-hardening overlay for a git command run directly by the node
+ * (not through the provider) inside `repoPath`: the filter drivers visible
+ * from there are read first (`git config` runs no hook or filter), then every
+ * one of them — and `lfs` — is neutralised along with hooks and fsmonitor.
+ */
+async function checkoutHardeningEnvFor(repoPath: string, signal?: AbortSignal): Promise<Record<string, string>> {
+	const probe = await execFileWithVerifiedCancellation('git', [...FILTER_DRIVER_PROBE_ARGS], {
+		cwd: repoPath,
+		env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+		windowsHide: true,
+		maxBuffer: 1024 * 1024,
+		...(signal ? { signal } : {})
+	});
+	// Exit 1 is "no filter driver configured" — the healthy answer.
+	const found = probe.error ? [] : parseFilterDriverConfig(String(probe.stdout ?? ''));
+	return checkoutHardeningEnv(await emptyHooksDir(), found);
+}
+
+/**
+ * Prove a fleet worktree's `.git` still points at ITS OWN private gitdir:
+ * a plain file (no link) reading `gitdir: <path>`, where `<path>` resolves to
+ * `<repositoryRoot>/repos/<pool>/worktrees/<id>` for the repository root the
+ * worktree itself lives in (`<repositoryRoot>/worktrees/<binding>`), and that
+ * gitdir's own back-pointer names this worktree's `.git`.
+ *
+ * Without it, a model that can edit files in the checkout could rewrite `.git`
+ * to a directory it wrote, and that directory's `config` — not the pool's —
+ * would decide what the node's own git commands execute. Throws
+ * `path-collision` and runs nothing when the proof fails.
+ */
+export async function assertLinkedWorktreePointer(worktreePath: string): Promise<void> {
+	const refuse = (why: string): never => {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`Task workspace '${worktreePath}' is not a fleet worktree any more (${why}); it was preserved and no Git command ran in it`
+		);
+	};
+	let canonicalWorktree: string;
+	let pointer: string;
+	try {
+		canonicalWorktree = await fs.realpath(worktreePath);
+		const marker = join(canonicalWorktree, '.git');
+		const stats = await fs.lstat(marker);
+		if (stats.isSymbolicLink() || !stats.isFile() || stats.size > 4096) return refuse('`.git` is not a plain file');
+		pointer = await fs.readFile(marker, 'utf8');
+	} catch (error) {
+		if (error instanceof FleetTaskWorkspaceError) throw error;
+		return refuse('`.git` could not be read');
+	}
+	const match = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(pointer);
+	if (!match) return refuse('`.git` does not hold a single gitdir line');
+	let gitDir: string;
+	try {
+		gitDir = await fs.realpath(resolve(canonicalWorktree, match[1].trim()));
+	} catch {
+		return refuse('its gitdir does not exist');
+	}
+	const repositoryRoot = dirname(dirname(canonicalWorktree));
+	const poolsDir = join(repositoryRoot, 'repos');
+	const worktreesDir = dirname(gitDir);
+	if (
+		parse(worktreesDir).base !== 'worktrees' ||
+		!samePath(dirname(dirname(worktreesDir)), poolsDir) ||
+		!isStrictDescendant(poolsDir, gitDir)
+	) {
+		return refuse('its gitdir is outside its own repository pool');
+	}
+	try {
+		const back = (await fs.readFile(join(gitDir, 'gitdir'), 'utf8')).trim();
+		const backTarget = await fs.realpath(resolve(gitDir, back));
+		if (!samePath(backTarget, join(canonicalWorktree, '.git')))
+			return refuse('its gitdir belongs to another worktree');
+	} catch (error) {
+		if (error instanceof FleetTaskWorkspaceError) throw error;
+		return refuse('its gitdir has no back-pointer');
 	}
 }
 

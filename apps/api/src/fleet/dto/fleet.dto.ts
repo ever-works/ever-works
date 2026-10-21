@@ -655,6 +655,42 @@ export class FleetNodeSelfDescriptionDto {
     consents?: Record<string, boolean>;
 
     /**
+     * Computer health, second phase (FL-03, CONTRACTS §1.1) — the primary
+     * interface's hardware address, for Wake-on-LAN. Sent only by a node
+     * started with `--manage`, in its newest optional tier. Only a bounded
+     * string here: `FleetService` validates the format and DROPS a value it
+     * cannot use, so an odd adapter never 400s the beat.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        example: 'aa:bb:cc:dd:ee:f0',
+        description:
+            "The primary network interface's hardware address (Wake-on-LAN). --manage only; stored for the owner and never shown in full.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    macAddress?: string;
+
+    /**
+     * Computer health, second phase (FL-03) — an opaque identity of the
+     * network the primary interface is on (a hash, never an address), so
+     * siblings on the same network can be matched. Same contract as
+     * {@link macAddress}; re-hashed with the owner's id before it is stored.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 128,
+        example: 'a1b2c3d4e5f60718',
+        description: 'Opaque hash of the network the primary interface is on (never an address). --manage only.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    lanId?: string;
+
+    /**
      * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
      * health: `{ state: running|stopped|failed, reason?, sessions, storage?, hooks? }`.
      * Shape-checked (small, unknown keys pass) for the reason `consents` is;
@@ -670,6 +706,23 @@ export class FleetNodeSelfDescriptionDto {
     @IsOptional()
     @IsFleetSessionDaemonShape()
     daemon?: Record<string, unknown>;
+
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * report: `{ enabled, failedAt, error, targetVersion, updatedAt,
+     * fromVersion }`. Only `@IsObject()`, for the reason `health` is: a value
+     * this build does not know must never fail the beat; the service keeps the
+     * known fields within their bounds and drops the rest.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        description:
+            'Self-update (--auto-update): enabled, and the last attempt — failedAt, error (a short class of failure), targetVersion, updatedAt, fromVersion. Unknown or malformed values are dropped, never rejected.',
+    })
+    @IsOptional()
+    @IsObject()
+    selfUpdate?: Record<string, unknown>;
 }
 
 /**
