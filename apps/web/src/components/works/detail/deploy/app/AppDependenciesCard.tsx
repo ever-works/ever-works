@@ -28,6 +28,7 @@ import {
 import {
     APP_DEPENDENCIES_ROUTE_UNAVAILABLE,
     APP_DEPENDENCY_BUSY_STATUSES,
+    canDeleteAppDependencyDataFor,
     canDeleteAppDependencyDataOf,
     canRetryAppDependency,
     isTransientAppDependencyFailure,
@@ -35,6 +36,7 @@ import {
     type AppDependencyEntry,
 } from '@/lib/api/app-dependencies.types';
 import { isAppEnvDependencyKindLeaf } from '@/lib/api/app-env.types';
+import { isAppOwnerRequired } from '@/lib/api/app-runtime.types';
 import { cn } from '@/lib/utils/cn';
 
 type CardState =
@@ -64,6 +66,11 @@ export interface AppDependenciesCardProps {
  *
  * A failure that heals on its own (`clusterUnreachable`, `deadlineExceeded`) says that pressing
  * Deploy retries it — the Deploy route does (`retryTransientFailures`).
+ *
+ * Works-security: **Delete data** is the Work owner's while the API's `APP_DATA_DELETE_OWNER_ONLY`
+ * switch is on. The list answer's `canDeleteData` says so; when it is `false` the button stays on
+ * the card, disabled, with "Only the Work owner can delete this data." (Retry is unaffected), and
+ * a `403 ownerRequired` from the delete itself reads the same.
  */
 export function AppDependenciesCard({ work, initial = null }: AppDependenciesCardProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.dependencies');
@@ -111,6 +118,7 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
     }, [busy, load]);
 
     const kindLabel = useKindLabel();
+    const ownerOnlyId = useId();
 
     const retry = async (entry: AppDependencyEntry) => {
         if (inFlight.current) return;
@@ -155,7 +163,11 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
     }
 
     const { dependencies, canEdit } = state.data;
+    const canDeleteData = canDeleteAppDependencyDataFor(state.data);
     const failing = dependencies.filter((entry) => entry.status === 'failed');
+    // The one line that explains every disabled **Delete data** on the card.
+    const deleteDataLocked =
+        canEdit && !canDeleteData && dependencies.some(canDeleteAppDependencyDataOf);
 
     return (
         <section
@@ -199,6 +211,8 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
                             entry={entry}
                             kindLabel={kindLabel(entry.kind)}
                             canEdit={canEdit}
+                            canDeleteData={canDeleteData}
+                            ownerOnlyId={deleteDataLocked ? ownerOnlyId : undefined}
                             pending={busyKind === entry.kind}
                             disabled={busyKind !== null}
                             onRetry={() => void retry(entry)}
@@ -206,6 +220,16 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
                         />
                     ))}
                 </ul>
+            )}
+
+            {deleteDataLocked && (
+                <p
+                    id={ownerOnlyId}
+                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="app-dependencies-delete-owner-only"
+                >
+                    {t('deleteDataOwnerOnly')}
+                </p>
             )}
 
             {deleting && (
@@ -237,6 +261,8 @@ function DependencyRow({
     entry,
     kindLabel,
     canEdit,
+    canDeleteData,
+    ownerOnlyId,
     pending,
     disabled,
     onRetry,
@@ -245,6 +271,10 @@ function DependencyRow({
     entry: AppDependencyEntry;
     kindLabel: string;
     canEdit: boolean;
+    /** `false` while Delete data is the owner's (the button stays, disabled). */
+    canDeleteData: boolean;
+    /** The card's "only the owner" line, for the disabled button's description. */
+    ownerOnlyId?: string;
     pending: boolean;
     disabled: boolean;
     onRetry: () => void;
@@ -339,7 +369,9 @@ function DependencyRow({
                             variant="ghost"
                             className="gap-1 text-danger"
                             onClick={onDeleteData}
-                            disabled={disabled}
+                            disabled={disabled || !canDeleteData}
+                            title={canDeleteData ? undefined : t('deleteDataOwnerOnly')}
+                            aria-describedby={canDeleteData ? undefined : ownerOnlyId}
                             data-testid="app-dependency-delete-open"
                             aria-label={t('deleteDataAria', { kind: kindLabel })}
                         >
@@ -394,6 +426,7 @@ function AppDependencyDeleteDataDialog({
     onDeleted,
 }: AppDependencyDeleteDataDialogProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.dependencies.deleteDialog');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const tDeps = useTranslations('dashboard.workDetail.appDependencies');
     const slugId = useId();
     const [typed, setTyped] = useState('');
@@ -419,6 +452,10 @@ function AppDependencyDeleteDataDialog({
                 return;
             }
             const code = result.code ?? '';
+            if (isAppOwnerRequired(result)) {
+                setMessage(tApp('ownerRequired'));
+                return;
+            }
             setMessage(
                 isAppDependencyReason(code)
                     ? tDeps(`reasons.${APP_DEPENDENCY_REASON_MESSAGE_LEAVES[code]}`, {

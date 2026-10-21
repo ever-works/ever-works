@@ -473,7 +473,9 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                               ? t('syncLimitReached', {
                                     time: retryAt ? formatNextSync(retryAt) : 'later',
                                 })
-                              : t('resultFailed', { reason: failure.code ?? 'failed' })}
+                              : failure.code === 'edit_access_required'
+                                ? t('editAccessRequired')
+                                : t('resultFailed', { reason: failure.code ?? 'failed' })}
                     </p>
                 )}
 

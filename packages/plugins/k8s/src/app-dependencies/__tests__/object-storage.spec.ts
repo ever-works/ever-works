@@ -17,12 +17,12 @@
  * Server-Side-Apply merge semantics, and the provider's clock, its only wait and its poll interval are all
  * injected — so "the Job has not succeeded yet" costs one loop, not ten minutes.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppDependencyContext } from '@ever-works/plugin';
 
 import { K8sPluginError } from '../../errors';
-import { KubernetesPlugin } from '../../k8s.plugin';
+import { DEPENDENCY_KUBECONFIG_GUARD_ENV, KubernetesPlugin } from '../../k8s.plugin';
 import { APP_DEPENDENCY_POLICY_LABEL } from '../../app/app-network-policy.renderer';
 import {
 	APP_LABEL_KIND,
@@ -952,6 +952,16 @@ describe('T21 — the declared block, read defensively', () => {
  * ------------------------------------------------------------------------- */
 
 describe('T21 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.md:319)', () => {
+	// These cases pin the DELEGATION over a fake cluster whose kubeconfig is a placeholder string, which the
+	// dependency-path guard (lane works-security) rightly refuses; the guard itself is covered by
+	// `__tests__/k8s.plugin.dependency-guard.spec.ts`. Off here = the pass-through these cases were written for.
+	beforeEach(() => {
+		vi.stubEnv(DEPENDENCY_KUBECONFIG_GUARD_ENV, 'false');
+	});
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it('publishes all four descriptors, each with the plan’s preference and target', () => {
 		const plugin = new KubernetesPlugin();
 

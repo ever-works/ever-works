@@ -154,6 +154,74 @@ describe('AppDeployDeploymentStoreAdapter.findById', () => {
     });
 });
 
+describe('AppDeployDeploymentStoreAdapter.findRequester (sec/app-works-gates)', () => {
+    it('reads the requester and the persisted session flag off the row — nothing else', async () => {
+        const mock = repo({
+            findById: jest.fn(async () => ({
+                id: 'd-1',
+                workId: 'w-1',
+                triggeredByUserId: 'owner-1',
+                appRender: { specCommitSha: 'c', requestedByHumanSession: true, phase: 'done' },
+                website: 'https://example.test',
+            })),
+        });
+
+        expect(await store(mock).findRequester('d-1')).toEqual({
+            workId: 'w-1',
+            triggeredByUserId: 'owner-1',
+            requestedByHumanSession: true,
+        });
+    });
+
+    it('a missing, non-boolean or absent flag is `false`; a Build row has no requester', async () => {
+        for (const appRender of [
+            null,
+            {},
+            { requestedByHumanSession: 'true' },
+            { requestedByHumanSession: 1 },
+            { requestedByHumanSession: false },
+        ]) {
+            const mock = repo({
+                findById: jest.fn(async () => ({ id: 'd-1', workId: 'w-1', appRender })),
+            });
+            expect(await store(mock).findRequester('d-1')).toEqual({
+                workId: 'w-1',
+                triggeredByUserId: null,
+                requestedByHumanSession: false,
+            });
+        }
+
+        expect(await store(repo()).findRequester('nope')).toBeNull();
+        expect(
+            await new AppDeployDeploymentStoreAdapter(undefined).findRequester('d-1'),
+        ).toBeNull();
+    });
+
+    it('round-trips what create() persisted from the draft', async () => {
+        let saved: Record<string, unknown> = {};
+        const mock = repo({
+            create: jest.fn(async (input: Record<string, unknown>) => {
+                saved = { ...input };
+                return { ...input, id: 'd-1' };
+            }),
+            findById: jest.fn(async () => saved),
+        });
+        const adapter = store(mock);
+
+        await adapter.create({
+            ...DRAFT,
+            triggeredByUserId: 'owner-1',
+            appRender: { ...DRAFT.appRender, requestedByHumanSession: true },
+        });
+
+        expect(await adapter.findRequester('d-1')).toEqual({
+            workId: 'w-1',
+            triggeredByUserId: 'owner-1',
+            requestedByHumanSession: true,
+        });
+    });
+});
+
 describe('AppDeployDeploymentStoreAdapter.markSuperseded (tasks.md:1155)', () => {
     it('MERGES supersededBy into appRender, keeping what is already there', async () => {
         // The property this adapter exists for. Replacing `appRender` loses the

@@ -268,4 +268,65 @@ describe('AppDependenciesCard', () => {
             "This app's App spec declares no dependencies.",
         );
     });
+
+    describe("works-security — Delete data is the owner's", () => {
+        it('canDeleteData false disables ONLY Delete data, with the reason; Retry stays', () => {
+            renderCard(list([FAILED_PG], { canDeleteData: false }));
+
+            const pg = within(row('postgres'));
+            const retry = pg.getByTestId('app-dependency-retry') as HTMLButtonElement;
+            expect(retry.disabled).toBe(false);
+
+            const deleteData = pg.getByTestId('app-dependency-delete-open') as HTMLButtonElement;
+            expect(deleteData.disabled).toBe(true);
+            expect(deleteData.getAttribute('title')).toBe(
+                'Only the Work owner can delete this data.',
+            );
+            const hint = screen.getByTestId('app-dependencies-delete-owner-only');
+            expect(hint.textContent).toBe('Only the Work owner can delete this data.');
+            expect(deleteData.getAttribute('aria-describedby')).toBe(hint.id);
+
+            fireEvent.click(deleteData);
+            expect(screen.queryByTestId('app-dependency-delete-dialog')).toBeNull();
+        });
+
+        it('an API that does not send canDeleteData falls back to canEdit', () => {
+            renderCard(list([dep({ status: 'ready' })]));
+            const deleteData = screen.getByTestId(
+                'app-dependency-delete-open',
+            ) as HTMLButtonElement;
+            expect(deleteData.disabled).toBe(false);
+            expect(screen.queryByTestId('app-dependencies-delete-owner-only')).toBeNull();
+        });
+
+        it('canDeleteData true (the switch off, or the owner) keeps Delete data enabled', () => {
+            renderCard(list([dep({ status: 'ready' })], { canDeleteData: true }));
+            expect(
+                (screen.getByTestId('app-dependency-delete-open') as HTMLButtonElement).disabled,
+            ).toBe(false);
+        });
+
+        it('an ownerRequired refusal of the delete reads the owner-only sentence', async () => {
+            deleteMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: "Only the Work owner can delete an App dependency's data.",
+            });
+            renderCard(list([dep({ status: 'ready' })]));
+
+            fireEvent.click(screen.getByTestId('app-dependency-delete-open'));
+            const dialog = within(screen.getByTestId('app-dependency-delete-dialog'));
+            fireEvent.change(dialog.getByTestId('app-dependency-delete-slug'), {
+                target: { value: 'hello-app' },
+            });
+            fireEvent.click(dialog.getByTestId('app-dependency-delete-confirm'));
+
+            await waitFor(() =>
+                expect(dialog.getByTestId('app-dependency-delete-message').textContent).toBe(
+                    'Only the Work owner can do this.',
+                ),
+            );
+        });
+    });
 });

@@ -58,6 +58,8 @@ export function attestRefusalOf(result: {
     if (result.code && (APP_LICENSE_ATTEST_REFUSALS as readonly string[]).includes(result.code)) {
         return result.code as AppLicenseAttestRefusal;
     }
+    // Works-security — the shared owner-only refusal (`apps/api/src/works/app-owner-gate.ts`).
+    if (result.code === 'ownerRequired') return 'ownerOnly';
     if (result.httpStatus === 403) return 'ownerOnly';
     if (result.httpStatus === 409) return 'licenseChanged';
     if (result.httpStatus === 422) return 'attestationNotRequired';

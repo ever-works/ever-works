@@ -77,7 +77,11 @@ function check(over: Partial<AppClusterCheckView> = {}): AppClusterCheckView {
     };
 }
 
-function renderDialog(target: AppTargetView = view(), onSaved = vi.fn()) {
+function renderDialog(
+    target: AppTargetView = view(),
+    onSaved = vi.fn(),
+    extra: { isOwner?: boolean } = {},
+) {
     render(
         <NextIntlClientProvider locale="en" messages={messages}>
             <ConnectClusterDialog
@@ -86,6 +90,7 @@ function renderDialog(target: AppTargetView = view(), onSaved = vi.fn()) {
                 workId={WORK_ID}
                 target={target}
                 onSaved={onSaved}
+                isOwner={extra.isOwner}
                 pollIntervalMs={0}
                 pollMax={3}
             />
@@ -261,6 +266,108 @@ describe('ConnectClusterDialog', () => {
             ),
         );
         expect(getTargetMock).toHaveBeenCalledTimes(3);
+    });
+
+    describe("works-security — connecting a cluster is the owner's", () => {
+        const OWNER_ONLY = 'Only the Work owner can do this.';
+
+        it('an ownerRequired refusal of the check reads the owner-only sentence', async () => {
+            checkMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: 'Only the Work owner can connect a cluster to this App or change its context.',
+            });
+            renderDialog();
+            paste(KUBECONFIG);
+            fireEvent.click(screen.getByTestId('connect-cluster-check'));
+            await waitFor(() =>
+                expect(screen.getByTestId('connect-cluster-notice').textContent).toBe(OWNER_ONLY),
+            );
+            expect(getTargetMock).not.toHaveBeenCalled();
+        });
+
+        it("a 403 without a code (the owner's API key) shows the API's own sentence", async () => {
+            checkMock.mockResolvedValue({
+                success: false,
+                httpStatus: 403,
+                error: 'Only a person signed in to Ever Works can connect a cluster to this App.',
+            });
+            renderDialog();
+            paste(KUBECONFIG);
+            fireEvent.click(screen.getByTestId('connect-cluster-check'));
+            await waitFor(() =>
+                expect(screen.getByTestId('connect-cluster-notice').textContent).toContain(
+                    'Only a person signed in to Ever Works can connect a cluster to this App.',
+                ),
+            );
+        });
+
+        it('an ownerRequired refusal of Save reads the owner-only sentence', async () => {
+            saveMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: "Only the Work owner can change the App's deploy target or its namespace.",
+            });
+            renderDialog(
+                view({ clusterCheck: check(), clusterCheckedAt: '2026-10-17T10:00:00.000Z' }),
+            );
+            const saveButton = screen.getByTestId('connect-cluster-save') as HTMLButtonElement;
+            await waitFor(() => expect(saveButton.disabled).toBe(false));
+            fireEvent.click(saveButton);
+            await waitFor(() =>
+                expect(screen.getByTestId('connect-cluster-notice').textContent).toBe(OWNER_ONLY),
+            );
+        });
+
+        it('a non-owner keeps the dialog but cannot send a kubeconfig or a context', () => {
+            renderDialog(view(), vi.fn(), { isOwner: false });
+            expect(screen.getByTestId('connect-cluster-owner-only').textContent).toBe(
+                'Only the Work owner can connect a cluster or change its context.',
+            );
+            expect(
+                (screen.getByTestId('connect-cluster-kubeconfig') as HTMLTextAreaElement).disabled,
+            ).toBe(true);
+            expect(
+                (screen.getByTestId('connect-cluster-context') as HTMLInputElement).disabled,
+            ).toBe(true);
+            // Nothing stored yet: there is nothing a non-owner could check.
+            expect(
+                (screen.getByTestId('connect-cluster-check') as HTMLButtonElement).disabled,
+            ).toBe(true);
+        });
+
+        it('a non-owner can still check the stored connection again (an editor action)', async () => {
+            checkMock.mockResolvedValue({ success: true });
+            getTargetMock.mockResolvedValue({
+                success: true,
+                data: view({ clusterCheck: check(), clusterCheckedAt: '2026-10-17T11:00:00.000Z' }),
+            });
+            renderDialog(
+                view({ clusterCheck: check(), clusterCheckedAt: '2026-10-17T10:00:00.000Z' }),
+                vi.fn(),
+                { isOwner: false },
+            );
+            const recheck = screen.getByTestId('connect-cluster-check') as HTMLButtonElement;
+            expect(recheck.disabled).toBe(false);
+            fireEvent.click(recheck);
+            await waitFor(() => expect(checkMock).toHaveBeenCalledWith(WORK_ID, {}));
+        });
+
+        it('an owner (or an unknown role) gets the fields enabled and no owner-only line', () => {
+            renderDialog(view(), vi.fn(), { isOwner: true });
+            expect(screen.queryByTestId('connect-cluster-owner-only')).toBeNull();
+            expect(
+                (screen.getByTestId('connect-cluster-kubeconfig') as HTMLTextAreaElement).disabled,
+            ).toBe(false);
+            cleanup();
+            renderDialog();
+            expect(screen.queryByTestId('connect-cluster-owner-only')).toBeNull();
+            expect(
+                (screen.getByTestId('connect-cluster-kubeconfig') as HTMLTextAreaElement).disabled,
+            ).toBe(false);
+        });
     });
 
     it('warns when network isolation is switched off (ACC-06-17)', () => {

@@ -190,6 +190,8 @@ What each class will allow, per [deploy target](./app-runtime.md#deploy-targets)
 | Unknown | Never refused | After the Work's owner confirms | No                                      |
 | Red     | Never refused | After the Work's owner confirms | Never                                   |
 
+Attesting a licence (`POST /api/works/:id/app-license/attest`) is the Work owner's statement, so it is taken only from the owner **signed in to Ever Works** — never from an API key, a fleet run or an integration key (`APP_LICENSE_ATTEST_SESSION_ONLY`, default on; exactly `false` restores attesting with the owner's personal API key).
+
 **Today:** the owner's confirmation is not built, so a deploy to your own cluster is not refused over its license — it carries a `license_eligibility_unavailable` warning instead — while Ever Works Apps refuses in the same state. **None** runs nothing, so no license can refuse it.
 
 ## Staying in sync with the original project
@@ -201,7 +203,7 @@ The sync rules the platform implements:
 - It **never pushes to the original project, never force-moves a branch, and never resolves a conflict itself.**
 - Upstream changes arrive as **one pull request** from the branch `ever-works/upstream-sync` into your tracked branch, reused and updated on later syncs. A conflicting pull request becomes a **Task** for your agents.
 - **Upstream changes to workflows wait for a person.** Moving `ever-works/upstream-sync`, opening the sync pull request and fast-forwarding your branch all put the original project's commits into your repository, where GitHub would run any workflow they carry with your repository's secrets. So when the incoming range touches `.github/workflows/**` or `.github/actions/**` — or the platform cannot read the comparison in full (for example a range of 300 files or more) — the sync moves nothing, opens nothing, and records the reason `held_for_workflow_review`. One Activity entry names the changed paths (never their contents). Every sync takes the same path: scheduled, **Sync now** and retries. The hold lifts by itself once upstream no longer carries the change; an operator can let a specific App Work through with `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS`. Nothing in the App spec can turn the hold off.
-- Syncs are scheduled **weekly, on Mondays at 06:00 UTC** by default, each Work shifted by a stable delay of up to five minutes. **Sync now** (`POST /api/works/:id/upstream/sync`) is limited to six times in a rolling hour.
+- Syncs are scheduled **weekly, on Mondays at 06:00 UTC** by default, each Work shifted by a stable delay of up to five minutes. **Sync now** (`POST /api/works/:id/upstream/sync`) is limited to six times in a rolling hour. **Sync now** and the readiness **Try again** need edit access: a viewer can read the card but is refused `403 edit_access_required`.
 
 **Today:** the sync job itself is not wired to a worker. **Sync now** is accepted (`202`), but no sync runs, and no scheduled sync runs either. The divergence reading and the last-sync time come from that same job, so they stay empty — the tab shows _Divergence unknown_ and _Not synced yet_. Syncing a private copy additionally needs a provider capability that does not exist yet. The `upstreamSync` block of your App spec is validated but not yet read by the sync.
 
@@ -229,6 +231,7 @@ Delete it from the Work's **Settings**, or with `POST /api/works/:id/delete`. Th
 - A **linked** repository, and a fork you already had before the App Work adopted it, are never deleted — asking for it is refused, not ignored.
 - A fork or private copy that **this App Work created** is deleted only when you explicitly ask. Leaving the option out always means _keep it_, for every client.
 - Deleting the app's stored data needs the Work's slug typed exactly.
+- Deleting stored data — with the Work, when removing the running App (`deleteData`), or one dependency's **Delete data** — is the Work **owner's** decision, made signed in to Ever Works; see [Decisions only the Work's owner can make](./app-runtime.md#decisions-only-the-works-owner-can-make).
 
 ## Builds, deployments and addresses
 

@@ -553,6 +553,60 @@ export class GitFacadeService implements IGitFacade {
     }
 
     /**
+     * Security (sec/app-works-gates, 2026-10-18) — the narrowest pull credential the platform can
+     * mint for a Work's container image: a GitHub App installation token requested with
+     * `permissions: { packages: 'read' }` ONLY (anything omitted is not granted, so it cannot read
+     * code, open a pull request or write anything), for a Work linked through the platform GitHub
+     * App (`sourceRepository.auth.mode === 'github_app_installation'`).
+     *
+     * The App Works image-pull fallback (`AppBuildPullCredentialSource`) prefers this over
+     * {@link getAccessToken}, whose installation branch mints the token with EVERY permission the
+     * App holds and whose OAuth branch is the member's whole-account `repo` token.
+     *
+     * `null` — never a throw — when the Work is not App-linked, the installation is gone or
+     * suspended, the App credentials are unset, or GitHub refuses the narrowed mint (today the
+     * platform App does not request `Packages: read` — `GITHUB-PERMISSIONS.md` §4, "App
+     * `Packages: read` … Gap" — so GitHub answers 422 until the App registration gains it and
+     * each installation owner re-approves). Deliberately NOT cached: the shared installation-token
+     * cache holds the unscoped token, and the two must never be handed out for each other.
+     */
+    async getWorkInstallationPackagesReadToken(options: GitFacadeOptions): Promise<string | null> {
+        if (!options?.workId || options.providerId !== 'github') return null;
+
+        try {
+            const work = await this.workRepository.findById(options.workId);
+            const auth = work?.sourceRepository?.auth;
+            if (!auth || auth.mode !== 'github_app_installation' || !auth.installationId) {
+                return null;
+            }
+
+            const installation = await this.gitHubAppInstallationRepository.findByInstallationId(
+                auth.installationId,
+            );
+            if (!installation || installation.deletedAt || installation.suspendedAt) return null;
+
+            const appId = config.githubApp.getAppId();
+            const privateKey = config.githubApp.getPrivateKey();
+            if (!appId || !privateKey) return null;
+
+            const minted = await requestGitHubAppInstallationAccessTokenDetails(
+                auth.installationId,
+                { appId, privateKey },
+                { permissions: { packages: 'read' } },
+            );
+            return minted.token || null;
+        } catch (error) {
+            // Name only: GitHub's answer can name the installation; the token is never in it.
+            this.logger.warn(
+                `Work ${options.workId}: a packages:read installation token could not be minted (${
+                    error instanceof Error ? error.name : 'unknown error'
+                }).`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * The member's own git token — APW-09 FR-24, plan §2.3.
      *
      * Resolves the connected provider account first (the GitHub integration

@@ -387,6 +387,16 @@ describe('AppUpstreamCard', () => {
             "You've synced 6 times this hour. Try again at Thu 12:30 UTC.",
         ],
         ['not_ready', { code: 'not_ready', statusCode: 409 }, 'Sync failed: not_ready'],
+        // Works-security — a viewer may read the card, not sync.
+        [
+            'edit_access_required',
+            {
+                code: 'edit_access_required',
+                statusCode: 403,
+                message: 'You need edit access to this App Work to do that.',
+            },
+            'You need edit access to this App Work to do that.',
+        ],
     ])('renders the %s refusal with its own copy', async (code, refusal, copy) => {
         syncUpstreamActionMock.mockResolvedValue({ success: false, ...refusal });
         renderCard(upstreamState());

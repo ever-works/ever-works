@@ -11,7 +11,7 @@ import { DomainManagement } from '@/components/works/detail/deploy/DomainManagem
 import { RuntimeEnvManagement } from '@/components/works/detail/deploy/RuntimeEnvManagement';
 import { SubdomainManagement } from '@/components/works/detail/deploy/SubdomainManagement';
 import { DeployProgressPanel } from '@/components/works/detail/deploy/DeployProgressPanel';
-import { canDeploy } from '@/lib/permissions';
+import { canDeploy, isOwner } from '@/lib/permissions';
 import { isAppWorkKind } from '@ever-works/contracts';
 import { appRuntimeAPI } from '@/lib/api/app-runtime';
 import { deriveAppTargetFromProvider, type AppTargetView } from '@/lib/api/app-runtime.types';
@@ -90,6 +90,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
                 initialTarget={appTarget}
                 status={appStatus}
                 canEdit={canDeploy(work.userRole)}
+                isOwner={isOwner(work.userRole)}
             />
         );
     }

@@ -474,6 +474,22 @@ export interface AppDeployOrchestratorDeploymentStore extends AppDeployDeploymen
     } | null>;
     /** §5.6 steps 4–7. One call, so the phase and the state cannot drift apart. */
     update?(workId: string, deploymentId: string, patch: AppDeployRowUpdate): Promise<unknown>;
+    /**
+     * Security (sec/app-works-gates) — who requested this Deployment, from its OWN row: the
+     * `triggeredByUserId` column and `appRender.requestedByHumanSession` (written by T24's
+     * `rowDraft`). The pull-credential port gates the owner-token fallback on it. Unbound, or a
+     * row it cannot read, means "nobody" — fail closed.
+     */
+    findRequester?(deploymentId: string): Promise<AppDeployRequesterFacts | null>;
+}
+
+/** Security (sec/app-works-gates) — the requester facts of one Deployment row. */
+export interface AppDeployRequesterFacts {
+    workId?: string | null;
+    /** `null` for a Build- or event-triggered Deployment, which has no person behind it. */
+    triggeredByUserId?: string | null;
+    /** `true` only when that person asked from a signed-in browser session. */
+    requestedByHumanSession?: boolean | null;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1115,6 +1131,8 @@ export class AppDeployOrchestrator {
         );
         const isFirstDeploymentOnCluster =
             !text(state?.clusterFingerprint) || state?.clusterFingerprint !== fingerprint;
+        // Security (sec/app-works-gates) — from the Deployment's own row, never the job payload.
+        const requester = await this.readRequester(context);
 
         try {
             const answer = await this.renderer.build({
@@ -1127,6 +1145,8 @@ export class AppDeployOrchestrator {
                 isFirstDeploymentOnCluster,
                 skipPreDeployJobs: request?.skipPreDeployJobs === true,
                 preview: request?.preview ?? null,
+                requestedByUserId: requester.userId,
+                requestedByHumanSession: requester.humanSession,
             });
 
             context.warnings.push(...(answer.warnings ?? []));
@@ -1142,6 +1162,40 @@ export class AppDeployOrchestrator {
             return { input: answer.input, code: '', reason: '' };
         } catch (error) {
             return { input: null, code: 'spec_unavailable', reason: messageOf(error) };
+        }
+    }
+
+    /**
+     * Security (sec/app-works-gates) — the person behind this Deployment, as its own row records
+     * it. The job payload is deliberately NOT consulted (the API's dispatch carries no actor, and a
+     * dequeued row is dispatched by the worker itself). Every failure answers "nobody": no store,
+     * no member, a throw, or a row that belongs to another Work.
+     */
+    private async readRequester(
+        context: RunContext,
+    ): Promise<{ userId: string | null; humanSession: boolean }> {
+        const nobody = { userId: null, humanSession: false };
+        if (!this.deployments || typeof this.deployments.findRequester !== 'function') {
+            return nobody;
+        }
+
+        try {
+            const facts = await this.deployments.findRequester(context.deploymentId);
+            if (!facts) return nobody;
+            if (text(facts.workId) && text(facts.workId) !== context.workId) return nobody;
+
+            const userId = text(facts.triggeredByUserId) || null;
+            return {
+                userId,
+                humanSession: Boolean(userId) && facts.requestedByHumanSession === true,
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Reading who requested App Deployment ${context.deploymentId} failed (` +
+                    `${messageOf(error)}); it is treated as requested by nobody.`,
+            );
+
+            return nobody;
         }
     }
 

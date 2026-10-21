@@ -59,11 +59,14 @@ import type {
     AppDeploySpecSource,
 } from '../app-deploy-preconditions.service';
 import type { AppVerificationSpecRequest } from '../app-verification-target.service';
-import type {
-    AppImagePullCredentialSource,
-    AppRuntimeEnvContext,
-    AppRuntimeEnvSource,
-    AppsTierPolicy,
+import {
+    AppPortUnavailableError,
+    AppPullCredentialRefusedError,
+    type AppImagePullCredentialContext,
+    type AppImagePullCredentialSource,
+    type AppRuntimeEnvContext,
+    type AppRuntimeEnvSource,
+    type AppsTierPolicy,
 } from '../ports';
 
 /* -------------------------------------------------------------------------- *
@@ -185,6 +188,8 @@ class FakeEnv implements AppRuntimeEnvSource {
 
 class FakePull implements AppImagePullCredentialSource {
     readonly calls: Array<{ workId: string; buildId: string }> = [];
+    /** Security (sec/app-works-gates) — the context each call carried, in order. */
+    readonly contexts: Array<AppImagePullCredentialContext | undefined> = [];
     credential: { server: string; username: string; password: string } | null = {
         server: 'ghcr.io',
         username: 'evereq',
@@ -197,9 +202,11 @@ class FakePull implements AppImagePullCredentialSource {
     async resolve(
         workId: string,
         buildId: string,
+        context?: AppImagePullCredentialContext,
     ): Promise<{ server: string; username: string; password: string } | null> {
         this.journal.push('pull.resolve');
         this.calls.push({ workId, buildId });
+        this.contexts.push(context);
         if (this.failsWith) throw this.failsWith;
         return this.credential;
     }
@@ -1316,6 +1323,97 @@ describe('refusals — a named code, never an exception', () => {
         const thrown = await harness.builder.build(request());
 
         expect(thrown.code).toBe('pull_credential_unavailable');
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Security (sec/app-works-gates) — the pull port's context, and its member-facing refusal
+ * -------------------------------------------------------------------------- */
+
+describe('the pull-credential context and the member-facing refusal (sec/app-works-gates)', () => {
+    it('hands the port the RESOLVED target and the requester from the request', async () => {
+        const harness = makeHarness();
+
+        inputOf(
+            await harness.builder.build(
+                request({ requestedByUserId: ' owner-1 ', requestedByHumanSession: true }),
+            ),
+        );
+
+        expect(harness.pull.contexts).toEqual([
+            { target: 'your-cluster', requestedByUserId: 'owner-1', requestedByHumanSession: true },
+        ]);
+    });
+
+    it('a request with no requester hands "nobody, not a session" — fail closed', async () => {
+        const harness = makeHarness();
+
+        await harness.builder.build(request());
+        await harness.builder.build(
+            request({ requestedByUserId: null, requestedByHumanSession: 'true' as never }),
+        );
+        await harness.builder.build(
+            request({ ref: { ...REF, target: 'ever-works-apps' }, requestedByHumanSession: true }),
+        );
+
+        expect(harness.pull.contexts).toEqual([
+            { target: 'your-cluster', requestedByUserId: null, requestedByHumanSession: false },
+            { target: 'your-cluster', requestedByUserId: null, requestedByHumanSession: false },
+            // The flag is passed as the request states it; the PORT pairs it with a requester.
+            { target: 'ever-works-apps', requestedByUserId: null, requestedByHumanSession: true },
+        ]);
+    });
+
+    it("carries a member-facing refusal's sentence onto the result's reason", async () => {
+        const harness = makeHarness();
+        const sentence =
+            'No read-only pull token is stored for this App and its image is private. Store a ' +
+            "read-only pull token on the Builds tab — the owner's GitHub token is not sent to your cluster.";
+        harness.pull.failsWith = new AppPullCredentialRefusedError(sentence, `${WORK_ID}:build-1`);
+
+        const result = await harness.builder.build(request());
+
+        expect(result.status).toBe('unavailable');
+        expect(result.code).toBe('pull_credential_unavailable');
+        expect(result.reason).toBe(sentence);
+        expect(result.input).toBeNull();
+    });
+
+    it('never carries an ordinary thrown message — only the generic sentence', async () => {
+        const harness = makeHarness();
+
+        for (const error of [
+            new Error(`upstream said ${GIT_TOKEN_SENTINEL}`),
+            new AppPortUnavailableError(
+                'pull_credential_unavailable',
+                `leak ${GIT_TOKEN_SENTINEL}`,
+            ),
+            Object.assign(new Error(`fake ${GIT_TOKEN_SENTINEL}`), {
+                code: 'pull_credential_unavailable',
+                memberFacing: true,
+            }),
+        ]) {
+            harness.pull.failsWith = error;
+            const result = await harness.builder.build(request());
+
+            expect(result.code).toBe('pull_credential_unavailable');
+            expect(result.reason).toBe('the App image pull credential could not be resolved');
+            expect(String(result.reason)).not.toContain(GIT_TOKEN_SENTINEL);
+        }
+    });
+
+    it('redacts a token-shaped value even inside a member-facing refusal (defence in depth)', async () => {
+        const harness = makeHarness();
+        const token = `ghp_${'A1b2C3d4E5'.repeat(4)}`;
+        harness.pull.failsWith = new AppPullCredentialRefusedError(
+            `No read-only pull token is stored for this App (${token}).`,
+        );
+
+        const result = await harness.builder.build(request());
+
+        expect(result.code).toBe('pull_credential_unavailable');
+        expect(String(result.reason)).toContain('No read-only pull token is stored for this App');
+        expect(String(result.reason)).not.toContain(token);
     });
 });
 

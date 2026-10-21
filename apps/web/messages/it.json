@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "Esamina l'accesso all'app GitHub",
                     "openOnGitHub": "Apri su GitHub",
                     "enableBuildWorkflow": "Attiva il workflow di build"
-                }
+                },
+                "editAccessRequired": "Ti serve l'accesso in modifica a questa App Work per farlo."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Evolvila con il suo agente",
                     "body": "Chiedi all'agente del Work di modificare l'app: aggiungere una funzionalità, correggere un bug, aggiornare una dipendenza. Lavora nel Repository del Work e apre pull request.",
                     "button": "Chatta su questa App"
-                }
+                },
+                "editAccessRequired": "Ti serve l'accesso in modifica a questa App Work per riprovare."
             },
             "builds": {
                 "title": "Build",
@@ -7178,7 +7180,8 @@
                     "saved": "Destinazione salvata.",
                     "saveFailed": "Impossibile salvare la destinazione: {reason}",
                     "changeNote": "Cambiare la destinazione non rimuove nulla di ciò che è già in esecuzione.",
-                    "routeUnavailable": "Il cambio di destinazione non è ancora disponibile su questa istanza."
+                    "routeUnavailable": "Il cambio di destinazione non è ancora disponibile su questa istanza.",
+                    "ownerOnly": "Solo il proprietario del lavoro può cambiare dove viene eseguita l'app o collegare un nuovo cluster."
                 },
                 "connect": {
                     "title": "Collega il tuo cluster",
@@ -7219,7 +7222,8 @@
                     "saving": "Salvataggio in corso…",
                     "saveBlocked": "Il salvataggio è disponibile quando la verifica viene superata con tutti i permessi richiesti.",
                     "saved": "Cluster collegato.",
-                    "saveFailed": "Impossibile salvare la connessione al cluster: {reason}"
+                    "saveFailed": "Impossibile salvare la connessione al cluster: {reason}",
+                    "ownerOnly": "Solo il proprietario del lavoro può collegare un cluster o cambiarne il contesto."
                 },
                 "check": {
                     "ok": "Connesso",
@@ -7356,7 +7360,8 @@
                         "resume": "Ripresa richiesta.",
                         "remove": "Rimozione richiesta.",
                         "cancelDeploy": "Annullamento richiesto."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Solo il proprietario del lavoro può eliminare i dati archiviati."
                 },
                 "environment": {
                     "title": "Ambiente",
@@ -7445,8 +7450,11 @@
                         "confirm": "Elimina dati",
                         "requested": "Eliminazione dei dati di {kind} in corso.",
                         "failed": "Impossibile eliminare i dati. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Solo il proprietario del lavoro può eliminare questi dati."
+                },
+                "ownerRequired": "Solo il proprietario del lavoro può farlo.",
+                "ownerConfirmCluster": "Un altro membro ha salvato questa connessione al cluster, quindi il proprietario del lavoro deve eseguire un deploy una volta per confermarla."
             },
             "appEnv": {
                 "errors": {

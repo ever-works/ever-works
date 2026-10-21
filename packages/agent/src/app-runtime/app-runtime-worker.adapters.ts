@@ -38,6 +38,8 @@ import { parseBearerChallenge, parseImageReference } from './app-image-reference
 import { describeDependencyError } from '../app-dependencies/describe-dependency-error';
 import {
     AppPortUnavailableError,
+    AppPullCredentialRefusedError,
+    type AppImagePullCredentialContext,
     type AppImagePullCredentialSource,
     type AppRuntimeEventSink,
     type AppRuntimeTargetPort,
@@ -71,7 +73,44 @@ export interface AppPullCredentialGitTokens {
         providerId: string;
         workId?: string;
     }): Promise<string | null>;
+    /**
+     * Security (sec/app-works-gates) — `GitFacadeService.getWorkInstallationPackagesReadToken`: a
+     * GitHub App installation token minted with `permissions: { packages: 'read' }` ONLY, for a
+     * Work linked through the platform GitHub App. `null` when the Work is not App-linked, the App
+     * credentials are unset, or GitHub refuses the narrowed mint (the App does not hold
+     * `Packages: read`). Optional: a binding without it keeps `getAccessToken`'s answer.
+     */
+    getWorkInstallationPackagesReadToken?(options: {
+        userId: string;
+        providerId: string;
+        workId?: string;
+    }): Promise<string | null>;
 }
+
+/**
+ * Security (sec/app-works-gates, 2026-10-18) — the operator switch that lets the OWNER's git token
+ * be the fallback image-pull credential on **your cluster**. Default **off**: on only when the value
+ * is exactly `true`. Read per call.
+ */
+export const APP_PULL_OWNER_TOKEN_FALLBACK_ENV = 'APP_PULL_OWNER_TOKEN_FALLBACK';
+
+/** `APP_PULL_OWNER_TOKEN_FALLBACK` — `true` only for the exact string `'true'` (default off). */
+export function appPullOwnerTokenFallbackEnabled(
+    env: Record<string, string | undefined> = process.env,
+): boolean {
+    return env?.[APP_PULL_OWNER_TOKEN_FALLBACK_ENV] === 'true';
+}
+
+/** The member-facing refusal when the switch is off (your cluster, private image, no pull token). */
+export const APP_PULL_OWNER_TOKEN_REFUSED_MESSAGE =
+    'No read-only pull token is stored for this App and its image is private. Store a read-only ' +
+    "pull token on the Builds tab — the owner's GitHub token is not sent to your cluster.";
+
+/** The member-facing refusal when the switch is on but this Deployment may not use the fallback. */
+export const APP_PULL_OWNER_TOKEN_NOT_OWNER_SESSION_MESSAGE =
+    "No read-only pull token is stored for this App and its image is private. The owner's GitHub " +
+    'token is sent to your cluster only for a Deployment the Work owner starts themselves while ' +
+    'signed in, and this one was not. Store a read-only pull token on the Builds tab.';
 
 type FetchLike = (
     input: string,
@@ -89,11 +128,21 @@ type FetchLike = (
  * 1. The image is probed anonymously (the registry's own token dance, the same as T72's
  *    resolver). Pullable without a credential ⇒ `null` — "a public image", and nothing is
  *    written to the cluster.
- * 2. Otherwise, for `ghcr.io`, the App Work owner's git access token (the GitHub App
- *    installation token when the Work is linked, else the member's connected account) is the
- *    read credential — the only per-Work credential the platform holds for that package today.
+ * 2. Otherwise the owner's stored, read-only pull token (APW-05 T17) wins.
+ * 3. Otherwise, for `ghcr.io`, the **owner-token fallback**: a `packages: read`-only GitHub App
+ *    installation token when the Work is App-linked and GitHub grants that narrowed mint, else the
+ *    App Work owner's git access token (`getAccessToken`: the Work's full GitHub App installation
+ *    token when linked, else the owner's connected OAuth account with `repo`, else a settings PAT).
  *    Logged by name only.
- * 3. Anything else refuses with `pull_credential_unavailable`, which the render-input builder
+ *
+ *    🛑 Security (sec/app-works-gates, 2026-10-18): the fallback is rendered as an
+ *    `imagePullSecret` into the TARGET cluster, and an editor can repoint a your-cluster target.
+ *    So for any target that is not `ever-works-apps` (fail-closed: a missing or unknown target is
+ *    treated as your cluster) the fallback is refused with a member-facing
+ *    `pull_credential_unavailable` unless `APP_PULL_OWNER_TOKEN_FALLBACK=true` AND the Deployment
+ *    was requested by the Work owner from a signed-in session. A Build-triggered (or any
+ *    person-less) Deployment never gets it there. The managed tier keeps today's behaviour.
+ * 4. Anything else refuses with `pull_credential_unavailable`, which the render-input builder
  *    turns into the precondition of the same name.
  */
 export class AppBuildPullCredentialSource implements AppImagePullCredentialSource {
@@ -114,15 +163,19 @@ export class AppBuildPullCredentialSource implements AppImagePullCredentialSourc
 
     /**
      * Which credential the last `resolve` used for a Work: `public` (none), `pull-token` (APW-05's
-     * stored token) or `owner-token` (the fallback). The render-input builder reads it and records
-     * the warning `pull_credential_owner_token` on the Deployment when the fallback was used.
+     * stored token) or `owner-token` (the fallback — the `packages: read` installation mint or the
+     * owner's git token). The render-input builder reads it and records the warning
+     * `pull_credential_owner_token` on the Deployment when the fallback was used.
      */
     readonly lastSource = new Map<string, 'public' | 'pull-token' | 'owner-token'>();
 
     async resolve(
         workId: string,
         buildId: string,
+        context?: AppImagePullCredentialContext,
     ): Promise<{ server: string; username: string; password: string } | null> {
+        // A refusal below must not leave an earlier resolve's answer to be read as this one's.
+        this.lastSource.delete(workId);
         const build = this.builds ? await this.builds.getBuild(workId, buildId) : null;
         const reference = typeof build?.imageReference === 'string' ? build.imageReference : '';
         const parsed = parseImageReference(reference);
@@ -175,16 +228,55 @@ export class AppBuildPullCredentialSource implements AppImagePullCredentialSourc
             );
         }
 
+        // ---- the owner-token fallback, gated by target (sec/app-works-gates) ------------------
+        // Only the managed tier keeps it unconditionally. Every other value — `your-cluster`,
+        // `none`, an unknown string, or no context at all — is treated as your cluster.
+        const managedTier = context?.target === 'ever-works-apps';
+
+        if (!managedTier && !appPullOwnerTokenFallbackEnabled()) {
+            this.logger.warn(
+                `App Work ${workId}: private Build image, no stored pull token, and the owner-token ` +
+                    `fallback is off for your-cluster targets (${APP_PULL_OWNER_TOKEN_FALLBACK_ENV}); refused.`,
+            );
+            throw new AppPullCredentialRefusedError(
+                APP_PULL_OWNER_TOKEN_REFUSED_MESSAGE,
+                `${workId}:${buildId}`,
+            );
+        }
+
         const work = this.works ? await this.works.findById(workId) : null;
         const userId = work?.userId ? String(work.userId) : '';
-        const token =
-            userId && this.git
-                ? await this.git.getAccessToken({
-                      userId,
-                      providerId: work?.gitProvider ? String(work.gitProvider) : 'github',
-                      workId,
-                  })
-                : null;
+
+        if (!managedTier && !ownerRequestedFromSession(context, userId)) {
+            this.logger.warn(
+                `App Work ${workId}: the owner-token fallback is on, but this Deployment was not ` +
+                    'requested by the Work owner from a signed-in session; refused.',
+            );
+            throw new AppPullCredentialRefusedError(
+                APP_PULL_OWNER_TOKEN_NOT_OWNER_SESSION_MESSAGE,
+                `${workId}:${buildId}`,
+            );
+        }
+
+        const tokenOptions = {
+            userId,
+            providerId: work?.gitProvider ? String(work.gitProvider) : 'github',
+            workId,
+        };
+        // Prefer the narrowest credential the platform can mint for the owner: a GitHub App
+        // installation token limited to `packages: read`. `null` (not App-linked, App credentials
+        // unset, or the App does not hold `Packages: read`) falls back to today's token.
+        let scoped = false;
+        let token: string | null = null;
+        if (userId && this.git?.getWorkInstallationPackagesReadToken) {
+            token = await this.git
+                .getWorkInstallationPackagesReadToken(tokenOptions)
+                .catch(() => null);
+            scoped = Boolean(token);
+        }
+        if (!token && userId && this.git) {
+            token = await this.git.getAccessToken(tokenOptions);
+        }
 
         if (!token) {
             throw new AppPortUnavailableError(
@@ -196,7 +288,9 @@ export class AppBuildPullCredentialSource implements AppImagePullCredentialSourc
 
         this.lastSource.set(workId, 'owner-token');
         this.logger.warn(
-            `App Work ${workId}: no pull token is stored, so the private Build image is pulled with the owner's GitHub token (name only).`,
+            `App Work ${workId}: no pull token is stored, so the private Build image is pulled with the owner's ` +
+                `${scoped ? 'packages:read GitHub App installation token' : 'GitHub token'} ` +
+                `(target ${managedTier ? 'ever-works-apps' : 'your-cluster'}; name only).`,
         );
         return {
             server: 'ghcr.io',
@@ -244,6 +338,23 @@ export class AppBuildPullCredentialSource implements AppImagePullCredentialSourc
             return false;
         }
     }
+}
+
+/**
+ * Security (sec/app-works-gates) — `true` only when the Deployment's own row says the Work OWNER
+ * requested it from a signed-in session. A missing context, a missing requester (a Build- or
+ * event-triggered Deployment), an unknown owner, a different person (an editor) or anything but a
+ * literal `true` session flag all answer `false`.
+ */
+function ownerRequestedFromSession(
+    context: AppImagePullCredentialContext | undefined,
+    ownerUserId: string,
+): boolean {
+    const requester =
+        typeof context?.requestedByUserId === 'string' ? context.requestedByUserId.trim() : '';
+    if (!requester || !ownerUserId) return false;
+    if (requester !== ownerUserId) return false;
+    return context?.requestedByHumanSession === true;
 }
 
 /* -------------------------------------------------------------------------- *
