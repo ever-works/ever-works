@@ -1038,6 +1038,8 @@ export interface FleetScheduleView {
 	lastRun: FleetScheduleLastRun | null;
 	/** A run is in flight on the machine (as last reported). */
 	running: boolean;
+	/** The platform holds the computer's link right now (Run now needs it, FR-19). */
+	linkUp: boolean;
 	/** Consecutive failed runs, newest first (resets on a success). */
 	failureStreak: number;
 	syncState: FleetScheduleSyncState;

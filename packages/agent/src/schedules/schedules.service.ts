@@ -1,4 +1,5 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { fleetScheduleCadenceRaw } from '@ever-works/contracts';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
     Repository,
@@ -33,6 +34,7 @@ import {
     type ScheduleHealthInput,
 } from './schedule-health.service';
 import { buildScheduleControls } from './schedule-controls';
+import { NODE_SCHEDULE_PORT, type NodeScheduleSource } from './node-schedule.port';
 import type {
     ScheduleHealthReason,
     ScheduleHealthSummary,
@@ -90,6 +92,8 @@ const SOURCE_TYPES: ScheduleSourceType[] = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    // Schedules on computers (FL-13): Command schedules, read through `NODE_SCHEDULE_PORT`.
+    'node_schedule',
 ];
 
 const STATUSES: ScheduleStatus[] = ['active', 'paused', 'disabled', 'error', 'ended'];
@@ -160,9 +164,10 @@ function decodeCursor(raw: string | null | undefined): PageCursor | null {
 /**
  * Schedules ("Cadence") aggregation service (spec §4.3).
  *
- * Read-only. Projects the seven scheduled sources — recurring Tasks, Agent
+ * Read-only. Projects the eight scheduled sources — recurring Tasks, Agent
  * heartbeats, Work schedules, Mission ticks, item source-validation,
- * data-sync polling, and inbound triggers — into one unified
+ * data-sync polling, inbound triggers and (FL-13) Command schedules on the
+ * person's computers — into one unified
  * `ScheduleView[]`, scoped to the
  * caller exactly like every other Tier A read (userId + active
  * Organization; personal scope filters `organizationId IS NULL`).
@@ -197,6 +202,12 @@ export class SchedulesService {
         @Optional()
         @InjectRepository(TaskAssignee)
         private readonly taskAssigneeRepo?: Repository<TaskAssignee>,
+        // Schedules on computers (FL-13) — the `node_schedule` source. Appended
+        // LAST + @Optional(): unbound (no Fleet in this process) the source
+        // contributes no rows, and every positional construction compiles.
+        @Optional()
+        @Inject(NODE_SCHEDULE_PORT)
+        private readonly nodeScheduleSource?: NodeScheduleSource,
     ) {}
 
     async getSchedules(
@@ -206,6 +217,16 @@ export class SchedulesService {
         const now = new Date();
         const { rows } = await this.collect(scope, now, 'capped');
         let views = rows.map((row) => narrowScheduleView(row.view));
+        if (filters.nodeId) {
+            // FL-13 `?node=`: the flat row has no node field, so match on the full rows.
+            const wanted = filters.nodeId.toLowerCase();
+            const onNode = new Set(
+                rows
+                    .filter((row) => (row.view.nodeId ?? '').toLowerCase() === wanted)
+                    .map((row) => row.view.id),
+            );
+            views = views.filter((view) => onNode.has(view.id));
+        }
 
         if (filters.sourceType) {
             views = views.filter((view) => view.sourceType === filters.sourceType);
@@ -356,6 +377,9 @@ export class SchedulesService {
             if (filters.ownerType && view.ownerType !== filters.ownerType) return false;
             if (filters.enabledOnly && !view.enabled) return false;
             if (filters.agentId && view.agentId !== filters.agentId) return false;
+            if (filters.nodeId && (view.nodeId ?? '').toLowerCase() !== filters.nodeId.toLowerCase()) {
+                return false;
+            }
             if (filters.status && view.status !== filters.status) return false;
             if (filters.health === 'ok' && view.health?.ok === false) return false;
             if (filters.health === 'never-runs' && view.health?.ok !== false) return false;
@@ -385,16 +409,25 @@ export class SchedulesService {
         mode: SourceReadMode,
     ): Promise<Collected> {
         const degraded: ScheduleSourceType[] = [];
-        const [tasks, agents, workSchedules, missions, sourceValidation, dataSync, triggers] =
-            await Promise.all([
-                this.recurringTasks(scope, now, degraded, mode),
-                this.agentHeartbeats(scope, degraded, mode),
-                this.workSchedules(scope, degraded, mode),
-                this.missionTicks(scope, now, degraded, mode),
-                this.sourceValidation(scope, degraded, mode),
-                this.dataSync(scope, now, degraded, mode),
-                this.inboundTriggers(scope, degraded, mode),
-            ]);
+        const [
+            tasks,
+            agents,
+            workSchedules,
+            missions,
+            sourceValidation,
+            dataSync,
+            triggers,
+            nodeSchedules,
+        ] = await Promise.all([
+            this.recurringTasks(scope, now, degraded, mode),
+            this.agentHeartbeats(scope, degraded, mode),
+            this.workSchedules(scope, degraded, mode),
+            this.missionTicks(scope, now, degraded, mode),
+            this.sourceValidation(scope, degraded, mode),
+            this.dataSync(scope, now, degraded, mode),
+            this.inboundTriggers(scope, degraded, mode),
+            this.nodeSchedules(scope, degraded),
+        ]);
 
         const rows = [
             ...tasks,
@@ -404,6 +437,7 @@ export class SchedulesService {
             ...sourceValidation,
             ...dataSync,
             ...triggers,
+            ...nodeSchedules,
         ];
         for (const row of rows) {
             const health = evaluateScheduleHealth({ ...row.facts, now });
@@ -414,6 +448,7 @@ export class SchedulesService {
                 pausedAt: row.view.pausedAt ?? null,
                 health,
                 ownerStatus: row.ownerStatus,
+                nodeLinkUp: row.view.nodeSchedule?.linkUp,
             });
         }
         return { rows, degraded };
@@ -1013,6 +1048,63 @@ export class SchedulesService {
             }));
         } catch (error) {
             this.warn('inbound_trigger', error, degraded);
+            return [];
+        }
+    }
+
+    /**
+     * Schedules on computers (FL-13, R-2) — the person's Command schedules,
+     * read through `NODE_SCHEDULE_PORT` (`FleetScheduleService`). A schedule
+     * is its author's and its computer's, not a workspace's: like the
+     * person's Commands it shows in every scope (lane-log decision 6).
+     * `ownerId` is the Command id, so `node_schedule:<id>` resolves like every
+     * other row; `ownerLink` is the computer's Schedules tab.
+     */
+    private async nodeSchedules(
+        scope: ScheduleScope,
+        degraded: ScheduleSourceType[],
+    ): Promise<ProjectedRow[]> {
+        if (!this.nodeScheduleSource) return [];
+        try {
+            const schedules = await this.nodeScheduleSource.listForUser({ userId: scope.userId });
+            return schedules.map((schedule) => {
+                const paused = !schedule.enabled;
+                const view: ScheduleView = {
+                    id: schedule.scheduleId,
+                    sourceType: 'node_schedule',
+                    ownerType: 'node',
+                    ownerId: schedule.id,
+                    ownerName: schedule.name,
+                    ownerLink: `/fleet/computers/${encodeURIComponent(schedule.nodeId)}?tab=schedules`,
+                    cadenceRaw: fleetScheduleCadenceRaw(schedule.cadence),
+                    cadenceHuman: schedule.cadenceHuman,
+                    nextRunAt: schedule.nextRunAt,
+                    lastRunAt: schedule.lastRunAt,
+                    lastRunStatus: schedule.lastRun?.status ?? null,
+                    status: paused ? 'paused' : 'active',
+                    enabled: schedule.enabled,
+                    agentId: null,
+                    agentName: null,
+                    pausedAt: schedule.pausedAt,
+                    nextRunReasonKey: paused ? 'paused' : schedule.nextRunAt ? null : 'notScheduledYet',
+                    nodeId: schedule.nodeId,
+                    nodeName: schedule.nodeName,
+                    nodeTimeZone: schedule.nodeTimeZone,
+                    nodeSchedule: schedule,
+                };
+                return {
+                    view,
+                    facts: {
+                        sourceType: 'node_schedule' as const,
+                        cadenceKind: 'node-cadence' as const,
+                        cadence: view.cadenceRaw,
+                        paused,
+                        nodeNeverRuns: schedule.neverRuns?.reason ?? null,
+                    },
+                };
+            });
+        } catch (error) {
+            this.warn('node_schedule', error, degraded);
             return [];
         }
     }
