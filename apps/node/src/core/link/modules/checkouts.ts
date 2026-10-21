@@ -29,6 +29,13 @@ import {
 } from './checkouts/checkout-credential';
 import { discoverCheckouts } from './checkouts/checkout-discovery';
 import { evidenceGrew, isEvidenceClean, readChangesEvidence } from './checkouts/checkout-evidence';
+import {
+	containerRefusal,
+	containerRunArgv,
+	detectDocker,
+	isContainerImageReference
+} from './checkouts/checkout-container';
+import { linkSharedFolders } from './checkouts/checkout-shared-folders';
 import { createCheckoutGitRunner, redactedStderrHead, type CheckoutGitResult, type CheckoutGitRunner } from './checkouts/checkout-git';
 import { isGitCheckout, readCheckoutFacts, readWorktreeMain, type CheckoutFacts } from './checkouts/checkout-git-line';
 import {
@@ -112,11 +119,20 @@ export interface CheckoutsModuleOptions {
 	measure?: (path: string) => Promise<number>;
 	/** The reaper's max age, for the Task worktree note. */
 	reaperMaxAgeMs?: number | null;
+	/** P3: is a Docker daemon reachable (container isolation)? Default: one `docker version` call. */
+	hasDocker?: () => Promise<boolean>;
 	now?: () => number;
 	logger?: Logger;
 }
 
 export interface CheckoutsModule extends NodeModule {
+	/**
+	 * P3 (spec FR-31) — FL-04's session daemon and FL-12's commands ask this
+	 * before they spawn in a folder: the `docker run` argv that runs `command`
+	 * inside the checkout's container when the folder is a container-isolated
+	 * checkout, else null (run on the host as today).
+	 */
+	containerArgvFor(path: string, command: readonly string[], options?: { tty?: boolean }): Promise<string[] | null>;
 	/**
 	 * The paths of checkouts that are `ready` on this machine right now —
 	 * what the shared allowed-roots resolver reads (CONTRACTS R-39, R-41):
@@ -555,6 +571,20 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 		const source = params.source as
 			| { kind?: unknown; repoUrl?: unknown; parentPath?: unknown; credential?: unknown }
 			| undefined;
+		// P3 (spec FR-31, U11): container isolation is refused here — on Windows, or without Docker.
+		const container = params.isolation === 'container';
+		let containerImage: string | null = null;
+		if (container) {
+			const refusal = containerRefusal(platform, await (options.hasDocker ?? (() => detectDocker()))());
+			if (refusal) refuse('unsupported_on_node', refusal, { field: 'isolation' });
+			if (!isContainerImageReference(params.containerImage)) {
+				refuse('invalid', 'containerImage', { field: 'containerImage' });
+			}
+			containerImage = params.containerImage as string;
+		}
+		const sharedFolders = Array.isArray(params.sharedFolders)
+			? params.sharedFolders.filter((folder): folder is string => typeof folder === 'string').slice(0, 16)
+			: [];
 		const at = new Date(now()).toISOString();
 		return exclusive(context, target, 'create', async (signal) => {
 			let result: CheckoutGitResult;
@@ -575,9 +605,10 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 						origin: 'platform',
 						checkoutId: checkoutId!,
 						parentPath: null,
-						isolation: 'host',
+						isolation: container ? 'container' : 'host',
 						addedAt: at,
-						...(scoped ? {} : { anonymous: true })
+						...(scoped ? {} : { anonymous: true }),
+						...(containerImage ? { containerImage } : {})
 					};
 					const clone = (operation: CheckoutOperationOptions) => {
 						context.progress({ percent: 20, message: 'clone' });
@@ -615,14 +646,30 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 						origin: 'platform',
 						checkoutId: checkoutId!,
 						parentPath: parent.path,
-						isolation: 'host',
-						addedAt: at
+						isolation: container ? 'container' : 'host',
+						addedAt: at,
+						...(containerImage ? { containerImage } : {})
 					};
 					context.progress({ percent: 20, message: 'worktree' });
 					result = await addWorktree(
 						{ parentPath: mainPath, path: target, branch: branch as string, baseRef },
 						operationOptions(signal)
 					);
+					// P3 (spec FR-32): the parent's ignored folders, linked — never copied.
+					if (result.code === 0 && sharedFolders.length > 0) {
+						const linked = await linkSharedFolders(
+							{ parentPath: parent.path, worktreePath: target, folders: sharedFolders, platform },
+							git
+						);
+						const skipped = linked.filter((outcome) => !outcome.linked);
+						if (skipped.length > 0) {
+							options.logger?.warn(
+								`Shared folders not linked into ${target}: ${skipped
+									.map((outcome) => `${outcome.folder} (${outcome.reason})`)
+									.join(', ')}`
+							);
+						}
+					}
 				} else {
 					refuse('invalid', 'source must be a clone or a worktree', { field: 'source' });
 				}
@@ -737,6 +784,16 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 			'checkouts.sync': { stateChanging: true, run: sync },
 			'checkouts.create': { stateChanging: true, run: create },
 			'checkouts.delete': { stateChanging: true, run: remove }
+		},
+		async containerArgvFor(path, command, argvOptions = {}) {
+			const entry = await findEntry(path);
+			if (!entry || entry.isolation !== 'container' || !entry.containerImage) return null;
+			return containerRunArgv({
+				path: entry.path,
+				image: entry.containerImage,
+				command,
+				...(argvOptions.tty ? { tty: true } : {})
+			});
 		},
 		async readyPaths() {
 			const state = await loadState();

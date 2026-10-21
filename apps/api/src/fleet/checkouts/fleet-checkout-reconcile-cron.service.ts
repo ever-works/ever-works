@@ -3,9 +3,10 @@ import { Cron } from '@nestjs/schedule';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { config } from '@ever-works/agent/config';
 import { FleetCheckoutReconcileService } from '@ever-works/agent/fleet';
-import { FLEET_CHECKOUT_RECONCILE_CRON } from '@ever-works/contracts';
+import { FLEET_CHECKOUT_BIN_PURGE_CRON, FLEET_CHECKOUT_RECONCILE_CRON } from '@ever-works/contracts';
 
 const FLEET_CHECKOUT_RECONCILE_LOCK_KEY = 'fleet-checkouts:reconcile';
+const FLEET_CHECKOUT_BIN_PURGE_LOCK_KEY = 'fleet-checkouts:bin-purge';
 
 /**
  * Checkouts on computers (FL-14, plan §10, T-15) — the reconcile sweep when
@@ -55,6 +56,34 @@ export class FleetCheckoutReconcileCronService {
                 onLocked: () =>
                     this.logger.debug(
                         'Skipping fleet-checkout-reconcile pass because another instance holds the task lock',
+                    ),
+            },
+        );
+    }
+
+    /** P3 (spec FR-33): the daily bin purge, same posture as the reconcile pass. */
+    @Cron(FLEET_CHECKOUT_BIN_PURGE_CRON)
+    async runBinPurge(): Promise<void> {
+        if (config.trigger.shouldUseTrigger()) return;
+        if (!config.fleet.isCheckoutsEnabled()) return;
+        await this.taskLockService.runExclusive(
+            FLEET_CHECKOUT_BIN_PURGE_LOCK_KEY,
+            async () => {
+                try {
+                    const summary = await this.reconciler.purgeBin();
+                    if (summary.purged > 0) {
+                        this.logger.log(`fleet-checkout-bin-purge: ${summary.purged} bin row(s) purged`);
+                    }
+                } catch (error) {
+                    const stack = error instanceof Error ? error.stack : String(error);
+                    this.logger.error('fleet-checkout-bin-purge pass failed', stack);
+                }
+            },
+            {
+                ttlMs: 30 * 60 * 1000,
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping fleet-checkout-bin-purge because another instance holds the task lock',
                     ),
             },
         );

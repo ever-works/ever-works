@@ -170,6 +170,16 @@ export class CreateFleetCheckoutDto {
     @IsOptional()
     @IsIn(FLEET_CHECKOUT_ISOLATIONS as unknown as string[])
     isolation?: FleetCheckoutIsolation;
+
+    @ApiProperty({
+        required: false,
+        type: [String],
+        description: 'Worktrees only: ignored folders of the parent linked (not copied) into the new worktree.',
+    })
+    @IsOptional()
+    @IsString({ each: true })
+    @MaxLength(255, { each: true })
+    sharedFolders?: string[];
 }
 
 /** What the person saw in the delete preview (optional: the node re-checks against it). */
