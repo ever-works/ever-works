@@ -130,6 +130,7 @@ import {
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
+    FleetVirtualService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2164,6 +2165,10 @@ async function assertRealWriteTarget(
                 //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
                 { token: FleetNodeHealthService, optional: true },
                 { token: NeedsALookService, optional: true },
+                // Virtual computers (FL-16) — backs `fleet_virtual_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_VIRTUAL_ENABLED off) the
+                // five tools are not offered; create / stop / destroy only ever file an approval.
+                { token: FleetVirtualService, optional: true },
                 // Tasks on computers (FL-15 P3) — backs `fleet_tasks_handoff_options` and
                 // `fleet_nodes_git_identity_*`. APPENDED LAST (positional), optional:
                 // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
@@ -2203,6 +2208,7 @@ async function assertRealWriteTarget(
                 fleetLogs?: FleetLogsReaderPort | null,
                 fleetHealth?: FleetNodeHealthService | null,
                 needsALook?: NeedsALookService | null,
+                fleetVirtual?: FleetVirtualService | null,
                 fleetTaskHandoff?: FleetTaskHandoffService | null,
                 fleetGitIdentity?: FleetGitIdentityService | null,
             ): AgentDomainToolSources => ({
@@ -2249,6 +2255,7 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

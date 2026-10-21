@@ -66,3 +66,5 @@ export * from './git';
 // Tasks on computers (FL-15 P3) — the hand-off and identity Agent tools.
 export * from './agent-fleet-task-tools';
 export * from './ports';
+// Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
+export * from './virtual';

@@ -12,7 +12,10 @@ import type {
 	FleetJobPushCredentialResponse,
 	FleetJobView,
 	FleetRunEnvFileContent,
-	FleetRunEnvFileRequestRef
+	FleetRunEnvFileRequestRef,
+	FleetVirtualEnrollTokenResponse,
+	FleetVirtualPhase,
+	FleetVirtualState
 } from '@ever-works/contracts';
 import { FleetClientError, joinUrl, normalizeApiUrl, type FetchLike, type FetchRequestInit } from './fleet-client';
 import type { Logger } from './logger';
@@ -412,6 +415,58 @@ export class FleetJobClient {
 			this.logger?.protect(push.token);
 		}
 		return payload;
+	}
+
+	// ── Virtual computers (FL-16) — the host's two calls while it builds a child ──
+	//
+	// Under `api/internal/fleet/virtual`, the push-credential posture exactly:
+	// the node credential in the body, the job this node holds and its lease
+	// generation, one undifferentiated 401 for every refusal, 409 stale-lease.
+
+	/**
+	 * Virtual computers (FL-16, CONTRACTS R-35) — the guest said it is ready:
+	 * mint its one-time enrolment token. Returned once; protected in the
+	 * logger before this method returns, and never stored on this client.
+	 */
+	async mintVirtualEnrollToken(
+		childNodeId: string,
+		jobId: string,
+		leaseGeneration?: number
+	): Promise<FleetVirtualEnrollTokenResponse> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId };
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+		const payload = (await this.post(
+			`api/internal/fleet/virtual/${encodeURIComponent(childNodeId)}/enroll-token`,
+			'virtual-enroll-token',
+			body
+		)) as FleetVirtualEnrollTokenResponse;
+		if (!payload || typeof payload.token !== 'string' || payload.token.length < 16) {
+			throw new FleetClientError('malformed', 'Enrolment token response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return payload;
+	}
+
+	/** Virtual computers (FL-16) — one progress report (phase, state, first failure line, image). */
+	async reportVirtualProgress(
+		childNodeId: string,
+		jobId: string,
+		report: {
+			phase?: FleetVirtualPhase;
+			state?: FleetVirtualState;
+			error?: string | null;
+			image?: { ref: string; digest: string | null } | null;
+			activated?: boolean | null;
+		},
+		leaseGeneration?: number
+	): Promise<void> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId, ...report };
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+		await this.post(
+			`api/internal/fleet/virtual/${encodeURIComponent(childNodeId)}/progress`,
+			'virtual-progress',
+			body
+		);
 	}
 
 	// ── Agent computers — the live-view publish leg ─────────────────────
