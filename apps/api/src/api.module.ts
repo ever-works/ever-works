@@ -77,6 +77,7 @@ import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.modu
 import { FleetCommandsApiModule } from './fleet/commands/fleet-commands-api.module';
 import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
+import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
@@ -330,6 +331,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // the node link: the checkout routes, the link adapter and listener,
         // and the reconcile fallback. Dark unless FLEET_CHECKOUTS_ENABLED.
         FleetCheckoutsApiModule,
+        // Virtual computers (FL-16) — Containers (and, later, Windows VMs) created
+        // on a computer of the Fleet: the routes, the host-facing token mint and
+        // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
+        FleetVirtualApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
