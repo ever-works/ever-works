@@ -157,6 +157,7 @@ import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
 import { ComputerSession } from '../entities/computer-session.entity';
 import { FleetSession } from '../entities/fleet-session.entity';
+import { FleetPortTunnel } from '../entities/fleet-port-tunnel.entity';
 import { FleetCheckout } from '../entities/fleet-checkout.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
@@ -444,6 +445,7 @@ export const ENTITIES = [
     // Sessions on computers (FL-04) — persistent interactive processes on a
     // Node, owned by its session daemon; one row per session.
     FleetSession,
+    FleetPortTunnel,
     // Checkouts on computers (FL-14) — clones and worktrees on a Node; one
     // row per (node, path).
     FleetCheckout,

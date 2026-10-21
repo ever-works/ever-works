@@ -227,6 +227,11 @@ export interface FleetPortsListResponse extends FleetPortsList {
 	targets: Record<FleetPortOpenTarget, FleetPortOpenTargetState>;
 	/** What **Open** does by default (R-3: the desktop when available, else the preview browser), or null. */
 	defaultTarget: FleetPortOpenTarget | null;
+	/**
+	 * Phase 2: whether **Preview in my browser** is offered here (`FLEET_PORT_TUNNEL_ENABLED`, a preview host,
+	 * the `ports` audience), and the viewer's own open tunnels to this computer (the rows' "previewing" state).
+	 */
+	tunnel?: { available: boolean; open: FleetPortTunnelView[] };
 }
 
 /** What the platform answers `POST /nodes/:id/ports/:port/open` with. */
@@ -629,6 +634,39 @@ export interface FleetPortTunnelErrorEnvelope {
 	hint: string;
 }
 
+/** What `POST|GET /api/fleet/nodes/:id/ports/:port/preview` answers a person with. */
+export interface FleetPortTunnelOpenResponse {
+	tunnel: FleetPortTunnelView;
+	/**
+	 * The address to open in a new browser tab: the tunnel's URL with a 60-second, single-use hand-off token
+	 * (`?t=…`, R-17's fallback) that the preview host trades for its own cookie. Absent for an Agent: an Agent
+	 * is never handed a way in (spec U15).
+	 */
+	openUrl?: string;
+}
+
+/**
+ * A tunnel body chunk on the link (`DATA` / `END` payloads): `[request u32][bytes…]`. Several requests share
+ * one `tunnel` channel at once (a page loads its assets in parallel), so every chunk names its request. The
+ * JSON envelopes carry the same number as their `requestId` (decimal).
+ */
+export function encodeFleetPortTunnelChunk(request: number, bytes: Uint8Array = new Uint8Array(0)): Uint8Array {
+	const out = new Uint8Array(4 + bytes.byteLength);
+	new DataView(out.buffer).setUint32(0, request >>> 0, false);
+	out.set(bytes, 4);
+	return out;
+}
+
+/** The request number and bytes of a tunnel chunk, or null for a payload too short to carry one. */
+export function decodeFleetPortTunnelChunk(payload: Uint8Array): { request: number; bytes: Uint8Array } | null {
+	if (!(payload instanceof Uint8Array) || payload.byteLength < 4) return null;
+	const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+	return { request: view.getUint32(0, false), bytes: payload.subarray(4) };
+}
+
+/** Requests one `tunnel` channel carries at once; more answer 503 from the platform. */
+export const FLEET_PORT_TUNNEL_MAX_INFLIGHT = 32;
+
 /** HTTP methods a tunnel forwards. */
 export const FLEET_PORT_TUNNEL_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 
@@ -655,6 +693,45 @@ export const FLEET_PORT_TUNNEL_DROPPED_REQUEST_HEADERS: readonly string[] = [
 	'forwarded',
 	'cf-connecting-ip'
 ];
+
+/** Response headers never passed back through a tunnel: hop-by-hop headers (the platform frames its own). */
+export const FLEET_PORT_TUNNEL_DROPPED_RESPONSE_HEADERS: readonly string[] = [
+	'connection',
+	'keep-alive',
+	'proxy-connection',
+	'transfer-encoding',
+	'te',
+	'trailer',
+	'upgrade',
+	'proxy-authenticate'
+];
+
+/**
+ * Copy a header map keeping only string / string[] values, lower-cased names,
+ * without the names in `dropped`, and within {@link FLEET_PORT_TUNNEL_MAX_HEADER_BYTES}
+ * as JSON (headers past the budget are dropped, the first ones kept).
+ */
+export function filterFleetPortTunnelHeaders(
+	headers: Record<string, unknown>,
+	dropped: readonly string[]
+): Record<string, string | string[]> {
+	const blocked = new Set(dropped);
+	const out: Record<string, string | string[]> = {};
+	let budget = FLEET_PORT_TUNNEL_MAX_HEADER_BYTES;
+	for (const [rawName, value] of Object.entries(headers)) {
+		const name = rawName.toLowerCase();
+		if (blocked.has(name) || !/^[a-z0-9!#$%&'*+.^_`|~-]{1,128}$/.test(name)) continue;
+		let kept: string | string[] | null = null;
+		if (typeof value === 'string') kept = value;
+		else if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) kept = value as string[];
+		if (kept === null) continue;
+		const cost = name.length + JSON.stringify(kept).length + 4;
+		if (cost > budget) continue;
+		budget -= cost;
+		out[name] = kept;
+	}
+	return out;
+}
 
 /**
  * The `cookie` header without the preview host's own cookies (`ew_*`) and the
