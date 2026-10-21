@@ -81,7 +81,7 @@ import {
     FleetSessionRepository,
     type FleetSessionListQuery,
 } from './fleet-session.repository';
-import { toFleetSessionView } from './fleet-session.view';
+import { toFleetSessionGitRef, toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
 import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
 import { FleetSessionStateService } from './fleet-session-state.service';
@@ -296,12 +296,39 @@ export class FleetSessionService {
         options: { includeScreen?: boolean } = {},
     ): Promise<FleetSessionView[]> {
         const views = rows.map((row) => toFleetSessionView(row, options));
+        // FL-06 (spec FR-1, FR-6): the checkout each session works in, with its git line.
+        await this.withGit(views);
         const runIds = rows.map((row) => row.agentRunId).filter((id): id is string => !!id);
         if (runIds.length === 0 || !this.taskRules) return views;
         const refs = await this.taskRules.refsForRuns(runIds);
         for (const view of views) {
             const ref = view.agentRunId ? refs.get(view.agentRunId) : undefined;
             if (ref) view.task = ref;
+        }
+        return views;
+    }
+
+    /**
+     * FL-06 (spec FR-1, FR-6): each view's checkout — its git line with the
+     * platform-resolved pull request (CONTRACTS §4.7) — in one batched read.
+     * A failed read leaves the git lines off, never the list.
+     */
+    private async withGit(views: FleetSessionView[]): Promise<FleetSessionView[]> {
+        const ids = views.map((view) => view.checkoutId).filter((id): id is string => !!id);
+        if (ids.length === 0 || !this.checkouts) return views;
+        try {
+            const rows = await this.checkouts.findByIds(ids);
+            const byId = new Map(rows.map((row) => [row.id, row]));
+            for (const view of views) {
+                const row = view.checkoutId ? byId.get(view.checkoutId) : undefined;
+                view.git = row ? toFleetSessionGitRef(row) : null;
+            }
+        } catch (error) {
+            this.logger.debug(
+                `Checkouts of ${ids.length} sessions could not be read: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
         }
         return views;
     }
@@ -378,8 +405,9 @@ export class FleetSessionService {
         const columns: FleetSessionBoardResponse['columns'] = { needs_you: [], working: [], done: [], idle: [] };
         const movedAt = (view: FleetSessionView) =>
             Date.parse(view.stateChangedAt ?? view.lastActivityAt ?? view.createdAt) || 0;
-        for (const row of rows) {
-            const view = toFleetSessionView(row);
+        // FL-06: board cards carry the git line through the shared card (spec §5.8).
+        const views = await this.withGit(rows.map((row) => toFleetSessionView(row)));
+        for (const view of views) {
             const column = fleetSessionBoardColumn(view, now);
             if (column) columns[column].push(view);
         }

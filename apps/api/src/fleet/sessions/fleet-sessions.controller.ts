@@ -6,6 +6,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -19,6 +20,7 @@ import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+    FleetSessionGitService,
     FleetSessionService,
     type FleetSessionActor,
     type FleetSessionListQuery,
@@ -29,6 +31,7 @@ import {
     FLEET_SESSION_STARTS_PER_MINUTE,
     isFleetSessionLive,
     type FleetSessionAnswerResponse,
+    type FleetSessionBranchProposal,
     type FleetSessionBoardResponse,
     type FleetSessionAttachTokenResponse,
     type FleetSessionRecordingManifest,
@@ -50,6 +53,7 @@ import {
     RestartFleetSessionDto,
     StartFleetSessionDto,
 } from './dto/fleet-session.dto';
+import { FleetSessionBranchProposalQueryDto } from '../session-git/dto/fleet-session-git.dto';
 import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
 import { FleetSessionAttachService } from './fleet-session-attach.service';
 import { FleetSessionPresenceService } from './fleet-session-presence.service';
@@ -107,6 +111,8 @@ export class FleetSessionsController {
         private readonly attach: FleetSessionAttachService,
         private readonly presence: FleetSessionPresenceService,
         private readonly recordings?: FleetSessionRecordingService,
+        // FL-06: the branch proposal (FleetSessionGitApiModule is global; absent → 404).
+        @Optional() private readonly sessionGit?: FleetSessionGitService,
     ) {}
 
     @Get('nodes/:id/sessions')
@@ -193,6 +199,29 @@ export class FleetSessionsController {
         return this.sessions.listPage(actorOf(auth), {
             ...listQuery(query),
             ...(query.nodeId ? { nodeId: query.nodeId } : {}),
+        });
+    }
+
+    // FL-06 — declared ABOVE `sessions/:id` so the literal segment is never parsed as an id.
+    @Get('sessions/branch-proposal')
+    @ApiOperation({
+        summary:
+            'Propose the branch of a new session’s worktree: `<prefix>/<slug>` (the Agent’s slug, or my handle; the slug from the first message, the title, or a short generated name), never a name the repository ever had — on the remote or on any checkout of it, the bin included — with `-2`, `-3`, … and the reason. A session from a Task keeps the Task’s branch.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async branchProposal(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: FleetSessionBranchProposalQueryDto,
+    ): Promise<FleetSessionBranchProposal> {
+        if (!this.sessionGit) throw new NotFoundException();
+        return this.sessionGit.branchProposal(actorOf(auth), {
+            nodeId: query.nodeId,
+            checkoutId: query.checkoutId,
+            ...(query.agentId ? { agentId: query.agentId } : {}),
+            ...(query.firstMessage ? { firstMessage: query.firstMessage } : {}),
+            ...(query.title ? { title: query.title } : {}),
+            ...(query.taskId ? { taskId: query.taskId } : {}),
         });
     }
 

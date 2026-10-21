@@ -24,6 +24,7 @@
  */
 
 import type { FleetLinkConsentRequirement } from './fleet-link.types.js';
+import type { FleetSessionGitRef } from './fleet-session-actions.types.js';
 import type {
 	FleetSessionAttention,
 	FleetSessionHooks,
@@ -341,6 +342,13 @@ export interface FleetSessionView {
 	 * card's Task chip. Absent when the Run carries no Task.
 	 */
 	task?: FleetSessionTaskRef | null;
+	/**
+	 * The checkout the session works in (FL-06 spec FR-1, FR-6): its git line
+	 * with the platform-resolved pull request — the card's `gitLine` and
+	 * `prPill` slots and the detail header. Absent when the session records no
+	 * checkout, or on a platform that predates FL-06.
+	 */
+	git?: FleetSessionGitRef | null;
 }
 
 /** The Task a session's Run carries (FL-15, CONTRACTS R-22): `T-42` and its title. */

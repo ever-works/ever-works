@@ -15,12 +15,23 @@ import {
     type FleetSessionView,
 } from '@ever-works/contracts';
 import { listSessionAgentsAction } from '@/app/actions/fleet-sessions';
+import { createCheckoutAction } from '@/app/actions/fleet-checkouts';
+import { getHandoffCheckoutAction } from '@/app/actions/fleet-task-handoff';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { sessionsClient } from './sessions.client';
+import { SessionWhereStep, type SessionWhereChoice } from './SessionWhereStep';
+
+/** How long the dialog waits for a new worktree or clone to become ready (FL-06 S1: seconds on a warm repository). */
+const CHECKOUT_WAIT_MS = 120_000;
+const CHECKOUT_POLL_MS = 2_000;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 import {
     canStartAgentSession,
     canStartOwnerSession,
@@ -83,6 +94,9 @@ export function SessionStartDialog({
     const [agentId, setAgentId] = useState(initialAgentId ?? '');
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<SessionErrorRead | null>(null);
+    // FL-06 (spec FR-2): the Where step's checkout choice; `folder` is FL-04's free folder.
+    const [where, setWhere] = useState<SessionWhereChoice>({ mode: 'folder' });
+    const [creatingCheckout, setCreatingCheckout] = useState(false);
 
     useEffect(() => {
         if (!open) return;
@@ -138,19 +152,71 @@ export function SessionStartDialog({
         (who === 'owner' ? ownerAllowed : agentAllowed) &&
         agentReady &&
         !pending &&
-        cwd.trim().length > 0 &&
-        cwd.length <= FLEET_SESSION_CWD_MAX_LENGTH &&
+        (where.mode !== 'folder' || (cwd.trim().length > 0 && cwd.length <= FLEET_SESSION_CWD_MAX_LENGTH)) &&
         providerInstalled(node, provider);
+
+    /**
+     * FL-06 (spec FR-1, FR-2, S1): the checkout the session starts in — the
+     * chosen one, or a new worktree / clone created through Checkouts first
+     * and waited for until it is ready (one create path, one start path).
+     */
+    const resolveCheckout = async (): Promise<{ id: string; path: string } | null | 'failed'> => {
+        if (where.mode === 'folder') return null;
+        if (where.mode === 'existing') return { id: where.checkoutId, path: where.path };
+        setCreatingCheckout(true);
+        const created = await createCheckoutAction({
+            nodeId: node.id,
+            source:
+                where.mode === 'worktree'
+                    ? { kind: 'worktree', parentCheckoutId: where.parentCheckoutId }
+                    : { kind: 'clone', repoUrl: where.repoUrl },
+            branch: where.branch,
+        });
+        if (!created.success) {
+            setCreatingCheckout(false);
+            setError({
+                code: (created.code ?? 'internal') as SessionErrorRead['code'],
+                hint: created.hint,
+                details: created.details ?? {},
+                status: 0,
+            });
+            return 'failed';
+        }
+        let view = created.data.checkout;
+        const deadline = Date.now() + CHECKOUT_WAIT_MS;
+        while (view.state === 'creating' && Date.now() < deadline) {
+            await sleep(CHECKOUT_POLL_MS);
+            const again = await getHandoffCheckoutAction(view.id);
+            if (again.success) view = again.data;
+        }
+        setCreatingCheckout(false);
+        if (view.state !== 'ready') {
+            setError({
+                code: 'operation_failed',
+                hint: view.lastCommand?.stderrHead ?? t('start.checkoutNotReady', { state: view.state }),
+                details: {},
+                status: 0,
+            });
+            return 'failed';
+        }
+        return { id: view.id, path: view.path };
+    };
 
     const onSubmit = async (event: FormEvent) => {
         event.preventDefault();
         if (!canSubmit) return;
         setPending(true);
         setError(null);
+        const checkout = await resolveCheckout();
+        if (checkout === 'failed') {
+            setPending(false);
+            return;
+        }
         const result = await sessionsClient.start(node.id, {
             kind: who,
             provider,
-            cwd: cwd.trim(),
+            cwd: checkout ? checkout.path : cwd.trim(),
+            ...(checkout ? { checkoutId: checkout.id } : {}),
             ...(title.trim() ? { title: title.trim() } : {}),
             ...(who === 'agent' ? { agentId } : {}),
             ...(agentCli && firstMessage.trim() ? { firstMessage } : {}),
@@ -295,6 +361,18 @@ export function SessionStartDialog({
                             <legend className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                 {t('start.where')}
                             </legend>
+                            {/* FL-06 (spec FR-2, §5.6): a checkout, then Existing · New worktree · Fresh clone. */}
+                            <SessionWhereStep
+                                nodeId={node.id}
+                                nodeName={node.name}
+                                kind={who}
+                                agentId={who === 'agent' ? agentId || null : null}
+                                firstMessage={firstMessage}
+                                title={title}
+                                cwd={cwd}
+                                onCwdChange={setCwd}
+                                onChange={setWhere}
+                            />
                             <label className="block space-y-1 text-sm">
                                 <span className="text-text-muted dark:text-text-muted-dark">
                                     {t('start.folderLabel', { node: node.name })}
@@ -329,9 +407,11 @@ export function SessionStartDialog({
                                     ))}
                                 </div>
                             )}
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('start.inFolder')} · {t('start.worktreeLater')}
-                            </p>
+                            {where.mode === 'folder' ? (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('start.inFolder')} · {t('start.worktreeLater')}
+                                </p>
+                            ) : null}
                         </fieldset>
 
                         <label className="block space-y-1 text-sm">
@@ -397,7 +477,11 @@ export function SessionStartDialog({
                             {t('start.cancel')}
                         </Button>
                         <Button type="submit" disabled={!canSubmit} data-testid="fleet-session-start-submit">
-                            {pending ? t('start.starting') : t('start.submit')}
+                            {creatingCheckout
+                                ? t('start.creatingCheckout', { node: node.name })
+                                : pending
+                                  ? t('start.starting')
+                                  : t('start.submit')}
                         </Button>
                     </DialogFooter>
                 </form>
