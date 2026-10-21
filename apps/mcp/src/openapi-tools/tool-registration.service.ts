@@ -7,7 +7,14 @@ import { ApiClientService } from '../api-client/api-client.service.js';
 import { toMcpError } from '../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../api-client/fence-untrusted.js';
 import { WHITELIST, type WhitelistEntry } from './whitelist.js';
-import { MCP_PRIVILEGED_TOOLS_ENV, heldBackArgs, isHeldBack, mcpPrivilegedToolsEnabled } from './privileged-tools.js';
+import {
+	MCP_PRIVILEGED_TOOLS_ENV,
+	heldBackArgs,
+	heldBackValueNote,
+	heldBackValueRefusal,
+	isHeldBack,
+	mcpPrivilegedToolsEnabled
+} from './privileged-tools.js';
 
 // Security: the bundled/live-fetched OpenAPI spec is supply-chain-adjacent
 // (a tampered build artifact, or a MITM'd dev fetch, can inject text into
@@ -92,9 +99,9 @@ export class ToolRegistrationService {
 			// is the supply-chain-attackable source that reaches the LLM verbatim.
 			const specDescription = operation.summary || operation.description;
 			const description =
-				entry.description ||
-				(specDescription ? sanitizeSpecDescription(specDescription) : '') ||
-				`${entry.method} ${entry.path}`;
+				(entry.description ||
+					(specDescription ? sanitizeSpecDescription(specDescription) : '') ||
+					`${entry.method} ${entry.path}`) + heldBackValueNote(toolName, privilegedEnabled);
 			const parameters = this.withoutOmittedArgs(
 				this.converter.buildToolParameters(operation.pathParams, operation.queryParams, operation.requestBody),
 				entry,
@@ -106,7 +113,7 @@ export class ToolRegistrationService {
 				description,
 				parameters,
 				annotations: entry.annotations,
-				handler: this.createHandler(entry, operation)
+				handler: this.createHandler(entry, operation, toolName, privilegedEnabled)
 			});
 			count++;
 		}
@@ -169,7 +176,12 @@ export class ToolRegistrationService {
 		return parameters.omit(mask) as z.ZodObject<Record<string, z.ZodTypeAny>>;
 	}
 
-	private createHandler(entry: WhitelistEntry, operation: OpenApiOperation) {
+	private createHandler(
+		entry: WhitelistEntry,
+		operation: OpenApiOperation,
+		toolName: string = entry.toolName || this.generateToolName(entry.method, entry.path),
+		privilegedEnabled: boolean = mcpPrivilegedToolsEnabled()
+	) {
 		const pathParamNames = new Set(operation.pathParams.map((p) => p.name));
 		const queryParamNames = new Set(operation.queryParams.map((p) => p.name));
 		// Belt and braces for the schema-level omit above: if a transport ever
@@ -180,6 +192,13 @@ export class ToolRegistrationService {
 		const apiClient = this.apiClient;
 
 		return async (args: Record<string, unknown>) => {
+			// Works-security: a privileged argument VALUE (a dispatching Task move,
+			// an @mention that wakes an Agent) is refused while the switch is off.
+			// Nothing is sent upstream.
+			const refusal = heldBackValueRefusal(toolName, args ?? {}, privilegedEnabled);
+			if (refusal) {
+				return { content: [{ type: 'text' as const, text: refusal }], isError: true as const };
+			}
 			try {
 				let apiPath = entry.path;
 				const queryParams = new URLSearchParams();

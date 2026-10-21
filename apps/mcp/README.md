@@ -91,10 +91,12 @@ The API cannot tell an MCP client holding the owner's personal key (or a session
 | ----- | --------------------------------------- |
 | Deploy | `deploy_work` |
 | Plugin secrets / model routing | `enable_plugin`, `update_plugin_settings` |
-| Starts paid or autonomous work | `generate_items`, `update_items`, `update_schedule`, `run_scheduled_update`, `run_mission_now`, `resume_mission`, `build_idea`, `retry_idea`, `rebuild_idea`, `accept_idea`, `run_tasks_batch`, `run_task`, `activate_goal`, `update_goal_limits`, `run_agent_now`, `resume_agent`, `process_community_prs` |
+| Starts paid or autonomous work | `generate_items`, `update_items`, `update_schedule`, `run_scheduled_update`, `run_mission_now`, `resume_mission`, `clone_mission`, `build_idea`, `retry_idea`, `rebuild_idea`, `accept_idea`, `run_tasks_batch`, `run_task`, `activate_goal`, `update_goal_limits`, `run_agent_now`, `resume_agent`, `process_community_prs` |
 | Destroys or hides data | `delete_work`, `delete_mission`, `delete_task`, `discard_task_branch`, `delete_inbox_item`, `delete_comparison`, `remove_item` |
 
 The switch also governs two arguments: `create_task` / `update_task` do not offer or forward `agentId` and `scheduledAt` (who runs a Task and when) while it is off. And `kb.create` / `kb.update` file their documents as proposals (`reviewState: 'proposed'`, `source: 'agent'` on create; a content edit re-enters review) — the document feeds agent context once a person accepts it in the app; the API applies the same rule to every non-session credential (`KB_NON_SESSION_WRITES_PROPOSED`). The list lives in `src/openapi-tools/privileged-tools.ts`.
+
+Three more rules close the paths that would make a held-back run starter one call away (review of #2804): `create_mission` / `update_mission` do not offer or forward `schedule`, `autoBuildWorks` and `guardrailsOverride` (a one-shot Mission can still be filed and edited; a person starts it in the app); `transition_task` refuses a move to `in_progress`, `in_review` or `done` (those moves dispatch the Task's agents, its reviewers or its dependents; every other move still runs); and `post_task_chat_message` refuses a body with an `@mention` (a mention starts the mentioned Agent; the platform's mention grammar also matches an e-mail address, so write names without the @). A refused call sends nothing upstream and says which switch would allow it.
 
 ## Available Tools (127)
 

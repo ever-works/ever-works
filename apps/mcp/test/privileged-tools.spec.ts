@@ -8,8 +8,10 @@ import { McpConfigService } from '../src/config/mcp-config.service.js';
 import { WHITELIST } from '../src/openapi-tools/whitelist.js';
 import {
 	MCP_PRIVILEGED_ARGS,
+	MCP_PRIVILEGED_ARG_VALUES,
 	MCP_PRIVILEGED_TOOLS,
 	MCP_PRIVILEGED_TOOLS_ENV,
+	heldBackValueRefusal,
 	mcpPrivilegedToolsEnabled
 } from '../src/openapi-tools/privileged-tools.js';
 import { KbCreateTool } from '../src/tools/kb/create.js';
@@ -115,6 +117,7 @@ describe('MCP privileged tools switch', () => {
 		const whitelisted = new Set(WHITELIST.map((entry) => entry.toolName));
 		expect(Object.keys(MCP_PRIVILEGED_TOOLS).filter((name) => !whitelisted.has(name))).toEqual([]);
 		expect(Object.keys(MCP_PRIVILEGED_ARGS).filter((name) => !whitelisted.has(name))).toEqual([]);
+		expect(Object.keys(MCP_PRIVILEGED_ARG_VALUES).filter((name) => !whitelisted.has(name))).toEqual([]);
 	});
 
 	it.each([
@@ -133,6 +136,8 @@ describe('MCP privileged tools switch', () => {
 		'update_goal_limits',
 		'run_agent_now',
 		'resume_agent',
+		'resume_mission',
+		'clone_mission',
 		'delete_work',
 		'delete_mission',
 		'delete_task',
@@ -222,5 +227,185 @@ describe('MCP kb.create / kb.update land as proposals', () => {
 		expect(kbCreateAuthorship(true)).toEqual({});
 		expect(kbUpdateAuthorship({ body: 'x' }, true)).toEqual({});
 		expect(kbCreateAuthorship(false)).toEqual({ reviewState: 'proposed', source: 'agent' });
+	});
+});
+
+/**
+ * Review fix (2026-10-21): the held-back run starters must not be one call away
+ * through a registered tool. `transition_task` to a dispatching status starts
+ * agent runs, an `@mention` in Task chat starts the mentioned Agent, and a
+ * Mission `schedule` / `autoBuildWorks` sets up recurring paid runs.
+ */
+describe('MCP privileged argument values', () => {
+	const originalEnv = { ...process.env };
+	const TASK = '33333333-3333-4333-8333-333333333333';
+	const valueOperations: OpenApiOperation[] = [
+		{
+			operationId: 'Tasks_transition',
+			method: 'POST',
+			path: '/api/tasks/{id}/transition',
+			summary: 'Transition a Task.',
+			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
+			queryParams: [],
+			requestBody: {
+				type: 'object',
+				properties: { to: { type: 'string' }, force: { type: 'boolean' } },
+				required: ['to']
+			}
+		},
+		{
+			operationId: 'Tasks_postChat',
+			method: 'POST',
+			path: '/api/tasks/{id}/chat',
+			summary: 'Post a chat message.',
+			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
+			queryParams: [],
+			requestBody: { type: 'object', properties: { body: { type: 'string' } }, required: ['body'] }
+		},
+		{
+			operationId: 'Missions_create',
+			method: 'POST',
+			path: '/api/me/missions',
+			summary: 'Create a Mission.',
+			pathParams: [],
+			queryParams: [],
+			requestBody: {
+				type: 'object',
+				properties: {
+					description: { type: 'string' },
+					type: { type: 'string' },
+					schedule: { type: 'string' },
+					autoBuildWorks: { type: 'boolean' },
+					guardrailsOverride: { type: 'object' }
+				},
+				required: ['description']
+			}
+		},
+		{
+			operationId: 'Missions_clone',
+			method: 'POST',
+			path: '/api/me/missions/{id}/clone',
+			summary: 'Clone a Mission.',
+			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
+			queryParams: []
+		}
+	];
+	let registry: { registerTool: ReturnType<typeof vi.fn> };
+	let apiClient: ApiClientService;
+
+	const build = () => {
+		apiClient = new ApiClientService({
+			apiUrl: 'http://localhost:3100/api',
+			apiKey: 'ew_test_key'
+		} as McpConfigService);
+		registry = { registerTool: vi.fn() };
+		const loader = { getOperations: vi.fn(() => valueOperations) } as unknown as OpenApiLoaderService;
+		const service = new ToolRegistrationService(loader, new SchemaConverterService(), apiClient, registry as never);
+		service.registerTools();
+	};
+	const registered = (name: string) =>
+		registry.registerTool.mock.calls.find((call: unknown[]) => (call[0] as { name: string }).name === name)?.[0] as
+			| {
+					description: string;
+					parameters: z.ZodObject<Record<string, z.ZodTypeAny>>;
+					handler: (
+						a: Record<string, unknown>
+					) => Promise<{ isError?: boolean; content: Array<{ text: string }> }>;
+			  }
+			| undefined;
+
+	beforeEach(() => {
+		process.env = { ...originalEnv };
+		delete process.env[MCP_PRIVILEGED_TOOLS_ENV];
+	});
+	afterEach(() => {
+		process.env = originalEnv;
+		vi.restoreAllMocks();
+	});
+
+	it.each(['in_progress', 'in_review', 'done', 'IN_PROGRESS', ' done '])(
+		'off: transition_task to %j is refused and nothing is sent',
+		async (to) => {
+			build();
+			const tool = registered('transition_task');
+			expect(tool).toBeDefined();
+			const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: TASK });
+			const result = await tool!.handler({ id: TASK, to });
+			expect(result.isError).toBe(true);
+			expect(result.content[0].text).toContain(MCP_PRIVILEGED_TOOLS_ENV);
+			expect(spy).not.toHaveBeenCalled();
+		}
+	);
+
+	it.each(['backlog', 'todo', 'blocked', 'cancelled'])('off: transition_task to %s still runs', async (to) => {
+		build();
+		const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: TASK });
+		const result = await registered('transition_task')!.handler({ id: TASK, to });
+		expect(result.isError).toBeUndefined();
+		expect(spy).toHaveBeenCalledWith('POST', `/tasks/${TASK}/transition`, { to });
+	});
+
+	it('off: the transition_task description says which moves are held back', () => {
+		build();
+		expect(registered('transition_task')!.description).toContain('in_progress');
+		expect(registered('transition_task')!.description).toContain(MCP_PRIVILEGED_TOOLS_ENV);
+	});
+
+	it.each(['ping @builder-bot please', 'mail ops@example.com', 'hey @Nova'])(
+		'off: a Task chat post with a mention (%j) is refused',
+		async (body) => {
+			build();
+			const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'm1' });
+			const result = await registered('post_task_chat_message')!.handler({ id: TASK, body });
+			expect(result.isError).toBe(true);
+			expect(spy).not.toHaveBeenCalled();
+		}
+	);
+
+	it('off: a plain Task chat post still runs', async () => {
+		build();
+		const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'm1' });
+		await registered('post_task_chat_message')!.handler({ id: TASK, body: 'Looks good, thanks.' });
+		expect(spy).toHaveBeenCalledWith('POST', `/tasks/${TASK}/chat`, { body: 'Looks good, thanks.' });
+	});
+
+	it('off: create_mission neither offers nor forwards schedule / autoBuildWorks / guardrailsOverride', async () => {
+		build();
+		const tool = registered('create_mission');
+		expect(Object.keys(tool!.parameters.shape).sort()).toEqual(['description', 'type']);
+		const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'ms1' });
+		await tool!.handler({
+			description: 'find niches',
+			schedule: '0 9 * * *',
+			autoBuildWorks: true,
+			guardrailsOverride: { maxSpendCents: 999999 }
+		});
+		expect(spy).toHaveBeenCalledWith('POST', '/me/missions', { description: 'find niches' });
+	});
+
+	it('off: clone_mission is not registered', () => {
+		build();
+		expect(registered('clone_mission')).toBeUndefined();
+	});
+
+	it('on: every value and argument is available as before', async () => {
+		process.env[MCP_PRIVILEGED_TOOLS_ENV] = 'true';
+		build();
+		const spy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: TASK });
+		await registered('transition_task')!.handler({ id: TASK, to: 'in_progress' });
+		expect(spy).toHaveBeenLastCalledWith('POST', `/tasks/${TASK}/transition`, { to: 'in_progress' });
+		await registered('post_task_chat_message')!.handler({ id: TASK, body: '@builder-bot go' });
+		expect(spy).toHaveBeenLastCalledWith('POST', `/tasks/${TASK}/chat`, { body: '@builder-bot go' });
+		expect(Object.keys(registered('create_mission')!.parameters.shape)).toEqual(
+			expect.arrayContaining(['schedule', 'autoBuildWorks', 'guardrailsOverride'])
+		);
+		expect(registered('clone_mission')).toBeDefined();
+		expect(registered('transition_task')!.description).not.toContain(MCP_PRIVILEGED_TOOLS_ENV);
+	});
+
+	it('heldBackValueRefusal ignores arguments the client did not send', () => {
+		expect(heldBackValueRefusal('transition_task', { id: TASK }, false)).toBeNull();
+		expect(heldBackValueRefusal('transition_task', { to: 'in_progress' }, true)).toBeNull();
+		expect(heldBackValueRefusal('get_task', { to: 'in_progress' }, false)).toBeNull();
 	});
 });
