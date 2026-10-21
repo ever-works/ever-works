@@ -4,6 +4,7 @@ import { FLEET_STATUS_READER, FleetModule as AgentFleetModule } from '@ever-work
 import { PolicyModule } from '@ever-works/agent/policy';
 import { SafetyModule } from '@ever-works/agent/safety';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
+import { FleetConfirmationInterceptor } from './fleet-confirmation.interceptor';
 import { FleetStatusService } from './fleet-status.service';
 import { FleetToolsController } from './fleet-tools.controller';
 import { FleetToolsGateService } from './fleet-tools-gate.service';
@@ -14,7 +15,8 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
  *   - `FleetToolsController` — `GET /api/fleet/status`, `GET /api/fleet/tools/gate`;
  *   - `FleetStatusService` — the composition behind both `fleet_status` and the
  *     route, bound under `FLEET_STATUS_READER` for the Agent tool;
- *   - `FleetToolsGateService` — the per-family gate view of one Agent.
+ *   - `FleetToolsGateService` — the per-family gate view of one Agent;
+ *   - `FleetConfirmationInterceptor` — the uniform 409 `confirmation_required`.
  *
  * `@Global()` for the reason `FleetSessionsApiModule` documents: the api-side
  * `AgentsModule` binds `FLEET_STATUS_READER` into the Agent's domain tool
@@ -30,8 +32,10 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
         FleetStatusService,
         { provide: FLEET_STATUS_READER, useExisting: FleetStatusService },
         FleetToolsGateService,
+        // T-08 — the uniform `confirmation_required` answer, applied per family controller.
+        FleetConfirmationInterceptor,
         FleetEnabledGuard,
     ],
-    exports: [FleetStatusService, FLEET_STATUS_READER, FleetToolsGateService],
+    exports: [FleetStatusService, FLEET_STATUS_READER, FleetToolsGateService, FleetConfirmationInterceptor],
 })
 export class FleetToolsApiModule {}
