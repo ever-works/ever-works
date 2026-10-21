@@ -524,7 +524,12 @@ const LINK_EXPORTS = [
 	'encodeFleetLinkAck',
 	'decodeFleetLinkAck',
 	'encodeFleetLinkCloseReason',
-	'decodeFleetLinkCloseReason'
+	'decodeFleetLinkCloseReason',
+	// The computer-session leg over the link (FL-02 T-22).
+	'FLEET_LINK_COMPUTER_LEG_REQUEST',
+	'FLEET_LINK_COMPUTER_LEG_SOURCE',
+	'FLEET_LINK_COMPUTER_LEG_FRAME',
+	'FLEET_LINK_COMPUTER_LEG_WAIT_MS'
 ] as const;
 
 // Fleet operations (FL-02) — `fleet-operations.types.ts`.
@@ -729,7 +734,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 406 runtime symbols', () => {
+	it('exposes exactly these 410 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -806,7 +811,9 @@ describe('fleet barrel', () => {
 		// table and two helpers, in `fleet-jobs.types.ts` — an existing module.
 		// → 406 with opt-in self-update (FL-02 T-25): the error cap and the
 		// report's reader, in `fleet-node.types.ts` — an existing module.
-		expect(Object.keys(fleet)).toHaveLength(406);
+		// → 410 with the computer-session leg over the link (FL-02 T-22): its
+		// four wire constants, in `fleet-link.types.ts` — an existing module.
+		expect(Object.keys(fleet)).toHaveLength(410);
 	});
 
 	it.each([

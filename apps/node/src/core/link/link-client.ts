@@ -141,6 +141,13 @@ export interface NodeLink {
 	/** The kill-switch / drain state every module reads. */
 	readonly control: NodeLinkControlState;
 	readonly modules: ComposedNodeModules;
+	/**
+	 * Fleet node link (FL-02 T-22) — send a family's own channel-0 message to
+	 * the platform (`computer.leg`, FL-04's `session.event`, …). Only extension
+	 * types — never the link's own `link.*`, `channel.*` or `operation.*` —
+	 * and only while connected. False when it was not sent.
+	 */
+	sendControl(message: FleetLinkExtensionMessage): boolean;
 }
 
 /** Operation completions kept for the next link when none is up (bounded). */
@@ -250,6 +257,14 @@ class NodeLinkClient implements NodeLink {
 
 	getState(): NodeLinkState {
 		return { ...this.state, openChannels: this.mux.size };
+	}
+
+	sendControl(message: FleetLinkExtensionMessage): boolean {
+		if (this.closed || this.state.phase !== 'connected') return false;
+		const type = typeof message?.type === 'string' ? message.type : '';
+		// Only a family's own types: the link's vocabulary is the link's to send.
+		if (!/^[a-z]/.test(type) || /^(link|channel|operation)\./.test(type)) return false;
+		return this.mux.sendControl(message);
 	}
 
 	onChange(listener: (state: NodeLinkState) => void): () => void {

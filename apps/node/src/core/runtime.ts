@@ -23,6 +23,7 @@ import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
+import { ComputerLegBroker } from './link/computer-leg';
 import {
 	MANAGEMENT_LANE_CONCURRENCY,
 	MANAGEMENT_LANE_IDLE_POLL_MS,
@@ -676,8 +677,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	};
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, …) describe this process's consents, not the socket.
+	// Fleet node link (FL-02 T-22): a live view's inbound leg rides the link
+	// when the shell runs one — the broker matches the `desktop` channels the
+	// platform opens to the views that asked (the legacy leg stays the fallback).
+	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
 		...(options.linkModules ? { extra: options.linkModules } : {}),
+		...(computerLegs ? { computerLegs } : {}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -812,6 +818,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.now ? { now: io.now } : {})
 		});
 		runtime.link = link;
+		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
 			if (runtime.loop.acceptsField('consents')) {
@@ -1195,7 +1202,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	}
 
 	if (attendedCapture) {
-		const lane = createAttendedLane(config, io, options, environment, jobClientFor(), attendedCapture);
+		const lane = createAttendedLane(
+			config,
+			io,
+			options,
+			environment,
+			jobClientFor(),
+			attendedCapture,
+			computerLegs
+		);
 		runtime.attended = lane;
 		// The live-view lane leases through the same endpoint, so the same
 		// floor refuses it; hold it with the work lane.
@@ -1306,7 +1321,8 @@ function createAttendedLane(
 	options: CreateNodeRuntimeOptions,
 	environment: CapabilityEnvironment,
 	jobClient: FleetJobClient,
-	capture: AttendedCapture
+	capture: AttendedCapture,
+	computerLegs: ComputerLegBroker | null = null
 ): NonNullable<NodeRuntime['attended']> {
 	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
@@ -1349,7 +1365,10 @@ function createAttendedLane(
 				webSocketFactory,
 				logger: io.logger,
 				platform: environment.platform,
-				profileFs
+				profileFs,
+				// Fleet node link (FL-02 T-22): the view's leg over the link, when there is one.
+				...(computerLegs ? { linkLegs: computerLegs } : {}),
+				...(options.env ? { env: options.env } : {})
 			},
 			signal
 		)

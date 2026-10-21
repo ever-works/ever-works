@@ -1,4 +1,6 @@
+import type { ComputerLegBroker } from '../computer-leg';
 import { controlModule } from './control';
+import { createDesktopModule } from './desktop';
 import { createMachineModule, type MachineModuleOptions } from './machine';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
 
@@ -15,17 +17,29 @@ export const NODE_LINK_MODULES: readonly NodeModule[] = [];
 export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions, 'verb'> {
 	/** Extra modules after the list above (tests and embedders). */
 	extra?: readonly NodeModule[];
+	/**
+	 * Fleet node link (FL-02 T-22) — the runtime's live-view leg broker. With
+	 * it, the `desktop` family module (`./desktop`) is composed, carrying a
+	 * view's leg over the link; without it the family stays unclaimed.
+	 */
+	computerLegs?: ComputerLegBroker;
 }
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], ...machineOptions } = options;
+	const { extra = [], computerLegs, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
 		verb: (name) => composed?.machineVerb(name)
 	});
-	composed = composeNodeModules([controlModule, machine, ...NODE_LINK_MODULES, ...extra]);
+	composed = composeNodeModules([
+		controlModule,
+		machine,
+		...NODE_LINK_MODULES,
+		...(computerLegs ? [createDesktopModule(computerLegs)] : []),
+		...extra
+	]);
 	return composed;
 }
 
