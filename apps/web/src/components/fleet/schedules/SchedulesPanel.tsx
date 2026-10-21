@@ -226,7 +226,7 @@ export function SchedulesPanel({ node, nodes }: { node: FleetNodeView; nodes: Fl
                                     </span>
                                     <div className="flex flex-wrap gap-1">
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             size="sm"
                                             disabled={disabled || !schedule.linkUp || schedule.neverRuns !== null}
                                             title={!schedule.linkUp ? t('reasons.offline', { computer: node.name }) : undefined}
@@ -235,16 +235,16 @@ export function SchedulesPanel({ node, nodes }: { node: FleetNodeView; nodes: Fl
                                             {t('actions.runNow')}
                                         </Button>
                                         {schedule.enabled ? (
-                                            <Button variant="outline" size="sm" disabled={disabled} onClick={() => void act(schedule, 'pause')}>
+                                            <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'pause')}>
                                                 {t('actions.pause')}
                                             </Button>
                                         ) : (
-                                            <Button variant="outline" size="sm" disabled={disabled} onClick={() => void act(schedule, 'resume')}>
+                                            <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'resume')}>
                                                 {t('actions.resume')}
                                             </Button>
                                         )}
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             size="sm"
                                             disabled={disabled}
                                             onClick={() => setDialog({ mode: 'edit', initial: schedule, prefill: null })}
@@ -252,14 +252,14 @@ export function SchedulesPanel({ node, nodes }: { node: FleetNodeView; nodes: Fl
                                             {t('actions.edit')}
                                         </Button>
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             size="sm"
                                             disabled={disabled}
                                             onClick={() => setDialog({ mode: 'duplicate', initial: schedule, prefill: null })}
                                         >
                                             {t('actions.duplicate')}
                                         </Button>
-                                        <Button variant="outline" size="sm" disabled={disabled} onClick={() => void act(schedule, 'delete')}>
+                                        <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'delete')}>
                                             {t('actions.delete')}
                                         </Button>
                                     </div>

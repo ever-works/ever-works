@@ -134,7 +134,7 @@ export function NewNodeScheduleDialog({
                     <p className="text-xs">{t('confirmWhen', { cadence: confirmation.cadenceHuman })}</p>
                     <p className="text-xs font-medium text-warning">⚠ {t('sandbox')}</p>
                     <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setConfirmation(null)} disabled={busy}>
+                        <Button variant="secondary" size="sm" onClick={() => setConfirmation(null)} disabled={busy}>
                             {t('back')}
                         </Button>
                         <Button size="sm" onClick={() => void save(true)} disabled={busy} data-testid="fleet-schedule-confirm-yes">
@@ -292,7 +292,7 @@ export function NewNodeScheduleDialog({
                         </p>
                     ) : null}
                     <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>
+                        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
                             {t('cancel')}
                         </Button>
                         <Button size="sm" onClick={() => void save(false)} disabled={!ready || busy} data-testid="fleet-schedule-save">
