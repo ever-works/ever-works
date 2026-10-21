@@ -145,6 +145,8 @@ import {
     type AppsTierPolicy,
 } from './ports.js';
 import type {
+    AppDeclaredSpec,
+    AppDeclaredSpecRequest,
     AppVerificationSpec,
     AppVerificationSpecRequest,
     AppVerificationSpecSource,
@@ -473,6 +475,45 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
         return {
             input: withoutEnv(prepared.result.input),
             dependencyKinds: declaredDependencyKinds(prepared.spec),
+        };
+    }
+
+    /**
+     * The App spec's **declared** shape at one commit — components (replicas, probes, rollout
+     * deadlines), jobs, cron and smoke — with nothing render-time assembled: no Build, no image, no
+     * pull credential, no env, no hosts and no target policy.
+     *
+     * The lifecycle ops (`resume`, `status-refresh`, `job-run`) act on an App that is **already
+     * running**: what they need from the spec is what it declares, not a fresh render. The
+     * verification-shaped read above refuses a Build-backed App whose request names no Build
+     * (`no_green_build`), so a paused managed App could never be resumed to its declared replicas
+     * (`status_spec_unavailable`, prod 2026-10-20). This read cannot hit that refusal.
+     *
+     * `undefined` when the App spec cannot be read or is not deployable — never a guessed shape.
+     */
+    async readDeclaredSpec(request: AppDeclaredSpecRequest): Promise<AppDeclaredSpec | undefined> {
+        const workId = text(request?.workId);
+        const namespace = text(request?.namespace);
+
+        if (!workId || !namespace) {
+            return undefined;
+        }
+
+        const requestedCommit = text(request?.specCommitSha) || null;
+        const read = await this.readSpec(workId, requestedCommit);
+
+        if (read.status !== 'ready' || !read.snapshot?.spec) {
+            return undefined;
+        }
+
+        const body = read.snapshot.spec;
+
+        return {
+            specCommitSha: requestedCommit || text(read.snapshot.commitSha) || '',
+            components: componentInputs(body, namespace),
+            jobs: jobInputs(body),
+            cron: cronInputs(body),
+            smoke: smokeInputs(body),
         };
     }
 
