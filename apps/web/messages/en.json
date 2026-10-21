@@ -13765,6 +13765,23 @@
             }
         },
         "schedules": {
+            "unattendedCredentialNote": "Runs happen on {computer} using the Claude Code or Codex sign-in — or the API key — that is set up on that computer. Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a look until someone signs in on {computer} again.",
+            "agentSessions": {
+                "title": "Agent sessions",
+                "row": "{agent} · {cadence}",
+                "next": "next {when}",
+                "paused": "paused",
+                "openTask": "Open the task",
+                "costNote": "Each run appears in Runs with its cost like any other run."
+            },
+            "breaker": {
+                "pauseAll": "Pause all",
+                "confirm": "Pause {count, plural, one {# schedule} other {# schedules}} on {computer}? {running, plural, =0 {Nothing is running.} one {# run in flight finishes; nothing new starts.} other {# runs in flight finish; nothing new starts.}} Nothing is deleted.",
+                "done": "Paused {count, plural, one {# schedule} other {# schedules}} on {computer}.",
+                "undo": "Undo",
+                "undone": "Resumed {count, plural, one {# schedule} other {# schedules}}.",
+                "failed": "Could not pause the schedules on this computer."
+            },
             "tab": {
                 "zones": "{computer} keeps time in {zone} · you are in {viewerZone}",
                 "zonesUnknown": "{computer} has not reported its time zone yet, so its times read UTC · you are in {viewerZone}",
@@ -13826,6 +13843,22 @@
                 "delete": "Could not delete this schedule. Nothing was changed."
             },
             "dialog": {
+                "runs": "Runs",
+                "kindCommand": "A command",
+                "kindAgent": "An Agent session",
+                "agent": "Agent",
+                "agentReasons": {
+                    "pinnedElsewhere": "pinned to another computer",
+                    "notPinned": "not pinned to this computer — pin them on their Capabilities tab",
+                    "needsOrganization": "pinning needs an Organization"
+                },
+                "noPinnedAgent": "No Agent is pinned to {computer}. Pin one on its Capabilities tab first.",
+                "prompt": "Prompt",
+                "promptPlaceholder": "Triage the new issues in acme/api and label them",
+                "provider": "Agent CLI",
+                "checkout": "Checkout",
+                "checkoutHome": "home (~)",
+                "credentialTitle": "Sign-in on the computer",
                 "title": "New schedule on {computer}",
                 "editTitle": "Edit schedule on {computer}",
                 "copyOf": "{name} (copy)",
