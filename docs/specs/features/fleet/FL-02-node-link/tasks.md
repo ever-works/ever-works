@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-02-node-link`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) merged (#2748); web (T-16 … T-18) merged (#2827); T-22, T-24 … T-28 in PR 4 (#2832); T-29 (the full gates) is the owner's cascade under the fast-build rule
+**Status:** `In progress` — P1 (T-01 … T-15) merged (#2737); relay bus and viewers (T-19 … T-21, T-23) merged (#2748); web (T-16 … T-18) merged (#2827); T-22, T-24 … T-28 merged (#2832); T-29 (the full gates) is the owner's cascade under the fast-build rule
 **Last updated:** 2026-10-21
 
 ---
