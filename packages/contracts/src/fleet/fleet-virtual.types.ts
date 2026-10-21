@@ -456,8 +456,12 @@ export interface FleetVmCreatePayload {
 	cpus: number;
 	memoryGiB: number;
 	diskGiB: number | null;
-	/** The API the child enrols against (the platform's own public origin). */
-	apiUrl: string;
+	/**
+	 * The API the child enrols against. Absent / null = the API the HOST talks
+	 * to (its own enrolment), which is the right answer for every deployment
+	 * whose nodes reach one public origin.
+	 */
+	apiUrl?: string | null;
 }
 
 /** `vm-control` payload. */
@@ -471,8 +475,8 @@ export interface FleetVmControlPayload {
 	/** `resize` (phase 3). */
 	cpus?: number;
 	memoryGiB?: number;
-	/** `retry-enrollment` / `rebuild`: the API the child enrols against. */
-	apiUrl?: string;
+	/** `retry-enrollment` / `rebuild`: the API the child enrols against (absent = the host's). */
+	apiUrl?: string | null;
 }
 
 // ─── Progress and state (spec FR-13, §5.3) ──────────────────────────────────

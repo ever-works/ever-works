@@ -55,3 +55,5 @@ export * from './machine';
 // Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
 export * from './checkouts';
 export * from './ports';
+// Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
+export * from './virtual';

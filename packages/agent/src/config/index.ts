@@ -820,6 +820,20 @@ export const config = {
             );
         },
         /**
+         * Virtual computers (FL-16, CONTRACTS §9) — `FLEET_VIRTUAL_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/nodes/:id/virtual/**` route (and the node-facing
+         * `/api/internal/fleet/virtual/**`) answers 404, the reconcile sweep does
+         * nothing and no `vm-*` job is enqueued. Read per call: flipping it needs
+         * no restart. Children that already exist stay ordinary Nodes.
+         */
+        isVirtualEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_VIRTUAL_ENABLED === 'true'
+            );
+        },
+        /**
          * Checkouts on computers (FL-14 P3, spec §8b) — the image a
          * container-isolated checkout's sessions and commands run in
          * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work
