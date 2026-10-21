@@ -12811,6 +12811,125 @@
         }
     },
     "fleet": {
+        "checkouts": {
+            "hub": {
+                "title": "Checkouts on every computer",
+                "computerFilter": "Computer",
+                "allComputers": "All computers"
+            },
+            "tab": {
+                "title": "Checkouts on this computer"
+            },
+            "actions": {
+                "scan": "Scan now",
+                "scanAll": "Scan computers",
+                "scanning": "Scanning…",
+                "fetch": "Fetch",
+                "refresh": "Refresh",
+                "archive": "Archive",
+                "restore": "Restore",
+                "archiveConfirm": "Move to bin",
+                "cancel": "Cancel"
+            },
+            "bin": {
+                "toggle": "Bin ({count})",
+                "title": "Bin",
+                "empty": "The bin is empty."
+            },
+            "errorTitles": {
+                "notFound": "Not found",
+                "invalid": "Not possible",
+                "unreachable": "Not connected",
+                "consentMissing": "Not allowed on this computer",
+                "permissionDenied": "Not allowed",
+                "confirmationRequired": "Needs your confirmation",
+                "killSwitch": "All computers are stopped",
+                "limitExceeded": "Too many at once",
+                "unsupportedOnNode": "This computer cannot do this yet",
+                "busy": "Busy",
+                "operationFailed": "It did not finish",
+                "internal": "Something went wrong"
+            },
+            "states": {
+                "consentMissing": "Checkout management needs --manage on {name}. Run this on {name}:",
+                "offline": "{name} is offline — {count, plural, one {its # checkout is} other {its # checkouts are}} shown as last known ({age}).",
+                "lastKnown": "Shown as last known: {hint}",
+                "empty": "No checkouts yet. List a code folder on a computer and scan it.",
+                "loading": "Loading…"
+            },
+            "group": {
+                "unlinked": "No repository",
+                "work": "Work “{name}”",
+                "noWork": "no Work linked",
+                "count": "{count, plural, one {# checkout} other {# checkouts}} on {computers, plural, one {# computer} other {# computers}}"
+            },
+            "age": {
+                "unknown": "a while ago",
+                "m": "{value} min ago",
+                "h": "{value} h ago",
+                "d": "{value} d ago"
+            },
+            "codeFolders": {
+                "title": "Code folders",
+                "total": "Checkouts use {size} on disk",
+                "lastScan": "Last scan {age}",
+                "neverScanned": "Never scanned",
+                "ofCap": "{count} of {cap}",
+                "unknown": "Scan {name} to see the folders it lists.",
+                "none": "{name} lists no code folders yet, so only its Task worktrees are shown.",
+                "truncated": "{cap} or more — narrow the code folders on {name}.",
+                "setOnMachine": "Code folders are set on the machine itself, never from here:"
+            },
+            "row": {
+                "missing": "The folder is gone from {name}",
+                "creating": "Being created…",
+                "folderRemoved": "Folder removed",
+                "archived": "In the bin since {age}",
+                "taskRunning": "A Task run is working here",
+                "sessionRunning": "A session is working here",
+                "lastKnown": "Last known {age}",
+                "found": "Found {age}",
+                "seen": "Seen {age}",
+                "unknownComputer": "Unknown computer",
+                "taskBadge": "Task",
+                "containerBadge": "Container",
+                "credentialStripped": "The remote had an embedded credential — stripped",
+                "reaperNote": "{note}"
+            },
+            "confirmArchive": "Move {name} to the bin? The folder is not touched.",
+            "disabled": {
+                "scan": "Scanning needs the computer online with --manage",
+                "offline": "{name} is offline",
+                "consentMissing": "Needs --manage on {name}",
+                "notAllowed": "Only the owner of {name} can manage its checkouts",
+                "killSwitch": "All computers are stopped",
+                "missing": "The folder is gone",
+                "archived": "In the bin",
+                "creating": "Still being created",
+                "busy": "Something is working in this checkout",
+                "folderRemoved": "The folder was removed; it cannot be restored",
+                "taskWorktree": "Task worktrees are kept in sync by their runs"
+            },
+            "notices": {
+                "running": "Running on the computer…",
+                "fetchFailed": "Fetch failed (exit {code}): {line}",
+                "fetched": "Fetched",
+                "refreshed": "Refreshed"
+            },
+            "gitLine": {
+                "detached": "detached",
+                "worktree": "worktree",
+                "changes": "+{added} −{removed} · {files, plural, one {# file} other {# files}}",
+                "ahead": "↑{count}",
+                "aheadTitle": "{count, plural, one {# commit} other {# commits}} not on the remote yet",
+                "behind": "↓{count}",
+                "behindTitle": "{count, plural, one {# commit} other {# commits}} on the remote, not here",
+                "uncommitted": "● {count} uncommitted",
+                "clean": "✓ clean",
+                "pr": "PR #{number} ({state})",
+                "notRead": "git line not read yet"
+            }
+        },
         "palette": {
             "goToComputer": "Go to computer {name}"
         },
