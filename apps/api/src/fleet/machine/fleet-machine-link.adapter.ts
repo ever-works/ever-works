@@ -7,7 +7,13 @@ import {
     type FleetMachineNodeReply,
     type FleetMachineNodeRequest,
 } from '@ever-works/agent/fleet';
+import { isFleetOperationTerminal, makeFleetLinkError } from '@ever-works/contracts';
+import { FleetLinkException } from '../../fleet-link/fleet-link.errors';
 import { FleetLinkService } from '../../fleet-link/fleet-link.service';
+import { FleetOperationsService } from '../../fleet-link/fleet-operations.service';
+
+/** How often a waited-for operation is re-read. */
+const OPERATION_POLL_MS = 250;
 
 /**
  * Machine actions (FL-09) — `FLEET_MACHINE_NODE_PORT` over the node link
@@ -28,6 +34,7 @@ export class FleetMachineLinkAdapter implements FleetMachineNodePort {
     constructor(
         private readonly link: FleetLinkService,
         private readonly nodes: FleetNodeRepository,
+        private readonly operations: FleetOperationsService,
     ) {}
 
     async authorize(input: FleetMachineGateInput): Promise<FleetMachineNodeFacts> {
@@ -57,10 +64,30 @@ export class FleetMachineLinkAdapter implements FleetMachineNodePort {
             },
             timeoutMs: input.timeoutMs,
         });
-        if (outcome.operationId !== undefined) {
+        if (outcome.operationId === undefined) return { result: outcome.result };
+        if (!input.awaitOperationMs || input.awaitOperationMs <= 0) {
             return { operationId: outcome.operationId, operation: outcome.operation };
         }
-        return { result: outcome.result };
+        // The node turned it into an operation: wait for it (the record is kept by
+        // FleetOperationsService, readable by the person it belongs to).
+        const userId = input.caller.kind === 'user' ? input.caller.userId : input.caller.ownerUserId;
+        const deadline = Date.now() + input.awaitOperationMs;
+        let view = outcome.operation;
+        while (!isFleetOperationTerminal(view.state) && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, OPERATION_POLL_MS));
+            try {
+                view = this.operations.get(outcome.operationId, userId);
+            } catch {
+                break;
+            }
+        }
+        if (view.state === 'done') return { result: view.result };
+        if (isFleetOperationTerminal(view.state)) {
+            throw new FleetLinkException(
+                view.error ?? makeFleetLinkError('operation_failed', 'the computer did not finish it'),
+            );
+        }
+        return { operationId: outcome.operationId, operation: view };
     }
 
     async describe(nodeId: string): Promise<FleetMachineNodeFacts | null> {

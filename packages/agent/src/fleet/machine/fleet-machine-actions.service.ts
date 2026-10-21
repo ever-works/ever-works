@@ -69,8 +69,11 @@ import {
 /** How long a list waits for the machine (a Windows service read takes a few seconds). */
 export const FLEET_MACHINE_LIST_TIMEOUT_MS = 30_000;
 
-/** How long an act waits before the platform reports it as an operation (spec §6: ≤ 10 s P95). */
+/** How long the link waits for an act's first answer (a reply, or the node's operation id). */
 export const FLEET_MACHINE_ACTION_TIMEOUT_MS = 70_000;
+
+/** How long an act that became an operation is waited for before it is reported as one (spec §6: ≤ 10 s P95). */
+export const FLEET_MACHINE_ACTION_AWAIT_MS = 10_000;
 
 export interface FleetServiceActionInput {
     name: string;
@@ -106,6 +109,8 @@ interface ActSpec {
     /** Shown in `confirmation_required` (a `docker run` command line with values masked). */
     preview?: string;
     timeoutMs?: number;
+    /** 0 for an act that is ALWAYS an operation (a pull, Compose up): answer its id at once. */
+    awaitOperationMs?: number;
 }
 
 /** The outcome an error code is audited as: `failed` when the machine ran it and it failed. */
@@ -219,6 +224,7 @@ export class FleetMachineActionsService {
             stateChanging: false,
             params,
             timeoutMs: FLEET_MACHINE_LIST_TIMEOUT_MS,
+            awaitOperationMs: FLEET_MACHINE_LIST_TIMEOUT_MS,
         });
         if ('operationId' in reply && reply.operationId) {
             // A list never outlives the inline window on a healthy node; one that
@@ -294,6 +300,8 @@ export class FleetMachineActionsService {
                     acknowledgeBlastRadius: spec.fields?.acknowledgeBlastRadius === true,
                 },
                 timeoutMs: spec.timeoutMs ?? FLEET_MACHINE_ACTION_TIMEOUT_MS,
+                // A quick act answers with its result (spec §6: ≤ 10 s); a longer one is an operation.
+                awaitOperationMs: spec.awaitOperationMs ?? FLEET_MACHINE_ACTION_AWAIT_MS,
             });
         } catch (error) {
             const refusal = readFleetMachineError(error);

@@ -47,6 +47,13 @@ export interface FleetMachineGateInput {
 export interface FleetMachineNodeRequest extends FleetMachineGateInput {
     params: Record<string, unknown>;
     timeoutMs?: number;
+    /**
+     * A request the node turned into an operation (it ran past the link's 2 s
+     * inline window — a Windows process read, a slow restart) is waited for up
+     * to this long and answered with its result, so a list or a quick act is
+     * never handed an operation id. Past it the operation is returned as is.
+     */
+    awaitOperationMs?: number;
 }
 
 /** The node's answer: a result, or — for a request that ran over the inline window — its operation. */
