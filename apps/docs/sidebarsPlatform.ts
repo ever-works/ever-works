@@ -185,6 +185,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-hub',
 				// What each computer lets the platform do, and the one link it keeps.
 				'features/fleet-node-link',
+				// One command on several computers, from the hub or the CLI.
+				'features/fleet-commands',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.
