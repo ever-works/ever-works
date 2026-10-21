@@ -15,17 +15,34 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 const FleetHubFlagContext = createContext<boolean>(false);
 
+/** Logs on computers (FL-08): `FLEET_MACHINE_FACTS_ENABLED` (with the hub), for "Logs on <computer>". */
+const FleetMachineFactsFlagContext = createContext<boolean>(false);
+
 export function FleetHubFlagProvider({
     enabled,
+    machineFacts = false,
     children,
 }: {
     enabled: boolean;
+    /** FL-08: machine facts are on for this deployment (never without the hub). */
+    machineFacts?: boolean;
     children: ReactNode;
 }) {
-    return <FleetHubFlagContext.Provider value={enabled}>{children}</FleetHubFlagContext.Provider>;
+    return (
+        <FleetHubFlagContext.Provider value={enabled}>
+            <FleetMachineFactsFlagContext.Provider value={enabled && machineFacts}>
+                {children}
+            </FleetMachineFactsFlagContext.Provider>
+        </FleetHubFlagContext.Provider>
+    );
 }
 
 /** True when `FLEET_ENABLED` and `FLEET_HUB_ENABLED` are both on. */
 export function useFleetHubEnabled(): boolean {
     return useContext(FleetHubFlagContext);
+}
+
+/** True when the hub and `FLEET_MACHINE_FACTS_ENABLED` are both on (FL-08). */
+export function useFleetMachineFactsEnabled(): boolean {
+    return useContext(FleetMachineFactsFlagContext);
 }

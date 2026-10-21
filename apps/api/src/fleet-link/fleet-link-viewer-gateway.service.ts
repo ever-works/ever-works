@@ -68,6 +68,12 @@ export interface FleetLinkViewerObserver {
     inbound?(viewer: FleetLinkViewerHandle, bytes: number): void;
     /** Asked on every ping tick while open: false closes the viewer (it lost the right to watch). */
     stillAllowed?(viewer: FleetLinkViewerHandle): Promise<boolean>;
+    /**
+     * A JSON control message the NODE sent on the viewer's channel (FL-08: the
+     * logs batch's `logs.initial-done`, whose counts the audit row records).
+     * Called before the message is forwarded; never sees a `DATA` payload.
+     */
+    nodeMessage?(viewer: FleetLinkViewerHandle, message: Record<string, unknown>): void;
     /** The viewer is gone. */
     closed?(viewer: FleetLinkViewerHandle): void;
 }
@@ -246,13 +252,30 @@ export class FleetLinkViewerGatewayService
                 this.tellClosed(state);
                 return;
             }
+            const observer = state.observer;
+            // FL-08: an observer that reads the node's JSON messages sees each
+            // one before it is forwarded (bytes are never shown to it).
+            const events =
+                observer?.nodeMessage !== undefined
+                    ? {
+                          ...bridge.events,
+                          json: (message: Record<string, unknown>) => {
+                              try {
+                                  observer.nodeMessage?.(handle, message);
+                              } catch {
+                                  // an observer never breaks the stream
+                              }
+                              bridge.events.json?.(message);
+                          },
+                      }
+                    : bridge.events;
             const channel = await this.links.openChannel({
                 nodeId: claims.nodeId,
                 family: claims.family,
                 params,
                 caller: { kind: 'user', userId: claims.userId },
                 requirement: FleetLinkAttachService.requirementFor(claims.role, claims.requirement),
-                events: bridge.events,
+                events,
             });
             bridge.attach(channel);
             if (!bridge.isEnded && ws.readyState === ws.OPEN) {
