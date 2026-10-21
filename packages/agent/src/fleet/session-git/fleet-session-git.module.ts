@@ -2,10 +2,14 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { Agent } from '../../entities/agent.entity';
+import { AgentRunLog } from '../../entities/agent-run-log.entity';
+import { FleetAudit } from '../../entities/fleet-audit.entity';
 import { User } from '../../entities/user.entity';
+import { PolicyModule } from '../../policy/policy.module';
 import { FleetCheckoutsModule } from '../checkouts/fleet-checkouts.module';
 import { FleetModule } from '../fleet.module';
 import { FleetSessionsModule } from '../sessions/fleet-sessions.module';
+import { FleetSessionActionService } from './fleet-session-action.service';
 import { FleetSessionGitService } from './fleet-session-git.service';
 
 /**
@@ -25,9 +29,12 @@ import { FleetSessionGitService } from './fleet-session-git.service';
         FleetModule,
         FleetSessionsModule,
         FleetCheckoutsModule,
-        TypeOrmModule.forFeature([Agent, User]),
+        // P2: the merge policy's protected branches (a leaf module), the ledger
+        // rows of an Agent session's Run, and an owner session's audit rows.
+        PolicyModule,
+        TypeOrmModule.forFeature([Agent, User, AgentRunLog, FleetAudit]),
     ],
-    providers: [FleetSessionGitService, AgentRepository],
-    exports: [FleetSessionGitService],
+    providers: [FleetSessionGitService, FleetSessionActionService, AgentRepository],
+    exports: [FleetSessionGitService, FleetSessionActionService],
 })
 export class FleetSessionGitModule {}

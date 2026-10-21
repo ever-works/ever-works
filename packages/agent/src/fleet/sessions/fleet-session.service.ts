@@ -894,6 +894,53 @@ export class FleetSessionService {
         });
     }
 
+    /** FL-06: the platform holds this computer's link right now (spec U1). */
+    isReachable(nodeId: string): boolean {
+        return this.node?.isConnected(nodeId) ?? false;
+    }
+
+    /**
+     * FL-06 (spec FR-14, FR-24): type an action prompt into a live session —
+     * exactly what `sendInput` types (the agent's own permission prompts stay
+     * in force), with `source: 'action'` and the action id for the node's own
+     * log line. NO audit row here: the caller writes ONE `node.session.action`
+     * row with the delivery (spec FR-21). Resolves when the machine confirmed
+     * it typed the bytes; rejects with the CONTRACTS §8 refusal otherwise
+     * (`unreachable` when the link could not confirm it — "not delivered").
+     */
+    async typeAction(
+        session: FleetSession,
+        actor: FleetSessionActor,
+        data: string,
+        meta: { actionId: string; ledgerId?: string | null },
+    ): Promise<void> {
+        if (typeof data !== 'string' || data.length === 0 || data.length > 64 * 1024) {
+            throw fleetSessionError('invalid', 'the prompt is 1–64 KiB', { field: 'prompt' });
+        }
+        if (!isFleetSessionLive(session.state)) {
+            throw fleetSessionError('invalid', 'the session has ended; restart it first', { state: session.state });
+        }
+        if (await this.isStopped()) throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
+        if (!this.node?.isConnected(session.nodeId)) {
+            throw fleetSessionError('unreachable', 'the computer is not connected', { nodeId: session.nodeId });
+        }
+        await this.requireNode().request({
+            nodeId: session.nodeId,
+            sessionId: session.daemonSessionId,
+            kind: session.kind,
+            mode: 'driver',
+            verb: 'session.input',
+            params: {
+                data,
+                source: 'action',
+                actionId: meta.actionId,
+                ...(meta.ledgerId ? { ledgerId: meta.ledgerId } : {}),
+            },
+            caller: { kind: 'user', userId: actor.userId },
+            stateChanging: true,
+        });
+    }
+
     // ─── Attention (FL-05 P2, CONTRACTS §5.2, R-12, R-32) ───────────────────
 
     /** What a session asks right now (`fleet_sessions_question`, readOnly; spec S13). */

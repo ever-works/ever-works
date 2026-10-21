@@ -466,6 +466,13 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 							return;
 						}
 						observeInput(request.data);
+						// FL-06 (T-14): an action prompt carries `source: 'action'` and its id — logged here,
+						// typed byte-for-byte like any other input (the agent's own permission prompts stay).
+						if (request.source === 'action' && typeof request.actionId === 'string') {
+							options.logger?.info?.(
+								`Session ${params.sessionId}: action ${request.actionId.slice(0, 40)} typed (${request.data.length} chars)`
+							);
+						}
 						void control(requestId, 'input', { data: request.data }, 'could not send the input');
 						return;
 					}
