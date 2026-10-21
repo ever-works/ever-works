@@ -21,6 +21,19 @@ import {
     type PublishOptions,
 } from '../domain-events/domain-event-publisher.service';
 
+/**
+ * Works-security lane (integration API gates, finding 5) — an Idea's title or
+ * description edit refused because the Idea is no longer in a status that takes
+ * one (queued / building / accepted / failed: the build executor reads the
+ * description at run time). `status` is the Idea's status when it refused.
+ */
+export class IdeaNotEditableError extends Error {
+    constructor(readonly status: WorkProposalStatus) {
+        super(`The Idea is ${status}; its title and description can no longer change.`);
+        this.name = 'IdeaNotEditableError';
+    }
+}
+
 export interface CreateWorkProposalInput {
     userId: string;
     title: string;
@@ -322,9 +335,20 @@ export class WorkProposalRepository {
         id: string,
         userId: string,
         patch: { title?: string; description?: string },
+        // Works-security lane (integration API gates, finding 5) — the statuses an
+        // edit may land in (absent: any). Enforced in the write's own WHERE, so an
+        // Idea queued for build between the caller's check and this write is not
+        // rewritten; it throws {@link IdeaNotEditableError} instead.
+        editableStatuses?: readonly WorkProposalStatus[],
     ): Promise<WorkProposal | null> {
         const row = await this.repository.findOne({ where: { id, userId } });
         if (!row) return null;
+        if (editableStatuses && !editableStatuses.includes(row.status)) {
+            throw new IdeaNotEditableError(row.status);
+        }
+        const guard = editableStatuses
+            ? { id, userId, status: In([...editableStatuses]) }
+            : { id, userId };
         const set: Partial<Pick<WorkProposal, 'title' | 'description'>> = {};
         const previous: Record<string, unknown> = {};
         if (patch.title !== undefined && patch.title !== row.title) {
@@ -339,7 +363,11 @@ export class WorkProposalRepository {
         if (changedFields.length === 0) return row;
         const publisher = this.domainEvents;
         if (!publisher) {
-            await this.repository.update({ id, userId }, set);
+            const result = await this.repository.update(guard, set);
+            if (editableStatuses && result.affected === 0) {
+                const now = await this.repository.findOne({ where: { id, userId } });
+                throw new IdeaNotEditableError(now?.status ?? row.status);
+            }
             return this.repository.findOne({ where: { id, userId } });
         }
         // The edit and its `idea.updated` commit together (unlike the build lifecycle's
@@ -347,7 +375,11 @@ export class WorkProposalRepository {
         // `If-Match` version, which the publisher re-checks at the version bump, so a
         // stale write must roll back rather than land without its event.
         await publisher.transaction(async (manager) => {
-            await manager.getRepository(WorkProposal).update({ id, userId }, set);
+            const result = await manager.getRepository(WorkProposal).update(guard, set);
+            if (editableStatuses && result.affected === 0) {
+                // Rolls the transaction back: no `idea.updated` for a write that did not land.
+                throw new IdeaNotEditableError(row.status);
+            }
             await publisher.changed(manager, 'idea', id, 'idea.updated', {
                 changedFields,
                 previous,

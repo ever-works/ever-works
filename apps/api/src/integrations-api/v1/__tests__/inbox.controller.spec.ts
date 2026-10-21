@@ -54,8 +54,10 @@ describe('IntegrationInboxController', () => {
                 etag: `"${version}"`,
                 recipientUserId: RECIPIENT,
             })),
-            // Works-security lane 3a — merge approvals need `merges:decide`.
-            isMergeApproval: jest.fn().mockResolvedValue(false),
+            // Works-security lane 3a — merge approvals need `merges:decide`; the
+            // integration API gates lane — the other individual decisions need
+            // `decisions:individual` (or `merges:decide`).
+            decisionScopeOf: jest.fn().mockResolvedValue(null),
             recordRelayedDecision: jest.fn().mockResolvedValue(true),
         };
         const items = {
@@ -232,7 +234,7 @@ describe('IntegrationInboxController', () => {
         it('refuses a merge decision without merges:decide (403 scope_missing) and leaves it pending', async () => {
             const { controller, inbox, items } = setup();
             inbox.get.mockResolvedValue(mergeItem());
-            inbox.isMergeApproval.mockResolvedValue(true);
+            inbox.decisionScopeOf.mockResolvedValue('merge');
             const reply = controller.reply(
                 as(RECIPIENT),
                 'item-1',
@@ -258,7 +260,7 @@ describe('IntegrationInboxController', () => {
         it('relays a merge decision from a key that holds merges:decide, and records the relay', async () => {
             const { controller, inbox, items } = setup();
             inbox.get.mockResolvedValue(mergeItem());
-            inbox.isMergeApproval.mockResolvedValue(true);
+            inbox.decisionScopeOf.mockResolvedValue('merge');
             items.reply.mockResolvedValueOnce({
                 item: {},
                 routed: 'approved',
@@ -285,7 +287,7 @@ describe('IntegrationInboxController', () => {
         it('still requires act-as = the recipient before the scope is even considered', async () => {
             const { controller, inbox, items } = setup();
             inbox.get.mockResolvedValue(mergeItem());
-            inbox.isMergeApproval.mockResolvedValue(true);
+            inbox.decisionScopeOf.mockResolvedValue('merge');
             await expect(
                 controller.reply(
                     as(OTHER, ['merges:decide']),
@@ -296,6 +298,90 @@ describe('IntegrationInboxController', () => {
                 ),
             ).rejects.toMatchObject({ code: 'act_as_forbidden' });
             expect(items.reply).not.toHaveBeenCalled();
+        });
+    });
+
+    // Works-security lane (integration API gates, finding 6) — the approvals the
+    // platform never decides in bulk besides merges (an email-draft release, an
+    // agent's identity-file edit, an agent-proposed escalation closure) are
+    // relayed only by a key holding the opt-in `decisions:individual` scope (or
+    // `merges:decide`). `inbox:write` + act-as (a header the key sets) is not enough.
+    describe('individual-decision approvals', () => {
+        const fileEditItem = () => ({
+            dto: dto(1, { kind: 'approval', proposalId: 'file-edit-1' }),
+            etag: '"1"',
+            recipientUserId: RECIPIENT,
+        });
+
+        it('refuses an identity-file edit approval without decisions:individual (403) and decides nothing', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue(fileEditItem());
+            inbox.decisionScopeOf.mockResolvedValue('individual');
+            const reply = controller.reply(
+                as(RECIPIENT),
+                'item-1',
+                { optionId: 'approve' },
+                req(),
+                res(),
+            );
+            await expect(reply).rejects.toMatchObject({
+                code: 'scope_missing',
+                response: {
+                    error: {
+                        details: { missing: ['decisions:individual'], reason: 'individual_decision' },
+                    },
+                },
+            });
+            expect(items.reply).not.toHaveBeenCalled();
+            expect(inbox.recordRelayedDecision).not.toHaveBeenCalled();
+        });
+
+        it('relays it from a key holding decisions:individual, or merges:decide', async () => {
+            for (const scope of ['decisions:individual', 'merges:decide']) {
+                const { controller, inbox, items } = setup();
+                inbox.get.mockResolvedValue(fileEditItem());
+                inbox.decisionScopeOf.mockResolvedValue('individual');
+                items.reply.mockResolvedValueOnce({
+                    item: {},
+                    routed: 'approved',
+                    restart: 'none',
+                } as never);
+                await controller.reply(
+                    as(RECIPIENT, [scope]),
+                    'item-1',
+                    { optionId: 'approve' },
+                    req(),
+                    res(),
+                );
+                expect(items.reply).toHaveBeenCalled();
+                expect(inbox.recordRelayedDecision).toHaveBeenCalledWith(
+                    'file-edit-1',
+                    expect.objectContaining({ recipientUserId: RECIPIENT }),
+                );
+            }
+        });
+
+        it('decisions:individual does not stand in for merges:decide on a merge approval', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue(fileEditItem());
+            inbox.decisionScopeOf.mockResolvedValue('merge');
+            await expect(
+                controller.reply(
+                    as(RECIPIENT, ['decisions:individual']),
+                    'item-1',
+                    { optionId: 'approve' },
+                    req(),
+                    res(),
+                ),
+            ).rejects.toMatchObject({ code: 'scope_missing' });
+            expect(items.reply).not.toHaveBeenCalled();
+        });
+
+        it('an ordinary approval, a question or an escalation still needs inbox:write only', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.decisionScopeOf.mockResolvedValue(null);
+            await controller.reply(as(RECIPIENT), 'item-1', { text: 'go ahead' }, req(), res());
+            expect(items.reply).toHaveBeenCalled();
         });
     });
 
