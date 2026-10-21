@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     Param,
@@ -18,6 +19,7 @@ import type {
     FleetVirtualCreateResponse,
     FleetVirtualOperationResponse,
     FleetVirtualOptionsView,
+    FleetVirtualPasswordRevealResponse,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
@@ -28,6 +30,7 @@ import {
     FleetVirtualDestroyDto,
     FleetVirtualOptionsQueryDto,
     FleetVirtualPowerDto,
+    FleetVirtualRevealDto,
     virtualConfirmFields,
 } from './dto/fleet-virtual.dto';
 import { FleetVirtualEnabledGuard } from './fleet-virtual-enabled.guard';
@@ -164,6 +167,25 @@ export class FleetVirtualController {
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'destroy a virtual computer', REFUSAL_WHY);
         return this.virtual.destroy({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+    }
+
+    @Post('nodes/:id/virtual/:childId/password/reveal')
+    @ApiOperation({
+        summary:
+            'Reveal a Windows VM’s generated password once (owner only; never an Agent). It is read from the host’s keychain over the node link and never stored or logged by Ever Works; the audit log records who revealed it. Send `confirm: true`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Header('Cache-Control', 'no-store')
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    async revealPassword(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualRevealDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualPasswordRevealResponse> {
+        refuseMachinePrincipalAction(auth, req, 'reveal a virtual computer’s password', REFUSAL_WHY);
+        return this.virtual.revealPassword({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
     }
 
     @Post('nodes/:id/virtual/:childId/retry-enrollment')

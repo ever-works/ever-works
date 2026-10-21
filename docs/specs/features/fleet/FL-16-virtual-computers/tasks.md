@@ -6,7 +6,7 @@
 
 **Feature ID**: `FL-16-virtual-computers`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `P1 implemented` (lane log: `docs/internal/fleet/lanes/FL-16.md`)
+**Status**: `P1 + P2 implemented` (lane log: `docs/internal/fleet/lanes/FL-16.md`)
 **Last updated**: 2026-10-18
 
 ---
@@ -204,32 +204,32 @@
 
 # PHASE 2 — Windows VMs
 
-- [ ] **T-27**. Add `apps/node/src/core/link/modules/virtual/kvm-probe.ts` and advertise `kvm` in
+- [x] **T-27**. Add `apps/node/src/core/link/modules/virtual/kvm-probe.ts` and advertise `kvm` in
       `apps/node/src/core/capabilities.ts` (beside `docker`, L294): Linux x64 + R/W `/dev/kvm`.
       **Test**: extend `capabilities.spec.ts` — never on macOS/Windows/arm64; never without R/W access.
-- [ ] **T-28**. Add `apps/node/src/core/link/modules/virtual/windows-oem.ts` — first-boot step (install Node 26 +
+- [x] **T-28**. Add `apps/node/src/core/link/modules/virtual/windows-oem.ts` — first-boot step (install Node 26 +
       the published runtime, set the generated account password, wait for the token file in the OEM
       share, `enroll --token-file`, start-at-boot via the `install-service.ps1` logic as the generated
       account); write `ready.txt` when the step begins so the host requests the token (late mint).
       **Test**: `windows-oem.spec.ts` — no token or password literal in the generated files; the
       runtime is never registered as a built-in account.
-- [ ] **T-29**. Extend `vm-create.ts` with the Windows path: prechecks (`kvm`, ≥ 30 GB, x64 Linux),
+- [x] **T-29**. Extend `vm-create.ts` with the Windows path: prechecks (`kvm`, ≥ 30 GB, x64 Linux),
       `--env-file` for the password (0600, removed after start), loopback viewer port registration
       with FL-10's port module (`apps/node/src/core/link/modules/ports/`), phases `downloading Windows · installing · first boot`, token request on `ready.txt`.
       **Test**: extend `vm-create.spec.ts` — each precheck message; viewer bound to `127.0.0.1`
       only; password never in argv (`--env-file` path only).
-- [ ] **T-30**. Extend `vm-control.ts`: `docker stop -t 120` for VMs; destroy deletes the keychain
+- [x] **T-30**. Extend `vm-control.ts`: `docker stop -t 120` for VMs; destroy deletes the keychain
       entry; add the `vm.password.reveal` handler to `apps/node/src/core/link/modules/virtual/index.ts`
       reading the keychain once.
       **Test**: extend `vm-control.spec.ts` and `link/modules/virtual/index.spec.ts` — reveal returns
       the value once and logs nothing.
-- [ ] **T-31**. API: `password/reveal` (owner-only by default — spec §8b; requires `confirm: true`,
+- [x] **T-31**. API: `password/reveal` (owner-only by default — spec §8b; requires `confirm: true`,
       else 409 `confirmation_required`; 5/min; never cached — `Cache-Control: no-store`) and
       `retry-enrollment` routes in `fleet-virtual.controller.ts`; audit `node.vm.password.reveal`
       (CONTRACTS §7) with `extra.revealed: true`, never the value.
       **Test**: extend the controller spec — 403 for non-owners; 409 without `confirm`; audit row
       written; response body never appears in logs.
-- [ ] **T-32**. Web: Windows systems in the dialog (disk field, download/install note, activation
+- [x] **T-32**. Web: Windows systems in the dialog (disk field, download/install note, activation
       note), `RevealPasswordDialog.tsx` (60 s auto-hide), `Watch the install` button (opens the
       viewer port through FL-10's "open on the machine"), `not activated` chip.
       **Test**: `RevealPasswordDialog.unit.spec.tsx` — hides at 60 s; copy button present.

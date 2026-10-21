@@ -15,6 +15,9 @@ import {
 	VirtualHostError,
 	type VirtualHostDeps
 } from '../link/modules/virtual/host';
+import { posix } from 'node:path';
+import { WINDOWS_ENROLLED_MARKER, WINDOWS_READY_MARKER } from '../link/modules/virtual/windows';
+import { cleanUpWindows, handOverWindowsToken } from './vm-windows';
 
 /**
  * Virtual computers (FL-16, plan §6.1, T-17) — the host's `vm-control`
@@ -22,7 +25,8 @@ import {
  *
  *  - `start`  — `docker start`; the child's own heartbeat turns its row online.
  *  - `stop`   — `docker stop -t 10` for a Container (spec FR-27: within 10 s);
- *               a Windows VM gets 120 s to shut down (phase 2).
+ *               `-t 120` for a Windows VM, which Docker turns into an orderly
+ *               shutdown request before it powers off (phase 2).
  *  - `destroy` — `docker rm -f`, the child's home volume and EXACTLY its folder
  *               under the host's virtual data folder (spec S5: nothing else on
  *               the host is touched), then `gone` — the platform removes the
@@ -96,14 +100,32 @@ export function createVmControlExecutor(deps: VirtualHostDeps) {
 							if ((await containerState(deps, child)) !== 'gone') throw error;
 						}
 					);
-					await deps.runner.run('docker', homeVolumeRemoveArgs(child), { timeoutMs: DOCKER_STEP_TIMEOUT_MS });
-					await deps.state.removeChild(child);
+					if (kind === 'vm') {
+						// A VM's disk volume, its password in the keychain, its folder (P2, T-30).
+						await cleanUpWindows(deps, child);
+					} else {
+						await deps.runner.run('docker', homeVolumeRemoveArgs(child), { timeoutMs: DOCKER_STEP_TIMEOUT_MS });
+						await deps.state.removeChild(child);
+					}
 					await report(deps, job, child, { state: 'gone' });
 					return { childNodeId: child, state: 'gone' };
 				}
 				case 'retry-enrollment': {
 					if ((await containerState(deps, child)) !== 'running') {
 						throw new VirtualHostError('it is not running; start it first');
+					}
+					if (kind === 'vm') {
+						// Windows (P2, FR-24): the markers live in the shared folder; nothing is rebuilt.
+						const shared = deps.state.sharedDir(child);
+						if (await deps.state.exists(posix.join(shared, WINDOWS_ENROLLED_MARKER))) {
+							return { childNodeId: child, state: 'running', alreadyEnrolled: true };
+						}
+						if (!(await deps.state.exists(posix.join(shared, WINDOWS_READY_MARKER)))) {
+							throw new VirtualHostError('Windows has not finished its first boot yet');
+						}
+						await handOverWindowsToken(deps, job, child, signal);
+						await report(deps, job, child, { phase: 'online', state: 'running' });
+						return { childNodeId: child, state: 'running' };
 					}
 					if (await guestHasFile(deps, child, GUEST_ENROLLED_MARKER)) {
 						return { childNodeId: child, state: 'running', alreadyEnrolled: true };

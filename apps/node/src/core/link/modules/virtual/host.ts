@@ -13,6 +13,7 @@ import { DOCKER } from '../machine-facts/docker-cli';
 import { GUEST_TOKEN_FILE } from './container-bootstrap';
 import { guestRemoveFileArgs, guestTestFileArgs, guestWriteTokenArgs } from './docker-args';
 import type { VirtualState } from './state';
+import type { WindowsPasswordStore } from './windows';
 
 /**
  * Virtual computers (FL-16) — what the host's `vm-create` / `vm-control`
@@ -96,6 +97,15 @@ export interface VirtualHostDeps {
 	sleep(ms: number, signal?: AbortSignal): Promise<void>;
 	now(): number;
 	logger?: Logger;
+	/** This host's own name, for the sentences a refusal carries ("… on build-01"). */
+	nodeName?: string;
+	/** Windows VMs (P2): `process.platform` / `process.arch` of this host. */
+	platform?: string;
+	arch?: string;
+	/** Windows VMs (P2): whether `/dev/kvm` is usable here (re-checked before every build, FR-18). */
+	kvm?: () => boolean;
+	/** Windows VMs (P2): the generated passwords (keychain, or the owner-only file fallback). */
+	passwords?: WindowsPasswordStore | null;
 }
 
 /** A host step that failed: the message is the first line a person reads (spec U8). */

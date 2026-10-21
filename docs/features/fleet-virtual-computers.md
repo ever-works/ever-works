@@ -10,11 +10,11 @@ description: Create a Linux Container on a computer you already have in the Flee
 A computer you already have in the [Fleet hub](./fleet-hub.md) — a Linux or macOS machine with Docker — can create **more computers on itself**. Each new one runs the Ever Works node inside and enrols itself, so it appears in the Fleet as an ordinary computer: nested under its host, able to take work, host sessions, show its logs and services, and covered by the kill switch.
 
 - **Containers** (available now) — Ubuntu 26.04, Ubuntu 24.04, Debian 13, Fedora, Alpine or Arch Linux. A Container shares its host's kernel and has no init system of its own; it is ready in about a minute. Arch Linux needs an x86-64 host.
-- **Windows VMs** (a later phase) — Windows 11, Windows 10 and Windows Server, installed by a KVM-backed installer on a Linux x86-64 host. Only these are ever called VMs.
+- **Windows VMs** — Windows 11, Windows 10, Windows Server 2025 and 2022, installed by a KVM-backed installer image on a Linux x86-64 host that its operator set up for it (see [Windows VMs](#windows-vms)). Only these are ever called VMs.
 
 :::info Status: shipped behind a flag
 
-Containers ship behind `FLEET_VIRTUAL_ENABLED` (default off), on top of `FLEET_ENABLED` and `FLEET_HUB_ENABLED`. With it off every route answers 404 and the menu items are absent. Nothing here spends credits: a virtual computer uses its host's CPU, memory and disk.
+Containers and Windows VMs ship behind `FLEET_VIRTUAL_ENABLED` (default off), on top of `FLEET_ENABLED` and `FLEET_HUB_ENABLED`. With it off every route answers 404 and the menu items are absent. Nothing here spends credits: a virtual computer uses its host's CPU, memory and disk.
 
 :::
 
@@ -70,6 +70,20 @@ An Agent with the tools can list virtual computers and hosts (`fleet_virtual_lis
 ## Who may do what
 
 Creating, starting, stopping and destroying are the `machines` family of the host's control policy — the owner by default; an Organization admin when the owner allowed it. Everything is refused while the Fleet kill switch is on; running virtual computers keep running (they are computers like any other).
+
+## Windows VMs
+
+A Windows VM needs, on its host:
+
+- Linux on an x86-64 processor, with `/dev/kvm` readable and writable by the user the node runs as (the node then advertises `kvm`);
+- at least 30 GB free where Docker keeps its volumes;
+- a **Windows installer image** the host's operator chose: Ever Works ships none. Set `EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE` on the host to a KVM-backed Windows-in-a-container image (ideally pinned, `repository@sha256:…`) that takes the edition, size and account as `VERSION`, `RAM_SIZE`, `CPU_CORES`, `DISK_SIZE`, `USERNAME` and `PASSWORD`, keeps its disk in `/storage`, runs `/oem/install.bat` at first logon, shares a folder with Windows (`/shared`, seen as `\\host.lan\Data` — override with `EVER_WORKS_NODE_VIRTUAL_WINDOWS_SHARE_DIR` / `…_SHARE_UNC`) and shows its screen on port 8006. The node then advertises `virtual-windows`.
+
+Pick a Windows system and a disk (64, 128 or 256 GB). Windows downloads about 6 GB and installs itself in 15–30 minutes; the row shows the phases, and **Watch the install** opens the installer's screen on the host's own desktop (its viewer listens on the host's loopback only, never beyond it). At its first desktop a first-boot step installs Node.js and the node runtime, enrols with a token minted at that moment, and registers the runtime to start at boot as the VM's own account.
+
+- **Password.** The account's password is generated on the host (24 characters) and kept only in the host's OS keychain (or an owner-only file next to the node's configuration when the host has no keychain). **Copy password** reveals it once, for 60 seconds, to the host's owner only — never to an Organization admin, never to an Agent — and the audit log records who revealed it.
+- **Activation.** Windows stays **not activated** until you add a product key inside Windows. Activation is yours; Ever Works ships no key.
+- **Stop** asks Windows to shut down and gives it two minutes before powering off.
 
 ## Updating images
 

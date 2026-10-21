@@ -821,7 +821,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// folders (bootstrap, meta, the catalogue lock) beside the config. A
 		// Windows host never hosts virtual computers (spec U4).
 		...(deps.platform !== 'win32'
-			? { virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual') }
+			? {
+					virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual'),
+					// Windows VM passwords (FL-16 P2) live in the same keychain as the node credential.
+					virtualSecrets: deps.secrets ?? null
+				}
 			: {})
 	});
 	// The daemon starts with the node, before the first beat, so that beat can

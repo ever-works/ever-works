@@ -1,5 +1,7 @@
 import {
+	FLEET_KVM_CAPABILITY,
 	FLEET_VIRTUAL_HOST_CAPABILITY,
+	FLEET_VIRTUAL_WINDOWS_CAPABILITY,
 	makeFleetLinkError,
 	type FleetVirtualListResult,
 	type FleetVirtualMachineFact
@@ -9,6 +11,7 @@ import { DOCKER, parseDockerLabels, parseJsonLines } from './machine-facts/docke
 import { createMachineCommandRunner } from './machine-facts/exec';
 import { containerListArgs, isChildNodeId, VIRTUAL_CHILD_LABEL } from './virtual/docker-args';
 import type { VirtualState } from './virtual/state';
+import { resolveWindowsImage, type WindowsPasswordStore } from './virtual/windows';
 import { MachineVerbError, type NodeModule } from './registry';
 
 /**
@@ -30,6 +33,12 @@ import { MachineVerbError, type NodeModule } from './registry';
 export interface VirtualModuleDeps {
 	state: VirtualState;
 	runner?: CommandRunner;
+	/** Windows VMs (P2): whether `/dev/kvm` is usable here (the `kvm` tag). */
+	kvm?: () => boolean;
+	/** Windows VMs (P2): the node's environment (an operator-configured installer image → `virtual-windows`). */
+	env?: NodeJS.ProcessEnv;
+	/** Windows VMs (P2): the generated passwords, for `vm.password.reveal`. */
+	passwords?: WindowsPasswordStore | null;
 }
 
 /** A container's `State` column → the fact's state. */
@@ -40,7 +49,7 @@ function factState(state: string): FleetVirtualMachineFact['state'] {
 }
 
 /** Every child this machine hosts (containers by label, plus folders whose container is gone). */
-export async function listVirtualMachines(deps: Required<VirtualModuleDeps>): Promise<FleetVirtualListResult> {
+export async function listVirtualMachines(deps: { state: VirtualState; runner: CommandRunner }): Promise<FleetVirtualListResult> {
 	const result = await deps.runner.run(DOCKER, containerListArgs(), { timeoutMs: 15_000 });
 	if (result.code !== 0) return { docker: false, machines: [] };
 	const machines = new Map<string, FleetVirtualMachineFact>();
@@ -81,13 +90,21 @@ export async function listVirtualMachines(deps: Required<VirtualModuleDeps>): Pr
 }
 
 export function createVirtualModule(deps: VirtualModuleDeps): NodeModule {
-	const full: Required<VirtualModuleDeps> = { state: deps.state, runner: deps.runner ?? createMachineCommandRunner() };
+	const full = { state: deps.state, runner: deps.runner ?? createMachineCommandRunner() };
 	return {
 		id: 'virtual',
-		tags: (environment) =>
-			environment.consents.manage && (environment.platform === 'linux' || environment.platform === 'darwin')
-				? [FLEET_VIRTUAL_HOST_CAPABILITY]
-				: [],
+		tags: (environment) => {
+			if (!environment.consents.manage) return [];
+			if (environment.platform !== 'linux' && environment.platform !== 'darwin') return [];
+			const tags = [FLEET_VIRTUAL_HOST_CAPABILITY];
+			// Windows VMs (P2, CONTRACTS §1.2): `kvm` when /dev/kvm is usable here (Linux
+			// x86-64 only), `virtual-windows` when the operator configured an installer image.
+			if (deps.kvm?.()) {
+				tags.push(FLEET_KVM_CAPABILITY);
+				if (resolveWindowsImage(deps.env ?? process.env)) tags.push(FLEET_VIRTUAL_WINDOWS_CAPABILITY);
+			}
+			return tags;
+		},
 		machineVerbs: {
 			'vm.list': {
 				stateChanging: false,
@@ -104,6 +121,31 @@ export function createVirtualModule(deps: VirtualModuleDeps): NodeModule {
 					const fact = listed.machines.find((machine) => machine.childNodeId === childId.toLowerCase());
 					if (!fact) throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
 					return fact;
+				}
+			},
+			/**
+			 * Copy password (P2, FR-21): the generated password, read once from this
+			 * host's keychain and answered on this request only — never logged, never
+			 * an operation. State-changing for the gate (refused while the kill switch
+			 * holds the link paused); the platform checks the owner-only rule first.
+			 */
+			'vm.password.reveal': {
+				stateChanging: true,
+				run: async (context) => {
+					const childId = context.params.childId;
+					if (!isChildNodeId(childId)) {
+						throw new MachineVerbError(makeFleetLinkError('invalid', 'childId must be a virtual computer id'));
+					}
+					const meta = await deps.state.readMeta(childId);
+					if (!meta) throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
+					if (meta.kind !== 'vm') {
+						throw new MachineVerbError(makeFleetLinkError('unsupported_on_node', 'a Container has no generated password'));
+					}
+					const password = deps.passwords ? await deps.passwords.get(childId) : null;
+					if (!password) {
+						throw new MachineVerbError(makeFleetLinkError('not_found', 'no password is kept for it on this computer'));
+					}
+					return { password };
 				}
 			}
 		}

@@ -16,6 +16,7 @@ import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
 import type { FleetComputerActionProps } from '../registry';
 import { isVirtualBusy, isVirtualChild } from './virtual.shared';
+import { RevealPasswordDialog } from './RevealPasswordDialog';
 
 /**
  * Virtual computers (FL-16, spec §5.5, §5.6, FR-26 – FR-28, FR-33, U10) — the
@@ -33,6 +34,7 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
     const router = useRouter();
     const [dialog, setDialog] = useState<{ act: 'stop' | 'destroy'; model: ConfirmDialogModel } | null>(null);
     const [pending, startTransition] = useTransition();
+    const [revealOpen, setRevealOpen] = useState(false);
     if (!isVirtualChild(node) || !node.hostNodeId) return null;
     const hostNodeId = node.hostNodeId;
     const virtual = node.virtual ?? null;
@@ -108,10 +110,54 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
         });
 
     const notAllowed = allowed ? undefined : t('power.notAllowed', { name: hostLabel });
+    // Copy password is the owner's alone (spec U16), and only a Windows VM has one.
+    const isOwner = (node.viewerRole ?? 'owner') === 'owner';
+    const viewerPort = virtual?.viewerPort ?? null;
+
+    // Watch the install (FR-23): the installer's screen, opened ON the host
+    // through FL-10's "open on the machine" (its viewer listens on the host's
+    // loopback only).
+    const watch = () =>
+        startTransition(async () => {
+            if (!viewerPort) return;
+            try {
+                const response = await fetch(
+                    `/api/fleet/nodes/${encodeURIComponent(hostNodeId)}/ports/${viewerPort}/open`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: 'desktop' }),
+                    },
+                );
+                if (response.ok) toast.success(t('watch.opened', { host: hostLabel }));
+                else {
+                    const body = (await response.json().catch(() => null)) as { error?: { hint?: string } } | null;
+                    toast.error(body?.error?.hint || t('watch.failed'));
+                }
+            } catch {
+                toast.error(t('watch.failed'));
+            }
+        });
     const running = state === 'running' || node.status === 'online';
 
     return (
         <div className="flex items-center gap-2" data-testid="fleet-virtual-child-actions">
+            {isVm && viewerPort ? (
+                <Button type="button" size="sm" variant="ghost" onClick={watch} disabled={pending} data-testid="fleet-virtual-watch">
+                    {t('watch.button')}
+                </Button>
+            ) : null}
+            {isVm && isOwner && state !== 'creating' && state !== 'destroying' ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRevealOpen(true)}
+                    data-testid="fleet-virtual-copy-password"
+                >
+                    {t('password.button')}
+                </Button>
+            ) : null}
             {state === 'not-enrolled' ? (
                 <Button type="button" size="sm" variant="ghost" onClick={retry} disabled={!allowed || busy} title={notAllowed}>
                     {t('power.retryEnrollment')}
@@ -144,6 +190,16 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
                 onConfirm={confirm}
                 onCancel={() => setDialog(null)}
             />
+            {isVm ? (
+                <RevealPasswordDialog
+                    open={revealOpen}
+                    hostNodeId={hostNodeId}
+                    childNodeId={node.id}
+                    name={node.name}
+                    hostName={hostLabel}
+                    onClose={() => setRevealOpen(false)}
+                />
+            ) : null}
         </div>
     );
 }
