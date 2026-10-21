@@ -46,6 +46,14 @@ describe('reserved Task labels (works-security 2026-10-18)', () => {
 		expect(changesReservedTaskLabels(['awaiting-owner'], undefined)).toBe(false);
 	});
 
+	it('treats a look-alike swap of a held label as removing it (the readers match exactly)', () => {
+		expect(reservedTaskLabelChanges(['awaiting-owner'], ['AWAITING-OWNER'])).toEqual({
+			added: ['AWAITING-OWNER'],
+			removed: ['awaiting-owner']
+		});
+		expect(changesReservedTaskLabels(['app-provision'], [' app-provision'])).toBe(true);
+	});
+
 	it('is enforced unless explicitly switched off', () => {
 		expect(taskReservedLabelsEnforced(undefined)).toBe(true);
 		expect(taskReservedLabelsEnforced('')).toBe(true);

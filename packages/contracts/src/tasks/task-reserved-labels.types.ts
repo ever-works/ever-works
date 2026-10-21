@@ -107,10 +107,18 @@ export function reservedTaskLabelRefusal(who: string, change: ReservedTaskLabelC
 	);
 }
 
+/**
+ * The reserved labels of a list, by their EXACT text. Recognising a reserved
+ * label is case- and whitespace-insensitive ({@link isReservedTaskLabel}), but
+ * the comparison must not be: the readers match exactly (`awaiting-owner.ts`
+ * looks for `'awaiting-owner'`), so swapping `awaiting-owner` for
+ * `AWAITING-OWNER` releases the hold while a normalised comparison would call it
+ * "no change". Exact text reports that swap as one removal plus one addition.
+ */
 function reservedOf(labels: readonly string[] | null | undefined): Set<string> {
 	const out = new Set<string>();
 	for (const label of labels ?? []) {
-		if (isReservedTaskLabel(label)) out.add(label.trim().toLowerCase());
+		if (isReservedTaskLabel(label)) out.add(label);
 	}
 	return out;
 }
