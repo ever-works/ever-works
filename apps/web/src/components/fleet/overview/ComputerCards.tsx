@@ -19,7 +19,7 @@ import {
     type FleetComputerGroup,
 } from '../fleet-hub.shared';
 import { osKeyOf } from '../fleet-os.shared';
-import { ComputerStateLine } from '../health/ComputerStateLine';
+import { ComputerStateSentence } from '../health/ComputerStateSentence';
 import { HealthSparkline } from '../health/HealthSparkline';
 
 interface ComputerCardsProps {
@@ -257,13 +257,7 @@ function ComputerCard({
                 node's own reason, "can be woken from build-01" — never a repeat of it. */}
             {mounted ? (
                 <div className="mt-1 ml-6">
-                    <ComputerStateLine
-                        node={node}
-                        variant="sentence"
-                        withAction={false}
-                        canWake={Boolean(node.canWake)}
-                        wakeVia={node.canWake?.name ?? null}
-                    />
+                    <ComputerStateSentence node={node} wakeVia={node.canWake?.name ?? null} />
                 </div>
             ) : null}
             {hostName && (

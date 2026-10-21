@@ -26,7 +26,7 @@ import {
 } from '../registry';
 import { RegisteredComponent } from '../RegisteredComponent';
 import { LinkLine } from '../link/LinkLine';
-import { ComputerStateLine } from '../health/ComputerStateLine';
+import { ComputerStateSentence } from '../health/ComputerStateSentence';
 
 const ACTION =
     'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium h-8 px-3 text-xs border border-border dark:border-border-dark text-text dark:text-text-dark disabled:opacity-50 disabled:cursor-not-allowed';
@@ -168,13 +168,7 @@ export function ComputerHeader({
                         node's own reason, "can be woken from build-01". Client-side only:
                         reset times are in the reader's zone. */}
                     {mounted ? (
-                        <ComputerStateLine
-                            node={node}
-                            variant="sentence"
-                            withAction={false}
-                            canWake={Boolean(node.canWake)}
-                            wakeVia={node.canWake?.name ?? null}
-                        />
+                        <ComputerStateSentence node={node} wakeVia={node.canWake?.name ?? null} />
                     ) : null}
                     <LinkLine node={node} />
                 </div>

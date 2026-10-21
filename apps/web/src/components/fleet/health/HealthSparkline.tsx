@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { FleetNodeHealthHistoryPoint } from '@ever-works/contracts';
-import { fetchFleetNodeHealthHistoryAction } from '@/app/actions/fleet-health';
 
 const WIDTH = 64;
 const HEIGHT = 16;
@@ -60,10 +59,19 @@ export function HealthSparkline({ nodeId, points: injected }: HealthSparklinePro
     useEffect(() => {
         if (injected) return;
         let cancelled = false;
-        void fetchFleetNodeHealthHistoryAction(nodeId, '1h').then((result) => {
-            if (cancelled) return;
-            setPoints(result.success && !result.data.disabled ? result.data.points : []);
-        });
+        // Loaded on demand: the cards render on pages and in tests that never
+        // read history, and the action module is server-bound.
+        void import('@/app/actions/fleet-health')
+            .then(({ fetchFleetNodeHealthHistoryAction }) =>
+                fetchFleetNodeHealthHistoryAction(nodeId, '1h'),
+            )
+            .then((result) => {
+                if (cancelled) return;
+                setPoints(result.success && !result.data.disabled ? result.data.points : []);
+            })
+            .catch(() => {
+                if (!cancelled) setPoints([]);
+            });
         return () => {
             cancelled = true;
         };
