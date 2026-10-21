@@ -15449,6 +15449,113 @@
                 "paste": "Paste",
                 "failed": "The paste failed"
             }
+        },
+        "cloud": {
+            "menu": {
+                "addItem": "New cloud computer…"
+            },
+            "create": {
+                "title": "New cloud computer",
+                "description": "Ever Works creates a machine at your cloud provider, on your account. It installs the node and joins your Fleet by itself.",
+                "provider": "Provider",
+                "connectedAs": "connected as {account}",
+                "name": "Name",
+                "nameHint": "2–39 lower-case letters, digits and hyphens, starting with a letter or digit.",
+                "region": "Region",
+                "size": "Size",
+                "sizeSpec": "{vcpus} CPU · {memory} · {disk} GB",
+                "sizePrice": "{month}/mo ({hour}/h)",
+                "software": "Software",
+                "softwareNames": {
+                    "docker": "Docker",
+                    "node": "Node.js",
+                    "claudeCode": "Claude Code",
+                    "codex": "Codex",
+                    "overlayVpn": "Overlay-VPN client"
+                },
+                "loading": "Loading regions and prices…",
+                "loadFailed": "The provider could not be read. Check its token under Plugins.",
+                "empty": "Connect a cloud provider first. Enable a provider under Plugins and save its token or sign in.",
+                "openPlugins": "Open Plugins",
+                "disclaimer": "Estimates from {provider} list prices; your bill may differ.",
+                "limit": "{used} of {max} cloud computers.",
+                "priceChanged": "Prices changed — now {price}/mo. Check and create again.",
+                "failed": "The cloud computer could not be created.",
+                "cancel": "Cancel",
+                "create": "Create",
+                "createWithPrice": "Create · {price}/mo",
+                "created": "Creating {name} at {provider}…"
+            },
+            "progress": {
+                "label": "Create progress",
+                "askingProvider": "asking {provider}",
+                "booting": "booting",
+                "installing": "installing",
+                "enrolling": "enrolling",
+                "online": "online",
+                "failed": "failed"
+            },
+            "block": {
+                "title": "Cloud",
+                "line": "{provider} · {region} · {vcpus} CPU · {memory} · {disk} GB",
+                "running": "running {duration}",
+                "off": "powered off {duration}",
+                "offBills": "powered off {duration} · still billed at this size while off",
+                "creating": "creating — {phase}",
+                "failed": "failed — {error}",
+                "gone": "gone at {provider} for {duration} · no longer billing",
+                "unenrolled": "needs a look — created {duration} ago, not online · {rate}/h",
+                "pending": {
+                    "poweringOff": "powering off…",
+                    "starting": "starting…",
+                    "destroying": "destroying…"
+                },
+                "costs": "{hour}/hour · this month {month} · since created {since} · projected month {projected}",
+                "providerMtd": "{provider} reports {amount} this month for the whole account.",
+                "disclaimer": "Estimates from {provider} list prices; your bill may differ.",
+                "idlePolicy": "Idle policy: {policy}",
+                "idleNothing": "Nothing",
+                "idleTellMe": "Tell me after {hours} h",
+                "idlePowerOff": "Power off after {hours} h",
+                "address": "Public address {ip} (Ever Works never connects in; the machine connects out).",
+                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer."
+            },
+            "power": {
+                "off": "Power off",
+                "on": "Power on",
+                "offTitle": "Power off {name}?",
+                "onTitle": "Power on {name}?",
+                "offBody": "{provider} still bills this size while it is off. Sessions on it end.",
+                "offBodyFree": "Sessions on it end.",
+                "onBody": "It bills about {rate}/hour while it runs.",
+                "poweringOff": "Powering off {name}…",
+                "starting": "Starting {name}…",
+                "failed": "The power change failed.",
+                "notAllowed": "Only the owner of {name} can power or destroy it"
+            },
+            "destroy": {
+                "button": "Destroy…",
+                "title": "Destroy {name}?",
+                "body": "It has cost {cost} since {date}. The machine and its disk are deleted at {provider}. This cannot be undone.",
+                "confirm": "Destroy",
+                "done": "Destroyed {name}. It cost {cost}.",
+                "failed": "The destroy failed."
+            },
+            "removeUnavailable": {
+                "line": "Cloud computers are destroyed, not removed, so a machine you pay for is never left behind."
+            },
+            "card": {
+                "line": "Cloud computer · {provider} · {region} · {month}/mo · {cost}",
+                "failed": "failed",
+                "gone": "gone at {provider}",
+                "unenrolled": "never came online",
+                "off": "powered off"
+            },
+            "palette": {
+                "newCloud": "New cloud computer",
+                "powerOff": "Power off {name}",
+                "powerOn": "Power on {name}"
+            }
         }
     }
 }

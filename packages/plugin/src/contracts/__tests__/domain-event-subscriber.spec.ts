@@ -22,7 +22,11 @@ describe('the domain-event-subscriber capability (EW-P1-1)', () => {
 		expect(DOMAIN_EVENT_SUBSCRIBER_CAPABILITY).toBe('domain-event-subscriber');
 		expect(PLUGIN_CAPABILITIES.DOMAIN_EVENT_SUBSCRIBER).toBe(DOMAIN_EVENT_SUBSCRIBER_CAPABILITY);
 		const keys = Object.keys(PLUGIN_CAPABILITIES);
-		expect(keys[keys.length - 1]).toBe('DOMAIN_EVENT_SUBSCRIBER');
+		// Appended last in ITS change; later epics append behind it (FL-17's
+		// `MACHINE_PROVIDER`), so the position is pinned net of those.
+		const appendedLater = ['MACHINE_PROVIDER'];
+		expect(keys.indexOf('DOMAIN_EVENT_SUBSCRIBER')).toBe(keys.length - 1 - appendedLater.length);
+		expect(keys.slice(keys.length - appendedLater.length)).toEqual(appendedLater);
 		expect(ALL_PLUGIN_CAPABILITIES.filter((value) => value === 'domain-event-subscriber')).toHaveLength(1);
 		expect(isValidPluginCapability('domain-event-subscriber')).toBe(true);
 		// Near misses stay invalid: manifests are validated against this guard.

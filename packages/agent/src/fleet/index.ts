@@ -74,3 +74,5 @@ export * from './agent-fleet-task-tools';
 export * from './ports';
 // Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
 export * from './virtual';
+// Cloud computers (FL-17) — machines created at a cloud provider, their service, sweeps and Agent tools.
+export * from './cloud';

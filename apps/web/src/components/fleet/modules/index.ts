@@ -15,7 +15,9 @@
  * "New session ▾" header action (`./fl-04-sessions`); FL-10's Servers block
  * (`./fl-10-ports`); FL-12's "Run a command…" menu item and "Last command"
  * Overview block (`./fl-12-commands`); FL-16's "New virtual computer…" entries
- * and a virtual computer's header actions (`./fl-16-virtual`).
+ * and a virtual computer's header actions (`./fl-16-virtual`); FL-17's "New cloud
+ * computer…" entry, a cloud computer's header actions and its Cloud block
+ * (`./fl-17-cloud`).
  */
 import './fl-03-health';
 import './fl-02-link';
@@ -24,3 +26,4 @@ import './fl-09-runs-here';
 import './fl-10-ports';
 import './fl-12-commands';
 import './fl-16-virtual';
+import './fl-17-cloud';

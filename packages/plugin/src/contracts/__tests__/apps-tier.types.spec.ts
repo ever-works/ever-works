@@ -141,8 +141,17 @@ const EXISTING_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
  */
 const LATER_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
 	// Domain events (EW-P1-1).
-	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber']
+	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber'],
+	// Cloud computers (FL-17).
+	['MACHINE_PROVIDER', 'machine-provider']
 ];
+
+/**
+ * Categories later epics appended behind the pre-T2 tuple (T2 itself appends
+ * none), in tuple order — FL-17's `machine-provider`. The snapshot comparison
+ * below stays exact: the pre-T2 members position by position, then these.
+ */
+const LATER_CATEGORIES: readonly string[] = ['machine-provider'];
 
 /** Every category that existed before T2, in the tuple's own order. T2 appends none. */
 const PRE_APPS_TIER_CATEGORIES: readonly string[] = [
@@ -519,8 +528,8 @@ describe('the apps-tier capability (APW-10 T2)', () => {
 		// not be touched. A category inserted anywhere in the tuple renumbers every
 		// index a consumer persisted, so the snapshot is compared position by
 		// position and the length is pinned separately.
-		expect(PLUGIN_CATEGORIES).toEqual([...PRE_APPS_TIER_CATEGORIES]);
-		expect(PLUGIN_CATEGORIES).toHaveLength(PRE_APPS_TIER_CATEGORIES.length);
+		expect(PLUGIN_CATEGORIES).toEqual([...PRE_APPS_TIER_CATEGORIES, ...LATER_CATEGORIES]);
+		expect(PLUGIN_CATEGORIES).toHaveLength(PRE_APPS_TIER_CATEGORIES.length + LATER_CATEGORIES.length);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 		expect(PLUGIN_CATEGORIES).toContain('deployment');
 

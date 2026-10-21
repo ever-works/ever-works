@@ -133,6 +133,7 @@ import {
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetVirtualService,
+    FleetCloudService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2192,6 +2193,10 @@ async function assertRealWriteTarget(
                 // tools are not offered.
                 { token: FleetSessionActionService, optional: true },
                 { token: FleetPullRequestService, optional: true },
+                // Cloud computers (FL-17) — backs `fleet_cloud_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_CLOUD_ENABLED off) the six
+                // tools are not offered; create / power / destroy only ever file an approval.
+                { token: FleetCloudService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2233,6 +2238,7 @@ async function assertRealWriteTarget(
                 fleetSchedules?: FleetScheduleService | null,
                 fleetSessionActions?: FleetSessionActionService | null,
                 fleetPullRequests?: FleetPullRequestService | null,
+                fleetCloud?: FleetCloudService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2288,6 +2294,7 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
+                    ...(fleetCloud && config.fleet.isCloudEnabled() ? { cloud: fleetCloud } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

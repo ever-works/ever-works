@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
-import type { FleetNodeOrigin, FleetNodeVirtualKind, FleetVirtualMeta } from '@ever-works/contracts';
+import type { FleetCloudMeta, FleetNodeOrigin, FleetNodeVirtualKind, FleetVirtualMeta } from '@ever-works/contracts';
 import {
     FleetNode,
     FleetNodeKind,
@@ -26,6 +26,10 @@ export interface CreateFleetNodeData {
     hostNodeId?: string | null;
     virtualKind?: FleetNodeVirtualKind | null;
     virtualMeta?: FleetVirtualMeta | null;
+    /** Cloud computers (FL-17): the machine-provider plugin and the machine's facts (no secrets). */
+    providerPluginId?: string | null;
+    providerMachineRef?: string | null;
+    providerMeta?: FleetCloudMeta | null;
 }
 
 /** Columns the enroll CAS is allowed to stamp alongside the flip. */
@@ -250,6 +254,24 @@ export class FleetNodeRepository {
         const ids = [...new Set(hostNodeIds.filter((id) => typeof id === 'string' && id.length > 0))];
         if (ids.length === 0) return [];
         return this.repository.find({ where: { hostNodeId: In(ids) }, order: { name: 'ASC' } });
+    }
+
+    /**
+     * Cloud computers (FL-17) — every cloud computer of every owner (the
+     * reconcile and bootstrap-watch sweeps), oldest first, bounded.
+     */
+    async findCloudNodes(limit = 2000): Promise<FleetNode[]> {
+        return this.repository.find({
+            where: { origin: 'cloud' },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /** Cloud computers (FL-17) — the row a provider machine belongs to, or null. */
+    async findByProviderMachine(providerPluginId: string, providerMachineRef: string): Promise<FleetNode | null> {
+        if (!providerPluginId || !providerMachineRef) return null;
+        return this.repository.findOne({ where: { providerPluginId, providerMachineRef } });
     }
 
     /** Virtual computers (FL-16) — every child of any host (the reconcile sweep), bounded. */

@@ -92,6 +92,8 @@ interface DashboardLayoutClientProps {
     fleetMachineFactsEnabled?: boolean;
     /** Virtual computers (FL-16): `FLEET_VIRTUAL_ENABLED` with the hub — "New virtual computer" in the palette. */
     fleetVirtualEnabled?: boolean;
+    /** Cloud computers (FL-17): `FLEET_CLOUD_ENABLED` with the hub — "New cloud computer" in the palette. */
+    fleetCloudEnabled?: boolean;
 }
 
 /**
@@ -133,6 +135,7 @@ export function DashboardLayoutClient({
     fleetHubEnabled = false,
     fleetMachineFactsEnabled = false,
     fleetVirtualEnabled = false,
+    fleetCloudEnabled = false,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -495,6 +498,7 @@ export function DashboardLayoutClient({
                     enabled={fleetHubEnabled}
                     machineFacts={fleetMachineFactsEnabled}
                     virtual={fleetVirtualEnabled}
+                    cloud={fleetCloudEnabled}
                 >
                     <CommandPaletteProvider>
                         {/*

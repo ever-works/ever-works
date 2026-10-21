@@ -81,6 +81,8 @@ export function FleetComputersTable({
     favorites,
 }: FleetComputersTableProps) {
     const t = useTranslations('dashboard.settings.fleet');
+    // Cloud computers (FL-17, CONTRACTS R-36): why Remove is disabled for one.
+    const tCloud = useTranslations('fleet.cloud');
     const kindLabel = (kind: FleetNodeKind): string => t(`kinds.${kind}` as never);
     const statusDotClass = fleetStatusDotClass;
     const formatLastSeen = formatFleetLastSeen;
@@ -307,9 +309,13 @@ export function FleetComputersTable({
                                     <Button
                                         variant="ghost"
                                         onClick={() => onRemove(node)}
-                                        disabled={isPending}
+                                        disabled={isPending || Boolean(node.cloud && !node.cloud.removable)}
                                         data-testid={`fleet-node-remove-${node.id}`}
-                                        title={t('actions.remove')}
+                                        title={
+                                            node.cloud && !node.cloud.removable
+                                                ? tCloud('removeUnavailable.line')
+                                                : t('actions.remove')
+                                        }
                                     >
                                         <Trash2 className="w-4 h-4 text-danger" />
                                     </Button>

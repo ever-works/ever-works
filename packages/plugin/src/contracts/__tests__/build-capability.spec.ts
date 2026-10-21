@@ -162,8 +162,14 @@ const EXISTING_CATEGORIES = [
  * the assertions weaker, it makes them FAIL on a legitimate append — which is
  * exactly how the "last category is `build`" pin here was found.
  */
-const LATER_CAPABILITIES: readonly string[] = ['identity-provider', 'apps-tier', 'domain-event-subscriber'];
-const LATER_CATEGORIES: readonly PluginCategory[] = ['identity'];
+const LATER_CAPABILITIES: readonly string[] = [
+	'identity-provider',
+	'apps-tier',
+	'domain-event-subscriber',
+	// FL-17 (cloud computers).
+	'machine-provider'
+];
+const LATER_CATEGORIES: readonly PluginCategory[] = ['identity', 'machine-provider'];
 
 /** The four strategies of Resolution R-13, in the plan's order (plan §4.1:585–589). */
 const EVERY_STRATEGY: readonly BuildStrategy[] = ['dockerfile', 'image', 'auto', 'none'];

@@ -834,6 +834,31 @@ export const config = {
             );
         },
         /**
+         * Cloud computers (FL-17, CONTRACTS §9) — `FLEET_CLOUD_ENABLED`. Off
+         * unless set to `true`, and never without `FLEET_ENABLED`: with it off
+         * every `/api/fleet/providers/**` and `/api/fleet/cloud/**` route answers
+         * 404, the reconcile and bootstrap-watch sweeps do nothing and the Agent
+         * tools are not offered. Read per call: flipping it needs no restart.
+         * Cloud computers that already exist stay ordinary Nodes, and the
+         * "Remove from Fleet" guard (R-36) holds whatever the flag says.
+         */
+        isCloudEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_CLOUD_ENABLED === 'true'
+            );
+        },
+        /**
+         * Cloud computers (FL-17, plan §6) — the `ever-works-node` npm spec a
+         * cloud computer's bootstrap installs: `EVER_WORKS_NODE_CLOUD_RUNTIME_SPEC`
+         * (an exact `ever-works-node@<version>` or an `https://….tgz`), else
+         * `ever-works-node@<this platform's supported node version>`.
+         */
+        getCloudRuntimeSpec(): string | null {
+            const raw = process.env.EVER_WORKS_NODE_CLOUD_RUNTIME_SPEC?.trim();
+            return raw ? raw : null;
+        },
+        /**
          * Checkouts on computers (FL-14 P3, spec §8b) — the image a
          * container-isolated checkout's sessions and commands run in
          * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work

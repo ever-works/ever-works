@@ -1,0 +1,79 @@
+{
+	"name": "@ever-works/digitalocean-machines-plugin",
+	"version": "1.0.0",
+	"description": "DigitalOcean machine-provider plugin for Ever Works - cloud computers in the Fleet, billed to your own DigitalOcean account",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^26.6.4",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^5.0.5"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "digitalocean-machines",
+			"name": "DigitalOcean Machines",
+			"version": "1.0.0",
+			"category": "machine-provider",
+			"capabilities": [
+				"machine-provider"
+			],
+			"description": "Create cloud computers at DigitalOcean that join your Fleet, with the price shown before you create one",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "user-only",
+			"uiHints": {
+				"setupLink": {
+					"url": "https://cloud.digitalocean.com/account/api/tokens",
+					"label": "Create a DigitalOcean API token",
+					"showWhenEmpty": [
+						"apiToken"
+					]
+				},
+				"completionFields": [
+					"apiToken"
+				]
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

@@ -67,6 +67,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
+import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
@@ -635,6 +636,23 @@ export class AgentToolService {
                                 ? runContext.runId
                                 : null,
                         service: virtual,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Cloud computers (FL-17): list / options / usage read-only; a create, a
+            // power change and a destroy are held for the owner's approval (spec S9).
+            if (fleet.cloud) {
+                const cloud = fleet.cloud;
+                add('fleet-cloud', () =>
+                    buildFleetCloudTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: cloud,
                         proposals: sources.proposals ?? null,
                     }),
                 );

@@ -59,8 +59,10 @@ import {
     selectFleetWakeSiblings,
     isFleetNodeOrigin,
     isFleetVirtualKind,
+    FLEET_CLOUD_REMOVE_HINT,
 } from '@ever-works/contracts';
 import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
+import { fleetCloudRemovableNode, fleetCloudViewOf } from './cloud/fleet-cloud.view';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -1499,7 +1501,9 @@ export class FleetService {
             // A virtual computer being built (FL-16) is not a token a person
             // minted: its row waits for the guest, which is handed its own
             // token when it is ready. The hub shows it under its host instead.
-            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual')
+            // A cloud computer (FL-17) is the same: its token went into the
+            // provider's bootstrap, and the hub shows the row with its phase.
+            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual' && row.origin !== 'cloud')
             .map((row) => {
                 const issuedAtMs = credentialIssuedAtMs(row);
                 const hasIssuedAt = Number.isFinite(issuedAtMs);
@@ -1550,6 +1554,9 @@ export class FleetService {
                 'Only an unused enrollment token can be revoked; rotate the node credential instead',
             );
         }
+        // Cloud computers (FL-17, R-36): an enrolling cloud computer may already
+        // have a billing machine behind its token — the same guard as Remove.
+        this.assertCloudRemovable(node);
         await this.repository.delete(node.id);
         // The row is gone, so the audit row is the only surviving record
         // that this machine was ever half-registered. `nodeId` carries no
@@ -1946,6 +1953,23 @@ export class FleetService {
     async unenrollByCredential(nodeId: unknown, secret: unknown): Promise<boolean> {
         const node = await this.authenticateNodeByCredential(nodeId, secret);
         if (!node) return false;
+        // Cloud computers (FL-17, CONTRACTS R-36): a cloud machine that leaves
+        // must not take its registration with it while the provider may still
+        // bill — the owner destroys it from the Fleet. Its credential dies here
+        // (heartbeat fails closed on a NULL hash) and the row stays, drained.
+        if ((node.origin === 'cloud' || node.providerPluginId) && !fleetCloudRemovableNode(node)) {
+            await this.repository.update(node.id, { status: 'disabled', enrollmentTokenHash: null });
+            await this.tryAuditNode({
+                action: 'node.unenroll',
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                before: { status: node.status, name: node.name, kind: node.kind },
+                after: { status: 'disabled' },
+                extra: { via: 'node', keptForDestroy: true },
+            });
+            return true;
+        }
         await this.repository.delete(node.id);
         // The registration is gone; this row is the only record that the
         // machine ever existed, and `fleet_audit.nodeId` carries no FK so
@@ -1982,6 +2006,10 @@ export class FleetService {
         // refusals, checked before anything is deleted: a host that still hosts
         // children, and a child whose machine still runs on its host.
         await this.assertVirtualRemovable(node);
+        // Cloud computers (FL-17, CONTRACTS R-36, spec FR-19) — an additive
+        // refusal: a cloud computer's registration is removed by Destroy, never
+        // by Remove, while the provider may still be billing for its machine.
+        this.assertCloudRemovable(node);
         if (confirmation.confirmName !== undefined) {
             assertConfirmName(node, confirmation.confirmName);
             ctx = {
@@ -1993,6 +2021,24 @@ export class FleetService {
         await this.auditLifecycle('node.delete', userId, node, ctx, {
             before: { status: node.status, name: node.name, kind: node.kind },
             after: null,
+        });
+    }
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS R-36, spec FR-19, U2, U6) — a cloud
+     * computer's registration is refused removal with `unsupported_on_node`
+     * ("destroy it instead; it bills until destroyed") until the provider has
+     * reported its machine gone, or the create failed before a machine existed.
+     * Every other Node passes untouched. Synchronous: the facts are on the row.
+     */
+    private assertCloudRemovable(node: FleetNode): void {
+        if (node.origin !== 'cloud' && !node.providerPluginId) return;
+        if (fleetCloudRemovableNode(node)) return;
+        const hint = `${node.name} is a cloud computer — ${FLEET_CLOUD_REMOVE_HINT}`;
+        throw new UnprocessableEntityException({
+            statusCode: 422,
+            message: hint,
+            error: { code: 'unsupported_on_node', hint, details: { origin: 'cloud', action: 'destroy' } },
         });
     }
 
@@ -2365,6 +2411,10 @@ export class FleetService {
             hostNodeId: node.hostNodeId ?? null,
             virtualKind: isFleetVirtualKind(node.virtualKind) ? node.virtualKind : null,
             virtual: fleetVirtualViewOf(node),
+            // Cloud computers (FL-17): the provider plugin and the Cloud block
+            // (provider, region, size, power, phase, cost, R-36 removability).
+            providerPluginId: node.providerPluginId ?? null,
+            cloud: fleetCloudViewOf(node),
         };
     }
 
@@ -2629,6 +2679,11 @@ function toSharedView(
         // see the host; the block carries no password, token or host path.
         origin: view.origin ?? 'enrolled',
         virtual: view.virtual ?? null,
+        // Cloud computers (FL-17) — DECIDED shared: the Cloud block is what the
+        // computer page shows anyone who may see it (spec S10: a member sees the
+        // machine and its cost, the actions disabled); prices and states only.
+        providerPluginId: view.providerPluginId ?? null,
+        cloud: view.cloud ?? null,
         // Computer health (FL-03) — DECIDED shared: reading health is the `view`
         // family (FL-03 spec §7, "Read health / history: view / org-members").
         // The stored snapshot carries numbers, booleans, a failed-service COUNT
@@ -2665,6 +2720,8 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'virtualKind',
     'origin',
     'virtual',
+    'providerPluginId',
+    'cloud',
     'health',
 ];
 
