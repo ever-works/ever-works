@@ -1248,6 +1248,20 @@ export const config = {
             },
 
             /**
+             * 2026-10-21 — `APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`: before a Deployment reaches
+             * the cluster, read the image config's `User` from the registry (with the App's own
+             * pull credential) and refuse an image the kubelet would refuse under
+             * `runAsNonRoot` — `managed_root_forbidden` (root / no user) or
+             * `image_user_unverifiable` (a user NAME) — unless the component declares a numeric
+             * `runAsUser`. Without it the same refusal arrives only from the kubelet, after the
+             * namespace was prepared and a Job or a rollout waited. A registry that cannot be read
+             * is a warning (`image_user_unchecked`), never a refusal. Default OFF; read per call.
+             */
+            imageUserPrecheckEnabled() {
+                return process.env.APP_WORKS_IMAGE_USER_PRECHECK_ENABLED === 'true';
+            },
+
+            /**
              * APW-09 FR-46 — the operator kill switch for upstream pull requests. ON unless
              * `APP_WORKS_UPSTREAM_PRS_ENABLED` is exactly `'false'`; read per call.
              */

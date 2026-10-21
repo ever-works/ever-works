@@ -702,10 +702,16 @@ describe('app-lifecycle-ops — resume (APW-06 T70)', () => {
         const result = await service.resume(op({ op: 'resume' }));
 
         // An empty declared map: the plugin restores each component's recorded pre-pause count.
-        expect(plugin.scaleApp).toHaveBeenCalledWith(REF, KUBECONFIG, 'resume', {}, {
-            smoke: [],
-            deadlines: {},
-        });
+        expect(plugin.scaleApp).toHaveBeenCalledWith(
+            REF,
+            KUBECONFIG,
+            'resume',
+            {},
+            {
+                smoke: [],
+                deadlines: {},
+            },
+        );
         expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
         expect(result.state).toBe('done');
         expect(result.detail?.replicas).toBe('pre-pause');

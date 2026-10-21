@@ -1,10 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { WorkCreatedEvent } from '@ever-works/agent/events';
-import {
-    FleetExecutionPreferenceService,
-    FleetNodeRepository,
-} from '@ever-works/agent/fleet';
+import { FleetExecutionPreferenceService, FleetNodeRepository } from '@ever-works/agent/fleet';
 import { appWorkCloudPushAllowed } from '@ever-works/agent/tasks-domain';
 import type { FleetExecutionMode, FleetNodeStatus } from '@ever-works/contracts';
 

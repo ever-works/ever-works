@@ -1837,8 +1837,8 @@ describe('`jobs[].expectsWork`: a Job that exits 0 must also report the work it 
 
 		const silent = migrate({});
 		await silent.deploy();
-		const plain = silent.cluster.applied('Job').find((job) => job.metadata.name === MIGRATE_JOB)?.spec.template
-			.spec.containers[0];
+		const plain = silent.cluster.applied('Job').find((job) => job.metadata.name === MIGRATE_JOB)?.spec.template.spec
+			.containers[0];
 		expect(plain.terminationMessagePath).toBeUndefined();
 		expect(plain.env).toBeUndefined();
 	});
