@@ -354,6 +354,11 @@ All three are thin wrappers over existing endpoints — no new mutation surface,
 
 None required. This feature reads first-party entity tables and reuses first-party endpoints. It introduces no plugin contract, no new pipeline step, and no provider surface. (If a future plugin wants to register its own schedule source, that would be a `ScheduleSourceType` extension + a provider interface — flagged as out-of-scope in §9, not built here.)
 
+> **Note (2026-10-21, FL-13):** a first-party source-type extension now exists — `node_schedule`, Commands scheduled on
+> one of the person's computers ([Fleet FL-13](../fleet/FL-13-schedules-on-computers/spec.md)). It is read through the
+> `NODE_SCHEDULE_PORT` port (no plugin contract), keeps the thirteen flat-list fields, and its Run now / Pause / Resume
+> delegate to `FleetScheduleService` like every other source's controls delegate to their domain service.
+
 ---
 
 ## 7. Security

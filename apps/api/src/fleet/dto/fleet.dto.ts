@@ -737,6 +737,23 @@ export class FleetNodeSelfDescriptionDto {
     @IsOptional()
     @IsObject()
     selfUpdate?: Record<string, unknown>;
+
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §1.1) — the machine's IANA
+     * time zone. Only a bounded string here: `FleetService` validates it with
+     * `isFleetTimeZone` and DROPS a value it cannot use, so an odd runtime
+     * never 400s the beat.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        example: 'Europe/Paris',
+        description: "The machine's IANA time zone; its Command schedules fire on that clock.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    timeZone?: string;
 }
 
 /**

@@ -176,6 +176,21 @@ export type FleetAuditAction =
 	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
 	| 'node.command.cancel'
 	/**
+	 * Schedules on computers (FL-13, CONTRACTS §7) — one row per change of a
+	 * Schedule, with `family: 'schedules'`, `target` (the Command id of a
+	 * Command schedule, the Task id of an Agent-session schedule),
+	 * `requestedBy`, `confirmationClass` and `outcome`; never the command
+	 * line and never output. A run the machine made on its own clock is
+	 * written as `node.command.run` with `requestedBy: schedule:<commandId>`
+	 * when it is reconciled (spec FR-27).
+	 */
+	| 'node.schedule.create'
+	| 'node.schedule.update'
+	| 'node.schedule.delete'
+	| 'node.schedule.run'
+	| 'node.schedule.pause'
+	| 'node.schedule.resume'
+	/**
 	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
 	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
 	 * `family`, `target` (service name, container or image id, project, pid),
@@ -288,6 +303,12 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.logs.follow',
 	'node.command.run',
 	'node.command.cancel',
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
 	'node.service.start',
 	'node.service.stop',
 	'node.service.restart',

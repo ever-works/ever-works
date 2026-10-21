@@ -55,6 +55,8 @@ export { FleetAudit } from '../entities/fleet-audit.entity';
 export * from './sessions';
 // Commands on computers (FL-12) — the command service, its policy and its node port.
 export * from './commands';
+// Schedules on computers (FL-13) — Command schedules, their node port and producer.
+export * from './schedules';
 // Machine actions (FL-09) — services, processes, Docker and Compose, and their node port.
 export * from './machine';
 // Checkouts on computers (FL-14) — the checkout service, its policy and its node port.

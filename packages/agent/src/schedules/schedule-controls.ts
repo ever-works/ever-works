@@ -20,7 +20,10 @@ import type {
  *    cannot be separated from its Mission, so pausing asks first);
  *  - inbound Trigger — pause / resume; it fires on an external event, so
  *    there is nothing to run now;
- *  - the three Work-owned sources — managed on the Work's own settings.
+ *  - the three Work-owned sources — managed on the Work's own settings;
+ *  - a Command schedule on a computer (FL-13) — run now (needs the computer
+ *    online and started with `--manage`), pause / resume, and duplicate /
+ *    reassign (move to another computer) through the computer's own dialog.
  *
  * `edit` opens the owning entity's existing editor, which every source has.
  * Duplicate and reassign need the authored Schedule form and are declared
@@ -34,6 +37,8 @@ type RowState = Pick<ScheduleView, 'sourceType' | 'status' | 'pausedAt' | 'healt
      * Defaults to the row status.
      */
     ownerStatus?: ScheduleView['status'];
+    /** FL-13: the platform holds the computer's link right now (a Command schedule's Run now needs it). */
+    nodeLinkUp?: boolean;
 };
 
 export function buildScheduleControls(row: RowState): ScheduleControls {
@@ -101,6 +106,19 @@ export function buildScheduleControls(row: RowState): ScheduleControls {
                 pause = 'ownerInactive';
                 resume = 'ownerInactive';
             }
+            break;
+        }
+        case 'node_schedule': {
+            // Schedules on computers (FL-13, spec FR-18): every control applies,
+            // each disabled with the machine's own reason when it cannot.
+            if (healthReason === 'consent-missing') runNow = 'consentMissing';
+            else if (healthReason === 'node-removed') runNow = 'ownerArchived';
+            else if (healthReason === 'node-unsupported') runNow = 'notAvailableYet';
+            else if (row.nodeLinkUp === false) runNow = 'nodeOffline';
+            if (row.pausedAt || row.status === 'paused') pause = 'alreadyPaused';
+            else resume = 'notPaused';
+            duplicate = null;
+            reassign = null;
             break;
         }
         case 'inbound_trigger': {

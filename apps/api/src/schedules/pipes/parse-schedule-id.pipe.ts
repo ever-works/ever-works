@@ -8,6 +8,8 @@ const SOURCE_TYPES = new Set([
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    // Schedules on computers (FL-13): `node_schedule:<commandId>`.
+    'node_schedule',
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,7 +19,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *
  * A schedule id contains a colon and is NOT a uuid, so `ParseUUIDPipe` must
  * never be used on it. The source type must be one of the seven known
- * sources and the owner id a uuid; anything else is a 400 before any
+ * sources (eight since FL-13's `node_schedule`) and the owner id a uuid; anything else is a 400 before any
  * repository is touched.
  */
 @Injectable()

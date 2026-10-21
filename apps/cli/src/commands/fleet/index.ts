@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
+import { schedulesCommand } from './schedule';
 import { commandsGetCommand, commandsListCommand } from './commands-read';
 import { dockerCommand, logsCommand, portsCommand, processesCommand, servicesCommand } from './machine';
 import { nodesCommand } from './nodes';
@@ -66,4 +67,6 @@ export const fleetCommand = new Command('fleet')
     .addCommand(dockerCommand)
     .addCommand(portsCommand)
     .addCommand(operationsCommand)
-    .addCommand(toolsCommand);
+    .addCommand(toolsCommand)
+    // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
+    .addCommand(schedulesCommand);
