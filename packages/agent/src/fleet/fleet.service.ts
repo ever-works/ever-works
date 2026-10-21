@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import {
     BadRequestException,
     ForbiddenException,
@@ -46,6 +46,12 @@ import {
     normalizeFleetConsents,
     normalizeFleetNodeWorkerState,
     sanitizeFleetNodeHealthSnapshot,
+    FLEET_LAN_ID_LENGTH,
+    isFleetNodeAsleep,
+    maskFleetMacAddress,
+    normalizeFleetLanId,
+    normalizeFleetMacAddress,
+    selectFleetWakeSiblings,
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
@@ -57,6 +63,7 @@ import type {
     FleetNodeLoadView,
     FleetNodeWorkerState,
     FleetViewerRole,
+    FleetWakeRoute,
 } from '@ever-works/contracts';
 import { config } from '../config';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
@@ -249,6 +256,16 @@ export interface EnrollInput {
      * blanks it.
      */
     consents?: unknown;
+    /**
+     * Computer health, second phase (FL-03) — the primary interface's
+     * hardware address (`--manage` only). UNTRUSTED: validated with
+     * `normalizeFleetMacAddress`; an unusable value is dropped, never a 400.
+     * Stored together with {@link lanId}, both or neither; absent leaves the
+     * stored pair alone.
+     */
+    macAddress?: unknown;
+    /** Computer health, second phase (FL-03) — the opaque network identity; re-hashed with the owner's id. */
+    lanId?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -720,6 +737,9 @@ export class FleetService {
         }
         // Fleet node link (FL-02): the consents, stored only when they changed.
         const consentChange = applyReportedConsents(node, refresh, patch);
+        // Computer health, second phase (FL-03): the hardware address and the
+        // owner-salted network identity, for Wake-on-LAN.
+        applyReportedNetworkIdentity(node, refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -1135,7 +1155,14 @@ export class FleetService {
         await this.announceOfflineTransitions(userId, cutoff);
         await this.repository.sweepOffline(userId, cutoff);
         const rows = await this.repository.findByUser(userId);
-        return rows.map((row) => this.toView(row));
+        // Computer health, second phase (FL-03): which offline computer can be
+        // woken, and through which sibling — judged over this same list (one
+        // owner, one read), never a second query.
+        return withWakeRoutes(
+            rows.map((row) => this.toView(row)),
+            Date.now(),
+            config.fleet.getNodeOfflineAfterMs(),
+        );
     }
 
     /**
@@ -1145,7 +1172,71 @@ export class FleetService {
      * stays independent of the job runtime.
      */
     async getForUser(userId: string, nodeId: string): Promise<FleetNodeView> {
-        return this.toView(await this.getOwnedNode(userId, nodeId));
+        const node = await this.getOwnedNode(userId, nodeId);
+        return { ...this.toView(node), canWake: await this.wakeRouteFor(node) };
+    }
+
+    /**
+     * Computer health, second phase (FL-03) — the owner's computers that can
+     * wake `target` right now, best first (spec FR-24): same owner, same
+     * network identity, online by status and by their last beat, advertising
+     * `wake` and `managed`. Empty when the target never reported a network
+     * identity. One read of the owner's rows.
+     */
+    async listWakeSiblings(target: FleetNode): Promise<FleetNode[]> {
+        if (!normalizeFleetLanId(target.lanId)) return [];
+        const rows = await this.repository.findByUser(target.userId);
+        return selectFleetWakeSiblings(target, rows, {
+            now: Date.now(),
+            offlineAfterMs: config.fleet.getNodeOfflineAfterMs(),
+        });
+    }
+
+    /** The sibling an offline `node` can be woken through, or null (FR-24). */
+    async wakeRouteFor(node: FleetNode): Promise<FleetWakeRoute | null> {
+        try {
+            const now = Date.now();
+            const offlineAfterMs = config.fleet.getNodeOfflineAfterMs();
+            if (!isFleetNodeAsleep(node, now, offlineAfterMs)) return null;
+            if (!normalizeFleetMacAddress(node.macAddress)) return null;
+            const [first] = await this.listWakeSiblings(node);
+            return first ? { nodeId: first.id, name: first.name } : null;
+        } catch {
+            // Best-effort decoration of a read: never fail the read for it.
+            return null;
+        }
+    }
+
+    /**
+     * Computer health, second phase (FL-03) — Refresh now landed: store the
+     * snapshot a `health.now` reply carried exactly as a beat's would be stored
+     * (sanitised, stamped with the platform's receipt time, the disk-low and
+     * sample markers carried forward), WITHOUT touching the liveness columns or
+     * writing a history sample — a refresh is not a beat (FR-18, FR-28).
+     * Answers the stored snapshot, or null when the reply held nothing usable.
+     */
+    async applyRefreshedHealth(
+        nodeId: string,
+        raw: unknown,
+        receivedAt: Date = new Date(),
+    ): Promise<FleetNodeHealthStored | null> {
+        const node = await this.repository.findById(nodeId);
+        if (!node) return null;
+        const health = buildStoredHealth(
+            raw,
+            receivedAt,
+            toStoredHealthView(node.health),
+            { diskFreeBytes: node.diskFreeBytes, minFreeDiskBytes: node.minFreeDiskBytes },
+            false,
+        );
+        if (!health) return null;
+        await this.repository.update(node.id, { health });
+        return health;
+    }
+
+    /** Computer health, second phase (FL-03) — stamp a wake attempt on the target (FR-26 reads it back). */
+    async recordWakeAttempt(nodeId: string, at: Date = new Date()): Promise<void> {
+        await this.repository.update(nodeId, { lastWakeAttemptAt: at });
     }
 
     /**
@@ -1202,7 +1293,16 @@ export class FleetService {
             };
         }
         const { node, role } = await this.access.resolveVisible(nodeId, userId);
-        if (role === 'owner') return { view: { ...this.toView(node), viewerRole: 'owner' }, role };
+        if (role === 'owner') {
+            return {
+                view: {
+                    ...this.toView(node),
+                    canWake: await this.wakeRouteFor(node),
+                    viewerRole: 'owner',
+                },
+                role,
+            };
+        }
         const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
         return { view: toSharedView(this.toView(node), node, role, cutoff), role };
     }
@@ -2114,6 +2214,15 @@ export class FleetService {
             // Computer health (FL-03): the latest snapshot off the row — one
             // read per computer, never a join to the history.
             health: toStoredHealthView(node.health),
+            // Computer health, second phase (FL-03): the hardware address MASKED
+            // (never in full, plan §11), the stored network identity and the last
+            // wake attempt. Owner views only — `toSharedView` is an allow-list
+            // that does not carry them. `canWake` is filled in by the reads that
+            // know the owner's other computers.
+            macAddress: maskFleetMacAddress(node.macAddress),
+            lanId: normalizeFleetLanId(node.lanId),
+            lastWakeAttemptAt: node.lastWakeAttemptAt ? toIso(node.lastWakeAttemptAt) : null,
+            canWake: null,
             // Fleet hub (FL-01): the owner's star and the policy in force,
             // every family filled in (the legacy column read through as
             // `desktop` when the map has no entry for it).
@@ -2236,6 +2345,55 @@ function applyReportedConsents(
     if (!fleetConsentsDiffer(before, after)) return null;
     patch.consents = after;
     return { before, after };
+}
+
+/**
+ * Computer health, second phase (FL-03) — the network identity a beat
+ * reported, stored for Wake-on-LAN: the hardware address normalised, the
+ * network identity RE-HASHED with the owner's id (so two owners on one
+ * network never share a stored value, and sibling matching can only ever
+ * find the owner's own computers). Both or neither; an unusable value is
+ * dropped (never a 400); absent leaves the stored pair alone; an unchanged
+ * pair writes nothing.
+ */
+function applyReportedNetworkIdentity(
+    node: FleetNode,
+    refresh: EnrollInput,
+    patch: Partial<FleetNode>,
+): void {
+    const macAddress = normalizeFleetMacAddress(refresh.macAddress);
+    const reported = normalizeFleetLanId(refresh.lanId);
+    if (!macAddress || !reported) return;
+    const lanId = saltFleetLanId(node.userId, reported);
+    if (node.macAddress !== macAddress) patch.macAddress = macAddress;
+    if (node.lanId !== lanId) patch.lanId = lanId;
+}
+
+/** `sha256(ownerId + newline + reported lanId)`, first 16 hex characters. */
+export function saltFleetLanId(userId: string, reported: string): string {
+    return createHash('sha256')
+        .update(`${userId}\n${reported}`)
+        .digest('hex')
+        .slice(0, FLEET_LAN_ID_LENGTH);
+}
+
+/**
+ * Computer health, second phase (FL-03) — stamp `canWake` on every asleep
+ * computer of ONE owner's list that has a hardware address and an online
+ * sibling on its network (spec FR-24). Pure over the list.
+ */
+export function withWakeRoutes(
+    views: FleetNodeView[],
+    now: number,
+    offlineAfterMs: number,
+): FleetNodeView[] {
+    return views.map((view) => {
+        if (view.kind === 'k8s') return view;
+        if (!view.macAddress || !view.lanId) return { ...view, canWake: null };
+        if (!isFleetNodeAsleep(view, now, offlineAfterMs)) return { ...view, canWake: null };
+        const [first] = selectFleetWakeSiblings(view, views, { now, offlineAfterMs });
+        return { ...view, canWake: first ? { nodeId: first.id, name: first.name } : null };
+    });
 }
 
 /**

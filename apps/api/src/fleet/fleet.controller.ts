@@ -839,6 +839,9 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the consents, should an enrolling node send them.
             consents: body.consents,
+            // Computer health, second phase (FL-03): never sent at enrol; validated by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -886,6 +889,10 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
+            // Computer health, second phase (FL-03): hardware address and network
+            // identity (`--manage` only), validated and owner-salted by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

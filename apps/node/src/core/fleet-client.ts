@@ -459,6 +459,12 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 			usageScan: source.consents.usageScan === true
 		};
 	}
+	// Computer health, second phase (FL-03): the hardware address and the
+	// opaque network identity, both or neither (`describeSelf` validated them).
+	if (typeof source.macAddress === 'string' && typeof source.lanId === 'string') {
+		out.macAddress = source.macAddress;
+		out.lanId = source.lanId;
+	}
 	return out;
 }
 

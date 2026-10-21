@@ -652,6 +652,42 @@ export class FleetNodeSelfDescriptionDto {
     @IsOptional()
     @IsFleetConsentsShape()
     consents?: Record<string, boolean>;
+
+    /**
+     * Computer health, second phase (FL-03, CONTRACTS §1.1) — the primary
+     * interface's hardware address, for Wake-on-LAN. Sent only by a node
+     * started with `--manage`, in its newest optional tier. Only a bounded
+     * string here: `FleetService` validates the format and DROPS a value it
+     * cannot use, so an odd adapter never 400s the beat.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        example: 'aa:bb:cc:dd:ee:f0',
+        description:
+            "The primary network interface's hardware address (Wake-on-LAN). --manage only; stored for the owner and never shown in full.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    macAddress?: string;
+
+    /**
+     * Computer health, second phase (FL-03) — an opaque identity of the
+     * network the primary interface is on (a hash, never an address), so
+     * siblings on the same network can be matched. Same contract as
+     * {@link macAddress}; re-hashed with the owner's id before it is stored.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 128,
+        example: 'a1b2c3d4e5f60718',
+        description: 'Opaque hash of the network the primary interface is on (never an address). --manage only.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    lanId?: string;
 }
 
 /**

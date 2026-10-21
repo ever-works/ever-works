@@ -557,7 +557,9 @@
 			"maxCpuPercent",
 			"maxMemoryMb",
 			"health",
-			"consents"
+			"consents",
+			"macAddress",
+			"lanId"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -573,7 +575,9 @@
 			"maxCpuPercent",
 			"maxMemoryMb",
 			"health",
-			"consents"
+			"consents",
+			"macAddress",
+			"lanId"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -595,7 +599,9 @@
 				"maxCpuPercent",
 				"maxMemoryMb",
 				"health",
-				"consents"
+				"consents",
+				"macAddress",
+				"lanId"
 			],
 			"heartbeat": [
 				"platform",
@@ -616,7 +622,9 @@
 				"maxCpuPercent",
 				"maxMemoryMb",
 				"health",
-				"consents"
+				"consents",
+				"macAddress",
+				"lanId"
 			]
 		}
 	},
