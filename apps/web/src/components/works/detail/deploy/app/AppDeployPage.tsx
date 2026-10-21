@@ -31,6 +31,15 @@ export interface AppDeployPageProps {
     /** `null` while `GET app-status` is not deployed on this API. */
     status: AppStatusView | null;
     canEdit: boolean;
+    /**
+     * Works-security — whether the member is the Work's owner (`work.userRole`). A few App Works
+     * actions are the owner's while the API's default-on switches are on: connecting a cluster or
+     * changing its context, changing the target, and Remove with stored data. With `false` those
+     * controls stay on the page, disabled with a line saying only the owner can use them; the
+     * API refuses them anyway (`403 ownerRequired`). `undefined` = not known: nothing extra is
+     * disabled.
+     */
+    isOwner?: boolean;
 }
 
 /**
@@ -45,7 +54,13 @@ export interface AppDeployPageProps {
  * cluster** as the primary action, **Deploy now** once a target is chosen, and
  * a link to the Builds that feed it.
  */
-export function AppDeployPage({ work, initialTarget, status, canEdit }: AppDeployPageProps) {
+export function AppDeployPage({
+    work,
+    initialTarget,
+    status,
+    canEdit,
+    isOwner,
+}: AppDeployPageProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy');
     const tTarget = useTranslations('dashboard.workDetail.appDeploy.target');
     const [target, setTarget] = useState<AppTargetView>(initialTarget);
@@ -116,6 +131,7 @@ export function AppDeployPage({ work, initialTarget, status, canEdit }: AppDeplo
                 workId={work.id}
                 target={target}
                 canEdit={canEdit}
+                isOwner={isOwner}
                 // APW-10 lite — the API's own answer: `GET app-target`'s eligibility is
                 // `eligible` only while the operator opened the tier (EVER_WORKS_APPS_MANAGED_ENABLED).
                 managedAvailable={target.eligibility?.managed?.eligible === true}
@@ -143,6 +159,7 @@ export function AppDeployPage({ work, initialTarget, status, canEdit }: AppDeplo
                 <AppLifecycleActions
                     work={{ id: work.id, slug: work.slug }}
                     status={status}
+                    isOwner={isOwner}
                     onChanged={() => router.refresh()}
                 />
             )}
@@ -164,6 +181,7 @@ export function AppDeployPage({ work, initialTarget, status, canEdit }: AppDeplo
                     onOpenChange={setConnectOpen}
                     workId={work.id}
                     target={target}
+                    isOwner={isOwner}
                     onSaved={setTarget}
                 />
             )}

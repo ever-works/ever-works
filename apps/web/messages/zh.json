@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "查看 GitHub 应用访问权限",
                     "openOnGitHub": "在 GitHub 上打开",
                     "enableBuildWorkflow": "启用构建工作流"
-                }
+                },
+                "editAccessRequired": "您需要此 App Work 的编辑权限才能执行此操作。"
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "借助其智能体持续改进",
                     "body": "让该 Work 的智能体修改应用——添加功能、修复缺陷、升级依赖。它会在 Work 仓库中工作并发起拉取请求。",
                     "button": "就此 App 进行对话"
-                }
+                },
+                "editAccessRequired": "您需要此 App Work 的编辑权限才能重试。"
             },
             "builds": {
                 "title": "构建",
@@ -7178,7 +7180,8 @@
                     "saved": "目标已保存。",
                     "saveFailed": "无法保存目标：{reason}",
                     "changeNote": "更改目标不会移除任何已在运行的内容。",
-                    "routeUnavailable": "此实例暂不支持更改目标。"
+                    "routeUnavailable": "此实例暂不支持更改目标。",
+                    "ownerOnly": "只有作品所有者可以更改应用的运行位置或连接新集群。"
                 },
                 "connect": {
                     "title": "连接您的集群",
@@ -7219,7 +7222,8 @@
                     "saving": "正在保存…",
                     "saveBlocked": "检查通过且具备所有必需权限后即可保存。",
                     "saved": "集群已连接。",
-                    "saveFailed": "无法保存集群连接：{reason}"
+                    "saveFailed": "无法保存集群连接：{reason}",
+                    "ownerOnly": "只有作品所有者可以连接集群或更改其上下文。"
                 },
                 "check": {
                     "ok": "已连接",
@@ -7356,7 +7360,8 @@
                         "resume": "已请求恢复。",
                         "remove": "已请求移除。",
                         "cancelDeploy": "已请求取消。"
-                    }
+                    },
+                    "deleteDataOwnerOnly": "只有作品所有者可以删除已存储的数据。"
                 },
                 "environment": {
                     "title": "环境",
@@ -7445,8 +7450,11 @@
                         "confirm": "删除数据",
                         "requested": "正在删除 {kind} 的数据。",
                         "failed": "无法删除数据。{reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "只有作品所有者可以删除这些数据。"
+                },
+                "ownerRequired": "只有作品所有者可以执行此操作。",
+                "ownerConfirmCluster": "此集群连接由其他成员保存，因此作品所有者需要部署一次以进行确认。"
             },
             "appEnv": {
                 "errors": {

@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import { AlertTriangle, Rocket, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { requestAppDeployAction } from '@/app/actions/dashboard/app-runtime';
-import { appPreconditionLeaf, type AppDeployNotice } from '@/lib/api/app-runtime.types';
+import {
+    appPreconditionLeaf,
+    isAppOwnerRequired,
+    type AppDeployNotice,
+} from '@/lib/api/app-runtime.types';
 
 export interface AppDeployNowButtonProps {
     workId: string;
@@ -36,7 +40,11 @@ type Outcome =
  *  - `422 APP_DEPLOY_PRECONDITIONS` → **Fix these before deploying:** with one
  *    row per unmet code (ACC-06-19), in our copy when we know the code and in
  *    the API's words when we do not;
- *  - `422 worker_not_isolated` → why nothing can deploy on this instance yet.
+ *  - `422 worker_not_isolated` → why nothing can deploy on this instance yet;
+ *  - `403 ownerRequired` (works-security) → "Only the Work owner can do this." — this button never
+ *    sends `confirmClusterChange`, so the refusal means another member saved the cluster
+ *    connection and the owner's own Deploy has to confirm it, which the line says too. Any other
+ *    `403` (the owner's API key) is shown in the API's words.
  */
 export function AppDeployNowButton({
     workId,
@@ -46,6 +54,7 @@ export function AppDeployNowButton({
 }: AppDeployNowButtonProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.deployNow');
     const tPre = useTranslations('dashboard.workDetail.appDeploy.preconditions');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const inFlight = useRef(false);
     const [pending, setPending] = useState(false);
     const [outcome, setOutcome] = useState<Outcome>(null);
@@ -79,6 +88,13 @@ export function AppDeployNowButton({
             }
 
             const code = result.code ?? data?.code ?? null;
+            if (isAppOwnerRequired({ code })) {
+                setOutcome({
+                    kind: 'message',
+                    text: `${tApp('ownerRequired')} ${tApp('ownerConfirmCluster')}`,
+                });
+                return;
+            }
             if (result.httpStatus === 409 || code === 'APP_DEPLOY_IN_PROGRESS') {
                 setOutcome({ kind: 'inProgress', id: data?.runningDeploymentId ?? '' });
                 return;

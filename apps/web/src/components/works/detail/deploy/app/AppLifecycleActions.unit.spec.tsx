@@ -58,11 +58,16 @@ function status(over: Partial<AppStatusView> = {}): AppStatusView {
     };
 }
 
-function renderActions(view: AppStatusView = status()) {
+function renderActions(view: AppStatusView = status(), extra: { isOwner?: boolean } = {}) {
     const onChanged = vi.fn();
     render(
         <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
-            <AppLifecycleActions work={WORK} status={view} onChanged={onChanged} />
+            <AppLifecycleActions
+                work={WORK}
+                status={view}
+                onChanged={onChanged}
+                isOwner={extra.isOwner}
+            />
         </NextIntlClientProvider>,
     );
     return { onChanged };
@@ -129,5 +134,82 @@ describe('AppLifecycleActions', () => {
                 confirmSlug: 'acme-app',
             }),
         );
+    });
+
+    describe("works-security — Remove with stored data is the owner's", () => {
+        const OWNER_ONLY = 'Only the Work owner can do this.';
+
+        it('an ownerRequired refusal of Remove with data reads the owner-only sentence, in the dialog too', async () => {
+            lifecycleMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: "Only the Work owner can delete the App's stored data.",
+            });
+            const { onChanged } = renderActions();
+            fireEvent.click(screen.getByTestId('app-lifecycle-remove-open'));
+            fireEvent.click(screen.getByTestId('app-remove-delete-data'));
+            fireEvent.change(screen.getByTestId('app-remove-confirm-slug'), {
+                target: { value: 'acme-app' },
+            });
+            fireEvent.click(screen.getByTestId('app-remove-confirm'));
+
+            await waitFor(() =>
+                expect(screen.getByTestId('app-remove-message').textContent).toBe(OWNER_ONLY),
+            );
+            expect(toastError).toHaveBeenCalledWith(OWNER_ONLY);
+            // The dialog stays open, and nothing was reported as changed.
+            expect(screen.getByTestId('app-remove-dialog')).toBeTruthy();
+            expect(onChanged).not.toHaveBeenCalled();
+        });
+
+        it('a non-owner keeps Remove but the delete-data option is disabled with the reason', async () => {
+            lifecycleMock.mockResolvedValue({ success: true, data: {} });
+            renderActions(status(), { isOwner: false });
+            fireEvent.click(screen.getByTestId('app-lifecycle-remove-open'));
+
+            const deleteData = screen.getByTestId('app-remove-delete-data') as HTMLInputElement;
+            expect(deleteData.disabled).toBe(true);
+            const hint = screen.getByTestId('app-remove-delete-data-owner-only');
+            expect(hint.textContent).toBe('Only the Work owner can delete stored data.');
+            expect(deleteData.getAttribute('aria-describedby')).toBe(hint.id);
+
+            // Remove without data is still an editor's.
+            const confirm = screen.getByTestId('app-remove-confirm') as HTMLButtonElement;
+            expect(confirm.disabled).toBe(false);
+            fireEvent.click(confirm);
+            await waitFor(() =>
+                expect(lifecycleMock).toHaveBeenCalledWith(WORK.id, {
+                    action: 'remove',
+                    deleteData: false,
+                }),
+            );
+        });
+
+        it('an owner (or an unknown role) can tick delete-data', () => {
+            renderActions(status(), { isOwner: true });
+            fireEvent.click(screen.getByTestId('app-lifecycle-remove-open'));
+            expect(
+                (screen.getByTestId('app-remove-delete-data') as HTMLInputElement).disabled,
+            ).toBe(false);
+            expect(screen.queryByTestId('app-remove-delete-data-owner-only')).toBeNull();
+        });
+
+        it('an ownerRequired refusal of Roll back says the owner must confirm the cluster', async () => {
+            rollbackMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: 'Only the Work owner can confirm a cluster credential another member saved.',
+            });
+            renderActions();
+            fireEvent.click(screen.getByTestId('app-rollback-open'));
+            fireEvent.click(screen.getByTestId('app-rollback-confirm'));
+            await waitFor(() =>
+                expect(screen.getByTestId('app-rollback-message').textContent).toBe(
+                    'Only the Work owner can do this. Another member saved this cluster connection, so the Work owner has to deploy once to confirm it.',
+                ),
+            );
+        });
     });
 });

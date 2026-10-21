@@ -8,12 +8,12 @@
  *
  * **No network, ever** — the shared `FakeDependencyCluster`, and an injected clock that never sleeps.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppDependencyContext } from '@ever-works/plugin';
 
 import { K8sPluginError } from '../../errors';
-import { KubernetesPlugin } from '../../k8s.plugin';
+import { DEPENDENCY_KUBECONFIG_GUARD_ENV, KubernetesPlugin } from '../../k8s.plugin';
 import { APP_DEPENDENCY_POLICY_LABEL } from '../../app/app-network-policy.renderer';
 import { APP_LABEL_PART_OF } from '../../app/app-names';
 import { MAILPIT_IMAGE_DIGEST, isDigestPinned } from '../images';
@@ -422,6 +422,16 @@ describe('k8s-inline-mailpit — deprovision', () => {
 });
 
 describe('the k8s plugin publishes and delegates the smtp provider', () => {
+	// These cases pin the DELEGATION over a fake cluster whose kubeconfig is a placeholder string, which the
+	// dependency-path guard (lane works-security) rightly refuses; the guard itself is covered by
+	// `__tests__/k8s.plugin.dependency-guard.spec.ts`. Off here = the pass-through these cases were written for.
+	beforeEach(() => {
+		vi.stubEnv(DEPENDENCY_KUBECONFIG_GUARD_ENV, 'false');
+	});
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it('lists the descriptor and routes every member to the provider', async () => {
 		const cluster = new FakeDependencyCluster();
 		const plugin = new KubernetesPlugin({ api: cluster as unknown as KubernetesApiService });

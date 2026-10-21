@@ -69,6 +69,25 @@ See [Kubernetes Deployment](./k8s-deployment.md) for configuring the Kubernetes 
 
 Each App Work gets its own namespace, named `ew-<slug>-<8 characters of the Work id>`. Inside it, the platform renders the App spec's components as Deployments with their Services and an Ingress, the App spec's `jobs` (such as migrations) as Jobs and its `cron` entries as CronJobs, plus the namespace's quota, limits, service account, configuration and secrets. By default the namespace also gets **default-deny network policies** with explicit allowances: traffic inside the namespace, DNS, outbound traffic to **public** addresses only (private, shared, link-local, loopback, multicast and reserved ranges are blocked, so an app cannot reach a host on a private network), ingress to the published components, and the app's own dependencies.
 
+### Decisions only the Work's owner can make
+
+Whoever chooses the cluster receives everything the App renders into it — every environment value, the dependency credentials and the image pull credential — and deleted App data cannot be brought back. So these actions need the Work's **owner**, signed in to Ever Works. Editors (and their API keys) are refused with `403 ownerRequired`; the owner's own API key, a fleet run and an integration key are refused because they are not a person in a signed-in session:
+
+| Action                                                                                                                                                                                      | Switch (default **on**)              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Connecting a cluster or changing its context (`POST /api/works/:id/app-target/check` with a `kubeconfig` or `kubeContext`; also the same keys through the Work's Kubernetes plugin settings) | `APP_TARGET_CHANGE_REQUIRES_OWNER`   |
+| Changing the deploy target or its namespace (`PUT /api/works/:id/app-target`)                                                                                                               | `APP_TARGET_CHANGE_REQUIRES_OWNER`   |
+| Deploying or rolling back with `confirmClusterChange: true`                                                                                                                                 | `APP_TARGET_CHANGE_REQUIRES_OWNER`   |
+| The first deploy (or rollback) with a cluster credential someone other than the owner saved — the owner's deploy confirms it                                                                | `APP_TARGET_CHANGE_REQUIRES_OWNER`   |
+| Removing the App **with its data** (`POST /api/works/:id/app-lifecycle` with `deleteData: true`) and a dependency's **Delete data** (`DELETE /api/works/:id/app-dependencies/:kind`)       | `APP_DATA_DELETE_OWNER_ONLY`         |
+| Attesting the App's licence (`POST /api/works/:id/app-license/attest`) — owner-only already; now a signed-in session too                                                                    | `APP_LICENSE_ATTEST_SESSION_ONLY`    |
+
+Editors keep everything else: ordinary deploys and rollbacks, a cluster re-check without a new kubeconfig, other target settings, environment values, Builds, pause, resume, remove without data, and cancel. A deploy nobody pressed (a Build-triggered auto-deploy) with an unconfirmed credential is refused `cluster_changed_unconfirmed` (named `owner_confirmation_required`) until the owner deploys once. A switch is off only when set to exactly `false`, which restores the previous behaviour; see `apps/api/.env.example`.
+
+**The image pull credential.** A private Build image is pulled with the App's stored **read-only pull token** (saved on the Builds tab). On **Your cluster**, when no pull token is stored, the Deployment is refused `pull_credential_unavailable` ("store a read-only pull token for this App") rather than placing the owner's GitHub token in the cluster: that token reaches every repository the owner can. An operator can set `APP_PULL_OWNER_TOKEN_FALLBACK=true` (worker environment; default off) to allow the owner's token again, and even then only for a Deployment the owner requested from a signed-in session — never an editor's, an API key's or a Build-triggered one. Where the GitHub App can mint one, the fallback uses an installation token limited to `packages: read`.
+
+A pasted kubeconfig is also checked when it is saved: one that runs a credential plugin (`exec`, `auth-provider`), reads a token or certificate **file**, sets a proxy or skips TLS verification is refused `422 kubeconfig_unsupported` before it is stored. The same check, plus pinning the cluster address to a public one, now runs before every **dependency** operation (provision, outputs, release, backup status) on your cluster. Both follow `EVER_WORKS_APPS_GUARD_DEPENDENCY_KUBECONFIG` (default on).
+
 ## Deploying
 
 ```bash
@@ -78,7 +97,7 @@ curl -X POST https://api.ever.works/api/works/<id>/deploy \
   -d '{}'
 ```
 
-`POST /api/works/:id/deploy` needs **edit** access to the App Work. The body may name a `buildId` to deploy an earlier green Build, and `confirmClusterChange: true` when the cluster changed since the last connection check. The route never waits for the rollout:
+`POST /api/works/:id/deploy` needs **edit** access to the App Work (and the owner, in a signed-in session, for the cases [above](#decisions-only-the-works-owner-can-make)). The body may name a `buildId` to deploy an earlier green Build, and `confirmClusterChange: true` when the cluster changed since the last connection check. The route never waits for the rollout:
 
 | Answer                         | Meaning                                                                                                                         |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -95,7 +114,7 @@ The preconditions you are most likely to see:
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `target_none`                                                      | The App Work's deploy target is **None**.                                                                                        |
 | `target_not_checked`                                               | No passing cluster connection check is on record for the App Work.                                                               |
-| `cluster_changed_unconfirmed`                                      | The check was made against a different cluster than the one the App runs on; send `confirmClusterChange: true`.                  |
+| `cluster_changed_unconfirmed`                                      | The check was made against a different cluster than the one the App runs on — the owner sends `confirmClusterChange: true` — or (named `owner_confirmation_required`) the cluster credential was saved by someone other than the owner and the owner has not deployed with it yet. |
 | `spec_invalid`                                                     | Fix the errors on **Settings → App spec**.                                                                                       |
 | `no_green_build`, `no_green_build_for_head`, `build_image_missing` | A `dockerfile` or `auto` App needs a green Build with a confirmed image — of the current commit, unless you name an earlier one. |
 | `nothing_to_deploy`                                                | `build.strategy` is `none`.                                                                                                      |

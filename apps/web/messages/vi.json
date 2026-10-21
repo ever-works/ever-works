@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "Xem lại quyền truy cập ứng dụng GitHub",
                     "openOnGitHub": "Mở trên GitHub",
                     "enableBuildWorkflow": "Bật quy trình làm việc build"
-                }
+                },
+                "editAccessRequired": "Bạn cần quyền chỉnh sửa App Work này để làm việc đó."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Phát triển nó cùng agent",
                     "body": "Yêu cầu agent của Work thay đổi ứng dụng — thêm tính năng, sửa lỗi, nâng cấp phụ thuộc. Agent làm việc trong Kho mã Work và mở pull request.",
                     "button": "Trò chuyện về App này"
-                }
+                },
+                "editAccessRequired": "Bạn cần quyền chỉnh sửa App Work này để thử lại."
             },
             "builds": {
                 "title": "Bản dựng",
@@ -7178,7 +7180,8 @@
                     "saved": "Đã lưu đích.",
                     "saveFailed": "Không thể lưu đích: {reason}",
                     "changeNote": "Thay đổi đích không gỡ bỏ bất cứ thứ gì đang chạy.",
-                    "routeUnavailable": "Thay đổi đích chưa khả dụng trên phiên bản này."
+                    "routeUnavailable": "Thay đổi đích chưa khả dụng trên phiên bản này.",
+                    "ownerOnly": "Chỉ chủ sở hữu công việc mới có thể thay đổi nơi ứng dụng chạy hoặc kết nối cụm mới."
                 },
                 "connect": {
                     "title": "Kết nối cụm của bạn",
@@ -7219,7 +7222,8 @@
                     "saving": "Đang lưu…",
                     "saveBlocked": "Có thể lưu khi việc kiểm tra đạt với đầy đủ quyền bắt buộc.",
                     "saved": "Đã kết nối cụm.",
-                    "saveFailed": "Không thể lưu kết nối cụm: {reason}"
+                    "saveFailed": "Không thể lưu kết nối cụm: {reason}",
+                    "ownerOnly": "Chỉ chủ sở hữu công việc mới có thể kết nối cụm hoặc thay đổi Context của cụm."
                 },
                 "check": {
                     "ok": "Đã kết nối",
@@ -7356,7 +7360,8 @@
                         "resume": "Đã yêu cầu tiếp tục.",
                         "remove": "Đã yêu cầu gỡ.",
                         "cancelDeploy": "Đã yêu cầu hủy."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Chỉ chủ sở hữu công việc mới có thể xóa dữ liệu đã lưu."
                 },
                 "environment": {
                     "title": "Môi trường",
@@ -7445,8 +7450,11 @@
                         "confirm": "Xóa dữ liệu",
                         "requested": "Đang xóa dữ liệu của {kind}.",
                         "failed": "Không thể xóa dữ liệu. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Chỉ chủ sở hữu công việc mới có thể xóa dữ liệu này."
+                },
+                "ownerRequired": "Chỉ chủ sở hữu công việc mới có thể làm việc này.",
+                "ownerConfirmCluster": "Một thành viên khác đã lưu kết nối cụm này, nên chủ sở hữu công việc cần triển khai một lần để xác nhận."
             },
             "appEnv": {
                 "errors": {

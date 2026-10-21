@@ -104,6 +104,8 @@ When you save a kubeconfig, Ever Works lists every `IngressClass` your cluster e
 If your cluster has multiple controllers, pick which one this work's Ingress should use. Leaving the field blank uses the cluster's default `IngressClass`.
 
 :::warning kubeconfigs with `exec` plugins
+**Refused by default.** A kubeconfig you paste that runs a credential plugin (`exec`, `auth-provider`) or reads a file on the host (`tokenFile`, `token-file`, `client-certificate`, `client-key`) is refused before it is loaded — on **Save & verify**, deploys, status and domain calls — because it would run that command, or read that file, inside Ever Works. An operator can set `EVER_WORKS_K8S_MEMBER_KUBECONFIG_EXEC_ALLOWED=true` to accept such kubeconfigs again; kubeconfigs the operator configures in the environment are not affected.
+
 Kubeconfigs that rely on `users[].user.exec` (for example, `aws-iam-authenticator`, `gke-gcloud-auth-plugin`, or Azure CLI auth) will not work in our deploy workflow runner — there is no `aws`/`gcloud`/`az` binary on the runner. Use a static service-account token kubeconfig instead. Generate one with:
 
 ```bash

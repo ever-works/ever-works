@@ -7571,7 +7571,8 @@
                     "reviewGitHubAppAccess": "Review GitHub App access",
                     "openOnGitHub": "Open on GitHub",
                     "enableBuildWorkflow": "Enable the build workflow"
-                }
+                },
+                "editAccessRequired": "You need edit access to this App Work to do that."
             },
             "appDependencies": {
                 "status": {
@@ -9033,7 +9034,8 @@
                     "title": "Evolve it with its agent",
                     "body": "Ask the Work's agent to change the app — add a feature, fix a bug, upgrade a dependency. It works in the Work Repository and opens pull requests.",
                     "button": "Chat about this App"
-                }
+                },
+                "editAccessRequired": "You need edit access to this App Work to try again."
             },
             "builds": {
                 "title": "Builds",
@@ -9306,7 +9308,8 @@
                     "saved": "Target saved.",
                     "saveFailed": "Couldn't save the target: {reason}",
                     "changeNote": "Changing the target doesn't remove anything already running.",
-                    "routeUnavailable": "Changing the target isn't available on this instance yet."
+                    "routeUnavailable": "Changing the target isn't available on this instance yet.",
+                    "ownerOnly": "Only the Work owner can change where the app runs or connect a new cluster."
                 },
                 "connect": {
                     "title": "Connect your cluster",
@@ -9347,7 +9350,8 @@
                     "saving": "Saving…",
                     "saveBlocked": "Save is available once the check passes with every required permission.",
                     "saved": "Cluster connected.",
-                    "saveFailed": "Couldn't save the cluster connection: {reason}"
+                    "saveFailed": "Couldn't save the cluster connection: {reason}",
+                    "ownerOnly": "Only the Work owner can connect a cluster or change its context."
                 },
                 "check": {
                     "ok": "Connected",
@@ -9484,7 +9488,8 @@
                         "resume": "Resume requested.",
                         "remove": "Removal requested.",
                         "cancelDeploy": "Cancellation requested."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Only the Work owner can delete stored data."
                 },
                 "environment": {
                     "title": "Environment",
@@ -9573,8 +9578,11 @@
                         "confirm": "Delete data",
                         "requested": "Deleting the {kind} data.",
                         "failed": "The data couldn't be deleted. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Only the Work owner can delete this data."
+                },
+                "ownerRequired": "Only the Work owner can do this.",
+                "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it."
             }
         },
         "newPage": {

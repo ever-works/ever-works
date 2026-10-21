@@ -5580,7 +5580,8 @@
                     "reviewGitHubAppAccess": "Revisar el acceso a la aplicación de GitHub",
                     "openOnGitHub": "Abrir en GitHub",
                     "enableBuildWorkflow": "Activar el flujo de trabajo de compilación"
-                }
+                },
+                "editAccessRequired": "Necesitas acceso de edición a este Trabajo de App para hacer eso."
             },
             "settings": {
                 "tabs": {
@@ -6973,7 +6974,8 @@
                     "title": "Evoluciónala con su agente",
                     "body": "Pide al agente del Trabajo que cambie la app: añadir una función, corregir un error, actualizar una dependencia. Trabaja en el Repositorio del Trabajo y abre pull requests.",
                     "button": "Chatear sobre esta App"
-                }
+                },
+                "editAccessRequired": "Necesitas acceso de edición a este Trabajo de App para intentarlo de nuevo."
             },
             "builds": {
                 "title": "Compilaciones",
@@ -7246,7 +7248,8 @@
                     "saved": "Destino guardado.",
                     "saveFailed": "No se pudo guardar el destino: {reason}",
                     "changeNote": "Cambiar el destino no elimina nada de lo que ya se está ejecutando.",
-                    "routeUnavailable": "Cambiar el destino aún no está disponible en esta instancia."
+                    "routeUnavailable": "Cambiar el destino aún no está disponible en esta instancia.",
+                    "ownerOnly": "Solo el propietario del trabajo puede cambiar dónde se ejecuta la app o conectar un clúster nuevo."
                 },
                 "connect": {
                     "title": "Conectar tu clúster",
@@ -7287,7 +7290,8 @@
                     "saving": "Guardando…",
                     "saveBlocked": "Podrás guardar cuando la comprobación se supere con todos los permisos necesarios.",
                     "saved": "Clúster conectado.",
-                    "saveFailed": "No se pudo guardar la conexión del clúster: {reason}"
+                    "saveFailed": "No se pudo guardar la conexión del clúster: {reason}",
+                    "ownerOnly": "Solo el propietario del trabajo puede conectar un clúster o cambiar su contexto."
                 },
                 "check": {
                     "ok": "Conectado",
@@ -7424,7 +7428,8 @@
                         "resume": "Reanudación solicitada.",
                         "remove": "Eliminación solicitada.",
                         "cancelDeploy": "Cancelación solicitada."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Solo el propietario del trabajo puede eliminar los datos almacenados."
                 },
                 "environment": {
                     "title": "Entorno",
@@ -7513,8 +7518,11 @@
                         "confirm": "Eliminar datos",
                         "requested": "Eliminando los datos de {kind}.",
                         "failed": "No se pudieron eliminar los datos. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Solo el propietario del trabajo puede eliminar estos datos."
+                },
+                "ownerRequired": "Solo el propietario del trabajo puede hacer esto.",
+                "ownerConfirmCluster": "Otro miembro guardó esta conexión al clúster, así que el propietario del trabajo tiene que desplegar una vez para confirmarla."
             },
             "appEnv": {
                 "errors": {

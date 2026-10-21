@@ -85,6 +85,8 @@ function result(overrides: Partial<AppDeployRequestResult> = {}): AppDeployReque
 function ownership(kind = 'app'): WorkOwnershipService {
     return {
         ensureCanEdit: jest.fn(async () => ({ work: { id: WORK_ID, kind }, isCreator: true })),
+        // Works-security — the owner gate (`app-works-owner-gates.spec.ts`) asks this.
+        ensureIsOwner: jest.fn(async () => ({ work: { id: WORK_ID, kind }, role: 'owner' })),
     } as unknown as WorkOwnershipService;
 }
 
@@ -173,8 +175,9 @@ describe('WorkAppDeployController — what it passes on', () => {
     it('forwards only the two body fields §2.2 step 1 names', async () => {
         const request = service();
 
+        // Confirming a cluster change is the owner's, in a signed-in session (works-security).
         await new WorkAppDeployController(ownership(), request).deploy(
-            auth,
+            { userId: USER_ID, authMethod: 'session' } as never,
             WORK_ID,
             { buildId: 'b-1', confirmClusterChange: true } as never,
             response(),
@@ -186,6 +189,7 @@ describe('WorkAppDeployController — what it passes on', () => {
             trigger: 'manual',
             buildId: 'b-1',
             confirmClusterChange: true,
+            requestedByHumanSession: true,
         });
     });
 

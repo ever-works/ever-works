@@ -8,7 +8,11 @@ import { APP_DEPLOY_TARGET_CHOICES, type AppDeployTargetChoice } from '@ever-wor
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { saveAppTargetAction } from '@/app/actions/dashboard/app-runtime';
-import { APP_RUNTIME_ROUTE_UNAVAILABLE, type AppTargetView } from '@/lib/api/app-runtime.types';
+import {
+    APP_RUNTIME_ROUTE_UNAVAILABLE,
+    isAppOwnerRequired,
+    type AppTargetView,
+} from '@/lib/api/app-runtime.types';
 
 /** i18n leaf per target (`dashboard.workDetail.appDeploy.target.<leaf>`). */
 export const APP_TARGET_LEAF: Record<
@@ -25,6 +29,14 @@ export interface AppTargetCardProps {
     target: AppTargetView;
     /** Whether the member may change anything (edit access). */
     canEdit: boolean;
+    /**
+     * Works-security — whether the member is the Work's owner. Changing the target is the owner's
+     * while the API's `APP_TARGET_CHANGE_REQUIRES_OWNER` switch is on, so `false` disables the
+     * target choice with a line saying so. **Connect your cluster** stays available: re-checking
+     * the stored connection and the cluster settings are an editor's too. `undefined` = not
+     * known: nothing extra is disabled and the API's refusal is shown if it comes.
+     */
+    isOwner?: boolean;
     /**
      * Whether Ever Works Apps can be picked for this App Work. It is closed
      * today (APW-10 `AppsTierPolicy` unwritten), so the default is `false` and
@@ -49,12 +61,17 @@ export function AppTargetCard({
     workId,
     target,
     canEdit,
+    isOwner,
     managedAvailable = false,
     onConnectCluster,
     onSaved,
 }: AppTargetCardProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.target');
+    const tApp = useTranslations('dashboard.workDetail.appDeploy');
     const groupName = useId();
+    const ownerOnlyId = `${groupName}-owner-only`;
+    // Only a definite "not the owner" locks the choice — never an unknown role.
+    const targetLocked = canEdit && isOwner === false;
     const [selected, setSelected] = useState<AppDeployTargetChoice>(target.target);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -65,7 +82,7 @@ export function AppTargetCard({
             : t('everWorksApps.unavailable');
 
     const isDisabled = (choice: AppDeployTargetChoice) =>
-        !canEdit || (choice === 'ever-works-apps' && !managedAvailable);
+        !canEdit || targetLocked || (choice === 'ever-works-apps' && !managedAvailable);
 
     const save = async () => {
         if (saving || selected === target.target) return;
@@ -77,7 +94,9 @@ export function AppTargetCard({
                 setError(
                     result.code === APP_RUNTIME_ROUTE_UNAVAILABLE
                         ? t('routeUnavailable')
-                        : t('saveFailed', { reason: result.error ?? '' }),
+                        : isAppOwnerRequired(result)
+                          ? tApp('ownerRequired')
+                          : t('saveFailed', { reason: result.error ?? '' }),
                 );
                 return;
             }
@@ -109,6 +128,16 @@ export function AppTargetCard({
                 <legend className="mb-3 text-sm font-semibold text-text dark:text-text-dark">
                     {t('heading')}
                 </legend>
+                {targetLocked && (
+                    <p
+                        id={ownerOnlyId}
+                        className="mb-3 flex items-start gap-2 text-xs text-text-muted dark:text-text-muted-dark"
+                        data-testid="app-target-owner-only"
+                    >
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {t('ownerOnly')}
+                    </p>
+                )}
                 <div className="space-y-2">
                     {APP_DEPLOY_TARGET_CHOICES.map((choice) => {
                         const leaf = APP_TARGET_LEAF[choice];
@@ -136,7 +165,14 @@ export function AppTargetCard({
                                     checked={selected === choice}
                                     disabled={disabled}
                                     onChange={() => setSelected(choice)}
-                                    aria-describedby={showReason ? reasonId : undefined}
+                                    aria-describedby={
+                                        [
+                                            showReason ? reasonId : null,
+                                            targetLocked ? ownerOnlyId : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ') || undefined
+                                    }
                                     className="mt-1"
                                     data-testid={`app-target-${choice}`}
                                 />

@@ -38,6 +38,7 @@ import {
 } from '../entities/activity-log.types';
 import { NotificationCategory, NotificationType } from '../entities/notification.types';
 import type { Task, TaskStatus } from '../entities/task.entity';
+import { WorkMemberRole } from '../entities/types';
 import type { Work } from '../entities/work.entity';
 import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import { GitFacadeService, NoGitCredentialsError } from '../facades/git.facade';
@@ -184,7 +185,8 @@ export type AppUpstreamErrorCode =
     | 'sync_limit_reached'
     | 'sync_paused'
     | 'not_retryable'
-    | 'retry_limit_reached';
+    | 'retry_limit_reached'
+    | 'edit_access_required';
 
 /**
  * The typed refusal every route of plan §4.1 answers with — `{ status: 'error', code,
@@ -958,7 +960,7 @@ export class AppUpstreamStateService {
      * reset because the automatic allowance is per attempt (FR-23).
      */
     async retryReadiness(workId: string, userId: string): Promise<AppUpstreamDispatchResult> {
-        await this.requireVisibleAppWork(workId, userId);
+        await this.requireEditableAppWork(workId, userId);
         const state = await this.requireState(workId);
 
         if (state.readinessState === 'preparing' || state.readinessState === 'ready') {
@@ -1024,7 +1026,7 @@ export class AppUpstreamStateService {
      * run.
      */
     async requestSync(workId: string, userId: string): Promise<AppUpstreamDispatchResult> {
-        await this.requireVisibleAppWork(workId, userId);
+        await this.requireEditableAppWork(workId, userId);
         const state = await this.requireState(workId);
         const now = Date.now();
 
@@ -1371,6 +1373,36 @@ export class AppUpstreamStateService {
             throw notFound();
         }
 
+        return work;
+    }
+
+    /**
+     * Works-security (2026-10-18) — the two WRITE routes (**Sync now**, **Try again**) need edit
+     * access, as every other App Work write does (`WorkOwnershipService.ensureCanEdit`): a viewer
+     * may read the card, not queue jobs that change the repository. Visibility is decided first,
+     * so a Work the caller cannot see still answers the same `404`; a visible Work the caller may
+     * only view answers `403 edit_access_required`.
+     */
+    private async requireEditableAppWork(workId: string, userId: string): Promise<Work> {
+        const work = await this.requireVisibleAppWork(workId, userId);
+        if (work.userId === userId) {
+            return work;
+        }
+        const member = this.workMembers?.findMember
+            ? await this.workMembers.findMember(workId, userId).catch(() => null)
+            : null;
+        const canEdit =
+            !!member &&
+            (typeof member.hasRoleOrHigher === 'function'
+                ? member.hasRoleOrHigher(WorkMemberRole.EDITOR)
+                : false);
+        if (!canEdit) {
+            throw new AppUpstreamRefusalError(
+                'edit_access_required',
+                403,
+                'You need edit access to this App Work to do that.',
+            );
+        }
         return work;
     }
 

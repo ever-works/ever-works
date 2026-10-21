@@ -125,6 +125,10 @@ export class AppUpstreamController {
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 202, description: '`{ queued: true, runId: string | null }`.' })
     @ApiResponse({ status: 401, description: 'No session.' })
+    @ApiResponse({
+        status: 403,
+        description: '`edit_access_required` — a viewer may read the card, not sync.',
+    })
     @ApiResponse({ status: 404, description: '`not_found`.' })
     @ApiResponse({
         status: 409,
@@ -162,6 +166,10 @@ export class AppUpstreamController {
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 202, description: '`{ queued: true, runId: string | null }`.' })
     @ApiResponse({ status: 401, description: 'No session.' })
+    @ApiResponse({
+        status: 403,
+        description: '`edit_access_required` — a viewer may read the card, not retry.',
+    })
     @ApiResponse({ status: 404, description: '`not_found`.' })
     @ApiResponse({ status: 409, description: '`not_retryable`.' })
     @ApiResponse({ status: 429, description: '`retry_limit_reached`.' })

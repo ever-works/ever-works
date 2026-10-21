@@ -139,6 +139,46 @@ describe('AppLicenseAttestationDialog (APW-03 §6.3, ACC-06-39)', () => {
             COPY.refusals.licenseChanged,
         );
     });
+
+    it("works-security — a 403 without a code (no signed-in session) shows the API's sentence; ownerRequired reads owner-only", async () => {
+        attestMock.mockResolvedValueOnce({
+            success: false,
+            httpStatus: 403,
+            error: 'Only a person signed in to Ever Works can attest an App licence; an API key, an automation or a fleet run cannot.',
+        });
+        const onAttested = vi.fn();
+        wrap(
+            <AppLicenseAttestationDialog
+                open
+                onOpenChange={vi.fn()}
+                workId="w1"
+                license={license()}
+                onAttested={onAttested}
+                onLicenseChanged={vi.fn()}
+            />,
+        );
+        fireEvent.click(screen.getByTestId('app-license-attest-checkbox'));
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('app-license-attest-confirm'));
+        });
+        expect(screen.getByTestId('app-license-attest-error').textContent).toBe(
+            'Only a person signed in to Ever Works can attest an App licence; an API key, an automation or a fleet run cannot.',
+        );
+        expect(onAttested).not.toHaveBeenCalled();
+
+        attestMock.mockResolvedValueOnce({
+            success: false,
+            code: 'ownerRequired',
+            httpStatus: 403,
+            error: 'Only the Work owner can attest an App licence.',
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('app-license-attest-confirm'));
+        });
+        expect(screen.getByTestId('app-license-attest-error').textContent).toBe(
+            COPY.refusals.ownerOnly,
+        );
+    });
 });
 
 describe('AppLicenseCard', () => {

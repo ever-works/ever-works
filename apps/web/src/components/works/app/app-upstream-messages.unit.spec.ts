@@ -18,7 +18,7 @@ import { APP_UPSTREAM_WARNING_CODES } from '@ever-works/contracts';
  *
  * Five claims, each a way the block can ship a hole:
  *
- *  1. **every leaf resolves in every bundle.** The 52 leaves of the tree plus
+ *  1. **every leaf resolves in every bundle.** The 53 leaves of the tree plus
  *     `dashboard.workDetail.upstream.tabName` and the three
  *     `dashboard.activity.filters.types.app*` labels are asserted present and
  *     non-empty in all 21 bundles, not only in `en.json`.
@@ -195,10 +195,12 @@ describe('Upstream messages — the whole block, in all 21 bundles (APW-02 T35)'
 
     it('has a non-trivial block to assert, so the scan cannot silently shrink', () => {
         // Vacuity guard: the English tree is the shape every other locale is
-        // held to. 52 leaves under the tree, plus the tab name and the three
+        // held to. 53 leaves under the tree (the landed 52 plus works-security's
+        // `editAccessRequired`, 2026-10-18), plus the tab name and the three
         // Activity labels, is the landed block.
-        expect(APP_UPSTREAM_LEAVES).toHaveLength(52);
+        expect(APP_UPSTREAM_LEAVES).toHaveLength(53);
         expect(APP_UPSTREAM_LEAVES).toContain('title');
+        expect(APP_UPSTREAM_LEAVES).toContain('editAccessRequired');
         expect(APP_UPSTREAM_LEAVES).toContain('warnings.upstreamArchived');
         expect(APP_UPSTREAM_LEAVES).toContain('readiness.waitingForSetupPr');
         expect(treeAt(EN, 'dashboard.workDetail.upstream')).toEqual({ tabName: 'Upstream' });
