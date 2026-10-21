@@ -1,5 +1,6 @@
 import { Injectable, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { config } from '../../config';
 import { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import { Work } from '../../entities/work.entity';
 import { FleetModule } from '../fleet.module';
@@ -19,7 +20,9 @@ import { FleetCheckoutService } from './fleet-checkout.service';
 export class FleetCheckoutReconcileService {
     constructor(private readonly checkouts: FleetCheckoutService) {}
 
-    reconcile(): Promise<{ swept: number; asked: number }> {
+    /** Does nothing while `FLEET_CHECKOUTS_ENABLED` is off (the flag is read per call). */
+    async reconcile(): Promise<{ swept: number; asked: number }> {
+        if (!config.fleet.isCheckoutsEnabled()) return { swept: 0, asked: 0 };
         return this.checkouts.reconcile();
     }
 }
