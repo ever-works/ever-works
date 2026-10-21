@@ -86,6 +86,13 @@ export class FleetVirtualPowerDto {
     confirm?: boolean;
 }
 
+export class FleetVirtualRevealDto {
+    @ApiProperty({ required: false, description: 'The reveal is `confirm`-class: send `confirm: true`.' })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
 export class FleetVirtualDestroyDto {
     @ApiProperty({ required: false, maxLength: 64, description: 'The virtual computer’s exact name (`confirm-destructive`).' })
     @IsOptional()
@@ -131,6 +138,12 @@ export class FleetVirtualProgressDto extends FleetVirtualHostJobDto {
     @IsOptional()
     @IsBoolean()
     activated?: boolean | null;
+
+    @ApiProperty({ required: false, description: 'Windows VMs: the host-loopback port of the installer viewer.' })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    viewerPort?: number | null;
 }
 
 export function virtualConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {
