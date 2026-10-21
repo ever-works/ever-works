@@ -83,13 +83,13 @@
 
 ## P2 — Git identity
 
-- [ ] **T-09**. Create `apps/node/src/core/link/modules/git/git-identity.ts` (`read`, `set`; argv-only;
+- [x] **T-09**. Create `apps/node/src/core/link/modules/git/git-identity.ts` (`read`, `set`; argv-only;
       exit 1 = unset; control characters refused) and the module `apps/node/src/core/link/modules/git.ts`
       registering `git.identity` / `git.setIdentity` (CONTRACTS §3.3) on FL-02's `machine` verb router
       (`--manage`; `kill_switch`; refused under `link.pause`); one entry in
       `apps/node/src/core/link/modules/index.ts` (R-40).
       **Test**: `apps/node/src/core/link/modules/git/git-identity.spec.ts`, `apps/node/src/core/link/modules/git.spec.ts`.
-- [ ] **T-10**. Create `packages/agent/src/fleet/fleet-git-identity.service.ts` (read with 60 s
+- [x] **T-10**. Create `packages/agent/src/fleet/fleet-git-identity.service.ts` (read with 60 s
       cache; owner-only values; `canPushForAgents` from the `git-push` tag + installation
       repositories; `set` requires `confirm: true` (CONTRACTS §2.2) and the `commands` family
       (§2.1) → node → audit `node.git.identity.set` with field names only) and
@@ -98,7 +98,7 @@
       `node.git.identity.set` (CONTRACTS §7) to `packages/contracts/src/fleet/fleet-panic.types.ts`.
       **Test**: `fleet-git-identity.service.spec.ts` (values masked for non-owners, no-reply email
       composition, account-email warning path, audit has no value), controller spec (codes, 5/min).
-- [ ] **T-11**. Create `apps/web/src/components/fleet/git/GitIdentityCard.tsx` and mount it as a
+- [x] **T-11**. Create `apps/web/src/components/fleet/git/GitIdentityCard.tsx` and mount it as a
       section of FL-01's `apps/web/src/components/fleet/computer/tabs/SettingsTab.tsx` (flag-gated; FL-01's
       registry has no settings-card hook); fill `IdentityLine.tsx` in the
       dialog; BFF `apps/web/src/app/api/fleet/nodes/[id]/git/identity/route.ts`; i18n
