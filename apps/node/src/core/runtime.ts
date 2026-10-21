@@ -23,6 +23,14 @@ import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
+import {
+	MANAGEMENT_LANE_CONCURRENCY,
+	MANAGEMENT_LANE_IDLE_POLL_MS,
+	MANAGEMENT_LANE_LEASE_TTL_SEC,
+	planManagementLane,
+	type ManagementLanePlan,
+	type ManagementLaneTables
+} from './management-lane';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -406,6 +414,17 @@ export interface NodeRuntime {
 		/** The capture backend this machine selected, or null (terminal-only views). */
 		captureBackend: CaptureBackend | null;
 	};
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane, present
+	 * only when a kind registered for it has its consent on here (none do in
+	 * FL-02: the kind list ships empty). Its own worker loop, one job at a
+	 * time, outside `--concurrency`; the shell starts and drains it with the
+	 * other lanes.
+	 */
+	management?: {
+		worker: WorkerLoop;
+		kinds: FleetJobKind[];
+	};
 }
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
@@ -540,6 +559,12 @@ export interface CreateNodeRuntimeOptions {
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
 	persistLinkState?: (record: NodeLinkRecord) => Promise<void> | void;
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane's kinds,
+	 * consents and executors. Defaults to the compile-time tables (empty in
+	 * FL-02); a test or an embedder passes its own.
+	 */
+	managementLane?: ManagementLaneTables;
 }
 
 /**
@@ -657,6 +682,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
 	};
 	telemetry.consents = () => consents;
+	// The management lane (CONTRACTS R-34): which of its kinds this process may
+	// lease, and every kind it owns — the work lane below never leases those.
+	const managementPlan = planManagementLane(consents, options.managementLane);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
 	let lastDescribedCapabilities: readonly string[] = [];
@@ -819,6 +847,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				const excluded: FleetJobKind[] = [];
 				if (options.attendEnabled) excluded.push('computer-session');
 				if (!executionPolicy.allowShellCommands) excluded.push('acceptance-checks');
+				// Fleet node link (CONTRACTS R-34): machine jobs belong to the
+				// management lane alone, whatever this process's consents.
+				for (const kind of managementPlan.ownedKinds) if (!excluded.includes(kind)) excluded.push(kind);
 				return excluded.length > 0 ? { excludeKinds: excluded } : {};
 			})(),
 			// Fleet usage limits: the CLIs an agent-task can run with here, so a
@@ -1140,7 +1171,47 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		};
 	}
 
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, only when
+	// one of its kinds has its consent on here. None do in FL-02.
+	if (managementPlan.kinds.length > 0) {
+		const management = createManagementLane(io, options, jobClientFor(), managementPlan);
+		runtime.management = management;
+		// It leases through the same endpoint, so the same version floor holds it.
+		holdableLanes.push(management.worker);
+		management.worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
+		runtime.jobClient ??= jobClientFor();
+	}
+
 	return runtime;
+}
+
+/**
+ * Fleet node link (FL-02, T-27, CONTRACTS R-34) — the management lane, a
+ * sibling of {@link createAttendedLane}: its own worker loop leasing ONLY the
+ * planned kinds, one job at a time and outside `--concurrency` (the work
+ * lane's limits are not shared), on a slow idle poll. Each planned kind's
+ * executor is registered from the plan.
+ */
+function createManagementLane(
+	io: NodeIo,
+	options: CreateNodeRuntimeOptions,
+	jobClient: FleetJobClient,
+	plan: ManagementLanePlan
+): NonNullable<NodeRuntime['management']> {
+	const worker = new WorkerLoop({
+		client: jobClient,
+		logger: io.logger,
+		limits: clampResourceLimits({ maxConcurrentJobs: MANAGEMENT_LANE_CONCURRENCY }),
+		leaseTtlSec: MANAGEMENT_LANE_LEASE_TTL_SEC,
+		idlePollMs: MANAGEMENT_LANE_IDLE_POLL_MS,
+		kinds: [...plan.kinds],
+		...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
+		...(io.scheduler ? { scheduler: io.scheduler } : {}),
+		...(io.now ? { now: io.now } : {}),
+		...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
+	});
+	for (const executor of plan.executors) worker.register(executor.kind, executor.run);
+	return { worker, kinds: [...plan.kinds] };
 }
 
 /** `2 concurrent job(s), CPU < 80%, no memory ceiling` — for the log line a ceiling change writes. */

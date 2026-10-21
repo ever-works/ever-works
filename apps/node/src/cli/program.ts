@@ -574,6 +574,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, present only
+	// when a kind registered for it has its consent on (none in FL-02).
+	const managementWorker = runtime.management?.worker ?? null;
 	// One line per ACCEPTED beat. The loop patches its state more than once per
 	// beat (`connected`, then the next attempt's delay) and every patch
 	// notifies, so keying on the state alone logged each beat twice. Keyed on
@@ -629,11 +632,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					: 'Live view enabled — terminal only: no browser was found here to show a screen'
 			);
 		}
+		if (managementWorker) {
+			await managementWorker.start();
+			deps.out(
+				`Management lane enabled — leasing [${(runtime.management?.kinds ?? []).join(', ')}] one at a time, outside --concurrency`
+			);
+		}
 	};
 	let lanesStarted: Promise<void> = Promise.resolve();
 	let laneStartFailed = false;
 	let laneStartFailure: unknown = undefined;
-	if (worker || attendedWorker) {
+	if (worker || attendedWorker || managementWorker) {
 		if (loop.getState().state === 'connected') {
 			await startLanes();
 		} else {
@@ -738,6 +747,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			attendedWorker.cancelJob(jobId, 'This machine is shutting down');
 		}
 		await attendedWorker.stop();
+	}
+	if (managementWorker) {
+		// Drains like the work lane: a machine job in flight finishes and reports.
+		await managementWorker.stop();
 	}
 	if (worker) {
 		// Drains: stops leasing at once, then WAITS for the jobs already
