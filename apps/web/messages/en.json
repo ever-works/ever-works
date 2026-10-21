@@ -13672,6 +13672,12 @@
                 "label": "Last command:",
                 "ago": "{time} ago",
                 "open": "Commands"
+            },
+            "rerun": {
+                "action": "Run again",
+                "label": "Run {command} again",
+                "redacted": "The stored command was redacted — type it again to run it.",
+                "none": "None of these computers can take a command right now."
             }
         },
         "sessions": {

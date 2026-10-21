@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { config } from '@ever-works/agent/config';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
-import { FleetJobRepository } from '@ever-works/agent/fleet';
+import { FleetCommandRepository, FleetJobRepository } from '@ever-works/agent/fleet';
 
 /** Rows one purge batch touches. */
 export const FLEET_JOB_PURGE_BATCH_SIZE = 200;
@@ -52,7 +52,67 @@ export class FleetJobRetentionService {
     constructor(
         private readonly jobs: FleetJobRepository,
         private readonly taskLock: DistributedTaskLockService,
+        // Commands on computers (FL-12 P3, T-27): the stored heads and tails of
+        // ended command runs. Appended LAST + @Optional(): unbound (Commands not
+        // mounted), the second pass does nothing.
+        @Optional() private readonly commandRuns?: FleetCommandRepository,
     ) {}
+
+    /**
+     * Commands on computers (FL-12 P3, T-27) — the nightly pass over
+     * `fleet_command_runs`: the first and last 64 KiB stored for each ended run
+     * are cleared once the run ended more than the fleet retention window ago
+     * (`FLEET_JOB_RETENTION_DAYS`, default 30); the row stays (status, exit
+     * code, timings, the refusal), and the machine's own copy of its last 30
+     * runs is the machine's business. Same switch, lock idiom and batch bounds
+     * as the job-body pass; 03:45 UTC so the two never share a minute.
+     */
+    @Cron('45 3 * * *')
+    async purgeExpiredCommandOutputs(): Promise<void> {
+        if (!config.fleet.isJobPurgeEnabled() || !this.commandRuns) return;
+        await this.taskLock.runExclusive(
+            'fleet-commands:purge-outputs',
+            async () => {
+                try {
+                    const purged = await this.purgeCommandOutputs();
+                    if (purged > 0) {
+                        this.logger.log(
+                            `Fleet command retention cleared the stored output of ${purged} run(s) older than ${config.fleet.getJobRetentionDays()} days`,
+                        );
+                    }
+                } catch (error) {
+                    this.logger.error('Fleet command retention purge failed:', error);
+                }
+            },
+            {
+                ttlMs: 60 * 60 * 1000,
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping the fleet command retention purge because another instance holds the task lock',
+                    ),
+            },
+        );
+    }
+
+    /** The command-output pass in bounded batches; returns the runs cleared. */
+    async purgeCommandOutputs(
+        now: Date = new Date(),
+        batchSize: number = FLEET_JOB_PURGE_BATCH_SIZE,
+        maxBatches: number = FLEET_JOB_PURGE_MAX_BATCHES,
+    ): Promise<number> {
+        if (!this.commandRuns) return 0;
+        const cutoff = new Date(now.getTime() - config.fleet.getJobRetentionDays() * DAY_MS);
+        let total = 0;
+        for (let batch = 0; batch < maxBatches; batch += 1) {
+            const purged = await this.commandRuns.purgeEndedOutputs(cutoff, batchSize);
+            total += purged;
+            if (purged < batchSize) return total;
+        }
+        this.logger.warn(
+            `Fleet command retention stopped at ${maxBatches} batches (${total} runs); the remainder is left to the next pass`,
+        );
+        return total;
+    }
 
     @Cron('35 3 * * *')
     async purgeExpiredJobBodies(): Promise<void> {
