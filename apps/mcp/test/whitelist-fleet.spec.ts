@@ -29,7 +29,7 @@ const WITHHELD: Record<string, string> = {
 	fleet_sessions_question: 'same route as fleet_sessions_read',
 	// P2: a container run may carry secret values a person types in the Run dialog (FL-09 Q5).
 	fleet_docker_run: 'secret values are typed by a person',
-	// The pull is a POST on the images collection; MCP keeps one tool per image action route.
+	// The Agent tool reads it through the machine service; there is no REST route of its own.
 	fleet_docker_compose_describe: 'no REST route'
 };
 
