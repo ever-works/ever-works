@@ -13,6 +13,7 @@ import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
+import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
@@ -122,6 +123,18 @@ export interface AgentFleetToolSource {
         service: Pick<FleetService, 'getVisibleForUser' | 'listVisibleForUser'>;
         history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
         needsALook?: Pick<NeedsALookService, 'forNodes'>;
+    };
+    /**
+     * Checkouts on computers (FL-14 P2, spec FR-29) — when bound, the
+     * `fleet_checkouts_*` tools are offered (`buildFleetCheckoutTools`), each
+     * act checked against the Node's `checkouts` audience for the Agent's
+     * owner and classified on the trust ladder (`safety/action-category.ts`).
+     */
+    checkouts?: {
+        service: Pick<
+            FleetCheckoutService,
+            'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
+        >;
     };
     /**
      * Logs on computers (FL-08) — when bound, the read-only

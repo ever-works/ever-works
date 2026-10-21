@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { attachCommand } from './session/attach';
 import { listCommand } from './session/list';
@@ -20,4 +21,6 @@ export const fleetSessionCommand = new Command('session')
 export const fleetCommand = new Command('fleet')
     .description('Your computers')
     .addCommand(fleetSessionCommand)
-    .addCommand(commandsCommand);
+    .addCommand(commandsCommand)
+    // Checkouts on computers (FL-14): `fleet checkouts list|get|create|sync|archive|delete` (alias `fleet checkout`).
+    .addCommand(checkoutsCommand);

@@ -608,7 +608,17 @@ const CHECKOUT_EXPORTS = [
 	'parseFleetCheckoutsListReply',
 	'parseFleetCheckoutsSyncResult',
 	'fleetCheckoutDisplayPath',
-	'fleetCheckoutName'
+	'fleetCheckoutName',
+	'FLEET_CHECKOUT_DELETE_MODES',
+	'FLEET_CHECKOUT_CREDENTIAL_ACCESS',
+	'isFleetCheckoutDeleteMode',
+	'isFleetCheckoutCredentialAccess',
+	'isFleetCheckoutBranchName',
+	'proposeFleetCheckoutBranch',
+	'fleetCheckoutFolderName',
+	'parseFleetCheckoutChangesEvidence',
+	'parseFleetCheckoutsCreateResult',
+	'parseFleetCheckoutsDeleteResult'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -635,6 +645,14 @@ const ALL_EXPORTS = [
 ];
 
 const FUNCTION_EXPORTS = [
+	'isFleetCheckoutDeleteMode',
+	'isFleetCheckoutCredentialAccess',
+	'isFleetCheckoutBranchName',
+	'proposeFleetCheckoutBranch',
+	'fleetCheckoutFolderName',
+	'parseFleetCheckoutChangesEvidence',
+	'parseFleetCheckoutsCreateResult',
+	'parseFleetCheckoutsDeleteResult',
 	'isFleetCheckoutKind',
 	'isFleetCheckoutState',
 	'isFleetCheckoutIsolation',
@@ -885,7 +903,9 @@ describe('fleet barrel', () => {
 		// → +43 with checkouts on computers (FL-14): the twenty-six constants and
 		// seventeen helpers of `fleet-checkout.types.ts` — a NEW module, so the
 		// witness table below gains a row.
-		expect(Object.keys(fleet)).toHaveLength(455);
+		// → 465 with FL-14 P2: two constants and eight helpers more in the same
+		// module (create, delete, the scoped credential, the branch rule).
+		expect(Object.keys(fleet)).toHaveLength(465);
 	});
 
 	it.each([

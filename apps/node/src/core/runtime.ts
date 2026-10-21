@@ -62,7 +62,7 @@ import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
-import { resolveAllowedRoots, standardLogDirs } from './link/allowed-roots';
+import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
@@ -74,6 +74,10 @@ import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules
 import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import { createCheckoutsModule } from './link/modules/checkouts';
 import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
+import {
+	createCheckoutCredentialClient,
+	type CheckoutCredentialFetch
+} from './link/modules/checkouts/checkout-credential';
 import type { ConnectFn } from './sessions/daemon-client';
 import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
@@ -935,6 +939,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					nodeName: config.name?.trim() || 'this computer',
 					platform: io.environment.platform,
 					...(options.checkoutsGit ? { git: options.checkoutsGit } : {}),
+					// FL-14 P2: the operation-scoped git credential a checkout Ever Works
+					// made authenticates with (never the machine's own helper).
+					credentials: createCheckoutCredentialClient({
+						apiUrl: apiBase.url,
+						nodeId: config.nodeId,
+						secret: config.secret,
+						fetchFn: io.fetchFn as unknown as CheckoutCredentialFetch,
+						userAgent,
+						protect: (token) => io.logger.protect(token),
+						unprotect: (token) => io.logger.unprotect(token)
+					}),
 					reaperMaxAgeMs: (config.workspaceGc?.maxAgeDays ?? DEFAULT_WORKSPACE_MAX_AGE_DAYS) * 86_400_000,
 					logger: io.logger
 				})
@@ -968,13 +983,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			nodeName: config.name?.trim() || 'this computer',
 			roots: async () => {
 				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
-				const resolved = await resolveAllowedRoots(
+				const resolved = await resolveCanonicalAllowedRoots(
 					{
 						platform,
 						homedir,
+						purpose: 'logs',
 						workspaceRoot,
 						checkouts,
-						filesRoots: options.filesRoots ?? [],
+						extraRoots: options.filesRoots ?? [],
 						logDirs: standardLogDirs(platform, homedir)
 					},
 					logIo.fs

@@ -1,4 +1,5 @@
 // Checkouts on computers (FL-14) — clones and worktrees on a Node.
+export * from './agent-fleet-checkout-tools';
 export * from './checkout-remote-match';
 export * from './fleet-checkout.errors';
 export * from './fleet-checkout-node.port';

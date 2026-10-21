@@ -611,6 +611,34 @@ export const WHITELIST: WhitelistEntry[] = [
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
 
+	// Checkouts on computers (6) — FL-14, `apps/api/src/fleet/checkouts/
+	// fleet-checkouts.controller.ts`, the same names as the Agent tools
+	// (CONTRACTS §11.3). Pull, push, archive and delete answer
+	// `confirmation_required` first; the caller repeats with `confirm` /
+	// `confirmName` (CONTRACTS §2.2). The node-facing credential route
+	// (`/api/fleet/checkouts/{id}/credential`) is deliberately NOT exposed.
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts',
+		toolName: 'fleet_checkouts_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/checkouts', toolName: 'fleet_checkouts_create' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/sync', toolName: 'fleet_checkouts_sync' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/archive', toolName: 'fleet_checkouts_archive' },
+	{
+		method: 'DELETE',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_delete',
+		annotations: { destructiveHint: true }
+	},
+
 	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
 	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
 	// read at most 500 secret-scanned lines of one. The read never follows; a

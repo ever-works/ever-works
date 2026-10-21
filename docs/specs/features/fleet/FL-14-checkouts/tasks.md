@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-14-checkouts`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft` — P1 built (#2833, not yet run; see `docs/internal/fleet/lanes/FL-14.md`)
+**Status:** `Draft` — P1 merged (#2833), P2 built (#2840); nothing run yet — see `docs/internal/fleet/lanes/FL-14.md`
 **Last updated:** 2026-10-21
 
 ---
@@ -138,40 +138,40 @@
 
 ## P2 — Create, sync, delete, roots, tools
 
-- [ ] **T-21**. Add `packages/contracts/src/fleet/fleet-git-credential.types.ts`; create
+- [x] **T-21**. Add `packages/contracts/src/fleet/fleet-git-credential.types.ts`; create
       `apps/api/src/fleet/fleet-git-credential.service.ts` generalising `fleet-push-credential.service.ts`
       (operation-keyed, `read`/`write` access, host check) and the node-authenticated
       `POST /api/internal/fleet/checkouts/credential` on `apps/api/src/fleet/fleet-jobs.controller.ts`'s
       sibling `fleet-checkouts-internal.controller.ts`.
       **Test**: `apps/api/src/fleet/__tests__/fleet-git-credential.service.spec.ts` — scope,
       narrowing, revoke on done, host mismatch refused, undifferentiated 401.
-- [ ] **T-22**. Create `apps/node/src/core/link/modules/checkouts/checkout-credential.ts` (header in child env for
+- [x] **T-22**. Create `apps/node/src/core/link/modules/checkouts/checkout-credential.ts` (header in child env for
       one command only) and `checkout-operations.ts` (`clone`, `worktreeAdd`, `fetch`, `pull`, `push`,
       `remove`, `forget`; cancellable; progress; partial cleanup; `core.longpaths` on win32).
       **Test**: `checkout-credential.spec.ts` (never argv/config), `checkout-operations.spec.ts`
       (argv per op, dirty-tree pull refused, cancellation removes partial clone).
-- [ ] **T-23**. Extend `apps/node/src/core/link/modules/checkouts.ts` with `checkouts.create`,
+- [x] **T-23**. Extend `apps/node/src/core/link/modules/checkouts.ts` with `checkouts.create`,
       `checkouts.sync`, `checkouts.delete` (evidence re-computed; `busy` on live session cwd / lease /
       reaper intent). FL-06 (its T-04/T-23) later adds `remoteHeads` → `remoteBranches` and the
       `cleanUp=1` gate to this module and to T-24's delete — leave both seams open.
       **Test**: extend `checkouts.spec.ts` — consent per origin, `expected` counts exceeded →
       refused, discovered checkouts never request a platform credential.
-- [ ] **T-24**. Extend `fleet-checkout.service.ts` and `fleet-checkouts.controller.ts` with
+- [x] **T-24**. Extend `fleet-checkout.service.ts` and `fleet-checkouts.controller.ts` with
       `POST /checkouts`, `POST /checkouts/:id/sync`, `DELETE /checkouts/:id` (CONTRACTS §2.2: without
       a field it answers `409 confirmation_required` with `{ class, uncommitted, unpushedCommits }` —
       the delete preview — then accepts `confirm: true` or `confirmName`; branch-name uniqueness per
       remote incl. archived rows → `-2` suffix).
       **Test**: extend both specs — 202 + operationId, `confirmation_required` with counts, suffix
       rule, `confirm` vs `confirm-destructive` from counts, wrong `confirmName` refused.
-- [ ] **T-25**. Create `NewCheckoutDialog.tsx` and `DeleteCheckoutDialog.tsx`; add Pull/Push to the
+- [x] **T-25**. Create `NewCheckoutDialog.tsx` and `DeleteCheckoutDialog.tsx`; add Pull/Push to the
       row menu; cost footer.
       **Test**: `DeleteCheckoutDialog.unit.spec.tsx` (typed name only when dirty), `NewCheckoutDialog.unit.spec.tsx`.
-- [ ] **T-26**. Wire the registry's `readyPaths()` into the shared resolver
+- [x] **T-26**. Wire the registry's `readyPaths()` into the shared resolver
       `apps/node/src/core/link/allowed-roots.ts` (R-39) so FL-08's logs and FL-11's files see `ready`
       checkouts + the workspace root; no second resolver.
       **Test**: extend `checkout-registry.spec.ts` and `apps/node/src/core/link/allowed-roots.spec.ts`
       — an archived or missing checkout is not a root.
-- [ ] **T-27**. Add `fleet_checkouts_list|get|create|sync|archive|delete` to
+- [x] **T-27**. Add `fleet_checkouts_list|get|create|sync|archive|delete` to
       `packages/agent/src/fleet/agent-fleet-tools.ts` with CONTRACTS §11.3 annotations; add the routes
       to `apps/mcp/src/openapi-tools/whitelist.ts` with the same names; add
       `apps/cli/src/commands/fleet/checkout.ts` (FL-19 §9.3's file; `ever-works fleet checkouts list|get|create|sync|archive|delete [--json]`).

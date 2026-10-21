@@ -56,3 +56,15 @@ export interface FleetCheckoutNodePort {
 }
 
 export const FLEET_CHECKOUT_NODE_PORT = 'FLEET_CHECKOUT_NODE_PORT' as const;
+
+/**
+ * FL-14 P2 — does a GitHub App installation of this person cover a remote, so
+ * a clone of it gets the operation-scoped credential (spec FR-17)? The API
+ * binds it over the push-credential scope resolver (platform state only, no
+ * GitHub call). Unbound: every clone is anonymous (public repositories only).
+ */
+export interface FleetCheckoutCredentialScope {
+    covers(userId: string, remoteUrl: string): Promise<boolean>;
+}
+
+export const FLEET_CHECKOUT_CREDENTIAL_SCOPE = 'FLEET_CHECKOUT_CREDENTIAL_SCOPE' as const;
