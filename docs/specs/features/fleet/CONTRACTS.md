@@ -41,11 +41,35 @@ failure thresholds stay fixed (§6) until the owner asks for editors.
 channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
 `session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
 
+**Revision 10 (2026-10-21)** — FL-04 P3 (recording, AW-11 P3): session recordings are session-keyed
+`terminal_transcript_chunks` (R-9) kept `FLEET_SESSION_RECORDING_RETENTION_DAYS` = 14 days whatever the plan;
+`GET /api/fleet/sessions/:id/recording` answers `FleetSessionRecordingManifest { state, chunks, durationMs, firstAt,
+lastAt, driverSpans[], expired, retentionDays }`, or with `?from=<seq>&limit=<n>` a `FleetSessionRecordingPage
+{ chunks[{ seq, text, at }], lastSeq, hasMore }`; `POST …/recording { on }` answers the session; defaults: Agent
+sessions recorded, owner sessions when the node's `recordWatchSessions` is on; the platform records through a
+watch-only `session` channel (a system caller) on the replica holding the link.
+
+**Revision 9 (2026-10-21)** — FL-04 P2 (Agent sessions): job kind `agent-session` (§6 / R-28) with
+`FleetAgentSessionPayload { fleetSessionId, agentId, agentRunId, nodeId, provider: claude-code|codex, cwd, title,
+firstMessage, cols, rows, permissionMode, leaseTtlSec }` (ids, the folder and the first message — never a command
+line), required tags `sessions` + the CLI's, idempotency key `fleet-session:<id>`, pinned to `payload.nodeId`, lease
+TTL 300 s, queue SLA 2 h (the session sweeper ends one still waiting after 10 min); result `FleetAgentSessionResult
+{ exitCode, outcome, endedReason?, providerSessionId }`; `agent_runs.fleetSessionId` + trigger `session` (§4.2, R-1,
+slot `1796040100000`); `RunLedgerRow.fleetSessionId?`. An Agent session runs on the person's own computer (a node
+leases only its owner's jobs).
+
 **Revision 8 (2026-10-21)** — FL-04 P1b: session viewers (§3.3 "Session viewers") — the browser's
 `session.attach`, the watcher and driver JSON allow-lists of the `session` family, the attach-token body,
 `presence` on the session detail, watchers admitted under the kill switch.
 
-**Revision 9 (2026-10-21)** — FL-12 P1 (lane log `docs/internal/fleet/lanes/FL-12.md`, decisions 2–5): the
+**Revision 9 (2026-10-21)** — FL-14 P1 (lane-log decisions 1–5): `checkouts.list` needs `work-or-manage`
+(a `FLEET_LINK_VERB_CONSENT_OVERRIDES` entry, §3.3) and discovery (`rescan`) `--manage`, checked on the machine; the node
+keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `checkoutIds`) and answers
+`{ checkouts, complete, truncated, codeFolders, scannedAt, checkoutsRoot, remoteBranches? }`, and
+`checkouts.sync` takes `{ path, op, checkoutId? }`; a person's rescan is audited as `node.checkout.sync` with
+`op: 'rescan'` (§7). Shapes in `packages/contracts/src/fleet/fleet-checkout.types.ts`.
+
+**Revision 11 (2026-10-21)** — FL-12 P1 (lane log `docs/internal/fleet/lanes/FL-12.md`, decisions 2–5): the
 `command` family opens with `{ commandId, nodeId, runId }` and its node→platform messages carry the fields of §3.3
 "Command family details"; `fleet_commands.commandRedacted` and `fleet_command_runs.errorCode`, `errorHint`,
 `outputBytes`, `capped` (§4.4, FL-12's own slots); the per-computer refusal lives on the run row, the `failedReason`
@@ -277,9 +301,10 @@ the node went away mid-operation; never reported as `done`).
 
 **Consent exceptions per verb.** The `machine` family needs `manage` except `health.now`, which is
 allowed on any open link (R-31). The link implementation keeps these exceptions in one table
-(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code.
+(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code. FL-14 adds
+`checkouts.list: work-or-manage` (revision 9).
 
-**Command family details (FL-12, revision 9).** One channel per run, opened with `{ commandId, nodeId, runId }`.
+**Command family details (FL-12, revision 11).** One channel per run, opened with `{ commandId, nodeId, runId }`.
 `command.run { runId, command, cwd?, timeoutSec }` answers `{ pid, startedAt, shell }` once the process exists (a
 shell that cannot start answers `operation_failed` with the first line of the error); `DATA` frames of at most 64 KiB
 follow until 10 MiB, then `command.truncated { runId, bytes }`; `command.timeout { runId, timeoutSec }` when the
@@ -431,7 +456,7 @@ allowed values validated in code, as existing fleet columns are.
 | `deletedAt`                          | timestamptz null                                                                           | soft delete of a schedule (FL-13 slot 00)                       |
 
 FL-12's `CreateFleetCommands` creates every column above the `pausedAt` row (including `cadence`,
-`name`, `enabled`, `lastRunAt`, `nextRunAt`) plus `commandRedacted boolean` (revision 9: the stored command line
+`name`, `enabled`, `lastRunAt`, `nextRunAt`) plus `commandRedacted boolean` (revision 11: the stored command line
 was redacted by the secret scanner); FL-13's slot 00 (`AddFleetCommandCadence`) adds the
 last three rows and `fleet_command_runs.scheduledFor`.
 
@@ -439,7 +464,7 @@ last three rows and `fleet_command_runs.scheduledFor`.
 (`running · done · failed · timeout · skipped-overlap · skipped-offline`), `failedReason`
 (enum null `link-lost · node-restart · kill-switch · drain · shell-failed · cancelled-by-user`),
 `outputHead` / `outputTail` (first and last 64 KiB), `outputRef` (full output kept on the node for
-30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13). Revision 9 (FL-12's slot 01) adds
+30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13). Revision 11 (FL-12's slot 01) adds
 `errorCode` (varchar null, a §8 code) and `errorHint` (text null) — a computer that refused BEFORE the command ran
 (`unreachable`, `consent_missing`, `permission_denied`, `unsupported_on_node`, `busy`, `kill_switch`) or a start
 that failed (`operation_failed`, with `failedReason: shell-failed`) — `outputBytes` (int) and `capped` (boolean,

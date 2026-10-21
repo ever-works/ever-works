@@ -34,6 +34,7 @@ import type { FleetJobView } from './fleet-jobs.types';
 import type { FleetNodeLoadView } from './fleet-jobs.types.js';
 import type { FleetNodeModelThrottleView } from './fleet-model-usage-limit.types.js';
 import type { FleetNodeHealthSnapshot, FleetNodeHealthStored } from './fleet-node-health.types.js';
+import type { FleetWakeRoute } from './fleet-node-wake.types.js';
 
 import type { ComputerControlPolicy } from '../computer/computer-session.types.js';
 import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access.types.js';
@@ -355,6 +356,26 @@ export interface FleetNodeSelfDescription {
 	 */
 	consents?: FleetConsents;
 	/**
+	 * Computer health (FL-03, second phase; CONTRACTS §1.1) — the primary
+	 * network interface's hardware address, the one fact a Wake-on-LAN packet
+	 * needs. Sent only by a node started with `--manage` (spec FR-23); the
+	 * platform validates it (`normalizeFleetMacAddress`), stores it for the
+	 * owner's own computer and never shows it in full.
+	 *
+	 * Heartbeat only, in the NEWEST optional tier together with {@link lanId}:
+	 * a platform older than the pair 400s it, and the node drops exactly these
+	 * two and keeps beating.
+	 */
+	macAddress?: string;
+	/**
+	 * Computer health (FL-03, second phase) — an OPAQUE identity of the
+	 * network the primary interface is on (a short hash of that network,
+	 * never an address), so siblings on the same network can be matched
+	 * without storing addresses. Re-hashed with the owner's id before it is
+	 * stored. Sent with {@link macAddress}, under `--manage` only.
+	 */
+	lanId?: string;
+	/**
 	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
 	 * health: `running` while it answers, `stopped` or `failed` with the
 	 * node's own diagnosis otherwise. Sent by a node with `--manage` or
@@ -560,6 +581,24 @@ export interface FleetNodeView {
 	 * `isFleetNodeHealthStale` before showing it as current.
 	 */
 	health?: FleetNodeHealthStored | null;
+	/**
+	 * Computer health (FL-03, second phase) — the hardware address the node
+	 * reported, MASKED to its last two octets (`••:••:••:••:3f:9a`), or null
+	 * when it never reported one. Owner only: never on a shared view.
+	 */
+	macAddress?: string | null;
+	/** Computer health (FL-03, second phase) — the stored (owner-salted) network identity, or null. Owner only. */
+	lanId?: string | null;
+	/**
+	 * Computer health (FL-03, second phase) — the sibling an offline computer
+	 * can be woken through right now, or null when it cannot (not offline, no
+	 * hardware address, no online sibling advertising `wake` on its network).
+	 * Computed on the owner's list and detail reads; never on a shared view
+	 * (the health read answers a shared viewer's `wake` availability itself).
+	 */
+	canWake?: FleetWakeRoute | null;
+	/** Computer health (FL-03, second phase) — the last wake attempt on this computer (ISO), or null. */
+	lastWakeAttemptAt?: string | null;
 	/**
 	 * Fleet hub (FL-01) — the owner's star. Favourites sort first on the hub.
 	 * Owner-only: always false on a row someone else sees through an

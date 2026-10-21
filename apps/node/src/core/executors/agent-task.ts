@@ -1650,7 +1650,8 @@ async function runModelStep(
  * Mirrors what the CLI applies: an absent, unreadable or unparseable file
  * is not in effect for the CLI either, so it does not refuse here.
  */
-async function refuseUnderClaudeManagedMcpConfig(
+/** Exported for the `agent-session` executor (FL-04 P2), which reuses this gate unchanged. */
+export async function refuseUnderClaudeManagedMcpConfig(
 	provider: FleetAgentExecutionProvider,
 	io: AgentTaskIo
 ): Promise<void> {
@@ -1800,7 +1801,8 @@ function supportsRestrictedMode(
  *      whose onboarding lives in the file being moved away from would
  *      fail every model step on a prompt `-p` cannot answer.
  */
-async function establishModelContainment(
+/** Exported for the `agent-session` executor (FL-04 P2), which reuses the Task-run isolation unchanged. */
+export async function establishModelContainment(
 	provider: FleetAgentExecutionProvider,
 	scratchDir: string,
 	scratchFs: AgentTaskScratchFs,
@@ -2785,7 +2787,7 @@ async function readModelOutput(
 }
 
 /** Per-job scratch directory PREFIX — the job id is a uuid, but never trust the wire. */
-function scratchDirName(jobId: string): string {
+export function scratchDirName(jobId: string): string {
 	const safe = jobId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
 	return safe || 'job';
 }

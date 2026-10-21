@@ -115,6 +115,9 @@ The whole surface is gated by `FLEET_ENABLED` on the API. When it is off, every 
 
 ## Health signals
 
+> The per-check-in health snapshot (CPU, memory, disk, GPU, load, uptime, pending reboot, failed services),
+> its history, **Refresh now** and **Wake** are described in [Computer health](./fleet-health.md).
+
 `status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
 
 ### Worker state
@@ -1076,3 +1079,7 @@ Uploading a node's own log when a run fails is not built: the node has no authen
 - [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
 - [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
   what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)
+
+## Sessions on computers
+
+A computer can also keep **sessions** — a shell, Claude Code or Codex in a folder, kept running by the computer even when nobody watches, for you or for one of your Agents. See [Sessions on computers](./fleet-sessions.md).

@@ -35,6 +35,7 @@ import {
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { runAgentSessionJob } from './executors/agent-session';
 import { defaultRepositoryLayerFs } from './executors/codex-repository-layers';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
@@ -55,15 +56,18 @@ import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
-import type { FleetConsents, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
+import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
-import { composeNodeLinkModules } from './link/modules';
+import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createCommandModule } from './link/modules/command';
 import { CommandOutputStore } from './link/modules/command/command-output-store';
+import { createCheckoutsModule } from './link/modules/checkouts';
+import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
 import type { ConnectFn } from './sessions/daemon-client';
 import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
@@ -74,6 +78,7 @@ import { homedir as osHomedir } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	DEFAULT_WORKSPACE_MAX_AGE_DAYS,
 	effectiveMinFreeDiskBytes,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
@@ -133,6 +138,19 @@ export interface NodeIo {
 	 * (`createHealthProbeIo`); every test can leave it out.
 	 */
 	health?: HealthProbeIo;
+	/**
+	 * Computer health, second phase (FL-03) — the host's network interfaces
+	 * (`os.networkInterfaces()`), read for the primary interface's hardware
+	 * address and opaque network identity. Optional: without it the node
+	 * reports neither and advertises no `wake`. Read only under `--manage`.
+	 */
+	network?: () => NetworkInterfaceMap | null;
+	/**
+	 * Computer health, second phase (FL-03) — sends a Wake-on-LAN datagram
+	 * (`node:dgram`, bound in `node-io.ts`). Optional: without it `wake.send`
+	 * is not offered on the link.
+	 */
+	wakeSender?: WakeSender;
 }
 
 /**
@@ -575,6 +593,12 @@ export interface CreateNodeRuntimeOptions {
 	nodeLink?: boolean;
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
+	/**
+	 * Services and processes (FL-09) — replaces the machine-facts modules the
+	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
+	 * or fakes so no real `systemctl` / `ps` runs.
+	 */
+	machineFactModules?: readonly NodeModule[];
 	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
@@ -625,6 +649,16 @@ export interface CreateNodeRuntimeOptions {
 	commandOutputDir?: string;
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
+	/**
+	 * Checkouts on computers (FL-14) — where the node-local checkout registry
+	 * lives (`checkouts.json` beside the config). Absent (the desktop shell,
+	 * tests, embedders): no checkouts module, so `checkouts.*` answers
+	 * `unsupported_on_node`. The code folders come from the stored config
+	 * (`start --code-folder`), never from the platform.
+	 */
+	checkoutsRegistryPath?: string;
+	/** Test seam: replace the checkouts module's git runner. */
+	checkoutsGit?: CheckoutGitRunner;
 }
 
 /**
@@ -695,12 +729,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// and the tools it spawns — stops running too (`loopRef` is set once the
 	// loop below exists).
 	let loopRef: HeartbeatLoop | null = null;
+	let probeHealth: (() => Promise<FleetNodeHealthSnapshot | null>) | undefined;
 	if (io.health) {
-		const probeHealth = createHealthProbe(io.health, {
+		const probe = createHealthProbe(io.health, {
 			workspacePath: io.workspacePath ?? workspaceRoot,
 			...(io.now ? { now: io.now } : {})
 		});
-		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probeHealth());
+		probeHealth = probe;
+		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probe());
 	}
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
@@ -718,6 +754,35 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		manage: options.manageEnabled === true,
 		usageScan: false
 	};
+	// Computer health, second phase (FL-03): this machine's primary interface,
+	// read fresh on every call (a laptop changes networks). Reported on the
+	// beat — hardware address and the opaque network identity, never an
+	// address — only under `--manage` (spec FR-23), and only while the
+	// platform has not proven it predates the pair.
+	const readNetwork = io.network
+		? (): LocalNetworkIdentity | null => {
+				try {
+					return resolveNetworkIdentity(io.network!());
+				} catch {
+					return null;
+				}
+			}
+		: undefined;
+	if (consents.manage && readNetwork) {
+		telemetry.network = () => {
+			if (loopRef && !loopRef.acceptsField('macAddress')) return null;
+			const identity = readNetwork();
+			return identity ? { macAddress: identity.macAddress, lanId: identity.lanId } : null;
+		};
+	}
+	// The `health` link module (FL-03): `health.now` (Refresh now) over the
+	// heartbeat's own probe, `wake.send` over this machine's interface, and the
+	// `wake` tag under `--manage`. Registered here, where the probe exists.
+	const healthLinkModule = createHealthLinkModule({
+		...(probeHealth ? { probeHealth } : {}),
+		...(readNetwork ? { network: readNetwork } : {}),
+		...(io.wakeSender ? { wakeSender: io.wakeSender } : {})
+	});
 	// Sessions on computers (FL-04): the session daemon's supervisor and the
 	// link's `session` module, for a process that may host sessions (owner
 	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
@@ -780,6 +845,22 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions = { supervisor, module: sessionModule };
 		telemetry.sessionDaemon = () => supervisor.report();
 	}
+	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
+	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
+	const checkoutsModule =
+		options.checkoutsRegistryPath && (consents.manage || consents.work)
+			? createCheckoutsModule({
+					registryPath: options.checkoutsRegistryPath,
+					codeFolders: config.codeFolders ?? [],
+					workspaceRoot,
+					consents,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					...(options.checkoutsGit ? { git: options.checkoutsGit } : {}),
+					reaperMaxAgeMs: (config.workspaceGc?.maxAgeDays ?? DEFAULT_WORKSPACE_MAX_AGE_DAYS) * 86_400_000,
+					logger: io.logger
+				})
+			: undefined;
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -789,7 +870,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
-		...(options.linkModules ? { extra: options.linkModules } : {}),
+		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
 		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
 		...(consents.manage
@@ -807,6 +888,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				}
 			: {}),
 		...(computerLegs ? { computerLegs } : {}),
+		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
+		// FL-09 — services and processes (their verbs need --manage on this machine).
+		machineFacts: options.machineFactModules ?? createMachineFactModules(),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -1324,6 +1408,34 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				await pushCredentials?.dispose();
 			}
 		});
+		// Sessions on computers (FL-04 P2): an Agent working in an interactive
+		// session on this machine. The WORK lane only (never the attended
+		// lane), counted against `--concurrency` like `agent-task` (R-28);
+		// started through the session daemon under the Task-run isolation, the
+		// lease held while the session lives. Without a daemon (no `--work` /
+		// `--manage`, or the shell did not wire one) every job is refused with
+		// the reason rather than pretending to have run it.
+		worker.register('agent-session', (job, signal) =>
+			runAgentSessionJob(job, signal, {
+				workEnabled: options.workerEnabled === true,
+				daemon: sessions?.supervisor ?? null,
+				modelCli,
+				containment: {
+					sessionConfigFs: defaultSessionConfigFs,
+					managedMcpConfigFs: defaultSessionConfigFs,
+					modelCli,
+					nodeId: config.nodeId,
+					logger: io.logger,
+					...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {})
+				},
+				nodeId: config.nodeId,
+				homedir: osHomedir(),
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
+				platform: io.environment.platform as NodeJS.Platform,
+				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+			})
+		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising
 		// the `browser` capability with no executor behind it would fail

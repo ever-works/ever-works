@@ -250,6 +250,7 @@ export class RunLedgerService {
                 awaitingInput: run.awaitingInput ?? false,
                 queuedReason: run.queuedReason ?? null,
                 attentionReason: run.attentionReason ?? null,
+                fleetSessionId: run.fleetSessionId ?? null,
             };
         });
     }

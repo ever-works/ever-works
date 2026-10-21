@@ -24,7 +24,7 @@ import { PortableDateColumn } from './_types';
  * `failedReason` null and the CONTRACTS §8 refusal in `errorCode` /
  * `errorHint` — the §4.4 `failedReason` enum names only how a run that RAN
  * failed. `errorCode`, `errorHint`, `outputBytes` and `capped` are FL-12's own
- * columns (lane-log decision 3, CONTRACTS revision 9).
+ * columns (lane-log decision 3, CONTRACTS revision 11).
  *
  * No foreign key on `nodeId`: the history outlives the computer, as
  * `fleet_audit.nodeId` does. `commandId` → `fleet_commands` CASCADE lives in

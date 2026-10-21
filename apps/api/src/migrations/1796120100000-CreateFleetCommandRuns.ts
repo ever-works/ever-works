@@ -15,7 +15,7 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * last 30 runs (`outputRef`).
  *
  * FL-12's own columns beside CONTRACTS §4.4's (lane-log decision 3, CONTRACTS
- * revision 9): `errorCode` / `errorHint` — the CONTRACTS §8 refusal of a
+ * revision 11): `errorCode` / `errorHint` — the CONTRACTS §8 refusal of a
  * computer that would not run it (offline, no `--manage`, outside the
  * audience, an older node); `outputBytes` and `capped` — how much it printed,
  * and whether the machine stopped keeping output at 10 MiB. FL-13's slot

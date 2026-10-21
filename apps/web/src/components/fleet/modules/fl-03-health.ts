@@ -7,7 +7,9 @@ import { registerOverviewBlock } from '../registry';
  * Computer health (FL-03) — what this epic adds to the Fleet module registry
  * (README D9, `components/fleet/registry.ts`):
  *
- *  - the metrics block at the top of every computer page's Overview tab. It
+ *  - the metrics block at the top of every computer page's Overview tab (with
+ *    Refresh now and, for an offline computer, the Wake panel), and the
+ *    history chart under it (second phase). The metrics block
  *    carries the computer's state in words and its one fix, so it renders
  *    before every other block. No `flag`: the snapshot and the state are
  *    report-only and ship on; only the history behind them is
@@ -28,6 +30,22 @@ registerOverviewBlock({
     order: 10,
     epic: 'FL-03',
     load: () => import('../health/overview/HealthMetricsBlock'),
+});
+
+/**
+ * FL-03 second phase — the history chart, right under the metrics. No `flag`
+ * on purpose: with `FLEET_HEALTH_HISTORY_ENABLED` off the history read answers
+ * `{ disabled: true }` and the block says "History is switched off on this
+ * deployment" (spec U10) instead of silently missing.
+ */
+export const HEALTH_HISTORY_BLOCK_ID = 'fl-03.health-history';
+
+registerOverviewBlock({
+    id: HEALTH_HISTORY_BLOCK_ID,
+    surface: 'computer',
+    order: 20,
+    epic: 'FL-03',
+    load: () => import('../health/overview/HealthHistoryBlock'),
 });
 
 registerNeedsALookCommand(FLEET_CLEAR_MODEL_THROTTLE_COMMAND, async (item) => {

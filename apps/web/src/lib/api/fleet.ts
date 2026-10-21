@@ -45,11 +45,21 @@ import type {
     FleetRunnerStatusView,
     // Computer health (FL-03).
     FleetNodeHealthView,
+    // Computer health, second phase (FL-03).
+    FleetNodeHealthHistory,
+    FleetNodeHealthRange,
+    FleetNodeWakeResult,
+    FleetNodeWakeStatus,
 } from '@ever-works/contracts';
 
 export type {
     // Computer health (FL-03).
     FleetNodeHealthView,
+    // Computer health, second phase (FL-03).
+    FleetNodeHealthHistory,
+    FleetNodeHealthRange,
+    FleetNodeWakeResult,
+    FleetNodeWakeStatus,
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
     FleetAuditView,
@@ -536,6 +546,44 @@ export const fleetAPI = {
     health: async (nodeId: string) => {
         return serverFetch<FleetNodeHealthView>(
             `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+        );
+    },
+
+    /**
+     * Computer health, second phase (FL-03) — Refresh now: a fresh snapshot
+     * over the node link (any open link, CONTRACTS R-31). Answers the same
+     * shape as {@link health}.
+     */
+    refreshHealth: async (nodeId: string) => {
+        return serverMutation<FleetNodeHealthView>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Computer health, second phase (FL-03) — the history over one range (≤ 500 points, gaps kept). */
+    healthHistory: async (nodeId: string, range: FleetNodeHealthRange) => {
+        return serverFetch<FleetNodeHealthHistory>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/health/history?range=${encodeURIComponent(range)}`,
+        );
+    },
+
+    /** Computer health, second phase (FL-03) — wake an offline computer through a sibling (audited). */
+    wake: async (nodeId: string) => {
+        return serverMutation<FleetNodeWakeResult>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Computer health, second phase (FL-03) — has the computer answered its last wake? */
+    wakeStatus: async (nodeId: string) => {
+        return serverFetch<FleetNodeWakeStatus>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
         );
     },
 };

@@ -10,6 +10,10 @@ import type { IngestedEventRepository } from '../ingest/ingested-event.repositor
 import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
+import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
+import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
+import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
+import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -91,6 +95,31 @@ export interface AgentMeetingToolSource {
 
 export interface AgentFleetToolSource {
     service: Pick<FleetService, 'listForUser'>;
+    /**
+     * Services and processes on computers (FL-09) — backs
+     * `fleet_services_list|action` and `fleet_processes_list|signal`.
+     * Optional: unbound, those tools are simply not offered.
+     */
+    machine?: Pick<
+        FleetMachineActionsService,
+        'listServices' | 'serviceAction' | 'listProcesses' | 'signalProcess'
+    >;
+    /**
+     * Computer health (FL-03 second phase) — when bound, the read-only
+     * `fleet_nodes_health` / `fleet_nodes_needs_a_look` tools are offered
+     * (`buildFleetHealthTools`). Optional and unbound by default: FL-19 owns
+     * the Agent catalogue and binds it with the Agent gates.
+     */
+    health?: {
+        service: Pick<FleetService, 'getVisibleForUser' | 'listVisibleForUser'>;
+        history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
+        needsALook?: Pick<NeedsALookService, 'forNodes'>;
+    };
+}
+
+/** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
+export interface AgentFleetSessionToolSource {
+    service: FleetSessionsToolService['service'];
 }
 
 export interface AgentPrReviewToolSource {
@@ -218,6 +247,7 @@ export interface AgentDomainToolSources {
     digest?: AgentDigestToolSource;
     meetings?: AgentMeetingToolSource;
     fleet?: AgentFleetToolSource;
+    fleetSessions?: AgentFleetSessionToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

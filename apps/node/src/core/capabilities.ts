@@ -5,6 +5,8 @@ import {
 	FLEET_PUSH_CAPABILITY,
 	FLEET_PUSH_MIN_GIT_VERSION,
 	FLEET_SCREEN_CAPABILITY,
+	normalizeFleetLanId,
+	normalizeFleetMacAddress,
 	FLEET_SESSIONS_CAPABILITY,
 	normalizeFleetNodeSelfUpdate,
 	normalizeFleetSessionDaemonReport,
@@ -544,6 +546,13 @@ export interface SelfDescriptionTelemetry {
 	 */
 	consents?: () => FleetConsents | null;
 	/**
+	 * Computer health, second phase (FL-03) — the primary interface's hardware
+	 * address and opaque network identity (`resolveNetworkIdentity`), for
+	 * Wake-on-LAN. Wired by the runtime under `--manage` only (spec FR-23);
+	 * heartbeat only, like `health`. Null or a throw leaves both fields ABSENT.
+	 */
+	network?: () => { macAddress: string; lanId: string } | null;
+	/**
 	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
 	 * health (`SessionDaemonSupervisor.report()`). Absent on a process with
 	 * neither `--manage` nor `--work`, which then reports no `daemon` block.
@@ -680,6 +689,17 @@ export async function describeSelf(
 			manage: consents.manage === true,
 			usageScan: consents.usageScan === true
 		};
+	}
+	// Computer health, second phase (FL-03). Both or neither, each validated
+	// here at the wire boundary for the reason the housekeeping block gives.
+	const network = await resolveTelemetry(telemetry.network);
+	if (network) {
+		const macAddress = normalizeFleetMacAddress(network.macAddress);
+		const lanId = normalizeFleetLanId(network.lanId);
+		if (macAddress && lanId) {
+			description.macAddress = macAddress;
+			description.lanId = lanId;
+		}
 	}
 	// Sessions on computers (FL-04). Normalised (bounded reason, known keys
 	// only) for the reason above: a wire payload, never a spread.
