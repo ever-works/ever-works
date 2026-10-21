@@ -36,16 +36,17 @@ export default function LastCommandBlock({ nodes }: FleetOverviewBlockProps) {
     const [last, setLast] = useState<FleetCommandLastRunResponse['last'] | undefined>(undefined);
     const [now] = useState(() => Date.now());
 
+    const nodeId = node?.id ?? null;
     useEffect(() => {
-        if (!node) return;
+        if (!nodeId) return;
         let cancelled = false;
-        void commandsClient.lastForNode(node.id).then((result) => {
+        void commandsClient.lastForNode(nodeId).then((result) => {
             if (!cancelled) setLast(result.ok ? result.data.last : null);
         });
         return () => {
             cancelled = true;
         };
-    }, [node]);
+    }, [nodeId]);
 
     if (!node || !last) return null;
     const end = commandCardEnd(last.run);
