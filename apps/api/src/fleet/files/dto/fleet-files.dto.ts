@@ -83,6 +83,17 @@ export class FleetFilesConflictsDto extends FleetFilesLocationQueryDto {
     names!: string[];
 }
 
+/** `POST /api/fleet/nodes/:id/files/download/check`. */
+export class FleetFilesDownloadCheckDto extends FleetFilesLocationQueryDto {
+    @ApiProperty({ type: [String], description: 'Entries of the folder the download would take.' })
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(FLEET_FILES_LIMITS.maxEntries)
+    @IsString({ each: true })
+    @MaxLength(FLEET_FILES_NAME_MAX_LENGTH, { each: true })
+    entries!: string[];
+}
+
 /** `GET /api/fleet/nodes/:id/files/download`. */
 export class FleetFilesDownloadQueryDto extends FleetFilesLocationQueryDto {
     @ApiProperty({

@@ -17,6 +17,7 @@ import {
     sanitizeFleetFileConflicts,
     sanitizeFleetFileEntry,
     sanitizeFleetFileRootsResult,
+    sanitizeFleetFilesDownloadCheck,
     sanitizeFleetFilesListResult,
     isFleetFileRootId,
     type FleetAuditAction,
@@ -25,6 +26,7 @@ import {
     type FleetFileListView,
     type FleetFileRootsResponse,
     type FleetFilesDeleteResult,
+    type FleetFilesDownloadCheck,
     type FleetLinkReply,
 } from '@ever-works/contracts';
 import { randomUUID } from 'crypto';
@@ -271,6 +273,28 @@ export class FleetFilesService implements FleetFilesReaderPort {
         );
     }
 
+    // ─── Download check (FR-16, FR-17 before the browser starts) ───────────
+
+    async checkDownloadForUser(
+        userId: string,
+        nodeId: string,
+        input: { root: unknown; path?: unknown; entries: unknown },
+    ): Promise<FleetFilesDownloadCheck> {
+        await this.fleet.getVisibleForUser(userId, nodeId);
+        const location = parseFleetFilesLocation(input.root, input.path);
+        const names = parseFleetFilesNames(input.entries, 'entries', 5000);
+        return sanitizeFleetFilesDownloadCheck(
+            await this.requestOnce(
+                { kind: 'user', userId },
+                nodeId,
+                location,
+                FLEET_FILES_MESSAGES.pack,
+                { entries: names, dryRun: true },
+                { timeoutMs: 120_000 },
+            ),
+        );
+    }
+
     // ─── Delete (FR-18, confirm-destructive) ───────────────────────────────
 
     async deleteForUser(
@@ -301,7 +325,11 @@ export class FleetFilesService implements FleetFilesReaderPort {
                 target: location.path || '/',
             },
         });
-        const expected = names.length === 1 ? names[0] : fleetFileBaseName(location.path) || null;
+        const expected =
+            names.length === 1
+                ? names[0]
+                : fleetFileBaseName(location.path) ||
+                  (await this.rootFolderName(caller, nodeId, location.root));
         const confirmed =
             typeof input.confirmName === 'string' &&
             expected !== null &&
@@ -354,6 +382,19 @@ export class FleetFilesService implements FleetFilesReaderPort {
             });
             throw error;
         }
+    }
+
+    /** Several entries at a root's top: the folder to type is the root's own folder name. */
+    private async rootFolderName(
+        caller: FleetLinkCaller,
+        nodeId: string,
+        rootId: string,
+    ): Promise<string | null> {
+        const roots = await this.roots(caller, nodeId).catch(() => null);
+        const root = roots?.roots.find((candidate) => candidate.id === rootId);
+        if (!root) return null;
+        const segments = root.path.split(/[\\/]/).filter((segment) => segment.length > 0);
+        return segments[segments.length - 1] ?? null;
     }
 
     // ─── The Agent port (FL-19 assembles the tools) ────────────────────────

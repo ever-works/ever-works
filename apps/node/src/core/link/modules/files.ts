@@ -279,6 +279,24 @@ class FilesChannel {
 			this.reply(requestId, { error: asLinkError(error) });
 			return;
 		}
+		// A check before a download (the web's "Download" press): what would move, nothing streamed.
+		if (params.dryRun === true) {
+			this.active = null;
+			this.reply(requestId, {
+				result: {
+					accepted: {
+						entries: scan.entries,
+						bytes: scan.bytes,
+						skippedLinks: scan.skippedLinks,
+						skippedOther: scan.skippedOther,
+						single: scan.items.length === 1 && scan.items[0].header.kind === 'file'
+					},
+					credentialShaped: scan.credentialShaped,
+					credentialShapedCount: scan.credentialShapedCount
+				}
+			});
+			return;
+		}
 		if (scan.credentialShapedCount > 0 && params.allowCredentialShaped !== true) {
 			this.active = null;
 			this.reply(requestId, {

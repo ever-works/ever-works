@@ -425,6 +425,43 @@ export interface FleetFilesOperationStarted {
 	operationId: string | null;
 }
 
+/**
+ * `POST /download/check` — what a download would move, asked before it starts
+ * (the machine walks the selection and streams nothing): the counts the
+ * limits are checked against and the credential-shaped files inside, so the
+ * confirmation shows BEFORE the browser starts a download (FR-16, FR-17).
+ */
+export interface FleetFilesDownloadCheck {
+	entries: number;
+	bytes: number;
+	skippedLinks: number;
+	skippedOther: number;
+	/** One file: it downloads as itself; otherwise as a `.zip`. */
+	single: boolean;
+	/** Relative paths of credential-shaped files inside (at most 20 named). */
+	credentialShaped: string[];
+	credentialShapedCount: number;
+}
+
+/** A download check off the wire. */
+export function sanitizeFleetFilesDownloadCheck(value: unknown): FleetFilesDownloadCheck {
+	const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+	const accepted = raw.accepted && typeof raw.accepted === 'object' ? (raw.accepted as Record<string, unknown>) : {};
+	const num = (input: unknown) =>
+		typeof input === 'number' && Number.isFinite(input) && input >= 0 ? Math.floor(input) : 0;
+	return {
+		entries: num(accepted.entries),
+		bytes: num(accepted.bytes),
+		skippedLinks: num(accepted.skippedLinks),
+		skippedOther: num(accepted.skippedOther),
+		single: accepted.single === true,
+		credentialShaped: (Array.isArray(raw.credentialShaped) ? raw.credentialShaped : [])
+			.filter((path): path is string => typeof path === 'string' && normalizeFleetFileRelativePath(path) !== null)
+			.slice(0, 20),
+		credentialShapedCount: num(raw.credentialShapedCount)
+	};
+}
+
 /** `POST /delete` once done (the delete is short: it answers when the machine did). */
 export interface FleetFilesDeleteResult {
 	transferId: string;

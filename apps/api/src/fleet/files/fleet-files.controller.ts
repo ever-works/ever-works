@@ -24,6 +24,7 @@ import {
     type FleetFileListView,
     type FleetFileRootsResponse,
     type FleetFilesDeleteResult,
+    type FleetFilesDownloadCheck,
     type FleetFilesTransfersResponse,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
@@ -34,6 +35,7 @@ import {
     FleetFilesCancelQueryDto,
     FleetFilesConflictsDto,
     FleetFilesDeleteDto,
+    FleetFilesDownloadCheckDto,
     FleetFilesDownloadQueryDto,
     FleetFilesListQueryDto,
     FleetFilesStatQueryDto,
@@ -172,6 +174,25 @@ export class FleetFilesController {
             root: body.root,
             path: body.path ?? '',
             names: body.names,
+        });
+    }
+
+    @Post('nodes/:id/files/download/check')
+    @ApiOperation({
+        summary:
+            'What a download of these entries would move — entries, bytes, whether it is one file, and the credential-shaped files inside — asked before the download starts. Nothing is sent.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: FLEET_FILES_REQUEST_RATE_LIMIT, ttl: 60_000 } })
+    checkDownload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetFilesDownloadCheckDto,
+    ): Promise<FleetFilesDownloadCheck> {
+        return this.files.checkDownloadForUser(auth.userId, id, {
+            root: body.root,
+            path: body.path ?? '',
+            entries: body.entries,
         });
     }
 
