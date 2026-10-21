@@ -91,6 +91,9 @@ const JOB_EXPORTS = [
 ] as const;
 
 const NODE_EXPORTS = [
+	// Opt-in self-update (FL-02 T-25).
+	'FLEET_SELF_UPDATE_MAX_ERROR_LENGTH',
+	'normalizeFleetNodeSelfUpdate',
 	'FLEET_NODE_KINDS',
 	'FLEET_ENROLLABLE_NODE_KINDS',
 	'isFleetEnrollableNodeKind',
@@ -710,7 +713,8 @@ const FUNCTION_EXPORTS = [
 	'fleetLinkViewerKey',
 	'fleetLinkViewerMaySend',
 	'fleetManagementLaneConsentFor',
-	'fleetManagementLaneKindsFor'
+	'fleetManagementLaneKindsFor',
+	'normalizeFleetNodeSelfUpdate'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -725,7 +729,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 404 runtime symbols', () => {
+	it('exposes exactly these 406 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -800,7 +804,9 @@ describe('fleet barrel', () => {
 		// below gains a row.
 		// → 404 with the management lane (FL-02 T-27): its kind list, consent
 		// table and two helpers, in `fleet-jobs.types.ts` — an existing module.
-		expect(Object.keys(fleet)).toHaveLength(404);
+		// → 406 with opt-in self-update (FL-02 T-25): the error cap and the
+		// report's reader, in `fleet-node.types.ts` — an existing module.
+		expect(Object.keys(fleet)).toHaveLength(406);
 	});
 
 	it.each([

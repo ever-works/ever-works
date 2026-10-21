@@ -6,6 +6,7 @@ import type {
     FleetControlPolicyFamiliesInput,
     FleetNodeKind,
     FleetNodeModelThrottleView,
+    FleetNodeSelfUpdateReport,
     FleetNodeStatus,
     FleetNodeWorkerState,
 } from '@ever-works/contracts';
@@ -668,6 +669,18 @@ export class FleetNode {
      */
     @Column({ type: 'boolean', default: false })
     previewProfileEnabled: boolean;
+
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * (`--auto-update`) as its last heartbeat reported it: on or off, and the
+     * outcome of its last attempt. NULL = never reported (a daemon older than
+     * the field). Read it through `normalizeFleetNodeSelfUpdate`.
+     *
+     * `simple-json` in a `text` column like {@link consents}.
+     * Migration: `1796020100000-AddFleetNodeSelfUpdate`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    selfUpdate?: FleetNodeSelfUpdateReport | null;
 
     @CreateDateColumn()
     createdAt: Date;
