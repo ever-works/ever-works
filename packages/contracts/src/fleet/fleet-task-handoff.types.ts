@@ -435,6 +435,77 @@ export interface FleetGitIdentity {
 	readAt: string;
 }
 
+/** How long the platform keeps a computer's identity read (plan §10). */
+export const FLEET_GIT_IDENTITY_CACHE_MS = 60_000;
+
+/** Identity reads and sets per person per minute (CONTRACTS §10.1). */
+export const FLEET_GIT_IDENTITY_PER_MINUTE = 10;
+
+/** Where **Use my Ever Works identity** takes the email from (spec FR-14). */
+export type FleetGitIdentityEmailSource = 'github-noreply' | 'account';
+
+/** `POST /api/fleet/nodes/:id/git/identity` answer: the re-read identity and what was set. */
+export interface FleetGitIdentitySetResult extends FleetGitIdentity {
+	fields: Array<'user.name' | 'user.email'>;
+	emailSource: FleetGitIdentityEmailSource;
+}
+
+/** GitHub's no-reply address for a linked account: `<id>+<login>@users.noreply.github.com`. */
+export function fleetGithubNoReplyEmail(githubUserId: string | number, githubLogin: string): string | null {
+	const id = String(githubUserId).trim();
+	const login = typeof githubLogin === 'string' ? githubLogin.trim() : '';
+	if (!/^\d{1,20}$/.test(id) || !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(login)) return null;
+	return `${id}+${login}@users.noreply.github.com`;
+}
+
+function readIdentityField(raw: unknown): FleetGitIdentityField {
+	if (typeof raw !== 'object' || raw === null) return { set: false };
+	const record = raw as Record<string, unknown>;
+	if (record.set !== true) return { set: false };
+	return typeof record.value === 'string' && record.value.length > 0
+		? { set: true, value: record.value.slice(0, 200) }
+		: { set: true };
+}
+
+/** The node's `git.identity` / `git.setIdentity` reply, read defensively (the node is another release). */
+export function parseFleetGitIdentityReply(
+	raw: unknown
+): Pick<FleetGitIdentity, 'name' | 'email' | 'helper'> & { readAt: string | null } {
+	const record = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+	const helperRaw =
+		typeof record.helper === 'object' && record.helper !== null ? (record.helper as Record<string, unknown>) : {};
+	return {
+		name: readIdentityField(record.name),
+		email: readIdentityField(record.email),
+		helper:
+			helperRaw.present === true
+				? typeof helperRaw.value === 'string' && helperRaw.value
+					? { present: true, value: helperRaw.value.slice(0, 200) }
+					: { present: true }
+				: { present: false },
+		readAt: typeof record.readAt === 'string' ? record.readAt : null
+	};
+}
+
+/**
+ * What a viewer may read of an identity (spec FR-13): the computer's owner
+ * reads the values; everyone else reads set / unset only.
+ */
+export function maskFleetGitIdentity(identity: FleetGitIdentity, viewerIsOwner: boolean): FleetGitIdentity {
+	if (viewerIsOwner) return identity;
+	return {
+		...identity,
+		name: { set: identity.name.set },
+		email: { set: identity.email.set },
+		helper: { present: identity.helper.present }
+	};
+}
+
+/** The identity needs the fix: name or email unset (the dialog offers it inline, FR-16). */
+export function fleetGitIdentityIncomplete(identity: Pick<FleetGitIdentity, 'name' | 'email'>): boolean {
+	return !identity.name.set || !identity.email.set;
+}
+
 // ─── The GitHub "for me" audience (P3, spec FR-18) ──────────────────────────
 
 /** Review requested from me · assigned to me · pull requests I opened. */
