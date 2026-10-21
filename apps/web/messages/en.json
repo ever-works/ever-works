@@ -13322,6 +13322,96 @@
                 "back": "Back to Fleet"
             }
         },
+        "commands": {
+            "title": "Run a command",
+            "description": "One command, the computers it should run on, and what each one said.",
+            "sandbox": "These are real machines, not a sandbox. The command runs as you, in your login shell.",
+            "costNote": "Running a command spends no model tokens and no credits.",
+            "stop": "Stop",
+            "composer": {
+                "label": "Command",
+                "placeholder": "git -C ~/code/api status --short",
+                "timeout": "Timeout",
+                "timeoutMinutes": "{minutes} min",
+                "folder": "Folder",
+                "folderPlaceholder": "home (~)",
+                "run": "Run on {count}",
+                "runNone": "Run"
+            },
+            "picker": {
+                "label": "On",
+                "none": "No computer can take a command right now",
+                "reasons": {
+                    "offline": "offline · last seen {time} ago",
+                    "offlineNever": "offline",
+                    "manageOff": "management is off — start the node with --manage",
+                    "notAllowed": "the owner of {name} has not allowed you to run commands on it",
+                    "paused": "paused",
+                    "disabled": "disabled",
+                    "enrolling": "still enrolling",
+                    "cluster": "a cluster node",
+                    "linkDown": "not connected right now"
+                }
+            },
+            "confirm": {
+                "title": "Run on {count} computers?",
+                "titleOne": "Run on {name}?",
+                "description": "Check the command and where it runs.",
+                "line": "{name} · {os} · {shell} as the machine owner, from {folder}",
+                "lineNoOs": "{name} · {shell} as the machine owner, from {folder}",
+                "refusedLine": "{name} — {hint}",
+                "timeout": "Timeout {minutes} min · no input is possible (prompts fail — pass -y)",
+                "nothingRunnable": "None of these computers can run it.",
+                "cancel": "Cancel",
+                "run": "Run on {count}",
+                "running": "Starting…"
+            },
+            "card": {
+                "running": "Running · {duration}",
+                "linkDown": "Connection to {name} lost — the command may still be running there",
+                "done": "✓ {duration}",
+                "exit": "Exit {code} · {duration}",
+                "timedOut": "Timed out after {clock}",
+                "killSwitch": "Stopped by the fleet kill switch",
+                "drain": "Stopped — the fleet is draining",
+                "linkLost": "Connection to {name} lost — the full output stays on the computer",
+                "nodeRestart": "{name} restarted while it ran",
+                "cancelled": "Stopped",
+                "shellFailed": "The shell could not start: {hint}",
+                "refused": "{hint}",
+                "failed": "Failed · {duration}",
+                "truncated": "first 64 KiB and last 64 KiB shown",
+                "capped": "Output capped at 10 MiB",
+                "noOutput": "No output",
+                "removed": "a removed computer",
+                "expand": "Expand",
+                "collapse": "Collapse",
+                "copy": "Copy",
+                "copied": "Copied",
+                "fullOutput": "Open full output",
+                "fullOutputSoon": "The full output is kept on the computer; opening it arrives soon",
+                "fullOutputOffline": "The full output is on {name}, which is offline"
+            },
+            "summary": {
+                "running": "{running} of {total} running",
+                "allDone": "All done · {duration}",
+                "someFailed": "{failed} of {total} failed · {duration}"
+            },
+            "recent": {
+                "title": "Recent",
+                "empty": "No commands yet",
+                "loading": "Loading recent commands"
+            },
+            "empty": {
+                "title": "No computers yet",
+                "body": "Add a computer to run commands on it."
+            },
+            "errors": {
+                "generic": "The command could not be sent.",
+                "withHint": "{hint}",
+                "network": "Ever Works could not be reached. Try again."
+            }
+        },
         "sessions": {
             "providers": {
                 "shell": "Shell",
