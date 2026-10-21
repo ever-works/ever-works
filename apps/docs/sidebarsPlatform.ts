@@ -191,6 +191,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-commands',
 				// Terminals that keep running on those computers (FL-04).
 				'features/fleet-sessions',
+				// What runs on each computer — services, Docker, processes (FL-09).
+				'features/fleet-services-docker',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

@@ -123,6 +123,7 @@ export function layoutCompose(services: readonly FleetComposeServiceView[]): Com
             edges.push({ from: service.name, to: dep.service, tone: edgeTone(byName.get(dep.service), dep.condition), condition: dep.condition });
         }
     }
+    edges.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
     const maxLayer = Math.max(0, ...boxes.map((box) => box.layer));
     const maxRow = Math.max(0, ...boxes.map((box) => box.row));
     return {
