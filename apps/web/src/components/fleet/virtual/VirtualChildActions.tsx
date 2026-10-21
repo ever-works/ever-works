@@ -39,6 +39,8 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
     const state = virtual?.state ?? null;
     const busy = isVirtualBusy(state) || pending;
     const isVm = node.virtualKind === 'vm';
+    // The computer page's row carries no host name; "the host" reads right either way.
+    const hostLabel = virtual?.hostName ?? t('create.theHost');
 
     const fail = (error: FleetLinkError) => toast.error(error.hint || t('power.failed'));
 
@@ -100,12 +102,12 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             model: {
                 class: 'confirm-destructive',
                 title: t('destroy.title', { name: node.name }),
-                body: isVm ? t('destroy.bodyVm', { host: virtual?.hostName ?? '' }) : t('destroy.body', { host: virtual?.hostName ?? '' }),
+                body: isVm ? t('destroy.bodyVm', { host: hostLabel }) : t('destroy.body', { host: hostLabel }),
                 typeName: node.name,
             },
         });
 
-    const notAllowed = allowed ? undefined : t('power.notAllowed', { name: virtual?.hostName ?? node.name });
+    const notAllowed = allowed ? undefined : t('power.notAllowed', { name: hostLabel });
     const running = state === 'running' || node.status === 'online';
 
     return (
