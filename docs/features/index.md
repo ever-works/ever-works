@@ -84,6 +84,7 @@ A Work's **kind** is chosen once, at creation, and decides what that Work has. T
 | [Fleet](./fleet.md)                          | The registry of machines that are yours — enroll a node, watch it heartbeat, drain it when you want it quiet                                                           |
 | [Job Runtimes](./job-runtimes.md)            | The swappable engines behind Workers — Trigger.dev, Temporal, BullMQ, pg-boss, Inngest, and your own Fleet nodes                                                       |
 | [Logs on computers](./fleet-logs.md)         | Read a computer's system log, log files, containers and services — the last 500 lines then live, scanned on the machine, never stored                                  |
+| [Servers & ports](./fleet-ports.md)          | What a computer listens on, web servers first — open one on the machine, or preview it in your own browser through an owner-only, time-boxed tunnel                     |
 | [Environments](./environments.md)            | Named runtime recipes — packages plus a networking posture — published once under Settings and assigned to an Agent                                                    |
 | [Secret Stores](./secret-stores.md)          | Resolver plugins that turn a credential pointer into a real secret, so the platform database never holds one                                                           |
 

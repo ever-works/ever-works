@@ -201,26 +201,26 @@
 
 # PHASE 3 — WebSocket passthrough and watch
 
-- [ ] **T-24**. Extend `tunnel.ts` and the bridge with `tunnel.ws-open` (node WS client to loopback;
+- [x] **T-24**. Extend `tunnel.ts` and the bridge with `tunnel.ws-open` (node WS client to loopback;
       opcode-prefixed `DATA`; `END` closes; counts WebSocket upgrades into the close audit row (no
       column — CONTRACTS §4.9); an open socket counts as activity for
       the idle clock); preview host upgrade handling.
     - **Test**: `tunnel.spec.ts` ws round trip; middleware upgrade spec; e2e: a dev server's reload
       socket connects through the tunnel.
-- [ ] **T-25**. Add **Watch** to `PortRow.tsx` / `OpenPortField.tsx`; when a watched listener
+- [x] **T-25**. Add **Watch** to `PortRow.tsx` / `OpenPortField.tsx`; when a watched listener
       disappears, show the inline notice and create an Inbox item through the existing Inbox service
       (`packages/agent/src/inbox/…`) with the sentence from spec FR-33.
     - **Test**: `PortsTab.unit.spec.tsx` notice; inbox service spec case.
 
 ## Docs and rollout
 
-- [ ] **T-26**. Write `docs/features/fleet-ports.md` (what is listed and how it is ranked, the two
+- [x] **T-26**. Write `docs/features/fleet-ports.md` (what is listed and how it is ranked, the two
       ways **Open** works and why, the preview profile, the tunnel's limits and the preview hostname
       setup incl. the cookie-domain requirement and the hand-off fallback, Agent tools, what is never
       stored); add after FL-09's entry following `'features/fleet'` in `apps/docs/sidebarsPlatform.ts`
       (`:183`) and a row in `docs/features/index.md`.
     - **Test**: `pnpm --filter ever-works-docs build` — no broken links.
-- [ ] **T-27**. Update [`../TRACKER.md`](../TRACKER.md) FL-10 row and the `Status` fields of the three
+- [x] **T-27**. Update [`../TRACKER.md`](../TRACKER.md) FL-10 row and the `Status` fields of the three
       documents; add the CONTRACTS §10 rows raised in spec §8b in the same PR (the §4.9 table, the
       `ports` family, R-17's fallback and §3.3's `profile` param already landed in CONTRACTS rev 2).
     - **Test**: docs build clean; the banned-terms grep over this folder prints nothing.
