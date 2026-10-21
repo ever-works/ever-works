@@ -503,11 +503,18 @@ export function pullRequestHeadMismatch(
     task: Pick<Task, 'branchRef'>,
     status: Pick<GitPullRequestStatus, 'headRef'>,
 ): string | null {
-    const recorded = typeof task.branchRef === 'string' ? task.branchRef.trim() : '';
-    const live = typeof status.headRef === 'string' ? status.headRef.trim() : '';
+    const recorded = bareBranchName(task.branchRef);
+    const live = bareBranchName(status.headRef);
     if (!recorded || !live) return null;
     if (live === recorded) return null;
     return `merges branch \`${live}\`, not the Task's branch \`${recorded}\``;
+}
+
+/** A branch name without a `refs/heads/` prefix, trimmed; `''` when absent. */
+function bareBranchName(ref: string | null | undefined): string {
+    if (typeof ref !== 'string') return '';
+    const trimmed = ref.trim();
+    return trimmed.startsWith('refs/heads/') ? trimmed.slice('refs/heads/'.length) : trimmed;
 }
 
 /**
