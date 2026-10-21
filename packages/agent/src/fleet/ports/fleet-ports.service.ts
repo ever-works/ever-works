@@ -183,6 +183,10 @@ export class FleetPortsService {
             target,
             url: typeof reply?.url === 'string' ? reply.url : `http://127.0.0.1:${portNumber}/`,
         };
+        // The machine opened it: that is the act, audited once, before anything
+        // else can fail (a viewer token that cannot be minted leaves a preview
+        // nobody watches, which the machine ends 30 s later).
+        await this.auditOpen(node, actor, portNumber, target, reply ?? null, 'opened');
         if (target === 'preview-profile' && viewId) {
             result.previewViewId = viewId;
             result.endsAt = new Date(Date.now() + FLEET_PORT_PREVIEW_MAX_MS).toISOString();
@@ -192,7 +196,6 @@ export class FleetPortsService {
                 result.attach = await link.mintPreviewAttach({ nodeId: node.id, viewId, userId: actor.userId });
             }
         }
-        await this.auditOpen(node, actor, portNumber, target, reply ?? null, 'opened');
         return result;
     }
 

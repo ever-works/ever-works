@@ -1,5 +1,6 @@
 import {
 	FLEET_PORT_LIST_CACHE_MS,
+	FLEET_PORT_PROBE_CONCURRENCY,
 	FLEET_PORTS_CAPABILITY,
 	FLEET_PORTS_DESKTOP_OPEN_CAPABILITY,
 	FLEET_PORTS_LIST_MAX,
@@ -20,7 +21,7 @@ import type { DesktopSourceOpener } from '../desktop';
 import { MachineVerbError, type MachineVerbContext, type NodeLinkControlState, type NodeModule } from '../registry';
 import { classifyListener, isSystemNoise, mergeByPort } from './classify';
 import { discoverListeners, discoveryToolMissingHint, type RawListener } from './discover';
-import { mapWithConcurrency, probeHttp, type HttpProbeOptions, type HttpProbeResult } from './http-probe';
+import { probeHttp, type HttpProbeOptions, type HttpProbeResult } from './http-probe';
 import { joinListeners } from './join';
 import { openOnDesktop, type DesktopUrlOpener } from './open-desktop';
 import { openPreviewChannel, type PreviewBrowserManager } from './preview-browser';
@@ -77,6 +78,11 @@ export interface PortsModule extends NodeModule {
 	shutdown(): Promise<void>;
 }
 
+/** A probe answer is reused this long (the tab asks every 5 s). */
+const PROBE_CACHE_MS = 4_000;
+/** How long a list waits for fresh probes before it answers with what it has (inside the 2 s inline window). */
+const PROBE_DEADLINE_MS = 1_400;
+
 /** The most "discovery tool missing" warnings logged per hour. */
 const MISSING_TOOL_LOG_EVERY_MS = 60 * 60_000;
 
@@ -95,6 +101,38 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 		null;
 	let building: Promise<NonNullable<typeof cache>> | null = null;
 	let watchedControl: NodeLinkControlState | null = null;
+	/** The last answer per port, reused for {@link PROBE_CACHE_MS} and when a fresh probe is late. */
+	const probeCache = new Map<number, { at: number; result: HttpProbeResult }>();
+	const probing = new Map<number, Promise<HttpProbeResult>>();
+	let activeProbes = 0;
+	const queued: Array<() => void> = [];
+	const withProbeSlot = async <T>(task: () => Promise<T>): Promise<T> => {
+		if (activeProbes >= FLEET_PORT_PROBE_CONCURRENCY) {
+			await new Promise<void>((resolve) => queued.push(resolve));
+		}
+		activeProbes++;
+		try {
+			return await task();
+		} finally {
+			activeProbes--;
+			queued.shift()?.();
+		}
+	};
+	const probeFor = (port: number): Promise<HttpProbeResult> => {
+		const cached = probeCache.get(port);
+		if (cached && now() - cached.at < PROBE_CACHE_MS) return Promise.resolve(cached.result);
+		let running = probing.get(port);
+		if (!running) {
+			running = withProbeSlot(() => probe(port))
+				.then((result) => {
+					probeCache.set(port, { at: now(), result });
+					return result;
+				})
+				.finally(() => probing.delete(port));
+			probing.set(port, running);
+		}
+		return running;
+	};
 
 	const watchControl = (control: NodeLinkControlState): void => {
 		if (watchedControl === control) return;
@@ -130,10 +168,24 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 			platform: options.platform,
 			homedir: options.homedir
 		});
-		const probes = await mapWithConcurrency(joined, 32, async (entry) =>
-			// System ports are never asked anything (U7); everything else is asked once.
-			isSystemNoise(entry.listener, options.platform) ? null : probe(entry.listener.port)
+		// System ports are never asked anything (U7). Everything else is asked
+		// within the deadline, so the reply stays inside the link's inline
+		// window; a probe still running then keeps going in the background and
+		// fills the cache the next list (5 s later) reads.
+		let resolveLate: (value: 'late') => void = () => undefined;
+		const deadline = new Promise<'late'>((resolve) => {
+			resolveLate = resolve;
+		});
+		const deadlineTimer = setTimeout(() => resolveLate('late'), PROBE_DEADLINE_MS);
+		const probes = await Promise.all(
+			joined.map(async (entry) => {
+				if (isSystemNoise(entry.listener, options.platform)) return null;
+				const port = entry.listener.port;
+				const answer = await Promise.race([probeFor(port), deadline]);
+				return answer === 'late' ? (probeCache.get(port)?.result ?? null) : answer;
+			})
 		);
+		clearTimeout(deadlineTimer);
 		const rows = joined.map((entry, index) =>
 			classifyListener({
 				listener: entry.listener,
