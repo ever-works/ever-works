@@ -25,6 +25,7 @@ import { probeHttp, type HttpProbeOptions, type HttpProbeResult } from './http-p
 import { joinListeners } from './join';
 import { openOnDesktop, type DesktopUrlOpener } from './open-desktop';
 import { openPreviewChannel, type PreviewBrowserManager } from './preview-browser';
+import { openTunnelChannel, type TunnelChannelOptions } from './tunnel';
 import { StoppedPortTracker, waitingRows } from './watch-list';
 
 /**
@@ -48,6 +49,9 @@ import { StoppedPortTracker, waitingRows } from './watch-list';
  * has no discovery tool; `ports-desktop` when an opener is bound and the
  * node runs with `--attend` (the platform's Open menu reads both).
  *
+ * Phase 2 adds the `tunnel` channel family (`./tunnel.ts`): HTTP for one
+ * port, carried over the link to the person's own browser.
+ *
  * The preview picture is not here: it rides the `desktop` family
  * (`./desktop.ts`), whose `preview` source is {@link PortsModule.previewSource}.
  */
@@ -69,6 +73,8 @@ export interface PortsModuleOptions {
 	discover?: typeof discoverListeners;
 	/** Test seam: replace the probe. */
 	probe?: (port: number) => Promise<HttpProbeResult>;
+	/** Test seams of the `tunnel` channel (phase 2). */
+	tunnel?: TunnelChannelOptions;
 }
 
 export interface PortsModule extends NodeModule {
@@ -266,6 +272,9 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 			[FLEET_PORTS_LINK_VERBS.list]: { stateChanging: false, run: list },
 			[FLEET_PORTS_LINK_VERBS.open]: { stateChanging: true, run: open }
 		},
+		// Phase 2 — Preview in my browser: HTTP for one port over the link
+		// (`./tunnel.ts`); the family's consent (`manage`) is checked by the link.
+		families: [{ family: 'tunnel', open: (context) => openTunnelChannel(context, options.tunnel) }],
 		previewSource: (context) => {
 			watchControl(context.control);
 			if (context.control.paused) {

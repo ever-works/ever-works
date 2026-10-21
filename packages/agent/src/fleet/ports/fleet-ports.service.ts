@@ -23,6 +23,7 @@ import {
     type FleetPortsNodePort,
 } from './fleet-ports-node.port';
 import { fleetPortTargetRefusal, resolveFleetPortOpenTargets } from './fleet-ports.policy';
+import { FleetPortTunnelService } from './fleet-port-tunnel.service';
 
 /**
  * Servers and ports (FL-10, P1) — list what a computer is listening on, and
@@ -86,6 +87,9 @@ export class FleetPortsService {
         private readonly access: FleetAccessService,
         @Optional() private readonly audit?: FleetAuditService,
         @Optional() @Inject(FLEET_PORTS_NODE_PORT) private readonly node?: FleetPortsNodePort,
+        // Phase 2 — the person's open tunnels on this computer, for the rows.
+        // APPENDED LAST + @Optional(): absent, the list carries no tunnel state.
+        @Optional() private readonly tunnels?: FleetPortTunnelService,
     ) {}
 
     /** The computer's listening ports, web servers first, with what Open can do for this caller. */
@@ -116,7 +120,7 @@ export class FleetPortsService {
             );
         }
         const decision = await this.decide(node, userId);
-        return {
+        const response: FleetPortsListResponse = {
             ...list,
             nodeId: node.id,
             nodeName: node.name,
@@ -124,6 +128,13 @@ export class FleetPortsService {
             targets: decision.targets,
             defaultTarget: decision.defaultTarget,
         };
+        if (this.tunnels?.isEnabled()) {
+            response.tunnel = {
+                available: decision.canPorts,
+                open: await this.tunnels.listOpenForNode(node.id, userId).catch(() => []),
+            };
+        }
+        return response;
     }
 
     /** Open `port` on the machine: on its desktop, or in its preview browser. */
