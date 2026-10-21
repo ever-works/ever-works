@@ -15,23 +15,37 @@ export const NODE_LINK_MODULES: readonly NodeModule[] = [];
 export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions, 'verb'> {
 	/** Extra modules after the list above (tests and embedders). */
 	extra?: readonly NodeModule[];
+	/**
+	 * Sessions on computers (FL-04) — the `session` family, built by the
+	 * runtime around its session daemon supervisor (`createSessionModule`).
+	 * Absent on a process with neither `--manage` nor `--work`, which then
+	 * refuses every session channel `unsupported_on_node`.
+	 */
+	session?: NodeModule;
 }
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], ...machineOptions } = options;
+	const { extra = [], session, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
 		verb: (name) => composed?.machineVerb(name)
 	});
-	composed = composeNodeModules([controlModule, machine, ...NODE_LINK_MODULES, ...extra]);
+	composed = composeNodeModules([
+		controlModule,
+		machine,
+		...NODE_LINK_MODULES,
+		...(session ? [session] : []),
+		...extra
+	]);
 	return composed;
 }
 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
 export {
 	composeNodeModules,
 	MachineVerbError,

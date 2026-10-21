@@ -50,6 +50,10 @@ import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
 import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { writeAttribution } from '../../auth/integration/integration-attribution';
+import {
+    rethrowReservedLabelRefusal,
+    refuseMachinePrincipalReservedLabels,
+} from '../../auth/machine-principal';
 import { ScopeContextService } from '../../scope/scope-context.service';
 import { IntegrationOnlyGuard } from './integration-only.guard';
 import { IntegrationExceptionFilter } from './integration-exception.filter';
@@ -452,6 +456,11 @@ export class IntegrationTasksWriteController {
                 }
             }
 
+            // Works-security (2026-10-18) — an integration files no Task already
+            // carrying a control-signal label (`awaiting-owner`, `release:*`, …):
+            // `422 domain_rule`, before anything is written.
+            refuseMachinePrincipalReservedLabels(user, undefined, [], dto.labels);
+
             // Review 2026-10-17 F1: the parent must be a task this integration may
             // read. A private parent answers 404 (no existence oracle), instead of
             // creating a child the integration then cannot read either.
@@ -658,7 +667,15 @@ export class IntegrationTasksWriteController {
         if (dto.estimateMinutes !== undefined) patch.estimateMinutes = dto.estimateMinutes;
         await withExpectedVersion('task', id, expected, async () => {
             if (Object.keys(patch).length > 0) {
-                await this.tasks.update(user.userId, id, patch, this.scope.getScope() as never);
+                // Works-security (2026-10-18) — labels stay editable, but a
+                // reserved one (`awaiting-owner`, `release:*`, …) is neither
+                // added nor removed: judged against the row the service writes,
+                // answered as `422 domain_rule`.
+                await this.tasks
+                    .update(user.userId, id, patch, this.scope.getScope() as never, {
+                        restrictReservedLabels: { who: 'An integration key' },
+                    })
+                    .catch((error: unknown) => rethrowReservedLabelRefusal(error, user, undefined));
             }
             if (dto.teamIds !== undefined) {
                 await this.syncExtraTeams(user.userId, organizationId, id, dto.teamIds.slice(1));

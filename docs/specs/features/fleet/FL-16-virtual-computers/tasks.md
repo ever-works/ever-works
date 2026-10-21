@@ -132,8 +132,7 @@
       marker, wait for the token file, `enroll --token-file`, `exec start --work --manage`).
       **Test**: `container-bootstrap.spec.ts` — the script never contains the token; it pins the
       host's runtime version; it writes the readiness marker before waiting.
-- [ ] **T-16**. Add `apps/node/src/core/executors/vm-create.ts` (Container path): phases, `docker
-      pull`/`run` via `apps/node/src/core/link/modules/docker/docker-cli.ts`, request the token through
+- [ ] **T-16**. Add `apps/node/src/core/executors/vm-create.ts` (Container path): phases, `docker pull`/`run` via `apps/node/src/core/link/modules/docker/docker-cli.ts`, request the token through
       the internal endpoint only when the guest's readiness marker appears (R-35), write
       `<datadir>/run/enroll-token` 0600 and delete it host-side once `enroll` exits or the first
       heartbeat arrives, progress via FL-02 operations, cleanup on failure (`docker rm -f`, data dir).
@@ -216,8 +215,7 @@
       runtime is never registered as a built-in account.
 - [ ] **T-29**. Extend `vm-create.ts` with the Windows path: prechecks (`kvm`, ≥ 30 GB, x64 Linux),
       `--env-file` for the password (0600, removed after start), loopback viewer port registration
-      with FL-10's port module (`apps/node/src/core/link/modules/ports/`), phases `downloading Windows · installing
-      · first boot`, token request on `ready.txt`.
+      with FL-10's port module (`apps/node/src/core/link/modules/ports/`), phases `downloading Windows · installing · first boot`, token request on `ready.txt`.
       **Test**: extend `vm-create.spec.ts` — each precheck message; viewer bound to `127.0.0.1`
       only; password never in argv (`--env-file` path only).
 - [ ] **T-30**. Extend `vm-control.ts`: `docker stop -t 120` for VMs; destroy deletes the keychain
@@ -249,8 +247,7 @@
       audit `node.vm.resize` / `node.vm.rebuild` (CONTRACTS §7).
       **Test**: controller + executor specs — resize refused `busy` while running; rebuild keeps
       `home/` and the registration.
-- [ ] **T-35**. CLI `apps/cli/src/commands/fleet/virtual.ts` (`list|options|create|start|stop|destroy
-      [--json]`, exit codes 0/1/2) under FL-19's `fleet` root.
+- [ ] **T-35**. CLI `apps/cli/src/commands/fleet/virtual.ts` (`list|options|create|start|stop|destroy [--json]`, exit codes 0/1/2) under FL-19's `fleet` root.
       **Test**: `apps/cli/src/commands/fleet/__tests__/virtual.spec.ts` — `--json` shapes equal the
       API DTOs; a refused create exits 1 with the hint printed.
 - [ ] **T-36**. Catalogue refresh: a node `doctor` line reporting catalogue digests vs the operator

@@ -27,6 +27,7 @@ import {
 	type CanonicalBuildBlock,
 	type CanonicalWorkflowInputs
 } from './inputs-hash.js';
+import { assertWorkflowInputSafe } from './input-guard.js';
 import { EMBEDDED_VERIFY_RUNNER_SCRIPT } from './verify-runner.sh.js';
 
 /**
@@ -59,6 +60,13 @@ import { EMBEDDED_VERIFY_RUNNER_SCRIPT } from './verify-runner.sh.js';
  *      (FR-54): `packages: read`, no `docker push`, no `--push`, no `cache-to`,
  *      and its own `verify-<buildId>` concurrency group so it can never replace —
  *      or be replaced by — the push Build of the head commit (`APW05-G02`).
+ *   6. **No App-spec string can become YAML or an expression** (prompt-injection
+ *      hardening). `yamlString` quotes, but GitHub evaluates `${{ … }}` inside
+ *      quoted values too, and a build argument is one line of a `|` block scalar
+ *      that a newline would end. So before a byte is generated, `input-guard.ts`
+ *      refuses any interpolated value carrying `${`, a line break or a control
+ *      character, and any name that is not its pattern — a
+ *      `WorkflowInputRefusedError`, which the plugin reports as `specInvalid`.
  *
  * ## The `checks` job
  *
@@ -347,6 +355,8 @@ export function checksOnlyFile(input: WorkflowGeneratorInput): boolean {
  *      `checks`.
  */
 export function generateWorkflow(input: WorkflowGeneratorInput): string {
+	// Property 6: refuse a hostile App-spec string before anything is generated.
+	assertWorkflowInputSafe(input);
 	const verifyRunnerScript = input.verifyRunnerScript ?? EMBEDDED_VERIFY_RUNNER_SCRIPT;
 	const canonical = canonicalInputsFor(input, verifyRunnerScript);
 	const inputHash = computeWorkflowInputsHash(canonical);

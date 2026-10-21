@@ -362,7 +362,7 @@ describe('TaskPrStatusService', () => {
         expect(transitions.transition).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-a' }),
             TaskStatus.DONE,
-            { actorType: 'agent', livePullRequestHeadSha: openStatus.headSha },
+            { actorType: 'agent', ownRunTask: true, livePullRequestHeadSha: openStatus.headSha },
         );
         expect(summary).toMatchObject({ merged: 1, completed: 1 });
     });

@@ -21,6 +21,7 @@ import { K8sPluginError } from '../../errors';
 import { APP_LIMITRANGE_FORBIDDEN } from '../app-deployer';
 import {
 	APP_LIFECYCLE_CODES,
+	APP_PRE_PAUSE_REPLICAS_ANNOTATION,
 	APP_REPLICA_MAX,
 	APP_REPLICA_MIN,
 	AppLifecycle,
@@ -1100,6 +1101,16 @@ describe('scaleApp (FR-49, ACC-06-35)', () => {
 			['web', 0],
 			['worker', 0]
 		]);
+		// The scale re-applies the LIVE object with only `replicas` changed — it carries the
+		// `spec.template` — because a server-side apply of just `{spec:{replicas}}` releases the
+		// selector/template it owned and the apiserver then rejects it 422 (prod, 2026-10-20).
+		for (const object of deployments) {
+			expect(object.spec.template).toBeDefined();
+			expect(object.spec.template.spec.containers[0].name).toBeTruthy();
+		}
+		// The deployment-id annotation (which log targeting reads) survives the scale: omitting it
+		// from the same-field-manager apply would let the server-side apply prune it.
+		expect(deployments[0].metadata.annotations['ever-works.io/deployment-id']).toBeTruthy();
 		expect(h.cluster.appliedOf('CronJob')).toEqual([
 			expect.objectContaining({
 				metadata: expect.objectContaining({ name: 'cron-nightly' }),
@@ -1262,6 +1273,91 @@ describe('scaleApp (FR-49, ACC-06-35)', () => {
 
 		expect(h.cluster.appliedOf('Deployment').map((object) => object.metadata.name)).toEqual(['web']);
 		expect(result.components.map((component) => component.name)).toEqual(['web']);
+	});
+
+	it("records each component's running replica count on pause, and never overwrites it with 0", async () => {
+		const h = harness();
+		liveApp(h, { cron: false, ingress: false });
+		h.cluster.seedDeployment({ spec: { ...liveDeployment().spec, replicas: 3 } });
+
+		await h.lifecycle.scaleApp(REF, KUBECONFIG, 'pause', {});
+
+		const paused = h.cluster.appliedOf('Deployment')[0];
+		expect(paused.spec.replicas).toBe(0);
+		expect(paused.metadata.annotations[APP_PRE_PAUSE_REPLICAS_ANNOTATION]).toBe('3');
+		// The deployment-id annotation is still carried beside it.
+		expect(paused.metadata.annotations['ever-works.io/deployment-id']).toBeTruthy();
+
+		// A second pause of an already-paused component keeps the count the first one recorded.
+		h.cluster.seedDeployment({
+			metadata: {
+				...liveDeployment().metadata,
+				annotations: {
+					...liveDeployment().metadata.annotations,
+					[APP_PRE_PAUSE_REPLICAS_ANNOTATION]: '3'
+				}
+			},
+			spec: { ...liveDeployment().spec, replicas: 0 }
+		});
+		await h.lifecycle.scaleApp(REF, KUBECONFIG, 'pause', {});
+		const again = h.cluster.appliedOf('Deployment').slice(-1)[0];
+		expect(again.metadata.annotations[APP_PRE_PAUSE_REPLICAS_ANNOTATION]).toBe('3');
+	});
+
+	it('resumes an undeclared component to the count its pause recorded (no App spec readable)', async () => {
+		const h = harness();
+		liveApp(h, { cron: false, ingress: false });
+		h.cluster.seedDeployment({
+			metadata: {
+				...liveDeployment().metadata,
+				annotations: {
+					...liveDeployment().metadata.annotations,
+					[APP_PRE_PAUSE_REPLICAS_ANNOTATION]: '2'
+				}
+			},
+			spec: { ...liveDeployment().spec, replicas: 0 }
+		});
+
+		const result = await h.lifecycle.scaleApp(REF, KUBECONFIG, 'resume', {}, { smoke: [], deadlines: {} });
+
+		const deployment = h.cluster.appliedOf('Deployment')[0];
+		expect([deployment.metadata.name, deployment.spec.replicas]).toEqual(['web', 2]);
+		expect(result.components.map((component) => component.name)).toEqual(['web']);
+		// The record does not outlive its pause; the deployment-id annotation is still carried.
+		expect(deployment.metadata.annotations[APP_PRE_PAUSE_REPLICAS_ANNOTATION]).toBeUndefined();
+		expect(deployment.metadata.annotations['ever-works.io/deployment-id']).toBeTruthy();
+	});
+
+	it('prefers the declared count over the recorded one, and ignores a recorded count out of range', async () => {
+		const h = harness();
+		liveApp(h, { cron: false, ingress: false });
+		h.cluster.seedDeployment({
+			metadata: {
+				...liveDeployment().metadata,
+				annotations: {
+					...liveDeployment().metadata.annotations,
+					[APP_PRE_PAUSE_REPLICAS_ANNOTATION]: '2'
+				}
+			},
+			spec: { ...liveDeployment().spec, replicas: 0 }
+		});
+
+		await h.lifecycle.scaleApp(REF, KUBECONFIG, 'resume', { web: 1 }, { smoke: [], deadlines: { web: 60 } });
+		expect(h.cluster.appliedOf('Deployment')[0].spec.replicas).toBe(1);
+
+		const other = harness();
+		liveApp(other, { cron: false, ingress: false });
+		other.cluster.seedDeployment({
+			metadata: {
+				...liveDeployment().metadata,
+				annotations: { ...liveDeployment().metadata.annotations, [APP_PRE_PAUSE_REPLICAS_ANNOTATION]: '99' }
+			},
+			spec: { ...liveDeployment().spec, replicas: 0 }
+		});
+		const result = await other.lifecycle.scaleApp(REF, KUBECONFIG, 'resume', {}, { smoke: [], deadlines: {} });
+		// Neither declared nor validly recorded: nothing is scaled and nothing is claimed resumed.
+		expect(other.cluster.appliedOf('Deployment')).toEqual([]);
+		expect(result.components).toEqual([]);
 	});
 
 	it("refuses a replica count outside FR-11's 0–10 range", async () => {

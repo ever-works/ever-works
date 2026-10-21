@@ -128,6 +128,14 @@ export const APP_ROLLOUT_POLL_MS = 5_000;
 export const APP_PUBLISH_TIMEOUT_S = 60;
 /** §5.3: the fallback deadline for a resume of a component with no declared one (the client's 750). */
 export const APP_RESUME_DEADLINE_S = 750;
+/**
+ * The annotation `pause` stamps on each component Deployment it scales down: the replica count the
+ * component was running **before** the pause. `resume` falls back to it for a component the caller
+ * did not declare (e.g. the App spec could not be read), so a paused App always comes back at the
+ * size it had — never at 0, and never at an invented count. A later render of the Deployment drops
+ * it (the field manager no longer declares it), so it never outlives the pause it records.
+ */
+export const APP_PRE_PAUSE_REPLICAS_ANNOTATION = 'ever-works.io/pre-pause-replicas';
 /** FR-11 and APW-03 `schema.md` §10: a component's declared replicas are 0–10. */
 export const APP_REPLICA_MIN = 0;
 /** The upper bound of the same range — a resume that names more is refused, never clamped. */
@@ -959,10 +967,17 @@ export class AppLifecycle {
 		/** What this call will write: the components it scales, and to what. */
 		const targets: Array<{ objectName: string; replicas: number }> = [];
 		for (const objectName of names) {
-			const count = pause ? 0 : declaredReplicas(declared, objectName);
+			let count = pause ? 0 : declaredReplicas(declared, objectName);
 			if (count === null) {
-				// A component the caller did not declare is left at whatever it is running: the resume
-				// payload is "the declared replicas from the spec" (§9.10), and nothing here invents one.
+				// A component the caller did not declare: the count the pause recorded on it, when there
+				// is one — that is what it ran before the pause, so restoring it invents nothing.
+				count = prePauseReplicas(
+					live.find((deployment) => String(deployment?.metadata?.name ?? '') === objectName)
+				);
+			}
+			if (count === null) {
+				// Neither declared nor recorded: left at whatever it is running. The resume payload is
+				// "the declared replicas from the spec" (§9.10), and nothing here invents one.
 				continue;
 			}
 			targets.push({ objectName, replicas: count });
@@ -970,7 +985,25 @@ export class AppLifecycle {
 		this.assertScalable(targets, live);
 
 		for (const target of targets) {
-			await this.applyReplicas(credential, namespace, target.objectName, target.replicas, context);
+			const liveDeployment = live.find(
+				(deployment) => String(deployment?.metadata?.name ?? '') === target.objectName
+			);
+			// `pause` records the running count before it scales to 0, so a resume that cannot read
+			// the App spec still restores the App's own size. A component already at 0 keeps the count
+			// an earlier pause recorded (a second pause must not overwrite it with 0).
+			// A resume drops the record: the App runs again, so the count must not outlive its pause.
+			const running = asReplicaCount(liveDeployment?.spec?.replicas);
+			const recordPrePause = pause && running > 0 ? { [APP_PRE_PAUSE_REPLICAS_ANNOTATION]: String(running) } : {};
+			await this.applyReplicas(
+				credential,
+				namespace,
+				target.objectName,
+				target.replicas,
+				liveDeployment,
+				context,
+				recordPrePause,
+				pause ? [] : [APP_PRE_PAUSE_REPLICAS_ANNOTATION]
+			);
 		}
 
 		for (const cronJob of await this.workCronJobs(credential, ref, context)) {
@@ -1056,21 +1089,61 @@ export class AppLifecycle {
 		}
 	}
 
-	/** One component's replica count, with §4.12's "never a negative or fractional count" applied. */
+	/**
+	 * One component's replica count, with §4.12's "never a negative or fractional count" applied.
+	 *
+	 * `applyObject` is a **server-side apply** under one field manager. A body of only
+	 * `{ spec: { replicas } }` makes that manager claim ONLY `spec.replicas` and release the
+	 * `selector` / `template` it owned from the deploy; with no manager left owning them the apiserver
+	 * prunes them and the apply is rejected `422: spec.selector Required / template.metadata.labels
+	 * null` (prod `cal-e2e` + fixture pause, 2026-10-20). So re-apply the LIVE object with only
+	 * `replicas` overridden: the manager keeps owning `selector` / `template`, and the apply validates.
+	 */
 	private async applyReplicas(
 		credential: string,
 		namespace: string,
 		objectName: string,
 		replicas: number,
-		context?: string
+		liveDeployment: AppLiveDeployment | undefined,
+		context?: string,
+		extraAnnotations: Record<string, string> = {},
+		dropAnnotations: readonly string[] = []
 	): Promise<void> {
+		const live =
+			liveDeployment ??
+			(await this.api.readObject<AppLiveDeployment>(
+				credential,
+				'apps/v1',
+				'Deployment',
+				namespace,
+				objectName,
+				context
+			));
+		if (!live?.spec?.template) {
+			throw lifecycleError(
+				APP_LIFECYCLE_CODES.no_live_version,
+				`scaleApp: Deployment '${objectName}' has no live spec/template to scale in ` +
+					`namespace '${namespace}'.`
+			);
+		}
 		await this.api.applyObject(
 			credential,
 			{
 				apiVersion: 'apps/v1',
 				kind: 'Deployment',
-				metadata: { name: objectName, namespace },
-				spec: { replicas: asReplicaCount(replicas) }
+				metadata: {
+					name: objectName,
+					namespace,
+					// Carry the labels AND annotations the field manager already owns: the same manager
+					// re-applies here, so anything omitted (e.g. `ever-works.io/deployment-id`, which
+					// log targeting reads) would be pruned by the server-side apply.
+					...(live.metadata?.labels ? { labels: live.metadata.labels } : {}),
+					...(live.metadata?.annotations || Object.keys(extraAnnotations).length > 0
+						? { annotations: annotationsFor(live.metadata?.annotations, extraAnnotations, dropAnnotations) }
+						: {})
+				},
+				// The live spec carries selector + the full template; only the replica count changes.
+				spec: { ...live.spec, replicas: asReplicaCount(replicas) }
 			},
 			context
 		);
@@ -1978,6 +2051,33 @@ function tlsMode(value: unknown): AppRenderInput['ingress']['tls'] | null {
 function asReplicaCount(value: unknown): number {
 	const count = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
 	return Math.max(0, count);
+}
+
+/** The live annotations with `extra` merged in and `drop` removed (a server-side apply prunes what it omits). */
+function annotationsFor(
+	live: Record<string, string> | undefined,
+	extra: Record<string, string>,
+	drop: readonly string[]
+): Record<string, string> {
+	const merged: Record<string, string> = { ...(live ?? {}), ...extra };
+	for (const name of drop) {
+		delete merged[name];
+	}
+	return merged;
+}
+
+/**
+ * The replica count `pause` recorded on a component Deployment ({@link APP_PRE_PAUSE_REPLICAS_ANNOTATION}),
+ * or `null` when there is none or it is not a whole count in FR-11's 1–10 (a recorded 0 restores
+ * nothing, so it is treated as absent).
+ */
+function prePauseReplicas(deployment: AppLiveDeployment | undefined): number | null {
+	const raw: unknown = deployment?.metadata?.annotations?.[APP_PRE_PAUSE_REPLICAS_ANNOTATION];
+	if (typeof raw !== 'string' || !/^\d{1,2}$/.test(raw.trim())) {
+		return null;
+	}
+	const count = Number(raw.trim());
+	return count >= 1 && count <= APP_REPLICA_MAX ? count : null;
 }
 
 /**

@@ -98,6 +98,9 @@ export class TerminalTranscriptChunkRepository {
             .createQueryBuilder('chunk')
             .select('chunk.runId', 'runId')
             .where('chunk.createdAt < :cutoff', { cutoff })
+            // Session-keyed chunks (FL-04, CONTRACTS R-9) carry no run: they
+            // follow the session retention, never a run's plan tier.
+            .andWhere('chunk.runId IS NOT NULL')
             .groupBy('chunk.runId')
             .orderBy('chunk.runId', 'ASC')
             .limit(limit)

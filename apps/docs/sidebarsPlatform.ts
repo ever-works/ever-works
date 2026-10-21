@@ -181,6 +181,8 @@ const sidebars: SidebarsConfig = {
 				// Fleet is the registry the Desktop App enrolls into —
 				// keep it adjacent so the two read together.
 				'features/fleet',
+				// The hub is the app's view of the same registry — read it right after.
+				'features/fleet-hub',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

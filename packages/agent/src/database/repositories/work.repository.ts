@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In, EntityManager } from 'typeorm';
+import {
+    Repository,
+    IsNull,
+    Brackets,
+    Raw,
+    LessThanOrEqual,
+    In,
+    EntityManager,
+    type SelectQueryBuilder,
+} from 'typeorm';
 import { Work } from '../../entities/work.entity';
 import { Mission } from '../../entities/mission.entity';
 import { User } from '../../entities/user.entity';
@@ -1026,8 +1035,22 @@ export class WorkRepository {
         search?: string;
         /** EW-P2-4 — only Works of this persisted kind (exact match). */
         kind?: string;
+        /**
+         * Works-security (run-token scope) — only Works of this Organization;
+         * `null` = only Works with no Organization (the personal scope).
+         * `undefined` (the default) = every accessible Work, as before.
+         */
+        organizationId?: string | null;
     }): Promise<Work[]> {
-        const { userId, memberWorkIds = [], limit, offset, search, kind } = options || {};
+        const {
+            userId,
+            memberWorkIds = [],
+            limit,
+            offset,
+            search,
+            kind,
+            organizationId,
+        } = options || {};
 
         if (!userId) {
             return [];
@@ -1076,6 +1099,8 @@ export class WorkRepository {
             queryBuilder.andWhere('work.kind = :kind', { kind });
         }
 
+        applyWorkOrganizationPin(queryBuilder, organizationId);
+
         queryBuilder.orderBy('work.updatedAt', 'DESC');
 
         if (limit) {
@@ -1098,8 +1123,10 @@ export class WorkRepository {
         search?: string;
         /** EW-P2-4 — only Works of this persisted kind (exact match). */
         kind?: string;
+        /** Works-security (run-token scope) — see {@link findAllAccessible}. */
+        organizationId?: string | null;
     }): Promise<number> {
-        const { userId, memberWorkIds = [], search, kind } = options || {};
+        const { userId, memberWorkIds = [], search, kind, organizationId } = options || {};
 
         if (!userId) {
             return 0;
@@ -1145,6 +1172,8 @@ export class WorkRepository {
         if (kind) {
             queryBuilder.andWhere('work.kind = :kind', { kind });
         }
+
+        applyWorkOrganizationPin(queryBuilder, organizationId);
 
         return queryBuilder.getCount();
     }
@@ -1422,4 +1451,23 @@ function launcherCandidateLimit(requested: number | undefined): number {
         return LAUNCHER_CANDIDATE_LIMIT_MAX;
     }
     return Math.min(Math.trunc(requested), LAUNCHER_CANDIDATE_LIMIT_MAX);
+}
+
+/**
+ * Works-security (run-token scope) — narrow a `work` query to one
+ * Organization (`null` = Works with no Organization). `undefined` leaves the
+ * query exactly as it was.
+ */
+function applyWorkOrganizationPin(
+    queryBuilder: SelectQueryBuilder<Work>,
+    organizationId: string | null | undefined,
+): void {
+    if (organizationId === undefined) return;
+    if (organizationId === null) {
+        queryBuilder.andWhere('work.organizationId IS NULL');
+    } else {
+        queryBuilder.andWhere('work.organizationId = :pinnedOrganizationId', {
+            pinnedOrganizationId: organizationId,
+        });
+    }
 }

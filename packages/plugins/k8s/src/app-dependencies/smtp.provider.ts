@@ -502,7 +502,14 @@ export class SmtpDependencyProvider {
 		const objects = await this.api
 			.listObjects<{
 				metadata?: { name?: string };
-			}>(cluster.kubeconfig, kind.apiVersion, kind.kind, cluster.namespace, `${APP_DEPENDENCY_POLICY_LABEL}=${SMTP_OBJECT_KIND}`, cluster.context)
+			}>(
+				cluster.kubeconfig,
+				kind.apiVersion,
+				kind.kind,
+				cluster.namespace,
+				`${APP_DEPENDENCY_POLICY_LABEL}=${SMTP_OBJECT_KIND}`,
+				cluster.context
+			)
 			.catch(() => []);
 		return objects
 			.filter((object) => typeof object?.metadata?.name === 'string' && object.metadata.name)

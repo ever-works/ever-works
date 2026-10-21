@@ -35,9 +35,16 @@ import {
     machinePrincipalKind,
     refuseMachinePrincipalAction,
     refuseMachinePrincipalFields,
+    refuseMachinePrincipalFieldsOutside,
     requireHumanSession,
     type MachinePrincipalRequest,
 } from '../auth/machine-principal';
+import {
+    MACHINE_PRINCIPAL_GOAL_WRITABLE_FIELDS,
+    dodSignOffChanges,
+    isMachineGoalTextEditWhileRunningAllowed,
+    patchClosesCriterion,
+} from './goal-machine-principal';
 import { ScopeContextService } from '../scope';
 import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
 import {
@@ -246,6 +253,42 @@ export class GoalsController {
             'a Goal',
             "completing a Goal and changing its constraints are the owner's decisions; a person does it in the app.",
         );
+        // Works-security (run-token scope) — and nothing else but descriptive
+        // text: the metric source, comparator, target, unit, window, baseline,
+        // deadline, check cadence and criteria decide whether the Goal is met,
+        // so a run that moves them completes (or fails) the Goal without ever
+        // sending `outcome`. Allowlist, so a field added later is refused too.
+        refuseMachinePrincipalFieldsOutside(
+            auth,
+            req,
+            body as unknown as Record<string, unknown>,
+            MACHINE_PRINCIPAL_GOAL_WRITABLE_FIELDS,
+            'a Goal',
+            "a Goal's target, metric, deadline and criteria decide when it is met; a person changes them in the app.",
+        );
+        // …and not even that text while the Goal's loop is running: every
+        // iteration's brief is built from it, so the run would be writing the
+        // next run's instructions. `MACHINE_PRINCIPAL_GOAL_TEXT_EDIT_RUNNING=true`
+        // re-allows it.
+        if (
+            machinePrincipalKind(auth, req) &&
+            (body.title !== undefined || body.description !== undefined) &&
+            !isMachineGoalTextEditWhileRunningAllowed()
+        ) {
+            const current = await this.service.getForUser(
+                auth.userId,
+                id,
+                this.scopeContext?.getScope(),
+            );
+            if (current.loopStatus === 'running') {
+                refuseMachinePrincipalAction(
+                    auth,
+                    req,
+                    "change the title or description of a Goal whose execution loop is running (every iteration's brief is built from them)",
+                    'a person edits them in the app, or pauses the loop first.',
+                );
+            }
+        }
         return this.service.update(
             auth.userId,
             id,
@@ -395,7 +438,18 @@ export class GoalsController {
             "replace a Goal's definition of done",
             'propose criteria with /dod/propose; a person approves them.',
         );
-        await this.requireScopedGoal(auth.userId, id);
+        const current = await this.service.getForUser(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
+        // Works-security (run-token scope) — a replacement that closes a
+        // criterion, approves a proposed one or drops an open one is the same
+        // sign-off `/dod/approve` and the waiver are: a person's session only.
+        // A personal API key keeps every other edit (adding, rewording, re-saving).
+        if (dodSignOffChanges(current.dodCriteria, body.criteria ?? null).length > 0) {
+            requireHumanSession(auth, "sign off a Goal's definition of done");
+        }
         return this.orchestrator.setDodCriteria(auth.userId, id, body.criteria ?? null);
     }
 
@@ -451,6 +505,12 @@ export class GoalsController {
             'tick or waive a definition-of-done criterion',
             'a person signs criteria off in the app.',
         );
+        // Works-security (run-token scope) — closing a criterion (`done` /
+        // `waived`) is a sign-off: a person's session, not a personal API key.
+        // Unticking, rewording and adding evidence stay open to the key.
+        if (patchClosesCriterion(body.status)) {
+            requireHumanSession(auth, 'tick or waive a definition-of-done criterion');
+        }
         await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.patchDodCriterion(auth.userId, id, criterionId, {
             status: body.status,

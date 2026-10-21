@@ -101,6 +101,8 @@ import {
 	type AppRenderedObject
 } from './app-manifest.renderer.js';
 import {
+	APP_JOB_REPORT_PATH,
+	APP_JOB_REPORT_PATH_ENV,
 	APP_JOB_RUNS_KEPT,
 	APP_RUNNER_CONTAINER_NAME,
 	APP_RUNNER_DEADLINE_EXTRA_S,
@@ -146,6 +148,9 @@ export const APP_CRON_DEADLINE_MS = 60_000;
 export const APP_PUBLIC_SMOKE_WINDOW_S = 600;
 /** … and on every later one. */
 export const APP_PUBLIC_SMOKE_WINDOW_LATER_S = 180;
+
+/** "Stuck right now": the smallest positive window, so any current waiting reason qualifies. */
+const JOB_STUCK_NOW_SECONDS = 0.001;
 /** §4.10: a probe Job that does not report in time is `null` + this warning, **never** `true`. */
 export const APP_ISOLATION_PROBE_INCONCLUSIVE = 'isolation_probe_inconclusive';
 /** §4.11: the hairpin run's failure is this warning, never a rollback. */
@@ -1085,7 +1090,9 @@ export class AppDeployer {
 				const podFailure = waited.podFailure ?? null;
 				const message = podFailure
 					? jobPodFailureMessage(entry, podFailure)
-					: jobFailureMessage(entry, waited.result);
+					: waited.noWork
+						? jobNoWorkMessage(entry, waited.noWork)
+						: jobFailureMessage(entry, waited.result);
 				if (!warnOnly) {
 					return {
 						phase: state.phase,
@@ -1162,7 +1169,7 @@ export class AppDeployer {
 		state: RunState,
 		entry: AppJobPlanEntry,
 		plan: { objects: AppRenderedObject[] }
-	): Promise<{ result: AppJobResult; stop: WaitStop; podFailure?: AppPodFailure }> {
+	): Promise<{ result: AppJobResult; stop: WaitStop; podFailure?: AppPodFailure; noWork?: string }> {
 		const appliedAt = this.now();
 		const name = String(entry.name ?? '');
 		const timeoutMs = jobTimeoutMs(plan, entry);
@@ -1170,6 +1177,10 @@ export class AppDeployer {
 		let status: AppJobResult['status'] = 'running';
 		let stop: WaitStop = 'ok';
 		let podFailure: AppPodFailure | null = null;
+		// The pod's newest waiting reason, judged WITHOUT the 180 s window. A Job whose own deadline
+		// is shorter than the window (a 120 s migrate stuck in ErrImagePull, prod 2026-10-18) used to
+		// end as a bare `timeout`; with this it ends with the reason its pod never started.
+		let lastStuck: AppPodFailure | null = null;
 
 		while (status === 'running') {
 			const observed = await this.api.readObject<JobLike>(
@@ -1184,7 +1195,14 @@ export class AppDeployer {
 			if (status !== 'running') {
 				break;
 			}
-			podFailure = await this.classifyJobPods(state, entry);
+			const verdicts = await this.classifyJobPods(state, entry);
+			podFailure = verdicts.failure;
+			// Replace (also with null) whenever this Job's pods were seen, so a pod that recovered
+			// leaves no stale reason; keep it only when the list failed or the Job controller has
+			// already removed the pod (it deletes active pods at the deadline).
+			if (verdicts.observed) {
+				lastStuck = verdicts.stuckNow;
+			}
 			if (podFailure) {
 				status = 'failed';
 				break;
@@ -1198,6 +1216,22 @@ export class AppDeployer {
 				break;
 			}
 			await this.sleep(this.pollIntervalMs());
+		}
+
+		if (!podFailure && stop === 'ok' && (status === 'timeout' || status === 'failed') && lastStuck) {
+			podFailure = lastStuck;
+		}
+
+		// `jobs[].expectsWork` (additive, default off): a Job that exits 0 is a success only when it
+		// also REPORTED the work it did on its termination message. A migrate/bootstrap script whose
+		// entry point never ran exits 0 having done nothing, and that used to pass as a success until
+		// a later smoke check failed for an unrelated-looking reason (prod fixture, 2026-10-18).
+		let noWork: string | null = null;
+		if (status === 'succeeded' && stop === 'ok' && entry.kind === 'command' && expectsWork(state, name)) {
+			noWork = await this.missingWorkReport(state, entry);
+			if (noWork) {
+				status = 'failed';
+			}
 		}
 
 		// A runner Job's report is the pod's log (§4.8); a command Job has none.
@@ -1215,7 +1249,38 @@ export class AppDeployer {
 			...('logRef' in read && read.logRef ? { logRef: read.logRef } : {})
 		};
 
-		return { result, stop, ...(podFailure ? { podFailure } : {}) };
+		return { result, stop, ...(podFailure ? { podFailure } : {}), ...(noWork ? { noWork } : {}) };
+	}
+
+	/**
+	 * `null` when the succeeded Job's container wrote a non-empty termination message; otherwise the
+	 * one-line reason the Job counts as having done no work. Fail-closed: a Job that declared
+	 * `expectsWork` and whose report cannot be read is not passed as a success.
+	 */
+	private async missingWorkReport(state: RunState, entry: AppJobPlanEntry): Promise<string | null> {
+		let pods: AppRolloutPod[];
+		try {
+			pods = await this.api.listObjects<AppRolloutPod>(
+				state.kubeconfig,
+				'v1',
+				'Pod',
+				state.namespace,
+				`${APP_LABEL_JOB}=${String(entry.name ?? '')}`,
+				state.context
+			);
+		} catch (err) {
+			return `its pods could not be listed to read the report (${messageOf(err)})`;
+		}
+		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
+		if (own.length === 0) {
+			return 'its pod was already gone, so no report could be read';
+		}
+		const reported = own.some((pod) =>
+			(pod?.status?.containerStatuses ?? []).some(
+				(status) => String(status?.state?.terminated?.message ?? '').trim().length > 0
+			)
+		);
+		return reported ? null : `it wrote nothing to ${APP_JOB_REPORT_PATH}`;
 	}
 
 	/**
@@ -1227,7 +1292,10 @@ export class AppDeployer {
 	 * §4.1) and narrowed to **this** run's Job, because a kept run of an earlier Deployment has pods
 	 * with the same label. A failed list is not a verdict: the Job's own status still decides.
 	 */
-	private async classifyJobPods(state: RunState, entry: AppJobPlanEntry): Promise<AppPodFailure | null> {
+	private async classifyJobPods(
+		state: RunState,
+		entry: AppJobPlanEntry
+	): Promise<{ failure: AppPodFailure | null; stuckNow: AppPodFailure | null; observed: boolean }> {
 		let pods: AppRolloutPod[];
 		try {
 			pods = await this.api.listObjects<AppRolloutPod>(
@@ -1239,17 +1307,28 @@ export class AppDeployer {
 				state.context
 			);
 		} catch {
-			return null;
+			return { failure: null, stuckNow: null, observed: false };
 		}
 
 		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
 		recordWaitingSince(own, state.podWaitingSince, this.now());
-		return classifyJobPodFailure(own, {
+		const failure = classifyJobPodFailure(own, {
 			now: this.now(),
 			podWaitingSince: state.podWaitingSince,
 			userMessageSeconds: 0,
 			...(this.options.stuckPodSeconds !== undefined ? { stuckPodSeconds: this.options.stuckPodSeconds } : {})
 		});
+		// The same classifier with an (effectively) zero window: what the pod is stuck on RIGHT NOW.
+		// Never a verdict on its own; used only if the Job then ends without one (see waitForJob).
+		const stuckNow = failure
+			? failure
+			: classifyJobPodFailure(own, {
+					now: this.now(),
+					podWaitingSince: state.podWaitingSince,
+					userMessageSeconds: 0,
+					stuckPodSeconds: JOB_STUCK_NOW_SECONDS
+				});
+		return { failure, stuckNow, observed: own.length > 0 };
 	}
 
 	/* --------------------------------------------------------------------- *
@@ -2151,6 +2230,20 @@ function jobTimeoutMs(plan: { objects: AppRenderedObject[] }, entry: AppJobPlanE
 	const seconds =
 		typeof declared === 'number' && Number.isFinite(declared) && declared > 0 ? declared : JOB_TIMEOUT_FALLBACK_S;
 	return (seconds + JOB_TIMEOUT_SLACK_S) * 1_000;
+}
+
+/** A Job that declared `expectsWork`, exited 0, and reported nothing (`jobs[].expectsWork`). */
+function jobNoWorkMessage(entry: AppJobPlanEntry, reason: string): string {
+	return (
+		`Job '${entry.name}' exited 0 but reported no work: ${reason}. A job with \`expectsWork: true\` must ` +
+		`write a one-line report to ${APP_JOB_REPORT_PATH} ($${APP_JOB_REPORT_PATH_ENV}) — check that its entry ` +
+		`point actually ran.`
+	);
+}
+
+/** True when the render input's job of this name declares `expectsWork: true`. */
+function expectsWork(state: RunState, name: string): boolean {
+	return (state.input?.jobs ?? []).some((job) => job?.name === name && job?.expectsWork === true);
 }
 
 function jobFailureMessage(entry: AppJobPlanEntry, result: AppJobResult): string {

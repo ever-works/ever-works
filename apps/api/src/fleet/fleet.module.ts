@@ -14,6 +14,7 @@ import { FleetKillSwitchController } from './fleet-kill-switch.controller';
 import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetMcpCredentialListener } from './fleet-mcp-credential.listener';
+import { FleetAppWorkPreferenceListener } from './fleet-app-work-preference.listener';
 import { FleetJobRetentionService } from './fleet-job-retention.service';
 import { AgentRunRetentionService } from './agent-run-retention.service';
 import { FleetRunTelemetryListener } from './fleet-run-telemetry.listener';
@@ -150,6 +151,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // completion event they all emit. Additive: no edit to
         // `FleetJobService` was needed to make revocation guaranteed.
         FleetMcpCredentialListener,
+        // App Works follow-up (2026-10-21) — a new App Work defaults its execution preference to
+        // the owner's fleet (`local-wait`) when the owner has one; never overwrites a choice.
+        FleetAppWorkPreferenceListener,
         // Self-build slice AP — fleet run lifecycle events to PostHog and
         // Sentry through the app-wide `MonitoringModule` services (both
         // @Optional, so a deployment without them boots unchanged).

@@ -3,9 +3,15 @@ import { minimatch } from 'minimatch';
 import type { AppSpec } from '@ever-works/contracts';
 import type { GitDiffFile, GitDiffResult } from '@ever-works/plugin';
 
-import { diffGuardedSpecBlocks, isProtectedPath } from '../app-spec/app-spec-guarded-blocks';
+import {
+    diffGuardedSpecBlocks,
+    isProtectedPath,
+    isRequireHumanMergePath,
+    loosenedSpecSwitches,
+} from '../app-spec/app-spec-guarded-blocks';
 // A value import from the ring-free port (it has no runtime imports of its own).
 import { APP_WORK_SPEC_PATH } from '../tasks-domain/app-work-change-gate.port';
+import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
 import type { AppWorkRules } from './app-work-rules.service';
 
 /**
@@ -32,7 +38,14 @@ import type { AppWorkRules } from './app-work-rules.service';
  * 4. **Guarded App spec blocks**, when `.works/works.yml` is in the diff:
  *    `source`, `license` and `blueprint` changes, and **removals** from
  *    `display.protectedPaths` / `agents.requireHumanMergePaths`. Additions
- *    stay allowed — a member may always tighten.
+ *    stay allowed — a member may always tighten. Since works-security
+ *    (2026-10-18) also any `upstreamSync` change and switching ON
+ *    `upstreamPullRequests.enabled` / `provisioning.autoReprovision`
+ *    (`loosenedSpecSwitches`), which is what the evolve brief promises.
+ *
+ * An ALLOWED verdict additionally names the changed paths matching
+ * `agents.requireHumanMergePaths` (`humanMergePaths`): such a change may
+ * become a pull request, but the merge gate asks a person to merge it.
  * 5. **Size**, past {@link REFUSAL_MULTIPLE}× the guidance. Under it, a note;
  *    over it, a refusal.
  *
@@ -74,7 +87,36 @@ export const APP_SPEC_PATH = APP_WORK_SPEC_PATH;
 /** Over this multiple of the size guidance, a note becomes a refusal. */
 export const REFUSAL_MULTIPLE = 3;
 
-/** The label that exempts a Task from rule 4, and from nothing else. */
+/**
+ * Works-security (2026-10-18) — rule 4 also refuses the spec changes that loosen
+ * what reaches the running App unattended (`loosenedSpecSwitches`: any
+ * `upstreamSync` change, switching on `upstreamPullRequests.enabled` or
+ * `provisioning.autoReprovision`). On unless the operator sets this to `false`.
+ */
+export const APP_CHANGE_GUARD_SPEC_SWITCHES_ENV = 'APP_CHANGE_GUARD_SPEC_SWITCHES_ENFORCED' as const;
+
+/** Default-safe: only an explicit `false` turns the extra rule-4 refusals off. */
+export function appChangeGuardSpecSwitchesEnforced(): boolean {
+    return (process.env[APP_CHANGE_GUARD_SPEC_SWITCHES_ENV] ?? '').trim().toLowerCase() !== 'false';
+}
+
+// `APP_HUMAN_MERGE_PATHS_ENFORCED` / `appHumanMergePathsEnforced` live in the
+// ring-free port (`app-work-change-gate.port.ts`): the merge gate in
+// `tasks-domain/` reads them and may not import this file.
+export {
+    APP_HUMAN_MERGE_PATHS_ENV,
+    appHumanMergePathsEnforced,
+} from '../tasks-domain/app-work-change-gate.port';
+
+/**
+ * The label APW-04 files its provisioning Tasks with — display, the board
+ * filter, and the provisioner's own "is one already open?" lookup.
+ *
+ * It exempts NOTHING (works-security 2026-10-18). Labels are free-form and any
+ * caller of `PATCH /api/tasks/:id` could add it to its own Task, so rule 4's
+ * exemption reads the server-written {@link AppChangeGuardInput.taskOrigin}
+ * instead, which only `AppProvisioningService.start` sets.
+ */
 export const PROVISION_LABEL = 'app-provision';
 
 /**
@@ -117,6 +159,13 @@ export interface AppChangeVerdict {
     readonly changedLines: number;
     /** Set when the change is allowed but larger than the guidance. */
     readonly note: string | null;
+    /**
+     * Works-security (2026-10-18) — on an ALLOWED verdict only: the changed
+     * paths (a rename's old path included) that match the base commit's
+     * `agents.requireHumanMergePaths`. Present only when non-empty: the change
+     * may become a pull request, but only a person may merge it. Bounded.
+     */
+    readonly humanMergePaths?: readonly string[];
 }
 
 /** What `evaluate` is asked about. */
@@ -133,8 +182,12 @@ export interface AppChangeGuardInput {
      * must not collapse them.
      */
     readonly headSpec?: AppSpec | null;
-    /** The Task's labels; only `app-provision` is read. */
-    readonly labels?: readonly string[];
+    /**
+     * The Task's server-written provenance (`Task.origin`). Only
+     * `'app-provisioning'` is read: it exempts the Task from rule 4, and from
+     * nothing else. Never the Task's labels (see {@link PROVISION_LABEL}).
+     */
+    readonly taskOrigin?: string | null;
 }
 
 /** How many offending paths a refusal names before it stops listing. */
@@ -204,7 +257,7 @@ export class AppChangeGuard {
             );
         }
 
-        return {
+        const allowed: AppChangeVerdict = {
             allowed: true,
             code: null,
             message: null,
@@ -216,6 +269,15 @@ export class AppChangeGuard {
                       `${rules.sizeGuidance}. It was allowed, but a smaller change is easier to review.`
                     : null,
         };
+        // Works-security (2026-10-18) — allowed, but only a person may MERGE a
+        // change to a human-merge path. Named here (the merge gate raises the
+        // approval); the key is added only when there is something to name, so
+        // every other verdict keeps its exact shape.
+        const humanMergeHits = this.pathHits(diff.files, (path) => matchesHumanMerge(rules, path));
+        if (humanMergeHits.length > 0) {
+            return { ...allowed, humanMergePaths: Object.freeze([...humanMergeHits]) };
+        }
+        return allowed;
     }
 
     /**
@@ -265,11 +327,12 @@ export class AppChangeGuard {
         );
         if (!touchesSpec) return null;
 
-        if ((input.labels ?? []).includes(PROVISION_LABEL)) {
+        if (input.taskOrigin === TASK_ORIGIN_APP_PROVISIONING) {
             // APW-04 provisioning legitimately writes `source` and `blueprint`.
-            // The exemption is this rule and nothing else.
+            // The exemption is this rule and nothing else, and it keys off the
+            // server-written origin — never a label a caller could add.
             this.logger.log(
-                `App change guard: skipping the guarded-spec-block rule for an "${PROVISION_LABEL}" Task.`,
+                `App change guard: skipping the guarded-spec-block rule for an App provisioning Task.`,
             );
             return null;
         }
@@ -289,11 +352,23 @@ export class AppChangeGuard {
         if (input.headSpec === undefined) return null;
 
         const blocks = diffGuardedSpecBlocks(input.baseSpec ?? null, input.headSpec);
-        if (!blocks.requiresHumanReview) return null;
+        // Works-security (2026-10-18) — the changes FR-26 reports without a
+        // person that still loosen what reaches the running App unattended
+        // (`upstreamSync`, switching on upstream pull requests or automatic
+        // re-provisioning). See `loosenedSpecSwitches`.
+        const loosened = appChangeGuardSpecSwitchesEnforced()
+            ? loosenedSpecSwitches(input.baseSpec ?? null, input.headSpec)
+            : [];
+        if (!blocks.requiresHumanReview && loosened.length === 0) return null;
 
         const reasons: string[] = [];
-        if (blocks.changedBlocks.length > 0)
+        if (blocks.requiresHumanReview && blocks.changedBlocks.length > 0)
             reasons.push(`changes ${blocks.changedBlocks.join(', ')}`);
+        // `upstreamSync` is not one of FR-26's blocks, so it is never in
+        // `changedBlocks`; it is named here and only here.
+        if (loosened.includes('upstreamSync')) reasons.push('changes upstreamSync');
+        const switchedOn = loosened.filter((name) => name !== 'upstreamSync');
+        if (switchedOn.length > 0) reasons.push(`switches on ${switchedOn.join(', ')}`);
         if (blocks.removedProtectedPaths.length > 0) {
             reasons.push(`removes protected paths (${listPaths(blocks.removedProtectedPaths)})`);
         }
@@ -337,6 +412,16 @@ function matchesProtected(rules: AppWorkRules, path: string): boolean {
     // a spec, and the rules were resolved from one. Passing the list through
     // APW-03's own matcher is the point — one `{ dot: true }`, one answer.
     return isProtectedPath({ display: { protectedPaths: rules.protectedPaths } } as AppSpec, path);
+}
+
+/** The spec's human-merge globs, through APW-03's matcher (same `{ dot: true }`). */
+function matchesHumanMerge(rules: AppWorkRules, path: string): boolean {
+    const list = Array.isArray(rules.humanMergePaths) ? rules.humanMergePaths : [];
+    if (list.length === 0) return false;
+    return isRequireHumanMergePath(
+        { agents: { requireHumanMergePaths: list } } as unknown as AppSpec,
+        path,
+    );
 }
 
 /** This guard's own floor, matched with the same library and option. */

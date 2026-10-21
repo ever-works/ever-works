@@ -55,6 +55,14 @@ export type IntegrationKind = (typeof INTEGRATION_KINDS)[number];
  * escalation is relayed with `inbox:write` alone. It is opt-in (never in a
  * preset): without it the reply answers `403 scope_missing` and the approval
  * stays pending for a decision in Ever Works.
+ *
+ * `decisions:individual` (works-security lane, integration API gates,
+ * 2026-10-18) lets an integration relay a person's answer to the OTHER
+ * approvals the platform never decides in bulk (`requiresIndividualDecision`):
+ * releasing a held Agent email draft, an agent's rewrite of its own identity
+ * files (SOUL.md / AGENTS.md), an agent-proposed closure of an escalation. Also
+ * opt-in (`merges:decide` covers them too): without either, the reply answers
+ * `403 scope_missing` and the approval stays pending.
  */
 export const INTEGRATION_SCOPES = [
 	'org:read',
@@ -83,7 +91,8 @@ export const INTEGRATION_SCOPES = [
 	'events:read',
 	'webhooks:manage',
 	'links:write',
-	'merges:decide'
+	'merges:decide',
+	'decisions:individual'
 ] as const;
 export type IntegrationScope = (typeof INTEGRATION_SCOPES)[number];
 
@@ -93,11 +102,19 @@ export type IntegrationScope = (typeof INTEGRATION_SCOPES)[number];
  */
 export const INTEGRATION_MERGE_DECISION_SCOPE = 'merges:decide' satisfies IntegrationScope;
 
+/**
+ * The scope an integration key needs to relay a decision on an approval that
+ * is never decided in bulk and is not a merge (works-security lane, integration
+ * API gates). `merges:decide` is accepted for these too. See {@link INTEGRATION_SCOPES}.
+ */
+export const INTEGRATION_INDIVIDUAL_DECISION_SCOPE = 'decisions:individual' satisfies IntegrationScope;
+
 /** Scopes that are opt-in even under the "Ever Gauzy" preset. */
 export const INTEGRATION_OPT_IN_SCOPES: readonly IntegrationScope[] = [
 	'org:write',
 	'email:write',
-	INTEGRATION_MERGE_DECISION_SCOPE
+	INTEGRATION_MERGE_DECISION_SCOPE,
+	INTEGRATION_INDIVIDUAL_DECISION_SCOPE
 ];
 
 /** The "Ever Gauzy" preset: every v1 scope except the opt-in ones. */

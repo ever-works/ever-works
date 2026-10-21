@@ -208,6 +208,60 @@ export function isRequireHumanMergePath(spec: AppSpec | null | undefined, path: 
     return matchesAny(requireHumanMergePathsOf(spec ?? null), path);
 }
 
+/**
+ * Works-security (2026-10-18) — the guarded-block changes outside
+ * {@link HUMAN_REQUIRED_SPEC_BLOCKS} that still LOOSEN what reaches the running
+ * App with no person in between, so an agent's pull request may not make them:
+ *
+ *   - `upstreamSync` — any change. It decides which third-party branch is
+ *     merged into the Work Repository, how often, and whether at all; an agent
+ *     pointing it at another branch (or switching it back on) chooses whose
+ *     commits are built and deployed next.
+ *   - `upstreamPullRequests.enabled` switched ON — the Work then opens pull
+ *     requests from its repository to the upstream on its own.
+ *   - `provisioning.autoReprovision` switched ON — the owner's opt-in to an
+ *     Agent re-provisioning the App, unattended, after an Upstream sync breaks
+ *     the smoke tests (`AppProvisioningService.start` now reads it).
+ *
+ * Switching either of the last two OFF tightens and stays allowed — the same
+ * "a member may always tighten" rule as the path lists. FR-26's
+ * {@link diffGuardedSpecBlocks} answer is unchanged (it still reports these
+ * blocks as changed without a person); APW-08's change guard reads this list
+ * alongside it, which is what makes the evolve brief's promise true.
+ *
+ * A `null` / absent `before` (no effective spec yet) compares against the
+ * documented defaults: `upstreamSync` absent, both switches off.
+ */
+export type LoosenedSpecSwitch =
+    | 'upstreamSync'
+    | 'upstreamPullRequests.enabled'
+    | 'provisioning.autoReprovision';
+
+export function loosenedSpecSwitches(
+    before: AppSpec | null | undefined,
+    after: AppSpec | null | undefined,
+): readonly LoosenedSpecSwitch[] {
+    const previous = (before ?? null) as AppSpec | null;
+    const next = (after ?? null) as AppSpec | null;
+    const loosened: LoosenedSpecSwitch[] = [];
+    if (!sameJson(previous?.upstreamSync, next?.upstreamSync)) {
+        loosened.push('upstreamSync');
+    }
+    if (
+        next?.upstreamPullRequests?.enabled === true &&
+        previous?.upstreamPullRequests?.enabled !== true
+    ) {
+        loosened.push('upstreamPullRequests.enabled');
+    }
+    if (
+        next?.provisioning?.autoReprovision === true &&
+        previous?.provisioning?.autoReprovision !== true
+    ) {
+        loosened.push('provisioning.autoReprovision');
+    }
+    return loosened;
+}
+
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------

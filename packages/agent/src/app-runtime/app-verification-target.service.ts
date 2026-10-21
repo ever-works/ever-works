@@ -572,10 +572,45 @@ export interface AppVerificationSpec {
     dependencyKinds: readonly string[];
 }
 
+/**
+ * What a **declared-spec** read is asked with: the App Work, the namespace its component inputs are
+ * named for, and the commit to read the App spec at (`null` = the deploy branch head).
+ */
+export interface AppDeclaredSpecRequest {
+    workId: string;
+    namespace: string;
+    specCommitSha: string | null;
+}
+
+/**
+ * The App spec's **declared** shape — the components (with their replicas, probes and rollout
+ * deadlines), jobs, cron schedules and smoke checks — and nothing that is a render-time fact (no
+ * image, no pull credential, no env, no hosts, no target policy).
+ *
+ * This is what a lifecycle op on an App that is already running needs: `resume` restores the
+ * declared replicas, `status-refresh` names the components, `job-run` finds the declared job. A
+ * paused managed App has no Build in the request and no target policy to resolve, so the full
+ * verification-shaped read refuses it; this read does not need either.
+ */
+export interface AppDeclaredSpec {
+    /** The commit the App spec was read at (the head's, when the request named none). */
+    specCommitSha: string;
+    components: AppRenderInput['components'];
+    jobs: AppRenderInput['jobs'];
+    cron: AppRenderInput['cron'];
+    smoke: AppRenderInput['smoke'];
+}
+
 /** APW-06 T22's builder, as this task consumes it. */
 export interface AppVerificationSpecSource {
     /** `undefined` when the spec cannot be read — never a half-built input. */
     readVerificationSpec(req: AppVerificationSpecRequest): Promise<AppVerificationSpec | undefined>;
+    /**
+     * The declared shape only (see {@link AppDeclaredSpec}). Optional: a source that cannot answer it
+     * leaves the lifecycle ops on the verification-shaped read alone. `undefined` when the App spec
+     * cannot be read or is not deployable.
+     */
+    readDeclaredSpec?(req: AppDeclaredSpecRequest): Promise<AppDeclaredSpec | undefined>;
 }
 
 /** DI token for {@link AppVerificationSpecSource} — owned by APW-06 T22. */
