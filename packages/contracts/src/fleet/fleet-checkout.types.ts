@@ -451,6 +451,12 @@ export interface FleetCheckoutsListParams {
 	remoteHeads?: boolean;
 	/** Measure sizes on disk (slow on big trees). Default: on a rescan only. */
 	measureSize?: boolean;
+	/**
+	 * FL-14 P2: the paths of this node's checkouts the platform has in the bin
+	 * — the WHOLE set when present. The node keeps them out of its allowed
+	 * roots (CONTRACTS R-41); the folders are untouched.
+	 */
+	archivedPaths?: string[];
 }
 
 /** `checkouts.list` reply. */
@@ -779,7 +785,12 @@ export interface FleetCheckoutDeleteRequest {
 export interface FleetCheckoutsCreateParams {
 	checkoutId: string;
 	path: string;
-	source: { kind: 'clone'; repoUrl: string } | { kind: 'worktree'; parentPath: string };
+	/**
+	 * `credential: true` — a GitHub App installation covers the repository, so
+	 * the node asks for the operation-scoped token (spec FR-17); false — a
+	 * public repository, cloned anonymously with every credential source off.
+	 */
+	source: { kind: 'clone'; repoUrl: string; credential?: boolean } | { kind: 'worktree'; parentPath: string };
 	branch: string;
 	baseRef: string | null;
 	/** `task` for a checkout a Task run asked for (`--work` suffices); else a person or an Agent (`--manage`). */
