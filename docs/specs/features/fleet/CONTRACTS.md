@@ -84,6 +84,10 @@ parentPath }, branch, baseRef, createdBy }` with the platform naming the exact p
 `archivedPaths` (the platform's bin, so archived checkouts are not roots, R-41); the scoped credential route is
 `POST /api/fleet/checkouts/:id/credential` (node-authenticated; §11.2's internal-prefix note stands for later moves).
 
+**Revision 13 (2026-10-21)** — FL-14 P3 (lane-log decisions 19–21): `checkouts.create` gains `isolation`,
+`containerImage` (the deployment default `FLEET_CHECKOUT_CONTAINER_IMAGE`) and `sharedFolders` (worktrees only, linked
+when git ignores them); the bin purge is the daily scheduled task `fleet-checkout-bin-purge` (`23 3 * * *`).
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
