@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { sessionsClient } from '../sessions/sessions.client';
 import { CheckoutChoice } from './CheckoutChoice';
 import { ComputerPicker } from './ComputerPicker';
+import { IdentityLine } from './IdentityLine';
 import {
     checkoutCreateRequest,
     choiceStillOffered,
@@ -355,6 +356,10 @@ export function FixOnComputerDialog({
                                 {t('dialog.firstMessageHint')}
                             </p>
                         </section>
+
+                        {computer?.selectable && (
+                            <IdentityLine key={computer.nodeId} nodeId={computer.nodeId} nodeName={computer.name} />
+                        )}
 
                         {costLine && (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-handoff-cost">

@@ -12821,6 +12821,45 @@
         }
     },
     "fleet": {
+        "gitIdentity": {
+            "card": {
+                "title": "Git on {node}",
+                "refresh": "Read again",
+                "loading": "Reading the git settings…",
+                "name": "Name",
+                "email": "Email",
+                "helper": "Helper",
+                "set": "set",
+                "notSet": "not set",
+                "none": "none",
+                "canPushYes": "Ever Works can push for agents: yes — {repositories}",
+                "canPushNo": "Ever Works can push for agents: no — {reason}",
+                "useMine": "Use my Ever Works identity",
+                "fixHint": "Sets name and email in this computer’s global Git config. Nothing else changes.",
+                "fixHintIncomplete": "Name or email is not set. This sets both in this computer’s global Git config; nothing else changes."
+            },
+            "confirm": {
+                "name": "Name",
+                "email": "Email",
+                "nothingElse": "Only user.name and user.email change. No credential, token or helper is written.",
+                "cancel": "Cancel",
+                "set": "Set identity"
+            },
+            "warnings": {
+                "accountEmail": "Your account email will appear in public commits."
+            },
+            "errors": {
+                "failed": "The git identity could not be set.",
+                "readFailed": "The git settings could not be read.",
+                "needsManage": "Start the node with --manage on {node} to read its git settings."
+            },
+            "line": {
+                "loading": "Reading git on {node}…",
+                "needsManage": "Git on {node}: needs --manage to check",
+                "unknown": "Git on {node}: could not be checked",
+                "summary": "Git on {node}   name {name} · email {email} · Ever Works can push for agents {push}"
+            }
+        },
         "taskHandoff": {
             "button": "Fix with an agent on this computer",
             "palette": "Fix {slug} with an agent on a computer",
