@@ -316,7 +316,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/sessions/{id}'),
 		cli: 'fleet sessions read'
 	}),
-	read('fleet_sessions_question', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'live', {
+	read('fleet_sessions_question', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'planned', {
 		route: GET('/api/fleet/sessions/{id}'),
 		cli: 'fleet sessions question'
 	}),
