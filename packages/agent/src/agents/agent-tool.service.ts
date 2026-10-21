@@ -67,6 +67,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
@@ -658,6 +659,26 @@ export class AgentToolService {
                     userId: agent.userId,
                     agentId: agent.id,
                     service: fleetSessions.service,
+                }),
+            );
+        }
+
+        // FL-12 P2 — Commands on computers. `fleet_commands_run` never runs a
+        // command itself: it files an approval the owner decides in My
+        // Decisions (fail-closed without the queue). Bound only while
+        // FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetCommands) {
+            const fleetCommands = sources.fleetCommands;
+            add('fleet-commands', () =>
+                buildFleetCommandTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
                 }),
             );
         }

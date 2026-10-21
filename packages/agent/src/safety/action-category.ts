@@ -59,6 +59,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // Checkouts on computers (FL-14 P2) — reads, then the acts on a machine.
     fleet_checkouts_list: 'read.internal',
     fleet_checkouts_get: 'read.internal',
+    fleet_commands_list: 'read.internal',
+    fleet_commands_get: 'read.internal',
     list_meetings: 'read.internal',
     get_meeting_summary: 'read.internal',
     list_recent_events: 'read.internal',
@@ -139,6 +141,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // ── machine.run — commands in the agent's own workspace directory ──
     'facade:terminal-session': 'machine.run',
     'facade:fleet-job-dispatch': 'machine.run',
+    // Commands on computers (FL-12 P2): an Agent asking to run a command on the owner's computers.
+    fleet_commands_run: 'machine.run',
+    fleet_commands_cancel: 'machine.run',
 
     // ── machine.admin — changing a computer ──
     'facade:node-admin': 'machine.admin',

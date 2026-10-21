@@ -1,5 +1,7 @@
 // Commands on computers (FL-12) — one command line, N computers, N output cards.
+export * from './agent-fleet-command-tools';
 export * from './fleet-command.errors';
+export * from './fleet-command-proposal.listener';
 export * from './fleet-command-node.port';
 export * from './fleet-command.policy';
 export * from './fleet-command.repository';

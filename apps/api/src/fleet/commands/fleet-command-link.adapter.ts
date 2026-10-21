@@ -136,6 +136,71 @@ export class FleetCommandLinkAdapter implements FleetCommandNodePort {
         }
     }
 
+    /**
+     * "Open full output" (P2): `command.read` on a channel of its own — the
+     * reply carries the size, then `DATA` chunks reach `sink.data` until `END`.
+     * Resolves at `END` (or an orderly close); rejects with the CONTRACTS §8
+     * refusal (`not_found` when the machine no longer keeps it, `unreachable`
+     * when the link went away part-way). Not state-changing: a read.
+     */
+    async readOutput(
+        input: FleetCommandCancelInput,
+        sink: { bytes(total: number): void; data(chunk: Uint8Array): void },
+    ): Promise<void> {
+        const channel = await this.link.openChannel({
+            nodeId: input.nodeId,
+            family: 'command',
+            params: { commandId: input.commandId, nodeId: input.nodeId, runId: input.runId },
+            caller: toLinkCaller(input.caller),
+            requirement: {
+                consent: 'manage',
+                actionFamily: 'commands',
+                stateChanging: false,
+                target: input.commandId,
+            },
+        });
+        await new Promise<void>((resolve, reject) => {
+            let finished = false;
+            let unlisten: () => void = () => undefined;
+            const done = (error?: unknown) => {
+                if (finished) return;
+                finished = true;
+                unlisten();
+                this.closeQuietly(channel, input.nodeId);
+                if (error) reject(error);
+                else resolve();
+            };
+            unlisten = channel.listen({
+                binary: (kind, payload) => {
+                    if (kind === FLEET_LINK_FRAME_KINDS.DATA) sink.data(payload);
+                    else if (kind === FLEET_LINK_FRAME_KINDS.END) done();
+                },
+                close: (reason, hint) => {
+                    if (reason === 'normal') done();
+                    else
+                        done(
+                            new FleetCommandException(
+                                makeFleetLinkError(
+                                    reason === 'resume_failed' ? 'unreachable' : reason,
+                                    hint ?? 'the computer stopped sending the output',
+                                ),
+                            ),
+                        );
+                },
+            });
+            channel
+                .request('command.read', { runId: input.runId }, { timeoutMs: FLEET_COMMAND_CANCEL_TIMEOUT_MS })
+                .then((reply) => {
+                    if ('error' in reply) done(new FleetCommandException(reply.error));
+                    else if ('result' in reply) {
+                        const bytes = Number((reply.result as { bytes?: unknown } | null)?.bytes);
+                        sink.bytes(Number.isFinite(bytes) && bytes > 0 ? bytes : 0);
+                    }
+                })
+                .catch((error: unknown) => done(error));
+        });
+    }
+
     private eventsFor(input: FleetCommandStartInput): FleetLinkChannelEvents {
         const { sink } = input;
         return {

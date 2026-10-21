@@ -684,6 +684,38 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Commands on computers (4) — FL-12 P2, `apps/api/src/fleet/commands/fleet-commands.controller.ts`
+	// (dark unless FLEET_COMMANDS_ENABLED). One command line on one or more of the caller's computers, in
+	// the machine owner's login shell with no input. CONTRACTS §2.2 class `confirm`: without
+	// `confirm: true` the API answers `confirmation_required` with one line per computer; repeat the call
+	// with `confirm: true` once the person agreed. Output is read back with `fleet_commands_get`.
+	{
+		method: 'POST',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_run',
+		description:
+			"Run one shell command on one or more of my fleet computers, in the machine owner's login shell, as the owner, with no input (prompts fail). These are real machines, not a sandbox. Without confirm: true it answers confirmation_required with one line per computer (shell, folder, or why it cannot run); repeat with confirm: true once agreed. Answers one run per computer; read the output with fleet_commands_get.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands/{id}',
+		toolName: 'fleet_commands_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/commands/{id}/cancel',
+		toolName: 'fleet_commands_cancel',
+		annotations: { destructiveHint: false }
+	},
+
 	// Servers and ports (FL-10, CONTRACTS §2.1) — `apps/api/src/fleet/ports/fleet-ports.controller.ts`.
 	// The list is a read of the machine (nothing stored, nothing audited); open is
 	// not destructive — it opens the port's page ON the machine (its desktop or its
