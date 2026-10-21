@@ -1,6 +1,6 @@
 import type { ComputerLegBroker } from '../computer-leg';
 import { controlModule } from './control';
-import { createDesktopModule } from './desktop';
+import { createDesktopModule, type DesktopFamilySources } from './desktop';
 import { createMachineModule, type MachineModuleOptions } from './machine';
 import { createProcessesModule, type ProcessesModuleDeps } from './processes';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
@@ -46,6 +46,18 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 */
 	command?: NodeModule;
 	/**
+	 * Servers and ports (FL-10) — the `ports` module (`ports.list`,
+	 * `ports.open`), built by the runtime around the machine's runner and its
+	 * preview browser (`createPortsModule`). Absent without `--manage`.
+	 */
+	ports?: NodeModule;
+	/**
+	 * Servers and ports (FL-10) — more sources of the `desktop` family
+	 * (`./desktop`): the preview browser's picture (`preview`). With them, or
+	 * with `computerLegs`, the family module is composed.
+	 */
+	desktopSources?: DesktopFamilySources;
+	/**
 	 * Fleet node link (FL-02 T-22) — the runtime's live-view leg broker. With
 	 * it, the `desktop` family module (`./desktop`) is composed, carrying a
 	 * view's leg over the link; without it the family stays unclaimed.
@@ -69,7 +81,18 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], session, command, computerLegs, checkouts, machineFacts = [], ...machineOptions } = options;
+	const {
+		extra = [],
+		session,
+		command,
+		computerLegs,
+		checkouts,
+		machineFacts = [],
+		ports,
+		desktopSources,
+		...machineOptions
+	} = options;
+	const desktopSourcesGiven = Boolean(desktopSources && (desktopSources.preview || desktopSources.desktop));
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
@@ -81,7 +104,8 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
 		...(command ? [command] : []),
-		...(computerLegs ? [createDesktopModule(computerLegs)] : []),
+		...(ports ? [ports] : []),
+		...(computerLegs || desktopSourcesGiven ? [createDesktopModule(computerLegs ?? null, desktopSources)] : []),
 		...(checkouts ? [checkouts] : []),
 		...machineFacts,
 		...extra
@@ -99,6 +123,13 @@ export { createSessionModule, type SessionModule, type SessionModuleLink, type S
 export { createCommandModule, type CommandModuleOptions } from './command';
 export { CommandOutputStore } from './command/command-output-store';
 export { createCheckoutsModule, type CheckoutsModule, type CheckoutsModuleOptions } from './checkouts';
+export {
+	createDesktopFamilyModule,
+	createDesktopModule,
+	type DesktopFamilySources,
+	type DesktopSourceOpener
+} from './desktop';
+export { createPortsModule, type PortsModule, type PortsModuleOptions } from './ports';
 export {
 	composeNodeModules,
 	MachineVerbError,

@@ -777,6 +777,36 @@ export const config = {
             );
         },
         /**
+         * Servers and ports, phase 2 (FL-10, CONTRACTS §9, R-17) —
+         * `FLEET_PORT_TUNNEL_ENABLED`: "Preview in my browser". Needs the
+         * machine-facts flag too, and a preview hostname
+         * ({@link getPortPreviewHost}); without either it is off. Off, the
+         * button is absent, the tunnel routes answer 404 and the preview host
+         * answers 404.
+         */
+        isPortTunnelEnabled(): boolean {
+            return (
+                this.isMachineFactsEnabled() &&
+                process.env.FLEET_PORT_TUNNEL_ENABLED === 'true' &&
+                this.getPortPreviewHost() !== null
+            );
+        },
+        /**
+         * The dedicated preview hostname tunnels are served on
+         * (`FLEET_PREVIEW_HOST`, e.g. `preview.ever.works`) — a bare host, no
+         * scheme, no path; anything else reads as unset. Dedicated so a
+         * tunnelled page can never read Ever Works' own cookies or storage.
+         */
+        getPortPreviewHost(): string | null {
+            const raw = (process.env.FLEET_PREVIEW_HOST ?? '').trim().toLowerCase();
+            if (raw.length === 0 || raw.length > 253) return null;
+            return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d{1,5})?$/.test(
+                raw,
+            )
+                ? raw
+                : null;
+        },
+        /**
          * Checkouts on computers (FL-14, CONTRACTS §9) — `FLEET_CHECKOUTS_ENABLED`.
          * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
          * off every `/api/fleet/**checkouts**` route answers 404 and the

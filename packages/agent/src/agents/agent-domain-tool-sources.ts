@@ -14,6 +14,7 @@ import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
+import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -95,6 +96,12 @@ export interface AgentMeetingToolSource {
 
 export interface AgentFleetToolSource {
     service: Pick<FleetService, 'listForUser'>;
+    /**
+     * Servers and ports (FL-10) — `fleet_ports_list` / `fleet_ports_open`.
+     * Optional: unbound (a context without the API's node link), the two tools
+     * are simply not offered.
+     */
+    ports?: Pick<FleetPortsService, 'list' | 'open'>;
     /**
      * Services and processes on computers (FL-09) — backs
      * `fleet_services_list|action` and `fleet_processes_list|signal`.

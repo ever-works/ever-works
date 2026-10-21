@@ -12,8 +12,10 @@
  *
  * Registered today: FL-03's health metrics block and its "Clear limit now"
  * command (`./fl-03-health`); FL-02's consents card (`./fl-02-link`); FL-04's
- * "New session ▾" header action (`./fl-04-sessions`).
+ * "New session ▾" header action (`./fl-04-sessions`); FL-10's Servers block
+ * (`./fl-10-ports`).
  */
 import './fl-03-health';
 import './fl-02-link';
 import './fl-04-sessions';
+import './fl-10-ports';

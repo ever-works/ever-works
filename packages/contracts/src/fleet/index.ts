@@ -17,6 +17,7 @@ export * from './fleet-node-wake.types.js';
 export * from './fleet-operations.types.js';
 export * from './fleet-panic.types.js';
 export * from './fleet-processes.types.js';
+export * from './fleet-ports.types.js';
 export * from './fleet-push-credential.types.js';
 export * from './fleet-run-secrets.types.js';
 export * from './fleet-run-credential.types.js';

@@ -52,3 +52,4 @@ export * from './commands';
 export * from './machine';
 // Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
 export * from './checkouts';
+export * from './ports';

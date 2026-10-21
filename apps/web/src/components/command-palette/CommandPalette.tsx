@@ -38,7 +38,12 @@ import { PALETTE_RECENT_BOOST_WINDOW_MS, usePaletteRecents } from './hooks/use-p
 import { useWorkspaceSearch } from './hooks/use-workspace-search';
 import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
-import { fleetComputerMachineScreens, fleetComputerScreens, screensFor } from './registry/screens';
+import {
+    fleetComputerMachineScreens,
+    fleetComputerPortsScreens,
+    fleetComputerScreens,
+    screensFor,
+} from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
 import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
 import {
@@ -258,6 +263,8 @@ export function CommandPalette({
             ...fleetComputerScreens(fleetComputers),
             // FL-09 (FR-23): "Services on <name>", "Docker on <name>", "Processes on <name>".
             ...fleetComputerMachineScreens(fleetComputers),
+            // Servers and ports (FL-10): "Ports on <computer>".
+            ...fleetComputerPortsScreens(fleetComputers),
         ],
         [appPath, fleetHubEnabled, fleetComputers],
     );

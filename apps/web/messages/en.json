@@ -12944,7 +12944,8 @@
             "goToComputer": "Go to computer {name}",
             "servicesOn": "Services on {name}",
             "dockerOn": "Docker on {name}",
-            "processesOn": "Processes on {name}"
+            "processesOn": "Processes on {name}",
+            "portsOn": "Ports on {name}"
         },
         "nav": {
             "label": "Fleet"
@@ -13960,6 +13961,82 @@
                 "stopTitle": "Send SIGTERM to {name} ({pid}) on {machine}?",
                 "killTitle": "Send SIGKILL to {name} ({pid}) on {machine}?",
                 "killBody": "It cannot save its work."
+            }
+        },
+        "ports": {
+            "title": "Servers on {name}",
+            "live": "live ({seconds} s)",
+            "openAPort": "Open a port…",
+            "openAPortLabel": "A port to watch for",
+            "openAPortAdd": "Watch",
+            "openAPortInvalid": "A port is a number from 1 to 65535.",
+            "waiting": "waiting for a server…",
+            "watchLive": "Watching — the row turns live when a server starts.",
+            "removeWatch": "Stop watching :{port}",
+            "stopped": "stopped",
+            "localOnly": "only on {name} itself",
+            "noTitle": "— (no title)",
+            "https": "https",
+            "noHttpAnswer": "no HTTP answer",
+            "otherPorts": "{count, plural, one {# other port} other {# other ports}}",
+            "systemPorts": "{count, plural, one {# system port (hidden)} other {# system ports (hidden)}}",
+            "show": "show",
+            "hide": "hide",
+            "open": "Open",
+            "openMenu": "Open options for :{port}",
+            "rowMenu": "More for :{port}",
+            "openOnDesktop": "Open on the desktop",
+            "openInPreview": "Open in the preview browser",
+            "copyAddress": "Copy address",
+            "copied": "Address copied",
+            "showInProcesses": "Show in Processes",
+            "showInDocker": "Show in Docker",
+            "openedDesktop": "Opened {url} in the default browser on {name}.",
+            "watchDesktop": "Watch the desktop",
+            "openFailed": "Could not open :{port}",
+            "noOpen": "Only the owner of {name} can open its servers",
+            "reasons": {
+                "attendMissing": "live viewing is switched off — run {command} there",
+                "desktopFamily": "you may not drive the desktop of {name}",
+                "noDesktop": "{name} has no desktop the node can open a browser on",
+                "previewOff": "The preview browser is switched off for {name} — turn it on under Settings",
+                "noBrowser": "No browser found on {name} — install Chrome, Edge or Chromium there, or point the node at one.",
+                "portsFamily": "Only the owner of {name} can open its servers"
+            },
+            "states": {
+                "loading": "Asking {name} what is listening…",
+                "slow": "{name} has not answered yet.",
+                "empty": "Nothing is listening on {name} — start a server, or type a port to watch for one.",
+                "error": "Could not list ports on {name}",
+                "offline": "{name} is not connected",
+                "consentMissing": "Ports need machine management switched on for {name}",
+                "permissionDenied": "You may not see the ports of {name}",
+                "unsupported": "{name} cannot list its ports yet",
+                "killSwitch": "The fleet is stopped — nothing can be opened until it is cleared",
+                "lastKnown": "Showing the last list read.",
+                "tryAgain": "Try again"
+            },
+            "preview": {
+                "title": "Preview · {name} · :{port} · preview profile",
+                "live": "LIVE",
+                "refresh": "Refresh the picture",
+                "close": "Close the preview",
+                "connecting": "Starting the preview browser on {name}…",
+                "driving": "You are driving the preview browser on {name}. It is yours — no agent uses this profile.",
+                "endsIn": "Ends when you leave, or in {time}.",
+                "ended": "This preview has ended. Open it again from the list.",
+                "a11y": "Preview of :{port} on {name}"
+            },
+            "servers": {
+                "title": "Servers",
+                "otherPorts": "{count, plural, one {# other port} other {# other ports}}",
+                "open": "Open the Ports tab"
+            },
+            "settings": {
+                "title": "Preview browser",
+                "body": "Lets Open show a page in a browser profile on this computer that no agent uses.",
+                "saved": "Saved.",
+                "failed": "Could not switch the preview browser."
             }
         }
     }

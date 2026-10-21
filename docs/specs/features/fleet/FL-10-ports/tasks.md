@@ -32,36 +32,36 @@
 
 ## P1.A — Contracts
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-ports.types.ts` (kinds, `FleetListeningPort`,
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-ports.types.ts` (kinds, `FleetListeningPort`,
       `FleetPortsList`, `FleetPortOpenTarget`, `FleetPortOpenResult`, `FleetPortTunnelView`,
       constants = CONTRACTS §10) and export from `packages/contracts/src/fleet/index.ts`; add
       `node.port.open`, `node.port.preview.open`, `node.port.preview.close` to
       `packages/contracts/src/fleet/fleet-panic.types.ts` and `FLEET_PORTS_CAPABILITY` to `fleet-jobs.types.ts`.
     - **Test**: `packages/contracts/src/fleet/__tests__/fleet-ports.types.spec.ts`; extend `fleet-panic.spec.ts`.
-- [ ] **T-02**. Make sure FL-02's link contract file (`packages/contracts/src/fleet/fleet-link.types.ts`)
+- [x] **T-02**. Make sure FL-02's link contract file (`packages/contracts/src/fleet/fleet-link.types.ts`)
       carries CONTRACTS §3.3's `profile?: 'agent' | 'preview'` on the `desktop` channel-open params
       (default `agent`); add it there, additively, if FL-02 has not.
     - **Test**: FL-02's link contract spec gains a case: `profile: 'preview'` accepted, unknown refused.
 
 ## P1.B — Node module
 
-- [ ] **T-03**. Write `apps/node/src/core/link/modules/ports/discover.ts` (`ss -tlnpH` with `-p`-less
+- [x] **T-03**. Write `apps/node/src/core/link/modules/ports/discover.ts` (`ss -tlnpH` with `-p`-less
       fallback, `lsof -nP -iTCP -sTCP:LISTEN -F pcnL`, PowerShell encoded `Get-NetTCPConnection` +
       `Get-Process` → JSON) and `classify.ts` (well-known table, Windows + Unix noise tables,
       `localOnly`, Microsoft-HTTPAPI detection). Tables are exported data.
     - **Test**: `discover.spec.ts` (fixtures per OS under `modules/ports/__fixtures__/`),
       `classify.spec.ts` (5357 noise; 127.0.0.1 local; HTTPAPI page is not web).
-- [ ] **T-04**. Write `http-probe.ts` (loopback only; `GET /` `Accept: text/html`; 2 s; 64 KiB cap;
+- [x] **T-04**. Write `http-probe.ts` (loopback only; `GET /` `Accept: text/html`; 2 s; 64 KiB cap;
       https fallback with `rejectUnauthorized: false`; `<title>` ≤ 120 chars through `redactSecrets`;
       ≤ 32 concurrent) and `join.ts` (PID → program/cwd per OS; published port → container via FL-09's
       docker module when present).
     - **Test**: `http-probe.spec.ts` (timeout, cap, title, redaction, refuses non-loopback host),
       `join.spec.ts`.
-- [ ] **T-05**. Write `watch-list.ts` (waiting ports probed each list) and `open-desktop.ts`
+- [x] **T-05**. Write `watch-list.ts` (waiting ports probed each list) and `open-desktop.ts`
       (`target: 'desktop'` → FL-07 `desktopHooks.openUrl`; absent hook → `consent_missing` with
       `--attend` hint or `unsupported_on_node`).
     - **Test**: `watch-list.spec.ts`, `open-desktop.spec.ts`.
-- [ ] **T-06**. Add `PreviewPageSource` (exported; `navigate(url)` restricted to `127.0.0.1`) to
+- [x] **T-06**. Add `PreviewPageSource` (exported; `navigate(url)` restricted to `127.0.0.1`) to
       `apps/node/src/core/screen/headless-browser-backend.ts` without changing `BrowserPageSource`;
       write `apps/node/src/core/link/modules/ports/preview-browser.ts` (profile root
       `~/.ever-works/preview-profile` beside `agent-profiles`, lazy with the owner-only ACL from
@@ -69,7 +69,7 @@
     - **Test**: `apps/node/src/core/screen/headless-browser-backend.spec.ts` (navigate refuses
       `http://example.com`), `modules/ports/preview-browser.spec.ts` (dir is a sibling of
       agent-profiles, never inside; busy; caps).
-- [ ] **T-07**. Write `apps/node/src/core/link/modules/ports/index.ts` (`createPortsModule`; `ports.list`,
+- [x] **T-07**. Write `apps/node/src/core/link/modules/ports/index.ts` (`createPortsModule`; `ports.list`,
       `ports.open`; 2 s list cache; `ports` tag under `manage` when a discovery tool exists) and register
       it with one entry in FL-02's compile-time module array `apps/node/src/core/link/modules/index.ts`.
     - **Test**: `index.spec.ts` — refusal codes; no tag without a tool; preview open returns the
@@ -77,7 +77,7 @@
 
 ## P1.C — Platform service and API
 
-- [ ] **T-08**. Write `packages/agent/src/fleet/ports/fleet-ports.service.ts` (`list` with `view`;
+- [x] **T-08**. Write `packages/agent/src/fleet/ports/fleet-ports.service.ts` (`list` with `view`;
       `open` with `ports` (+ `desktop` for the desktop target) → consent (`manage`; `attend` for
       desktop) → kill switch → `previewProfileEnabled` → link `ports.open` → for preview, open the
       `desktop` channel with `profile: 'preview'` and mint a `driver` attach token bound to the
@@ -85,7 +85,7 @@
     - **Test**: `fleet/ports/__tests__/fleet-ports.service.spec.ts` — every §8 code; desktop target
       without `attend` names `attend`; preview disabled sentence; audit details hold port, target,
       program, no URL query.
-- [ ] **T-09**. Write `apps/api/src/fleet/ports/fleet-ports.controller.ts` + `dto/fleet-ports.dto.ts`
+- [x] **T-09**. Write `apps/api/src/fleet/ports/fleet-ports.controller.ts` + `dto/fleet-ports.dto.ts`
       (GET list with `watch=`, POST open); register in `apps/api/src/fleet/fleet.module.ts`; guards
       `FleetEnabledGuard`, `FleetMachineFactsEnabledGuard`; throttles; Swagger.
     - **Test**: `fleet-ports.controller.spec.ts`; `apps/api/test/fleet-ports.e2e-spec.ts` (fake peer:
@@ -93,11 +93,11 @@
 
 ## P1.D — Web
 
-- [ ] **T-10**. Write `apps/web/src/components/fleet/ports/ports.shared.ts` (ordering, folding text,
+- [x] **T-10**. Write `apps/web/src/components/fleet/ports/ports.shared.ts` (ordering, folding text,
       well-known names, time-left) and `use-ports-live.ts` (5 s polling only while visible; `watch`
       list in URL state).
     - **Test**: `ports.shared.unit.spec.ts`, `use-ports-live.unit.spec.tsx`.
-- [ ] **T-11**. Write `PortsTab.tsx`, `PortRow.tsx`, `OtherPortsFold.tsx`, `SystemPortsFold.tsx`,
+- [x] **T-11**. Write `PortsTab.tsx`, `PortRow.tsx`, `OtherPortsFold.tsx`, `SystemPortsFold.tsx`,
       `OpenPortField.tsx`, `OpenMenu.tsx` (disabled reasons for desktop / preview), `PreviewPane.tsx`
       (wraps `apps/web/src/components/computer/ComputerStage.tsx` via FL-07's attach hook; watermark;
       ends-in line), `ServersBlock.tsx`, `ports-tab.registry.ts` (tab through FL-01's
@@ -106,7 +106,7 @@
       `apps/web/src/components/fleet/ports/`; BFF routes `apps/web/src/app/api/fleet/nodes/[id]/ports/route.ts`
       and `.../ports/[port]/open/route.ts`. Every state in spec §5.5.
     - **Test**: `PortsTab.unit.spec.tsx`, `PreviewPane.unit.spec.tsx`, `ServersBlock.unit.spec.tsx`.
-- [ ] **T-12**. Add the **Preview browser** switch (`previewProfileEnabled`) to the computer
+- [x] **T-12**. Add the **Preview browser** switch (`previewProfileEnabled`) to the computer
       Settings tab (FL-01's `apps/web/src/components/fleet/settings/ComputerSettingsTab.tsx` or its
       merged name) with the sentence from plan §8, saving through `PATCH /api/fleet/nodes/:id`
       (`apps/api/src/fleet/fleet.controller.ts:501`, DTO extended additively).
@@ -114,7 +114,7 @@
 
 ## P1.E — Tools, i18n, e2e
 
-- [ ] **T-13**. Write `packages/agent/src/fleet/ports/agent-fleet-ports-tools.ts` (`fleet_ports_list`
+- [x] **T-13**. Write `packages/agent/src/fleet/ports/agent-fleet-ports-tools.ts` (`fleet_ports_list`
       readOnly, `fleet_ports_open` destructive false audited as `agent:<id>`); concatenate beside
       `buildFleetTools`; MCP whitelist entries in `apps/mcp/src/openapi-tools/whitelist.ts`.
     - **Test**: `agent-fleet-ports-tools.spec.ts` (list writes no audit; open does; a non-loopback
