@@ -8,6 +8,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { FLEET_TONE_DOT_CLASS } from '../fleet-hub.shared';
+import { SessionTaskChip } from '../tasks/SessionTaskChip';
 import { providerKey, sessionElapsed, sessionStateGlyph } from './sessions.shared';
 
 /**
@@ -85,6 +86,8 @@ export function SessionCard({
                         {session.cwd}
                     </span>
                 </span>
+                {/* FL-15 P1 (spec FR-10): the Task this session's Run works on. */}
+                {session.task ? <SessionTaskChip task={session.task} /> : null}
                 {footerSlots}
             </footer>
         </article>
