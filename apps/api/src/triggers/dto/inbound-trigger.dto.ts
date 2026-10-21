@@ -90,6 +90,54 @@ export class TriggerEventMatcherDto {
     @IsOptional()
     @IsUUID()
     workId?: string;
+
+    @ApiPropertyOptional({
+        description:
+            "FL-15: only GitHub events about the Trigger's owner (their linked GitHub login): review requested from me, assigned to me, pull requests I opened. Needs a linked GitHub account.",
+        type: () => TriggerEventAudienceDto,
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => TriggerEventAudienceDto)
+    audience?: TriggerEventAudienceDto;
+}
+
+const TRIGGER_AUDIENCE_KINDS = ['review-requested', 'assigned', 'authored'] as const;
+
+/** FL-15 P3 — the "about me" group of an event matcher. */
+export class TriggerEventAudienceDto {
+    @ApiProperty({ enum: TRIGGER_AUDIENCE_KINDS, isArray: true })
+    @IsArray()
+    @ArrayMaxSize(3)
+    @IsIn(TRIGGER_AUDIENCE_KINDS as unknown as string[], { each: true })
+    me: Array<(typeof TRIGGER_AUDIENCE_KINDS)[number]>;
+}
+
+/** FL-15 P3 — body of `POST /api/inbound-triggers/presets/github-for-me` (spec FR-19). */
+export class GithubForMePresetDto {
+    @ApiPropertyOptional({
+        enum: TRIGGER_AUDIENCE_KINDS,
+        isArray: true,
+        description: 'Which events about me; all three when absent.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(3)
+    @IsIn(TRIGGER_AUDIENCE_KINDS as unknown as string[], { each: true })
+    audience?: Array<(typeof TRIGGER_AUDIENCE_KINDS)[number]>;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'The Agent the Tasks are assigned to.' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+
+    @ApiPropertyOptional({
+        enum: TRIGGER_AUTO_STARTS,
+        description: "'manual' (default) parks every Task in the Backlog; 'always' starts the Agent on it.",
+    })
+    @IsOptional()
+    @IsIn(TRIGGER_AUTO_STARTS as unknown as string[])
+    autoStart?: InboundTriggerAutoStart;
 }
 
 /**
