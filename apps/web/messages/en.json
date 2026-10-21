@@ -13947,6 +13947,21 @@
                 "body": "Lets Open show a page in a browser profile on this computer that no agent uses.",
                 "saved": "Saved.",
                 "failed": "Could not switch the preview browser."
+            },
+            "tunnel": {
+                "button": "Preview in my browser",
+                "previewing": "previewing",
+                "timeLeft": "{time} left",
+                "requests": "{count, plural, one {# request} other {# requests}}",
+                "reopen": "Open",
+                "close": "Close preview",
+                "copyLink": "Copy link",
+                "copied": "Link copied — it opens in this browser only",
+                "limit": "You already have 4 previews open — close one.",
+                "limitRow": ":{port} ({left} left)",
+                "failed": "Could not open the preview",
+                "openedByAgent": "opened by an agent for you",
+                "egressBilled": "Egress on this cloud computer is billed by its provider."
             }
         }
     }

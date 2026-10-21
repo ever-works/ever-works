@@ -588,6 +588,7 @@ export class AgentToolService {
                     buildFleetPortsTools({
                         agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
                         service: ports,
+                        tunnels: fleet.portTunnels ?? null,
                     }),
                 );
             }

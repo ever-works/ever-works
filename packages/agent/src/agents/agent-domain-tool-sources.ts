@@ -15,6 +15,7 @@ import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tool
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
+import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -102,6 +103,8 @@ export interface AgentFleetToolSource {
      * are simply not offered.
      */
     ports?: Pick<FleetPortsService, 'list' | 'open'>;
+    /** Servers and ports, phase 2 — `fleet_ports_preview_open|close` (offered only while the tunnel flag is on). */
+    portTunnels?: Pick<FleetPortTunnelService, 'open' | 'closeForUser' | 'isEnabled'>;
     /**
      * Services and processes on computers (FL-09) — backs
      * `fleet_services_list|action` and `fleet_processes_list|signal`.

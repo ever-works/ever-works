@@ -658,6 +658,16 @@ export const WHITELIST: WhitelistEntry[] = [
 			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
 		annotations: { destructiveHint: false }
 	},
+	// FL-10 P2 — close a preview tunnel (dark unless FLEET_PORT_TUNNEL_ENABLED). Opening one is NOT
+	// exposed here: its answer carries a one-time address into the owner's tunnel, which a tool must
+	// never hold (spec U15); the in-platform Agent tool opens one without that address.
+	{
+		method: 'DELETE',
+		path: '/api/fleet/nodes/{id}/ports/{port}/preview',
+		toolName: 'fleet_ports_preview_close',
+		description: "Close the person's preview tunnel to a port on a fleet computer.",
+		annotations: { destructiveHint: false }
+	},
 
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.
