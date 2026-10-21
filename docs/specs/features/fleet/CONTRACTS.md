@@ -69,6 +69,16 @@ keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `ch
 `checkouts.sync` takes `{ path, op, checkoutId? }`; a person's rescan is audited as `node.checkout.sync` with
 `op: 'rescan'` (§7). Shapes in `packages/contracts/src/fleet/fleet-checkout.types.ts`.
 
+**Revision 11 (2026-10-21)** — FL-05 P1 (session status): `session.status { sessionId, seq, state, outcome,
+stateChangedAt, lastEvidence, hooks?, boundaryUntil }` and `session.attention { sessionId, seq, attention | null,
+finished? }` on channel 0 (§3.3 "Session status"), applied newer-`seq`-only; `lastEvidence.detail` carries `{ event, seq,
+rule?, userLine?, agentLine? }` (the card's two lines, so no sixth column); `attention` gains optional `allowsText` and
+`tool`, options are `{ id, label, primary?, deny? }` (keys stay on the node); the Claude Code overlay may also register
+`PostToolUse` (a permission answered in the terminal ends `needs_you`); the hook client is one Node script
+(`<state>/hooks/hook-client.cjs`) reading `<state>/hook-endpoint.json`; heartbeat `daemon.hooks` counters are
+`badTokenLastMinute · spooled · events · spoolApplied · unknownSession · malformed · unknownEvents · endpointUp`.
+Shapes in `packages/contracts/src/fleet/fleet-session-status.types.ts`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
@@ -316,6 +326,17 @@ confirmation class and audit row, never through a live view. The attach-token bo
 (`FleetSessionAttachTokenRequest`). The detail answers `presence { attached[], drivers, watchers }` for a live
 session, counted by the API replica that serves the reader. A watcher is not kept out by the kill switch (it reads
 the stop banner); a driver is.
+
+**Session status (FL-05, revision 11).** The node runs ONE state machine per session
+(`mergeFleetSessionEvidence`, contracts) over the CLI's hooks, the daemon's output and exit, a driver's Ctrl-C and the
+clock, and reports on channel 0 after every change: `session.status` (the merged state, outcome, `stateChangedAt`,
+`lastEvidence`, what was injected, the boundary window) and, when the attention moved, `session.attention` (the edge, or
+`null` when it cleared; `finished: true` when a turn ended and it is news). `seq` never goes below the node's clock in
+ms, so the platform applies a status only when it is newer than the row's `lastEvidence.detail.seq` — also across a node
+restart — and never for an ended session; an attention with the key the row holds keeps `raisedAt` and
+`acknowledgedAt`. After every (re)connect the node re-sends where each reported session stands. A shell is never
+`needs_you` or `done`, whatever a report says. `session.answer { key, answer: { optionId } | { text } }` (platform →
+node, P2) names the option by id; the keys to type stay on the node.
 
 ### 3.4 Viewer side (browser → platform)
 
