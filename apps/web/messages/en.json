@@ -2316,7 +2316,8 @@
                 "work": "Work",
                 "agent": "Agent",
                 "noMission": "This run was not part of a Mission",
-                "openSchedule": "Open the schedule that ran this"
+                "openSchedule": "Open the schedule that ran this",
+                "openFleetSession": "Open the session on its computer"
             },
             "shortcuts": {
                 "button": "Keyboard shortcuts",
@@ -12819,8 +12820,130 @@
         }
     },
     "fleet": {
+        "checkouts": {
+            "hub": {
+                "title": "Checkouts on every computer",
+                "computerFilter": "Computer",
+                "allComputers": "All computers"
+            },
+            "tab": {
+                "title": "Checkouts on this computer"
+            },
+            "actions": {
+                "scan": "Scan now",
+                "scanAll": "Scan computers",
+                "scanning": "Scanning…",
+                "fetch": "Fetch",
+                "refresh": "Refresh",
+                "archive": "Archive",
+                "restore": "Restore",
+                "archiveConfirm": "Move to bin",
+                "cancel": "Cancel"
+            },
+            "bin": {
+                "toggle": "Bin ({count})",
+                "title": "Bin",
+                "empty": "The bin is empty."
+            },
+            "errorTitles": {
+                "notFound": "Not found",
+                "invalid": "Not possible",
+                "unreachable": "Not connected",
+                "consentMissing": "Not allowed on this computer",
+                "permissionDenied": "Not allowed",
+                "confirmationRequired": "Needs your confirmation",
+                "killSwitch": "All computers are stopped",
+                "limitExceeded": "Too many at once",
+                "unsupportedOnNode": "This computer cannot do this yet",
+                "busy": "Busy",
+                "operationFailed": "It did not finish",
+                "internal": "Something went wrong"
+            },
+            "states": {
+                "consentMissing": "Checkout management needs --manage on {name}. Run this on {name}:",
+                "offline": "{name} is offline — {count, plural, one {its # checkout is} other {its # checkouts are}} shown as last known ({age}).",
+                "lastKnown": "Shown as last known: {hint}",
+                "empty": "No checkouts yet. List a code folder on a computer and scan it.",
+                "loading": "Loading…"
+            },
+            "group": {
+                "unlinked": "No repository",
+                "work": "Work “{name}”",
+                "noWork": "no Work linked",
+                "count": "{count, plural, one {# checkout} other {# checkouts}} on {computers, plural, one {# computer} other {# computers}}"
+            },
+            "age": {
+                "unknown": "a while ago",
+                "m": "{value} min ago",
+                "h": "{value} h ago",
+                "d": "{value} d ago"
+            },
+            "codeFolders": {
+                "title": "Code folders",
+                "total": "Checkouts use {size} on disk",
+                "lastScan": "Last scan {age}",
+                "neverScanned": "Never scanned",
+                "ofCap": "{count} of {cap}",
+                "unknown": "Scan {name} to see the folders it lists.",
+                "none": "{name} lists no code folders yet, so only its Task worktrees are shown.",
+                "truncated": "{cap} or more — narrow the code folders on {name}.",
+                "setOnMachine": "Code folders are set on the machine itself, never from here:"
+            },
+            "row": {
+                "missing": "The folder is gone from {name}",
+                "creating": "Being created…",
+                "folderRemoved": "Folder removed",
+                "archived": "In the bin since {age}",
+                "taskRunning": "A Task run is working here",
+                "sessionRunning": "A session is working here",
+                "lastKnown": "Last known {age}",
+                "found": "Found {age}",
+                "seen": "Seen {age}",
+                "unknownComputer": "Unknown computer",
+                "taskBadge": "Task",
+                "containerBadge": "Container",
+                "credentialStripped": "The remote had an embedded credential — stripped",
+                "reaperNote": "{note}"
+            },
+            "confirmArchive": "Move {name} to the bin? The folder is not touched.",
+            "disabled": {
+                "scan": "Scanning needs the computer online with --manage",
+                "offline": "{name} is offline",
+                "consentMissing": "Needs --manage on {name}",
+                "notAllowed": "Only the owner of {name} can manage its checkouts",
+                "killSwitch": "All computers are stopped",
+                "missing": "The folder is gone",
+                "archived": "In the bin",
+                "creating": "Still being created",
+                "busy": "Something is working in this checkout",
+                "folderRemoved": "The folder was removed; it cannot be restored",
+                "taskWorktree": "Task worktrees are kept in sync by their runs"
+            },
+            "notices": {
+                "running": "Running on the computer…",
+                "fetchFailed": "Fetch failed (exit {code}): {line}",
+                "fetched": "Fetched",
+                "refreshed": "Refreshed"
+            },
+            "gitLine": {
+                "detached": "detached",
+                "worktree": "worktree",
+                "changes": "+{added} −{removed} · {files, plural, one {# file} other {# files}}",
+                "ahead": "↑{count}",
+                "aheadTitle": "{count, plural, one {# commit} other {# commits}} not on the remote yet",
+                "behind": "↓{count}",
+                "behindTitle": "{count, plural, one {# commit} other {# commits}} on the remote, not here",
+                "uncommitted": "● {count} uncommitted",
+                "clean": "✓ clean",
+                "pr": "PR #{number} ({state})",
+                "notRead": "git line not read yet"
+            }
+        },
         "palette": {
             "goToComputer": "Go to computer {name}",
+            "servicesOn": "Services on {name}",
+            "dockerOn": "Docker on {name}",
+            "processesOn": "Processes on {name}",
             "portsOn": "Ports on {name}"
         },
         "nav": {
@@ -13026,7 +13149,77 @@
                 "hours": "{hours} h {minutes} min",
                 "minutes": "{minutes} min"
             },
-            "checkedAgo": "checked {relative}"
+            "checkedAgo": "checked {relative}",
+            "refreshing": "Refreshing…",
+            "refreshDone": "Checked just now",
+            "refreshFailed": "Could not refresh: {hint}",
+            "refreshTryAgain": "Try again",
+            "refreshShortcut": "Shortcut: R",
+            "refreshNoLink": "Refresh needs a link — start {name} with --work, --attend or --manage · next automatic check in {seconds} s",
+            "refreshNoLinkSoon": "Refresh needs a link — start {name} with --work, --attend or --manage · next automatic check any moment",
+            "refreshNotConnected": "{name} is not connected right now · next automatic check in {seconds} s",
+            "refreshNotConnectedSoon": "{name} is not connected right now · next automatic check any moment",
+            "refreshKillSwitch": "Live actions are paused while all computers are stopped",
+            "refreshLinkDisabled": "This deployment does not accept node links yet. The next automatic check is within a minute.",
+            "refreshCommand": "ever-works-node start --work"
+        },
+        "wake": {
+            "heading": "Wake",
+            "regionLabel": "Wake {name}",
+            "button": "Wake",
+            "shortcut": "Shortcut: W",
+            "canWakeFrom": "Can be woken from {via} (same network)",
+            "canWake": "Can be woken from another computer on its network",
+            "cardCanWake": "can be woken from {via}",
+            "waking": "Waking… sent through {via} · listening for {name}",
+            "back": "{name} is back · checked just now",
+            "notYet": "{name} has not answered yet",
+            "noAnswer": "{name} has not answered — it may be powered off or on another network",
+            "tryAgain": "Try again",
+            "failed": "Could not send the wake: {hint}",
+            "lastAttempt": "Last wake attempt {relative}",
+            "reasons": {
+                "noSibling": "No online computer on {name}'s network can wake it",
+                "noHardwareAddress": "{name} has not reported a hardware address yet — start it once with --manage",
+                "rateLimited": "Already tried 3 times; give it a minute",
+                "notAllowed": "Ask the owner of {name} to allow you: machines",
+                "killSwitch": "Live actions are paused while all computers are stopped"
+            }
+        },
+        "history": {
+            "heading": "History",
+            "regionLabel": "Health history of {name}",
+            "rangeLabel": "Range",
+            "metricsLabel": "Lines",
+            "ranges": {
+                "1h": "1 h",
+                "24h": "24 h",
+                "7d": "7 d",
+                "90d": "90 d"
+            },
+            "rangeWords": {
+                "1h": "hour",
+                "24h": "24 hours",
+                "7d": "7 days",
+                "90d": "90 days"
+            },
+            "metrics": {
+                "cpu": "CPU",
+                "mem": "Memory",
+                "disk": "Disk"
+            },
+            "off": "History is switched off on this deployment.",
+            "empty": "No samples yet — the first one lands on the next check-in.",
+            "loading": "Loading history…",
+            "error": "Could not load history.",
+            "tryAgain": "Try again",
+            "valuePercent": "{value}%",
+            "peak": "peak {value}%",
+            "summary": "{metric} averaged {mean}% over the last {range}, peak {peak}% at {time}.",
+            "summaryNoPeak": "{metric} averaged {mean}% over the last {range}.",
+            "summaryNone": "No {metric} readings over the last {range}.",
+            "gapNote": "Breaks in a line are times the computer was not checking in.",
+            "sparklineLabel": "CPU over the last hour"
         },
         "os": {
             "linux": "Linux",
@@ -13088,7 +13281,8 @@
             "copy": "Copy",
             "copied": "Copied",
             "copyFailed": "Could not copy. Select the command and copy it yourself.",
-            "copyLabel": "Copy the command that turns on {consent}"
+            "copyLabel": "Copy the command that turns on {consent}",
+            "trayHint": "{consent} is off. Turn it on from the Ever Works Desktop Node tray on {name}."
         },
         "errors": {
             "notFound": "This is not here any more.",
@@ -13110,6 +13304,24 @@
             "relayUnavailable": "The relay bus is unavailable. Try again in a moment.",
             "tryAgain": "Try again",
             "follow": "Follow again"
+        },
+        "upgrade": {
+            "heading": "Node version",
+            "required": "Upgrade required",
+            "runs": "{name} runs ever-works-node {version}.",
+            "runsUnknown": "{name} has not reported its node version.",
+            "needs": "This deployment needs {floor} or newer.",
+            "body": "It keeps reporting health but takes no work until it is upgraded.",
+            "current": "It meets this deployment’s minimum ({floor}).",
+            "runThis": "Run this on {name}:",
+            "thenRestart": "Then restart the node service on {name}.",
+            "copyLabel": "Copy the upgrade command",
+            "selfUpdateOff": "Self-update: off on this computer. Start it with --auto-update to let it upgrade itself when the platform asks.",
+            "selfUpdateOn": "Self-update: on — it upgrades itself when the platform asks.",
+            "selfUpdateUnknown": "Self-update: not reported by this node version.",
+            "selfUpdateFailed": "Self-update failed on {name} at {time} — run the command yourself.",
+            "selfUpdateFailedReason": "Reason: {error}",
+            "updated": "Last self-update: from {from}, {time}."
         },
         "computer": {
             "tabsLabel": "Computer",
@@ -13378,7 +13590,12 @@
                 "limit": "{node} already has {count} sessions. End one to start another.",
                 "failed": "The session could not start.",
                 "fieldCwd": "Choose a folder on {node}.",
-                "offline": "{node} is offline. Sessions start once it is back."
+                "offline": "{node} is offline. Sessions start once it is back.",
+                "agentPick": "Agent",
+                "noAgents": "You have no Agents yet. Create one under Agents first.",
+                "agentShellNot": "an Agent drives a CLI, not a shell",
+                "firstMessageRequired": "Required for an Agent session: what the Agent should do (3–4 000 characters).",
+                "queuedHint": "The session starts as soon as {node} has a free slot; until then it waits."
             },
             "detail": {
                 "back": "Sessions",
@@ -13431,7 +13648,9 @@
                 "end": "End…",
                 "restart": "Restart",
                 "copyLink": "Copy link",
-                "shortcuts": "Keyboard shortcuts"
+                "shortcuts": "Keyboard shortcuts",
+                "waiting": "Waiting for a free slot on {node}…",
+                "openRun": "Open the Run"
             },
             "shortcuts": {
                 "title": "Session shortcuts",
@@ -13479,6 +13698,152 @@
                 "newSessionMenu": "New session on {node}",
                 "state": "State: {state}",
                 "card": "{title} on {node}, {state}"
+            },
+            "agentBlock": {
+                "title": "Sessions",
+                "empty": "{agent} has no sessions on your computers yet.",
+                "loadFailed": "The sessions could not be loaded."
+            }
+        },
+        "actions": {
+            "cancel": "Cancel",
+            "anyway": "{action} anyway",
+            "typeNameToConfirm": "Type {name} to confirm:",
+            "rootRequired": {
+                "title": "{name} needs your password for this",
+                "body": "Ever Works never asks for it. Run this on {name}:",
+                "help": "Or allow the node’s user to run it without a password — see “Root actions” in the Fleet docs.",
+                "windowsTitle": "{name} needs administrator rights for this",
+                "windowsBody": "Run in an elevated PowerShell on {name}:",
+                "windowsHelp": "Or run the node as an administrator — see “Root actions” in the Fleet docs.",
+                "copy": "Copy the command",
+                "close": "Close"
+            },
+            "states": {
+                "asking": "Asking {name}…",
+                "slow": "{name} has not answered yet. It may be busy.",
+                "offline": "{name} is offline. Try again when it is back.",
+                "consentMissing": "Machine management is switched off on {name}, so its {family} cannot be shown. Run this there:",
+                "permissionDenied": "Only the owner of {name} can see or change its {family}.",
+                "killSwitch": "All computers are stopped. Live actions are paused until the stop is cleared under Settings → Fleet.",
+                "killSwitchLastKnown": "All computers are stopped — showing the last answer. Actions are paused.",
+                "lastKnown": "{name} did not answer the last refresh — showing the last answer.",
+                "unsupported": "{name} cannot do this yet.",
+                "notFound": "This computer is not here any more.",
+                "failed": "Could not read {family} on {name}.",
+                "tryAgain": "Try again"
+            }
+        },
+        "services": {
+            "title": "Services",
+            "family": "services",
+            "heading": "{count, plural, one {Service (#)} other {Services (#)}}",
+            "find": "Find a service…",
+            "order": "failed first · system + user",
+            "refresh": "Refresh now",
+            "every30s": "every 30 s",
+            "ownerOnly": "Only the owner of {name} can change its services.",
+            "noManager": "{name} has no service manager Ever Works understands. Its Processes and Docker tabs still work.",
+            "empty": "No services Ever Works can list on {name}.",
+            "noMatch": "No service matches.",
+            "listError": "Could not list {manager} services on {name}: “{message}”",
+            "userScope": "(user)",
+            "working": "working…",
+            "exited": "exited {code}",
+            "atBoot": "at boot",
+            "atLogin": "at login",
+            "manual": "manual",
+            "more": "More for {name}",
+            "enableAtBoot": "Start at boot",
+            "disableAtBoot": "Do not start at boot",
+            "log": "Log",
+            "copyName": "Copy unit name",
+            "copied": "Copied {name}.",
+            "copyFailed": "Could not copy.",
+            "thisNodeTooltip": "This is the Ever Works node itself. Ever Works will not stop it from here.",
+            "riskTooltip": "Stopping this could cut {name} off from Ever Works.",
+            "stillWorking": "{name} is still changing; the list will show it when it is done.",
+            "done": "{action}: {name} is now {state}.",
+            "actionFailed": "That did not work on the computer.",
+            "actionFailedWith": "That did not work: {hint}",
+            "act": {
+                "start": "Start",
+                "stop": "Stop",
+                "restart": "Restart",
+                "enable": "Start at boot",
+                "disable": "Do not start at boot"
+            },
+            "risk": {
+                "node": "this node",
+                "network": "network",
+                "ssh": "remote access",
+                "vpn": "private network",
+                "docker": "Docker"
+            },
+            "states": {
+                "running": "running",
+                "failed": "failed",
+                "inactive": "inactive",
+                "activating": "starting…",
+                "deactivating": "stopping…",
+                "unknown": "unknown"
+            },
+            "columns": {
+                "name": "Name",
+                "state": "State",
+                "since": "Since · boot",
+                "cpu": "CPU",
+                "memory": "Memory",
+                "actions": "Actions"
+            },
+            "dialog": {
+                "title": "{action} {name} on {machine}?",
+                "enableTitle": "Start {name} at boot on {machine}?",
+                "disableTitle": "Stop starting {name} at boot on {machine}?",
+                "restartBody": "{name} will be unavailable for a moment.",
+                "stopBody": "{name} stops until someone starts it again."
+            }
+        },
+        "processes": {
+            "title": "Processes",
+            "family": "processes",
+            "busiest": "Processes · busiest of {count} by CPU",
+            "largest": "Processes · largest of {count} by memory",
+            "find": "Find a process…",
+            "sortBy": "Sort by",
+            "every5s": "every 5 s",
+            "ownerOnly": "Only the owner of {name} can stop its processes.",
+            "stop": "Stop",
+            "kill": "Kill",
+            "stopping": "stopping…",
+            "stillRunning": "still running — Kill?",
+            "stillRunningHint": "A process that is still running {seconds} seconds after Stop offers Kill.",
+            "gone": "{name} ({pid}) has stopped.",
+            "signalFailed": "The signal could not be sent.",
+            "signalFailedWith": "The signal could not be sent: {hint}",
+            "protectedNode": "this node",
+            "protectedInit": "not from here",
+            "columns": {
+                "pid": "PID",
+                "name": "Name",
+                "cpu": "CPU",
+                "memory": "Memory",
+                "owner": "Owner",
+                "runtime": "Run time",
+                "command": "Command",
+                "actions": "Actions"
+            },
+            "gpu": {
+                "title": "GPUs",
+                "label": "GPU",
+                "numbered": "GPU {index}",
+                "shared": "{memory} shared",
+                "utilizationUnavailable": "utilisation unavailable"
+            },
+            "dialog": {
+                "stopTitle": "Send SIGTERM to {name} ({pid}) on {machine}?",
+                "killTitle": "Send SIGKILL to {name} ({pid}) on {machine}?",
+                "killBody": "It cannot save its work."
             }
         },
         "ports": {

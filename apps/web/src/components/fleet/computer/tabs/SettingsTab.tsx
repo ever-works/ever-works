@@ -6,6 +6,7 @@ import { ROUTES } from '@/lib/constants';
 import type { FleetComputerTabProps } from '../../registry';
 import { PolicyFamiliesEditor } from '../PolicyFamiliesEditor';
 import { ComputerMachineSettings } from '../ComputerMachineSettings';
+import { UpgradeRequiredSection } from '../../link/UpgradeRequiredSection';
 import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
 
 /**
@@ -15,6 +16,8 @@ import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
  * credential) — the Computers tab's node panel, mounted unchanged. `machine`
  * carries what the credential hand-over needs; the page passes it (see
  * `SettingsTabServer`), and without it the tab links to the Computers tab.
+ * FL-02's "Node version" section (upgrade required, the exact command, the
+ * node's self-update) sits first, for the owner.
  */
 export default function SettingsTab({
     node,
@@ -26,6 +29,7 @@ export default function SettingsTab({
     const isOwner = node.viewerRole === undefined || node.viewerRole === 'owner';
     return (
         <div className="space-y-8" data-testid="fleet-computer-settings">
+            {isOwner && <UpgradeRequiredSection node={node} />}
             <PolicyFamiliesEditor node={node} />
             {/* Servers and ports (FL-10): the preview browser switch, owner only. */}
             {isOwner && <PreviewBrowserSwitch node={node} />}

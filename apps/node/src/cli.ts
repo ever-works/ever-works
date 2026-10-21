@@ -7,10 +7,13 @@ import {
 	createDiskProbe,
 	createHealthProbeIo,
 	createSecretStore,
+	createWakeSender,
 	createResourceProbe,
 	currentEnvironment,
 	defaultConfigPath,
 	isExecutableFile,
+	readNetworkInterfaces,
+	resolveEntryPath,
 	restrictFileToOwnerWindows,
 	statModelCliFile,
 	systemFetch
@@ -43,7 +46,11 @@ function buildDeps(): CliDeps {
 			// compatibility probe, so an upgraded CLI is re-probed at once.
 			statFile: statModelCliFile,
 			// Computer health (FL-03): the snapshot every heartbeat carries.
-			health: createHealthProbeIo(runner)
+			health: createHealthProbeIo(runner),
+			// Computer health, second phase (FL-03): the primary interface for
+			// Wake-on-LAN (read under `--manage` only) and the packet sender.
+			network: readNetworkInterfaces,
+			wakeSender: createWakeSender()
 		},
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),
@@ -66,7 +73,9 @@ function buildDeps(): CliDeps {
 		// Sessions on computers (FL-04): the session daemon is this same CLI
 		// (a hidden subcommand), run by the same Node binary.
 		...(process.argv[1] ? { sessionDaemonCommand: { command: process.execPath, args: [process.argv[1]] } } : {}),
-		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {})
+		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {}),
+		// Fleet node link (FL-02 T-25): what `--auto-update` identifies the install by.
+		entryPath: resolveEntryPath()
 	};
 }
 

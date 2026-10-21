@@ -748,10 +748,13 @@ export const config = {
             );
         },
         /**
-         * Machine facts (CONTRACTS §9) — `FLEET_MACHINE_FACTS_ENABLED`, the one
-         * flag behind logs (FL-08), services / Docker / processes (FL-09),
-         * ports (FL-10) and files (FL-11). Off unless set to `true`, and never
-         * without `FLEET_ENABLED`: off, those routes answer 404. Read per call.
+         * Machine facts (FL-08, FL-09, FL-10 P1, FL-11 — CONTRACTS §9) —
+         * `FLEET_MACHINE_FACTS_ENABLED`. Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every logs, services, Docker,
+         * Compose, processes, ports and files route answers 404 (the surface
+         * is not even confirmed). Every one of those reaches the machine over
+         * the node link, so the link flag still gates the machine calls on its
+         * own. Read per call: flipping it needs no restart.
          */
         isMachineFactsEnabled(): boolean {
             return (
@@ -788,6 +791,19 @@ export const config = {
             )
                 ? raw
                 : null;
+        },
+        /**
+         * Checkouts on computers (FL-14, CONTRACTS §9) — `FLEET_CHECKOUTS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**checkouts**` route answers 404 and the
+         * reconcile sweep does nothing. Read per call: flipping it needs no
+         * restart.
+         */
+        isCheckoutsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_CHECKOUTS_ENABLED === 'true'
+            );
         },
         /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`

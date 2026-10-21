@@ -34,6 +34,7 @@ import type { FleetJobView } from './fleet-jobs.types';
 import type { FleetNodeLoadView } from './fleet-jobs.types.js';
 import type { FleetNodeModelThrottleView } from './fleet-model-usage-limit.types.js';
 import type { FleetNodeHealthSnapshot, FleetNodeHealthStored } from './fleet-node-health.types.js';
+import type { FleetWakeRoute } from './fleet-node-wake.types.js';
 
 import type { ComputerControlPolicy } from '../computer/computer-session.types.js';
 import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access.types.js';
@@ -355,6 +356,26 @@ export interface FleetNodeSelfDescription {
 	 */
 	consents?: FleetConsents;
 	/**
+	 * Computer health (FL-03, second phase; CONTRACTS §1.1) — the primary
+	 * network interface's hardware address, the one fact a Wake-on-LAN packet
+	 * needs. Sent only by a node started with `--manage` (spec FR-23); the
+	 * platform validates it (`normalizeFleetMacAddress`), stores it for the
+	 * owner's own computer and never shows it in full.
+	 *
+	 * Heartbeat only, in the NEWEST optional tier together with {@link lanId}:
+	 * a platform older than the pair 400s it, and the node drops exactly these
+	 * two and keeps beating.
+	 */
+	macAddress?: string;
+	/**
+	 * Computer health (FL-03, second phase) — an OPAQUE identity of the
+	 * network the primary interface is on (a short hash of that network,
+	 * never an address), so siblings on the same network can be matched
+	 * without storing addresses. Re-hashed with the owner's id before it is
+	 * stored. Sent with {@link macAddress}, under `--manage` only.
+	 */
+	lanId?: string;
+	/**
 	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
 	 * health: `running` while it answers, `stopped` or `failed` with the
 	 * node's own diagnosis otherwise. Sent by a node with `--manage` or
@@ -362,6 +383,15 @@ export interface FleetNodeSelfDescription {
 	 * `consents`, so an older platform only loses the daemon line.
 	 */
 	daemon?: FleetSessionDaemonReport;
+	/**
+	 * Fleet node link (FL-02, spec FR-37, FR-38, U16) — what this daemon's
+	 * opt-in self-update (`ever-works-node start --auto-update`) is doing:
+	 * whether it is on, and the outcome of its last attempt. Heartbeat only,
+	 * in the node's newest strip tier: a platform older than the field 400s
+	 * the beat once and the node retries without it. Read it through
+	 * {@link normalizeFleetNodeSelfUpdate}.
+	 */
+	selfUpdate?: FleetNodeSelfUpdateReport;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -534,6 +564,14 @@ export interface FleetNodeView {
 	 * it right now. Absent on a build without the link and on cluster rows.
 	 */
 	link?: FleetNodeLinkView;
+	/**
+	 * Fleet node link (FL-02, spec §5.4, U16) — the node's self-update as its
+	 * last heartbeat reported it, or null when it never reported one (a
+	 * daemon older than the field). Shown on the computer's Settings tab:
+	 * "Self-update: off on this computer", or "Self-update failed on build-02
+	 * at 09:12 — run the command yourself".
+	 */
+	selfUpdate?: FleetNodeSelfUpdateReport | null;
 
 	/**
 	 * Computer health (FL-03) — the latest snapshot the node reported, stamped
@@ -543,6 +581,24 @@ export interface FleetNodeView {
 	 * `isFleetNodeHealthStale` before showing it as current.
 	 */
 	health?: FleetNodeHealthStored | null;
+	/**
+	 * Computer health (FL-03, second phase) — the hardware address the node
+	 * reported, MASKED to its last two octets (`••:••:••:••:3f:9a`), or null
+	 * when it never reported one. Owner only: never on a shared view.
+	 */
+	macAddress?: string | null;
+	/** Computer health (FL-03, second phase) — the stored (owner-salted) network identity, or null. Owner only. */
+	lanId?: string | null;
+	/**
+	 * Computer health (FL-03, second phase) — the sibling an offline computer
+	 * can be woken through right now, or null when it cannot (not offline, no
+	 * hardware address, no online sibling advertising `wake` on its network).
+	 * Computed on the owner's list and detail reads; never on a shared view
+	 * (the health read answers a shared viewer's `wake` availability itself).
+	 */
+	canWake?: FleetWakeRoute | null;
+	/** Computer health (FL-03, second phase) — the last wake attempt on this computer (ISO), or null. */
+	lastWakeAttemptAt?: string | null;
 	/**
 	 * Fleet hub (FL-01) — the owner's star. Favourites sort first on the hub.
 	 * Owner-only: always false on a row someone else sees through an
@@ -733,6 +789,63 @@ export const FLEET_DEFAULT_MIN_NODE_VERSION = '0.1.0';
  * same thing. Followed by a service restart on that machine.
  */
 export const FLEET_NODE_UPGRADE_COMMAND = 'npm install -g ever-works-node@latest';
+
+// ─── Node lifecycle: opt-in self-update (FL-02 T-25) ────────────────────────
+
+/**
+ * What a node's opt-in self-update reports on its heartbeat (FL-02 FR-37,
+ * FR-38, U16). Counts and instants only: `error` is a short, platform-written
+ * class of failure (`npm install exited 1`, `installer unknown`), never an
+ * installer's own output, which can carry local paths.
+ */
+export interface FleetNodeSelfUpdateReport {
+	/** True when this process was started with `--auto-update`. */
+	enabled: boolean;
+	/** ISO instant of the last FAILED attempt, or null. */
+	failedAt?: string | null;
+	/** Why it failed, one short sentence ({@link FLEET_SELF_UPDATE_MAX_ERROR_LENGTH}), or null. */
+	error?: string | null;
+	/** The version (or `latest`) the last attempt targeted, or null. */
+	targetVersion?: string | null;
+	/** ISO instant of the last SUCCESSFUL self-update (the restart that followed it), or null. */
+	updatedAt?: string | null;
+	/** The version that update came from, or null. */
+	fromVersion?: string | null;
+}
+
+/** Longest `error` a self-update report keeps. */
+export const FLEET_SELF_UPDATE_MAX_ERROR_LENGTH = 200;
+
+function selfUpdateString(value: unknown, max: number): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	if (trimmed.length === 0) return null;
+	return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
+}
+
+function selfUpdateInstant(value: unknown): string | null {
+	if (typeof value !== 'string' || value.length > 40) return null;
+	const at = Date.parse(value);
+	return Number.isFinite(at) ? new Date(at).toISOString() : null;
+}
+
+/**
+ * Read a self-update report off the wire or a stored column: `null` when it
+ * is not an object; otherwise `enabled` only when literally `true`, each
+ * instant re-serialised or dropped, each string bounded. Never throws.
+ */
+export function normalizeFleetNodeSelfUpdate(value: unknown): FleetNodeSelfUpdateReport | null {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+	const record = value as Record<string, unknown>;
+	return {
+		enabled: record.enabled === true,
+		failedAt: selfUpdateInstant(record.failedAt),
+		error: selfUpdateString(record.error, FLEET_SELF_UPDATE_MAX_ERROR_LENGTH),
+		targetVersion: selfUpdateString(record.targetVersion, FLEET_MAX_VERSION_LENGTH),
+		updatedAt: selfUpdateInstant(record.updatedAt),
+		fromVersion: selfUpdateString(record.fromVersion, FLEET_MAX_VERSION_LENGTH)
+	};
+}
 
 /** Most `cliVersions` entries one beat may carry — one per pinned provider, with room to grow. */
 export const FLEET_MAX_CLI_VERSIONS = 8;

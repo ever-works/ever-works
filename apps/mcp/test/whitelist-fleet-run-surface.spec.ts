@@ -101,7 +101,14 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	// Fleet mutations a run could turn against its own machine.
 	set_agent_node_affinity: 'fleet mutation',
 	clear_agent_node_affinity: 'fleet mutation',
-	drain_fleet_node: 'fleet mutation'
+	drain_fleet_node: 'fleet mutation',
+	// Sessions on computers (FL-04 P2): a person's terminals on their machines. A run's
+	// Agent works through its own `fleet_sessions_*` tools, never through a person's MCP surface.
+	fleet_sessions_list: "a person's sessions on their computers",
+	fleet_sessions_read: "a person's sessions on their computers (last screens)",
+	fleet_sessions_start: 'starts a process on a computer',
+	fleet_sessions_rename: "a person's sessions on their computers",
+	fleet_sessions_end: 'destructive: stops a process on a computer'
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

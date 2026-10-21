@@ -7,3 +7,4 @@ export * from './fleet-session.service';
 export * from './fleet-session.view';
 export * from './fleet-sessions.module';
 export { FleetSession } from '../../entities/fleet-session.entity';
+export * from './agent-session.dispatcher';

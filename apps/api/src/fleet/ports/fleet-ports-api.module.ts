@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { FLEET_PORTS_NODE_PORT, FleetPortsModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetMachineFactsEnabledGuard } from '../guards/fleet-machine-facts-enabled.guard';
+import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { FleetPortsController } from './fleet-ports.controller';
 import { FleetPortsLinkAdapter } from './fleet-ports-link.adapter';
 

@@ -1,7 +1,9 @@
 import 'server-only';
 import './index';
 import './fl-01-hub';
+import './fl-09-machine';
 import './fl-04-sessions.server';
+import './fl-14-checkouts';
 import './fl-10-ports.server';
 
 /**
@@ -13,7 +15,8 @@ import './fl-10-ports.server';
  * line above. Imported by the hub pages and the computer page only.
  *
  * Registered today: FL-01's own computer tabs (`./fl-01-hub`); FL-04's
- * Sessions tab and session page (`./fl-04-sessions.server`); FL-10's Ports tab
- * (`./fl-10-ports.server`).
+ * Sessions tab and session page (`./fl-04-sessions.server`); FL-14's hub and
+ * computer Checkouts tabs (`./fl-14-checkouts`); FL-09's Services and
+ * Processes tabs (`./fl-09-machine`); FL-10's Ports tab (`./fl-10-ports.server`).
  */
 export {};

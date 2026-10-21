@@ -41,9 +41,25 @@ failure thresholds stay fixed (§6) until the owner asks for editors.
 channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
 `session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
 
+**Revision 9 (2026-10-21)** — FL-04 P2 (Agent sessions): job kind `agent-session` (§6 / R-28) with
+`FleetAgentSessionPayload { fleetSessionId, agentId, agentRunId, nodeId, provider: claude-code|codex, cwd, title,
+firstMessage, cols, rows, permissionMode, leaseTtlSec }` (ids, the folder and the first message — never a command
+line), required tags `sessions` + the CLI's, idempotency key `fleet-session:<id>`, pinned to `payload.nodeId`, lease
+TTL 300 s, queue SLA 2 h (the session sweeper ends one still waiting after 10 min); result `FleetAgentSessionResult
+{ exitCode, outcome, endedReason?, providerSessionId }`; `agent_runs.fleetSessionId` + trigger `session` (§4.2, R-1,
+slot `1796040100000`); `RunLedgerRow.fleetSessionId?`. An Agent session runs on the person's own computer (a node
+leases only its owner's jobs).
+
 **Revision 8 (2026-10-21)** — FL-04 P1b: session viewers (§3.3 "Session viewers") — the browser's
 `session.attach`, the watcher and driver JSON allow-lists of the `session` family, the attach-token body,
 `presence` on the session detail, watchers admitted under the kill switch.
+
+**Revision 9 (2026-10-21)** — FL-14 P1 (lane-log decisions 1–5): `checkouts.list` needs `work-or-manage`
+(a `FLEET_LINK_VERB_CONSENT_OVERRIDES` entry, §3.3) and discovery (`rescan`) `--manage`, checked on the machine; the node
+keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `checkoutIds`) and answers
+`{ checkouts, complete, truncated, codeFolders, scannedAt, checkoutsRoot, remoteBranches? }`, and
+`checkouts.sync` takes `{ path, op, checkoutId? }`; a person's rescan is audited as `node.checkout.sync` with
+`op: 'rescan'` (§7). Shapes in `packages/contracts/src/fleet/fleet-checkout.types.ts`.
 
 ---
 
@@ -271,7 +287,8 @@ the node went away mid-operation; never reported as `done`).
 
 **Consent exceptions per verb.** The `machine` family needs `manage` except `health.now`, which is
 allowed on any open link (R-31). The link implementation keeps these exceptions in one table
-(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code.
+(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code. FL-14 adds
+`checkouts.list: work-or-manage` (revision 9).
 
 **Session family details (FL-04, revision 7).** `kind` on the open lets the node check the consent before
 the channel opens (`--manage` for owner sessions, `--work` for Agent sessions, R-5) and again against the

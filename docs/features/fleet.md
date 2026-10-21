@@ -33,6 +33,8 @@ Enrolled nodes go **offline** after five minutes without a heartbeat.
 
 ## Enrolling a node
 
+> **Consents (FL-02).** Enrolling lets a computer report health and nothing else; running work (`--work`), live viewing (`--attend`) and managing the machine (`--manage`) are separate consents its owner gives when starting the node — or in the desktop app's wizard and tray. With any of them on, the node also keeps one outbound link to the platform. See [Fleet node link](./fleet-node-link.md).
+
 Enrollment is outbound-only: the node calls the platform, never the other way round. Nothing needs to be reachable from the internet.
 
 0. **Install the node app** — `npm install -g ever-works-node` (Node.js ≥ 22). It is a single-file bundle published from `apps/node`; the unattended-run scripts (systemd unit, Windows service/scheduled-task installer) ship inside the package under `packaging/`.
@@ -110,6 +112,9 @@ Drain disables **first** and requeues second. The order is deliberate: the node 
 The whole surface is gated by `FLEET_ENABLED` on the API. When it is off, every `/api/fleet/**` route answers **404**, not 403 — a disabled deployment does not confirm the channel exists. The flag defaults to on.
 
 ## Health signals
+
+> The per-check-in health snapshot (CPU, memory, disk, GPU, load, uptime, pending reboot, failed services),
+> its history, **Refresh now** and **Wake** are described in [Computer health](./fleet-health.md).
 
 `status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
 
@@ -428,6 +433,8 @@ The node now probes the **pinned** model CLI binaries — the exact paths an `ag
 `ever-works-node doctor` prints one line for the daemon and one per pinned CLI; `--json` carries the same facts (`daemonVersion`, `minNodeVersion`, `upgradeRequired`, `upgradeCommand`, `modelCli[]`). `doctor` resolves the CLIs the way this shell does; a service started with `--claude-path` / `--codex-path` pins its own and logs its verdict at startup.
 
 There is no self-updater and no canary ring yet: an opt-in, reviewed self-update path is a follow-up. Until then the floor plus `doctor` is the rollout tool — upgrade a canary machine, confirm with `doctor`, upgrade the rest, then raise `FLEET_MIN_NODE_VERSION`.
+
+**Update (FL-02):** the opt-in self-update has shipped — `ever-works-node start --auto-update` lets a machine upgrade itself (npm installs only, never while a job runs, exit `75` for the service manager to restart it), and operators can name a recommended version with `FLEET_RECOMMENDED_NODE_VERSION`. The computer's **Settings** tab in the Fleet hub shows the version, the exact upgrade command for its OS, and what its self-update did last. See [Fleet node link](./fleet-node-link.md#keeping-nodes-current-opt-in-self-update). The canary-first rollout above is still the recommended way to raise the floor.
 
 ## Remote node limits
 

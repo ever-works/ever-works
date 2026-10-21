@@ -14,6 +14,7 @@ import { FleetSettings } from '@/components/settings/FleetSettings';
 import { captureFleetEvent } from '../fleet-telemetry';
 import { orderComputers } from '../fleet-hub.shared';
 import type { FleetComputersTableFavorites } from './FleetComputersTable';
+import { ComputerStateSentence } from '../health/ComputerStateSentence';
 
 type FleetSettingsProps = ComponentProps<typeof FleetSettings>;
 
@@ -127,6 +128,11 @@ export function FleetComputersPanel({
             >
                 {node.name}
             </Link>
+        ),
+        // FL-03: the state's why under the status word (a limit's reset, the
+        // node's own reason, "can be woken from build-01").
+        renderState: (node) => (
+            <ComputerStateSentence node={node} wakeVia={node.canWake?.name ?? null} />
         ),
     };
 

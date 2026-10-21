@@ -128,10 +128,13 @@ import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
     FleetJobService,
     FleetKillSwitchService,
+    FleetMachineActionsService,
     FleetModule,
     FleetPortsService,
     FleetService,
+    FleetSessionService,
 } from '@ever-works/agent/fleet';
+import { config } from '@ever-works/agent/config';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
@@ -2114,6 +2117,14 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // Services and processes on computers (FL-09) — backs the
+                // `fleet_services_*` / `fleet_processes_*` tools. APPENDED LAST
+                // (positional), optional: unbound, those tools are not offered.
+                { token: FleetMachineActionsService, optional: true },
+                // FL-04 P2 — the `sessions` tool family (fleet_sessions_*). APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED
+                // off) the six tools are simply not offered.
+                { token: FleetSessionService, optional: true },
                 // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
                 // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
                 { token: FleetPortsService, optional: true },
@@ -2140,6 +2151,8 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                fleetMachine?: FleetMachineActionsService | null,
+                fleetSessions?: FleetSessionService | null,
                 fleetPorts?: FleetPortsService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
@@ -2161,7 +2174,14 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet, ...(fleetPorts ? { ports: fleetPorts } : {}) },
+                fleet: {
+                    service: fleet,
+                    ...(fleetMachine ? { machine: fleetMachine } : {}),
+                    ...(fleetPorts ? { ports: fleetPorts } : {}),
+                },
+                ...(fleetSessions && config.fleet.isSessionsEnabled()
+                    ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

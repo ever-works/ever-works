@@ -18,7 +18,7 @@ import type { FleetPortOpenResult, FleetPortsListResponse } from '@ever-works/co
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetMachineFactsEnabledGuard } from '../guards/fleet-machine-facts-enabled.guard';
+import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { ListFleetPortsQueryDto, OpenFleetPortDto } from './dto/fleet-ports.dto';
 
 function actorOf(auth: AuthenticatedUser): FleetPortsActor {

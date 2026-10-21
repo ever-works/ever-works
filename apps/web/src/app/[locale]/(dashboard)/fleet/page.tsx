@@ -77,7 +77,10 @@ export default async function FleetOverviewPage() {
                 <div className="space-y-8">
                     <NeedsALookList initial={look} initialError={lookError} nodes={persisted} />
                     <FleetOverviewBlocks surface="hub" nodes={persisted} flags={flags} />
-                    <ComputerCards nodes={persisted} />
+                    <ComputerCards
+                        nodes={persisted}
+                        historyEnabled={flags.FLEET_HEALTH_HISTORY_ENABLED === true}
+                    />
                 </div>
             )}
         </FleetHubFrame>

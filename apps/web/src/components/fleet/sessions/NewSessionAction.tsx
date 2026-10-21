@@ -8,7 +8,7 @@ import { useShortcut } from '@/lib/hooks/use-shortcut';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { FleetComputerActionProps } from '../registry';
 import { SessionStartDialog } from './SessionStartDialog';
-import { canStartOwnerSession } from './sessions.shared';
+import { canStartAgentSession, canStartOwnerSession } from './sessions.shared';
 
 const ACTION =
     'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium h-8 px-3 text-xs border border-border dark:border-border-dark text-text dark:text-text-dark disabled:opacity-50 disabled:cursor-not-allowed';
@@ -24,7 +24,7 @@ const ACTION =
 export default function NewSessionAction({ node, allowed = true }: FleetComputerActionProps) {
     const t = useTranslations('fleet.sessions');
     const [open, setOpen] = useState(false);
-    const usable = allowed && canStartOwnerSession(node);
+    const usable = allowed && (canStartOwnerSession(node) || canStartAgentSession(node));
 
     useShortcut(
         {

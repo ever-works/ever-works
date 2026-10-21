@@ -65,6 +65,9 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
+import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
@@ -588,6 +591,50 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Services and processes on computers (FL-09) — every call runs the same
+            // chain a person's click does, as this Agent; a blast-radius act and every
+            // SIGKILL are held for the owner's approval (FR-22).
+            if (fleet.machine) {
+                const machine = fleet.machine;
+                add('fleet-machine', () =>
+                    buildFleetMachineTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: machine,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Computer health (FL-03): the read-only health tools, when bound.
+            if (fleet.health) {
+                const health = fleet.health;
+                add('fleet-health', () =>
+                    buildFleetHealthTools({
+                        userId: agent.userId,
+                        service: health.service,
+                        history: health.history,
+                        ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
+        }
+
+        // FL-04 P2 — the Agent's own sessions on computers (start is always an
+        // Agent session of THIS Agent, FR-51). Bound only while
+        // FLEET_SESSIONS_ENABLED is on.
+        if (sources.fleetSessions) {
+            const fleetSessions = sources.fleetSessions;
+            add('fleet-sessions', () =>
+                buildFleetSessionTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleetSessions.service,
+                }),
+            );
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it

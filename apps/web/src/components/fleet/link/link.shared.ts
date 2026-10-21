@@ -1,6 +1,7 @@
 import {
     FLEET_CONSENT_FLAGS,
     FLEET_NODE_LINK_STATES,
+    FLEET_NODE_UPGRADE_COMMAND,
     effectiveConsents,
     isFleetLinkErrorCode,
     normalizeFleetConsents,
@@ -8,9 +9,11 @@ import {
     type FleetLinkErrorCode,
     type FleetNodeLinkState,
     type FleetNodeLinkView,
+    type FleetNodeSelfUpdateReport,
     type FleetNodeView,
 } from '@ever-works/contracts';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
+import { osKeyOf } from '../fleet-os.shared';
 
 /**
  * Fleet node link (FL-02, spec §5.1 – §5.3, FR-28, FR-41, FR-42) — the pure
@@ -189,4 +192,54 @@ export function linkErrorMessageKey(code: unknown): string {
     return isFleetLinkErrorCode(code)
         ? LINK_ERROR_MESSAGE_KEYS[code]
         : LINK_ERROR_MESSAGE_KEYS.internal;
+}
+
+// ─── Upgrade required and self-update (T-24, spec §5.4, U16) ───────────────
+
+/**
+ * The exact command that upgrades the node on that machine and restarts its
+ * service, for the OS it reports (spec §5.4). The restart half matches the
+ * shipped service units: the systemd template `ever-works-node@<user>` on
+ * Linux and the `EverWorksNode` Windows service; elsewhere only the install,
+ * and the section says to restart the node service.
+ */
+export function nodeUpgradeCommand(platform: string | null | undefined): string {
+    switch (osKeyOf(platform)) {
+        case 'linux':
+            return `${FLEET_NODE_UPGRADE_COMMAND} && sudo systemctl restart ever-works-node@$USER`;
+        case 'win32':
+            return `${FLEET_NODE_UPGRADE_COMMAND}; Restart-Service EverWorksNode`;
+        default:
+            return FLEET_NODE_UPGRADE_COMMAND;
+    }
+}
+
+/** True when {@link nodeUpgradeCommand} already restarts the service on this OS. */
+export function upgradeCommandRestarts(platform: string | null | undefined): boolean {
+    const os = osKeyOf(platform);
+    return os === 'linux' || os === 'win32';
+}
+
+/** What the Settings tab says about the node's self-update. */
+export type SelfUpdateMessageKey =
+    | 'selfUpdateUnknown'
+    | 'selfUpdateOff'
+    | 'selfUpdateOn'
+    | 'selfUpdateFailed';
+
+/**
+ * Which self-update sentence applies: not reported (an older daemon), off,
+ * on, or failed — failed only when the failure is newer than the last
+ * success (a later successful update supersedes it).
+ */
+export function selfUpdateMessageKey(
+    report: FleetNodeSelfUpdateReport | null | undefined,
+): SelfUpdateMessageKey {
+    if (!report) return 'selfUpdateUnknown';
+    const failedAt = report.failedAt ? Date.parse(report.failedAt) : Number.NaN;
+    const updatedAt = report.updatedAt ? Date.parse(report.updatedAt) : Number.NaN;
+    if (Number.isFinite(failedAt) && !(Number.isFinite(updatedAt) && updatedAt > failedAt)) {
+        return 'selfUpdateFailed';
+    }
+    return report.enabled ? 'selfUpdateOn' : 'selfUpdateOff';
 }

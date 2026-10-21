@@ -1,72 +1,75 @@
-import { isFleetDesktopProfile, makeFleetLinkError } from '@ever-works/contracts';
+import { FLEET_LINK_COMPUTER_LEG_SOURCE, isFleetDesktopProfile, makeFleetLinkError } from '@ever-works/contracts';
+import type { ComputerLegBroker } from '../computer-leg';
 import type { NodeChannelContext, NodeChannelOpenResult, NodeModule } from './registry';
 
 /**
- * Fleet node link — the `desktop` channel family (CONTRACTS §3.3), as ONE
- * module that routes each channel to the source its params name:
+ * Fleet node link (FL-02 T-22) — the `desktop` channel family on the node.
  *
- *  - `{ source: 'browser', profile: 'preview', viewId }` — the owner-level
- *    preview browser of Servers & ports (FL-10, R-3);
- *  - `{ source: 'browser', profile: 'agent' | absent }` and
- *    `{ source: 'desktop', display? }` — the Agent browser and the machine's
- *    own desktop, which arrive with Desktop view & control (FL-07).
+ * One module owns the family and routes by `params.source` (and, for a
+ * browser, `params.profile` — CONTRACTS §3.3):
  *
- * A family can be claimed by only one module (`composeNodeModules` refuses a
- * second claim at startup), so FL-07 ADDS its sources to
- * {@link DesktopFamilySources} and passes them in here — it does not register
- * a second `desktop` module. Until a source is wired, a channel asking for it
- * is refused `unsupported_on_node`, naming what is missing.
+ *  - `browser` with `profile: 'preview'` — the owner-level PREVIEW browser of
+ *    Servers & ports (FL-10, R-3): the page **Open** showed on a machine
+ *    without a desktop source, pictured for the person who opened it
+ *    ({@link DesktopFamilySources.preview});
+ *  - `browser` otherwise — a live view's inbound leg (quality, refresh, mode,
+ *    input), handed to the running `computer-session` view that asked for it
+ *    ({@link ComputerLegBroker});
+ *  - `desktop` — the OS-level desktop through the native screen helper,
+ *    which FL-07 adds HERE as a source ({@link DesktopFamilySources.desktop};
+ *    a second module claiming the family would be refused at composition).
  *
- * The family's consent stays the CONTRACTS one (`attend`): the link checks it
- * before `open` runs, on the node as on the platform.
+ * The family's consent is CONTRACTS' (`attend`), checked by the link before
+ * `open` runs; a view exists only under `--attend` anyway.
  */
 
 export type DesktopSourceOpener = (context: NodeChannelContext) => NodeChannelOpenResult | Promise<NodeChannelOpenResult>;
 
 export interface DesktopFamilySources {
-	/** FL-10: the preview profile's page. */
+	/** FL-10: the preview profile's page (`source: 'browser', profile: 'preview'`). */
 	preview?: DesktopSourceOpener;
-	/** FL-07: an Agent's browser over the link. */
-	agentBrowser?: DesktopSourceOpener;
-	/** FL-07: the machine's own desktop through the native helper. */
+	/** FL-07: the machine's own desktop through the native helper (`source: 'desktop'`). */
 	desktop?: DesktopSourceOpener;
 }
 
-function unsupported(context: NodeChannelContext, what: string): NodeChannelOpenResult {
+function unsupported(context: NodeChannelContext): NodeChannelOpenResult {
 	return {
 		ok: false,
 		error: makeFleetLinkError(
 			'unsupported_on_node',
-			`${context.nodeName} (node ${context.nodeVersion}) cannot show ${what} over the link yet`,
-			{ family: 'desktop', nodeVersion: context.nodeVersion }
+			`this computer (node ${context.nodeVersion}) cannot show that desktop source yet`,
+			{ source: typeof context.params.source === 'string' ? context.params.source : null }
 		)
 	};
 }
 
-export function createDesktopFamilyModule(sources: DesktopFamilySources): NodeModule {
+export function createDesktopModule(broker: ComputerLegBroker | null, sources: DesktopFamilySources = {}): NodeModule {
 	return {
 		id: 'desktop',
 		families: [
 			{
 				family: 'desktop',
 				open: (context) => {
-					const source = context.params.source;
 					const profile = context.params.profile;
 					if (profile !== undefined && !isFleetDesktopProfile(profile)) {
-						return { ok: false, error: makeFleetLinkError('invalid', 'profile', { profile: String(profile) }) };
+						return {
+							ok: false,
+							error: makeFleetLinkError('invalid', 'profile', { profile: String(profile).slice(0, 32) })
+						};
 					}
-					if (source === 'browser' && profile === 'preview') {
-						return sources.preview ? sources.preview(context) : unsupported(context, 'the preview browser');
+					if (context.params.source === 'browser' && profile === 'preview') {
+						return sources.preview ? sources.preview(context) : unsupported(context);
 					}
-					if (source === 'browser') {
-						return sources.agentBrowser ? sources.agentBrowser(context) : unsupported(context, "an Agent's browser");
-					}
-					if (source === 'desktop') {
-						return sources.desktop ? sources.desktop(context) : unsupported(context, 'its desktop');
-					}
-					return { ok: false, error: makeFleetLinkError('invalid', 'source') };
+					if (context.params.source === FLEET_LINK_COMPUTER_LEG_SOURCE && broker) return broker.open(context);
+					if (context.params.source === 'desktop' && sources.desktop) return sources.desktop(context);
+					return unsupported(context);
 				}
 			}
 		]
 	};
+}
+
+/** The family with sources only (no live-view leg broker) — tests and embedders. */
+export function createDesktopFamilyModule(sources: DesktopFamilySources): NodeModule {
+	return createDesktopModule(null, sources);
 }
