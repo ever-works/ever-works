@@ -607,6 +607,11 @@ With a node chosen, every `agent-task` job dispatched for that agent is stamped 
 
 ## Running agents on your machines
 
+> **Agents acting on your computers (FL-19).** What an Agent may do to a computer through its tools — and what an
+> external assistant over MCP or a shell with `ever-works fleet …` may do — is one surface with three gates (tool
+> grants, the trust ladder, the computer owner's audience): see
+> [Fleet tools for Agents, the MCP server and the CLI](./fleet-agent-tools.md).
+
 With the `node` runtime selected, every Task run dispatched to an Agent becomes a fleet job. Two execution modes exist, chosen per tenant under **Settings → Job Runtime → Fleet Node Job Runtime**:
 
 | Mode                | What the node does                                                                                                                                                                                                                                                                                                                                                       |
