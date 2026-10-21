@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
 import {
+    FLEET_PULL_REQUEST_BODY_MAX_LENGTH,
+    FLEET_PULL_REQUEST_TITLE_MAX_LENGTH,
+    FLEET_SESSION_ACTION_IDS,
+    FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH,
+    type FleetSessionActionId,
     FLEET_CHANGES_MAX_BYTES,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
     FLEET_SESSION_TITLE_MAX_LENGTH,
@@ -49,4 +54,51 @@ export class FleetCheckoutChangesQueryDto {
     @Min(4096)
     @Max(FLEET_CHANGES_MAX_BYTES)
     maxBytes?: number;
+}
+
+/** `POST /api/fleet/sessions/:id/actions` (FL-06 spec FR-14). */
+export class SendFleetSessionActionDto {
+    @ApiProperty({ enum: FLEET_SESSION_ACTION_IDS })
+    @IsIn(FLEET_SESSION_ACTION_IDS as unknown as string[])
+    actionId!: FleetSessionActionId;
+
+    @ApiProperty({ description: 'The prompt as shown and edited (the rendered template when unchanged).' })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH)
+    prompt!: string;
+}
+
+/** `POST /api/fleet/sessions/:id/actions/:ledgerId/resend` (FL-06 spec FR-24). */
+export class ResendFleetSessionActionDto {
+    @ApiProperty({ required: false, description: 'The prompt the sheet still holds; the template rendered afresh when absent.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH)
+    prompt?: string;
+}
+
+/** `POST /api/fleet/checkouts/:id/pull-request` (FL-06 spec FR-16 … FR-18). */
+export class OpenFleetPullRequestDto {
+    @ApiProperty({ description: `At most ${FLEET_PULL_REQUEST_TITLE_MAX_LENGTH} characters.` })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(FLEET_PULL_REQUEST_TITLE_MAX_LENGTH)
+    title!: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_PULL_REQUEST_BODY_MAX_LENGTH)
+    body?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    draft?: boolean;
+
+    @ApiProperty({ required: false, format: 'uuid', description: 'The session asking (its ledger is credited).' })
+    @IsOptional()
+    @IsUUID()
+    sessionId?: string;
 }

@@ -1,15 +1,34 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseUUIDPipe,
+    Post,
+    Query,
+    Req,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetCheckoutService, type FleetCheckoutActor } from '@ever-works/agent/fleet';
-import type { FleetCheckoutChangesReply, FleetCheckoutPullRequestFacts } from '@ever-works/contracts';
+import type {
+    FleetCheckoutChangesReply,
+    FleetCheckoutPullRequestFacts,
+    FleetOpenPullRequestResponse,
+    FleetPullRequestDraft,
+} from '@ever-works/contracts';
+import { fleetRunBindingOf, type MachinePrincipalRequest } from '../../auth/machine-principal';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetCheckoutsEnabledGuard } from '../checkouts/fleet-checkouts-enabled.guard';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetSessionsEnabledGuard } from '../sessions/fleet-sessions-enabled.guard';
-import { FleetCheckoutChangesQueryDto } from './dto/fleet-session-git.dto';
+import { FleetCheckoutChangesQueryDto, OpenFleetPullRequestDto } from './dto/fleet-session-git.dto';
 import { FleetPrEnrichmentService } from './fleet-pr-enrichment.service';
+import { FleetPullRequestService } from './fleet-pull-request.service';
 
 function actorOf(auth: AuthenticatedUser): FleetCheckoutActor {
     return { userId: auth.userId };
@@ -31,7 +50,46 @@ export class FleetSessionGitController {
     constructor(
         private readonly checkouts: FleetCheckoutService,
         private readonly enrichment: FleetPrEnrichmentService,
+        private readonly pullRequests: FleetPullRequestService,
     ) {}
+
+    @Post('checkouts/:id/pull-request')
+    @ApiOperation({
+        summary:
+            'Open the pull request of this checkout’s branch — or update the title and body of the one already open (never a second one) — through the GitHub App, after the computer pushed it. From an Agent session (its run token) only for its own checkout and only with the Agent’s "may open pull requests" permission; a session on a Task records it on the Task and moves the Task to In review. Never merges.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async openPullRequest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: OpenFleetPullRequestDto,
+        @Req() request: MachinePrincipalRequest,
+    ): Promise<FleetOpenPullRequestResponse> {
+        return this.pullRequests.open(
+            id,
+            { userId: auth.userId, run: fleetRunBindingOf(request) },
+            {
+                title: body.title,
+                ...(body.body !== undefined ? { body: body.body } : {}),
+                ...(body.draft !== undefined ? { draft: body.draft } : {}),
+                ...(body.sessionId ? { sessionId: body.sessionId } : {}),
+            },
+        );
+    }
+
+    @Get('checkouts/:id/pull-request/draft')
+    @ApiOperation({
+        summary: 'What the pull-request dialog is prefilled with: branch, base, a title, and the open pull request when there is one.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async pullRequestDraft(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<FleetPullRequestDraft> {
+        return this.pullRequests.draft(id, auth.userId);
+    }
 
     @Get('checkouts/:id/changes')
     @ApiOperation({
