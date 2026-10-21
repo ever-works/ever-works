@@ -149,7 +149,18 @@ export type FleetAuditAction =
 	/** A session was ended, with its reason. */
 	| 'node.session.end'
 	| 'node.session.recording.start'
-	| 'node.session.recording.stop';
+	| 'node.session.recording.stop'
+	/**
+	 * Servers and ports (FL-10, CONTRACTS §7) — one row per **Open** (port,
+	 * `target: desktop | preview-profile`, program or container, requester,
+	 * class `plain`; never a URL query or page content). An open on the desktop
+	 * from the Ports tab writes only this, never FL-07's `node.desktop.openUrl`.
+	 */
+	| 'node.port.open'
+	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
+	| 'node.port.preview.open'
+	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
+	| 'node.port.preview.close';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -197,7 +208,10 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.port.open',
+	'node.port.preview.open',
+	'node.port.preview.close'
 ];
 
 /**

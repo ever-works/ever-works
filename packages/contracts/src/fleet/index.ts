@@ -12,6 +12,7 @@ export * from './fleet-node.types.js';
 export * from './fleet-node-health.types.js';
 export * from './fleet-operations.types.js';
 export * from './fleet-panic.types.js';
+export * from './fleet-ports.types.js';
 export * from './fleet-push-credential.types.js';
 export * from './fleet-run-secrets.types.js';
 export * from './fleet-run-credential.types.js';
