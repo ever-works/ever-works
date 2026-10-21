@@ -179,6 +179,32 @@ export class FleetSessionRepository {
         return (result.affected ?? 0) > 0;
     }
 
+    /**
+     * Write a patch only while the session is in one of `states` (FL-05: the
+     * idle floor never moves a session that changed meanwhile). False when it
+     * was not.
+     */
+    async updateIfState(
+        id: string,
+        states: readonly FleetSession['state'][],
+        patch: Partial<FleetSession>,
+    ): Promise<boolean> {
+        const result = await this.repository.update({ id, state: In([...states]) }, patch);
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * FL-05's idle floor: `working` / `done` sessions with no activity since
+     * before `cutoff`, oldest first (the node's own 30-minute clock is primary).
+     */
+    async findIdleCandidates(cutoff: Date, limit = 200): Promise<FleetSession[]> {
+        return this.repository.find({
+            where: { state: In(['working', 'done']), lastActivityAt: LessThan(cutoff) },
+            order: { lastActivityAt: 'ASC' },
+            take: limit,
+        });
+    }
+
     /** Owner sessions still `starting` since before `cutoff` (the sweeper). */
     async findStartingBefore(cutoff: Date, limit = 200): Promise<FleetSession[]> {
         return this.repository.find({
