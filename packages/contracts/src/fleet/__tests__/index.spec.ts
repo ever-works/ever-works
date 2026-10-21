@@ -565,6 +565,52 @@ const VIEWER_EXPORTS = [
 	'FLEET_LINK_VIEWER_CONTROL_TYPES'
 ] as const;
 
+const CHECKOUT_EXPORTS = [
+	'FLEET_CHECKOUT_KINDS',
+	'FLEET_CHECKOUT_STATES',
+	'FLEET_CHECKOUT_ISOLATIONS',
+	'FLEET_CHECKOUT_CREATED_BY',
+	'FLEET_CHECKOUT_SYNC_OPS',
+	'FLEET_NODE_CHECKOUT_ORIGINS',
+	'FLEET_CHECKOUTS_DISCOVERY_CAP',
+	'FLEET_CHECKOUTS_DISCOVERY_MAX_DEPTH',
+	'FLEET_CHECKOUTS_DISCOVERY_BUDGET_MS',
+	'FLEET_CHECKOUTS_DISCOVERY_SKIP_DIRS',
+	'FLEET_CHECKOUT_GIT_LINE_REFRESH_MS',
+	'FLEET_CHECKOUT_MANUAL_REFRESH_MIN_MS',
+	'FLEET_CHECKOUT_LISTED_REFRESH_MS',
+	'FLEET_CHECKOUT_RECONCILE_MS',
+	'FLEET_CHECKOUT_CREATING_STALE_MS',
+	'FLEET_CHECKOUT_WRITES_PER_MINUTE',
+	'FLEET_CHECKOUT_PATH_MAX_LENGTH',
+	'FLEET_CHECKOUT_REF_MAX_LENGTH',
+	'FLEET_CHECKOUT_REMOTE_MAX_LENGTH',
+	'FLEET_CHECKOUT_CODE_FOLDERS_MAX',
+	'FLEET_CHECKOUT_STDERR_HEAD_MAX_LENGTH',
+	'FLEET_CHECKOUT_RECONCILE_CRON',
+	'FLEET_CHECKOUT_LINK_VERBS',
+	'FLEET_GIT_LINE_PR_STATES',
+	'FLEET_GIT_LINE_PR_CHECKS',
+	'FLEET_NODE_CHECKOUT_BUSY_REASONS',
+	'isFleetCheckoutKind',
+	'isFleetCheckoutState',
+	'isFleetCheckoutIsolation',
+	'isFleetCheckoutCreatedBy',
+	'isFleetCheckoutSyncOp',
+	'isFleetNodeCheckoutOrigin',
+	'isFleetCheckoutLinkVerb',
+	'parseFleetGitLine',
+	'stripFleetRemoteCredential',
+	'parseFleetRemote',
+	'fleetRemotesMatch',
+	'isFleetCheckoutPath',
+	'parseFleetNodeCheckoutRecord',
+	'parseFleetCheckoutsListReply',
+	'parseFleetCheckoutsSyncResult',
+	'fleetCheckoutDisplayPath',
+	'fleetCheckoutName'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -584,10 +630,28 @@ const ALL_EXPORTS = [
 	...NEEDS_A_LOOK_EXPORTS,
 	...LINK_EXPORTS,
 	...OPERATION_EXPORTS,
-	...VIEWER_EXPORTS
+	...VIEWER_EXPORTS,
+	...CHECKOUT_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
+	'isFleetCheckoutKind',
+	'isFleetCheckoutState',
+	'isFleetCheckoutIsolation',
+	'isFleetCheckoutCreatedBy',
+	'isFleetCheckoutSyncOp',
+	'isFleetNodeCheckoutOrigin',
+	'isFleetCheckoutLinkVerb',
+	'parseFleetGitLine',
+	'stripFleetRemoteCredential',
+	'parseFleetRemote',
+	'fleetRemotesMatch',
+	'isFleetCheckoutPath',
+	'parseFleetNodeCheckoutRecord',
+	'parseFleetCheckoutsListReply',
+	'parseFleetCheckoutsSyncResult',
+	'fleetCheckoutDisplayPath',
+	'fleetCheckoutName',
 	'resolveExclusiveAgentCredentials',
 	'isFleetExecutionMode',
 	'isLocalExecutionMode',
@@ -818,7 +882,10 @@ describe('fleet barrel', () => {
 		// two helpers (`fleet-jobs.types.ts`), opt-in self-update's error cap and
 		// reader (`fleet-node.types.ts`) and the computer-session leg's four wire
 		// constants (`fleet-link.types.ts`) — all existing modules.
-		expect(Object.keys(fleet)).toHaveLength(412);
+		// → +43 with checkouts on computers (FL-14): the twenty-six constants and
+		// seventeen helpers of `fleet-checkout.types.ts` — a NEW module, so the
+		// witness table below gains a row.
+		expect(Object.keys(fleet)).toHaveLength(455);
 	});
 
 	it.each([
@@ -840,7 +907,8 @@ describe('fleet barrel', () => {
 		['fleet-link.types.js', 'FLEET_LINK_FAMILIES'],
 		['fleet-link.codec.js', 'encodeFleetLinkFrame'],
 		['fleet-operations.types.js', 'FLEET_OPERATION_STATES'],
-		['fleet-link-viewer.types.js', 'FLEET_LINK_VIEWER_CHANNEL']
+		['fleet-link-viewer.types.js', 'FLEET_LINK_VIEWER_CHANNEL'],
+		['fleet-checkout.types.js', 'FLEET_CHECKOUT_KINDS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

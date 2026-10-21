@@ -155,7 +155,22 @@ export type FleetAuditAction =
 	/** A session was ended, with its reason. */
 	| 'node.session.end'
 	| 'node.session.recording.start'
-	| 'node.session.recording.stop';
+	| 'node.session.recording.stop'
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS §7) — every row carries
+	 * `family: 'checkouts'`, `target` (the checkout's path), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never a credential or a remote URL
+	 * with one (spec FR-28).
+	 */
+	| 'node.checkout.create'
+	/** A checkout was deleted (folder removed) or forgotten (row only). */
+	| 'node.checkout.delete'
+	/** Fetch, pull, push — and a person's rescan of the code folders. */
+	| 'node.checkout.sync'
+	/** Moved to the bin (folder untouched). */
+	| 'node.checkout.archive'
+	/** Brought back from the bin. */
+	| 'node.checkout.restore';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -204,7 +219,12 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore'
 ];
 
 /**

@@ -1,4 +1,5 @@
 import { Command, CommanderError } from 'commander';
+import { homedir as osHomedir } from 'node:os';
 import { posix, win32 } from 'node:path';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
@@ -426,6 +427,57 @@ export interface StartCommandOptions {
 	 * service manager starts the new binary. Off by default (report only).
 	 */
 	autoUpdate?: boolean;
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS R-41) — a folder this machine's
+	 * owner keeps code in; discovery walks it for git clones. Repeatable;
+	 * persisted (the list given replaces the stored one), like
+	 * `--workspace-root`.
+	 */
+	codeFolder?: string[];
+}
+
+/**
+ * Parse `--code-folder` (FL-14, spec FR-3): every value absolute (a leading
+ * `~/` is the home folder), never a filesystem root, and never the home
+ * folder ITSELF — discovery must not walk a whole home directory. Duplicates
+ * collapse. `undefined` / empty means the flag was not given.
+ */
+export function parseCodeFolders(
+	raw: readonly string[] | undefined,
+	platform: string,
+	home: string = osHomedir()
+): string[] | undefined {
+	if (!raw || raw.length === 0) return undefined;
+	const path = platform === 'win32' ? win32 : posix;
+	const homeResolved = home ? path.resolve(home) : '';
+	const out: string[] = [];
+	for (const entry of raw) {
+		let value = entry.trim();
+		if (value.length === 0) throw new CliError('--code-folder must not be empty');
+		if (value === '~') {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if ((value.startsWith('~/') || value.startsWith('~\\')) && homeResolved) {
+			value = path.join(homeResolved, value.slice(2));
+		}
+		if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+			throw new CliError(`--code-folder must be an absolute directory (got "${entry}")`);
+		}
+		const normalized = path.resolve(value);
+		if (normalized === path.parse(normalized).root) {
+			throw new CliError(`--code-folder cannot be a filesystem root (got "${entry}")`);
+		}
+		const same =
+			platform === 'win32'
+				? normalized.toLowerCase() === homeResolved.toLowerCase()
+				: normalized === homeResolved;
+		if (homeResolved && same) {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if (!out.includes(normalized)) out.push(normalized);
+	}
+	if (out.length > 32) throw new CliError('--code-folder can be given at most 32 times');
+	return out;
 }
 
 /**
@@ -476,6 +528,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const override = parseIntervalSeconds(options.heartbeatInterval);
 	// Usage errors first, before the config is even read.
 	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
+	const codeFolders = parseCodeFolders(options.codeFolder, deps.platform);
 	const workspaceGcOverrides = parseWorkspaceGcFlags(options);
 	const stored = await requireConfig(deps);
 	// The reaper policy is persisted on `start` (see `StartCommandOptions`),
@@ -494,11 +547,20 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// directory in the admin's own profile, reported as "nothing to
 	// reclaim" while the node refused every job for want of space on D:.
 	const rootChanged = workspaceRoot !== undefined && workspaceRoot !== stored.workspaceRoot;
-	if (workspaceGcOverrides !== undefined || rootChanged) {
+	// `--code-folder` is persisted for the same reason (FL-14): the service
+	// re-reads it on every start, and `install-service` re-applies flags.
+	const foldersChanged =
+		codeFolders !== undefined && JSON.stringify(codeFolders) !== JSON.stringify(stored.codeFolders ?? []);
+	if (workspaceGcOverrides !== undefined || rootChanged || foldersChanged) {
 		await saveConfig(
 			deps.fs,
 			deps.configPath,
-			{ ...stored, workspaceGc, ...(workspaceRoot !== undefined ? { workspaceRoot } : {}) },
+			{
+				...stored,
+				workspaceGc,
+				...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+				...(codeFolders !== undefined ? { codeFolders } : {})
+			},
 			{ platform: deps.platform, secrets: deps.secrets ?? null, logger: deps.io.logger }
 		);
 	}
@@ -506,6 +568,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...stored,
 		workspaceGc,
 		...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+		...(codeFolders !== undefined ? { codeFolders } : {}),
 		...(override === undefined ? {} : { heartbeatIntervalMs: override })
 	};
 
@@ -622,7 +685,13 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// Fleet node link (FL-02 T-25): the self-update's report rides every
 		// beat, and every accepted beat's version verdict reaches it.
 		selfUpdateReport: () => selfUpdate?.report() ?? null,
-		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response)
+		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response),
+		// Checkouts on computers (FL-14): the node-local checkout registry,
+		// beside the config like the session daemon's state.
+		checkoutsRegistryPath: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'checkouts.json'
+		)
 	});
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
@@ -1849,6 +1918,11 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--workspace-root <dir>',
 			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
+		)
+		.option(
+			'--code-folder <dir>',
+			'A folder you keep code in; Ever Works lists the git clones under it, three folders deep (repeatable; persisted; needs --manage)',
+			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);

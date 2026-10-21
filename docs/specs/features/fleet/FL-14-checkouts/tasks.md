@@ -6,8 +6,8 @@
 
 **Epic ID:** `FL-14-checkouts`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft`
-**Last updated:** 2026-10-18
+**Status:** `Draft` — P1 built (#2833, not yet run; see `docs/internal/fleet/lanes/FL-14.md`)
+**Last updated:** 2026-10-21
 
 ---
 
@@ -31,23 +31,23 @@
 
 ## P1.A — Contracts and schema
 
-- [ ] **T-01**. Add checkout contracts at `packages/contracts/src/fleet/fleet-checkout.types.ts`:
+- [x] **T-01**. Add checkout contracts at `packages/contracts/src/fleet/fleet-checkout.types.ts`:
       kind/state/isolation/createdBy unions with `readonly` arrays and `isX` guards, `FleetGitLine`
       (CONTRACTS §4.7), `FleetCheckoutView`, `FleetCheckoutCreateRequest`, `FleetCheckoutSyncOp`,
       the `checkouts.*` link request/reply shapes, and the constants (cap 300, refresh 60 s, manual
       refresh 10 s, reconcile 10 min). Export from `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-checkout.types.spec.ts` — guards,
       token-free URL rule reused from `fleet-task-workspace.types.ts`, constants.
-- [ ] **T-02** _(parallel)_. Add `node.checkout.create|delete|sync|archive` (CONTRACTS §7) to
+- [x] **T-02** _(parallel)_. Add `node.checkout.create|delete|sync|archive` (CONTRACTS §7) to
       `FleetAuditAction` and `FLEET_AUDIT_ACTIONS` in `packages/contracts/src/fleet/fleet-panic.types.ts`.
       The heartbeat gains no field (code folders travel in the `checkouts.list` reply).
       **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-panic.spec.ts`; conformance
       fixture `packages/contracts/fixtures/fleet-node-contract.v1.json` unchanged.
-- [ ] **T-03**. Add the entity `packages/agent/src/entities/fleet-checkout.entity.ts` (plan §4.1 — CONTRACTS §4.3 columns only, `simple-json` text, `varchar` enums),
+- [x] **T-03**. Add the entity `packages/agent/src/entities/fleet-checkout.entity.ts` (plan §4.1 — CONTRACTS §4.3 columns only, `simple-json` text, `varchar` enums),
       register it in `packages/agent/src/entities/index.ts` and `packages/agent/src/database/_entities-inventory.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/fleet-checkout.repository.integration.spec.ts` —
       unique `(nodeId, path)`, state filter, archived excluded by default.
-- [ ] **T-04**. Author migration `apps/api/src/migrations/1796140000000-CreateFleetCheckouts.ts` from
+- [x] **T-04**. Author migration `apps/api/src/migrations/1796140000000-CreateFleetCheckouts.ts` from
       `apps/api/` (`pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateFleetCheckouts`).
       Hand-check: one `CREATE TABLE`, four indexes, three FKs (`nodeId` ON DELETE CASCADE,
       `parentCheckoutId` and `workId` ON DELETE SET NULL), no drops; `down` reverses exactly.
@@ -56,21 +56,21 @@
 
 ## P1.B — Node: registry, discovery, git line, Task import
 
-- [ ] **T-05**. Add `--code-folder <dir>` (repeatable, absolute, never `~` alone or a filesystem root)
+- [x] **T-05**. Add `--code-folder <dir>` (repeatable, absolute, never `~` alone or a filesystem root)
       to `start` in `apps/node/src/cli/program.ts`, persisted beside `--workspace-root` (`:439`).
       **Test**: extend `apps/node/src/cli/program.spec.ts` — parse, persist, refuse home/root.
-- [ ] **T-06**. Create `apps/node/src/core/link/modules/checkouts/checkout-registry.ts` (`checkouts.json`
+- [x] **T-06**. Create `apps/node/src/core/link/modules/checkouts/checkout-registry.ts` (`checkouts.json`
       in the config dir; `readyPaths()` feeds `resolveAllowedRoots({ checkouts, … })` of the shared
       resolver `apps/node/src/core/link/allowed-roots.ts` — import it, or create it with FL-08's API
       only if neither FL-08 nor FL-11 landed it, CONTRACTS R-39).
       **Test**: `apps/node/src/core/link/modules/checkouts/checkout-registry.spec.ts` — load/save,
       ready paths exclude archived/missing, corrupted file → empty registry with a warning; extend
       `apps/node/src/core/link/allowed-roots.spec.ts` with checkout roots.
-- [ ] **T-07**. Create `apps/node/src/core/link/modules/checkouts/checkout-discovery.ts` (depth 3, prune at `.git`,
+- [x] **T-07**. Create `apps/node/src/core/link/modules/checkouts/checkout-discovery.ts` (depth 3, prune at `.git`,
       skip list, 300 cap, `truncated`, `git remote get-url origin` with userinfo stripped and flagged).
       **Test**: `checkout-discovery.spec.ts` — fixture tree with nested repos, `node_modules`, a
       symlink escaping the folder (not followed), a tokenised remote, 301 clones → 300 + truncated.
-- [ ] **T-08** _(parallel)_. Create `apps/node/src/core/link/modules/checkouts/checkout-git-line.ts` (porcelain v2,
+- [x] **T-08** _(parallel)_. Create `apps/node/src/core/link/modules/checkouts/checkout-git-line.ts` (porcelain v2,
       numstat, left-right count, worktree flag, base ref; **no network**).
       **Test**: `checkout-git-line.spec.ts` — real temp repos: clean, dirty, ahead, behind, detached,
       worktree; asserts no `fetch` argv ever appears.
@@ -78,10 +78,10 @@
       `apps/node/src/core/link/modules/checkouts/checkout-evidence.ts` and make the reaper call it (behaviour
       unchanged).
       **Test**: `checkout-evidence.spec.ts` + the existing `workspace-reaper.spec.ts` still green.
-- [ ] **T-10**. Create `apps/node/src/core/link/modules/checkouts/checkout-task-import.ts` mapping
+- [x] **T-10**. Create `apps/node/src/core/link/modules/checkouts/checkout-task-import.ts` mapping
       `workspace-inventory.ts` records to `worktree`/`task` rows.
       **Test**: `checkout-task-import.spec.ts` — pool fixture → rows with branch, remote, size.
-- [ ] **T-11**. Create `apps/node/src/core/link/modules/checkouts.ts` — the `NodeModule` (CONTRACTS
+- [x] **T-11**. Create `apps/node/src/core/link/modules/checkouts.ts` — the `NodeModule` (CONTRACTS
       R-40, one entry in `apps/node/src/core/link/modules/index.ts`) registering `checkouts.list` on
       FL-02's `machine` verb router (rescan, refresh, code folders in the reply, consent matrix,
       `kill_switch` refusal, `link.pause` aborts operations).
@@ -91,44 +91,44 @@
 
 ## P1.C — Platform: service, API, jobs
 
-- [ ] **T-12**. Create `packages/agent/src/fleet/fleet-checkout.repository.ts` and
+- [x] **T-12**. Create `packages/agent/src/fleet/fleet-checkout.repository.ts` and
       `packages/agent/src/fleet/fleet-checkout.service.ts` (upsert from node lists, state machine,
       archive/restore, refresh throttle 1/10 s, R-19 org scope, audience check via FL-01 roles, audit).
       **Test**: `packages/agent/src/fleet/__tests__/fleet-checkout.service.spec.ts` — every state
       transition, throttle, audience refusal, audit row per action with no credential field.
-- [ ] **T-13** _(parallel)_. Create pure `packages/agent/src/fleet/checkout-remote-match.ts`
+- [x] **T-13** _(parallel)_. Create pure `packages/agent/src/fleet/checkout-remote-match.ts`
       (`parseRemote`, host-aware `owner/repo`, match to Work `sourceRepository` and installation
       repositories).
       **Test**: `checkout-remote-match.spec.ts` — https/ssh/scp forms, trailing `.git`, other hosts
       never match, tokenised URL rejected.
-- [ ] **T-14**. Create `apps/api/src/fleet/fleet-checkouts.controller.ts` (`GET /checkouts`,
+- [x] **T-14**. Create `apps/api/src/fleet/fleet-checkouts.controller.ts` (`GET /checkouts`,
       `GET /nodes/:id/checkouts`, `GET /checkouts/:id`, `POST /checkouts/:id/refresh`,
       `POST /checkouts/:id/archive|restore`) with DTOs in `apps/api/src/fleet/dto/fleet-checkout.dto.ts`,
       guarded by `FleetEnabledGuard` + a `FLEET_CHECKOUTS_ENABLED` guard; mount in `apps/api/src/fleet/fleet.module.ts`.
       **Test**: `apps/api/src/fleet/fleet-checkouts.controller.spec.ts` — codes/hints for every
       refusal, cross-user 404, flag off → 404.
-- [ ] **T-15**. Create `packages/tasks/src/tasks/trigger/fleet-checkout-reconcile.task.ts` (cron
+- [x] **T-15**. Create `packages/tasks/src/tasks/trigger/fleet-checkout-reconcile.task.ts` (cron
       `7/10 * * * *`) with a `FLEET_CHECKOUT_RECONCILE_DISPATCHER` symbol bound in `fleet.module.ts`.
       **Test**: `packages/tasks/src/__tests__/fleet-checkout-reconcile.task.spec.ts` — stale
       `creating` → `missing`, idempotent on overlap.
 
 ## P1.D — Web
 
-- [ ] **T-16**. Register the hub tab (`registerHubTab`) and the computer tab (`registerComputerTab`,
+- [x] **T-16**. Register the hub tab (`registerHubTab`) and the computer tab (`registerComputerTab`,
       `consent: 'manage'`) for `checkouts` in `apps/web/src/components/fleet/registry.ts` (FL-01).
       The `/fleet/checkouts` route file and `DASHBOARD_FLEET_CHECKOUTS` are FL-01's (CONTRACTS §11.1);
       do not create them.
       **Test**: `apps/web/src/components/fleet/registry.unit.spec.ts` extended — tab present with
       flag + `manage`, state card otherwise.
-- [ ] **T-17**. Create `apps/web/src/components/fleet/checkouts/checkouts.shared.ts` (grouping,
+- [x] **T-17**. Create `apps/web/src/components/fleet/checkouts/checkouts.shared.ts` (grouping,
       ordering, action availability matrix, size and reaper-note formatting).
       **Test**: `checkouts.shared.unit.spec.ts` — matrix over state × consent × audience × busy × online.
-- [ ] **T-18**. Create `CheckoutsHubTab.tsx`, `ComputerCheckoutsTab.tsx`, `CheckoutRow.tsx`,
+- [x] **T-18**. Create `CheckoutsHubTab.tsx`, `ComputerCheckoutsTab.tsx`, `CheckoutRow.tsx`,
       `GitLine.tsx`, `CodeFoldersCard.tsx`, `CheckoutsBin.tsx`, `CheckoutStateCard.tsx` under
       `apps/web/src/components/fleet/checkouts/`; BFF routes under `apps/web/src/app/api/fleet/checkouts/**`
       and `apps/web/src/app/api/fleet/nodes/[id]/checkouts/route.ts`.
       **Test**: `GitLine.unit.spec.tsx`, `CheckoutRow.unit.spec.tsx` (offline dimming, consent banner).
-- [ ] **T-19**. Add i18n groups `fleet.checkouts.*` and the shared `fleet.errors.*` hints to
+- [x] **T-19**. Add i18n groups `fleet.checkouts.*` and the shared `fleet.errors.*` hints to
       `apps/web/messages/en.json`; palette entry in `apps/web/src/components/command-palette/registry/screens.ts`.
       **Test**: `grep -c '"[a-zA-Z]*\.[a-zA-Z]*":' apps/web/messages/en.json` unchanged; no literal
       user-visible string in `components/fleet/checkouts/`.

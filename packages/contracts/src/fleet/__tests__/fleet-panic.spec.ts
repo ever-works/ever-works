@@ -73,7 +73,12 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */
