@@ -13065,7 +13065,17 @@
             "gitLine": {
                 "noCheckout": "Not in a checkout",
                 "worktreeOf": "Worktree of {folder}",
-                "folderGone": "the folder is gone"
+                "folderGone": "the folder is gone",
+                "worktreeRemoved": "Worktree removed · branch {branch} kept"
+            },
+            "cleanUp": {
+                "button": "Clean up",
+                "title": "Remove this worktree now that its pull request is done; the branch {branch} is kept",
+                "confirm": "Remove the worktree of {branch} on {node}? The branch is kept.",
+                "typeName": "Type {name} to confirm",
+                "remove": "Remove the worktree",
+                "cancel": "Cancel",
+                "done": "Worktree removed · branch {branch} kept"
             },
             "prPill": {
                 "label": "PR #{number} {state}",

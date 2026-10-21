@@ -62,7 +62,11 @@ export function SessionGitLine({
                 <GitLine line={withoutPullRequest(line)} branch={git.branch} />
             </span>
             {state === 'missing' ? (
-                <span className="text-amber-600 dark:text-amber-400">{t('folderGone')}</span>
+                <span className="text-amber-600 dark:text-amber-400">
+                    {git.state === 'archived' && git.kind === 'worktree'
+                        ? t('worktreeRemoved', { branch: git.branch ?? '—' })
+                        : t('folderGone')}
+                </span>
             ) : null}
             {pill ? <PrPill pr={line?.pr ?? null} unknownMinutes={unknownMinutes} /> : null}
             {age ? (
