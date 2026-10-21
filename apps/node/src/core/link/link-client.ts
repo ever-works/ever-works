@@ -142,10 +142,12 @@ export interface NodeLink {
 	readonly control: NodeLinkControlState;
 	readonly modules: ComposedNodeModules;
 	/**
-	 * Fleet node link (FL-02 T-22) — send a family's own channel-0 message to
-	 * the platform (`computer.leg`, FL-04's `session.event`, …). Only extension
-	 * types — never the link's own `link.*`, `channel.*` or `operation.*` —
-	 * and only while connected. False when it was not sent.
+	 * Send a family's own channel-0 message that belongs to no channel
+	 * (`session.list`, `session.event` — CONTRACTS §3.2–3.3; FL-02's
+	 * `computer.leg`). Only extension types — never the link's own `link.*`,
+	 * `channel.*` or `operation.*`. False when the link is not connected
+	 * (nothing is queued: the module re-reports what matters after the next
+	 * `link.ready`) or the message is over the cap.
 	 */
 	sendControl(message: FleetLinkExtensionMessage): boolean;
 }

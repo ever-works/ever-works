@@ -4,6 +4,7 @@ import { config } from '@ever-works/agent/config';
 import {
     isFleetLinkFamily,
     isFleetLinkVerb,
+    type FleetConsents,
     type FleetLinkFamily,
     type FleetLinkReply,
     type FleetNodeLinkView,
@@ -184,6 +185,16 @@ export class FleetLinkService {
     /** True when this replica, or another, holds the node's link. */
     isConnected(nodeId: string): boolean {
         return this.registry.isConnected(nodeId) || this.remote?.isHeldElsewhere(nodeId) === true;
+    }
+
+    /**
+     * The consents the node's live link presented — this replica's link, else
+     * the holder's as the directory last described it — or null without a link.
+     * Added for sessions on computers (FL-04): a start refuses `consent_missing`
+     * before contacting the machine, from what the machine runs with right now.
+     */
+    liveConsents(nodeId: string): FleetConsents | null {
+        return this.registry.liveConsents(nodeId) ?? this.remote?.liveConsents(nodeId) ?? null;
     }
 
     /** One `machine` request, on this replica's link or through the holder of the node's link. */

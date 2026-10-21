@@ -367,6 +367,7 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
             expect(h.store.rows[0].appRender).toEqual({
                 specCommitSha: 'sha-spec-1',
                 skipPreDeployJobs: false,
+                requestedByHumanSession: false,
             });
 
             // The dispatch names the row, never the plugin, and carries the idempotency key.
@@ -597,6 +598,7 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
             expect(h.store.rows[0].appRender).toEqual({
                 specCommitSha: 'sha-image',
                 skipPreDeployJobs: false,
+                requestedByHumanSession: false,
             });
         });
     });
@@ -1233,7 +1235,11 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 commitSha: 'sha-spec-1',
                 branch: 'main',
                 triggeredByUserId: manual().userId,
-                appRender: { specCommitSha: 'sha-spec-1', skipPreDeployJobs: false },
+                appRender: {
+                    specCommitSha: 'sha-spec-1',
+                    skipPreDeployJobs: false,
+                    requestedByHumanSession: false,
+                },
             });
         });
     });
@@ -1314,5 +1320,88 @@ describe('AppDeployRequestService — a Build-backed request that named no Build
                 ready({ context: { ...ready().context, buildId: 'x' } }),
             ),
         ).toBe('x');
+    });
+});
+
+/**
+ * Security (sec/app-works-gates, 2026-10-18) — `AppDeployRequest.requestedByHumanSession` is the
+ * API's statement that `userId` asked from a signed-in session. It is persisted on the row
+ * (`appRender.requestedByHumanSession`), which is where the worker's pull-credential gate reads it.
+ */
+describe('AppDeployRequestService — requestedByHumanSession is persisted (sec/app-works-gates)', () => {
+    it('stores `true` for a person who asked from a session (the accepted row)', async () => {
+        const h = harness();
+
+        const result = await h.service.request(manual({ requestedByHumanSession: true }));
+
+        expect(result.status).toBe('accepted');
+        expect(h.store.rows[0].triggeredByUserId).toBe(manual().userId);
+        expect(h.store.rows[0].appRender).toMatchObject({ requestedByHumanSession: true });
+        // The dispatch payload stays ids-only: the worker reads the flag off the row.
+        expect(h.dispatcher.calls[0]).not.toHaveProperty('requestedByHumanSession');
+    });
+
+    it('stores `true` on a queued row as well (a queueable trigger while the lock is held)', async () => {
+        const h = harness();
+        h.states.claimGranted = false;
+        h.states.state = { ...h.states.state, deployLockId: 'running-1' };
+
+        const result = await h.service.request(
+            manual({ trigger: 'build', requestedByHumanSession: true }),
+        );
+
+        expect(result.status).toBe('queued');
+        expect(h.store.rows[0].appRender).toMatchObject({ requestedByHumanSession: true });
+    });
+
+    it('stores `false` when absent, not literally true, or without a person (fail closed)', () => {
+        const facts = storedFacts(manual(), ready(), 'manual', false);
+        const cases: Array<Partial<AppDeployRequest>> = [
+            {},
+            { requestedByHumanSession: false },
+            { requestedByHumanSession: 'true' as never },
+            { requestedByHumanSession: 1 as never },
+            { requestedByHumanSession: true, userId: null },
+            { requestedByHumanSession: true, userId: '' },
+        ];
+
+        for (const overrides of cases) {
+            const request = manual(overrides);
+            const draft = rowDraft('dep-1', 'work-1', request, facts, 'manual');
+            expect(draft.appRender.requestedByHumanSession).toBe(false);
+        }
+
+        const human = rowDraft(
+            'dep-1',
+            'work-1',
+            manual({ requestedByHumanSession: true }),
+            facts,
+            'manual',
+        );
+        expect(human.appRender.requestedByHumanSession).toBe(true);
+        expect(human.triggeredByUserId).toBe(manual().userId);
+    });
+
+    it('a Build-triggered request (no actor) stores `false`', async () => {
+        const h = harness();
+
+        await h.service.request(manual({ trigger: 'build', userId: null }));
+
+        expect(h.store.rows[0].triggeredByUserId).toBeNull();
+        expect(h.store.rows[0].appRender).toMatchObject({ requestedByHumanSession: false });
+    });
+
+    it('requestDeploy (the APW-01 port shape) passes the flag through', async () => {
+        const h = harness();
+
+        await h.service.requestDeploy({
+            workId: manual().workId,
+            userId: manual().userId,
+            buildId: manual().buildId,
+            provider: 'k8s',
+            requestedByHumanSession: true,
+        });
+
+        expect(h.store.rows[0].appRender).toMatchObject({ requestedByHumanSession: true });
     });
 });

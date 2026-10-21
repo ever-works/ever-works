@@ -358,7 +358,9 @@ const COMMIT_MESSAGE_EXPORTS = [
 	'isFleetCommitType',
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
-	'retypeFleetCommitMessage'
+	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective'
 ] as const;
 
 // Computer health (FL-03) — `fleet-node-health.types.ts`, pinned in
@@ -652,6 +654,8 @@ const FUNCTION_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage',
+	'neutralizeCiSkipDirectives',
+	'containsCiSkipDirective',
 	'sanitizeFleetNodeHealthSnapshot',
 	'hasFleetNodeHealthReading',
 	'isFleetNodeHealthStale',
@@ -734,7 +738,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 410 runtime symbols', () => {
+	it('exposes exactly these 412 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -807,13 +811,14 @@ describe('fleet barrel', () => {
 		// → 400 with viewers on a link channel (FL-02 P1b): the nineteen symbols
 		// of `fleet-link-viewer.types.ts` — a NEW module, so the witness table
 		// below gains a row.
-		// → 404 with the management lane (FL-02 T-27): its kind list, consent
-		// table and two helpers, in `fleet-jobs.types.ts` — an existing module.
-		// → 406 with opt-in self-update (FL-02 T-25): the error cap and the
-		// report's reader, in `fleet-node.types.ts` — an existing module.
-		// → 410 with the computer-session leg over the link (FL-02 T-22): its
-		// four wire constants, in `fleet-link.types.ts` — an existing module.
-		expect(Object.keys(fleet)).toHaveLength(410);
+		// → 402 with the CI-skip neutraliser (works-security, node 0.2.7):
+		// `neutralizeCiSkipDirectives` + `containsCiSkipDirective` in
+		// `fleet-commit-message.types.ts`, an existing module — no new witness row.
+		// → 412 with FL-02 PR 4: the management lane's kind list, consent table and
+		// two helpers (`fleet-jobs.types.ts`), opt-in self-update's error cap and
+		// reader (`fleet-node.types.ts`) and the computer-session leg's four wire
+		// constants (`fleet-link.types.ts`) — all existing modules.
+		expect(Object.keys(fleet)).toHaveLength(412);
 	});
 
 	it.each([

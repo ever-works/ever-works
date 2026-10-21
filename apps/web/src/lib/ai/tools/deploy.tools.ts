@@ -3,6 +3,8 @@ import { tool } from 'ai';
 import { ROUTES } from '@/lib/constants';
 import { deploy, lookupExistingDeployment, getDomains } from '@/app/actions/dashboard/deploy';
 import { deployAPI } from '@/lib/api/plugins-capabilities/deploy';
+import type { UserConfirmationCheck } from './generated/confirmation';
+import { CONFIRMED_FIELD_DESCRIPTION, requireUserConfirmation } from './confirm-gate';
 
 export const checkDeployConnection = tool({
     description: [
@@ -48,23 +50,44 @@ export const checkDeployConnection = tool({
     },
 });
 
-export const deployWork = tool({
-    description: [
-        "Deploy a Work's website. Check deploy provider connection first with checkDeployConnection.",
-        'Also check git connection with checkGitConnection — both are required.',
-    ].join(' '),
-    inputSchema: z.object({
-        workId: z.string().describe('Work ID to deploy'),
-    }),
-    execute: async ({ workId }) => {
-        const result = await deploy(workId);
-        return {
-            success: result.success,
-            message: result.data?.message ?? result.error,
-            requiresGitProvider: result.requiresGitProvider,
-        };
-    },
-});
+/**
+ * Works-security (2026-10-18): a deploy publishes the Work's site to the
+ * internet and spends provider minutes — the user's call, confirmed in their
+ * own message (same handshake as the generated `run_agent_now`).
+ */
+export function createDeployWorkTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            "Deploy a Work's website. Check deploy provider connection first with checkDeployConnection.",
+            'Also check git connection with checkGitConnection — both are required.',
+            'Requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            workId: z.string().describe('Work ID to deploy'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ workId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'deployWork',
+                action: "Deploy a Work's website",
+                target: workId,
+                args: { workId },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            const result = await deploy(workId);
+            return {
+                success: result.success,
+                message: result.data?.message ?? result.error,
+                requiresGitProvider: result.requiresGitProvider,
+            };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const deployWork = createDeployWorkTool();
 
 export const checkDeploymentStatus = tool({
     description: 'Check if a Work has an existing deployment.',

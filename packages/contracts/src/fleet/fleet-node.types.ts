@@ -39,6 +39,7 @@ import type { ComputerControlPolicy } from '../computer/computer-session.types.j
 import type { FleetControlPolicyFamilies, FleetViewerRole } from './fleet-access.types.js';
 
 import type { FleetConsents, FleetNodeLinkView } from './fleet-link.types.js';
+import type { FleetSessionDaemonReport } from './fleet-sessions.types.js';
 
 /**
  * App shape of a fleet node.
@@ -354,6 +355,14 @@ export interface FleetNodeSelfDescription {
 	 */
 	consents?: FleetConsents;
 	/**
+	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+	 * health: `running` while it answers, `stopped` or `failed` with the
+	 * node's own diagnosis otherwise. Sent by a node with `--manage` or
+	 * `--work`; optional and additive, in the newest strip tier like
+	 * `consents`, so an older platform only loses the daemon line.
+	 */
+	daemon?: FleetSessionDaemonReport;
+	/**
 	 * Fleet node link (FL-02, spec FR-37, FR-38, U16) — what this daemon's
 	 * opt-in self-update (`ever-works-node start --auto-update`) is doing:
 	 * whether it is on, and the outcome of its last attempt. Heartbeat only,
@@ -580,6 +589,14 @@ export interface FleetNodeView {
 	hostNodeId?: string | null;
 	/** Virtual computers (FL-16) — what kind of child this is. Null / absent for an ordinary machine. */
 	virtualKind?: FleetNodeVirtualKind | null;
+	/**
+	 * Sessions on computers (FL-04) — the session daemon as the node last
+	 * reported it (heartbeat `daemon`), or null when it never reported one.
+	 * The Sessions tab reads it for "the session daemon is not running"
+	 * with the node's own reason; the `sessions` capability tag remains
+	 * the source of "can a session start here".
+	 */
+	sessionDaemon?: FleetSessionDaemonReport | null;
 }
 
 /**

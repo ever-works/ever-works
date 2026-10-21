@@ -51,6 +51,41 @@ import { APPS_TIER_POLICY, type AppsTierPolicy } from './ports';
 import { AppsDomainDnsServiceImpl } from '../ever-works-providers/apps-domain-dns.service';
 import { AppDeployRequestService, type AppDeployRequestResult } from './app-deploy-request.service';
 import { AppLicenseGate } from './app-license-gate';
+import { clusterCredentialNeedsOwnerConfirmation } from './app-owner-gates';
+import type { AppClusterCredentialProvenance } from '../entities/work-app-runtime-state.entity';
+
+/**
+ * Works-security (2026-10-18) — the save-time kubeconfig shape check (`POST app-target/check`):
+ * ON unless exactly `false`. The same switch gates the k8s plugin's dependency-path guard.
+ */
+export const APP_GUARD_DEPENDENCY_KUBECONFIG_ENV = 'EVER_WORKS_APPS_GUARD_DEPENDENCY_KUBECONFIG';
+
+function guardKubeconfigOnSave(): boolean {
+    return (
+        String(process.env[APP_GUARD_DEPENDENCY_KUBECONFIG_ENV] ?? '')
+            .trim()
+            .toLowerCase() !== 'false'
+    );
+}
+
+/** What `PUT app-target` would change that only the owner may (`pendingTargetChange`). */
+export interface AppTargetPendingChange {
+    targetChanges: boolean;
+    namespaceChanges: boolean;
+}
+
+/** Who is saving a cluster credential — recorded as provenance (`app-owner-gates.ts`). */
+export interface AppTargetCredentialActor {
+    isOwner?: boolean;
+}
+
+/** The optional pure shape check a your-cluster plugin offers (`KubernetesPlugin`). */
+interface ClusterCredentialShapeCheck {
+    checkClusterCredentialShape?: (
+        kubeconfig: string,
+        kubeContext?: string,
+    ) => { ok: true } | { ok: false; code?: string; message?: string };
+}
 
 /** The managed tier's capability (`facades/app-runtime.facade.ts` `APP_TIER_CAPABILITY`). */
 const APP_TIER_CAPABILITY = 'apps-tier';
@@ -96,6 +131,8 @@ export interface AppTargetStateRow {
     namespace?: string | null;
     clusterCheck?: unknown;
     clusterCheckedAt?: Date | string | null;
+    /** The deployed cluster (plan §6.3) — read by the owner-confirmation rule. */
+    clusterFingerprint?: string | null;
     currentDeploymentId?: string | null;
     paused?: boolean | null;
     pausedAt?: Date | string | null;
@@ -285,6 +322,7 @@ export class AppTargetService {
         workId: string,
         userId: string,
         body: { kubeconfig?: unknown; kubeContext?: unknown },
+        actor?: AppTargetCredentialActor,
     ): Promise<
         | { ok: true; httpStatus: 202; requestId: string; dispatched: boolean }
         | { ok: false; refusal: AppTargetRefusal }
@@ -313,6 +351,11 @@ export class AppTargetService {
                     'No deployment plugin that can run an App on your own cluster is installed.',
                 );
             }
+            // Works-security — fail early: a kubeconfig shape every cluster path refuses (an exec
+            // or auth-provider credential plugin, a token or certificate FILE, a proxy, skipped TLS
+            // verification) is refused before it is stored. Pure shape check, no connection.
+            const shape = await this.checkCredentialShape(pluginId, kubeconfig, kubeContext);
+            if (shape) return { ok: false, refusal: shape };
             // Write-only, encrypted, validated against nothing and connected to nothing (§9.1).
             await this.settings.writePlatformManagedWorkSettings(pluginId, workId, {
                 clusterSource: 'custom-kubeconfig',
@@ -321,15 +364,16 @@ export class AppTargetService {
             });
             // Connecting a cluster is choosing Your cluster: a Work still on `none` moves to it,
             // so the worker's check can resolve the credential it was just given.
-            if (this.states?.patchRuntimeState && (!row?.target || row.target === 'none')) {
-                await this.states.patchRuntimeState(workId, { target: 'your-cluster' });
-            }
+            const moveToYourCluster = !row?.target || row.target === 'none';
+            await this.recordCredentialProvenance(workId, row, userId, actor, moveToYourCluster);
         } else if (kubeContext && this.settings?.writePlatformManagedWorkSettings) {
             const pluginId = await this.ensureDeployProvider(workId);
             if (pluginId) {
                 await this.settings.writePlatformManagedWorkSettings(pluginId, workId, {
                     kubeContext,
                 });
+                // A different context can name a different cluster in the same kubeconfig.
+                await this.recordCredentialProvenance(workId, row, userId, actor, false);
             }
         }
 
@@ -415,7 +459,8 @@ export class AppTargetService {
     async rollback(
         workId: string,
         userId: string,
-        body: { deploymentId?: unknown; runPreDeployJobs?: unknown },
+        body: { deploymentId?: unknown; runPreDeployJobs?: unknown; confirmClusterChange?: unknown },
+        options?: { requestedByHumanSession?: boolean },
     ): Promise<
         { ok: true; result: AppDeployRequestResult } | { ok: false; refusal: AppTargetRefusal }
     > {
@@ -467,6 +512,10 @@ export class AppTargetService {
             buildId: row.buildId ?? null,
             specCommitSha,
             runPreDeployJobs: body?.runPreDeployJobs === true,
+            // Works-security — the controller lets this through only for the owner in a session
+            // while `APP_TARGET_CHANGE_REQUIRES_OWNER` is on, exactly as on `POST :id/deploy`.
+            ...(body?.confirmClusterChange === true ? { confirmClusterChange: true } : {}),
+            ...(options?.requestedByHumanSession === true ? { requestedByHumanSession: true } : {}),
             rollback: {
                 deploymentId,
                 buildId: row.buildId ?? null,
@@ -544,6 +593,152 @@ export class AppTargetService {
     }
 
     /* ---------------------------------------------------------------------- *
+     * Works-security (2026-10-18) — the owner-only cluster decisions
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * What `PUT app-target` with this body would change that `APP_TARGET_CHANGE_REQUIRES_OWNER`
+     * reserves for the owner: the target itself, or the namespace override. A body that would be
+     * refused anyway (an unknown target, unparseable settings) changes nothing — `putTarget`
+     * answers its own `400`.
+     */
+    async pendingTargetChange(
+        workId: string,
+        body: { target?: unknown; settings?: unknown },
+    ): Promise<AppTargetPendingChange> {
+        const target = TARGETS.find((choice) => choice === body?.target);
+        const parsed = parseSettings(body?.settings);
+        if (!target || 'error' in parsed) return { targetChanges: false, namespaceChanges: false };
+        const row = await this.readState(workId);
+        const current = (TARGETS.find((choice) => choice === row?.target) ?? 'none') as string;
+        const nextNamespace = parsed.settings?.namespaceOverride;
+        const currentNamespace = row?.targetSettings?.namespaceOverride ?? null;
+        return {
+            targetChanges: target !== current,
+            namespaceChanges:
+                nextNamespace !== undefined && (nextNamespace ?? null) !== currentNamespace,
+        };
+    }
+
+    /**
+     * Whether the your-cluster credential must be confirmed by the owner before its next use
+     * (`clusterCredentialNeedsOwnerConfirmation`). No readable row means nothing to judge here;
+     * the deploy preconditions read the same row and refuse a Deployment they cannot evaluate.
+     */
+    async clusterCredentialNeedsOwnerConfirmation(workId: string): Promise<boolean> {
+        const row = await this.readState(workId);
+        return clusterCredentialNeedsOwnerConfirmation(row);
+    }
+
+    /**
+     * Record that the owner confirmed the current your-cluster credential (the controller calls
+     * this only after it established the owner in a signed-in session). `false` when nothing
+     * could be written — the deploy preconditions then still refuse, which is the safe answer.
+     */
+    async confirmClusterCredential(workId: string, ownerUserId: string): Promise<boolean> {
+        const row = await this.readState(workId);
+        if (!row || !this.states?.patchRuntimeState) return false;
+        const previous = (row.targetSettings?.clusterCredential ??
+            null) as AppClusterCredentialProvenance | null;
+        const clusterCredential: AppClusterCredentialProvenance = {
+            savedByUserId: previous?.savedByUserId ?? null,
+            savedByOwner: previous?.savedByOwner ?? null,
+            savedAt: previous?.savedAt ?? null,
+            ownerConfirmedByUserId: ownerUserId,
+            ownerConfirmedAt: new Date().toISOString(),
+        };
+        try {
+            await this.states.patchRuntimeState(workId, {
+                targetSettings: { ...(row.targetSettings ?? {}), clusterCredential },
+            });
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `Recording the owner's confirmation of ${workId}'s cluster credential failed: ${messageOf(error)}`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Provenance of a credential just saved: who, whether they were the owner, when — and any
+     * earlier owner confirmation is cleared, because it confirmed a different credential.
+     */
+    private async recordCredentialProvenance(
+        workId: string,
+        row: AppTargetStateRow | null,
+        userId: string,
+        actor: AppTargetCredentialActor | undefined,
+        moveToYourCluster: boolean,
+    ): Promise<void> {
+        if (!this.states?.patchRuntimeState) return;
+        const clusterCredential: AppClusterCredentialProvenance = {
+            savedByUserId: userId || null,
+            savedByOwner: actor?.isOwner === true,
+            savedAt: new Date().toISOString(),
+            ownerConfirmedByUserId: null,
+            ownerConfirmedAt: null,
+        };
+        await this.states.patchRuntimeState(workId, {
+            ...(moveToYourCluster ? { target: 'your-cluster' as AppDeployTarget } : {}),
+            targetSettings: { ...(row?.targetSettings ?? {}), clusterCredential },
+        });
+    }
+
+    /**
+     * The your-cluster plugin's own pure shape check of a pasted kubeconfig, when it offers one
+     * and `EVER_WORKS_APPS_GUARD_DEPENDENCY_KUBECONFIG` is not `false`. `null` = acceptable (or
+     * no check available); otherwise the refusal. The plugin's message never echoes the
+     * kubeconfig, and neither does this one.
+     */
+    private async checkCredentialShape(
+        pluginId: string,
+        kubeconfig: string,
+        kubeContext: string,
+    ): Promise<AppTargetRefusal | null> {
+        if (!guardKubeconfigOnSave()) return null;
+        const registered = this.registry?.get(pluginId);
+        if (!registered) return null;
+        let plugin = registered.plugin as unknown as ClusterCredentialShapeCheck & {
+            __materialize?: () => Promise<unknown>;
+        };
+        if (typeof plugin?.__materialize === 'function') {
+            try {
+                plugin = ((await plugin.__materialize()) ?? plugin) as typeof plugin;
+            } catch {
+                return null;
+            }
+        }
+        if (typeof plugin?.checkClusterCredentialShape !== 'function') return null;
+        let verdict: ReturnType<NonNullable<ClusterCredentialShapeCheck['checkClusterCredentialShape']>>;
+        try {
+            verdict = plugin.checkClusterCredentialShape(kubeconfig, kubeContext || undefined);
+        } catch {
+            verdict = { ok: false };
+        }
+        if (verdict && verdict.ok === true) return null;
+        const failed = verdict as { code?: string; message?: string } | null;
+        return {
+            httpStatus: 422,
+            code: 'kubeconfig_unsupported',
+            message:
+                text(failed?.message) ||
+                'This kubeconfig uses a credential or connection setting Ever Works does not accept.',
+            ...(text(failed?.code)
+                ? {
+                      unmet: [
+                          {
+                              code: 'target_not_checked',
+                              names: [text(failed?.code)],
+                              message: text(failed?.message) || 'Unsupported kubeconfig.',
+                          },
+                      ],
+                  }
+                : {}),
+        };
+    }
+
+    /* ---------------------------------------------------------------------- *
      * internals
      * ---------------------------------------------------------------------- */
 
@@ -567,9 +762,15 @@ export class AppTargetService {
                 eligibility = null;
             }
         }
+        // Works-security — the credential provenance is the platform's bookkeeping, not a setting.
+        let settings: AppRuntimeTargetSettings | null = row?.targetSettings ?? null;
+        if (settings && 'clusterCredential' in settings) {
+            const { clusterCredential: _provenance, ...rest } = settings;
+            settings = rest;
+        }
         return {
             target,
-            settings: row?.targetSettings ?? null,
+            settings,
             namespace: text(row?.namespace) || null,
             // Secret-free by construction (`AppClusterCheck`, plan §6.3).
             clusterCheck: row?.clusterCheck ?? null,

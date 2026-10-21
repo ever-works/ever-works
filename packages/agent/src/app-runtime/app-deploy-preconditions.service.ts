@@ -99,6 +99,11 @@ import {
     type AppsTierPolicy,
 } from './ports';
 import { isAppClusterWorkerContext } from './worker-context';
+import {
+    appTargetChangeRequiresOwner,
+    clusterCredentialNeedsOwnerConfirmation,
+} from './app-owner-gates';
+import type { AppClusterCredentialProvenance } from '../entities/work-app-runtime-state.entity';
 
 /* -------------------------------------------------------------------------- *
  * Vocabulary this file adds
@@ -146,7 +151,14 @@ export interface AppDeployRuntimeState {
     clusterFingerprint?: string | null;
     clusterCheck?: { fingerprint?: string | null; code?: string | null } | null;
     namespace?: string | null;
-    targetSettings?: { tls?: string | null; managedSubdomain?: boolean | null } | null;
+    targetSettings?: {
+        tls?: string | null;
+        managedSubdomain?: boolean | null;
+        /** Works-security — who saved the your-cluster credential (`app-owner-gates.ts`). */
+        clusterCredential?: AppClusterCredentialProvenance | null;
+    } | null;
+    /** Set once a Deployment went live; read by the owner-confirmation rule. */
+    currentDeploymentId?: string | null;
 }
 
 /** APW-06 T17's `WorkAppRuntimeStateRepository`, as this task consumes it. */
@@ -699,6 +711,25 @@ export class AppDeployPreconditionsService {
                     message:
                         'The connection check was made against a different cluster than the one ' +
                         'this App Work runs on. Confirm the change before deploying.',
+                });
+            }
+
+            // Works-security (2026-10-18) — a credential the OWNER did not save (or one of unknown
+            // origin on a never-deployed Work) is not used until the owner confirms it from a
+            // signed-in session; the deploy route records that confirmation. This is what refuses
+            // a deploy nobody pressed (a Build-triggered auto-deploy, the worker's own re-check),
+            // so it reads only the persisted confirmation, never the request's flag.
+            if (
+                appTargetChangeRequiresOwner() &&
+                !unmet.some((entry) => entry.code === 'cluster_changed_unconfirmed') &&
+                clusterCredentialNeedsOwnerConfirmation({ ...state, target })
+            ) {
+                unmet.push({
+                    code: 'cluster_changed_unconfirmed',
+                    names: ['owner_confirmation_required'],
+                    message:
+                        'The cluster credential was saved by someone other than the Work owner. ' +
+                        'The owner must confirm it by deploying once while signed in.',
                 });
             }
         }

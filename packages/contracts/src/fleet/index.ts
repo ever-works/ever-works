@@ -16,4 +16,5 @@ export * from './fleet-push-credential.types.js';
 export * from './fleet-run-secrets.types.js';
 export * from './fleet-run-credential.types.js';
 export * from './fleet-runner-status.types.js';
+export * from './fleet-sessions.types.js';
 export * from './fleet-task-workspace.types.js';

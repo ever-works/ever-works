@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "GitHub 앱 액세스 검토",
                     "openOnGitHub": "GitHub에서 열기",
                     "enableBuildWorkflow": "빌드 워크플로 사용 설정"
-                }
+                },
+                "editAccessRequired": "이 작업을 하려면 이 App Work에 대한 편집 권한이 필요합니다."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "에이전트와 함께 발전시키기",
                     "body": "Work의 에이전트에게 앱 변경을 요청하세요 — 기능 추가, 버그 수정, 종속성 업그레이드 등. 에이전트는 Work 리포지토리에서 작업하고 풀 리퀘스트를 엽니다.",
                     "button": "이 App에 대해 채팅"
-                }
+                },
+                "editAccessRequired": "다시 시도하려면 이 App Work에 대한 편집 권한이 필요합니다."
             },
             "builds": {
                 "title": "빌드",
@@ -7178,7 +7180,8 @@
                     "saved": "대상이 저장되었습니다.",
                     "saveFailed": "대상을 저장할 수 없습니다: {reason}",
                     "changeNote": "대상을 변경해도 이미 실행 중인 항목은 제거되지 않습니다.",
-                    "routeUnavailable": "이 인스턴스에서는 아직 대상을 변경할 수 없습니다."
+                    "routeUnavailable": "이 인스턴스에서는 아직 대상을 변경할 수 없습니다.",
+                    "ownerOnly": "앱이 실행되는 위치를 변경하거나 새 클러스터를 연결하는 것은 워크 소유자만 할 수 있습니다."
                 },
                 "connect": {
                     "title": "클러스터 연결",
@@ -7219,7 +7222,8 @@
                     "saving": "저장 중…",
                     "saveBlocked": "필요한 모든 권한으로 검사를 통과하면 저장할 수 있습니다.",
                     "saved": "클러스터가 연결되었습니다.",
-                    "saveFailed": "클러스터 연결을 저장할 수 없습니다: {reason}"
+                    "saveFailed": "클러스터 연결을 저장할 수 없습니다: {reason}",
+                    "ownerOnly": "클러스터를 연결하거나 컨텍스트를 변경하는 것은 워크 소유자만 할 수 있습니다."
                 },
                 "check": {
                     "ok": "연결됨",
@@ -7356,7 +7360,8 @@
                         "resume": "재개를 요청했습니다.",
                         "remove": "제거를 요청했습니다.",
                         "cancelDeploy": "취소를 요청했습니다."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "저장된 데이터는 워크 소유자만 삭제할 수 있습니다."
                 },
                 "environment": {
                     "title": "환경",
@@ -7445,8 +7450,11 @@
                         "confirm": "데이터 삭제",
                         "requested": "{kind} 데이터를 삭제하는 중입니다.",
                         "failed": "데이터를 삭제할 수 없습니다. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "이 데이터는 워크 소유자만 삭제할 수 있습니다."
+                },
+                "ownerRequired": "워크 소유자만 이 작업을 할 수 있습니다.",
+                "ownerConfirmCluster": "다른 멤버가 이 클러스터 연결을 저장했으므로, 워크 소유자가 한 번 배포해 확인해야 합니다."
             },
             "appEnv": {
                 "errors": {

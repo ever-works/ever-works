@@ -328,6 +328,46 @@ describe('AgentRunService.execute() — LLM dispatch (FU-1)', () => {
         );
     });
 
+    it('works-security — only the OWNER’s own Conversation turn is an owner chat turn for the tools', async () => {
+        agents.findById.mockResolvedValue(makeAgent());
+        ai.dispatch.mockResolvedValue(aiResponse({ text: 'ok' }));
+
+        // A reply to a Conversation message the Agent's owner (u1) sent.
+        await makeSvc().execute({
+            runId: 'r-conv',
+            agentId: 'a1',
+            userId: 'u1',
+            kind: 'chat',
+            conversationMessageId: 'cm1',
+        });
+        // A Task-chat reply, a Task run, and a Conversation turn someone else started.
+        await makeSvc().execute({
+            runId: 'r-taskchat',
+            agentId: 'a1',
+            userId: 'u1',
+            kind: 'chat',
+            taskId: 't1',
+            chatMessageId: 'm1',
+        });
+        await makeSvc().execute({ runId: 'r-task', agentId: 'a1', userId: 'u1', kind: 'task', taskId: 't1' });
+        await makeSvc().execute({
+            runId: 'r-member',
+            agentId: 'a1',
+            userId: 'someone-else',
+            kind: 'chat',
+            conversationMessageId: 'cm2',
+        });
+
+        const contexts = (toolService.resolveAllowedTools as jest.Mock).mock.calls.map(
+            (call: unknown[]) => call[1] as { runId: string; ownerChatTurn?: boolean },
+        );
+        const byRun = (id: string) => contexts.find((c) => c.runId === id);
+        expect(byRun('r-conv')?.ownerChatTurn).toBe(true);
+        expect(byRun('r-taskchat')?.ownerChatTurn).toBeUndefined();
+        expect(byRun('r-task')?.ownerChatTurn).toBeUndefined();
+        expect(byRun('r-member')?.ownerChatTurn).toBeUndefined();
+    });
+
     it('AW-17 — a run with no Task dispatches with no Mission', async () => {
         agents.findById.mockResolvedValueOnce(makeAgent({ missionId: 'agent-own-mission' }));
         ai.dispatch.mockResolvedValueOnce(aiResponse());

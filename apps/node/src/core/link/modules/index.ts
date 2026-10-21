@@ -18,6 +18,13 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	/** Extra modules after the list above (tests and embedders). */
 	extra?: readonly NodeModule[];
 	/**
+	 * Sessions on computers (FL-04) — the `session` family, built by the
+	 * runtime around its session daemon supervisor (`createSessionModule`).
+	 * Absent on a process with neither `--manage` nor `--work`, which then
+	 * refuses every session channel `unsupported_on_node`.
+	 */
+	session?: NodeModule;
+	/**
 	 * Fleet node link (FL-02 T-22) — the runtime's live-view leg broker. With
 	 * it, the `desktop` family module (`./desktop`) is composed, carrying a
 	 * view's leg over the link; without it the family stays unclaimed.
@@ -27,7 +34,7 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], computerLegs, ...machineOptions } = options;
+	const { extra = [], session, computerLegs, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
@@ -37,6 +44,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		controlModule,
 		machine,
 		...NODE_LINK_MODULES,
+		...(session ? [session] : []),
 		...(computerLegs ? [createDesktopModule(computerLegs)] : []),
 		...extra
 	]);
@@ -46,6 +54,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
 export {
 	composeNodeModules,
 	MachineVerbError,

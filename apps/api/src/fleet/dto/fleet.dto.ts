@@ -55,6 +55,7 @@ import {
     MaxConfiguredCapabilityTags,
 } from './fleet-capability.validators';
 import { IsFleetControlPolicyFamilies } from './fleet-access.validators';
+import { IsFleetSessionDaemonShape } from '../sessions/dto/fleet-session-daemon.validator';
 
 /**
  * Every bound below comes from the SHARED fleet contract
@@ -652,6 +653,23 @@ export class FleetNodeSelfDescriptionDto {
     @IsOptional()
     @IsFleetConsentsShape()
     consents?: Record<string, boolean>;
+
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+     * health: `{ state: running|stopped|failed, reason?, sessions, storage?, hooks? }`.
+     * Shape-checked (small, unknown keys pass) for the reason `consents` is;
+     * the service keeps only what it knows.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        example: { state: 'running', sessions: 2 },
+        description:
+            'The session daemon of this node: running, stopped or failed with the reason, and how many sessions it holds.',
+    })
+    @IsOptional()
+    @IsFleetSessionDaemonShape()
+    daemon?: Record<string, unknown>;
 
     /**
      * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update

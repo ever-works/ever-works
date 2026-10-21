@@ -5580,7 +5580,8 @@
                     "reviewGitHubAppAccess": "Examiner l'accès à l'application GitHub",
                     "openOnGitHub": "Ouvrir sur GitHub",
                     "enableBuildWorkflow": "Activer le workflow de build"
-                }
+                },
+                "editAccessRequired": "Vous avez besoin d'un accès en modification à ce Travail App pour faire cela."
             },
             "settings": {
                 "tabs": {
@@ -6973,7 +6974,8 @@
                     "title": "Faites-la évoluer avec son agent",
                     "body": "Demandez à l'agent du Travail de modifier l'app — ajouter une fonctionnalité, corriger un bug, mettre à jour une dépendance. Il travaille dans le Dépôt du Travail et ouvre des pull requests.",
                     "button": "Discuter de cette App"
-                }
+                },
+                "editAccessRequired": "Vous avez besoin d'un accès en modification à ce Travail App pour réessayer."
             },
             "builds": {
                 "title": "Builds",
@@ -7246,7 +7248,8 @@
                     "saved": "Cible enregistrée.",
                     "saveFailed": "Impossible d'enregistrer la cible : {reason}",
                     "changeNote": "Changer de cible ne supprime rien de ce qui s'exécute déjà.",
-                    "routeUnavailable": "Le changement de cible n'est pas encore disponible sur cette instance."
+                    "routeUnavailable": "Le changement de cible n'est pas encore disponible sur cette instance.",
+                    "ownerOnly": "Seul le propriétaire du travail peut changer l'endroit où l'app s'exécute ou connecter un nouveau cluster."
                 },
                 "connect": {
                     "title": "Connecter votre cluster",
@@ -7287,7 +7290,8 @@
                     "saving": "Enregistrement…",
                     "saveBlocked": "L'enregistrement est possible une fois que la vérification réussit avec toutes les autorisations requises.",
                     "saved": "Cluster connecté.",
-                    "saveFailed": "Impossible d'enregistrer la connexion au cluster : {reason}"
+                    "saveFailed": "Impossible d'enregistrer la connexion au cluster : {reason}",
+                    "ownerOnly": "Seul le propriétaire du travail peut connecter un cluster ou changer son contexte."
                 },
                 "check": {
                     "ok": "Connecté",
@@ -7424,7 +7428,8 @@
                         "resume": "Reprise demandée.",
                         "remove": "Retrait demandé.",
                         "cancelDeploy": "Annulation demandée."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Seul le propriétaire du travail peut supprimer les données stockées."
                 },
                 "environment": {
                     "title": "Environnement",
@@ -7513,8 +7518,11 @@
                         "confirm": "Supprimer les données",
                         "requested": "Suppression des données de {kind} en cours.",
                         "failed": "Les données n'ont pas pu être supprimées. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Seul le propriétaire du travail peut supprimer ces données."
+                },
+                "ownerRequired": "Seul le propriétaire du travail peut faire cela.",
+                "ownerConfirmCluster": "Un autre membre a enregistré cette connexion au cluster ; le propriétaire du travail doit donc déployer une fois pour la confirmer."
             },
             "appEnv": {
                 "errors": {

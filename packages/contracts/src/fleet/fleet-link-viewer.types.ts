@@ -110,7 +110,9 @@ export type FleetLinkViewerCloseCode =
  * in the PR that ships the family, never in code elsewhere.
  */
 export const FLEET_LINK_VIEWER_JSON_TYPES: Readonly<Record<FleetLinkFamily, readonly string[]>> = {
-	session: [],
+	// FL-04 P1b: a watcher asks the node to stream the session (`session.attach`, which the node
+	// answers in its own mode — a viewer's attach never sizes the terminal) and may read the screen.
+	session: ['session.attach', 'session.screen'],
 	desktop: ['desktop.quality', 'desktop.refresh', 'desktop.displays'],
 	logs: ['logs.read', 'logs.follow', 'logs.pause', 'logs.resume', 'logs.earlier'],
 	machine: [],
@@ -120,6 +122,25 @@ export const FLEET_LINK_VIEWER_JSON_TYPES: Readonly<Record<FleetLinkFamily, read
 	tunnel: [],
 	clip: []
 };
+
+/**
+ * The JSON message types a `driver` may send on a family's channel, for the
+ * families that narrow it (FL-04 P1b). A family absent here forwards every
+ * JSON message of a driver (the behaviour before this list). `session` keeps a
+ * browser to what a terminal does — attach, type, size, read the screen —
+ * so starting, ending or renaming a session can only go through the
+ * platform's own routes, with their confirmation and their audit row.
+ */
+export const FLEET_LINK_DRIVER_JSON_TYPES: Readonly<Partial<Record<FleetLinkFamily, readonly string[]>>> = {
+	session: ['session.attach', 'session.input', 'session.resize', 'session.screen']
+};
+
+/** May a `driver` send this JSON message type on this family's channel? */
+export function fleetLinkDriverMaySend(family: FleetLinkFamily, type: unknown): boolean {
+	if (typeof type !== 'string') return false;
+	const allowed = FLEET_LINK_DRIVER_JSON_TYPES[family];
+	return allowed === undefined || allowed.includes(type);
+}
 
 /** Frame kinds a `viewer` may send whatever the family: flow-control credit only. */
 export const FLEET_LINK_VIEWER_FRAME_KINDS: readonly number[] = [FLEET_LINK_FRAME_KINDS.ACK];

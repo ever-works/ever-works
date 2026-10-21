@@ -48,6 +48,7 @@ import { RecordVisibilityService } from '@ever-works/agent/record-visibility';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
+import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { writeAttribution } from '../../auth/integration/integration-attribution';
 import { ScopeContextService } from '../../scope/scope-context.service';
 import { IntegrationOnlyGuard } from './integration-only.guard';
@@ -73,6 +74,7 @@ import {
     IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
+import { integrationMissionEditPausedOnly } from './integration-safety-switches';
 
 const WORK_RELATIONS = [
     'created',
@@ -458,7 +460,38 @@ export class IntegrationMissionsController {
                 dto.status as 'paused' | 'completed' | 'failed',
             );
         }
+        // Works-security lane (integration API gates, finding 3) — an ACTIVE
+        // Mission hands its description to the Idea generator at every tick and
+        // can queue builds from what comes back, with no person in between (the
+        // recurring-template rule of `PATCH /tasks/:id`). Its title and
+        // description change only while it does not tick; a PATCH that pauses
+        // (or completes / fails) it in the same request is applied status-first.
+        const textFields = ['title', 'description'].filter(
+            (field) => (dto as Record<string, unknown>)[field] !== undefined,
+        );
+        const resulting = dto.status ?? String(current.status);
+        if (
+            textFields.length > 0 &&
+            resulting === 'active' &&
+            integrationMissionEditPausedOnly()
+        ) {
+            throw new IntegrationHttpException(
+                422,
+                'domain_rule',
+                `An integration cannot change ${textFields.join(', ')} of an active Mission: every tick hands its description to the Idea generator. Pause the Mission first (status "paused"), or a person edits it in Ever Works.`,
+                { fields: textFields, reason: 'autonomous_mission', status: 'active' },
+            );
+        }
         await withExpectedVersion('mission', id, expected, async () => {
+            if (dto.status !== undefined) {
+                await this.applyStatus(
+                    user,
+                    id,
+                    String(current.status),
+                    dto.status as 'paused' | 'completed' | 'failed',
+                    dto.outcome,
+                );
+            }
             if (dto.title !== undefined || dto.description !== undefined) {
                 await this.missions.update(
                     user.userId,
@@ -472,15 +505,6 @@ export class IntegrationMissionsController {
             }
             if (dto.visibility !== undefined) {
                 await this.visibility.setVisibility('mission', id, dto.visibility as never);
-            }
-            if (dto.status !== undefined) {
-                await this.applyStatus(
-                    user,
-                    id,
-                    String(current.status),
-                    dto.status as 'paused' | 'completed' | 'failed',
-                    dto.outcome,
-                );
             }
         });
         return this.send(res, id, source);

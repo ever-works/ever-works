@@ -710,4 +710,88 @@ describe('PluginsController', () => {
             );
         });
     });
+
+    // Works-security (2026-10-18) — the generic Work plugin settings routes are a second way to
+    // replace an App Work's cluster credential; same owner + session rule as app-target/check.
+    describe('App Work cluster credential through the plugin settings routes', () => {
+        const previous = process.env.APP_TARGET_CHANGE_REQUIRES_OWNER;
+        afterEach(() => {
+            if (previous === undefined) delete process.env.APP_TARGET_CHANGE_REQUIRES_OWNER;
+            else process.env.APP_TARGET_CHANGE_REQUIRES_OWNER = previous;
+        });
+
+        function appWork(callerRole: 'owner' | 'editor') {
+            const ownership = {
+                ensureCanView: jest.fn(),
+                ensureCanEdit: jest.fn().mockResolvedValue({
+                    work: { id: 'w-1', kind: 'app' },
+                    role: callerRole,
+                }),
+                ensureIsOwner: jest.fn(async () => {
+                    if (callerRole !== 'owner') {
+                        const { ForbiddenException } = jest.requireActual('@nestjs/common');
+                        throw new ForbiddenException('not the owner');
+                    }
+                    return { role: 'owner' };
+                }),
+            };
+            pluginsService.updateWorkPluginSettings.mockResolvedValue({ ok: true });
+            pluginsService.enablePluginForWork.mockResolvedValue({ ok: true });
+            pluginValidationService.tryValidateConnection.mockResolvedValue(null);
+            const gated = new PluginsController(
+                pluginsService as unknown as PluginOperationsService,
+                ownership as unknown as WorkOwnershipService,
+                pluginValidationService as unknown as PluginValidationService,
+                activityLogService as unknown as ActivityLogService,
+            );
+            return { gated, ownership };
+        }
+
+        const session = { userId: 'user-1', authMethod: 'session' } as AuthenticatedUser;
+        const apiKey = { userId: 'user-1', authMethod: 'api-key' } as AuthenticatedUser;
+
+        it('refuses an editor a kubeconfig, kubeContext or clusterSource write and writes nothing', async () => {
+            const { gated } = appWork('editor');
+            for (const dto of [
+                { secretSettings: { kubeconfig: 'apiVersion: v1' } },
+                { settings: { kubeContext: 'prod' } },
+                { settings: { clusterSource: 'custom-kubeconfig' } },
+            ]) {
+                await expect(
+                    gated.updateWorkPluginSettings(session, 'w-1', 'k8s', dto as any),
+                ).rejects.toMatchObject({ response: { code: 'ownerRequired' } });
+            }
+            await expect(
+                gated.enableWorkPlugin(session, 'w-1', 'k8s', {
+                    settings: { kubeContext: 'prod' },
+                } as any),
+            ).rejects.toMatchObject({ response: { code: 'ownerRequired' } });
+            expect(pluginsService.updateWorkPluginSettings).not.toHaveBeenCalled();
+            expect(pluginsService.enablePluginForWork).not.toHaveBeenCalled();
+        });
+
+        it("refuses the owner's API key, allows the owner in a session", async () => {
+            const { gated } = appWork('owner');
+            const dto = { secretSettings: { kubeconfig: 'apiVersion: v1' } } as any;
+            await expect(gated.updateWorkPluginSettings(apiKey, 'w-1', 'k8s', dto)).rejects.toMatchObject({
+                status: 403,
+            });
+            await gated.updateWorkPluginSettings(session, 'w-1', 'k8s', dto);
+            expect(pluginsService.updateWorkPluginSettings).toHaveBeenCalledTimes(1);
+        });
+
+        it('other keys stay an editor action, and the switch off restores today', async () => {
+            const { gated } = appWork('editor');
+            await gated.updateWorkPluginSettings(session, 'w-1', 'k8s', {
+                settings: { namespace: 'x' },
+            } as any);
+            expect(pluginsService.updateWorkPluginSettings).toHaveBeenCalledTimes(1);
+
+            process.env.APP_TARGET_CHANGE_REQUIRES_OWNER = 'false';
+            await gated.updateWorkPluginSettings(session, 'w-1', 'k8s', {
+                secretSettings: { kubeconfig: 'apiVersion: v1' },
+            } as any);
+            expect(pluginsService.updateWorkPluginSettings).toHaveBeenCalledTimes(2);
+        });
+    });
 });

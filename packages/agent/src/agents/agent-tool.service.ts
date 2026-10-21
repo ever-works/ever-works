@@ -318,7 +318,17 @@ export class AgentToolService {
      */
     resolveAllowedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string>; missionId?: string } = {
+        runContext: {
+            runId: string;
+            editsThisRunByFile: Set<string>;
+            missionId?: string;
+            /**
+             * Works-security (2026-10-18) — the run is a Conversation reply its Agent's
+             * OWNER started. Only `request_app_change` reads it (an agent acting on its
+             * own files a change held for the owner). Absent = not an owner chat turn.
+             */
+            ownerChatTurn?: boolean;
+        } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -504,7 +514,10 @@ export class AgentToolService {
      * replay for no user-visible gain. Documented, not churned — see
      * `docs/specs/features/chat-everything/README.md` §4.1.
      */
-    private buildDomainTools(agent: Agent, runContext?: { runId: string }): AgentToolDescriptor[] {
+    private buildDomainTools(
+        agent: Agent,
+        runContext?: { runId: string; ownerChatTurn?: boolean },
+    ): AgentToolDescriptor[] {
         const sources = this.domainToolSources;
         if (!sources) return [];
 
@@ -610,6 +623,9 @@ export class AgentToolService {
                     service: appChanges.service,
                     authorize: (userId, workId, level) =>
                         appChanges.authorize(userId, workId, level),
+                    // Platform state from the run, never model input: only an owner's
+                    // own Conversation turn starts a change directly (works-security).
+                    ownerChatTurn: runContext?.ownerChatTurn === true,
                 }),
             );
         }
@@ -741,6 +757,8 @@ export class AgentToolService {
             editsThisRunByFile: Set<string>;
             missionId?: string;
             taskId?: string;
+            /** See {@link resolveAllowedTools}. */
+            ownerChatTurn?: boolean;
         } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),

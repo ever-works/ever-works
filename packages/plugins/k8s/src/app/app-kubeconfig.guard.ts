@@ -50,14 +50,33 @@ export const CLUSTER_PRIVATE_ALLOWLIST_ENV = 'EVER_WORKS_APPS_CLUSTER_PRIVATE_AL
 /** §6.1 step 2: the DNS lookup gets 10 s, injected so no spec touches a real resolver. */
 export const KUBECONFIG_DNS_TIMEOUT_MS = 10_000;
 
-/** §6.1 step 1: the selected user fields this guard refuses outright. */
+/**
+ * §6.1 step 1: the selected user fields this guard refuses outright.
+ *
+ * `token-file` (hyphenated) is `@kubernetes/client-node`'s own spelling, and the client reads it with
+ * `fs.readFileSync` while it LOADS the kubeconfig (`config_types.js` `findToken`) — then sends the file's
+ * contents as the bearer token to whatever server the kubeconfig names. kubectl's `tokenFile` alone was not
+ * enough (lane works-security).
+ */
 export const KUBECONFIG_UNSUPPORTED_USER_FIELDS = [
 	'exec',
 	'auth-provider',
 	'tokenFile',
+	'token-file',
 	'client-certificate',
 	'client-key'
 ] as const;
+
+/** One of {@link KUBECONFIG_UNSUPPORTED_USER_FIELDS}. */
+export type KubeconfigUnsupportedUserField = (typeof KUBECONFIG_UNSUPPORTED_USER_FIELDS)[number];
+
+/**
+ * The YAML merge key. `@kubernetes/client-node` parses kubeconfigs with js-yaml 4, which APPLIES `<<` merges;
+ * this plugin's js-yaml 5 keeps `<<` as a literal key. So `user: { <<: *anchor }` with `exec` under the
+ * anchor is invisible to a check on this side and an exec plugin on the client's — refused wherever a check
+ * runs (lane works-security).
+ */
+export const KUBECONFIG_MERGE_KEY = '<<';
 
 /** §6.1 step 1: the cluster fields this guard refuses outright — plus a missing `-data` sibling. */
 export const KUBECONFIG_UNSUPPORTED_CLUSTER_FIELDS = ['certificate-authority', 'proxy-url'] as const;
@@ -307,9 +326,10 @@ export async function resolvePublicAddresses(
  * Refused with `KUBECONFIG_UNSUPPORTED`, in this order (the plan's order — the first match is the
  * reason the owner sees):
  *
+ * 0. a YAML merge key (`<<`) anywhere — the client would merge in fields this check cannot see;
  * 1. user `exec` — an arbitrary local command;
  * 2. user `auth-provider` — the legacy plugin protocol;
- * 3. user `tokenFile` — a local file read;
+ * 3. user `tokenFile` / `token-file` — a local file read;
  * 4. user `client-certificate` / `client-key` — local file reads (inline `-data` stays supported);
  * 5. cluster `certificate-authority` — a local file read (inline `-data` is required instead);
  * 6. cluster `insecure-skip-tls-verify: true` — verification is never skipped (FR-4);
@@ -343,6 +363,48 @@ export function assertSupportedKubeconfig(kubeconfigYaml: string, contextOverrid
 		fingerprint: parsed.fingerprint,
 		caData: parsed.clusterCa ?? ''
 	};
+}
+
+/** What {@link findLocalCredentialSource} found — never a value from the kubeconfig, only which rule matched. */
+export type KubeconfigLocalCredentialFinding =
+	| { kind: 'field'; field: KubeconfigUnsupportedUserField }
+	| { kind: 'merge-key' }
+	| { kind: 'unreadable' };
+
+/**
+ * Would the Kubernetes client obtain a credential for this kubeconfig LOCALLY — by running a command (`exec`,
+ * an `auth-provider`) or by reading a file of the host it runs on (`tokenFile`, `token-file`,
+ * `client-certificate`, `client-key`)? `null` when it would not. **Pure**: no I/O, never throws.
+ *
+ * Unlike {@link assertSupportedKubeconfig} this answers for EVERY user in the document, not the selected
+ * one: its callers (the website-path members, lane works-security) pass a context name the client applies
+ * untrimmed, so "the selected user" is not something this side can compute exactly — and a document this
+ * side cannot read, or one with a merge key, is reported rather than passed (the client parses with a
+ * different YAML library, see {@link KUBECONFIG_MERGE_KEY}).
+ */
+export function findLocalCredentialSource(kubeconfigYaml: string): KubeconfigLocalCredentialFinding | null {
+	let doc: YamlMapping;
+	try {
+		doc = loadKubeconfigDocument(kubeconfigYaml);
+	} catch {
+		return { kind: 'unreadable' };
+	}
+	if (hasMergeKey(doc)) {
+		return { kind: 'merge-key' };
+	}
+
+	for (const entry of asArray(doc.users)) {
+		const user = asRecord(entry?.user) ?? {};
+		if (user.exec !== undefined) return { kind: 'field', field: 'exec' };
+		if (user['auth-provider'] !== undefined) return { kind: 'field', field: 'auth-provider' };
+		if (nonEmptyString(user.tokenFile) !== undefined) return { kind: 'field', field: 'tokenFile' };
+		if (nonEmptyString(user['token-file']) !== undefined) return { kind: 'field', field: 'token-file' };
+		if (nonEmptyString(user['client-certificate']) !== undefined) {
+			return { kind: 'field', field: 'client-certificate' };
+		}
+		if (nonEmptyString(user['client-key']) !== undefined) return { kind: 'field', field: 'client-key' };
+	}
+	return null;
 }
 
 /**
@@ -682,6 +744,10 @@ function loadKubeconfigDocument(input: string): YamlMapping {
 }
 
 function unsupportedKubeconfigReason(doc: YamlMapping, contextOverride?: string): string | null {
+	if (hasMergeKey(doc)) {
+		return `kubeconfig uses a YAML merge key ('<<'), which App Works refuse: the Kubernetes client would merge in fields this check cannot see. Write the fields out in full instead.`;
+	}
+
 	const contextName = (contextOverride?.trim() || asString(doc['current-context']) || '').trim();
 	const contexts = asArray(doc.contexts);
 	const selectedContext =
@@ -714,6 +780,9 @@ function unsupportedKubeconfigReason(doc: YamlMapping, contextOverride?: string)
 		}
 		if (nonEmptyString(user.tokenFile) !== undefined) {
 			return `kubeconfig user '${name}' reads its token from a local file ('tokenFile'), which App Works refuse: the worker has no such file. Paste the token itself instead.`;
+		}
+		if (nonEmptyString(user['token-file']) !== undefined) {
+			return `kubeconfig user '${name}' reads its token from a local file ('token-file'), which App Works refuse: the worker has no such file. Paste the token itself instead.`;
 		}
 		if (nonEmptyString(user['client-certificate']) !== undefined) {
 			return `kubeconfig user '${name}' points at a certificate file ('client-certificate'), which App Works refuse: the worker has no such file. Use 'client-certificate-data' instead.`;
@@ -766,6 +835,24 @@ function parseServerUrl(server: string): URL {
 	}
 
 	return url;
+}
+
+/** Does any mapping anywhere in the document carry a `<<` merge key? (Aliases may share nodes; each is visited once.) */
+function hasMergeKey(root: unknown): boolean {
+	const seen = new Set<unknown>();
+	const stack: unknown[] = [root];
+	while (stack.length > 0) {
+		const node = stack.pop();
+		if (node === null || typeof node !== 'object' || seen.has(node)) continue;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			stack.push(...node);
+			continue;
+		}
+		if (Object.prototype.hasOwnProperty.call(node, KUBECONFIG_MERGE_KEY)) return true;
+		stack.push(...Object.values(node as YamlMapping));
+	}
+	return false;
 }
 
 function findClusterBody(doc: YamlMapping, clusterName: string): YamlMapping | null {

@@ -109,10 +109,24 @@ export class WorkQueryService {
     ) {}
 
     async getWorks(
-        options: { limit?: number; offset?: number; search?: string; kind?: string } = {},
+        options: {
+            limit?: number;
+            offset?: number;
+            search?: string;
+            kind?: string;
+            /**
+             * Works-security (run-token scope) — only Works of this
+             * Organization (`null` = no Organization). Omitted = every
+             * accessible Work, exactly as before.
+             */
+            organizationId?: string | null;
+        } = {},
         user: User,
     ) {
-        const { limit = 20, offset = 0, search, kind } = options;
+        const { limit = 20, offset = 0, search, kind, organizationId } = options;
+        // Spread only when asked, so the default repository call shape stays
+        // byte-identical for every caller that never pins an Organization.
+        const organizationPin = organizationId !== undefined ? { organizationId } : {};
 
         let sanitizedSearch: string | undefined;
         if (search) {
@@ -131,6 +145,7 @@ export class WorkQueryService {
                 offset,
                 search: sanitizedSearch,
                 kind,
+                ...organizationPin,
             });
 
             const workIds = works.map((work) => work.id);
@@ -154,6 +169,7 @@ export class WorkQueryService {
                     memberWorkIds,
                     search: sanitizedSearch,
                     kind,
+                    ...organizationPin,
                 }),
             ]);
 

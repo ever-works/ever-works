@@ -14,6 +14,7 @@ export type {
     InboxDecisionCountsRow,
     InboxDecisionPageAfter,
     InboxDecisionRow,
+    InboxOrganizationPin,
     ListInboxDecisionsOptions,
     ListInboxItemsOptions,
 } from '../database/repositories/inbox-item.repository';

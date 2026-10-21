@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "GitHub アプリのアクセスを確認",
                     "openOnGitHub": "GitHub で開く",
                     "enableBuildWorkflow": "ビルドワークフローを有効にする"
-                }
+                },
+                "editAccessRequired": "この操作を行うには、この App Work の編集権限が必要です。"
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "エージェントと一緒に進化させる",
                     "body": "Work のエージェントにアプリの変更を依頼できます — 機能の追加、バグの修正、依存関係のアップグレードなど。エージェントは Work リポジトリで作業し、プルリクエストを作成します。",
                     "button": "この App についてチャット"
-                }
+                },
+                "editAccessRequired": "再試行するには、この App Work の編集権限が必要です。"
             },
             "builds": {
                 "title": "ビルド",
@@ -7178,7 +7180,8 @@
                     "saved": "ターゲットを保存しました。",
                     "saveFailed": "ターゲットを保存できませんでした: {reason}",
                     "changeNote": "ターゲットを変更しても、すでに実行中のものは削除されません。",
-                    "routeUnavailable": "このインスタンスではまだターゲットを変更できません。"
+                    "routeUnavailable": "このインスタンスではまだターゲットを変更できません。",
+                    "ownerOnly": "アプリの実行先の変更や新しいクラスターの接続は、ワークオーナーのみが行えます。"
                 },
                 "connect": {
                     "title": "クラスターを接続",
@@ -7219,7 +7222,8 @@
                     "saving": "保存中…",
                     "saveBlocked": "必要な権限がすべて揃った状態で確認に合格すると、保存できます。",
                     "saved": "クラスターを接続しました。",
-                    "saveFailed": "クラスター接続を保存できませんでした: {reason}"
+                    "saveFailed": "クラスター接続を保存できませんでした: {reason}",
+                    "ownerOnly": "クラスターの接続やコンテキストの変更は、ワークオーナーのみが行えます。"
                 },
                 "check": {
                     "ok": "接続済み",
@@ -7356,7 +7360,8 @@
                         "resume": "再開をリクエストしました。",
                         "remove": "削除をリクエストしました。",
                         "cancelDeploy": "キャンセルをリクエストしました。"
-                    }
+                    },
+                    "deleteDataOwnerOnly": "保存データを削除できるのはワークオーナーのみです。"
                 },
                 "environment": {
                     "title": "環境",
@@ -7445,8 +7450,11 @@
                         "confirm": "データを削除",
                         "requested": "{kind} のデータを削除しています。",
                         "failed": "データを削除できませんでした。{reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "このデータを削除できるのはワークオーナーのみです。"
+                },
+                "ownerRequired": "この操作はワークオーナーのみが行えます。",
+                "ownerConfirmCluster": "このクラスター接続は別のメンバーが保存したため、確認するにはワークオーナーが一度デプロイする必要があります。"
             },
             "appEnv": {
                 "errors": {

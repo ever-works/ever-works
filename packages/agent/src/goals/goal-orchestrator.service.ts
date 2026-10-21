@@ -110,6 +110,19 @@ const LIMIT_COLUMNS = [
 /** A Definition-of-Done write: the checklist and the progress mark it may move. */
 const DOD_COLUMNS: ReadonlyArray<keyof Goal> = ['dodCriteria', 'lastProgressIteration'];
 
+/**
+ * Works-security lane (integration API gates) — where a Definition-of-Done
+ * write came from when it was not a person in the app: `relayedBy` /
+ * `proposedBy` is the human-readable label on the Goal's log ("Ever Gauzy
+ * (Gauzy key)"), `provenance` the structured record (integration key id,
+ * the person it relayed for). The criteria themselves carry no provenance
+ * field, so the log and the activity row are where it is kept.
+ */
+export interface DodWriteProvenance {
+    relayedBy?: string;
+    provenance?: Record<string, unknown>;
+}
+
 /** How many iteration Tasks one rollup will ever consider. */
 const MAX_GOAL_TASKS = 500;
 
@@ -321,6 +334,11 @@ export class GoalOrchestratorService {
         userId: string,
         goalId: string,
         criteria: GoalDoDCriterion[] | null,
+        // Works-security lane (integration API gates) — who RELAYED this write
+        // (an integration key acting for a named person): recorded on the
+        // Goal's own log so the checklist says it came through a relay.
+        // Optional and appended LAST; every existing caller is unchanged.
+        options: DodWriteProvenance = {},
     ): Promise<GoalDto> {
         const goal = await this.findOrThrow(userId, goalId);
         this.assertDod(criteria);
@@ -353,11 +371,13 @@ export class GoalOrchestratorService {
             kind: 'dod',
             message:
                 `Definition of Done updated — ${summary.done} done, ${summary.waived} waived, ` +
-                `${summary.open} open${summary.proposed > 0 ? `, ${summary.proposed} awaiting approval` : ''}.`,
-            metadata: { summary },
+                `${summary.open} open${summary.proposed > 0 ? `, ${summary.proposed} awaiting approval` : ''}` +
+                `${options.relayedBy ? ` (relayed by ${options.relayedBy})` : ''}.`,
+            metadata: { summary, ...(options.provenance ? { provenance: options.provenance } : {}) },
         });
         await this.recordActivity(saved, ActivityActionType.GOAL_DOD_UPDATED, 'dod-set', {
             summary,
+            ...(options.provenance ? { provenance: options.provenance } : {}),
         });
         return toGoalDto(saved);
     }
@@ -374,6 +394,11 @@ export class GoalOrchestratorService {
         userId: string,
         goalId: string,
         criteria: GoalDoDCriterion[],
+        // Works-security lane (integration API gates) — an integration key
+        // without a person proposes through this same seam; `proposedBy`
+        // names it on the Goal's log and in the approval notice instead of
+        // "a planning run". Optional and appended LAST.
+        options: DodWriteProvenance & { proposedBy?: string } = {},
     ): Promise<GoalDto> {
         const goal = await this.findOrThrow(userId, goalId);
         if (!Array.isArray(criteria) || criteria.length === 0) {
@@ -397,15 +422,18 @@ export class GoalOrchestratorService {
         await this.recordEvent(saved, {
             kind: 'dod',
             message:
-                `Planning run proposed ${proposed.length} Definition-of-Done criteria — awaiting ` +
+                `${options.proposedBy ?? 'Planning run'} proposed ${proposed.length} Definition-of-Done criteria — awaiting ` +
                 'operator approval before they count toward completion.',
-            metadata: { proposedIds: proposed.map((entry) => entry.id) },
+            metadata: {
+                proposedIds: proposed.map((entry) => entry.id),
+                ...(options.provenance ? { provenance: options.provenance } : {}),
+            },
         });
         // Follow-up: when the Inbox surface lands, this becomes an Inbox
         // approval item. It does not exist on this branch's base, so the
         // approval request rides the existing notification path instead —
         // deliberately not silently dropped.
-        await this.notifyProposal(saved, proposed.length);
+        await this.notifyProposal(saved, proposed.length, options.proposedBy);
         return toGoalDto(saved);
     }
 
@@ -1708,7 +1736,7 @@ export class GoalOrchestratorService {
         }
     }
 
-    private async notifyProposal(goal: Goal, count: number): Promise<void> {
+    private async notifyProposal(goal: Goal, count: number, proposedBy?: string): Promise<void> {
         if (!this.notifications) return;
         try {
             await this.notifications.create({
@@ -1716,7 +1744,7 @@ export class GoalOrchestratorService {
                 type: NotificationType.INFO,
                 category: NotificationCategory.AGENT,
                 title: 'Definition of Done needs your approval',
-                message: `A planning run proposed ${count} criteria for "${goal.title}".`,
+                message: `${proposedBy ?? 'A planning run'} proposed ${count} criteria for "${goal.title}".`,
                 actionUrl: `/goals/${goal.id}`,
                 actionLabel: 'Review',
                 isPersistent: true,

@@ -5,11 +5,14 @@ import {
 	FLEET_PUSH_CAPABILITY,
 	FLEET_PUSH_MIN_GIT_VERSION,
 	FLEET_SCREEN_CAPABILITY,
+	FLEET_SESSIONS_CAPABILITY,
 	normalizeFleetNodeSelfUpdate,
+	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
 	type FleetConsents,
+	type FleetNodeHealthSnapshot,
 	type FleetNodeSelfUpdateReport,
-	type FleetNodeHealthSnapshot
+	type FleetSessionDaemonReport
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
 import { FLEET_MANAGED_CAPABILITY } from './link/modules/control';
@@ -406,7 +409,10 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	FLEET_SCREEN_CAPABILITY,
 	// Fleet node link (FL-02): `managed` exists only under `--manage`, which IS
 	// the opt-in — a selection written before the tag existed must not withhold it.
-	FLEET_MANAGED_CAPABILITY
+	FLEET_MANAGED_CAPABILITY,
+	// Sessions on computers (FL-04): `sessions` exists only while the session
+	// daemon a consent started answers — the consent IS the opt-in.
+	FLEET_SESSIONS_CAPABILITY
 ]);
 
 /**
@@ -537,6 +543,12 @@ export interface SelfDescriptionTelemetry {
 	 * then carries no `consents`, exactly as before.
 	 */
 	consents?: () => FleetConsents | null;
+	/**
+	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+	 * health (`SessionDaemonSupervisor.report()`). Absent on a process with
+	 * neither `--manage` nor `--work`, which then reports no `daemon` block.
+	 */
+	sessionDaemon?: () => FleetSessionDaemonReport | null;
 	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report (on or
 	 * off, and its last outcome). Heartbeat only, in the newest strip tier;
@@ -669,6 +681,10 @@ export async function describeSelf(
 			usageScan: consents.usageScan === true
 		};
 	}
+	// Sessions on computers (FL-04). Normalised (bounded reason, known keys
+	// only) for the reason above: a wire payload, never a spread.
+	const daemon = normalizeFleetSessionDaemonReport(await resolveTelemetry(telemetry.sessionDaemon));
+	if (daemon) description.daemon = daemon;
 	// Fleet node link (FL-02 T-25): the self-update report, re-read through the
 	// contracts normaliser at the wire boundary for the same reason.
 	const selfUpdate = normalizeFleetNodeSelfUpdate(await resolveTelemetry(telemetry.selfUpdate));
