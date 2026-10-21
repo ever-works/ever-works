@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation';
 import {
     isFleetLinkErrorCode,
     type FleetActionConfirmFields,
+    type FleetContainerAction,
+    type FleetContainersListResult,
+    type FleetImagesListResult,
+    type FleetOperationView,
     type FleetLinkError,
     type FleetOperationRef,
     type FleetProcessesListResult,
@@ -127,4 +131,62 @@ export async function signalFleetProcessAction(
             signal: input.signal,
         }),
     );
+}
+
+// ─── Docker (P2) ────────────────────────────────────────────────────────────
+
+export async function listFleetContainersAction(
+    nodeId: string,
+): Promise<FleetMachineResult<FleetContainersListResult>> {
+    return run(() => fleetMachineAPI.listContainers(nodeId));
+}
+
+export async function fleetContainerAction(
+    nodeId: string,
+    input: { container: string; action: FleetContainerAction; fields?: FleetActionConfirmFields },
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() => fleetMachineAPI.containerAction(nodeId, input.container, input.action, confirmOnly(input.fields)));
+}
+
+export async function runFleetContainerAction(
+    nodeId: string,
+    input: { request: unknown; fields?: FleetActionConfirmFields },
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() => fleetMachineAPI.runContainer(nodeId, { ...confirmOnly(input.fields), request: input.request }));
+}
+
+export async function listFleetImagesAction(nodeId: string): Promise<FleetMachineResult<FleetImagesListResult>> {
+    return run(() => fleetMachineAPI.listImages(nodeId));
+}
+
+export async function pullFleetImageAction(
+    nodeId: string,
+    input: { ref: string; fields?: FleetActionConfirmFields },
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() => fleetMachineAPI.pullImage(nodeId, { ...confirmOnly(input.fields), ref: input.ref }));
+}
+
+export async function removeFleetImageAction(
+    nodeId: string,
+    input: { id: string; fields?: FleetActionConfirmFields },
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() => fleetMachineAPI.removeImage(nodeId, input.id, confirmOnly(input.fields)));
+}
+
+export async function pruneFleetImagesAction(
+    nodeId: string,
+    input: { fields?: FleetActionConfirmFields } = {},
+): Promise<FleetMachineResult<Record<string, unknown>>> {
+    return run(() => fleetMachineAPI.pruneImages(nodeId, confirmOnly(input.fields)));
+}
+
+/** One operation's record (pull, run, prune; Compose in P3), for the operation card. */
+export async function getFleetOperationAction(operationId: string): Promise<FleetMachineResult<FleetOperationView>> {
+    return run(() => fleetMachineAPI.operation(operationId));
+}
+
+export async function cancelFleetOperationAction(
+    operationId: string,
+): Promise<FleetMachineResult<{ operation: FleetOperationView; sent: boolean }>> {
+    return run(() => fleetMachineAPI.cancelOperation(operationId));
 }

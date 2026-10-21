@@ -2,6 +2,7 @@ export * from './fleet-access.types.js';
 export * from './fleet-agent-credentials.types.js';
 export * from './fleet-checkout.types.js';
 export * from './fleet-commit-message.types.js';
+export * from './fleet-docker.types.js';
 export * from './fleet-execution-preference.types.js';
 export * from './fleet-jobs.types.js';
 export * from './fleet-link.codec.js';

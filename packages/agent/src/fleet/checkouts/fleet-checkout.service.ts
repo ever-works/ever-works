@@ -7,7 +7,10 @@ import {
     fleetCheckoutName,
     fleetFamilyAllows,
     fleetRemotesMatch,
+    FLEET_CHECKOUT_BIN_PURGE_AFTER_MS,
+    FLEET_CHECKOUT_SHARED_FOLDERS_MAX,
     FLEET_CHECKOUTS_DISCOVERY_CAP,
+    isFleetCheckoutSharedFolder,
     FLEET_CHECKOUT_LISTED_REFRESH_MS,
     FLEET_CHECKOUT_MANUAL_REFRESH_MIN_MS,
     FLEET_CHECKOUT_RECONCILE_MS,
@@ -50,6 +53,7 @@ import {
 import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import { Work } from '../../entities/work.entity';
+import { config } from '../../config';
 import { FleetAccessService } from '../fleet-access.service';
 import { FleetAuditService } from '../fleet-audit.service';
 import { FleetKillSwitchService } from '../fleet-kill-switch.service';
@@ -545,12 +549,21 @@ export class FleetCheckoutService {
         if (!source || (source.kind !== 'clone' && source.kind !== 'worktree')) {
             throw fleetCheckoutError('invalid', 'source must be a clone or a worktree', { field: 'source' });
         }
-        if (request.isolation === 'container') {
-            throw fleetCheckoutError(
-                'unsupported_on_node',
-                'Container checkouts arrive with the next Checkouts release',
-                { field: 'isolation' },
-            );
+        const container = request.isolation === 'container';
+        const sharedFolders = Array.isArray(request.sharedFolders) ? request.sharedFolders : [];
+        if (sharedFolders.length > 0) {
+            if (source.kind !== 'worktree')
+                throw fleetCheckoutError('invalid', 'shared folders apply to worktrees only', {
+                    field: 'sharedFolders',
+                });
+            if (
+                sharedFolders.length > FLEET_CHECKOUT_SHARED_FOLDERS_MAX ||
+                !sharedFolders.every((folder) => isFleetCheckoutSharedFolder(folder))
+            ) {
+                throw fleetCheckoutError('invalid', 'shared folders are relative folders inside the parent', {
+                    field: 'sharedFolders',
+                });
+            }
         }
         if (request.branch !== undefined && !isFleetCheckoutBranchName(request.branch)) {
             throw fleetCheckoutError('invalid', 'branch', { field: 'branch' });
@@ -559,6 +572,20 @@ export class FleetCheckoutService {
             throw fleetCheckoutError('invalid', 'baseRef', { field: 'baseRef' });
         }
         const { node } = await this.nodeFor(request.nodeId, actor, 'checkouts');
+        if (container) {
+            // Spec U11: refused before anything is written — Windows, or no Docker advertised.
+            const tags = node.capabilities ?? [];
+            if (tags.includes('os:win32'))
+                throw fleetCheckoutError('unsupported_on_node', 'Container checkouts are not available on Windows computers', {
+                    field: 'isolation',
+                    missing: 'os',
+                });
+            if (!tags.includes('docker'))
+                throw fleetCheckoutError('unsupported_on_node', `Container checkouts need Docker on ${node.name}`, {
+                    field: 'isolation',
+                    missing: 'docker',
+                });
+        }
         this.consumeWrite(actor.userId);
         if (await this.isStopped())
             throw fleetCheckoutError('kill_switch', 'clear it under Settings → Fleet');
@@ -639,7 +666,7 @@ export class FleetCheckoutService {
             workId: null,
             branch,
             baseRef,
-            isolation: 'host',
+            isolation: container ? 'container' : 'host',
             state: 'creating',
             createdBy: actor.agentId ? 'agent' : 'user',
             gitLine: null,
@@ -662,6 +689,10 @@ export class FleetCheckoutService {
                     branch: branch ?? null,
                     baseRef,
                     createdBy: actor.agentId ? 'agent' : 'user',
+                    ...(container
+                        ? { isolation: 'container', containerImage: config.fleet.getCheckoutContainerImage() }
+                        : {}),
+                    ...(sharedFolders.length > 0 ? { sharedFolders } : {}),
                 },
                 consent: 'manage',
                 actionFamily: 'checkouts',
@@ -992,6 +1023,19 @@ export class FleetCheckoutService {
         } catch {
             return [];
         }
+    }
+
+    /**
+     * The bin purge (spec FR-33, plan §10, daily): rows in the bin longer than
+     * 30 days whose folder a delete removed are dropped — rows only, never a
+     * folder, and never on read. Idempotent (a row-level delete by id).
+     */
+    async purgeBin(): Promise<{ purged: number }> {
+        const cutoff = new Date(this.now() - FLEET_CHECKOUT_BIN_PURGE_AFTER_MS);
+        const candidates = await this.checkouts.findArchivedBefore(cutoff);
+        const ids = candidates.filter((row) => isCheckoutFolderRemoved(row)).map((row) => row.id);
+        if (ids.length > 0) await this.checkouts.deleteMany(ids);
+        return { purged: ids.length };
     }
 
     // ─── What the node reports ─────────────────────────────────────────────

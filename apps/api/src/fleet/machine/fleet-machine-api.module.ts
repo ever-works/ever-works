@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { FLEET_MACHINE_NODE_PORT, FleetMachineModule, FleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
+import { FleetDockerController } from './fleet-docker.controller';
 import { FleetMachineFactsEnabledGuard } from './fleet-machine-facts-enabled.guard';
 import { FleetMachineLinkAdapter } from './fleet-machine-link.adapter';
 import { FleetProcessesController } from './fleet-processes.controller';
@@ -10,7 +11,7 @@ import { FleetServicesController } from './fleet-services.controller';
  * Machine actions (FL-09) — the API half of Services and Processes (P1),
  * Docker (P2) and Compose (P3):
  *
- *   - the controllers under `/api/fleet/nodes/:id/{services,processes}` (dark
+ *   - the controllers under `/api/fleet/nodes/:id/{services,processes,docker}` (dark
  *     unless `FLEET_MACHINE_FACTS_ENABLED`);
  *   - `FleetMachineLinkAdapter` — binds the agent package's
  *     `FLEET_MACHINE_NODE_PORT` to the node link (FL-02).
@@ -26,7 +27,7 @@ import { FleetServicesController } from './fleet-services.controller';
 @Global()
 @Module({
     imports: [FleetMachineModule, FleetModule],
-    controllers: [FleetServicesController, FleetProcessesController],
+    controllers: [FleetServicesController, FleetProcessesController, FleetDockerController],
     providers: [
         FleetMachineLinkAdapter,
         { provide: FLEET_MACHINE_NODE_PORT, useExisting: FleetMachineLinkAdapter },

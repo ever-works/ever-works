@@ -820,6 +820,17 @@ export const config = {
             );
         },
         /**
+         * Checkouts on computers (FL-14 P3, spec §8b) — the image a
+         * container-isolated checkout's sessions and commands run in
+         * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work
+         * override. Anything that is not a plain image reference falls back to
+         * the default rather than reaching `docker run`.
+         */
+        getCheckoutContainerImage(): string {
+            const raw = (process.env.FLEET_CHECKOUT_CONTAINER_IMAGE ?? '').trim();
+            return /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}$/.test(raw) ? raw : 'node:22-bookworm';
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single

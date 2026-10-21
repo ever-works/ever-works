@@ -191,6 +191,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-commands',
 				// Terminals that keep running on those computers (FL-04).
 				'features/fleet-sessions',
+				// Git clones and worktrees on those computers (FL-14).
+				'features/fleet-checkouts',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
 				'features/integrations',

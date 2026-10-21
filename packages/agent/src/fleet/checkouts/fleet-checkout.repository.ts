@@ -140,6 +140,21 @@ export class FleetCheckoutRepository {
         return rows.map((row) => row.nodeId).filter((id) => typeof id === 'string');
     }
 
+    /** Rows in the bin since before `cutoff` (the bin purge, P3), oldest first, bounded. */
+    async findArchivedBefore(cutoff: Date, limit = 500): Promise<FleetCheckout[]> {
+        return this.repository.find({
+            where: { state: 'archived', archivedAt: LessThan(cutoff) },
+            order: { archivedAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /** Remove rows by id (the bin purge). */
+    async deleteMany(ids: readonly string[]): Promise<void> {
+        if (ids.length === 0) return;
+        await this.repository.delete({ id: In([...ids]) });
+    }
+
     /** Remove a row outright (a `discovered` checkout's Forget, P2). */
     async delete(id: string): Promise<void> {
         await this.repository.delete({ id });

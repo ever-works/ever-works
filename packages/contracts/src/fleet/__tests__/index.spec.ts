@@ -618,7 +618,11 @@ const CHECKOUT_EXPORTS = [
 	'fleetCheckoutFolderName',
 	'parseFleetCheckoutChangesEvidence',
 	'parseFleetCheckoutsCreateResult',
-	'parseFleetCheckoutsDeleteResult'
+	'parseFleetCheckoutsDeleteResult',
+	'FLEET_CHECKOUT_SHARED_FOLDERS_MAX',
+	'FLEET_CHECKOUT_BIN_PURGE_AFTER_MS',
+	'FLEET_CHECKOUT_BIN_PURGE_CRON',
+	'isFleetCheckoutSharedFolder'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -645,6 +649,7 @@ const ALL_EXPORTS = [
 ];
 
 const FUNCTION_EXPORTS = [
+	'isFleetCheckoutSharedFolder',
 	'isFleetCheckoutDeleteMode',
 	'isFleetCheckoutCredentialAccess',
 	'isFleetCheckoutBranchName',
@@ -905,7 +910,9 @@ describe('fleet barrel', () => {
 		// witness table below gains a row.
 		// → 465 with FL-14 P2: two constants and eight helpers more in the same
 		// module (create, delete, the scoped credential, the branch rule).
-		expect(Object.keys(fleet)).toHaveLength(465);
+		// → 469 with FL-14 P3: three constants and one helper (shared folders,
+		// the bin purge), same module.
+		expect(Object.keys(fleet)).toHaveLength(469);
 	});
 
 	it.each([

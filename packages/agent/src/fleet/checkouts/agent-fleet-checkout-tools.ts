@@ -114,6 +114,15 @@ export function buildFleetCheckoutTools(args: {
                     parentCheckoutId: { type: 'string', description: 'For a worktree: the checkout to branch off.' },
                     branch: { type: 'string', description: 'Branch name; proposed (and made unique) when absent.' },
                     baseRef: { type: 'string', description: 'What a new branch starts from.' },
+                    isolation: {
+                        type: 'string',
+                        description: 'host (default) or container: sessions in it run in a container (needs Docker; not on Windows).',
+                    },
+                    sharedFolders: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Worktrees only: ignored folders of the parent to link in (e.g. node_modules).',
+                    },
                 },
                 required: ['nodeId'],
             },
@@ -131,6 +140,12 @@ export function buildFleetCheckoutTools(args: {
                 const baseRef = text(input.baseRef);
                 if (branch) request.branch = branch;
                 if (baseRef) request.baseRef = baseRef;
+                if (input.isolation === 'container') request.isolation = 'container';
+                if (Array.isArray(input.sharedFolders)) {
+                    request.sharedFolders = input.sharedFolders.filter(
+                        (folder): folder is string => typeof folder === 'string',
+                    );
+                }
                 try {
                     return await args.service.create(actor, request);
                 } catch (error) {

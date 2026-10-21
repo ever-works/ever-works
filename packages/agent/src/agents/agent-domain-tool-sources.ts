@@ -105,13 +105,20 @@ export interface AgentFleetToolSource {
      */
     ports?: Pick<FleetPortsService, 'list' | 'open'>;
     /**
-     * Services and processes on computers (FL-09) — backs
-     * `fleet_services_list|action` and `fleet_processes_list|signal`.
+     * Services, processes and Docker on computers (FL-09) — backs
+     * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
      * Optional: unbound, those tools are simply not offered.
      */
     machine?: Pick<
         FleetMachineActionsService,
-        'listServices' | 'serviceAction' | 'listProcesses' | 'signalProcess'
+        | 'listServices'
+        | 'serviceAction'
+        | 'listProcesses'
+        | 'signalProcess'
+        | 'listContainers'
+        | 'containerAction'
+        | 'listImages'
+        | 'pullImage'
     >;
     /**
      * Computer health (FL-03 second phase) — when bound, the read-only
