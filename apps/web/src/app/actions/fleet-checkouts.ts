@@ -142,10 +142,11 @@ export async function createCheckoutAction(
 export async function deleteCheckoutAction(
     id: string,
     body: FleetCheckoutDeleteRequest,
+    options: { cleanUp?: boolean } = {},
 ): Promise<CheckoutActionResult<FleetCheckoutView | { forgotten: true; id: string }>> {
     await ensureAuth();
     try {
-        return { success: true, data: await fleetCheckoutsAPI.remove(id, body) };
+        return { success: true, data: await fleetCheckoutsAPI.remove(id, body, options) };
     } catch (error) {
         return refusal(error);
     }

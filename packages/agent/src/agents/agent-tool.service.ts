@@ -73,6 +73,7 @@ import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-to
 import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
+import { buildFleetSessionGitTools } from '../fleet/session-git/agent-fleet-session-git-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
@@ -659,6 +660,20 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         service: checkouts.service,
+                    }),
+                );
+            }
+            // Session git & actions (FL-06 P3): the action, Changes and pull-request
+            // tools, when bound (and only while FLEET_SESSIONS_ENABLED is on).
+            if (fleet.sessionGit) {
+                const sessionGit = fleet.sessionGit;
+                add('fleet-session-git', () =>
+                    buildFleetSessionGitTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        actions: sessionGit.actions,
+                        checkouts: sessionGit.checkouts ?? null,
+                        pullRequests: sessionGit.pullRequests ?? null,
                     }),
                 );
             }

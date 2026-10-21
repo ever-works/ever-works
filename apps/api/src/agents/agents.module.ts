@@ -128,6 +128,7 @@ import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
     FleetCommandService,
     FleetScheduleService,
+    FleetSessionActionService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
@@ -148,6 +149,7 @@ import {
     type FleetStatusReaderPort,
     type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
+import { FleetPullRequestService } from '../fleet/session-git/fleet-pull-request.service';
 import { config } from '@ever-works/agent/config';
 // Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
 // (global through FleetTasksApiModule; optional below).
@@ -2184,6 +2186,12 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
                 // tools are not offered; create/update/delete/run only ever file an approval.
                 { token: FleetScheduleService, optional: true },
+                // Session git & actions (FL-06 P3) — backs `fleet_sessions_actions_list|action`,
+                // `fleet_checkouts_changes` and `fleet_checkouts_open_pull_request`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED off) the
+                // tools are not offered.
+                { token: FleetSessionActionService, optional: true },
+                { token: FleetPullRequestService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2223,6 +2231,8 @@ async function assertRealWriteTarget(
                 fleetGitIdentity?: FleetGitIdentityService | null,
                 fleetWake?: FleetWakeToolPort | null,
                 fleetSchedules?: FleetScheduleService | null,
+                fleetSessionActions?: FleetSessionActionService | null,
+                fleetPullRequests?: FleetPullRequestService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2269,6 +2279,15 @@ async function assertRealWriteTarget(
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
+                    ...(fleetSessionActions && config.fleet.isSessionsEnabled()
+                        ? {
+                              sessionGit: {
+                                  actions: fleetSessionActions,
+                                  ...(checkouts ? { checkouts } : {}),
+                                  ...(fleetPullRequests ? { pullRequests: fleetPullRequests } : {}),
+                              },
+                          }
+                        : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

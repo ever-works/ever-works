@@ -66,6 +66,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // Checkouts on computers (FL-14 P2) — reads, then the acts on a machine.
     fleet_checkouts_list: 'read.internal',
     fleet_checkouts_get: 'read.internal',
+    // Session git & actions (FL-06 P3) — reads.
+    fleet_sessions_actions_list: 'read.internal',
+    fleet_checkouts_changes: 'read.internal',
     // FL-15 P3 — Tasks on computers.
     fleet_tasks_handoff_options: 'read.internal',
     fleet_nodes_git_identity_get: 'read.internal',
@@ -108,6 +111,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     fleet_checkouts_create: 'write.internal',
     fleet_checkouts_sync: 'write.internal',
     fleet_checkouts_archive: 'write.internal',
+    // FL-06 P3 — types a prompt into a session (the agent there still asks before acting).
+    fleet_sessions_action: 'write.internal',
     // FL-15 P3 — sets name + email only, on the owner's own computer, after `confirm`.
     fleet_nodes_git_identity_set: 'write.internal',
     'facade:memory-write': 'write.internal',
@@ -132,6 +137,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // ── publish.external — deploy, publish, merge, open a public PR ──
     commitToRepo: 'publish.external',
     openPullRequest: 'publish.external',
+    // FL-06 P3 — the platform opens / updates a pull request (never merges).
+    fleet_checkouts_open_pull_request: 'publish.external',
     'facade:git-merge': 'publish.external',
     'facade:pull-request-gate': 'publish.external',
     'facade:deploy': 'publish.external',

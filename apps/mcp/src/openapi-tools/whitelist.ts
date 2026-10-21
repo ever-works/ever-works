@@ -639,6 +639,35 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Session git & actions (5) — FL-06, `apps/api/src/fleet/session-git/`, the same names as the
+	// Agent tools (CONTRACTS §11.3). An action is typed into the session as owner input (the agent
+	// there still asks before acting); the pull request is opened or updated by the platform
+	// through the GitHub App and never merged. Clean up is `fleet_checkouts_delete` with `cleanUp`.
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions/{id}/actions',
+		toolName: 'fleet_sessions_actions_list',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/sessions/{id}/actions', toolName: 'fleet_sessions_action' },
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/changes',
+		toolName: 'fleet_checkouts_changes',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_pull_request_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_open_pull_request'
+	},
+
 	// Tasks on computers (3) — FL-15 (CONTRACTS §11.3). The hand-off options for a Task (read-only;
 	// the start itself is `fleet_sessions_start` with `taskId`), and a computer's global git
 	// identity: read, and "Use my Ever Works identity" (class `confirm`: the first call answers
