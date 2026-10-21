@@ -393,7 +393,13 @@ export const FLEET_LINK_FAMILY_CONSENT: Readonly<Record<FleetLinkFamily, FleetLi
  */
 export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLinkConsentRequirement>> = {
 	/** A read allowed on any open link. */
-	'health.now': 'link'
+	'health.now': 'link',
+	/**
+	 * Checkouts on computers (FL-14, spec U2): a `--work`-only node still
+	 * lists the Task worktrees it holds; DISCOVERY (`rescan`) needs `--manage`,
+	 * which the verb checks on the machine and the platform narrows to.
+	 */
+	'checkouts.list': 'work-or-manage'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */
