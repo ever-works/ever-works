@@ -42,10 +42,15 @@ import {
     fleetComputerMachineScreens,
     fleetComputerPortsScreens,
     fleetComputerScreens,
+    fleetVirtualScreens,
     screensFor,
 } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
-import { useFleetHubEnabled, useFleetMachineFactsEnabled } from '@/components/fleet/FleetHubFlagProvider';
+import {
+    useFleetHubEnabled,
+    useFleetMachineFactsEnabled,
+    useFleetVirtualEnabled,
+} from '@/components/fleet/FleetHubFlagProvider';
 import {
     buildPaletteSections,
     filterLabel,
@@ -256,6 +261,7 @@ export function CommandPalette({
     // Fleet hub (FL-01, FR-13): the hub's screens exist only while it is on.
     const fleetHubEnabled = useFleetHubEnabled();
     const fleetMachineFactsEnabled = useFleetMachineFactsEnabled();
+    const fleetVirtualEnabled = useFleetVirtualEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
     const screens = useMemo(
@@ -266,8 +272,10 @@ export function CommandPalette({
             ...fleetComputerMachineScreens(fleetComputers),
             // Servers and ports (FL-10): "Ports on <computer>".
             ...fleetComputerPortsScreens(fleetComputers),
+            // Virtual computers (FL-16): "New virtual computer", "Start / Stop <name>".
+            ...fleetVirtualScreens(fleetComputers, fleetVirtualEnabled),
         ],
-        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetComputers],
+        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetVirtualEnabled, fleetComputers],
     );
 
     const sections = useMemo(

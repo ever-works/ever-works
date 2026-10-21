@@ -1,5 +1,5 @@
 import type { FleetConfirmationClass } from './fleet-machine-actions.types.js';
-import type { FleetNodeVirtualKind } from './fleet-node.types.js';
+import type { FleetNodeView, FleetNodeVirtualKind } from './fleet-node.types.js';
 
 /**
  * Virtual computers (FL-16, CONTRACTS R-4, R-20, R-34, R-35, §4.1) — the
@@ -651,4 +651,14 @@ export interface FleetVirtualListResult {
 	/** Docker answered (false: not installed or its daemon is down). */
 	docker: boolean;
 	machines: FleetVirtualMachineFact[];
+}
+
+/** `GET /api/fleet/nodes/:id/virtual` — one host's children (FR-31, FR-32). */
+export interface FleetVirtualChildrenListView {
+	host: { id: string; name: string };
+	children: FleetNodeView[];
+	/** Memory every child reserves on the host (running or not). */
+	reservedMemoryMiB: number;
+	/** The host's free memory net of what stopped children will take (spec S6, §5.4); null when unknown. */
+	freeMemoryMiB: number | null;
 }

@@ -12,6 +12,14 @@ export interface PaletteFleetComputer {
      * without them gets only "Go to computer".
      */
     capabilities?: string[];
+    /**
+     * Virtual computers (FL-16): the host a virtual computer runs on, so the
+     * palette offers "Start <name>" / "Stop <name>" for it (opening its page,
+     * where the act and its confirmation live). Absent for every other computer.
+     */
+    hostNodeId?: string;
+    /** Virtual computers (FL-16): its state, to offer Start or Stop. */
+    virtualState?: string;
 }
 
 /**
@@ -42,9 +50,14 @@ export function useFleetPaletteComputers(open: boolean, enabled: boolean): Palet
                                   const tags = (node.capabilities ?? []).filter((tag) =>
                                       PALETTE_MACHINE_TAGS.includes(tag),
                                   );
-                                  return tags.length > 0
-                                      ? { id: node.id, name: node.name, capabilities: tags }
-                                      : { id: node.id, name: node.name };
+                                  const base: PaletteFleetComputer =
+                                      tags.length > 0
+                                          ? { id: node.id, name: node.name, capabilities: tags }
+                                          : { id: node.id, name: node.name };
+                                  // FL-16: a virtual computer carries its host and state.
+                                  if (node.hostNodeId) base.hostNodeId = node.hostNodeId;
+                                  if (node.virtual?.state) base.virtualState = node.virtual.state;
+                                  return base;
                               })
                         : [],
                 );
