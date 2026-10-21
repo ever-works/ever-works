@@ -19,6 +19,7 @@ import { COMPUTER_RELAY_REQUIRES_CONTROL, ComputerRelayRegistry } from './comput
 import { computerSessionDispatcherProvider } from './computer-session.dispatcher.provider';
 import { ComputerSessionListener } from './computer-session.listener';
 import { ComputerWsService } from './computer-ws.service';
+import { ComputerLinkLegBridge } from './computer-link-leg.bridge';
 
 /**
  * Agent computers — watch the machine an Agent works on, from the Agent's
@@ -69,6 +70,10 @@ import { ComputerWsService } from './computer-ws.service';
         // every change of control whichever path made it.
         { provide: COMPUTER_RELAY_REQUIRES_CONTROL, useValue: true },
         ComputerControlListener,
+        // Fleet node link (FL-02 T-22): a view's machine leg over the node's
+        // link (the legacy socket leg stays the fallback). Its link seams are
+        // `@Optional()`: without the link module it does nothing.
+        ComputerLinkLegBridge,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetNodeAuthGuard,
