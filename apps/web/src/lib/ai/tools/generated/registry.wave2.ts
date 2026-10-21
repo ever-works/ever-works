@@ -2046,6 +2046,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/plugins/composio/triggers',
         summary: 'Create a Composio trigger subscription',
         kind: 'create',
+        // Works-security (#2804 review): a trigger subscription is a standing
+        // inbound event feed into the account, like a webhook — the user's call.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint:
             'toolkitSlug (required string), triggerSlug (required string), composioConnectedAccountId (required string), config (optional object)',

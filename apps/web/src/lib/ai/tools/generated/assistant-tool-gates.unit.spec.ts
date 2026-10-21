@@ -240,6 +240,8 @@ describe('privileged / run-starting generated tools are gated on every call', ()
         'rebuild_idea',
         'create_work_agent_build_request',
         'configure_sync_repo',
+        // Review of #2804: a standing inbound event feed, like a webhook.
+        'create_composio_trigger',
     ])('%s', async (name) => {
         const op = byName(name);
         expect(op, name).toBeDefined();
