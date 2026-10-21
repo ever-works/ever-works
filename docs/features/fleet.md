@@ -1085,3 +1085,5 @@ Uploading a node's own log when a run fails is not built: the node has no authen
 A computer can also keep **sessions** — a shell, Claude Code or Codex in a folder, kept running by the computer even when nobody watches, for you or for one of your Agents. See [Sessions on computers](./fleet-sessions.md).
 
 See also [Checkouts on computers](./fleet-checkouts.md) — every git clone and worktree on your computers.
+
+See also [Files on computers](./fleet-files.md) — browse the folders a computer shares, download, upload and delete through its link.
