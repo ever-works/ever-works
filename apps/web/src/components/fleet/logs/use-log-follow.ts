@@ -141,7 +141,10 @@ export function useLogFollow(input: UseLogFollowInput) {
                         return { ...s, groupHint: notice.hint ?? null };
                     case 'gone':
                     case 'stopped':
-                        return { ...s, following: false, stopReason: notice.kind, stopHint: notice.hint ?? null };
+                        // In a merged view one source ending leaves the others following (P2).
+                        return sources.length > 1
+                            ? { ...s, stopHint: notice.hint ?? null }
+                            : { ...s, following: false, stopReason: notice.kind, stopHint: notice.hint ?? null };
                     case 'kill-switch':
                         return { ...s, following: false, phase: 'stopped', stopReason: 'kill-switch', stopHint: notice.hint ?? null };
                     case 'error':

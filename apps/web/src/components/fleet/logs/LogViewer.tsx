@@ -336,7 +336,7 @@ export function LogViewer({
                             : state.stopReason === 'lost'
                               ? t('states.lost')
                               : state.stopReason === 'gone'
-                                ? t('notices.gone', { source: label })
+                                ? (state.stopHint ?? t('notices.gone', { source: label }))
                                 : (state.stopHint ?? t('notices.stopped', { source: label }))}
                     </p>
                     {state.stopReason === 'lost' && (
@@ -345,6 +345,16 @@ export function LogViewer({
                         </Button>
                     )}
                 </div>
+            )}
+
+            {merged && !state.stopReason && state.stopHint && (
+                <p
+                    className="px-3 py-1.5 border-t border-border dark:border-border-dark text-xs text-text-muted dark:text-text-muted-dark"
+                    role="status"
+                    data-testid="fleet-logs-merged-notice"
+                >
+                    {state.stopHint}
+                </p>
             )}
 
             <footer className="px-3 py-1.5 border-t border-border dark:border-border-dark text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-footer">
