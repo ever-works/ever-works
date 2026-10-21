@@ -591,7 +591,7 @@ export function fleetPortTunnelEndsAt(openedAt: Date | string): Date {
  * since it opened, before the first).
  */
 export function fleetPortTunnelExpiry(
-	tunnel: { openedAt: Date | string; lastRequestAt: Date | string | null },
+	tunnel: { openedAt: Date | string; lastRequestAt?: Date | string | null },
 	now: Date
 ): 'idle' | 'hard' | null {
 	const opened = new Date(tunnel.openedAt).getTime();
