@@ -10,6 +10,8 @@ export * from './fleet-model-usage-limit.types.js';
 export * from './fleet-needs-a-look.types.js';
 export * from './fleet-node.types.js';
 export * from './fleet-node-health.types.js';
+export * from './fleet-node-health-history.types.js';
+export * from './fleet-node-wake.types.js';
 export * from './fleet-operations.types.js';
 export * from './fleet-panic.types.js';
 export * from './fleet-push-credential.types.js';

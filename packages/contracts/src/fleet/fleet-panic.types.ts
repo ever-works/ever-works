@@ -129,7 +129,13 @@ export type FleetAuditAction =
 	 * node's control policy (CONTRACTS §2.1, §7). One row per family changed;
 	 * details carry `family`, `from`, `to` — never a member's name.
 	 */
-	| 'node.policy.change';
+	| 'node.policy.change'
+	/**
+	 * Computer health (FL-03, CONTRACTS §7) — someone woke an offline computer
+	 * through a sibling on its network. One row per attempt; details carry
+	 * `target`, `via` (the sibling's id) and `outcome` (`sent` · `refused`).
+	 */
+	| 'node.wake';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -168,7 +174,8 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.link.connect',
 	'node.link.disconnect',
 	'node.link.channel-open',
-	'node.policy.change'
+	'node.policy.change',
+	'node.wake'
 ];
 
 /**
