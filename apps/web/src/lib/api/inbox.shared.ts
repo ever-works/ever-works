@@ -100,6 +100,8 @@ export type InboxReplyRouted =
     | 'rejected'
     | 'escalation-resolved'
     | 'already-decided'
+    // FL-05: the answer was typed into a session on a computer.
+    | 'session-answered'
     | 'none';
 
 /**
@@ -308,6 +310,14 @@ export function isAwaitingReply(item: InboxItem): boolean {
  * source type is the whole test: the API only ever files `fleet-run`
  * rows as questions, and `sourceMeta` is decoration, not the signal.
  */
+/**
+ * FL-05 — an item about a session on one of the owner's computers (a question
+ * or a permission request it is waiting on, or a blocked / failed notice).
+ */
+export function isSessionAttention(item: Pick<InboxItem, 'sourceType'>): boolean {
+    return item.sourceType === 'fleet-session';
+}
+
 export function isFleetQuestion(item: InboxItem): boolean {
     return item.sourceType === 'fleet-run';
 }

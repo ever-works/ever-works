@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -44,7 +45,13 @@ import type {
     InboxProposalDecidedInput,
     InboxProposalPendingInput,
     InboxQuestionRaisedInput,
+    InboxSessionAttentionClearedInput,
+    InboxSessionAttentionRaisedInput,
 } from './inbox-producer.port';
+import {
+    FLEET_SESSION_ANSWER_ROUTER,
+    type FleetSessionAnswerRouter,
+} from './fleet-session-answer-router.port';
 import { decodeInboxDecisionCursor, encodeInboxDecisionCursor } from './inbox-decision-cursor';
 import {
     toInboxDecisionDto,
@@ -191,6 +198,11 @@ export class InboxService implements InboxProducer {
         // write (best-effort, `recordAfterWrite`). Appended LAST + @Optional:
         // a graph without it (unit tests, the worker) behaves exactly as before.
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // FL-05 — a `fleet-session` Decision's answer goes into the session
+        // (the API binds it). Appended LAST + @Optional like the one above.
+        @Optional()
+        @Inject(FLEET_SESSION_ANSWER_ROUTER)
+        private readonly sessionAnswers?: FleetSessionAnswerRouter,
     ) {}
 
     // ── reads ─────────────────────────────────────────────────────
@@ -531,6 +543,88 @@ export class InboxService implements InboxProducer {
         this.logCreated(row);
     }
 
+    // ── sessions on computers (FL-05, CONTRACTS R-12) ─────────────
+
+    /**
+     * {@link InboxProducer.sessionAttentionRaised} — file the item for a
+     * session that needs its person: a question or a permission request is
+     * ONE item of kind `question` / `approval` that IS the Decision in My
+     * Decisions; a blocked / failed session is a `notice`. Idempotent per
+     * attention key. Never rings: the session pipeline sends the session's
+     * own notification (one key, one delivery — FR-25).
+     */
+    async sessionAttentionRaised(input: InboxSessionAttentionRaisedInput): Promise<void> {
+        const key = input.sourceMeta.attentionKey;
+        const existing = await this.items.findByFleetSessionAttentionKey(input.userId, key);
+        if (existing) return;
+        const row = await this.items.create({
+            userId: input.userId,
+            kind: input.kind,
+            title: input.title,
+            body: input.body,
+            options: input.options ? normalizeInboxOptions(input.options) : null,
+            sourceType: 'fleet-session',
+            agentId: input.agentId ?? null,
+            agentRunId: input.agentRunId ?? null,
+            organizationId: input.organizationId ?? null,
+            sourceMeta: input.sourceMeta,
+        });
+        await this.recordCreated(row);
+        this.logCreated(row);
+    }
+
+    /**
+     * {@link InboxProducer.sessionAttentionCleared} — the session's prompt
+     * was answered (any door, the terminal included) or the session ended.
+     * Answered: the item closes with the option recorded (never free text).
+     * Expired: it is archived — a Decision for a session that is gone is not
+     * answerable, and it is never answered automatically (R-12, FR-27a).
+     * CAS-claimed like `reply`: when the Inbox reply itself answered, its
+     * claim already closed the item and this is a no-op.
+     */
+    async sessionAttentionCleared(input: InboxSessionAttentionClearedInput): Promise<void> {
+        const row = await this.items.findByFleetSessionAttentionKey(input.userId, input.attentionKey);
+        if (!row || row.status !== 'open') return;
+        if (input.reason === 'expired') {
+            await this.items.setArchived(row.id, row.userId, true);
+            await this.recordChanged(row.id, 'inbox.item.state_changed', ['status'], { status: 'open' });
+            return;
+        }
+        const claimed = await this.items.markAnswered(row.id, row.userId, {
+            text: input.note ? input.note.slice(0, 200) : null,
+            optionId: input.optionId ?? null,
+        });
+        if (!claimed) return;
+        await this.recordAnswered(row.id, row.unread);
+    }
+
+    /**
+     * A `fleet-session` Decision answered from the Inbox or My Decisions: the
+     * answer goes into the session through the router (an option by id, or the
+     * free text — typed by the node, never stored). A refusal (already
+     * answered in the terminal, the computer unreachable, the fleet stop)
+     * throws, and `reply` releases its claim so the Decision stays answerable.
+     */
+    private async routeSessionReply(
+        row: InboxItem,
+        userId: string,
+        option: InboxItemOption | null,
+        text: string,
+        requireReason: boolean,
+    ): Promise<InboxReplyRouted> {
+        const sessionId = row.sourceMeta?.sessionId ?? null;
+        const key = row.sourceMeta?.attentionKey ?? null;
+        if (!this.sessionAnswers || !sessionId || !key) return 'none';
+        await this.sessionAnswers.answer({
+            userId,
+            sessionId,
+            key,
+            ...(option ? { optionId: option.id } : { text }),
+            source: requireReason ? 'decisions' : 'inbox',
+        });
+        return 'session-answered';
+    }
+
     // ── reply routing ─────────────────────────────────────────────
 
     /**
@@ -603,7 +697,9 @@ export class InboxService implements InboxProducer {
         // hiccup still leaves the human an answerable item — the reason
         // the original order routed first.
         const claimed = await this.items.markAnswered(id, userId, {
-            text: text || null,
+            // FL-05: a session's free-text answer is typed into the session and
+            // never persisted (spec §6 privacy) — the option id is recorded.
+            text: row.sourceType === 'fleet-session' ? null : text || null,
             optionId: option?.id ?? null,
         });
         if (!claimed) {
@@ -620,7 +716,10 @@ export class InboxService implements InboxProducer {
         let runId: string | undefined;
         let restart: InboxReplyRestart = 'none';
         try {
-            switch (row.kind) {
+            // FL-05: a session's Decision answers the session, not a Run.
+            if (row.sourceType === 'fleet-session' && (row.kind === 'question' || row.kind === 'approval')) {
+                routed = await this.routeSessionReply(row, userId, option, text, answer.requireReason === true);
+            } else switch (row.kind) {
                 case 'question': {
                     const outcome = await this.routeQuestionReply(row, userId, composed);
                     routed = outcome.routed;

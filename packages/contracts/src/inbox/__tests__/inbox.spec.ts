@@ -107,8 +107,20 @@ describe('closed value sets', () => {
 		// Self-build slice Q. Appended, not inserted: the web mirror of this
 		// list pins the order, and a fleet question must stay distinguishable
 		// from the in-process `agent-run` one (different resume message).
-		expect(INBOX_ITEM_SOURCE_TYPES).toEqual(['agent-run', 'escalation', 'proposal', 'system', 'work', 'fleet-run']);
-		expect(INBOX_ITEM_SOURCE_TYPES[INBOX_ITEM_SOURCE_TYPES.length - 1]).toBe('fleet-run');
+		expect(INBOX_ITEM_SOURCE_TYPES).toEqual([
+			'agent-run',
+			'escalation',
+			'proposal',
+			'system',
+			'work',
+			'fleet-run',
+			'fleet-session'
+		]);
+		expect(INBOX_ITEM_SOURCE_TYPES.indexOf('fleet-run')).toBe(5);
+	});
+
+	it('lists fleet-session (FL-05) after fleet-run, appended last', () => {
+		expect(INBOX_ITEM_SOURCE_TYPES[INBOX_ITEM_SOURCE_TYPES.length - 1]).toBe('fleet-session');
 	});
 });
 

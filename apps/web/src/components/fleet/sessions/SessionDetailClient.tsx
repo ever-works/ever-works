@@ -30,6 +30,8 @@ import { SessionShortcutSheet } from './SessionShortcutSheet';
 import { SessionStartDialog } from './SessionStartDialog';
 import { SessionTerminal } from './SessionTerminal';
 import { sessionsClient } from './sessions.client';
+import { SessionAttentionBox } from './SessionAttentionBox';
+import { isAnswerable, isSessionUnread } from './sessions-status.shared';
 import { endedLine, providerKey } from './sessions.shared';
 import { useSessionAttach } from './use-session-attach';
 
@@ -127,6 +129,19 @@ export function SessionDetailClient({
     useEffect(() => {
         if (attach.state === 'ended') void refresh();
     }, [attach.state, refresh]);
+
+    // FL-05 (FR-26, U18): looking at the session acknowledges what it raised — the
+    // unread mark clears, the prompt itself stays until it is answered. Once per key.
+    const acknowledgedRef = useRef<string | null>(null);
+    useEffect(() => {
+        const attention = session.attention;
+        if (!attention || !isSessionUnread(session) || acknowledgedRef.current === attention.key) return;
+        acknowledgedRef.current = attention.key;
+        void sessionsClient.acknowledge(session.id, attention.key).then((result) => {
+            if (result.ok) setSession((current) => ({ ...current, attention: result.data.attention ?? null }));
+        });
+    }, [session]);
+    const prompt = live && session.state === 'needs_you' && isAnswerable(session.attention) ? session.attention : null;
 
     useEffect(() => {
         if (!live) return;
@@ -306,8 +321,22 @@ export function SessionDetailClient({
 
             {rewatch && <SessionReplayPlayer sessionId={session.id} title={session.title} nodeName={nodeName} />}
 
-            {live && agentCli && attach.role === 'driver' && (
-                <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
+            {/* FL-05 P2 (FR-31): while it asks, the approval / question card replaces the composer. */}
+            {prompt ? (
+                <SessionAttentionBox
+                    session={session}
+                    attention={prompt}
+                    nodeName={nodeName}
+                    variant="detail"
+                    killSwitchOn={attach.paused !== null}
+                    onAnswered={() => void refresh()}
+                />
+            ) : (
+                live &&
+                agentCli &&
+                attach.role === 'driver' && (
+                    <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
+                )
             )}
 
             <SessionFooter

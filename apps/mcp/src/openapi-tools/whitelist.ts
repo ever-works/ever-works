@@ -683,6 +683,15 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'fleet_sessions_end',
 		annotations: { destructiveHint: true }
 	},
+	// FL-05 P2 — answering what a session asks (a question or a permission prompt): an option the CLI
+	// showed or a free text; the attention (what it asks) rides `fleet_sessions_read`.
+	{
+		method: 'POST',
+		path: '/api/fleet/sessions/{id}/answer',
+		toolName: 'fleet_sessions_answer',
+		description:
+			"Answer what one of my sessions on a computer is waiting for: one of the options it showed (optionId) or, for a question that takes one, a free text. key is the session's attention key (from fleet_sessions_read). Refused once it was answered (in the terminal too), and while the computer is away."
+	},
 
 	// Commands on computers (4) — FL-12 P2, `apps/api/src/fleet/commands/fleet-commands.controller.ts`
 	// (dark unless FLEET_COMMANDS_ENABLED). One command line on one or more of the caller's computers, in
