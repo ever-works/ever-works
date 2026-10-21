@@ -314,6 +314,9 @@ kill-switch · drain · shell-failed · cancelled-by-user` when the node ended t
 full output — then `EXIT [code]` (124 timeout, 130 cancel, 137 kill switch or drain) and `channel.close`.
 `command.cancel { runId }` is accepted on ANY `command` channel (the platform opens a short-lived one, so a cancel
 works from any API replica). A link drop does not end a command; the end is reported when the channel resumes.
+`command.read { runId }` (FL-12 P2, "Open full output") streams one run's kept output from the machine's store on a
+short-lived channel of its own: the reply carries `{ bytes }`, then `DATA` chunks of at most 64 KiB, then `END` and
+the close (`not_found` when the machine no longer keeps it).
 
 **Session family details (FL-04, revision 7).** `kind` on the open lets the node check the consent before
 the channel opens (`--manage` for owner sessions, `--work` for Agent sessions, R-5) and again against the
@@ -751,7 +754,7 @@ All under `/api/fleet` (existing controller root), authenticated, `FLEET_ENABLED
 `/sessions/branch-proposal`, `/checkouts/:id/pull-request` (GET, POST),
 `/checkouts`, `/nodes/:id/checkouts`, `/checkouts/:id`, `/checkouts/:id/changes`,
 `/nodes/:id/git/identity`, `/commands/:id/cancel`, `/commands/:id/runs/:runId/output`,
-`/nodes/:id/schedules/agent-session`, `/checkouts/:id/refresh`, `/checkouts/:id/sync`,
+`/nodes/:id/commands/last` (FL-12 P2: the caller's latest run on that computer), `/nodes/:id/schedules/agent-session`, `/checkouts/:id/refresh`, `/checkouts/:id/sync`,
 `/checkouts/:id/archive`, `/checkouts/:id/restore`, `/tasks/:taskId/handoff-options`,
 `/nodes/:id/virtual`, `/providers`, `/providers/:plugin/options`, `/cloud`,
 `/nodes/:id/runners`, `/runners/jobs`, `/usage`, `/operations/:id` (GET, DELETE), `/link-token` (node credential).
