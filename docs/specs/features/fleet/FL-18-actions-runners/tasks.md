@@ -40,8 +40,7 @@
       **Test**: `packages/plugin/src/contracts/__tests__/actions-runners.interface.spec.ts`; extend
       the append-only pin specs; `isValidPluginCapability('actions-runners')`.
 - [ ] **T-02**. Add `packages/contracts/src/fleet/fleet-runners.types.ts` (plan §4.3) and export from
-      `packages/contracts/src/fleet/index.ts`; extend `fleet-jobs.types.ts` with `'runner-install' |
-      'runner-control'` (L117, L120) and max-age entries (L239: 3600 / 600) and
+      `packages/contracts/src/fleet/index.ts`; extend `fleet-jobs.types.ts` with `'runner-install' | 'runner-control'` (L117, L120) and max-age entries (L239: 3600 / 600) and
       `FLEET_ACTIONS_RUNNER_CAPABILITY`; extend `fleet-panic.types.ts` with
       `node.runner.install|start|stop|restart|remove` and `node.runner.job.cancel` (CONTRACTS §7).
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-runners.spec.ts` (count clamp 1–16;
@@ -87,8 +86,7 @@
 
 - [ ] **T-09**. Add `packages/agent/src/fleet/runners/fleet-runners.service.ts`: `options` (targets,
       canHost + reason, modes per OS), `install` (limit 16; rows first `installing`; fetch downloads
-      via facade; enqueue `runner-install` pinned to the node with `requiredCapabilities
-      ['actions-runner']` through the node job-runtime plugin as `fleet-agent-task.dispatcher.ts`
+      via facade; enqueue `runner-install` pinned to the node with `requiredCapabilities ['actions-runner']` through the node job-runtime plugin as `fleet-agent-task.dispatcher.ts`
       does; audit per runner), `control` (`runner-control`; `stoppedByOwner`; remove busy guard),
       `onAwaitingToken(runnerId)` (mint register/remove token → `runner.token` over the link via
       FL-02's link service; never while `link.pause` holds), `mergeState` (writes only C §4.11
@@ -172,8 +170,7 @@
 # PHASE 2 — Actions jobs
 
 - [ ] **T-22**. Service: `jobs(userId, targets)` (facade `listJobs` per watched target with ETags;
-      `diagnoseJob` from the plugin; busy count), `setWatched`, `cancelRun` (permission `actions:
-      write`; requires `confirm: true`; audit `node.runner.job.cancel`, CONTRACTS §7),
+      `diagnoseJob` from the plugin; busy count), `setWatched`, `cancelRun` (permission `actions: write`; requires `confirm: true`; audit `node.runner.job.cancel`, CONTRACTS §7),
       `checkPermission` (org).
       **Test**: extend `fleet-runners.service.spec.ts` — diagnosis per job; cancel refused outside
       `machines`; watched targets must be App-covered.

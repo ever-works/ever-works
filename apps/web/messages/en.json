@@ -12811,6 +12811,9 @@
         }
     },
     "fleet": {
+        "palette": {
+            "goToComputer": "Go to computer {name}"
+        },
         "nav": {
             "label": "Fleet"
         },
@@ -13039,6 +13042,20 @@
         },
         "computer": {
             "tabsLabel": "Computer",
+            "shortcuts": {
+                "title": "Keyboard shortcuts",
+                "description": "On a computer's page, whenever you are not typing in a field.",
+                "keys": {
+                    "favourite": "Add to or remove from favourites",
+                    "tabs": "Move between the tabs (in the tab strip)",
+                    "firstLastTab": "First or last tab (in the tab strip)",
+                    "sheet": "Show these shortcuts"
+                },
+                "kbd": {
+                    "home": "Home",
+                    "end": "End"
+                }
+            },
             "menu": {
                 "label": "More actions for {name}",
                 "rename": "Rename…",
@@ -13050,6 +13067,8 @@
                 "addFavourite": "Add to favourites",
                 "removeFavourite": "Remove from favourites",
                 "favouriteFailed": "Could not change the favourite.",
+                "favouriteAdded": "Added {name} to favourites.",
+                "favouriteRemoved": "Removed {name} from favourites.",
                 "pause": "Pause",
                 "resume": "Resume",
                 "paused": "Paused {name}. New work stops; jobs in flight finish.",

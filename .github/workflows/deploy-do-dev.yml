@@ -16,7 +16,11 @@ jobs:
     # DO is retired (registry 403); we don't deploy to DigitalOcean now. Gate the
     # whole job at job level (not just per-step) so it SKIPS without consuming an ARC
     # runner. Kept (no-removal) — set the DO_ENABLED repo/org var to 'true' to re-enable.
-    if: ${{ vars.DO_ENABLED == 'true' }}
+    # Security (works-security, 2026-10-18): a `workflow_run` trigger also fires for runs of a
+    # same-named workflow from a FORK pull request (the fork can add any `on:` and name its
+    # branch `main`), and this job would then run with this repository's secrets. Only a run
+    # that came from a push or a manual dispatch IN THIS REPOSITORY may continue.
+    if: ${{ vars.DO_ENABLED == 'true' && (github.event_name != 'workflow_run' || ((github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && github.event.workflow_run.head_repository.full_name == github.repository)) }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment:

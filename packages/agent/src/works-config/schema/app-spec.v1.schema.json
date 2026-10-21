@@ -190,12 +190,12 @@
                 "dockerfile": {
                     "description": "The Dockerfile path, only with `strategy: dockerfile` (§9:171); default: `Dockerfile`.",
                     "type": "string",
-                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]{1,255}$"
                 },
                 "context": {
                     "description": "The build context, only with `dockerfile` or `auto` (§9:172); default: `.`.",
                     "type": "string",
-                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]{1,255}$"
                 },
                 "target": {
                     "description": "The Dockerfile target stage, only with `strategy: dockerfile` (§9:173).",
@@ -221,9 +221,10 @@
                                 "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
                             },
                             "value": {
-                                "description": "A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10).",
+                                "description": "A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10). No `${`, line break or control character: it is written into the build workflow.",
                                 "type": "string",
-                                "maxLength": 1000
+                                "maxLength": 1000,
+                                "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$"
                             },
                             "fromEnv": {
                                 "description": "Names an `env` entry that must be `build` or `both` (§9:175); a secret one only warns (R11).",
@@ -272,12 +273,14 @@
                                     "type": "object",
                                     "properties": {
                                         "name": {
-                                            "description": "The variable name of a build service’s environment entry (§9:176).",
-                                            "type": "string"
+                                            "description": "The variable name of a build service’s environment entry (§9:176): ^[A-Za-z_][A-Za-z0-9_.]{0,127}$.",
+                                            "type": "string",
+                                            "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$"
                                         },
                                         "value": {
-                                            "description": "The value of a build service’s environment entry (§9:176).",
-                                            "type": "string"
+                                            "description": "The value of a build service’s environment entry (§9:176). No `${`, line break or control character: it is written into the build workflow.",
+                                            "type": "string",
+                                            "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$"
                                         }
                                     },
                                     "required": [

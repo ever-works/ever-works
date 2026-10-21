@@ -45,40 +45,40 @@ checkout row, the enrichment task adds `pr`, and the card re-renders from the st
 
 ## 2. Current state in the codebase
 
-| Piece                                                                                         | Where (verified at HEAD)                                                                                                                 | Reused how                                                                                                          |
-| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| PR + merge-policy tail every finalize uses                                                    | `packages/agent/src/tasks-domain/task-workspace.service.ts:1842` (`finalizeRemotePush`), `:1993` (`recordRemotePush`)                    | `FleetPullRequestService` calls `finalizeRemotePush` for a Task-bound session and a sibling `openForBranch` for a free session; nothing new talks to GitHub directly. |
-| Reconciler: how a node run's branch becomes a PR; `agentCanOpenPullRequests` gate              | `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:100-135, :457, :528`                                                           | Same permission read (`agent.permissions.canOpenPullRequests`) and same Task bookkeeping (`in_review`, chat post). |
-| Steering appends to `pendingInput` that no node reads                                         | `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:725-728`; `packages/agent/src/agents/run-steering.service.ts:207`             | Untouched; sessions use FL-04's `session.input` instead.                                                            |
-| Merge policy contract (`allowAgentMerge`, `protectedBranches`, scopes)                        | `packages/contracts/src/policy/merge-policy.types.ts:18-57`; `packages/agent/src/policy/merge-policy.service.ts`                           | `protectedBranches` feeds the relevance rules; FL-06 never merges.                                                   |
-| Task branch rule and columns                                                                   | `packages/agent/src/tasks-domain/task-isolation.ts:43-56` (`taskBranchName`); `packages/agent/src/entities/task.entity.ts:212-232`        | Task-born sessions reuse `task.branchRef`; FR-4.                                                                     |
-| Run ↔ fleet CLI session (`sessionId`, `nodeId`, `provider`), `workspaceMeta`                   | `packages/agent/src/entities/agent-run.entity.ts:33-44, :269, :283-300`                                                                   | An Agent session's ledger lives on its Run; `fleetSessionId` (FL-04) joins Run ↔ Session. Owner sessions have no Run (CONTRACTS R-1). |
-| Per-run structured log rows                                                                    | `packages/agent/src/entities/agent-run-log.entity.ts:21-34` (`runId` uuid not null; `level` `'INFO' \| 'WARN' \| 'ERROR'`; `step` varchar 80; `metadata` simple-json) | Agent-session ledger rows `step: 'fleet.action'` — no new table. Owner-session ledger = `fleet_audit` rows (spec §8b default). |
-| Agent files (`agent.yml` among five) and their service                                         | `packages/agent/src/entities/agent.entity.ts:204-209`; `packages/agent/src/agents/agent-file.service.ts`; `packages/agent/src/agents/types.ts` | Additive optional `fleet` block in the `agent.yml` schema; editor pill already exists (`apps/web/src/app/[locale]/(dashboard)/agents/[id]/instructions/page.tsx:5`). |
-| Run-scoped MCP token accepted by the API                                                       | `packages/agent/src/fleet/fleet-run-credential.service.ts:34-71` (`ew_run_…`); `apps/api/src/auth/guards/auth-session.guard.ts`           | The Agent session's bridge call to open a PR authenticates with the run token it already holds.                     |
-| Node MCP bridge (loopback proxy, `tools/call` counting)                                        | `apps/node/src/core/executors/mcp-bridge.ts:68-95, :315-328`                                                                               | Unchanged; the new tool is an API route the bridge already proxies.                                                  |
-| Diff rendering rules (text only, `<pre>`, link out)                                            | `apps/web/src/components/tasks/TaskDiffSheet.tsx:11-24`                                                                                  | `ChangesPanel` follows the same rules over a node-supplied diff.                                                     |
-| PR pill tones and URL validation                                                               | `apps/web/src/components/tasks/TaskPrPill.tsx:17-30` (`safePrUrl`)                                                                        | `PrPill` reuses `safePrUrl` and the tone map.                                                                        |
-| Git line renderer                                                                              | FL-14 `apps/web/src/components/fleet/checkouts/GitLine.tsx`                                                                              | Gains the `pr` slot.                                                                                                 |
-| Session card anatomy                                                                           | FL-05 (R-22) `apps/web/src/components/fleet/sessions/SessionCard.tsx`                                                                   | Footer slots `gitLine`, `prPill`, `cleanUp`.                                                                         |
-| Git facade (PR reviews, review comments, merge)                                               | `packages/agent/src/facades/git.facade.ts:172, :328-355`                                                                                 | Unresolved review-comment count and PR lookup for enrichment.                                                        |
+| Piece                                                                             | Where (verified at HEAD)                                                                                                                                              | Reused how                                                                                                                                                            |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR + merge-policy tail every finalize uses                                        | `packages/agent/src/tasks-domain/task-workspace.service.ts:1842` (`finalizeRemotePush`), `:1993` (`recordRemotePush`)                                                 | `FleetPullRequestService` calls `finalizeRemotePush` for a Task-bound session and a sibling `openForBranch` for a free session; nothing new talks to GitHub directly. |
+| Reconciler: how a node run's branch becomes a PR; `agentCanOpenPullRequests` gate | `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:100-135, :457, :528`                                                                                       | Same permission read (`agent.permissions.canOpenPullRequests`) and same Task bookkeeping (`in_review`, chat post).                                                    |
+| Steering appends to `pendingInput` that no node reads                             | `apps/api/src/fleet/fleet-agent-task-reconciler.service.ts:725-728`; `packages/agent/src/agents/run-steering.service.ts:207`                                          | Untouched; sessions use FL-04's `session.input` instead.                                                                                                              |
+| Merge policy contract (`allowAgentMerge`, `protectedBranches`, scopes)            | `packages/contracts/src/policy/merge-policy.types.ts:18-57`; `packages/agent/src/policy/merge-policy.service.ts`                                                      | `protectedBranches` feeds the relevance rules; FL-06 never merges.                                                                                                    |
+| Task branch rule and columns                                                      | `packages/agent/src/tasks-domain/task-isolation.ts:43-56` (`taskBranchName`); `packages/agent/src/entities/task.entity.ts:212-232`                                    | Task-born sessions reuse `task.branchRef`; FR-4.                                                                                                                      |
+| Run ↔ fleet CLI session (`sessionId`, `nodeId`, `provider`), `workspaceMeta`      | `packages/agent/src/entities/agent-run.entity.ts:33-44, :269, :283-300`                                                                                               | An Agent session's ledger lives on its Run; `fleetSessionId` (FL-04) joins Run ↔ Session. Owner sessions have no Run (CONTRACTS R-1).                                 |
+| Per-run structured log rows                                                       | `packages/agent/src/entities/agent-run-log.entity.ts:21-34` (`runId` uuid not null; `level` `'INFO' \| 'WARN' \| 'ERROR'`; `step` varchar 80; `metadata` simple-json) | Agent-session ledger rows `step: 'fleet.action'` — no new table. Owner-session ledger = `fleet_audit` rows (spec §8b default).                                        |
+| Agent files (`agent.yml` among five) and their service                            | `packages/agent/src/entities/agent.entity.ts:204-209`; `packages/agent/src/agents/agent-file.service.ts`; `packages/agent/src/agents/types.ts`                        | Additive optional `fleet` block in the `agent.yml` schema; editor pill already exists (`apps/web/src/app/[locale]/(dashboard)/agents/[id]/instructions/page.tsx:5`).  |
+| Run-scoped MCP token accepted by the API                                          | `packages/agent/src/fleet/fleet-run-credential.service.ts:34-71` (`ew_run_…`); `apps/api/src/auth/guards/auth-session.guard.ts`                                       | The Agent session's bridge call to open a PR authenticates with the run token it already holds.                                                                       |
+| Node MCP bridge (loopback proxy, `tools/call` counting)                           | `apps/node/src/core/executors/mcp-bridge.ts:68-95, :315-328`                                                                                                          | Unchanged; the new tool is an API route the bridge already proxies.                                                                                                   |
+| Diff rendering rules (text only, `<pre>`, link out)                               | `apps/web/src/components/tasks/TaskDiffSheet.tsx:11-24`                                                                                                               | `ChangesPanel` follows the same rules over a node-supplied diff.                                                                                                      |
+| PR pill tones and URL validation                                                  | `apps/web/src/components/tasks/TaskPrPill.tsx:17-30` (`safePrUrl`)                                                                                                    | `PrPill` reuses `safePrUrl` and the tone map.                                                                                                                         |
+| Git line renderer                                                                 | FL-14 `apps/web/src/components/fleet/checkouts/GitLine.tsx`                                                                                                           | Gains the `pr` slot.                                                                                                                                                  |
+| Session card anatomy                                                              | FL-05 (R-22) `apps/web/src/components/fleet/sessions/SessionCard.tsx`                                                                                                 | Footer slots `gitLine`, `prPill`, `cleanUp`.                                                                                                                          |
+| Git facade (PR reviews, review comments, merge)                                   | `packages/agent/src/facades/git.facade.ts:172, :328-355`                                                                                                              | Unresolved review-comment count and PR lookup for enrichment.                                                                                                         |
 
 Missing today: see spec §2.2 — no git line on sessions, no action prompts, no PR outside a run's
 end, no uncommitted view, no per-action cost, no clean-up affordance.
 
 ## 3. Tech choices
 
-| Concern                 | Choice                                                                                          | Why                                                                                                   |
-| ----------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Template storage        | Code defaults in `packages/contracts/src/fleet/fleet-session-actions.types.ts`; overrides in `agent.yml` `fleet.actions.<id>` and `fleet.branchPrefix` | Part of how the Agent works; no table, no slot (CONTRACTS §13 has none for FL-06); owner sessions edit inline |
-| Rendering               | Pure `renderActionPrompt(template, ctx)`; placeholders `{branch} {base} {pull} {task}`; unknown placeholders left verbatim | Testable; no template engine                                                                           |
-| Delivery                | FL-04 `session.input` with `source: 'action'` and `actionId`; echo confirms within 5 s           | Same pipe a person types through; the agent's own permission prompts stay in force                     |
-| Relevance               | Pure `availableActions(ctx)` over `{ hasCheckout, provider, branch, defaultBranch, protected[], pr, unresolvedComments, mergeable, behind, state }` | One truth table; UI and API share it                                                                   |
-| PR enrichment           | Scheduled task + `github.pr` ingest nudge; `GitFacade` lookup by head; 60 s cache per checkout   | No webhooks on the node; bounded GitHub calls                                                           |
-| PR opening              | `finalizeRemotePush` (Task-bound) / new `openForBranch` beside it (free session), both via `GitFacade` | One tail, same permission and merge policy                                                             |
-| Changes view            | `checkouts.changes` on the machine channel → `git status --porcelain=v2` + `git diff` (staged + unstaged) capped | Read-only; text-only render                                                                           |
-| Cost                    | Ledger row per action; FL-20 attributes tokens between consecutive `fleet.action` marks (by `providerSessionId`) | No new table; honest "unknown" until the scan                                                           |
-| Branch uniqueness       | Platform check over `fleet_checkouts.branch` for the remote (incl. archived) + node `git ls-remote --heads` at create | No retired-names table                                                                                 |
+| Concern           | Choice                                                                                                                                                 | Why                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Template storage  | Code defaults in `packages/contracts/src/fleet/fleet-session-actions.types.ts`; overrides in `agent.yml` `fleet.actions.<id>` and `fleet.branchPrefix` | Part of how the Agent works; no table, no slot (CONTRACTS §13 has none for FL-06); owner sessions edit inline |
+| Rendering         | Pure `renderActionPrompt(template, ctx)`; placeholders `{branch} {base} {pull} {task}`; unknown placeholders left verbatim                             | Testable; no template engine                                                                                  |
+| Delivery          | FL-04 `session.input` with `source: 'action'` and `actionId`; echo confirms within 5 s                                                                 | Same pipe a person types through; the agent's own permission prompts stay in force                            |
+| Relevance         | Pure `availableActions(ctx)` over `{ hasCheckout, provider, branch, defaultBranch, protected[], pr, unresolvedComments, mergeable, behind, state }`    | One truth table; UI and API share it                                                                          |
+| PR enrichment     | Scheduled task + `github.pr` ingest nudge; `GitFacade` lookup by head; 60 s cache per checkout                                                         | No webhooks on the node; bounded GitHub calls                                                                 |
+| PR opening        | `finalizeRemotePush` (Task-bound) / new `openForBranch` beside it (free session), both via `GitFacade`                                                 | One tail, same permission and merge policy                                                                    |
+| Changes view      | `checkouts.changes` on the machine channel → `git status --porcelain=v2` + `git diff` (staged + unstaged) capped                                       | Read-only; text-only render                                                                                   |
+| Cost              | Ledger row per action; FL-20 attributes tokens between consecutive `fleet.action` marks (by `providerSessionId`)                                       | No new table; honest "unknown" until the scan                                                                 |
+| Branch uniqueness | Platform check over `fleet_checkouts.branch` for the remote (incl. archived) + node `git ls-remote --heads` at create                                  | No retired-names table                                                                                        |
 
 ## 4. Data model
 
@@ -93,7 +93,7 @@ end, no uncommitted view, no per-action cost, no clean-up affordance.
   once through the git facade on a miss.
 - `agent_run_logs` rows (Agent sessions only — `runId` is not nullable): `step = 'fleet.action'`,
   `level = 'INFO'`, `metadata = { actionId, sessionId, checkoutId, sentAt, deliveredAt?,
-  undelivered?, prNumber?, tokens?, costCents? }` — written by the action service;
+undelivered?, prNumber?, tokens?, costCents? }` — written by the action service;
   `tokens`/`costCents` patched by FL-20.
 - Owner sessions (no Run): the ledger is read from the session's `node.session.input` audit rows
   (`details.action`, `details.promptPreview`, `outcome: 'sent'`); delivery is shown live from the
@@ -101,18 +101,18 @@ end, no uncommitted view, no per-action cost, no clean-up affordance.
   spec §8b.
 - `agent.yml` additive block (Zod, all optional):
 
-  ```yaml
-  fleet:
-    branchPrefix: nina          # default: agent slug
-    actions:
-      commit: "…{branch}…"
-      commitPush: "…"
-      pullRequest: "…{base}…{pull}…"
-      review: "…"
-      fixComments: "…{pull}…"
-      resolveConflicts: "…{base}…{branch}…"
-      recap: "…"
-  ```
+    ```yaml
+    fleet:
+        branchPrefix: nina # default: agent slug
+        actions:
+            commit: '…{branch}…'
+            commitPush: '…'
+            pullRequest: '…{base}…{pull}…'
+            review: '…'
+            fixComments: '…{pull}…'
+            resolveConflicts: '…{base}…{branch}…'
+            recap: '…'
+    ```
 
 - Contracts `packages/contracts/src/fleet/fleet-session-actions.types.ts`: `FleetSessionActionId`
   (`commit · commitPush · pullRequest · review · fixComments · resolveConflicts · recap`),
@@ -128,17 +128,17 @@ end, no uncommitted view, no per-action cost, no clean-up affordance.
 
 All under `/api/fleet`, `FleetEnabledGuard` + `FLEET_SESSIONS_ENABLED`; errors per CONTRACTS §8.
 
-| Method | Path                                         | Body / query                             | Returns                                     | Family / class                 | Errors                                                                                  |
-| ------ | -------------------------------------------- | ---------------------------------------- | ------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------- |
-| GET    | `/sessions/:id/actions`                      | —                                        | `{ actions: Availability[], templates }`    | `view`                         | `not_found`                                                                             |
-| POST   | `/sessions/:id/actions`                      | `{ actionId, prompt }`                   | `202 { ledgerId }`                          | `sessions` · `plain`           | `invalid` (not relevant), `busy` (2 s), `limit_exceeded` (10/min), `unreachable`, `consent_missing`, `permission_denied`, `kill_switch` |
-| GET    | `/sessions/:id/actions/ledger`               | —                                        | `FleetSessionActionLedgerEntry[]`           | `view`                         |                                                                                         |
-| POST   | `/sessions/:id/actions/:ledgerId/resend`     | —                                        | `202`                                       | `sessions` · `plain`           | `invalid` (was delivered)                                                               |
-| GET    | `/checkouts/:id/changes`                     | `?maxBytes`                              | `FleetCheckoutChangesReply`                 | `checkouts` · `plain` (read)   | `unreachable`, `consent_missing`, `kill_switch`                                         |
-| POST   | `/checkouts/:id/pull-request`                | `FleetOpenPullRequestRequest`            | `{ number, url, state, updated: boolean }`  | `checkouts` · `plain`          | `permission_denied` (Agent permission or audience), `invalid` (default branch / not pushed), `operation_failed` (provider), `kill_switch` |
-| GET    | `/checkouts/:id/pull-request`                | —                                        | `pr \| null` (fresh enrichment)             | `view`                         |                                                                                         |
-| DELETE | `/checkouts/:id` (FL-14's route, reused)     | `{ confirm: true }` or `{ confirmName }` (CONTRACTS §2.2); a first call without them returns `confirmation_required` with FL-14's delete preview | `202 { operationId }` | `checkouts` · `confirm`/`confirm-destructive` | FL-14 delete codes; FL-06 adds `invalid` "the pull request is not merged or closed yet" when called as Clean up (`?cleanUp=1`) and the FR-25 gate fails |
-| GET    | `/sessions/branch-proposal`                  | `?nodeId&checkoutId&agentId&firstMessage&taskId` | `{ branch, suffixed, reason }`      | `view`                         | `unreachable` (ls-remote)                                                               |
+| Method | Path                                     | Body / query                                                                                                                                     | Returns                                    | Family / class                                | Errors                                                                                                                                                  |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/sessions/:id/actions`                  | —                                                                                                                                                | `{ actions: Availability[], templates }`   | `view`                                        | `not_found`                                                                                                                                             |
+| POST   | `/sessions/:id/actions`                  | `{ actionId, prompt }`                                                                                                                           | `202 { ledgerId }`                         | `sessions` · `plain`                          | `invalid` (not relevant), `busy` (2 s), `limit_exceeded` (10/min), `unreachable`, `consent_missing`, `permission_denied`, `kill_switch`                 |
+| GET    | `/sessions/:id/actions/ledger`           | —                                                                                                                                                | `FleetSessionActionLedgerEntry[]`          | `view`                                        |                                                                                                                                                         |
+| POST   | `/sessions/:id/actions/:ledgerId/resend` | —                                                                                                                                                | `202`                                      | `sessions` · `plain`                          | `invalid` (was delivered)                                                                                                                               |
+| GET    | `/checkouts/:id/changes`                 | `?maxBytes`                                                                                                                                      | `FleetCheckoutChangesReply`                | `checkouts` · `plain` (read)                  | `unreachable`, `consent_missing`, `kill_switch`                                                                                                         |
+| POST   | `/checkouts/:id/pull-request`            | `FleetOpenPullRequestRequest`                                                                                                                    | `{ number, url, state, updated: boolean }` | `checkouts` · `plain`                         | `permission_denied` (Agent permission or audience), `invalid` (default branch / not pushed), `operation_failed` (provider), `kill_switch`               |
+| GET    | `/checkouts/:id/pull-request`            | —                                                                                                                                                | `pr \| null` (fresh enrichment)            | `view`                                        |                                                                                                                                                         |
+| DELETE | `/checkouts/:id` (FL-14's route, reused) | `{ confirm: true }` or `{ confirmName }` (CONTRACTS §2.2); a first call without them returns `confirmation_required` with FL-14's delete preview | `202 { operationId }`                      | `checkouts` · `confirm`/`confirm-destructive` | FL-14 delete codes; FL-06 adds `invalid` "the pull request is not merged or closed yet" when called as Clean up (`?cleanUp=1`) and the FR-25 gate fails |
+| GET    | `/sessions/branch-proposal`              | `?nodeId&checkoutId&agentId&firstMessage&taskId`                                                                                                 | `{ branch, suffixed, reason }`             | `view`                                        | `unreachable` (ls-remote)                                                                                                                               |
 
 Clean up adds no route: the button calls FL-14's delete preview and `DELETE /checkouts/:id` with
 `cleanUp=1`, which makes FL-14's handler apply the FR-25 gate first (worktree, PR merged/closed,
@@ -162,8 +162,8 @@ DTOs: `apps/api/src/fleet/dto/fleet-session-actions.dto.ts`, `fleet-pull-request
   No node change beyond honouring the optional `source`/`actionId` fields for its own log line.
 - **Machine channel (FL-14 module, extended):** `checkouts.changes { checkoutId, maxBytes }` →
   `{ files: [{ path, status, added, removed, patch?, truncated }], truncated, omittedFiles,
-  omittedBytes }` from `git status --porcelain=v2 -z` + `git diff --no-color --no-ext-diff
-  HEAD` (staged + unstaged); binary files reported without a patch; `.ever-works/` and `.mounts/`
+omittedBytes }` from `git status --porcelain=v2 -z` + `git diff --no-color --no-ext-diff
+HEAD` (staged + unstaged); binary files reported without a patch; `.ever-works/` and `.mounts/`
   excluded. `checkouts.changes` is in the CONTRACTS §3.3 `machine` vocabulary (rev 2).
 - **Remote heads for branch uniqueness:** FL-14's `checkouts.list` reply carries no remote branch
   list, so FL-06 adds one optional request flag `remoteHeads: true` → reply field
@@ -217,13 +217,13 @@ None. The git provider is reached through `GitFacadeService` (`packages/agent/sr
 
 ## 9. Agent / MCP / CLI surface
 
-| Tool                                   | Annotation                                        | Maps to                                  |
-| -------------------------------------- | ------------------------------------------------- | ---------------------------------------- |
-| `fleet_sessions_actions_list`          | `readOnly: true`                                  | `GET /sessions/:id/actions`              |
-| `fleet_sessions_action`                | `destructive: false`, `confirmationClass: 'plain'`| `POST /sessions/:id/actions`             |
-| `fleet_checkouts_changes`              | `readOnly: true`                                  | `GET /checkouts/:id/changes`             |
-| `fleet_checkouts_open_pull_request`    | `destructive: false`, `plain`; gated by `canOpenPullRequests` | `POST /checkouts/:id/pull-request` |
-| FL-14's `fleet_checkouts_delete` (reused for Clean up; no second delete tool) | `destructive: true`, `confirm`/`confirm-destructive` | `DELETE /checkouts/:id?cleanUp=1` |
+| Tool                                                                          | Annotation                                                    | Maps to                            |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- |
+| `fleet_sessions_actions_list`                                                 | `readOnly: true`                                              | `GET /sessions/:id/actions`        |
+| `fleet_sessions_action`                                                       | `destructive: false`, `confirmationClass: 'plain'`            | `POST /sessions/:id/actions`       |
+| `fleet_checkouts_changes`                                                     | `readOnly: true`                                              | `GET /checkouts/:id/changes`       |
+| `fleet_checkouts_open_pull_request`                                           | `destructive: false`, `plain`; gated by `canOpenPullRequests` | `POST /checkouts/:id/pull-request` |
+| FL-14's `fleet_checkouts_delete` (reused for Clean up; no second delete tool) | `destructive: true`, `confirm`/`confirm-destructive`          | `DELETE /checkouts/:id?cleanUp=1`  |
 
 Builder in `packages/agent/src/fleet/agent-fleet-tools.ts`; MCP whitelist entries in
 `apps/mcp/src/openapi-tools/whitelist.ts`; the bridge-reachable `open_pull_request` is the only
@@ -235,10 +235,10 @@ second delete verb).
 
 ## 10. Background jobs
 
-| Task                      | File                                                              | When                                          | Does                                                                                                   | Idempotency                       |
-| ------------------------- | ----------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------- |
-| `fleet-pr-enrichment`     | `packages/tasks/src/tasks/trigger/fleet-pr-enrichment.task.ts`    | cron `* * * * *` + nudge on `github.pr` ingest | For checkouts with a live session or a `pr` younger than 7 d: PR by head branch, state, checks roll-up, unresolved review comments, mergeable; writes `gitLine.pr` (§4.7 fields only) and caches the other two; ≤ 1 call/min/checkout | CAS on `gitLine.at`; per-checkout cache key |
-| `fleet-action-undelivered-sweep` | `packages/tasks/src/tasks/trigger/fleet-action-undelivered-sweep.task.ts` | every 2 min                         | Marks Agent-session ledger rows (`agent_run_logs`) without echo after 5 s as `undelivered`; owner sessions have no ledger row to mark | Row-level `UPDATE … WHERE deliveredAt IS NULL` |
+| Task                             | File                                                                      | When                                           | Does                                                                                                                                                                                                                                  | Idempotency                                    |
+| -------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `fleet-pr-enrichment`            | `packages/tasks/src/tasks/trigger/fleet-pr-enrichment.task.ts`            | cron `* * * * *` + nudge on `github.pr` ingest | For checkouts with a live session or a `pr` younger than 7 d: PR by head branch, state, checks roll-up, unresolved review comments, mergeable; writes `gitLine.pr` (§4.7 fields only) and caches the other two; ≤ 1 call/min/checkout | CAS on `gitLine.at`; per-checkout cache key    |
+| `fleet-action-undelivered-sweep` | `packages/tasks/src/tasks/trigger/fleet-action-undelivered-sweep.task.ts` | every 2 min                                    | Marks Agent-session ledger rows (`agent_run_logs`) without echo after 5 s as `undelivered`; owner sessions have no ledger row to mark                                                                                                 | Row-level `UPDATE … WHERE deliveredAt IS NULL` |
 
 Dispatched through `FLEET_PR_ENRICHMENT_DISPATCHER` bound in `apps/api/src/fleet/fleet.module.ts`.
 
@@ -296,14 +296,14 @@ Metrics `fleet_session_actions_total{action,delivered}`, `fleet_pull_requests_op
 
 ## 15. Risks
 
-| Risk                                                      | L   | I   | Mitigation                                                                              |
-| --------------------------------------------------------- | --- | --- | --------------------------------------------------------------------------------------- |
-| Prompt lands mid-permission-prompt and is read as an answer | M | M   | Sheet warning in `needs_you`; the prompt is shown before sending                         |
-| GitHub rate limits from enrichment                        | M   | M   | 1 call/min/checkout, only live or recent checkouts, conditional requests                |
-| Codex sandbox refuses worktree commits                    | M   | M   | Clarification raised; template default asks the agent to say so                         |
-| Agent opens PRs on the wrong checkout                     | L   | H   | Run token scoped to the session's checkout; server refuses others                       |
-| Ledger cost shows "unknown" for a long time               | M   | L   | Honest label; FL-20 cadence documented beside it                                        |
-| FL-04/FL-05 card and start dialog not yet landed          | M   | M   | Components are slot-based; P1 can ship on the checkout row first                        |
+| Risk                                                        | L   | I   | Mitigation                                                               |
+| ----------------------------------------------------------- | --- | --- | ------------------------------------------------------------------------ |
+| Prompt lands mid-permission-prompt and is read as an answer | M   | M   | Sheet warning in `needs_you`; the prompt is shown before sending         |
+| GitHub rate limits from enrichment                          | M   | M   | 1 call/min/checkout, only live or recent checkouts, conditional requests |
+| Codex sandbox refuses worktree commits                      | M   | M   | Clarification raised; template default asks the agent to say so          |
+| Agent opens PRs on the wrong checkout                       | L   | H   | Run token scoped to the session's checkout; server refuses others        |
+| Ledger cost shows "unknown" for a long time                 | M   | L   | Honest label; FL-20 cadence documented beside it                         |
+| FL-04/FL-05 card and start dialog not yet landed            | M   | M   | Components are slot-based; P1 can ship on the checkout row first         |
 
 ## 16. Constitution reconciliation
 

@@ -8,8 +8,16 @@ import {
     FleetJobService,
     FleetKillSwitchService,
 } from '@ever-works/agent/fleet';
-import type { AgentTaskExecuteDispatchPayload } from '@ever-works/agent/tasks-domain';
-import { decideFleetRouting, DEFAULT_FLEET_EXECUTION_MODE } from '@ever-works/contracts';
+import { WorkRepository } from '@ever-works/agent/database';
+import {
+    appWorkCloudPushAllowed,
+    type AgentTaskExecuteDispatchPayload,
+} from '@ever-works/agent/tasks-domain';
+import {
+    decideFleetRouting,
+    DEFAULT_FLEET_EXECUTION_MODE,
+    QUEUED_REASON_WAITING_FOR_RUNNER,
+} from '@ever-works/contracts';
 import type {
     FleetAgentTaskPayload,
     FleetAgentTaskStep,
@@ -159,6 +167,10 @@ export class FleetRunRouterService {
         // while the flag is set or cannot be read.
         @Optional()
         private readonly killSwitch?: FleetKillSwitchService,
+        // 2026-10-18 — the Work's kind, for the App Work cloud-fallback guard in
+        // `routeAgentTask`. Same appended-LAST + @Optional() posture; absent = no guard.
+        @Optional()
+        private readonly works?: WorkRepository,
     ) {}
 
     /**
@@ -299,7 +311,22 @@ export class FleetRunRouterService {
                 targetNodeId,
                 requiredCapabilities,
             });
-            const decision = decideFleetRouting(mode, availability);
+            let decision = decideFleetRouting(mode, availability);
+            if (
+                decision.target === 'cloud' &&
+                mode !== 'cloud' &&
+                (await this.isFleetOnlyWork(scope.workId))
+            ) {
+                // FR-12: an App Work's run publishes ONLY from a Fleet node (cloud push off).
+                // A `local-fallback` relocation to the cloud would run, publish nothing and park
+                // asking a human (prod 2026-10-18, T-45). Hold it for the fleet instead, and say so.
+                // An owner who explicitly chose `cloud` still gets the cloud.
+                decision = {
+                    target: 'fleet-waiting',
+                    mode,
+                    queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER,
+                };
+            }
             this.logger.debug(
                 `Fleet routing for task ${payload.taskId}: ${decision.target} (mode ${mode}, eligible ${
                     availability.free
@@ -315,6 +342,26 @@ export class FleetRunRouterService {
                 }`,
             );
             return { target: 'fleet', mode: DEFAULT_FLEET_EXECUTION_MODE };
+        }
+    }
+
+    /**
+     * True when the Work is an App Work whose runs may publish only from a Fleet node
+     * (`appWorkCloudPushAllowed` false). Best-effort: no repository, no id or a failed
+     * lookup answers false, which keeps the pre-guard routing.
+     */
+    private async isFleetOnlyWork(workId: string | null | undefined): Promise<boolean> {
+        if (!this.works || !workId) return false;
+        try {
+            const work = await this.works.findById(workId);
+            return Boolean(work) && !appWorkCloudPushAllowed(work?.kind);
+        } catch (err) {
+            this.logger.warn(
+                `Fleet routing: reading Work ${workId} for the App Work guard failed: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return false;
         }
     }
 

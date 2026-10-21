@@ -137,6 +137,53 @@ describe('HealthController', () => {
             expect(redis.isHealthy).toHaveBeenCalledWith('redis');
         });
 
+        describe('fleet_relay (FL-02, CONTRACTS R-7)', () => {
+            const withBus = (health: object) =>
+                new HealthController(
+                    { check: jest.fn().mockResolvedValue(OK_RESULT) } as never,
+                    db as never,
+                    redis as never,
+                    services as never,
+                    { health: () => health } as never,
+                );
+
+            it('reports single-replica without a bus, and never fails readiness for it', async () => {
+                const result = await controller.ready();
+                expect(result.status).toBe('ok');
+                expect(result.fleet_relay).toEqual({
+                    configured: false,
+                    mode: 'single-replica',
+                    status: 'up',
+                });
+            });
+
+            it('reports the Valkey bus as it runs — up, then degraded when its connection is lost', async () => {
+                process.env.REDIS_URL = 'redis://localhost:6379';
+                expect(
+                    (await withBus({ configured: true, mode: 'valkey', status: 'up' }).ready())
+                        .fleet_relay,
+                ).toEqual({ configured: true, mode: 'valkey', status: 'up' });
+                const degraded = await withBus({
+                    configured: true,
+                    mode: 'valkey',
+                    status: 'degraded',
+                }).ready();
+                expect(degraded.fleet_relay.status).toBe('degraded');
+                expect(degraded.status).toBe('ok');
+            });
+
+            it('reads a configured but unbound bus as degraded, and never echoes the URL', async () => {
+                process.env.REDIS_URL = 'redis://:hunter2-secret@valkey.internal:6379';
+                const result = await controller.ready();
+                expect(result.fleet_relay).toEqual({
+                    configured: true,
+                    mode: 'valkey',
+                    status: 'degraded',
+                });
+                expect(JSON.stringify(result)).not.toContain('hunter2-secret');
+            });
+        });
+
         it('propagates a failing Terminus check (e.g. DB down → 503)', async () => {
             health.check.mockRejectedValueOnce(new Error('service unavailable'));
             await expect(controller.ready()).rejects.toThrow('service unavailable');

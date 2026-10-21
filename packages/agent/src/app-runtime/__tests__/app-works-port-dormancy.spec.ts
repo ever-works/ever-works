@@ -329,6 +329,10 @@ const BOUND: readonly string[] = [
     // register like any other port — a new token in NEITHER list fails the
     // "classifies every token …" case below.
     'BUILD_REPOSITORY_FACTS_SOURCE',
+    // 2026-10-18 (#2783) — GitHub's own answer on repository visibility when the
+    // facts source can only give its `private` fail-safe; provided by
+    // `AppBuildsModule` (`createGitHubRepositoryVisibilityProbe`).
+    'BUILD_REPOSITORY_VISIBILITY_PROBE',
     // 2026-10-17 (A0.4) — the build plugin's resolved Work settings, lazily over
     // `PluginSettingsService`; provided by `AppBuildsModule` beside the two above.
     'BUILD_SETTINGS_SOURCE',
@@ -578,8 +582,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         // bound by `AppWorksModule`.
         // 29/45 → 28/46 the same day (lane aw-env-smtp): `APP_ENV_ACTIVITY` is bound by
         // `AppEnvModule` to `AppEnvActivityService` (APW-07 T26).
+        // 28/46 → 28/47 the same day (#2783): `BUILD_REPOSITORY_VISIBILITY_PROBE` is a new
+        // port, born bound by `AppBuildsModule` — nothing moved from UNBOUND.
         expect(UNBOUND).toHaveLength(28);
-        expect(BOUND).toHaveLength(46);
+        expect(BOUND).toHaveLength(47);
     });
 
     it('names where the worker binds what this package does not', () => {
