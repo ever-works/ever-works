@@ -56,12 +56,19 @@ export type HandoffCheckoutChoice =
     | { mode: 'clone' }
     | { mode: 'none' };
 
-/** The choice a computer's checkout step starts on (FR-5, U7). */
+/**
+ * The choice a computer's checkout step starts on (FR-5, U7). A checkout
+ * already on the Task's branch (an earlier session's worktree) is reused as
+ * it is — FL-06's Task-branch reuse: a second worktree would get a suffixed
+ * branch from FL-14's never-reuse rule and leave the Task's own branch.
+ */
 export function initialCheckoutChoice(
     step: FleetHandoffNodeCheckouts | undefined,
-    task: Pick<FleetHandoffTask, 'repoUrl'>,
+    task: Pick<FleetHandoffTask, 'repoUrl'> & { branch?: string | null },
 ): HandoffCheckoutChoice {
     if (!step) return task.repoUrl ? { mode: 'clone' } : { mode: 'none' };
+    const onTaskBranch = task.branch ? step.matching.find((row) => row.branch === task.branch) : undefined;
+    if (onTaskBranch) return { mode: 'existing', checkoutId: onTaskBranch.checkoutId };
     const firstMatching = step.matching[0];
     const firstOther = step.others[0];
     switch (step.defaultMode) {
