@@ -65,6 +65,7 @@ import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfac
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
 import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
 import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import { createCheckoutsModule } from './link/modules/checkouts';
@@ -881,7 +882,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.now ? { now: io.now } : {})
 		});
 		portsModule = createPortsModule({
-			runner: io.runner,
+			// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+			// `docker ps --format` carries braces and tabs a shell would split.
+			runner: createMachineCommandRunner(),
 			platform: io.environment.platform,
 			homedir: osHomedir(),
 			nodeName: config.name?.trim() || 'this computer',

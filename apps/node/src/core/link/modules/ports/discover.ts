@@ -43,6 +43,8 @@ export const PORT_DISCOVERY_TIMEOUT_MS = 8_000;
 /** The PowerShell script: listeners and their processes as one JSON array. */
 export const WINDOWS_PORTS_SCRIPT = [
 	"$ErrorActionPreference = 'Stop'",
+	"$ProgressPreference = 'SilentlyContinue'",
+	'[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
 	'$names = @{}',
 	'foreach ($p in Get-Process) {',
 	'  $path = $null',
