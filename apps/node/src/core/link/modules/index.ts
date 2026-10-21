@@ -22,11 +22,23 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 * refuses every session channel `unsupported_on_node`.
 	 */
 	session?: NodeModule;
+	/**
+	 * Servers and ports (FL-10) — the `ports` module (`ports.list`,
+	 * `ports.open`), built by the runtime around the machine's runner and its
+	 * preview browser (`createPortsModule`). Absent without `--manage`.
+	 */
+	ports?: NodeModule;
+	/**
+	 * The `desktop` family (`createDesktopFamilyModule`): its `preview` source
+	 * is FL-10's; FL-07 adds the Agent-browser and desktop sources to the same
+	 * module. Absent, every `desktop` channel is refused as an unknown family.
+	 */
+	desktop?: NodeModule;
 }
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], session, ...machineOptions } = options;
+	const { extra = [], session, ports, desktop, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
@@ -37,6 +49,8 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		machine,
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
+		...(ports ? [ports] : []),
+		...(desktop ? [desktop] : []),
 		...extra
 	]);
 	return composed;
@@ -46,6 +60,8 @@ export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from 
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
+export { createDesktopFamilyModule, type DesktopFamilySources, type DesktopSourceOpener } from './desktop';
+export { createPortsModule, type PortsModule, type PortsModuleOptions } from './ports';
 export {
 	composeNodeModules,
 	MachineVerbError,

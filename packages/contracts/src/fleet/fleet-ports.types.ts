@@ -19,6 +19,14 @@
 /** Capability tag: listening-port discovery is available (a discovery tool exists, `--manage`). */
 export const FLEET_PORTS_CAPABILITY = 'ports';
 
+/**
+ * Capability tag: **Open on the desktop** can work on this machine — the node
+ * runs with `--attend` and has a desktop opener (FL-07's helper, or the node
+ * itself running in a desktop session). The Open menu enables the desktop
+ * target only with it.
+ */
+export const FLEET_PORTS_DESKTOP_OPEN_CAPABILITY = 'ports-desktop';
+
 /** The `machine` verbs of this epic (CONTRACTS §3.3). `ports.list` answers to `view`, the others to `ports`. */
 export const FLEET_PORTS_LINK_VERBS = {
 	list: 'ports.list',
@@ -169,6 +177,8 @@ export interface FleetPortOpenParams {
 	scheme?: 'http' | 'https';
 	/** Preview profile only: the live-view id the platform then opens the `desktop` channel with. */
 	viewId?: string;
+	/** Preview profile only: who opened it, as a `busy` answer names them ("Ops is previewing :5173"). */
+	holder?: string;
 }
 
 /** What the node answers `ports.open` with. */

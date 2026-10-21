@@ -45,7 +45,7 @@ import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoo
 import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
-import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
+import { HeadlessBrowserCaptureBackend, HeadlessPreviewBrowser } from './screen/headless-browser-backend';
 import type { FleetConsents } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
@@ -53,6 +53,10 @@ import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-so
 import { composeNodeLinkModules } from './link/modules';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createDesktopFamilyModule } from './link/modules/desktop';
+import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
+import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import type { ConnectFn } from './sessions/daemon-client';
 import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
@@ -553,6 +557,18 @@ export interface CreateNodeRuntimeOptions {
 	nodeLink?: boolean;
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
+	/**
+	 * Servers and ports (FL-10) — where the owner-level preview browser profile
+	 * lives; defaults to `~/.ever-works/preview-profile` (R-3), beside the Agent
+	 * profiles, never inside them.
+	 */
+	previewProfileRoot?: string;
+	/**
+	 * Servers and ports (FL-10) — the opener behind "Open on the desktop".
+	 * Undefined = the system opener when this process runs in a desktop session
+	 * with `--attend`; null = none (FL-07's helper binds its own when it lands).
+	 */
+	portsDesktopOpener?: DesktopUrlOpener | null;
 	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
@@ -730,6 +746,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions = { supervisor, module: sessionModule };
 		telemetry.sessionDaemon = () => supervisor.report();
 	}
+	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
+	// preview source, for a process started with `--manage`. The preview
+	// browser is the probed one in an owner-level profile beside — never
+	// inside — the Agent profiles (R-3); without a browser it refuses with the
+	// sentence spec U10 gives. Open on the desktop uses the system opener only
+	// when the node itself runs in a desktop session with `--attend`, until
+	// FL-07's helper binds its own.
+	let portsModule: PortsModule | null = null;
+	let desktopModule: NodeModule | null = null;
+	if (consents.manage) {
+		const previewWebSockets =
+			options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+		const browserPath = io.environment.browserPath;
+		const restrictPreview =
+			options.restrictProfileDir ??
+			(io.environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+		const previewFs = createAgentProfileFs();
+		const preview = new PreviewBrowserManager({
+			starter: browserPath
+				? new HeadlessPreviewBrowser({ browserPath, webSocketFactory: previewWebSockets })
+				: null,
+			root: options.previewProfileRoot ?? defaultPreviewProfileRoot(options.env ?? process.env),
+			mkdir: (path) => previewFs.mkdir(path),
+			...(restrictPreview ? { restrictToOwner: restrictPreview } : {}),
+			nodeName: config.name?.trim() || 'this computer',
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		portsModule = createPortsModule({
+			runner: io.runner,
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			nodeName: config.name?.trim() || 'this computer',
+			attend: consents.attend,
+			desktopOpener:
+				options.portsDesktopOpener !== undefined
+					? options.portsDesktopOpener
+					: consents.attend && io.environment.hasDisplay
+						? createSystemBrowserOpener(io.runner, io.environment.platform)
+						: null,
+			preview,
+			logger: io.logger,
+			...(io.now ? { now: io.now } : {})
+		});
+		desktopModule = createDesktopFamilyModule({ preview: portsModule.previewSource });
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -737,6 +800,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const linkModules = composeNodeLinkModules({
 		...(options.linkModules ? { extra: options.linkModules } : {}),
 		...(sessions ? { session: sessions.module } : {}),
+		...(portsModule ? { ports: portsModule } : {}),
+		...(desktopModule ? { desktop: desktopModule } : {}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),

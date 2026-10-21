@@ -72,7 +72,7 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
-	// Servers and ports (FL-10, CONTRACTS ง7).
+	// Servers and ports (FL-10, CONTRACTS ยง7).
 	'node.port.open',
 	'node.port.preview.open',
 	'node.port.preview.close'
