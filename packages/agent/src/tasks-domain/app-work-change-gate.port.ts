@@ -43,11 +43,33 @@ export const APP_WORK_CHANGE_GATE = Symbol('APP_WORK_CHANGE_GATE');
  */
 export const APP_WORK_SPEC_PATH = '.works/works.yml';
 
+/**
+ * Works-security (2026-10-18) — `agents.requireHumanMergePaths` ("paths whose
+ * changes only a person may merge, whatever the merge policy says") was
+ * resolved into the Work's rules and then read by nobody, so a Work whose
+ * policy lets agents merge on green CI merged a change the spec said a person
+ * must merge. The change guard now names the matching paths on an allowed
+ * verdict and `TaskMergeGateService` raises a recorded human approval for
+ * them. Declared HERE (no runtime imports) so the merge gate can read it
+ * without importing `app-works/`. On unless the operator sets it to `false`.
+ */
+export const APP_HUMAN_MERGE_PATHS_ENV = 'APP_HUMAN_MERGE_PATHS_ENFORCED' as const;
+
+/** Default-safe: only an explicit `false` stops the merge gate asking a person. */
+export function appHumanMergePathsEnforced(): boolean {
+    return (process.env[APP_HUMAN_MERGE_PATHS_ENV] ?? '').trim().toLowerCase() !== 'false';
+}
+
 /** What the finalize path hands the gate. Every value is one it resolved itself. */
 export interface AppWorkChangeGateInput {
     readonly work: Work;
-    /** The Task's labels; only APW-04's `app-provision` exemption reads them. */
-    readonly taskLabels: readonly string[];
+    /**
+     * The Task's server-written provenance (`Task.origin`); only APW-04's
+     * provisioning exemption reads it (`'app-provisioning'`). Never the Task's
+     * labels: those are free-form and writable by any Task-PATCH caller
+     * (works-security 2026-10-18). `null` = an ordinary Task.
+     */
+    readonly taskOrigin: string | null;
     readonly owner: string;
     readonly repo: string;
     readonly gitOptions: { userId: string; providerId: string; workId: string };
@@ -62,7 +84,17 @@ export interface AppWorkChangeGateInput {
  * Task to transition and a message to post, not a stack trace to surface.
  */
 export type AppWorkChangeGateVerdict =
-    | { readonly allowed: true; readonly note: string | null }
+    | {
+          readonly allowed: true;
+          readonly note: string | null;
+          /**
+           * Works-security (2026-10-18) — the changed paths matching the base
+           * commit's `agents.requireHumanMergePaths`, present only when
+           * non-empty: the change may be a pull request, but only a person may
+           * merge it (the merge gate raises the approval).
+           */
+          readonly humanMergePaths?: readonly string[];
+      }
     | { readonly allowed: false; readonly message: string; readonly paths: readonly string[] };
 
 /**
@@ -110,11 +142,12 @@ export interface AppWorkChangePathsInput {
      */
     readonly contents?: Readonly<Record<string, string>>;
     /**
-     * The Task's labels, for APW-04's `app-provision` exemption — so the
-     * pre-push verdict on the cloud path equals `evaluate`'s for every rule the
-     * two share. Absent (the `commitToRepo` tool) is no labels.
+     * The Task's server-written provenance (`Task.origin`), for APW-04's
+     * provisioning exemption — so the pre-push verdict on the cloud path equals
+     * `evaluate`'s for every rule the two share. Absent (the `commitToRepo`
+     * tool) is no exemption.
      */
-    readonly taskLabels?: readonly string[];
+    readonly taskOrigin?: string | null;
 }
 
 export interface AppWorkChangeGate {

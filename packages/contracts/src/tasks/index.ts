@@ -4,3 +4,4 @@ export * from './repo-declared-commands.types.js';
 export * from './task-board-columns.types.js';
 export * from './task-board-stall.types.js';
 export * from './task-board-provenance.types.js';
+export * from './task-reserved-labels.types.js';

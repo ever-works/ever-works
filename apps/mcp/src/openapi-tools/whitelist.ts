@@ -27,6 +27,17 @@ export interface WhitelistEntry {
 	 * tool until someone lists them (works-security lane 3a).
 	 */
 	bodyArgs?: readonly string[];
+	/**
+	 * Works-security (2026-10-18) — the tool writes Task `labels`, and must
+	 * not add or remove a RESERVED one (`awaiting-owner`, `app-provision`,
+	 * `release:*`, `provision-attempt-*`; `@ever-works/contracts`
+	 * `isReservedTaskLabel`). `create`: none may be sent. `update`: the
+	 * handler reads the Task first and refuses a list that differs from it in
+	 * any reserved label. The API cannot tell an MCP call from the owner's own
+	 * session when the server forwards the caller's JWT, so the check lives
+	 * here. Off with `TASK_RESERVED_LABELS_ENFORCED=false`.
+	 */
+	reservedTaskLabels?: 'create' | 'update';
 }
 
 /**
@@ -375,11 +386,18 @@ export const WHITELIST: WhitelistEntry[] = [
 	// caller could plant the command the next run executes, so both tools lose
 	// the field too; the API refuses it for fleet-run tokens and integration
 	// keys, and a person adds checks in the app.
+	//
+	// `labels` stay writable, but never a reserved one (works-security
+	// 2026-10-18): `awaiting-owner` holds a Task for its owner, `release:*`
+	// forces a human approval on a promotion / revert, `provision-attempt-*`
+	// is a retry cap. An agent steered by injected text must not lift a hold
+	// or drop an approval by rewriting the list (`reservedTaskLabels`).
 	{
 		method: 'POST',
 		path: '/api/tasks',
 		toolName: 'create_task',
-		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks'],
+		reservedTaskLabels: 'create'
 	},
 	{ method: 'POST', path: '/api/tasks/run-batch', toolName: 'run_tasks_batch' },
 	{
@@ -392,7 +410,8 @@ export const WHITELIST: WhitelistEntry[] = [
 		method: 'PATCH',
 		path: '/api/tasks/{id}',
 		toolName: 'update_task',
-		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks'],
+		reservedTaskLabels: 'update'
 	},
 	{
 		method: 'DELETE',
