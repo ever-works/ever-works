@@ -1,5 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Injectable, Logger } from '@nestjs/common';
+import type { Duplex } from 'node:stream';
+import {
+    Injectable,
+    Logger,
+    OnApplicationBootstrap,
+    OnApplicationShutdown,
+    Optional,
+} from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
 import { config } from '@ever-works/agent/config';
 import { FleetNodeRepository, FleetPortTunnelService } from '@ever-works/agent/fleet';
 import {
@@ -13,8 +21,9 @@ import {
     rewriteFleetPortTunnelLocation,
     stripFleetPortTunnelCookies,
 } from '@ever-works/contracts';
-import { FleetPortTunnelBridge } from './fleet-port-tunnel.bridge';
+import { FleetPortTunnelBridge, type TunnelUpgradeHandle } from './fleet-port-tunnel.bridge';
 import { fleetPortTunnelAuthCookieName, FleetPortTunnelTokens } from './fleet-port-tunnel-tokens';
+import { isFleetPreviewHostRequest } from './preview-host.match';
 import { renderPreviewHostPage, type PreviewHostPage } from './preview-host.pages';
 
 /**
@@ -75,15 +84,29 @@ async function* emptyBody(): AsyncIterable<Buffer> {
     // a request without a body
 }
 
+/** Answer an upgrade we will not pass through, then drop the socket. */
+function refuseUpgrade(socket: Duplex, status: number): void {
+    if (socket.destroyed) return;
+    try {
+        socket.write(`HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    } catch {
+        // gone
+    }
+    socket.destroy();
+}
+
 @Injectable()
-export class FleetPreviewHostHandler {
+export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplicationShutdown {
     private readonly logger = new Logger(FleetPreviewHostHandler.name);
+    private upgradeListener: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | null = null;
 
     constructor(
         private readonly tunnels: FleetPortTunnelService,
         private readonly bridge: FleetPortTunnelBridge,
         private readonly tokens: FleetPortTunnelTokens,
         private readonly nodes: FleetNodeRepository,
+        // Phase 3 — the HTTP server whose upgrades it listens to. APPENDED LAST + @Optional().
+        @Optional() private readonly adapterHost?: HttpAdapterHost,
     ) {}
 
     /** The Express middleware `main.ts` mounts. */
@@ -286,6 +309,137 @@ export class FleetPreviewHostHandler {
                 },
             );
         });
+    }
+
+    // ─── Phase 3 (FR-32): WebSocket upgrades on the preview host ───────────
+
+    onApplicationBootstrap(): void {
+        const httpServer = this.adapterHost?.httpAdapter?.getHttpServer?.();
+        if (!httpServer || typeof httpServer.on !== 'function') return;
+        this.upgradeListener = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+            if (!isFleetPreviewHostRequest(req)) return; // another gateway's
+            this.handleUpgrade(req, socket, head).catch((error: unknown) => {
+                this.logger.debug(
+                    `preview host upgrade failed: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                refuseUpgrade(socket, 502);
+            });
+        };
+        httpServer.on('upgrade', this.upgradeListener);
+    }
+
+    onApplicationShutdown(): void {
+        const httpServer = this.adapterHost?.httpAdapter?.getHttpServer?.();
+        if (httpServer && this.upgradeListener) httpServer.off?.('upgrade', this.upgradeListener);
+    }
+
+    /**
+     * A tunnelled page's own WebSocket (a dev server's hot reload, spec S12):
+     * the same tunnel and owner checks as a request, then the upgrade is passed
+     * through to the loopback port and the two byte streams are relayed raw
+     * until either side ends. An open socket counts as activity for the idle
+     * clock (FR-32): the tunnel is touched every minute while it is open.
+     */
+    private async handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
+        const previewHost = config.fleet.getPortPreviewHost();
+        if (!previewHost || !config.fleet.isPortTunnelEnabled()) return refuseUpgrade(socket, 404);
+        const url = new URL(req.url ?? '/', `https://${previewHost}`);
+        const cookies = parseCookies(req.headers.cookie);
+        const match = TUNNEL_PATH.exec(url.pathname);
+        let tunnelId: string;
+        let path: string;
+        if (match && match[2] !== undefined) {
+            tunnelId = match[1].toLowerCase();
+            path = match[2];
+        } else {
+            const sticky = cookies.get(FLEET_PORT_TUNNEL_COOKIE);
+            if (!sticky || !/^[0-9a-f-]{36}$/.test(sticky)) return refuseUpgrade(socket, 404);
+            tunnelId = sticky;
+            path = url.pathname;
+        }
+        const userId = this.tokens.readCookie(cookies.get(fleetPortTunnelAuthCookieName(tunnelId)), tunnelId);
+        if (!userId) return refuseUpgrade(socket, 401);
+        const decision = await this.tunnels.authorizeRequest(tunnelId, userId);
+        if (!decision.ok) return refuseUpgrade(socket, decision.why === 'not-yours' ? 403 : 404);
+        const tunnel = decision.tunnel;
+
+        const headers = filterFleetPortTunnelHeaders(
+            req.headers as Record<string, unknown>,
+            FLEET_PORT_TUNNEL_DROPPED_REQUEST_HEADERS.filter((name) => name !== 'connection' && name !== 'upgrade'),
+        );
+        delete headers.cookie;
+        const appCookies = stripFleetPortTunnelCookies(req.headers.cookie ?? '', PLATFORM_COOKIE_NAMES);
+        if (appCookies.length > 0) headers.cookie = appCookies;
+
+        let bytesIn = 0;
+        let bytesOut = 0;
+        let ended = false;
+        let accepted = false;
+        let handle: TunnelUpgradeHandle | null = null;
+        const early: Buffer[] = [];
+        const activity = setInterval(() => {
+            void this.tunnels.touch(tunnel.id, { requests: 0, bytesIn, bytesOut });
+            bytesIn = 0;
+            bytesOut = 0;
+        }, 60_000);
+        activity.unref?.();
+        const finish = () => {
+            if (ended) return;
+            ended = true;
+            clearInterval(activity);
+            handle?.end();
+            void this.tunnels.touch(tunnel.id, { requests: 1, bytesIn, bytesOut });
+            if (!socket.destroyed) socket.destroy();
+        };
+        socket.on('error', finish);
+        socket.on('close', finish);
+        socket.on('data', (chunk: Buffer) => {
+            bytesIn += chunk.length;
+            if (!accepted || !handle) early.push(chunk);
+            else if (!handle.send(chunk)) finish();
+        });
+        if (head.length > 0) early.push(head);
+
+        handle = await this.bridge.upgrade(
+            {
+                tunnel: { id: tunnel.id, nodeId: tunnel.nodeId, port: tunnel.port, ownerUserId: tunnel.ownerUserId },
+                path,
+                query: url.search.startsWith('?') ? url.search.slice(1) : url.search,
+                headers,
+            },
+            {
+                onAccept: (status, upstream) => {
+                    if (ended) return;
+                    accepted = true;
+                    const lines = [`HTTP/1.1 ${status === 101 ? '101 Switching Protocols' : `${status} Upgrade`}`];
+                    for (const [name, value] of Object.entries(upstream)) {
+                        for (const one of Array.isArray(value) ? value : [value]) {
+                            if (/[\r\n]/.test(one) || /[\r\n:]/.test(name)) continue;
+                            lines.push(`${name}: ${one}`);
+                        }
+                    }
+                    socket.write(`${lines.join('\r\n')}\r\n\r\n`);
+                    for (const chunk of early.splice(0)) handle?.send(chunk);
+                },
+                onRefused: (status) => {
+                    refuseUpgrade(socket, status >= 400 && status <= 599 ? status : 502);
+                    finish();
+                },
+                onResponse: () => undefined,
+                onData: (bytes) => {
+                    if (ended) return;
+                    bytesOut += bytes.byteLength;
+                    socket.write(Buffer.from(bytes));
+                },
+                onEnd: () => finish(),
+                onError: (_code, hint) => {
+                    this.logger.debug(`tunnel ${tunnel.id} upgrade: ${hint}`);
+                    if (!accepted) refuseUpgrade(socket, 502);
+                    finish();
+                },
+            },
+        );
+        if (!handle && !ended) finish();
     }
 
     /** The computer's name for the "ended" page's sentence (the cookie already named its owner). */

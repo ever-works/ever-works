@@ -14119,7 +14119,10 @@
                 "failed": "Could not open the preview",
                 "openedByAgent": "opened by an agent for you",
                 "egressBilled": "Egress on this cloud computer is billed by its provider."
-            }
+            },
+            "watch": "Watch",
+            "watchStopped": "The server on :{port} on {name} stopped",
+            "dismiss": "Dismiss"
         },
         "logs": {
             "palette": "Logs on {name}",
