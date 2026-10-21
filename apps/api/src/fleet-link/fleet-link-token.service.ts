@@ -23,6 +23,20 @@ import { TerminalAttachService } from '../terminal/terminal-attach.service';
  * credential rotation kills every link token minted before it.
  */
 
+/**
+ * Added to the lifetime of a token's single-use claim (L4): the claim is set
+ * with the claiming replica's clock, while another replica decides "expired"
+ * with its own. A replica whose clock runs behind would otherwise still accept
+ * the token after the claim lapsed. Generous next to NTP skew; a claim key
+ * costs a few bytes for one more minute.
+ */
+export const FLEET_LINK_CLAIM_SKEW_MARGIN_MS = 60_000;
+
+/** How long a token's single-use claim must be held: until it expires on every replica's clock. */
+export function fleetLinkClaimTtlMs(expiresAtMs: number, now: number = Date.now()): number {
+    return Math.max(1, expiresAtMs - now) + FLEET_LINK_CLAIM_SKEW_MARGIN_MS;
+}
+
 /** Records a token id once; answers false for one already seen. */
 export interface FleetLinkReplayGuard {
     /** True the first time `jti` is seen within `ttlMs`; false after. */
@@ -48,6 +62,23 @@ export class InProcessFleetLinkReplayGuard implements FleetLinkReplayGuard {
 }
 
 /**
+ * The replay guard over the relay bus (FL-02 P1b): with Valkey a token's
+ * `jti` is claimed with `SET … NX PX`, so a token is single-use across every
+ * API replica; with the single-replica bus, in this process. A bus that
+ * cannot answer throws, and the token is refused.
+ */
+export class RelayBusFleetLinkReplayGuard implements FleetLinkReplayGuard {
+    constructor(
+        private readonly bus: { claimOnce(key: string, ttlMs: number): Promise<boolean> },
+        private readonly scope = 'fleet-link',
+    ) {}
+
+    claim(jti: string, ttlMs: number): Promise<boolean> {
+        return this.bus.claimOnce(`${this.scope}:jti:${jti}`, ttlMs);
+    }
+}
+
+/**
  * Works-security (run-token scope, 2026-10-18) — the SHARED replay guard: a
  * token id is claimed by INSERTing a primary-keyed row into `cache_entries`
  * (the table `DistributedTaskLockService` already uses as its cross-replica
@@ -55,10 +86,10 @@ export class InProcessFleetLinkReplayGuard implements FleetLinkReplayGuard {
  * the one that saw the first. An expired claim for the same key is swept on
  * the way in.
  *
- * The relay bus this module once expected (Valkey, `FLEET_RELAY_REQUIRE_BUS`)
- * was never built, so `FLEET_LINK_REPLAY_GUARD` was never bound and every
- * replica kept its own in-process map: with N replicas one token opened N
- * links. The database every replica already shares is the store.
+ * It is the binding when no Valkey relay bus is configured: the single-
+ * replica bus claims in its own process, so with two replicas and no bus one
+ * token would open one link per replica. The database every replica already
+ * shares is the store then.
  */
 export class CacheEntryFleetLinkReplayGuard implements FleetLinkReplayGuard {
     constructor(
@@ -114,9 +145,11 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * The replay guard binding. `FleetLinkApiModule` binds it to
- * {@link CacheEntryFleetLinkReplayGuard} (shared across replicas); the
- * in-process guard is only the fallback for a graph without one (unit tests).
+ * Bound to the relay bus's guard when Valkey is configured (so a token is
+ * single-use across replicas); otherwise to {@link CacheEntryFleetLinkReplayGuard}
+ * (works-security: the shared database, so two replicas without the bus are
+ * still one store); the in-process guard only for a graph with neither (unit
+ * tests). See `FleetLinkApiModule`.
  */
 export const FLEET_LINK_REPLAY_GUARD = 'FLEET_LINK_REPLAY_GUARD' as const;
 
@@ -214,7 +247,7 @@ export class FleetLinkTokenService {
                     return false;
                 }
             }
-            return await this.replay.claim(claims.jti, Math.max(1, claims.exp - Date.now()));
+            return await this.replay.claim(claims.jti, fleetLinkClaimTtlMs(claims.exp));
         } catch {
             // A guard that cannot answer must not let a token through twice.
             return false;

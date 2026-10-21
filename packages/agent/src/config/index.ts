@@ -721,6 +721,20 @@ export const config = {
             return process.env.FLEET_NODE_LINK_ENABLED === 'true';
         },
         /**
+         * Sessions on computers (FL-04, CONTRACTS §9) — `FLEET_SESSIONS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**sessions**` route answers 404 (the surface is
+         * not even confirmed) and node reports on the link are dropped. A
+         * session needs the node link, so the link flag gates the machine
+         * calls on its own. Read per call: flipping it needs no restart.
+         */
+        isSessionsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_SESSIONS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single
@@ -728,6 +742,20 @@ export const config = {
          */
         isRelayBusRequired(): boolean {
             return process.env.FLEET_RELAY_REQUIRE_BUS === 'true';
+        },
+        /**
+         * Fleet node link (FL-02, CONTRACTS R-7) — the cross-replica relay
+         * bus's kill switch (`FLEET_RELAY_BUS_ENABLED`). On unless set to
+         * `false`, `0` or `off` (any case): with a Redis URL configured the
+         * terminal relay, the computer live view and the node link then fan
+         * out over Valkey. Off keeps every relay in-process (the behaviour
+         * before the bus existed) even when `REDIS_URL` is set — for an
+         * operator who needs the bus off without a code change. Read once,
+         * at boot.
+         */
+        isRelayBusEnabled(): boolean {
+            const raw = (process.env.FLEET_RELAY_BUS_ENABLED || '').trim().toLowerCase();
+            return !(raw === 'false' || raw === '0' || raw === 'off');
         },
         /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
         getMaxCapabilityTags(): number {

@@ -39,16 +39,27 @@ const node = (over: Partial<FleetNodeView> & { health?: unknown } = {}): FleetNo
         ...over,
     }) as FleetNodeView;
 
-const cards = () => screen.getAllByTestId(/^fleet-computer-card-(?!state|favourite|health|shared|host)/);
+const cards = () =>
+    screen.getAllByTestId(/^fleet-computer-card-(?!state|favourite|health|shared|host)/);
 
 describe('ComputerCards', () => {
     it('lists favourites first, then online by most recent check, then the rest', () => {
         render(
             <ComputerCards
                 nodes={[
-                    node({ id: 'w', name: 'win-lab', status: 'offline', lastHeartbeatAt: '2026-10-01T00:00:00.000Z' }),
+                    node({
+                        id: 'w',
+                        name: 'win-lab',
+                        status: 'offline',
+                        lastHeartbeatAt: '2026-10-01T00:00:00.000Z',
+                    }),
                     node({ id: 'b2', name: 'build-02' }),
-                    node({ id: 'b1', name: 'build-01', isFavorite: true, lastHeartbeatAt: '2026-10-17T00:00:00.000Z' }),
+                    node({
+                        id: 'b1',
+                        name: 'build-01',
+                        isFavorite: true,
+                        lastHeartbeatAt: '2026-10-17T00:00:00.000Z',
+                    }),
                 ]}
             />,
         );
@@ -71,7 +82,13 @@ describe('ComputerCards', () => {
     it('shows the snapshot’s numbers when there is one', () => {
         render(
             <ComputerCards
-                nodes={[node({ id: 'a', name: 'a', health: { cpuPercent: 31, memPercent: 58, diskPercent: 40, at: recent } })]}
+                nodes={[
+                    node({
+                        id: 'a',
+                        name: 'a',
+                        health: { cpuPercent: 31, memPercent: 58, diskPercent: 40, at: recent },
+                    }),
+                ]}
             />,
         );
         expect(screen.getByTestId('fleet-computer-card-health')).toHaveTextContent('31%');
@@ -82,13 +99,21 @@ describe('ComputerCards', () => {
             <ComputerCards
                 nodes={[
                     node({ id: 'h', name: 'build-01' }),
-                    node({ id: 'v', name: 'win-11-vm', status: 'offline', hostNodeId: 'h', virtualKind: 'vm' }),
+                    node({
+                        id: 'v',
+                        name: 'win-11-vm',
+                        status: 'offline',
+                        hostNodeId: 'h',
+                        virtualKind: 'vm',
+                    }),
                 ]}
             />,
         );
         const host = screen.getByTestId('fleet-computer-card-h').closest('li') as HTMLElement;
         expect(within(host).getByTestId('fleet-computer-card-v')).toBeInTheDocument();
-        expect(within(host).getByTestId('fleet-computer-card-host')).toHaveTextContent('overview.computers.nestedVm:build-01');
+        expect(within(host).getByTestId('fleet-computer-card-host')).toHaveTextContent(
+            'overview.computers.nestedVm:build-01',
+        );
     });
 
     it('always says the state in words beside the dot, and marks a shared computer', () => {
@@ -100,15 +125,28 @@ describe('ComputerCards', () => {
                 ]}
             />,
         );
-        expect(within(screen.getByTestId('fleet-computer-card-q')).getByTestId('fleet-computer-card-state')).toHaveTextContent(
-            'states.quarantined',
-        );
-        expect(within(screen.getByTestId('fleet-computer-card-s')).getByTestId('fleet-computer-card-shared')).toBeInTheDocument();
-        expect(within(screen.getByTestId('fleet-computer-card-q')).queryByTestId('fleet-computer-card-shared')).toBeNull();
+        expect(
+            within(screen.getByTestId('fleet-computer-card-q')).getByTestId(
+                'fleet-computer-card-state',
+            ),
+        ).toHaveTextContent('states.quarantined');
+        expect(
+            within(screen.getByTestId('fleet-computer-card-s')).getByTestId(
+                'fleet-computer-card-shared',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(screen.getByTestId('fleet-computer-card-q')).queryByTestId(
+                'fleet-computer-card-shared',
+            ),
+        ).toBeNull();
     });
 
     it('links each card to the computer’s page', () => {
         render(<ComputerCards nodes={[node({ id: 'n1', name: 'build-01' })]} />);
-        expect(screen.getByTestId('fleet-computer-card-n1')).toHaveAttribute('href', '/fleet/computers/n1');
+        expect(screen.getByTestId('fleet-computer-card-n1')).toHaveAttribute(
+            'href',
+            '/fleet/computers/n1',
+        );
     });
 });

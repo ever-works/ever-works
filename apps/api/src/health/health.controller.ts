@@ -1,4 +1,4 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, Inject, Optional } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
     HealthCheck,
@@ -12,6 +12,7 @@ import { getBuildInfo, BuildInfo } from './build-info';
 import { detectInformationalServices, getRedisUrl } from './service-detection';
 import { RedisHealthIndicator } from './indicators/redis.indicator';
 import { ConfiguredServiceHealthIndicator } from './indicators/configured-service.indicator';
+import { RELAY_BUS, type RelayBus, type RelayBusHealth } from '../relay/relay-bus';
 
 // Tight CSP for JSON-only API endpoints — mirrors APIController. The
 // csp-strict e2e contract pins that EVERY API surface declares a CSP, so
@@ -29,7 +30,11 @@ const API_JSON_CSP =
  * - `GET /api/health/live`  — liveness (process up).
  * - `GET /api/health/ready` — readiness: DB (+ Redis if configured) are
  *   critical; AI/Sentry/PostHog/Trigger.dev/Stripe/email/storage are
- *   reported informationally. Embeds the version block on success.
+ *   reported informationally. Embeds the version block on success, and the
+ *   relay bus as `fleet_relay: { configured, mode, status }` (FL-02,
+ *   CONTRACTS R-7) — a top-level key beside `version`, because Terminus
+ *   reserves `status` inside an indicator. It never fails readiness: a
+ *   configured bus that is down already fails the critical `redis` check.
  *
  * All endpoints are `@Public()` (k8s probes + the unauthenticated web footer
  * call them) and JSON-only, so the response is safe to expose publicly: it
@@ -43,6 +48,9 @@ export class HealthController {
         private readonly db: TypeOrmHealthIndicator,
         private readonly redis: RedisHealthIndicator,
         private readonly services: ConfiguredServiceHealthIndicator,
+        // FL-02 — the relay bus. Appended LAST + @Optional(): unbound, the
+        // answer is read from the environment alone.
+        @Optional() @Inject(RELAY_BUS) private readonly relayBus?: RelayBus,
     ) {}
 
     @Public()
@@ -83,7 +91,9 @@ export class HealthController {
     })
     @ApiResponse({ status: 200, description: 'API is ready; details list per-dependency status' })
     @ApiResponse({ status: 503, description: 'A critical dependency is unavailable' })
-    async ready(): Promise<HealthCheckResult & { version: BuildInfo }> {
+    async ready(): Promise<
+        HealthCheckResult & { version: BuildInfo; fleet_relay: RelayBusHealth }
+    > {
         const checks: HealthIndicatorFunction[] = [
             () => this.db.pingCheck('database', { timeout: 3000 }),
         ];
@@ -97,6 +107,20 @@ export class HealthController {
         }
 
         const result = await this.health.check(checks);
-        return { ...result, version: getBuildInfo() };
+        return { ...result, version: getBuildInfo(), fleet_relay: this.relayHealth() };
+    }
+
+    /** `fleet_relay` — the bus as it runs, or (no bus bound here) as the environment configures it. */
+    private relayHealth(): RelayBusHealth {
+        if (this.relayBus) {
+            try {
+                return this.relayBus.health();
+            } catch {
+                // fall through to the configuration's answer
+            }
+        }
+        return getRedisUrl()
+            ? { configured: true, mode: 'valkey', status: 'degraded' }
+            : { configured: false, mode: 'single-replica', status: 'up' };
     }
 }

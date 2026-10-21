@@ -3,16 +3,51 @@
 	"compose": ["../../docker-compose.yml", "compose.egress-audit.yml"],
 	"project": "ever-audit-works",
 	"api_service": "ever-works-api",
-	"process_services": ["ever-works-api"],
-	"services": ["ever-works-api"],
-	"web_service": null,
-	"no_web_reason": "The web app (apps/web, a separate Next.js service) is not yet built inside the sealed audit network, so this audit covers the API process only; the browser leg is planned (follow-up PR).",
+	"process_services": ["ever-works-api", "ever-works-web"],
+	"services": ["ever-works-api", "ever-works-web"],
+	"web_service": "ever-works-web",
+	"web_url": "http://ever-works-web:3000",
+	"ui_routes": "ui-routes.json",
+	"route_params": "route-params.json",
+	"ui_baseline": "ui-baseline.json",
+	"ui_skip_routes": [
+		{
+			"path": "/:locale/templates",
+			"reason": "Template previews come from opengraph.githubassets.com through the web app's image optimizer. Inside the sealed network that lookup fails and Next.js logs the error as a multi-line object whose `code: 'ENOTFOUND'` line names no host, so the audit cannot attribute it to the allowed host and counts it as a resolver error. The page returns to the walk once the harness attributes such lines."
+		}
+	],
+	"idle_pages": [
+		"/:locale",
+		"/:locale/settings/ever-platform",
+		"/:locale/settings/integrations/ever-gauzy",
+		"/:locale/settings/connections",
+		"/:locale/catalog"
+	],
+	"idle_s": 30,
+	"ui_page_timeout_s": 90,
+	"ui_expected_requests": {
+		"positive_stats": ["GET /en/settings/ever-platform"]
+	},
 	"health_url": "http://ever-works-api:3100/api/health",
 	"health_timeout_s": 600,
 	"module_routes": ["/api/instance-stats/status", "/api/instance-stats/last"],
 	"adapter": "adapter.mjs",
 	"wait_s": 120,
-	"allowed_external_hosts": [],
+	"allowed_external_hosts": [
+		"api.github.com",
+		"raw.githubusercontent.com",
+		"opengraph.githubassets.com",
+		"cdn.jsdelivr.net",
+		"unpkg.com",
+		"challenges.cloudflare.com",
+		"framerusercontent.com",
+		"jina.ai",
+		"cdn.scrapfly.io",
+		"composio.dev",
+		"www.make.com",
+		"www.sim.ai",
+		"zapier.com"
+	],
 	"modes": {
 		"default_off": {
 			"description": "Nothing about statistics configured, in the container environment or the API's .env file (a fresh self-hosted installation): statistics are off by default, so the module is not loaded, no call, no Ever host looked up, every module route 404.",

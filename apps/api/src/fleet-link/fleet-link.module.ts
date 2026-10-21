@@ -5,19 +5,25 @@ import { CacheEntry } from '@ever-works/agent/entities';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetEnabledGuard } from '../fleet/guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from '../fleet/guards/fleet-node-auth.guard';
+import { RELAY_BUS, type RelayBus } from '../relay/relay-bus';
 import { TerminalModule } from '../terminal/terminal.module';
+import { FleetLinkAttachService } from './fleet-link-attach.service';
 import { RoleBasedFleetLinkAudience } from './fleet-link-audience';
 import { FleetLinkAuthorizer } from './fleet-link.authorizer';
 import { FleetLinkController } from './fleet-link.controller';
 import { FleetLinkGatewayService } from './fleet-link-gateway.service';
 import { FleetLinkRegistry } from './fleet-link.registry';
+import { FleetLinkRemote } from './fleet-link-remote.service';
 import { FleetLinkService } from './fleet-link.service';
 import {
     CacheEntryFleetLinkReplayGuard,
     FLEET_LINK_REPLAY_GUARD,
     FleetLinkTokenService,
+    InProcessFleetLinkReplayGuard,
+    RelayBusFleetLinkReplayGuard,
     type FleetLinkReplayGuard,
 } from './fleet-link-token.service';
+import { FleetLinkViewerGatewayService } from './fleet-link-viewer-gateway.service';
 import {
     FLEET_LINK_AUDIENCE,
     FLEET_LINK_DRAIN_NOTIFIER,
@@ -40,7 +46,14 @@ import { FleetOperationsService } from './fleet-operations.service';
  *   - `FleetLinkAuthorizer` — existence → kill switch → consent → family audience;
  *   - `FleetLinkService` (also `NodeLinkService`) — the one API every epic calls;
  *   - `FleetOperationsService` — long requests by id;
- *   - `FleetLinkController` — `POST /api/fleet/link-token`, `GET|DELETE /api/fleet/operations/:id`.
+ *   - `FleetLinkController` — `POST /api/fleet/link-token`, `GET|DELETE /api/fleet/operations/:id`;
+ *   - `FleetLinkRemote` — the same links across API replicas, over the relay bus;
+ *   - `FleetLinkAttachService` — viewer tokens (each epic's attach route calls it);
+ *   - `FleetLinkViewerGatewayService` — `/ws/fleet/<family>/<target>`, a browser bridged to a channel.
+ *
+ * Single-use tokens (the link's and the viewers') are claimed on the relay
+ * bus (`FLEET_LINK_REPLAY_GUARD`) — or, without a Valkey bus, in the shared
+ * `cache_entries` table — so they stay single-use across replicas.
  *
  * `@Global()` for the reason `ComputerApiModule` documents: four tokens bound
  * HERE are consumed `@Optional()` by modules that must not import this one —
@@ -63,28 +76,48 @@ import { FleetOperationsService } from './fleet-operations.service';
     providers: [
         FleetLinkRegistry,
         FleetLinkTokenService,
-        // Works-security (run-token scope) — link tokens are single-use across
-        // EVERY replica: the replay guard claims a token id in the shared
-        // `cache_entries` table instead of a per-process map.
-        {
-            provide: FLEET_LINK_REPLAY_GUARD,
-            useFactory: (dataSource: DataSource): FleetLinkReplayGuard =>
-                new CacheEntryFleetLinkReplayGuard(dataSource.getRepository(CacheEntry)),
-            inject: [DataSource],
-        },
         FleetOperationsService,
         FleetLinkAuthorizer,
         FleetLinkService,
         FleetLinkGatewayService,
+        FleetLinkRemote,
+        FleetLinkAttachService,
+        FleetLinkViewerGatewayService,
         { provide: FLEET_LINK_AUDIENCE, useClass: RoleBasedFleetLinkAudience },
+        // Single-use tokens stay single-use across EVERY replica: claimed on
+        // the Valkey relay bus when one is configured; otherwise (works-
+        // security, run-token scope) in the shared `cache_entries` table every
+        // replica already reads, so a deployment that runs two replicas
+        // without the bus still cannot open one link per replica with one
+        // token. The in-process map is only the fallback for a graph with
+        // neither (unit tests).
+        {
+            provide: FLEET_LINK_REPLAY_GUARD,
+            useFactory: (bus?: RelayBus, dataSource?: DataSource): FleetLinkReplayGuard => {
+                if (bus && bus.mode === 'valkey') return new RelayBusFleetLinkReplayGuard(bus);
+                if (dataSource) {
+                    return new CacheEntryFleetLinkReplayGuard(dataSource.getRepository(CacheEntry));
+                }
+                return bus ? new RelayBusFleetLinkReplayGuard(bus) : new InProcessFleetLinkReplayGuard();
+            },
+            inject: [
+                { token: RELAY_BUS, optional: true },
+                { token: DataSource, optional: true },
+            ],
+        },
         {
             provide: FLEET_LINK_HEARTBEAT_OBSERVER,
-            useFactory: (registry: FleetLinkRegistry): FleetLinkHeartbeatObserver => ({
+            useFactory: (
+                registry: FleetLinkRegistry,
+                remote: FleetLinkRemote,
+            ): FleetLinkHeartbeatObserver => ({
                 onHeartbeat: (nodeId, consents) => {
-                    registry.applyConsents(nodeId, consents);
+                    // The beat may land on a replica that does not hold the link.
+                    if (registry.isConnected(nodeId)) registry.applyConsents(nodeId, consents);
+                    else remote.forwardConsents(nodeId, consents);
                 },
             }),
-            inject: [FleetLinkRegistry],
+            inject: [FleetLinkRegistry, FleetLinkRemote],
         },
         {
             provide: FLEET_LINK_NODE_STATE,
@@ -95,21 +128,29 @@ import { FleetOperationsService } from './fleet-operations.service';
         },
         {
             provide: FLEET_LINK_DRAIN_NOTIFIER,
-            useFactory: (registry: FleetLinkRegistry): FleetLinkDrainNotifier => ({
+            useFactory: (
+                registry: FleetLinkRegistry,
+                remote: FleetLinkRemote,
+            ): FleetLinkDrainNotifier => ({
                 drainNodes: (nodeIds, graceSec) => {
                     registry.drainNodes(nodeIds, graceSec);
+                    remote.broadcastDrain(nodeIds, graceSec);
                 },
             }),
-            inject: [FleetLinkRegistry],
+            inject: [FleetLinkRegistry, FleetLinkRemote],
         },
         {
             provide: FLEET_LINK_NODE_LIFECYCLE,
-            useFactory: (registry: FleetLinkRegistry): FleetLinkNodeLifecycle => ({
+            useFactory: (
+                registry: FleetLinkRegistry,
+                remote: FleetLinkRemote,
+            ): FleetLinkNodeLifecycle => ({
                 nodeGone: (nodeId, reason) => {
                     registry.closeNode(nodeId, FLEET_LINK_CLOSE_CODES.auth, reason);
+                    remote.broadcastGone(nodeId, reason);
                 },
             }),
-            inject: [FleetLinkRegistry],
+            inject: [FleetLinkRegistry, FleetLinkRemote],
         },
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
@@ -121,6 +162,9 @@ import { FleetOperationsService } from './fleet-operations.service';
         FleetOperationsService,
         FleetLinkTokenService,
         FleetLinkGatewayService,
+        // `FleetLinkRemote` is NOT exported (L8): it is this module's own
+        // plumbing; every other module reaches a link through `FleetLinkService`.
+        FleetLinkAttachService,
         FLEET_LINK_AUDIENCE,
         FLEET_LINK_HEARTBEAT_OBSERVER,
         FLEET_LINK_NODE_STATE,

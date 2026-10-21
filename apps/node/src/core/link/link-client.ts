@@ -141,6 +141,13 @@ export interface NodeLink {
 	/** The kill-switch / drain state every module reads. */
 	readonly control: NodeLinkControlState;
 	readonly modules: ComposedNodeModules;
+	/**
+	 * Send a family's own channel-0 message that belongs to no channel
+	 * (`session.list`, `session.event` — CONTRACTS §3.2–3.3). False when the
+	 * link is not connected (nothing is queued: the module re-reports what
+	 * matters after the next `link.ready`) or the message is over the cap.
+	 */
+	sendControl(message: FleetLinkExtensionMessage): boolean;
 }
 
 /** Operation completions kept for the next link when none is up (bounded). */
@@ -257,6 +264,11 @@ class NodeLinkClient implements NodeLink {
 		return () => {
 			this.listeners.delete(listener);
 		};
+	}
+
+	sendControl(message: FleetLinkExtensionMessage): boolean {
+		if (this.state.phase !== 'connected') return false;
+		return this.mux.sendControl(message);
 	}
 
 	start(): void {

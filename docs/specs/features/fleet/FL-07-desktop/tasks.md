@@ -231,8 +231,7 @@
       marker only when the view is bound to an Agent; `releaseAll` on `watching`); advertise `input`
       in `capabilities.ts` when either injector exists.
       **Test**: extend `apps/node/src/core/link/modules/desktop.spec.ts` and `capabilities.spec.ts` — INPUT dropped while
-      watching; `input` tag iff an injector; the stale comment is gone (`grep -n "nothing on this
-      node injects" apps/node/src/core/capabilities.ts` returns nothing).
+      watching; `input` tag iff an injector; the stale comment is gone (`grep -n "nothing on this node injects" apps/node/src/core/capabilities.ts` returns nothing).
 - [ ] **T-32**. Platform control on views: add the control routes to `fleet-desktop.controller.ts`
       calling `packages/agent/src/computer/control-arbiter.service.ts` unchanged; relay forwards
       `INPUT` only from the holding viewer and emits `desktop.mode` to the node; `agent:` actor on

@@ -47,10 +47,16 @@ jobs:
   deploy:
     # Only run when the self-hosted migration flag is on AND the trigger is valid
     # (a manual dispatch, or a CI run that actually succeeded).
+    # Security (works-security, 2026-10-18): a `workflow_run` trigger also fires for runs of a
+    # same-named workflow from a FORK pull request (the fork can add any `on:` and name its
+    # branch `main`), and this job would then run with this repository's secrets. Only a run
+    # that came from a push or a manual dispatch IN THIS REPOSITORY may continue.
     if: >-
       ${{ vars.TRIGGER_SELFHOSTED == 'true' &&
           (github.event_name == 'workflow_dispatch' ||
-           github.event.workflow_run.conclusion == 'success') }}
+           (github.event.workflow_run.conclusion == 'success' &&
+            (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+            github.event.workflow_run.head_repository.full_name == github.repository)) }}
     runs-on: ${{ github.event.inputs.runner == 'github-hosted' && 'ubuntu-latest' || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     # Record the deployment under the matching GitHub environment for governance
     # parity with the legacy cloud workflows (prod/stage). These environments

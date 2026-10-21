@@ -198,8 +198,19 @@ describe('IntegrationKeysSection', () => {
         expect(screen.getByTestId('integration-key-secret').textContent).toBe(
             'ew_int_' + 'b'.repeat(64),
         );
-        fireEvent.click(screen.getByText('dialog.done'));
-        await waitFor(() => expect(screen.queryByTestId('integration-key-secret')).toBeNull());
+        // Done ignores clicks until the rotation's transition has settled (`isPending`); on a
+        // loaded CI runner that outlasted the secret's first render, so the click was dropped
+        // (stage runs 39245383947 #1 and #2). Click once it is enabled.
+        const done = screen.getByRole('button', { name: 'dialog.done' }) as HTMLButtonElement;
+        await waitFor(() => expect(done.disabled).toBe(false), { timeout: 5_000 });
+        fireEvent.click(done);
+        await waitFor(
+            () => {
+                expect(screen.queryByTestId('integration-key-secret')).toBeNull();
+                expect(screen.queryByRole('dialog')).toBeNull();
+            },
+            { timeout: 5_000 },
+        );
     });
 
     // Review 2026-10-17 U10: "None" stops the old secret at once, so no grace line.

@@ -1346,7 +1346,7 @@ export class TaskWorkspaceService {
             try {
                 verdict = await this.appChangeGate.evaluate({
                     work,
-                    taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                    taskOrigin: task.origin ?? null,
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
@@ -3259,7 +3259,7 @@ export class TaskWorkspaceService {
                 input.baseRef ?? (await this.resolveBaseRef(work, owner, repo, gitOptions));
             verdict = await this.appChangeGate.evaluate({
                 work,
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
                 owner,
                 repo,
                 gitOptions,
@@ -3704,7 +3704,7 @@ export class TaskWorkspaceService {
                           },
                       }
                     : {}),
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
             });
         } catch (error) {
             // The gate's contract is that it never rejects; this is the net.
@@ -3891,7 +3891,11 @@ export class TaskWorkspaceService {
      */
     async judgeAppWorkMerge(
         task: Task,
-    ): Promise<{ allowed: true } | { allowed: false; reason: string } | null> {
+    ): Promise<
+        | { allowed: true; humanMergePaths?: readonly string[] }
+        | { allowed: false; reason: string }
+        | null
+    > {
         if (!task.workId) return null;
         const work = await this.works.findById(task.workId);
         if (!work || !isAppWorkKind(work.kind)) return null;
@@ -3907,16 +3911,20 @@ export class TaskWorkspaceService {
             };
             const verdict = await this.appChangeGate.evaluate({
                 work,
-                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                taskOrigin: task.origin ?? null,
                 owner,
                 repo,
                 gitOptions,
                 baseRef: await this.resolveBaseRef(work, owner, repo, gitOptions),
                 branch,
             });
-            return verdict.allowed === true
-                ? { allowed: true }
-                : { allowed: false, reason: 'app-change-refused' };
+            if (verdict.allowed !== true) return { allowed: false, reason: 'app-change-refused' };
+            // Works-security (2026-10-18) — the human-merge paths the change
+            // touches, for the merge gate to raise a person's approval on.
+            // Only when there are some, so the plain answer keeps its shape.
+            return verdict.humanMergePaths && verdict.humanMergePaths.length > 0
+                ? { allowed: true, humanMergePaths: verdict.humanMergePaths }
+                : { allowed: true };
         } catch (error) {
             this.logger.warn(
                 `Task ${task.id}: App Work pull request could not be judged for merge: ${

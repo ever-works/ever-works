@@ -1,20 +1,29 @@
 name: Egress audit
 
-# Proves at runtime, with the API image built from this commit, what the anonymous usage
+# Proves at runtime, with the API and web images built from this commit, what the anonymous usage
 # statistics module may send: nothing at all when it is switched off, and only the documented
-# report when it is on. The API runs from the self-hosting compose file on Docker networks with
-# no route out; CoreDNS is its only resolver and a capture sees every connection attempt and DNS
-# query from before the process starts. Modes (tools/egress-audit/README.md):
+# report when it is on. The API and the web app run from the self-hosting compose file on Docker
+# networks with no route out; CoreDNS is their only resolver and a capture sees every connection
+# attempt and DNS query of each from before the process starts. In `off`, `loaded_off` and
+# `positive_stats` a real browser also signs in through the web app and walks every page of
+# tools/egress-audit/ui-routes.json in its own captured namespace (the browser leg): no Ever host
+# looked up, requested or newly linked. Modes (tools/egress-audit/README.md):
 #
 #   default_off     nothing about statistics configured (the self-hosted default is off): no
 #                   Ever host looked up, no connection attempt out, every statistics route 404
-#   off             EVER_STATS_ENABLED=false in the container environment: the same
+#   off             EVER_STATS_ENABLED=false in the container environment: the same, and the
+#                   browser walk
 #   off_env_file    the same switch written ONLY in the API's .env file
 #   loaded_off      module loaded (EVER_STATS_ENABLED=true), switched off in Settings by the
-#                   platform admin: no request
+#                   platform admin: no request; and the browser walk
 #   positive_stats  module on (EVER_STATS_ENABLED=true) against the mock platform: reports
-#                   accepted (202), and no call other than the statistics report
+#                   accepted (202), and no call other than the statistics report; the browser
+#                   walk, which must render Settings → Ever Platform
 #   control         positive_stats without the mock must FAIL, so a green run is not a blind one
+#
+# The images are built once (job `images`) and every mode runs in its own job, in parallel: a
+# browser walk of every page takes tens of minutes. The `routes` job checks that the route list is
+# in step with the app router and that the DOM baseline only shrinks.
 #
 # A second job runs the real sender against the same mock platform (202, every published
 # fixture's 422 with its path, 409 for a second key, 202 after an identity reset):
@@ -25,7 +34,8 @@ name: Egress audit
 # installed from the lockfile; nothing of either is copied into this repository.
 #
 # Runs on every push to develop, stage and main, on pull requests that touch the statistics
-# module, the API image or the self-hosting compose files, and on demand.
+# module, the web app's statistics page, the API or web image or the self-hosting compose files,
+# and on demand (`modes` picks a subset, for example '["off"]').
 on:
   push:
     branches: [develop, stage, main]
@@ -40,16 +50,28 @@ on:
       - 'packages/contracts/src/ever-platform/**'
       - 'packages/plugins/ever-stats-sink/**'
       - '.deploy/docker/api/**'
+      - '.deploy/docker/web/**'
+      # The web app's statistics surface: the settings page, its actions and its API client.
+      - 'apps/web/src/app/*/(dashboard)/settings/ever-platform/**'
+      - 'apps/web/src/app/actions/settings/instance-stats.ts'
+      - 'apps/web/src/components/settings/UsageStatisticsSettings.tsx'
+      - 'apps/web/src/lib/api/instance-stats.ts'
       - 'docker-compose.yml'
       - 'docker-compose.infra.yml'
       - '.env.compose'
       - 'tools/egress-audit/**'
       # The manifests that pin the Ever Connect SDK packages: a version change re-runs the audit.
       - 'apps/api/package.json'
+      - 'apps/web/package.json'
       - 'packages/agent/package.json'
       - 'packages/contracts/package.json'
       - '.github/workflows/egress-audit.yml'
   workflow_dispatch:
+    inputs:
+      modes:
+        description: 'The modes to run, as a JSON list (empty: all of them)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -63,26 +85,22 @@ env:
   # The `ever-egress-audit` bin of @ever-co/connect-tools (Apache-2.0), installed below.
   AUDIT_BIN: tools/egress-audit/node_modules/.bin/ever-egress-audit
   EVER_WORKS_API_IMAGE: ever-works-api:egress-audit
+  EVER_WORKS_WEB_IMAGE: ever-works-web:egress-audit
   AUDIT_CONFIG: tools/egress-audit/egress-audit.config.json
   AUDIT_ARTIFACTS: egress-audit-artifacts
 
 jobs:
-  egress-audit:
-    name: egress-audit
-    # GitHub-hosted on purpose: the capture needs Docker with NET_RAW and NET_ADMIN, and this job
-    # must not queue behind the shared self-hosted pool.
+  routes:
+    name: route list and DOM baseline
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 20
     steps:
-      - name: Free disk space for the API image build
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
       - name: Checkout
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # The baseline check reads the history of the baseline file.
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
@@ -95,10 +113,63 @@ jobs:
           node-version: 26
 
       - name: Install the audit tools (pinned @ever-co/connect-tools, from the lockfile)
+        run: pnpm install --frozen-lockfile --filter @ever-works/egress-audit
+
+      - name: The route list is in step with the Next.js app router
+        run: $AUDIT_BIN ui-routes --framework next-app --entry apps/web/src/app --out tools/egress-audit/ui-routes.json --check
+
+      - name: 'Control: a page missing from the route list must fail the check'
         run: |
-          # Only the audit's own workspace package: the API is audited as the image built below.
-          pnpm install --frozen-lockfile --filter @ever-works/egress-audit
-          "$AUDIT_BIN" --help > /dev/null
+          node -e '
+            const fs = require("fs");
+            const list = JSON.parse(fs.readFileSync("tools/egress-audit/ui-routes.json", "utf8"));
+            list.routes.splice(list.routes.findIndex((route) => route.source === "router"), 1);
+            fs.writeFileSync(process.env.RUNNER_TEMP + "/ui-routes.missing.json", JSON.stringify(list, null, 2));
+          '
+          set +e
+          $AUDIT_BIN ui-routes --framework next-app --entry apps/web/src/app --out "$RUNNER_TEMP/ui-routes.missing.json" --check
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::a route list missing a page must fail the check (exit 1); it exited $code"
+            exit 1
+          fi
+          echo "The control failed as it must (exit 1)."
+
+      - name: The DOM baseline only shrinks
+        env:
+          BASE_REF: ${{ github.base_ref || 'develop' }}
+        run: |
+          if ! node -e 'process.exit(require(process.argv[1]).ui_baseline ? 0 : 1)' "./$AUDIT_CONFIG"; then
+            echo "No DOM baseline in the config: nothing to compare."
+            exit 0
+          fi
+          base="origin/${BASE_REF}"
+          # The change that adopts the baseline is the one whose base has no baseline yet; from then on
+          # every change is compared with the base (the harness refuses --first-version once it exists).
+          first=""
+          if ! git cat-file -e "${base}:tools/egress-audit/ui-baseline.json" 2>/dev/null; then
+            first="--first-version"
+            echo "The baseline is adopted by this change (${base} has none)."
+          fi
+          $AUDIT_BIN check-baseline-shrink --base "$base" --config "$AUDIT_CONFIG" $first
+
+  images:
+    name: build the API and web images
+    # GitHub-hosted on purpose: the audit jobs need Docker with NET_RAW and NET_ADMIN, and nothing
+    # here may queue behind the shared self-hosted pool.
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Free disk space for the image builds
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
@@ -129,47 +200,103 @@ jobs:
             BUILD_RUN=${{ github.run_number }}
             BUILD_TIME=${{ steps.meta.outputs.build_time }}
 
-      - name: Write the API .env files of the modes
+      # The web image as the self-hosting compose file runs it: no analytics key is passed, so the
+      # browser bundle carries none (an operator opts in at build time).
+      - name: Build the web image from this commit
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: .deploy/docker/web/Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: ${{ env.EVER_WORKS_WEB_IMAGE }}
+
+      - name: Save the images for the audit jobs
         run: |
-          : > "$RUNNER_TEMP/api-empty.env"
-          printf 'EVER_STATS_ENABLED=false\n' > "$RUNNER_TEMP/api-stats-off.env"
           docker image ls "$EVER_WORKS_API_IMAGE"
+          docker image ls "$EVER_WORKS_WEB_IMAGE"
+          docker save "$EVER_WORKS_API_IMAGE" "$EVER_WORKS_WEB_IMAGE" | zstd -T0 -3 -o "$RUNNER_TEMP/egress-audit-images.tar.zst"
+          ls -lh "$RUNNER_TEMP/egress-audit-images.tar.zst"
+
+      - name: Upload the images
+        uses: actions/upload-artifact@v7
+        with:
+          name: images-for-egress-audit
+          path: ${{ runner.temp }}/egress-audit-images.tar.zst
+          compression-level: 0
+          retention-days: 1
+
+  egress-audit:
+    name: egress-audit (${{ matrix.mode }})
+    needs: images
+    runs-on: ubuntu-latest
+    # A browser walk of every page, retried pages and idle pages included.
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: ${{ fromJSON(inputs.modes || '["default_off","off","off_env_file","loaded_off","positive_stats","control"]') }}
+    steps:
+      - name: Free disk space for the images and the browser image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: 'default_off: nothing configured, statistics off by default'
-        if: ${{ !cancelled() }}
-        env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode default_off --artifacts "$AUDIT_ARTIFACTS" --verbose
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: 'off: EVER_STATS_ENABLED=false in the container environment'
-        if: ${{ !cancelled() }}
-        env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode off --artifacts "$AUDIT_ARTIFACTS" --verbose
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
 
-      - name: 'off_env_file: EVER_STATS_ENABLED=false only in the API .env file'
-        if: ${{ !cancelled() }}
-        env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-stats-off.env
-        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode off_env_file --artifacts "$AUDIT_ARTIFACTS" --verbose
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
 
-      - name: 'loaded_off: switched off in Settings'
-        if: ${{ !cancelled() }}
-        env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode loaded_off --artifacts "$AUDIT_ARTIFACTS" --verbose
+      - name: Install the audit tools (pinned @ever-co/connect-tools, from the lockfile)
+        run: |
+          # Only the audit's own workspace package: the API and the web app are audited as the images.
+          pnpm install --frozen-lockfile --filter @ever-works/egress-audit
+          "$AUDIT_BIN" --help > /dev/null
 
-      - name: 'positive_stats: on, against the mock platform'
-        if: ${{ !cancelled() }}
+      - name: Download the images
+        uses: actions/download-artifact@v8
+        with:
+          name: images-for-egress-audit
+          path: ${{ runner.temp }}/images
+
+      - name: Load the images
+        run: |
+          zstd -d --stdout "$RUNNER_TEMP/images/egress-audit-images.tar.zst" | docker load
+          rm -f "$RUNNER_TEMP/images/egress-audit-images.tar.zst"
+          docker image ls "$EVER_WORKS_API_IMAGE"
+          docker image ls "$EVER_WORKS_WEB_IMAGE"
+          df -h /
+
+      - name: Write the API .env file of the mode
         env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
-        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode positive_stats --artifacts "$AUDIT_ARTIFACTS" --verbose
+          MODE: ${{ matrix.mode }}
+        run: |
+          # off_env_file: the switch only in the API's .env file; every other mode: an empty file.
+          if [ "$MODE" = off_env_file ]; then
+            printf 'EVER_STATS_ENABLED=false\n' > "$RUNNER_TEMP/api.env"
+          else
+            : > "$RUNNER_TEMP/api.env"
+          fi
+          echo "EVER_WORKS_AUDIT_DOTENV=$RUNNER_TEMP/api.env" >> "$GITHUB_ENV"
+
+      - name: 'The audit: ${{ matrix.mode }}'
+        if: ${{ matrix.mode != 'control' }}
+        env:
+          MODE: ${{ matrix.mode }}
+        run: $AUDIT_BIN --config "$AUDIT_CONFIG" --mode "$MODE" --artifacts "$AUDIT_ARTIFACTS" --verbose
 
       - name: 'control: positive_stats without the mock platform must fail'
-        if: ${{ !cancelled() }}
-        env:
-          EVER_WORKS_AUDIT_DOTENV: ${{ runner.temp }}/api-empty.env
+        if: ${{ matrix.mode == 'control' }}
         run: |
           set +e
           "$AUDIT_BIN" --config "$AUDIT_CONFIG" --mode positive_stats --no-mock --artifacts "$AUDIT_ARTIFACTS" --verbose
@@ -181,30 +308,47 @@ jobs:
           fi
           echo "The control failed as it must (exit 1)."
 
+      - name: Upload the evidence (pcaps, DNS logs, HAR, DOM references, reports)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: egress-audit-${{ matrix.mode }}
+          path: ${{ env.AUDIT_ARTIFACTS }}
+          retention-days: 14
+
+  summary:
+    name: egress-audit summary
+    needs: egress-audit
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download the evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: egress-audit-*
+          path: ${{ env.AUDIT_ARTIFACTS }}
+          merge-multiple: true
+
       - name: Summary
-        if: ${{ !cancelled() }}
         run: |
           node -e '
             const fs = require("fs"), path = require("path");
             const dir = process.env.AUDIT_ARTIFACTS;
-            const rows = ["| Mode | Exit | Violations | DNS queries | Connection attempts | Calls |", "|---|---|---|---|---|---|"];
+            const rows = [
+              "| Mode | Exit | Violations | DNS queries | Connection attempts | Calls | Browser: pages opened / loaded |",
+              "|---|---|---|---|---|---|---|",
+            ];
             for (const mode of fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) {
               const file = path.join(dir, mode, "report.json");
               if (!fs.existsSync(file)) continue;
               const r = JSON.parse(fs.readFileSync(file, "utf8"));
               const rules = Object.entries(r.summary.rules).map(([k, v]) => `${k}: ${v}`).join(", ") || "none";
-              rows.push(`| ${mode} | ${r.exit} | ${rules} | ${r.summary.dns_queries} | ${r.summary.connection_attempts} | ${r.summary.calls ? r.summary.calls.join(", ") || "none" : "-"} |`);
+              const b = r.browser && r.browser.leg === "ran" ? `${r.browser.visits} / ${r.browser.loaded}` : "-";
+              rows.push(`| ${mode} | ${r.exit} | ${rules} | ${r.summary.dns_queries} | ${r.summary.connection_attempts} | ${r.summary.calls ? r.summary.calls.join(", ") || "none" : "-"} | ${b} |`);
             }
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Egress audit\n\n${rows.join("\n")}\n\nThe positive_stats-nomock row is the control and must exit 1.\n`);
           '
-
-      - name: Upload the evidence (pcaps, DNS logs, reports)
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: egress-audit
-          path: ${{ env.AUDIT_ARTIFACTS }}
-          retention-days: 14
 
   stats-mock:
     name: statistics against the mock platform

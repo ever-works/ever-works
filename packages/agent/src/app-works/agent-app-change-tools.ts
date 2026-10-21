@@ -42,6 +42,15 @@ export interface AppChangeToolService {
 export interface BuildAppChangeToolsArgs {
     agent: Pick<Agent, 'id' | 'userId' | 'permissions'>;
     service: AppChangeToolService;
+    /**
+     * Works-security (2026-10-18) — `true` only when the tools are assembled for a
+     * Conversation reply the Agent's OWNER started (a `chat` run on a Conversation
+     * message they sent). Platform state from the run context, never model input.
+     * Anything else — a Task run, a heartbeat, a Task-chat reply, a delegated run — is
+     * an agent acting on its own, and its change request is filed but held for the owner
+     * (`AGENT_APP_CHANGE_REQUIRES_OWNER`, default on).
+     */
+    ownerChatTurn?: boolean;
     /** The Work when the Agent's owner may EDIT it and it is an App Work; `null` otherwise. */
     authorize(userId: string, workId: string, level: 'edit' | 'view'): Promise<Work | null>;
 }
@@ -54,6 +63,14 @@ interface RequestAppChangeArgs {
 interface GetAppChangeArgs {
     workId: string;
     taskId?: string;
+}
+
+/**
+ * Works-security (2026-10-18) — an agent's change request outside an owner-driven chat
+ * turn is held for the owner unless `AGENT_APP_CHANGE_REQUIRES_OWNER=false`. Default-safe.
+ */
+export function agentAppChangeRequiresOwner(): boolean {
+    return (process.env.AGENT_APP_CHANGE_REQUIRES_OWNER ?? '').trim().toLowerCase() !== 'false';
 }
 
 export function buildAppChangeTools(args: BuildAppChangeToolsArgs): TaskToolDescriptor[] {
@@ -105,12 +122,17 @@ export function buildAppChangeTools(args: BuildAppChangeToolsArgs): TaskToolDesc
                         code: 'not_owner',
                     };
                 }
+                // Prompt-injection hardening (works-security 2026-10-18): outside a chat
+                // turn the owner is driving, the agent is acting on its own — maybe on text
+                // it just read — so the change Task is filed and held, never started.
+                const holdForOwner = args.ownerChatTurn !== true && agentAppChangeRequiresOwner();
                 const result = await service.request({
                     work,
                     actorUserId: agent.userId,
                     request: a.request,
                     ...(mayCommit ? { agentId: agent.id } : {}),
-                    channel: 'chat',
+                    channel: args.ownerChatTurn === true ? 'chat' : 'agent',
+                    ...(holdForOwner ? { holdForOwner: true } : {}),
                 });
                 if (result.status !== 'accepted') {
                     return {
@@ -120,6 +142,22 @@ export function buildAppChangeTools(args: BuildAppChangeToolsArgs): TaskToolDesc
                         ...(result.createFromTemplate
                             ? { createFromTemplate: result.createFromTemplate }
                             : {}),
+                    };
+                }
+                if (result.awaitingOwner) {
+                    return {
+                        status: 'awaiting_owner',
+                        taskId: result.taskId,
+                        taskSlug: result.taskSlug,
+                        taskUrl: result.taskUrl,
+                        agentId: result.agentId,
+                        dispatched: false,
+                        repository: result.repository,
+                        warnings: result.warnings,
+                        next:
+                            'The change Task was filed but NOT started: a change requested outside a chat with ' +
+                            'the owner waits for the owner to press Run. The owner has been notified; tell them ' +
+                            'the Task link.',
                     };
                 }
                 return {

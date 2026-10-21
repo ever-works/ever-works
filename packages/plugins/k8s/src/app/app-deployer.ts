@@ -146,6 +146,9 @@ export const APP_CRON_DEADLINE_MS = 60_000;
 export const APP_PUBLIC_SMOKE_WINDOW_S = 600;
 /** … and on every later one. */
 export const APP_PUBLIC_SMOKE_WINDOW_LATER_S = 180;
+
+/** "Stuck right now": the smallest positive window, so any current waiting reason qualifies. */
+const JOB_STUCK_NOW_SECONDS = 0.001;
 /** §4.10: a probe Job that does not report in time is `null` + this warning, **never** `true`. */
 export const APP_ISOLATION_PROBE_INCONCLUSIVE = 'isolation_probe_inconclusive';
 /** §4.11: the hairpin run's failure is this warning, never a rollback. */
@@ -1170,6 +1173,10 @@ export class AppDeployer {
 		let status: AppJobResult['status'] = 'running';
 		let stop: WaitStop = 'ok';
 		let podFailure: AppPodFailure | null = null;
+		// The pod's newest waiting reason, judged WITHOUT the 180 s window. A Job whose own deadline
+		// is shorter than the window (a 120 s migrate stuck in ErrImagePull, prod 2026-10-18) used to
+		// end as a bare `timeout`; with this it ends with the reason its pod never started.
+		let lastStuck: AppPodFailure | null = null;
 
 		while (status === 'running') {
 			const observed = await this.api.readObject<JobLike>(
@@ -1184,7 +1191,14 @@ export class AppDeployer {
 			if (status !== 'running') {
 				break;
 			}
-			podFailure = await this.classifyJobPods(state, entry);
+			const verdicts = await this.classifyJobPods(state, entry);
+			podFailure = verdicts.failure;
+			// Replace (also with null) whenever this Job's pods were seen, so a pod that recovered
+			// leaves no stale reason; keep it only when the list failed or the Job controller has
+			// already removed the pod (it deletes active pods at the deadline).
+			if (verdicts.observed) {
+				lastStuck = verdicts.stuckNow;
+			}
 			if (podFailure) {
 				status = 'failed';
 				break;
@@ -1198,6 +1212,10 @@ export class AppDeployer {
 				break;
 			}
 			await this.sleep(this.pollIntervalMs());
+		}
+
+		if (!podFailure && stop === 'ok' && (status === 'timeout' || status === 'failed') && lastStuck) {
+			podFailure = lastStuck;
 		}
 
 		// A runner Job's report is the pod's log (§4.8); a command Job has none.
@@ -1227,7 +1245,10 @@ export class AppDeployer {
 	 * §4.1) and narrowed to **this** run's Job, because a kept run of an earlier Deployment has pods
 	 * with the same label. A failed list is not a verdict: the Job's own status still decides.
 	 */
-	private async classifyJobPods(state: RunState, entry: AppJobPlanEntry): Promise<AppPodFailure | null> {
+	private async classifyJobPods(
+		state: RunState,
+		entry: AppJobPlanEntry
+	): Promise<{ failure: AppPodFailure | null; stuckNow: AppPodFailure | null; observed: boolean }> {
 		let pods: AppRolloutPod[];
 		try {
 			pods = await this.api.listObjects<AppRolloutPod>(
@@ -1239,17 +1260,28 @@ export class AppDeployer {
 				state.context
 			);
 		} catch {
-			return null;
+			return { failure: null, stuckNow: null, observed: false };
 		}
 
 		const own = pods.filter((pod) => podBelongsToJob(pod, entry.objectName));
 		recordWaitingSince(own, state.podWaitingSince, this.now());
-		return classifyJobPodFailure(own, {
+		const failure = classifyJobPodFailure(own, {
 			now: this.now(),
 			podWaitingSince: state.podWaitingSince,
 			userMessageSeconds: 0,
 			...(this.options.stuckPodSeconds !== undefined ? { stuckPodSeconds: this.options.stuckPodSeconds } : {})
 		});
+		// The same classifier with an (effectively) zero window: what the pod is stuck on RIGHT NOW.
+		// Never a verdict on its own; used only if the Job then ends without one (see waitForJob).
+		const stuckNow = failure
+			? failure
+			: classifyJobPodFailure(own, {
+					now: this.now(),
+					podWaitingSince: state.podWaitingSince,
+					userMessageSeconds: 0,
+					stuckPodSeconds: JOB_STUCK_NOW_SECONDS
+				});
+		return { failure, stuckNow, observed: own.length > 0 };
 	}
 
 	/* --------------------------------------------------------------------- *

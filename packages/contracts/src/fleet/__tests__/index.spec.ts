@@ -526,6 +526,30 @@ const OPERATION_EXPORTS = [
 	'isFleetOperationTerminal'
 ] as const;
 
+// Viewers on a node-link channel (FL-02) — `fleet-link-viewer.types.ts`,
+// pinned in `fleet-link-viewer.types.spec.ts`.
+const VIEWER_EXPORTS = [
+	'FLEET_LINK_VIEWER_CHANNEL',
+	'FLEET_LINK_VIEWER_TOKEN_TTL_SEC',
+	'FLEET_LINK_VIEWER_TOKEN_RATE_LIMIT',
+	'FLEET_LINK_VIEWER_AUTH_TIMEOUT_MS',
+	'FLEET_LINK_VIEWER_PING_INTERVAL_MS',
+	'FLEET_LINK_VIEWER_SLOW_BUFFER_BYTES',
+	'FLEET_LINK_VIEWER_MAX_BUFFER_BYTES',
+	'FLEET_LINK_VIEWER_MAX_PARAMS_BYTES',
+	'FLEET_LINK_VIEWER_ROLES',
+	'isFleetLinkViewerRole',
+	'FLEET_LINK_VIEWER_CLOSE_CODES',
+	'FLEET_LINK_VIEWER_JSON_TYPES',
+	'FLEET_LINK_VIEWER_FRAME_KINDS',
+	'isFleetLinkViewerTarget',
+	'fleetLinkViewerPath',
+	'parseFleetLinkViewerPath',
+	'fleetLinkViewerKey',
+	'fleetLinkViewerMaySend',
+	'FLEET_LINK_VIEWER_CONTROL_TYPES'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -544,7 +568,8 @@ const ALL_EXPORTS = [
 	...ACCESS_EXPORTS,
 	...NEEDS_A_LOOK_EXPORTS,
 	...LINK_EXPORTS,
-	...OPERATION_EXPORTS
+	...OPERATION_EXPORTS,
+	...VIEWER_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -672,7 +697,13 @@ const FUNCTION_EXPORTS = [
 	'decodeFleetLinkAck',
 	'encodeFleetLinkCloseReason',
 	'decodeFleetLinkCloseReason',
-	'isFleetOperationTerminal'
+	'isFleetOperationTerminal',
+	'isFleetLinkViewerRole',
+	'isFleetLinkViewerTarget',
+	'fleetLinkViewerPath',
+	'parseFleetLinkViewerPath',
+	'fleetLinkViewerKey',
+	'fleetLinkViewerMaySend'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -687,7 +718,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 381 runtime symbols', () => {
+	it('exposes exactly these 400 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -757,7 +788,10 @@ describe('fleet barrel', () => {
 		// → 381 with computer health (FL-03): the twenty-eight symbols of
 		// `fleet-node-health.types.ts` — a NEW module, so the witness table
 		// below gains a row.
-		expect(Object.keys(fleet)).toHaveLength(381);
+		// → 400 with viewers on a link channel (FL-02 P1b): the nineteen symbols
+		// of `fleet-link-viewer.types.ts` — a NEW module, so the witness table
+		// below gains a row.
+		expect(Object.keys(fleet)).toHaveLength(400);
 	});
 
 	it.each([
@@ -778,7 +812,8 @@ describe('fleet barrel', () => {
 		['fleet-needs-a-look.types.js', 'NEEDS_A_LOOK_KINDS'],
 		['fleet-link.types.js', 'FLEET_LINK_FAMILIES'],
 		['fleet-link.codec.js', 'encodeFleetLinkFrame'],
-		['fleet-operations.types.js', 'FLEET_OPERATION_STATES']
+		['fleet-operations.types.js', 'FLEET_OPERATION_STATES'],
+		['fleet-link-viewer.types.js', 'FLEET_LINK_VIEWER_CHANNEL']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

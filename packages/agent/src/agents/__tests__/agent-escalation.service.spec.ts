@@ -106,7 +106,9 @@ describe('AgentEscalationService (G3)', () => {
             agentId: 'agent-7',
         });
         const stored = repository.resolve.mock.calls[0][2] as string;
-        expect(stored).toMatch(/^\[Resolved on a proposal by agent agent-7; approved by the owner\]/);
+        expect(stored).toMatch(
+            /^\[Resolved on a proposal by agent agent-7; approved by the owner\]/,
+        );
         expect(stored).toContain('all good, continue');
         expect(inbox.escalationResolved).toHaveBeenCalledWith(
             expect.objectContaining({ escalationId: 'e1', resolvedBy: 'agent' }),
