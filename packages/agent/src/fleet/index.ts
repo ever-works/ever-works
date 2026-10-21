@@ -64,3 +64,5 @@ export * from './checkouts';
 // Tasks on computers (FL-15 P2) — a computer's global git identity.
 export * from './git';
 export * from './ports';
+// Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
+export * from './virtual';

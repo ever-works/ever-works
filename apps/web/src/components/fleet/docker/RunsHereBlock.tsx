@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { FLEET_DOCKER_CAPABILITY, type FleetContainerView } from '@ever-works/contracts';
@@ -14,6 +14,7 @@ import { dialogForRow } from '../machine/machine-actions.shared';
 import { useMachineAction } from '../machine/use-machine-action';
 import { useMachineList } from '../machine/use-machine-list';
 import { containerGlyph, sortContainers } from './docker.shared';
+import { VirtualRunsHereRows } from '../virtual/VirtualRunsHereRows';
 
 /** The Overview reads less often than the Docker tab. */
 const REFRESH_MS = 30_000;
@@ -27,20 +28,45 @@ const REFRESH_MS = 30_000;
  * computer that does not advertise Docker, and nothing while it is offline —
  * the Overview already says so.
  */
-export default function RunsHereBlock({ nodes }: FleetOverviewBlockProps) {
+export default function RunsHereBlock({ nodes, flags }: FleetOverviewBlockProps) {
     const node = nodes[0];
     const enabled = !!node && (node.capabilities ?? []).includes(FLEET_DOCKER_CAPABILITY);
     if (!node || !enabled) return null;
-    return <RunsHere nodeId={node.id} nodeName={node.name} allowed={computerActionAllowed(node, 'docker')} />;
+    // Virtual computers (FL-16, FR-32): this host's virtual computers are rows
+    // of THIS block (with Start / Stop and the memory they reserve), never a
+    // second block.
+    const virtualRows =
+        flags?.FLEET_VIRTUAL_ENABLED === true ? (
+            <VirtualRunsHereRows hostNodeId={node.id} allowed={computerActionAllowed(node, 'machines')} />
+        ) : null;
+    return (
+        <RunsHere
+            nodeId={node.id}
+            nodeName={node.name}
+            allowed={computerActionAllowed(node, 'docker')}
+            extra={virtualRows}
+        />
+    );
 }
 
-function RunsHere({ nodeId, nodeName, allowed }: { nodeId: string; nodeName: string; allowed: boolean }) {
+function RunsHere({
+    nodeId,
+    nodeName,
+    allowed,
+    extra = null,
+}: {
+    nodeId: string;
+    nodeName: string;
+    allowed: boolean;
+    /** FL-16's virtual-computer rows, rendered inside this block. */
+    extra?: ReactNode;
+}) {
     const t = useTranslations('fleet.docker');
     const load = useCallback(() => listFleetContainersAction(nodeId), [nodeId]);
     const list = useMachineList(load, REFRESH_MS);
     const machineAction = useMachineAction<Record<string, unknown>>();
     const rows = sortContainers(list.data?.containers ?? []).slice(0, 12);
-    if (!list.data || !list.data.docker.daemonRunning || rows.length === 0) return null;
+    if (!list.data || !list.data.docker.daemonRunning || (rows.length === 0 && !extra)) return null;
 
     const act = (container: FleetContainerView, action: 'start' | 'stop') => {
         const label = t(`act.${action}`);
@@ -94,6 +120,7 @@ function RunsHere({ nodeId, nodeName, allowed }: { nodeId: string; nodeName: str
                     {t('runsHere.open')}
                 </Link>
             </div>
+            {extra}
             <ConfirmActionDialog
                 model={machineAction.dialog}
                 actionLabel={machineAction.actionLabel}

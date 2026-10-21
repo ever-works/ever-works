@@ -53,6 +53,7 @@ import {
     FleetJobService,
     FleetNodeHealthService,
     FleetSessionSweepService,
+    FleetVirtualReconcileService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { SkillReadinessService } from '@ever-works/agent/skills';
@@ -312,6 +313,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: FleetCheckoutReconcileService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetCheckoutReconcileService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Virtual computers (FL-16) — the fleet-virtual-reconcile cron calls
+        // reconcile() over the internal RPC channel; the repositories and the
+        // node link live API-side.
+        {
+            provide: FleetVirtualReconcileService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetVirtualReconcileService'),
             inject: [TriggerInternalApiClient],
         },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
@@ -632,6 +642,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         FleetNodeHealthService,
         FleetSessionSweepService,
         FleetCheckoutReconcileService,
+        FleetVirtualReconcileService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

@@ -11,6 +11,7 @@ import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
+import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
@@ -114,6 +115,11 @@ export interface AgentFleetToolSource {
      * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
      * Optional: unbound, those tools are simply not offered.
      */
+    /**
+     * Virtual computers (FL-16) — backs `fleet_virtual_*`. Optional: unbound (or
+     * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
+     */
+    virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'

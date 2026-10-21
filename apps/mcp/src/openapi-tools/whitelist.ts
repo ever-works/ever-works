@@ -757,6 +757,52 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: false }
 	},
 
+	// Virtual computers (FL-16, plan §9, CONTRACTS §11.3) — `apps/api/src/fleet/virtual/fleet-virtual.controller.ts`.
+	// Same names as the in-platform Agent tools. Acts satisfy their confirmation class
+	// with the request fields (`confirm: true`, `confirmName`); without them the API
+	// answers 409 `confirmation_required` with the summary to show. Dark unless
+	// FLEET_VIRTUAL_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_list',
+		description:
+			'List the virtual computers (Containers, Windows VMs) a fleet computer hosts, with system, size, create phase and state, and the host memory net of what they reserve. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual/options',
+		toolName: 'fleet_virtual_options',
+		description:
+			'Which fleet computers can host a new virtual computer of a system (?system=), with free memory, free disk, KVM and why each other one cannot, plus the systems, sizes and the host "Choose for me" picks ({id} may be `auto`). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_create',
+		description:
+			'Create a Container on a fleet computer ({id}, or `auto` for the host with the most free memory). It uses that computer’s CPU, memory and disk; no credits are spent. Needs `confirm: true`; without it the answer is 409 with the host, CPUs, memory and disk to confirm.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/power',
+		toolName: 'fleet_virtual_power',
+		description:
+			'Start or stop a virtual computer (`action: start | stop`; stop needs `confirm: true` — a Container stops within 10 seconds).',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/destroy',
+		toolName: 'fleet_virtual_destroy',
+		description:
+			'Destroy a virtual computer: its machine and disk on the host, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name. Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
 	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each
