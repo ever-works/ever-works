@@ -213,18 +213,20 @@ const remove = new Command('delete')
     .description('Delete a checkout Ever Works created, or forget one found on the computer (--forget)')
     .argument('<id>', 'Checkout id')
     .option('--forget', 'Remove the row only; the folder is not touched')
+    .option('--clean-up', 'FL-06 Clean up: only a worktree whose pull request is merged or closed and no session uses')
     .option('--confirm', 'Confirm (nothing would be lost)')
     .option('--confirm-name <folder>', 'Confirm a delete that would lose work: the checkout folder name')
     .option('--json', 'Machine-readable output')
     .action(
         async (
             id: string,
-            options: { forget?: boolean; confirm?: boolean; confirmName?: string; json?: boolean },
+            options: { forget?: boolean; cleanUp?: boolean; confirm?: boolean; confirmName?: string; json?: boolean },
         ) => {
             if (!UUID.test(id)) usage('<id> must be a checkout id');
+            if (options.cleanUp && options.forget) usage('--clean-up removes the folder; it cannot be combined with --forget');
             await requireAuth();
             try {
-                const response = await getHttpClient().delete(`/fleet/checkouts/${id}`, {
+                const response = await getHttpClient().delete(`/fleet/checkouts/${id}${options.cleanUp ? '?cleanUp=1' : ''}`, {
                     data: {
                         ...(options.forget ? { mode: 'forget' } : {}),
                         ...(options.confirm ? { confirm: true } : {}),

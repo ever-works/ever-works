@@ -9,6 +9,7 @@ import { PolicyModule } from '../../policy/policy.module';
 import { FleetCheckoutsModule } from '../checkouts/fleet-checkouts.module';
 import { FleetModule } from '../fleet.module';
 import { FleetSessionsModule } from '../sessions/fleet-sessions.module';
+import { FleetAgentActionTemplatesService } from './fleet-agent-action-templates.service';
 import { FleetSessionActionService } from './fleet-session-action.service';
 import { FleetSessionGitService } from './fleet-session-git.service';
 
@@ -34,7 +35,7 @@ import { FleetSessionGitService } from './fleet-session-git.service';
         PolicyModule,
         TypeOrmModule.forFeature([Agent, User, AgentRunLog, FleetAudit]),
     ],
-    providers: [FleetSessionGitService, FleetSessionActionService, AgentRepository],
-    exports: [FleetSessionGitService, FleetSessionActionService],
+    providers: [FleetSessionGitService, FleetSessionActionService, FleetAgentActionTemplatesService, AgentRepository],
+    exports: [FleetSessionGitService, FleetSessionActionService, FleetAgentActionTemplatesService],
 })
 export class FleetSessionGitModule {}

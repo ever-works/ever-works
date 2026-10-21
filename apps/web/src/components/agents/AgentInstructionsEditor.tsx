@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { writeAgentFileAction } from '@/app/actions/agents';
 import type { AgentFileBody, AgentFileName } from '@/lib/api/agents';
+import { AgentFleetActionsSection } from './AgentFleetActionsSection';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -22,9 +23,12 @@ type Status = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
 export function AgentInstructionsEditor({
     agentId,
     files,
+    fleetActions = false,
 }: {
     agentId: string;
     files: AgentFileBody[];
+    /** FL-06 P3: show the Fleet actions section under agent.yml (while sessions are on). */
+    fleetActions?: boolean;
 }) {
     const initialMap = useMemo(() => {
         const map: Record<AgentFileName, AgentFileBody> = {} as Record<
@@ -156,6 +160,18 @@ export function AgentInstructionsEditor({
                 spellCheck={false}
                 aria-label={active}
             />
+            {/* FL-06 P3 (spec FR-27): the Fleet actions section over agent.yml's `fleet` block. */}
+            {active === 'agent.yml' && fleetActions ? (
+                <AgentFleetActionsSection
+                    agentId={agentId}
+                    expectedHash={hashes['agent.yml']}
+                    onSaved={(body, hash) => {
+                        setBuffers((b) => ({ ...b, 'agent.yml': body }));
+                        setHashes((h) => ({ ...h, 'agent.yml': hash }));
+                        setStatus((s) => ({ ...s, 'agent.yml': 'saved' }));
+                    }}
+                />
+            ) : null}
         </div>
     );
 }

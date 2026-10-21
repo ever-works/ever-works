@@ -13065,7 +13065,32 @@
             "gitLine": {
                 "noCheckout": "Not in a checkout",
                 "worktreeOf": "Worktree of {folder}",
-                "folderGone": "the folder is gone"
+                "folderGone": "the folder is gone",
+                "worktreeRemoved": "Worktree removed · branch {branch} kept"
+            },
+            "instructions": {
+                "title": "Fleet actions",
+                "intro": "How {agent} commits, opens pull requests and writes recaps in sessions on your computers. Empty fields use the Ever Works default.",
+                "blockError": "The fleet block in agent.yml could not be read ({error}); the defaults apply until it is fixed.",
+                "prefix": "Branch prefix",
+                "prefixDefault": "Default: {prefix} — new worktrees get branches like {prefix}/fix-login",
+                "usesDefault": "Uses the default",
+                "default": "Default",
+                "unknownPlaceholders": "{names} is not filled in; it would be typed as it is",
+                "placeholders": "{branch}, {base}, {pull} and {task} are filled in when the action is sent.",
+                "save": "Save Fleet actions",
+                "saving": "Saving…",
+                "saved": "Saved to agent.yml",
+                "failed": "Could not save"
+            },
+            "cleanUp": {
+                "button": "Clean up",
+                "title": "Remove this worktree now that its pull request is done; the branch {branch} is kept",
+                "confirm": "Remove the worktree of {branch} on {node}? The branch is kept.",
+                "typeName": "Type {name} to confirm",
+                "remove": "Remove the worktree",
+                "cancel": "Cancel",
+                "done": "Worktree removed · branch {branch} kept"
             },
             "prPill": {
                 "label": "PR #{number} {state}",

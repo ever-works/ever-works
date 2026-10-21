@@ -65,3 +65,5 @@ An Agent works with its own sessions through `fleet_sessions_list`, `fleet_sessi
 - [Fleet hub](./fleet-hub.md) — the computer page the Sessions tab sits on.
 - [Fleet node link](./fleet-node-link.md) — the consents (`--manage`, `--work`) and the one connection sessions ride.
 - [Agent terminals](./agent-terminals.md) — the terminal of a Run on the job runtime.
+
+See also [Session git & actions](./fleet-session-git.md) — the branch, the diff, the pull request and one-click actions of a session.

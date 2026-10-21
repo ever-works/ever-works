@@ -297,6 +297,15 @@ export class FleetSessionActionService {
                 rule: 'owner-dialog',
             });
         }
+        // An Agent prompts its OWN sessions; another session (an owner's interactive one, another
+        // Agent's) only when its owner switched on "may answer other sessions" (CONTRACTS R-32's reading).
+        if (actor.agentId && session.agentId !== actor.agentId && !(await this.agentMayPromptOthers(actor.agentId))) {
+            throw fleetSessionError(
+                'permission_denied',
+                'an Agent sends actions to its own sessions; ask its owner to allow "may answer other sessions"',
+                { setting: 'canAnswerOtherSessions' },
+            );
+        }
         const requestedBy = actor.agentId ? `agent:${actor.agentId}` : `user:${actor.userId}`;
         this.consumeRate(session.id, requestedBy);
         const preview = redactSecrets(prompt).cleaned.slice(0, FLEET_SESSION_ACTION_PREVIEW_MAX_LENGTH);
@@ -520,6 +529,18 @@ export class FleetSessionActionService {
             return [...(resolved.policy.protectedBranches ?? FALLBACK_PROTECTED)];
         } catch {
             return [...FALLBACK_PROTECTED];
+        }
+    }
+
+    /** R-32: may this Agent prompt a session that is not its own? Absent permission = no. */
+    private async agentMayPromptOthers(agentId: string): Promise<boolean> {
+        if (!this.agents) return false;
+        try {
+            const agent = await this.agents.findById(agentId);
+            const permissions = agent?.permissions as unknown as Record<string, unknown> | undefined;
+            return permissions?.canAnswerOtherSessions === true;
+        } catch {
+            return false;
         }
     }
 
