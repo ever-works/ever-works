@@ -159,6 +159,8 @@ function stubDomainSources(): AgentDomainToolSources {
             portTunnels: { isEnabled: () => true } as never,
             health: { service: stub(), history: stub(), needsALook: stub() },
             checkouts: { service: stub() },
+            // FL-06 P3 — the session actions, Changes and pull-request tools.
+            sessionGit: { actions: stub(), checkouts: stub(), pullRequests: stub() },
             logs: { reader: stub() },
             status: stub(),
             // `requestCancel` present so `fleet_operations_cancel` is listed (P2).

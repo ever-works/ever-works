@@ -2,6 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import type {
+    FleetAgentActionTemplates,
+    FleetAgentActionTemplatesUpdate,
     FleetCheckoutChangesReply,
     FleetCheckoutPullRequestFacts,
     FleetOpenPullRequestRequest,
@@ -170,6 +172,31 @@ export async function getPullRequestDraftAction(
     await ensureAuth();
     try {
         return { success: true, data: await fleetSessionGitAPI.pullRequestDraft(checkoutId) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/** An Agent's own Fleet action templates and branch prefix (spec FR-27). */
+export async function getAgentActionTemplatesAction(
+    agentId: string,
+): Promise<SessionGitActionResult<FleetAgentActionTemplates>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetSessionGitAPI.agentTemplates(agentId) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/** Save them into the Agent's agent.yml (the rest of the file is kept). */
+export async function saveAgentActionTemplatesAction(
+    agentId: string,
+    body: FleetAgentActionTemplatesUpdate,
+): Promise<SessionGitActionResult<FleetAgentActionTemplates>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetSessionGitAPI.saveAgentTemplates(agentId, body) };
     } catch (error) {
         return refusal(error);
     }

@@ -173,3 +173,19 @@ export function ledgerCostText(
 export function hiddenReasonKey(reason: string): string {
     return reason.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
 }
+
+/**
+ * May a worktree be cleaned up (spec FR-25)? A worktree that is there, whose
+ * pull request is merged or closed, and that no live session uses. The
+ * platform checks it again (`?cleanUp=1`); this only decides whether the
+ * button shows.
+ */
+export function canCleanUp(input: {
+    kind: string;
+    state: string;
+    pr: Pick<FleetGitLinePullRequest, 'state'> | null | undefined;
+    sessionLive: boolean;
+}): boolean {
+    if (input.kind !== 'worktree' || input.state !== 'ready' || input.sessionLive) return false;
+    return input.pr?.state === 'merged' || input.pr?.state === 'closed';
+}

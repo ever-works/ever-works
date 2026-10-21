@@ -102,3 +102,27 @@ export class OpenFleetPullRequestDto {
     @IsUUID()
     sessionId?: string;
 }
+
+/** `PUT /api/fleet/agents/:agentId/action-templates` (FL-06 spec FR-27). */
+export class UpdateFleetAgentActionTemplatesDto {
+    @ApiProperty({ required: false, nullable: true, description: 'The branch prefix; empty or null for the default (the Agent’s slug).' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(30)
+    branchPrefix?: string | null;
+
+    @ApiProperty({
+        required: false,
+        description: 'Templates by action id; an empty text falls back to the platform default.',
+        type: 'object',
+        additionalProperties: { type: 'string' },
+    })
+    @IsOptional()
+    actions?: Partial<Record<FleetSessionActionId, string | null>>;
+
+    @ApiProperty({ required: false, description: 'The agent files’ etag the editor last saw.' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    expectedHash?: string;
+}

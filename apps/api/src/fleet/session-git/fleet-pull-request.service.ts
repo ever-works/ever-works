@@ -34,6 +34,8 @@ import { FleetPrEnrichmentService } from './fleet-pr-enrichment.service';
 /** Who asks: a person, or an Agent session through its run-scoped token (`ew_run_…`). */
 export interface FleetPullRequestCaller {
     userId: string;
+    /** An Agent acting through its in-process tools (`fleet_checkouts_open_pull_request`). */
+    agentId?: string | null;
     /** Present when a fleet-run token authenticated the request (the Agent session's MCP bridge). */
     run?: FleetRunCredentialBinding | null;
 }
@@ -136,7 +138,7 @@ export class FleetPullRequestService {
         }
 
         // FR-18, U11: an Agent opens pull requests only with its owner's permission.
-        const agentId = caller.run?.agentId ?? (caller.run ? session?.agentId : null) ?? null;
+        const agentId = caller.run?.agentId ?? caller.agentId ?? (caller.run ? session?.agentId : null) ?? null;
         if (caller.run && !agentId) {
             throw fleetSessionError('permission_denied', 'only an Agent session may open a pull request this way', {
                 permission: 'canOpenPullRequests',

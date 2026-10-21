@@ -195,6 +195,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-sessions',
 				// What each session needs from you, answering it anywhere, the Sessions board (FL-05).
 				'features/fleet-session-status',
+				// The branch, the diff, the pull request and one-click actions of a session (FL-06).
+				'features/fleet-session-git',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
 				// Tasks on computers (FL-15) — the hand-off, the Computer block, GitHub things for me, git identity.

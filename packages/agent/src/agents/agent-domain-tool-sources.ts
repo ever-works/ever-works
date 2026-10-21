@@ -18,6 +18,8 @@ import type { FleetCommandService } from '../fleet/commands/fleet-command.servic
 import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
+import type { FleetSessionActionService } from '../fleet/session-git/fleet-session-action.service';
+import type { FleetSessionPullRequestOpener } from '../fleet/session-git/agent-fleet-session-git-tools';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
@@ -165,6 +167,18 @@ export interface AgentFleetToolSource {
             FleetCheckoutService,
             'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
         >;
+    };
+    /**
+     * Session git & actions (FL-06 P3, spec FR-26) — when bound, the
+     * `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` and
+     * `fleet_checkouts_open_pull_request` tools are offered
+     * (`buildFleetSessionGitTools`), each act checked against the Node's
+     * audience for the Agent's owner. The pull-request opener is the API's.
+     */
+    sessionGit?: {
+        actions: Pick<FleetSessionActionService, 'list' | 'send'>;
+        checkouts?: Pick<FleetCheckoutService, 'changes'>;
+        pullRequests?: FleetSessionPullRequestOpener;
     };
     /**
      * Logs on computers (FL-08) — when bound, the read-only

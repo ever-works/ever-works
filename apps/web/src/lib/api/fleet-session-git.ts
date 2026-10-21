@@ -1,5 +1,7 @@
 import 'server-only';
 import type {
+    FleetAgentActionTemplates,
+    FleetAgentActionTemplatesUpdate,
     FleetCheckoutChangesReply,
     FleetCheckoutPullRequestFacts,
     FleetOpenPullRequestRequest,
@@ -113,5 +115,22 @@ export const fleetSessionGitAPI = {
         return serverFetch<FleetPullRequestDraft>(
             `${BASE}/checkouts/${encodeURIComponent(checkoutId)}/pull-request/draft`,
         );
+    },
+
+    // ─── P3: the Agent's own templates (the instructions editor) ───
+
+    agentTemplates: async (agentId: string) => {
+        return serverFetch<FleetAgentActionTemplates>(
+            `${BASE}/agents/${encodeURIComponent(agentId)}/action-templates`,
+        );
+    },
+
+    saveAgentTemplates: async (agentId: string, body: FleetAgentActionTemplatesUpdate) => {
+        return serverMutation<FleetAgentActionTemplates>({
+            endpoint: `${BASE}/agents/${encodeURIComponent(agentId)}/action-templates`,
+            data: body,
+            method: 'PUT',
+            wrapInData: false,
+        });
     },
 };

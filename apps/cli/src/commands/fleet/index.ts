@@ -29,6 +29,12 @@ import { statusCommand } from './status';
 import { toolsCommand } from './tools';
 import { answerCommand } from './session/answer';
 import { questionCommand } from './session/question';
+import {
+    actionSendCommand,
+    actionsListCommand,
+    checkoutChangesCommand,
+    checkoutPullRequestCommand,
+} from './session/actions';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 import { virtualCommand } from './virtual';
 
@@ -50,6 +56,10 @@ export const fleetSessionCommand = new Command('session')
     .addCommand(answerCommand)
     // FL-15 P3: hand a Task to an Agent session on a computer.
     .addCommand(sessionStartCommand);
+
+// FL-06 P3 — `fleet session actions|action` and `fleet checkout changes|pull-request`.
+fleetSessionCommand.addCommand(actionsListCommand).addCommand(actionSendCommand);
+checkoutsCommand.addCommand(checkoutChangesCommand).addCommand(checkoutPullRequestCommand);
 
 // FL-15 P3 — `fleet nodes git-identity <nodeId> [--set [--confirm]]` on FL-19's `fleet nodes`.
 nodesCommand.addCommand(gitIdentityCommand);

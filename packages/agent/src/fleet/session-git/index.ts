@@ -5,3 +5,6 @@ export * from './fleet-session-git.module';
 export * from './fleet-session-action.service';
 export * from './agent-fleet-block';
 export * from './fleet-session-pr-facts.port';
+// P3 — the Agent tools and the editor's Fleet actions section.
+export * from './fleet-agent-action-templates.service';
+export * from './agent-fleet-session-git-tools';
