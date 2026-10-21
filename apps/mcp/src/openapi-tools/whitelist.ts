@@ -934,6 +934,59 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { readOnlyHint: true }
 	},
 
+	// FL-19 P2 — the acts of the catalogue that had no MCP entry (CONTRACTS §2.2: a confirming act
+	// answers `confirmation_required` with the summary first; repeat with `confirm: true`,
+	// `confirmName`, or `acknowledgeBlastRadius: true` as the answer says — never a token). They act
+	// as the API-key user, so the computer's own audience is checked for that person (spec FR-18).
+	// `fleet_docker_run` stays off MCP: a run may carry secret values a person types (FL-09).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/services/{name}/{action}',
+		toolName: 'fleet_services_action',
+		description:
+			"Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/processes/{pid}/signal',
+		toolName: 'fleet_processes_signal',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/containers/{cid}/{action}',
+		toolName: 'fleet_docker_container_action',
+		description:
+			'Start, stop, restart, pause, unpause or remove one Docker container on one of my fleet computers. Class confirm (remove: confirm-destructive — send confirmName with the container name). Audited.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/images/{iid}/{action}',
+		toolName: 'fleet_docker_image_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/compose/{project}/{action}',
+		toolName: 'fleet_docker_compose_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/wake',
+		toolName: 'fleet_nodes_wake',
+		annotations: { destructiveHint: false }
+	},
+	{
+		method: 'DELETE',
+		path: '/api/fleet/operations/{id}',
+		toolName: 'fleet_operations_cancel',
+		description: 'Ask the computer to stop a long operation that is still running. It then reads cancelled.',
+		annotations: { destructiveHint: false }
+	},
+
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.
 	{

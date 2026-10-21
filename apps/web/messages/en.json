@@ -12908,6 +12908,32 @@
                     "usage": "Usage",
                     "operations": "Operations"
                 }
+            },
+            "decision": {
+                "expiresIn": "Expires in {hours} h {minutes} m",
+                "expired": "Older than 24 hours: approving it runs nothing — the Agent must ask again.",
+                "details": "What it would call ({tool})",
+                "rungs": {
+                    "ask": "Ask",
+                    "draft": "Draft"
+                },
+                "categories": {
+                    "machineAdmin": "Change a computer",
+                    "machineRun": "Run commands on a computer",
+                    "writeDestructive": "Delete things",
+                    "writeInternal": "Change things inside the workspace",
+                    "agentFanout": "Hire agents and set schedules",
+                    "publishExternal": "Publish outside the workspace",
+                    "spendMetered": "Spend credits",
+                    "other": "Act on a computer"
+                },
+                "reasons": {
+                    "blastRadius": "The computer warned this could cut it off from Ever Works.",
+                    "kill": "Force-stopping a process is decided by a person.",
+                    "destructive": "This removes something and cannot be undone.",
+                    "run": "Starting a container is decided by a person.",
+                    "other": "This waits for a person."
+                }
             }
         },
         "gitIdentity": {

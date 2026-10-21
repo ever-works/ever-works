@@ -142,8 +142,10 @@ import {
     NeedsALookService,
     FLEET_LOGS_READER,
     FLEET_STATUS_READER,
+    FLEET_WAKE_TOOL_PORT,
     type FleetLogsReaderPort,
     type FleetStatusReaderPort,
+    type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
 // Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
@@ -2174,6 +2176,9 @@ async function assertRealWriteTarget(
                 // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
                 { token: FleetTaskHandoffService, optional: true },
                 { token: FleetGitIdentityService, optional: true },
+                // FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the Agent's owner).
+                // APPENDED LAST (positional), optional.
+                { token: FLEET_WAKE_TOOL_PORT, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2211,6 +2216,7 @@ async function assertRealWriteTarget(
                 fleetVirtual?: FleetVirtualService | null,
                 fleetTaskHandoff?: FleetTaskHandoffService | null,
                 fleetGitIdentity?: FleetGitIdentityService | null,
+                fleetWake?: FleetWakeToolPort | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2256,6 +2262,7 @@ async function assertRealWriteTarget(
                           }
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
+                    ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
