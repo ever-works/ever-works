@@ -276,6 +276,14 @@ export class FleetClient {
 		if (ceiling) {
 			response.limitCeiling = ceiling;
 		}
+		// Fleet node link (FL-02, CONTRACTS §1.1): the version this deployment
+		// recommends — what `--auto-update` upgrades to. Only a well-formed version.
+		const recommended = normalizeFleetNodeVersionFloor(
+			(payload as { recommendedNodeVersion?: unknown } | null)?.recommendedNodeVersion
+		);
+		if (recommended) {
+			response.recommendedNodeVersion = recommended;
+		}
 		return response;
 	}
 
@@ -458,6 +466,11 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 			manage: source.consents.manage === true,
 			usageScan: source.consents.usageScan === true
 		};
+	}
+	// Fleet node link (FL-02 T-25): the self-update report, already normalised
+	// by `describeSelf`; copied as is. Heartbeat-only in practice.
+	if (source.selfUpdate !== undefined) {
+		out.selfUpdate = source.selfUpdate;
 	}
 	return out;
 }

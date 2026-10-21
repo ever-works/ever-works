@@ -71,7 +71,11 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Computer health (FL-03): the health snapshot. Its own
+	// NEWEST first. Fleet node link (FL-02 T-25): the opt-in self-update's
+	// report. Its own tier, newest of all: a platform that knows the health
+	// snapshot but not this field costs the node exactly this one field.
+	['selfUpdate'],
+	// Computer health (FL-03): the health snapshot. Its own
 	// tier, so a platform that predates it costs exactly this one field —
 	// the consents, pinned CLI versions and enforced limits below keep
 	// flowing (FR-3, U9). Newer than the consents: FL-02 reached `develop`
@@ -445,13 +449,18 @@ function describeStrippedTiers(tiers: number): string {
 	if (tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length) {
 		return 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.';
 	}
-	if (tiers >= 3) {
+	// Tier 1 is FL-02's self-update report (newest), 2 FL-03's health, 3 the
+	// consents, 4 the pinned CLI versions and limits, 5 worker state and housekeeping.
+	if (tiers >= 4) {
 		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
 	}
-	if (tiers >= 2) {
+	if (tiers >= 3) {
 		return 'Platform rejected the consents field; it predates the node link. Still reporting pinned CLI versions, enforced limits, worker state and housekeeping; the node link stays closed and the health snapshot off until this node restarts.';
 	}
-	return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	if (tiers >= 2) {
+		return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	}
+	return 'Platform rejected the self-update report; it predates it. Still reporting everything else; the report stays off until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */

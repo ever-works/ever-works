@@ -53,7 +53,7 @@ import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
-import type { FleetConsents } from '@ever-works/contracts';
+import type { FleetConsents, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
@@ -565,6 +565,22 @@ export interface CreateNodeRuntimeOptions {
 	 * FL-02); a test or an embedder passes its own.
 	 */
 	managementLane?: ManagementLaneTables;
+	/**
+	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
+	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
+	 * embedder without self-update leaves it unset and the field is absent.
+	 */
+	selfUpdateReport?: () => FleetNodeSelfUpdateReport | null;
+	/**
+	 * Called with every ACCEPTED heartbeat's version verdict (the floor,
+	 * whether this daemon is below it, the recommended version) — what the
+	 * self-update decides on. Never able to fail the beat.
+	 */
+	onHeartbeatAccepted?: (response: {
+		minNodeVersion?: string;
+		upgradeRequired?: boolean;
+		recommendedNodeVersion?: string;
+	}) => void;
 }
 
 /**
@@ -682,6 +698,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
 	};
 	telemetry.consents = () => consents;
+	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
 	const managementPlan = planManagementLane(consents, options.managementLane);
@@ -731,12 +748,31 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			upgradeRequired?: boolean;
 			limitCeiling?: NodeLimitCeiling;
 			node?: { modelThrottles?: unknown };
+			recommendedNodeVersion?: string;
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
 			throttleTarget?.(response.node?.modelThrottles);
 			// Fleet node link (FL-02): the first accepted beat opens it (FR-1).
 			startLink?.();
+			// Fleet node link (FL-02 T-25): the self-update decides on the verdict.
+			if (options.onHeartbeatAccepted) {
+				try {
+					options.onHeartbeatAccepted({
+						...(response.minNodeVersion !== undefined ? { minNodeVersion: response.minNodeVersion } : {}),
+						...(response.upgradeRequired !== undefined
+							? { upgradeRequired: response.upgradeRequired }
+							: {}),
+						...(response.recommendedNodeVersion !== undefined
+							? { recommendedNodeVersion: response.recommendedNodeVersion }
+							: {})
+					});
+				} catch (error) {
+					io.logger.warn(
+						`Heartbeat listener failed: ${error instanceof Error ? error.message : String(error)}`
+					);
+				}
+			}
 		}
 	};
 

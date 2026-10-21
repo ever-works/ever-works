@@ -11,6 +11,7 @@ import {
 	currentEnvironment,
 	defaultConfigPath,
 	isExecutableFile,
+	resolveEntryPath,
 	statModelCliFile,
 	systemFetch
 } from './node-io';
@@ -61,7 +62,9 @@ function buildDeps(): CliDeps {
 			on: (signal, handler) => {
 				process.on(signal, handler);
 			}
-		}
+		},
+		// Fleet node link (FL-02 T-25): what `--auto-update` identifies the install by.
+		entryPath: resolveEntryPath()
 	};
 }
 
