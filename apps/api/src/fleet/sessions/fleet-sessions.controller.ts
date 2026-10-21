@@ -9,8 +9,10 @@ import {
     Patch,
     Post,
     Query,
+    Res,
     UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -116,17 +118,25 @@ export class FleetSessionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: StartFleetSessionDto,
+        @Res({ passthrough: true }) response?: Response,
     ): Promise<FleetSessionView> {
         const actor = actorOf(auth);
+        // An Agent session is QUEUED as a job (P2): `202` while it waits for a slot.
+        const queued = (view: FleetSessionView): FleetSessionView => {
+            if (view.kind === 'agent' && view.state === 'starting') response?.status(HttpStatus.ACCEPTED);
+            return view;
+        };
         if (body.restartOf) {
-            return this.sessions.restart(
-                body.restartOf,
-                actor,
-                { cols: body.cols, rows: body.rows },
-                { expectNodeId: id },
+            return queued(
+                await this.sessions.restart(
+                    body.restartOf,
+                    actor,
+                    { cols: body.cols, rows: body.rows },
+                    { expectNodeId: id },
+                ),
             );
         }
-        return this.sessions.start(id, actor, {
+        return queued(await this.sessions.start(id, actor, {
             kind: body.kind,
             provider: body.provider,
             cwd: body.cwd,
@@ -137,7 +147,7 @@ export class FleetSessionsController {
             ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
             ...(body.cols !== undefined ? { cols: body.cols } : {}),
             ...(body.rows !== undefined ? { rows: body.rows } : {}),
-        });
+        }));
     }
 
     @Get('sessions')

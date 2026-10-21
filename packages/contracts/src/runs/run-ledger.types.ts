@@ -123,6 +123,11 @@ export interface RunLedgerRow {
 	awaitingInput: boolean;
 	queuedReason: string | null;
 	attentionReason: string | null;
+	/**
+	 * Sessions on computers (FL-04 P2): the Agent session this run is (trigger
+	 * `session`), else null. Optional so an older API's rows still read.
+	 */
+	fleetSessionId?: string | null;
 }
 
 /** One cursor page of the ledger. */

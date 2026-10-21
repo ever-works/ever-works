@@ -333,3 +333,51 @@ describe('the daemon report (heartbeat `daemon`)', () => {
 		expect(normalizeFleetSessionDaemonReport([])).toBeNull();
 	});
 });
+
+import {
+	fleetAgentSessionRequiredCapabilities,
+	FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE,
+	FLEET_AGENT_SESSION_LEASE_TTL_SEC,
+	isFleetAgentSessionProvider,
+	parseFleetAgentSessionPayload
+} from '../fleet-sessions.types.js';
+
+describe('agent-session payload (FL-04 P2)', () => {
+	const UUID = '11111111-1111-4111-8111-111111111111';
+	const valid = {
+		fleetSessionId: UUID,
+		agentId: UUID,
+		agentRunId: UUID,
+		nodeId: UUID,
+		provider: 'claude-code',
+		cwd: '/home/nina/code/app',
+		title: 'fix the build',
+		firstMessage: 'Fix the failing build',
+		cols: 120,
+		rows: 32,
+		permissionMode: 'acceptEdits',
+		leaseTtlSec: 300
+	};
+
+	it('reads a well-formed payload and defaults what is missing', () => {
+		expect(parseFleetAgentSessionPayload(valid)).toEqual(valid);
+		const bare = parseFleetAgentSessionPayload({ ...valid, permissionMode: 'bypassPermissions', leaseTtlSec: 'x' });
+		expect(bare?.permissionMode).toBe(FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE);
+		expect(bare?.leaseTtlSec).toBe(FLEET_AGENT_SESSION_LEASE_TTL_SEC);
+	});
+
+	it('refuses a shell, a short or missing first message, a path-shaped id, a NUL folder', () => {
+		expect(parseFleetAgentSessionPayload({ ...valid, provider: 'shell' })).toBeNull();
+		expect(parseFleetAgentSessionPayload({ ...valid, firstMessage: 'hi' })).toBeNull();
+		expect(parseFleetAgentSessionPayload({ ...valid, firstMessage: undefined })).toBeNull();
+		expect(parseFleetAgentSessionPayload({ ...valid, fleetSessionId: '../x' })).toBeNull();
+		expect(parseFleetAgentSessionPayload({ ...valid, cwd: '/tmp\0/x' })).toBeNull();
+		expect(parseFleetAgentSessionPayload(null)).toBeNull();
+	});
+
+	it('requires the sessions tag and the CLI tag', () => {
+		expect(isFleetAgentSessionProvider('codex')).toBe(true);
+		expect(isFleetAgentSessionProvider('shell')).toBe(false);
+		expect(fleetAgentSessionRequiredCapabilities('codex')).toEqual(['sessions', 'codex']);
+	});
+});

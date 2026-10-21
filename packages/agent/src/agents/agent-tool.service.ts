@@ -65,6 +65,7 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
@@ -590,6 +591,20 @@ export class AgentToolService {
                     }),
                 );
             }
+        }
+
+        // FL-04 P2 — the Agent's own sessions on computers (start is always an
+        // Agent session of THIS Agent, FR-51). Bound only while
+        // FLEET_SESSIONS_ENABLED is on.
+        if (sources.fleetSessions) {
+            const fleetSessions = sources.fleetSessions;
+            add('fleet-sessions', () =>
+                buildFleetSessionTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleetSessions.service,
+                }),
+            );
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it

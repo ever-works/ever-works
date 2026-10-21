@@ -79,6 +79,23 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         expect([400, 404]).toContain(response.status());
     });
 
+    test('an Agent session on an unknown computer answers 404 — never a queued job (FL-04 P2)', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const response = await request.post(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`, {
+            headers: { ...authedHeaders(user.access_token), 'Content-Type': 'application/json' },
+            data: {
+                kind: 'agent',
+                provider: 'claude-code',
+                cwd: '~/code/app',
+                agentId: UNKNOWN_UUID,
+                firstMessage: 'Fix the failing build',
+            },
+        });
+        expect(response.status()).toBe(404);
+    });
+
     test('the routes need a signed-in person', async ({ request }) => {
         const response = await request.get(`${API_BASE}/api/fleet/sessions`);
         expect([401, 404]).toContain(response.status());

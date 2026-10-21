@@ -321,10 +321,33 @@ export class FleetJobService {
         if (kind === 'computer-session') {
             return this.resolveComputerSessionTarget(userId, payload?.nodeId);
         }
+        if (kind === 'agent-session') {
+            return this.resolveAgentSessionTarget(payload?.nodeId);
+        }
         if (kind !== 'agent-task') {
             return null;
         }
         return this.resolveAgentTaskTarget(userId, payload?.agentId);
+    }
+
+    /**
+     * Sessions on computers (FL-04 P2) — an Agent session runs on ONE machine,
+     * the one it was started on, so an `agent-session` job is always pinned to
+     * `payload.nodeId` and never written unpinned. The node may be one shared
+     * with the person through an Organization: `FleetSessionService.startAgent`
+     * (the one enqueuer) has already checked the person is in that computer's
+     * `sessions` audience, so this only refuses a job that names no node, or a
+     * node that does not exist.
+     */
+    private async resolveAgentSessionTarget(nodeId: unknown): Promise<string> {
+        if (typeof nodeId !== 'string' || !isUUID(nodeId)) {
+            throw new BadRequestException('An agent-session job must name the node it is for');
+        }
+        const node = await this.nodes.findById(nodeId);
+        if (!node) {
+            throw new BadRequestException('An agent-session job must name a node that exists');
+        }
+        return node.id;
     }
 
     /**

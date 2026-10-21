@@ -2316,7 +2316,8 @@
                 "work": "Work",
                 "agent": "Agent",
                 "noMission": "This run was not part of a Mission",
-                "openSchedule": "Open the schedule that ran this"
+                "openSchedule": "Open the schedule that ran this",
+                "openFleetSession": "Open the session on its computer"
             },
             "shortcuts": {
                 "button": "Keyboard shortcuts",
@@ -13585,7 +13586,12 @@
                 "limit": "{node} already has {count} sessions. End one to start another.",
                 "failed": "The session could not start.",
                 "fieldCwd": "Choose a folder on {node}.",
-                "offline": "{node} is offline. Sessions start once it is back."
+                "offline": "{node} is offline. Sessions start once it is back.",
+                "agentPick": "Agent",
+                "noAgents": "You have no Agents yet. Create one under Agents first.",
+                "agentShellNot": "an Agent drives a CLI, not a shell",
+                "firstMessageRequired": "Required for an Agent session: what the Agent should do (3–4 000 characters).",
+                "queuedHint": "The session starts as soon as {node} has a free slot; until then it waits."
             },
             "detail": {
                 "back": "Sessions",
@@ -13638,7 +13644,9 @@
                 "end": "End…",
                 "restart": "Restart",
                 "copyLink": "Copy link",
-                "shortcuts": "Keyboard shortcuts"
+                "shortcuts": "Keyboard shortcuts",
+                "waiting": "Waiting for a free slot on {node}…",
+                "openRun": "Open the Run"
             },
             "shortcuts": {
                 "title": "Session shortcuts",
@@ -13686,6 +13694,11 @@
                 "newSessionMenu": "New session on {node}",
                 "state": "State: {state}",
                 "card": "{title} on {node}, {state}"
+            },
+            "agentBlock": {
+                "title": "Sessions",
+                "empty": "{agent} has no sessions on your computers yet.",
+                "loadFailed": "The sessions could not be loaded."
             }
         }
     }
