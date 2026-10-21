@@ -64,13 +64,15 @@ export class FleetLinkController {
         summary:
             "Mint this node's single-use, five-minute token for its one outbound link socket (/ws/fleet/link). Node-credential authenticated; 404 while the deployment does not accept node links.",
     })
-    mintLinkToken(
+    async mintLinkToken(
         @CurrentFleetNode() node: AuthenticatedFleetNode,
         // Validated so the credential body has the one shape every node route accepts.
         @Body() _credential: FleetJobNodeCredentialDto,
-    ): FleetLinkTokenGrant {
+    ): Promise<FleetLinkTokenGrant> {
         if (!config.fleet.isNodeLinkEnabled()) throw new NotFoundException();
-        return this.tokens.mint(node.id);
+        // Works-security (run-token scope) — bound to the node's current
+        // credential generation, so a rotation refuses it at hello.
+        return this.tokens.mintForNode(node.id);
     }
 
     @Get('operations/:id')
@@ -94,12 +96,12 @@ export class FleetLinkController {
         summary:
             'Ask the computer to cancel a running operation. The operation then reads cancelled; one that already ended is returned as it is.',
     })
-    cancelOperation(
+    async cancelOperation(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-    ): FleetOperationCancelResult {
+    ): Promise<FleetOperationCancelResult> {
         if (!config.fleet.isNodeLinkEnabled() || !isFleetLinkId(id))
             throw fleetLinkError('not_found', 'no such operation');
-        return this.operations.cancel(id, auth.userId);
+        return this.operations.requestCancel(id, auth.userId);
     }
 }

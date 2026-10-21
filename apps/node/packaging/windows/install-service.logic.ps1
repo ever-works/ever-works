@@ -543,6 +543,12 @@ function New-ServiceConfigurationPlan {
     & $addNssm @('set', $Name, 'AppStopMethodConsole', '900000') 'give the drain 15 minutes'
     & $addNssm @('set', $Name, 'AppExit', 'Default', 'Restart') 'restart on exit'
     & $addNssm @('set', $Name, 'AppRestartDelay', '10000') 'back off 10s between restarts'
+    # Sessions on computers (FL-04): the node starts a detached session daemon
+    # that owns every session's terminal. NSSM kills the whole process tree on
+    # stop by default, which would end every session on each service restart
+    # or upgrade; with the tree kill off only node.exe stops and the daemon -
+    # with every session - keeps running for the next node process to find.
+    & $addNssm @('set', $Name, 'AppKillProcessTree', '0') 'keep the session daemon running across a service restart'
     & $addNssm @('set', $Name, 'Start', 'SERVICE_AUTO_START') 'start at boot'
 
     return , $steps.ToArray()

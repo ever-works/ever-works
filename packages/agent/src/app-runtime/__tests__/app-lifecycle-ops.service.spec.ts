@@ -518,6 +518,42 @@ describe('app-lifecycle-ops — pause (APW-06 T70)', () => {
         expect(result.code).toBe('runtime_state_unavailable');
         expect(plugin.scaleApp).not.toHaveBeenCalled();
     });
+
+    it('rolls back the `paused` mark when the scale FAILS (not a throw) — prod 2026-10-20', async () => {
+        // `setPaused(true)` is optimistic; a scale-down that does not complete means the pods are
+        // still up, so the App must not be left reading `paused` while serving.
+        const plugin = pluginFake({
+            scaleApp: jest.fn(async () => ({
+                components: [],
+                smoke: null,
+                failure: { code: 'cluster_unreachable', message: 'HTTP-Code: 422 …' },
+            })),
+        });
+        const state = stateFake({});
+        const { service } = build({ plugin, state });
+
+        const result = await service.pause(op({ op: 'pause' }));
+
+        expect(result.state).toBe('failed');
+        expect(result.code).toBe('cluster_unreachable');
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, true, expect.any(Date));
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+    });
+
+    it('rolls back the `paused` mark when the scale THROWS', async () => {
+        const plugin = pluginFake({
+            scaleApp: jest.fn(async () => {
+                throw new Error('the apply was rejected');
+            }),
+        });
+        const state = stateFake({});
+        const { service } = build({ plugin, state });
+
+        const result = await service.pause(op({ op: 'pause' }));
+
+        expect(result.state).toBe('failed');
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+    });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -610,6 +646,92 @@ describe('app-lifecycle-ops — resume (APW-06 T70)', () => {
         const result = await service.resume(op({ op: 'resume' }));
 
         expect(result.state).toBe('failed');
+        expect(state.releaseDeployLock).toHaveBeenCalledWith(WORK_ID, REQUEST_ID);
+    });
+
+    it('resumes a paused managed App to its declared replicas when only the declared read answers', async () => {
+        // Prod 2026-10-20: the verification-shaped read refuses a Build-backed App whose request names
+        // no Build, so resume used to refuse `status_spec_unavailable` for every paused managed App.
+        const specs = {
+            readVerificationSpec: jest.fn(async () => undefined),
+            readDeclaredSpec: jest.fn(async () => ({
+                specCommitSha: 'abc123',
+                components: SPEC.input.components,
+                jobs: SPEC.input.jobs,
+                cron: SPEC.input.cron,
+                smoke: SPEC.input.smoke,
+            })),
+        };
+        const state = stateFake({ namespace: NAMESPACE, paused: true });
+        const { service, plugin } = build({ state, spec: specs as never });
+
+        const result = await service.resume(op({ op: 'resume' }));
+
+        expect(specs.readDeclaredSpec).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: WORK_ID, namespace: NAMESPACE }),
+        );
+        expect(plugin.scaleApp).toHaveBeenCalledWith(
+            REF,
+            KUBECONFIG,
+            'resume',
+            { web: 2, worker: 1 },
+            {
+                smoke: [{ name: 'health', component: 'web', http: { path: '/api/health' } }],
+                deadlines: { web: 750, worker: 600 },
+            },
+        );
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+        expect(result.state).toBe('done');
+        expect(result.detail?.replicas).toBe('declared');
+    });
+
+    it('resumes to the pre-pause counts the cluster recorded when no App spec can be read', async () => {
+        const plugin = pluginFake({
+            scaleApp: jest.fn(async () => ({
+                components: [{ name: 'web', role: 'web', desired: 2, ready: 2, restarts: 0 }],
+                smoke: null,
+            })),
+        });
+        const state = stateFake({ namespace: NAMESPACE, paused: true });
+        const { service } = build({
+            plugin,
+            state,
+            spec: { readVerificationSpec: jest.fn(async () => undefined) } as never,
+        });
+
+        const result = await service.resume(op({ op: 'resume' }));
+
+        // An empty declared map: the plugin restores each component's recorded pre-pause count.
+        expect(plugin.scaleApp).toHaveBeenCalledWith(
+            REF,
+            KUBECONFIG,
+            'resume',
+            {},
+            {
+                smoke: [],
+                deadlines: {},
+            },
+        );
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+        expect(result.state).toBe('done');
+        expect(result.detail?.replicas).toBe('pre-pause');
+        expect(state.releaseDeployLock).toHaveBeenCalledWith(WORK_ID, REQUEST_ID);
+    });
+
+    it('stays paused with `status_spec_unavailable` when neither a spec nor a recorded count exists', async () => {
+        const state = stateFake({ namespace: NAMESPACE, paused: true });
+        const { service, plugin } = build({
+            state,
+            spec: { readVerificationSpec: jest.fn(async () => undefined) } as never,
+        });
+
+        const result = await service.resume(op({ op: 'resume' }));
+
+        expect(plugin.scaleApp).toHaveBeenCalledTimes(1);
+        expect(result.state).toBe('refused');
+        expect(result.code).toBe('status_spec_unavailable');
+        // Nothing resumed, so the App is not marked resumed — never a green resume of nothing.
+        expect(state.setPaused).not.toHaveBeenCalled();
         expect(state.releaseDeployLock).toHaveBeenCalledWith(WORK_ID, REQUEST_ID);
     });
 });

@@ -23,6 +23,7 @@ import {
     type FleetConsents,
     type FleetLinkCloseReason,
     type FleetLinkControlMessage,
+    type FleetLinkError,
     type FleetLinkExtensionMessage,
     type FleetLinkFamily,
     type FleetLinkFrame,
@@ -34,8 +35,11 @@ import {
     type FleetLinkReply,
     type FleetNodeLinkView,
 } from '@ever-works/contracts';
+import type { FleetLinkChannel, FleetLinkChannelEvents } from './fleet-link-channel';
 import { FleetLinkException, fleetLinkError } from './fleet-link.errors';
 import type { FleetLinkRequirement } from './fleet-link.types';
+
+export type { FleetLinkChannel, FleetLinkChannelEvents } from './fleet-link-channel';
 
 /**
  * Fleet node link — the platform's registry of live links and their
@@ -84,14 +88,6 @@ export interface FleetLinkSocketPort {
     /** Send one binary frame; false when it could not be sent (closed, backed up). */
     send(frame: Uint8Array): boolean;
     close(code: number, reason: string): void;
-}
-
-/** What a caller listens to on a channel. */
-export interface FleetLinkChannelEvents {
-    json?(message: Record<string, unknown>): void;
-    binary?(kind: FleetLinkFrameKind, payload: Uint8Array): void;
-    close?(reason: FleetLinkCloseReason, hint?: string): void;
-    resume?(linkGeneration: number): void;
 }
 
 export interface FleetLinkRegistryOptions {
@@ -201,7 +197,7 @@ interface Orphan {
  * A caller's face of one channel: survives a resume (the same handle keeps
  * working on the next generation) and refuses everything once closed.
  */
-export class FleetLinkChannelHandle {
+export class FleetLinkChannelHandle implements FleetLinkChannel {
     constructor(
         private readonly registry: FleetLinkRegistry,
         private readonly entry: () => ChannelEntry,
@@ -271,12 +267,26 @@ export class FleetLinkChannelHandle {
 /**
  * A link came or went. `continued` is true when the hello presented the
  * generation this platform last issued the node (the same node process,
- * reconnecting) — or when this platform has no record to compare (it
- * restarted); false for a fresh node process.
+ * reconnecting) — or a later one, which only another API replica can have
+ * issued to that same process (a fresh process presents none) — or when this
+ * platform has no record to compare (it restarted); false for a fresh node
+ * process.
  */
 export type FleetLinkEvent =
     | { type: 'connected'; nodeId: string; linkGeneration: number; continued: boolean }
     | { type: 'dropped'; nodeId: string; reason: string };
+
+/** One link this process holds, as the relay bus directory describes it to the other replicas. */
+export interface FleetLinkLinkSnapshot {
+    nodeId: string;
+    generation: number;
+    /** Epoch ms the link was accepted. */
+    connectedAt: number;
+    consents: FleetConsents;
+    bytesIn: number;
+    bytesOut: number;
+    openChannels: number;
+}
 
 /** What the operations service is handed from channel 0. */
 export type FleetLinkOperationMessage = FleetLinkOperationProgress | FleetLinkOperationDone;
@@ -301,6 +311,7 @@ export class FleetLinkRegistry {
     private operationSink: ((nodeId: string, message: FleetLinkOperationMessage) => void) | null =
         null;
     private readonly linkListeners = new Set<(event: FleetLinkEvent) => void>();
+    private readonly consentListeners = new Set<(nodeId: string) => void>();
     private paused = false;
     private nextLinkId = 1;
     private readonly now: () => number;
@@ -347,9 +358,16 @@ export class FleetLinkRegistry {
         const presented = hello.resume?.linkGeneration;
         const unconfirmed = this.unconfirmedFrom.get(nodeId);
         this.unconfirmedFrom.delete(nodeId);
+        // `presented > previous`: a node process presents only a generation a
+        // `link.ready` gave it, and generations only grow (each replica issues
+        // above everything it has issued, been presented, or observed on
+        // another replica — `observeGeneration`). So a generation above this
+        // replica's record was issued elsewhere, to this same process: the
+        // node bounced A → B → A. Treating it as a fresh process would mark
+        // every running operation of the node interrupted fleet-wide.
         const continued =
             presented !== undefined &&
-            (previous === 0 || presented === previous || presented === unconfirmed);
+            (previous === 0 || presented >= previous || presented === unconfirmed);
         const generation = Math.max(previous, presented ?? 0) + 1;
         this.generations.set(nodeId, generation);
         const link: LinkEntry = {
@@ -467,6 +485,50 @@ export class FleetLinkRegistry {
         return this.links.has(nodeId);
     }
 
+    /**
+     * Another API replica holds `nodeId`'s link at `generation` (the relay
+     * bus directory). Generations are per node fleet-wide: this replica
+     * issues its next one above it, and a hello presenting it reads as the
+     * same node process continuing.
+     */
+    observeGeneration(nodeId: string, generation: number): void {
+        if (!Number.isSafeInteger(generation) || generation <= 0) return;
+        if (generation > (this.generations.get(nodeId) ?? 0)) {
+            this.generations.set(nodeId, generation);
+        }
+    }
+
+    /**
+     * Another API replica accepted `nodeId`'s link at `generation` (M4): the
+     * node cannot resume here what an older link of this replica left
+     * suspended, so those channels end `resume_failed` now instead of waiting
+     * out the resume window. Returns how many ended.
+     */
+    finishOrphansBelow(nodeId: string, generation: number): number {
+        const orphan = this.orphans.get(nodeId);
+        if (!orphan || orphan.generation >= generation) return 0;
+        this.orphans.delete(nodeId);
+        this.clearTimer(orphan.timer);
+        for (const entry of orphan.channels) this.finish(entry, 'resume_failed', undefined, false);
+        return orphan.channels.length;
+    }
+
+    /** The link this process holds for `nodeId`, for the relay bus directory; null when it holds none. */
+    describeLink(nodeId: string): FleetLinkLinkSnapshot | null {
+        const link = this.links.get(nodeId);
+        if (!link) return null;
+        return {
+            nodeId,
+            generation: link.generation,
+            connectedAt: link.connectedAt,
+            consents: { ...link.consents },
+            bytesIn: link.bytesIn,
+            bytesOut: link.bytesOut,
+            openChannels: [...link.channels.values()].filter((entry) => entry.state === 'open')
+                .length,
+        };
+    }
+
     /** Ids of every connected node. */
     connectedNodeIds(): string[] {
         return [...this.links.keys()];
@@ -476,6 +538,23 @@ export class FleetLinkRegistry {
     liveConsents(nodeId: string): FleetConsents | null {
         const link = this.links.get(nodeId);
         return link ? { ...link.consents } : null;
+    }
+
+    /**
+     * The refusal an open needing `consent` gets from this process's link of
+     * `nodeId` right now — `consent_missing` with the command to run on the
+     * machine — or null when the link holds it (or there is no link here,
+     * which the open itself refuses). The relay bus's holder side checks it
+     * again on a forwarded open: the caller's replica read the consents from a
+     * directory entry that can be a sync behind a withdrawal.
+     */
+    consentRefusal(
+        nodeId: string,
+        consent: FleetLinkRequirement['consent'],
+    ): FleetLinkError | null {
+        const link = this.links.get(nodeId);
+        if (!link || fleetConsentSatisfies(link.consents, consent)) return null;
+        return { code: 'consent_missing', hint: fleetConsentMissingHint(consent, link.nodeName) };
     }
 
     /** The node's daemon version as its hello said, or null. */
@@ -561,6 +640,13 @@ export class FleetLinkRegistry {
                     true,
                 );
                 closedCount += 1;
+            }
+        }
+        for (const listener of [...this.consentListeners]) {
+            try {
+                listener(nodeId);
+            } catch (error) {
+                this.logger.warn(`link consent listener failed: ${describe(error)}`);
             }
         }
         return closedCount;
@@ -724,6 +810,14 @@ export class FleetLinkRegistry {
         this.linkListeners.add(listener);
         return () => {
             this.linkListeners.delete(listener);
+        };
+    }
+
+    /** A link this process holds took new consents from a heartbeat (the relay bus republishes it). */
+    onConsentsChange(listener: (nodeId: string) => void): () => void {
+        this.consentListeners.add(listener);
+        return () => {
+            this.consentListeners.delete(listener);
         };
     }
 

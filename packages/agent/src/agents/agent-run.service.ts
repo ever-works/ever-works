@@ -848,6 +848,13 @@ export class AgentRunService {
                   context.delegationScope,
                   context.missionId,
                   context.taskId,
+                  // Works-security (2026-10-18) — a reply to a Conversation message the
+                  // Agent's OWNER sent. Every other run (Task, heartbeat, Task chat,
+                  // delegated) is the agent acting on its own.
+                  context.kind === 'chat' &&
+                      typeof context.conversationMessageId === 'string' &&
+                      context.conversationMessageId.length > 0 &&
+                      context.userId === agent.userId,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -2168,6 +2175,7 @@ export class AgentRunService {
         delegationScope?: SubAgentScope | null,
         missionId?: string | null,
         taskId?: string | null,
+        ownerChatTurn = false,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
@@ -2177,6 +2185,7 @@ export class AgentRunService {
             missionId: missionId ?? undefined,
             // AW-17 — the run's Task, so MCP tool calls are attributed to it.
             taskId: taskId ?? undefined,
+            ...(ownerChatTurn ? { ownerChatTurn: true } : {}),
         };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(

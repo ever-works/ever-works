@@ -42,11 +42,11 @@ Agents get the same read through one read-only tool.
  └───────────────────────────────────────┴────────────────────────────────────────────────────┘
 ```
 
-| Phase  | Ships                                                                                                                                                                                                     | Flag                          |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Phase  | Ships                                                                                                                                                                                                               | Flag                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | **P1** | Source discovery per OS; the viewer (last 500, follow, filter, pause, copy, colour); files under allowed roots and standard log directories; container and service logs; Logs tab; `fleet_logs_read`; palette entry | `FLEET_MACHINE_FACTS_ENABLED` |
-| **P2** | Merged multi-source view (Compose hand-off to FL-09), "load 500 earlier", deep links from the Services and Docker tabs                                                                                    | same                          |
-| **P3** | "Open the log" from a failed service, positioned at the failure (a "needs a look" item once CONTRACTS §4.6 has its kind), snapshot download of the lines on screen                                       | same                          |
+| **P2** | Merged multi-source view (Compose hand-off to FL-09), "load 500 earlier", deep links from the Services and Docker tabs                                                                                              | same                          |
+| **P3** | "Open the log" from a failed service, positioned at the failure (a "needs a look" item once CONTRACTS §4.6 has its kind), snapshot download of the lines on screen                                                  | same                          |
 
 Each phase is independently shippable.
 
@@ -90,13 +90,13 @@ And, from an Agent's owner:
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer…                                       | Today they must…                                                                                                         | What breaks                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "What did the machine log?"                      | Walk to the machine, or ssh in from their own laptop, and run the journal or `tail` by hand.                              | Ever Works shows a computer's heartbeat, disk free and capability tags (`docs/features/fleet.md:110`) and nothing a machine has written. The node's four job kinds (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-120`) read no log of any kind; the node's own log is a redacting logger to its console (`apps/node/src/core/logger.ts`). |
-| "Why did that container exit?"                   | `docker logs` on the machine.                                                                                            | The platform knows Docker exists only as a tag — `docker --version` exiting 0 turns `docker` on (`apps/node/src/core/capabilities.ts:278-294`). No container is listed anywhere, so there is nothing to open.                                                                                                             |
-| "Show me the shell on that machine and I'll tail it myself." | Open the Agent's Computer tab, terminal channel, and take over.                                                 | That shell runs under the Agent's own file root (`apps/node/src/core/screen/terminal-channel.ts:38-40`), needs `--attend` and a take-over grant, and streams a PTY — a tail typed into a shell is a session, not a view, and it is not what an Agent can be given read-only.                                            |
-| "Let the Agent read it."                         | Paste the lines into the conversation.                                                                                   | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`); the MCP whitelist has eight fleet entries — five reads and three actions (set/clear affinity, drain), none of them a log (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`; EXISTING-SUBSTRATE §8.2); the CLI has no fleet verbs (`apps/cli/src/main.ts:5-8`). |
-| "Is it safe to show a log in the browser?"       | Trust that no token is in it.                                                                                            | The machine already has the right tool: every terminal frame a live view publishes is scanned by the node's outbox (`apps/node/src/core/screen/frame-outbox.ts:61-83`) with the platform's own scanner (`packages/contracts/src/secret/secret-patterns.ts:1-11`). Nothing reuses it for anything but a live view yet.    |
+| To answer…                                                   | Today they must…                                                                             | What breaks                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "What did the machine log?"                                  | Walk to the machine, or ssh in from their own laptop, and run the journal or `tail` by hand. | Ever Works shows a computer's heartbeat, disk free and capability tags (`docs/features/fleet.md:110`) and nothing a machine has written. The node's four job kinds (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-120`) read no log of any kind; the node's own log is a redacting logger to its console (`apps/node/src/core/logger.ts`).            |
+| "Why did that container exit?"                               | `docker logs` on the machine.                                                                | The platform knows Docker exists only as a tag — `docker --version` exiting 0 turns `docker` on (`apps/node/src/core/capabilities.ts:278-294`). No container is listed anywhere, so there is nothing to open.                                                                                                                                                 |
+| "Show me the shell on that machine and I'll tail it myself." | Open the Agent's Computer tab, terminal channel, and take over.                              | That shell runs under the Agent's own file root (`apps/node/src/core/screen/terminal-channel.ts:38-40`), needs `--attend` and a take-over grant, and streams a PTY — a tail typed into a shell is a session, not a view, and it is not what an Agent can be given read-only.                                                                                  |
+| "Let the Agent read it."                                     | Paste the lines into the conversation.                                                       | The one Agent fleet tool lists nodes (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`); the MCP whitelist has eight fleet entries — five reads and three actions (set/clear affinity, drain), none of them a log (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`; EXISTING-SUBSTRATE §8.2); the CLI has no fleet verbs (`apps/cli/src/main.ts:5-8`). |
+| "Is it safe to show a log in the browser?"                   | Trust that no token is in it.                                                                | The machine already has the right tool: every terminal frame a live view publishes is scanned by the node's outbox (`apps/node/src/core/screen/frame-outbox.ts:61-83`) with the platform's own scanner (`packages/contracts/src/secret/secret-patterns.ts:1-11`). Nothing reuses it for anything but a live view yet.                                         |
 
 ### 2.3 What this epic closes
 
@@ -226,7 +226,7 @@ migration slot (CONTRACTS §13) and therefore **no schema change**.
   **Given** a Linux node whose user is not in the journal group,
   **then** the System journal entry still opens with the lines the user may see and a notice
   _"Only this user's entries. To see the whole system log, run on build-01:_ `sudo usermod -aG
-  systemd-journal <user>` _and sign in again."_ The command is copyable; nothing is run for them.
+systemd-journal <user>` _and sign in again."_ The command is copyable; nothing is run for them.
 
 - **U6 — Root-only file.**
   **Given** `/var/log/auth.log` is readable by root only,
@@ -555,14 +555,14 @@ view.
 
 ## 7. Key entities & concepts
 
-| Entity / concept                 | New?     | Description                                                                                                   |
-| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
-| **Node** (UI copy **Computer**)  | Existing | The machine whose logs are read. Gains nothing in this epic; its `consents` and `controlPolicy` (FL-01/02) gate the tab. |
-| **Log source**                   | concept  | One thing that can be tailed: a system log, a file, a container, a service. Read from the Node, never stored. |
-| **Viewer**                       | concept  | One open source (or merged set) in a browser: held lines, filter, follow state, counters.                      |
-| **Fleet audit**                  | Existing | Gains two action names, `node.logs.read` and `node.logs.follow` (CONTRACTS §7).                               |
-| **Allowed roots**                | Existing (CONTRACTS R-18) | Where file sources may come from, plus the OS's standard log directories.                    |
-| **"Needs a look" item**          | Existing (CONTRACTS §4.6) | P3: a failed-service item carries an _Open the log_ action.                                  |
+| Entity / concept                | New?                      | Description                                                                                                              |
+| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Node** (UI copy **Computer**) | Existing                  | The machine whose logs are read. Gains nothing in this epic; its `consents` and `controlPolicy` (FL-01/02) gate the tab. |
+| **Log source**                  | concept                   | One thing that can be tailed: a system log, a file, a container, a service. Read from the Node, never stored.            |
+| **Viewer**                      | concept                   | One open source (or merged set) in a browser: held lines, filter, follow state, counters.                                |
+| **Fleet audit**                 | Existing                  | Gains two action names, `node.logs.read` and `node.logs.follow` (CONTRACTS §7).                                          |
+| **Allowed roots**               | Existing (CONTRACTS R-18) | Where file sources may come from, plus the OS's standard log directories.                                                |
+| **"Needs a look" item**         | Existing (CONTRACTS §4.6) | P3: a failed-service item carries an _Open the log_ action.                                                              |
 
 No new noun is introduced (README §1).
 
@@ -587,13 +587,13 @@ No new noun is introduced (README §1).
 - **Resolved** by CONTRACTS §2.1: `logs` is an action family with default audience `owner`; log
   reads map to it (FR-26).
 - **Resolved** by CONTRACTS §3.3: the `logs` family opens with `{ source, path?, unit?, container?,
-  lines, sources?[] }`; the P2 merged view uses `sources[]`, single-source opens are unchanged.
+lines, sources?[] }`; the P2 merged view uses `sources[]`, single-source opens are unchanged.
 - **Resolved** by CONTRACTS §2.1: an Agent reads a log only when both its own permissions allow the
   tool and the Node's `logs` audience includes the Agent's owner; no further owner opt-in (FR-31).
 - `[NEEDS CLARIFICATION: Windows "standard log directories" for the Files group (R-18 names "the OS
-  standard log directories" without listing Windows ones). Default until answered: on Windows only
-  the node's own log directory plus the allowed roots; `C:\Windows\Logs` is not listed
-  (administrator-only and noisy).]`
+standard log directories" without listing Windows ones). Default until answered: on Windows only
+the node's own log directory plus the allowed roots; `C:\Windows\Logs` is not listed
+(administrator-only and noisy).]`
 - **Resolved** by CONTRACTS §3.3, §4.6 and §10 (rev 4): `logs.sources` is a `machine` verb; `logs.earlier`, `logs.initial-done`, `logs.earlier-done`, `logs.notice` on the `logs` channel; kind `service-failed`; limits 5 000 held lines, 200 files per root, 12 merged sources, 8 log channels per viewer per Node; one allowed-roots resolver (R-39).
 
 ---

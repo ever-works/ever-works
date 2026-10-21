@@ -323,6 +323,19 @@ export const config = {
             return undefined;
         },
         /**
+         * 2026-10-21 — `FLEET_PINNED_AGENT_HOLDS_FOR_NODE`. When on, a run whose Agent the
+         * owner pinned to a node (agent ↔ node affinity) is HELD for the fleet
+         * (`fleet-waiting`, `waiting-for-runner`) under `local-fallback` instead of being
+         * relocated to a cloud stand-in while that node cannot lease (prod T-45). An
+         * explicit `cloud` preference still runs in the cloud. Default OFF: the shipped
+         * `local-fallback` contract (relocate, notify `pinned-runner-offline`) stays the
+         * default until the owner flips it. App Works are held regardless (#2809, FR-12).
+         */
+        pinnedAgentHoldsForNode(): boolean {
+            const raw = (process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
          * Command template a node runs for one `agent-task` job.
          * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
          * each substituted with an id validated against a strict
@@ -721,6 +734,20 @@ export const config = {
             return process.env.FLEET_NODE_LINK_ENABLED === 'true';
         },
         /**
+         * Sessions on computers (FL-04, CONTRACTS §9) — `FLEET_SESSIONS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**sessions**` route answers 404 (the surface is
+         * not even confirmed) and node reports on the link are dropped. A
+         * session needs the node link, so the link flag gates the machine
+         * calls on its own. Read per call: flipping it needs no restart.
+         */
+        isSessionsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_SESSIONS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single
@@ -728,6 +755,20 @@ export const config = {
          */
         isRelayBusRequired(): boolean {
             return process.env.FLEET_RELAY_REQUIRE_BUS === 'true';
+        },
+        /**
+         * Fleet node link (FL-02, CONTRACTS R-7) — the cross-replica relay
+         * bus's kill switch (`FLEET_RELAY_BUS_ENABLED`). On unless set to
+         * `false`, `0` or `off` (any case): with a Redis URL configured the
+         * terminal relay, the computer live view and the node link then fan
+         * out over Valkey. Off keeps every relay in-process (the behaviour
+         * before the bus existed) even when `REDIS_URL` is set — for an
+         * operator who needs the bus off without a code change. Read once,
+         * at boot.
+         */
+        isRelayBusEnabled(): boolean {
+            const raw = (process.env.FLEET_RELAY_BUS_ENABLED || '').trim().toLowerCase();
+            return !(raw === 'false' || raw === '0' || raw === 'off');
         },
         /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
         getMaxCapabilityTags(): number {
@@ -1218,6 +1259,20 @@ export const config = {
              */
             cloudPushEnabled() {
                 return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';
+            },
+
+            /**
+             * 2026-10-21 — `APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`: before a Deployment reaches
+             * the cluster, read the image config's `User` from the registry (with the App's own
+             * pull credential) and refuse an image the kubelet would refuse under
+             * `runAsNonRoot` — `managed_root_forbidden` (root / no user) or
+             * `image_user_unverifiable` (a user NAME) — unless the component declares a numeric
+             * `runAsUser`. Without it the same refusal arrives only from the kubelet, after the
+             * namespace was prepared and a Job or a rollout waited. A registry that cannot be read
+             * is a warning (`image_user_unchecked`), never a refusal. Default OFF; read per call.
+             */
+            imageUserPrecheckEnabled() {
+                return process.env.APP_WORKS_IMAGE_USER_PRECHECK_ENABLED === 'true';
             },
 
             /**

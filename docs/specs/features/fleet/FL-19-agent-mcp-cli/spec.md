@@ -47,11 +47,11 @@ state-changing call writes the audit row with `requestedBy: agent:<id>`.
  ✗ confirmation_required — Restart nginx on build-01? Re-run with --yes to confirm.      (exit 2)
 ```
 
-| Phase  | Ships                                                                                                                                                 |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase  | Ships                                                                                                                                                                                                                                                                                            |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **P1** | The gate (grants × ladder × node audience), tool annotations, typed errors, `fleet_status`, read-only tools for every shipped family, `wait:false` + `fleet_operations_get`, the CLI `fleet` group with `--json` and exit codes, MCP read-only additions, Agent Capabilities "Fleet tools" block |
-| **P2** | State-changing tools for every shipped family with confirmation arguments and Decisions at the Ask rung, `fleet_sessions_question` / `fleet_sessions_answer`, `ever-works fleet sessions attach`, MCP state-changing additions, audit `requestedBy: agent:<id>` everywhere |
-| **P3** | Tools for FL-16/17/18 (virtual, cloud, runners) as those epics land; the agent-facing doc; the CLI shell-completion                                     |
+| **P2** | State-changing tools for every shipped family with confirmation arguments and Decisions at the Ask rung, `fleet_sessions_question` / `fleet_sessions_answer`, `ever-works fleet sessions attach`, MCP state-changing additions, audit `requestedBy: agent:<id>` everywhere                       |
+| **P3** | Tools for FL-16/17/18 (virtual, cloud, runners) as those epics land; the agent-facing doc; the CLI shell-completion                                                                                                                                                                              |
 
 ---
 
@@ -92,12 +92,12 @@ epic fixes them once:
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer…                                      | Today…                                                                                                                                                                                          | What breaks                                                                                                                                                                                                                      |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "What can my Agent do to my computers?"         | One tool, `list_fleet_nodes`, read-only (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`), assembled with no annotation of any kind (`packages/agent/src/agents/agent-tool.service.ts:128-137`). | There is no act, and no way to mark a tool as read-only or destructive: the descriptor has name, description, parameters and invoke.                                                                                           |
-| "Who decides whether Nina may restart nginx?"   | Tool grants decide tool _names_ (`packages/contracts/src/policy/tool-grant.types.ts:20-54`); the trust ladder decides categories including `machine.run` and `machine.admin` (AW-24 §4.1); the computer's control policy decides _people_ (`packages/agent/src/entities/fleet-node.entity.ts:502`). | The three never meet. Nothing checks a computer's family audience against an Agent's owner, because no Agent action reaches a computer today.                                                                                   |
-| "Let an external assistant do it over MCP."     | Eight fleet entries in the whitelist, reads plus affinity and drain; enrolment deliberately not exposed (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`).                                     | Fine as far as it goes; every new family must be added in one place with the right annotations or it is silently missing.                                                                                                      |
-| "Script it."                                    | The CLI has `auth`, `work`, `plugins`, `kb` (`apps/cli/src/main.ts:22-26`); errors print a message and exit 1 (`apps/cli/src/utils/error.ts:3-32`); no `--json` envelope.                        | No fleet verbs, no machine-readable errors, no exit-code contract, no way to attach to a session from a terminal.                                                                                                             |
+| To answer…                                    | Today…                                                                                                                                                                                                                                                                                              | What breaks                                                                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| "What can my Agent do to my computers?"       | One tool, `list_fleet_nodes`, read-only (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`), assembled with no annotation of any kind (`packages/agent/src/agents/agent-tool.service.ts:128-137`).                                                                                              | There is no act, and no way to mark a tool as read-only or destructive: the descriptor has name, description, parameters and invoke.          |
+| "Who decides whether Nina may restart nginx?" | Tool grants decide tool _names_ (`packages/contracts/src/policy/tool-grant.types.ts:20-54`); the trust ladder decides categories including `machine.run` and `machine.admin` (AW-24 §4.1); the computer's control policy decides _people_ (`packages/agent/src/entities/fleet-node.entity.ts:502`). | The three never meet. Nothing checks a computer's family audience against an Agent's owner, because no Agent action reaches a computer today. |
+| "Let an external assistant do it over MCP."   | Eight fleet entries in the whitelist, reads plus affinity and drain; enrolment deliberately not exposed (`apps/mcp/src/openapi-tools/whitelist.ts:475-530`).                                                                                                                                        | Fine as far as it goes; every new family must be added in one place with the right annotations or it is silently missing.                     |
+| "Script it."                                  | The CLI has `auth`, `work`, `plugins`, `kb` (`apps/cli/src/main.ts:22-26`); errors print a message and exit 1 (`apps/cli/src/utils/error.ts:3-32`); no `--json` envelope.                                                                                                                           | No fleet verbs, no machine-readable errors, no exit-code contract, no way to attach to a session from a terminal.                             |
 
 ### 2.3 Why this epic is additive only
 
@@ -217,8 +217,8 @@ to its owner (D15).
 
 - **FR-1** Every fleet tool MUST be named `fleet_<family>_<verb>` (CONTRACTS §11.3) where `family` is
   the plural noun or API path segment of the thing acted on: `status · nodes · sessions · desktop ·
-  logs · services · processes · docker · ports · files · commands · schedules · checkouts · tasks ·
-  virtual · cloud · runners · usage · operations` (Compose is under `docker`, paste under `desktop`,
+logs · services · processes · docker · ports · files · commands · schedules · checkouts · tasks ·
+virtual · cloud · runners · usage · operations` (Compose is under `docker`, paste under `desktop`,
   health, wake and git identity under `nodes`). The tool family is a name, not a permission: each
   catalogue row also names its CONTRACTS §2.1 permission family.
 - **FR-2** Every tool MUST declare `readOnly: true` or `destructive: true|false`; a non-read tool
@@ -246,7 +246,7 @@ to its owner (D15).
 - **FR-9** A refusal by the ladder or grants MUST be recorded as an AW-24 refusal; a refusal by the
   computer's audience MUST NOT create a Decision (a person outside the audience cannot approve it).
 - **FR-10** An Agent-initiated state change MUST write the family's audit row with `requestedBy:
-  agent:<agentId>` and the Decision id when one was involved.
+agent:<agentId>` and the Decision id when one was involved.
 
 ### 4.3 Confirmation for non-interactive callers (P2)
 
@@ -260,7 +260,7 @@ to its owner (D15).
   require `acknowledgeBlastRadius: true` to proceed.
 - **FR-14** A tool MUST accept `wait: false` and return `{ operationId }` for any action that may
   exceed 5 seconds; `fleet_operations_get` MUST report the CONTRACTS §3.3 states `running · done ·
-  failed · cancelled · interrupted` with the result or the error.
+failed · cancelled · interrupted` with the result or the error.
 
 ### 4.4 Sessions between Agents (P2)
 
@@ -366,14 +366,14 @@ denied by a tool grant at {scope} scope` · `ask the owner of {computer} to allo
 
 ## 7. Key entities & concepts
 
-| Entity / concept        | New?     | Description                                                                                             |
-| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
-| **Fleet tool**          | Extended | An Agent/MCP tool over a fleet family with annotations (read-only or destructive, class, category).     |
-| **Gate**                | **NEW** (a rule, not a record) | The ordered check grants × ladder × computer audience × consent, naming its refusal.        |
-| **Confirmation summary**| **NEW** (transient) | What a `confirm` call would do; echoed back and matched on the confirming call.                 |
-| **Operation**           | FL-02    | The handle for `wait: false`.                                                                            |
-| **Decision**            | Existing | What an Ask/Draft rung produces for a fleet action.                                                      |
-| **Fleet audit**         | Existing | `requestedBy: agent:<id>` on Agent-initiated rows.                                                      |
+| Entity / concept         | New?                           | Description                                                                                         |
+| ------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Fleet tool**           | Extended                       | An Agent/MCP tool over a fleet family with annotations (read-only or destructive, class, category). |
+| **Gate**                 | **NEW** (a rule, not a record) | The ordered check grants × ladder × computer audience × consent, naming its refusal.                |
+| **Confirmation summary** | **NEW** (transient)            | What a `confirm` call would do; echoed back and matched on the confirming call.                     |
+| **Operation**            | FL-02                          | The handle for `wait: false`.                                                                       |
+| **Decision**             | Existing                       | What an Ask/Draft rung produces for a fleet action.                                                 |
+| **Fleet audit**          | Existing                       | `requestedBy: agent:<id>` on Agent-initiated rows.                                                  |
 
 ---
 
@@ -391,7 +391,7 @@ denied by a tool grant at {scope} scope` · `ask the owner of {computer} to allo
 - **Resolved** by CONTRACTS §2.1: the families now include `logs` and `ports`; log reads → `logs`, port list → `view`, port open / preview / tunnel → `ports`, wake, VM, cloud and Actions runner actions → `machines`, `git.setIdentity` → `commands`, `health.now` → `view` (plan §9.1 uses exactly this).
 - **Resolved** by CONTRACTS R-32: an Agent may answer another session's **question** only when its owner enabled "may answer other sessions" on it (FL-05 FR-30); permission prompts are human-only (S6, FR-16).
 - **Resolved** by CONTRACTS R-33: held Agent actions are `agent_action_proposals` rows (`actionType: 'fleet_machine_action'`, FL-09's value); no new table.
-- `[NEEDS CLARIFICATION: How long may a held fleet action wait for approval? `agent_action_proposals` has only `pending · approved · rejected` and no expiry sweep exists. Default until answered: 24 h, checked at approval time the way merge approvals check staleness (`packages/agent/src/agent-approvals/merge-approval.service.ts:97,210-221`) — an older approval answers `confirmation_required` with a fresh summary and nothing runs (U12); no new status, no sweep.]`
+- `[NEEDS CLARIFICATION: How long may a held fleet action wait for approval? `agent_action_proposals`has only`pending · approved · rejected` and no expiry sweep exists. Default until answered: 24 h, checked at approval time the way merge approvals check staleness (`packages/agent/src/agent-approvals/merge-approval.service.ts:97,210-221`) — an older approval answers `confirmation_required` with a fresh summary and nothing runs (U12); no new status, no sweep.]`
 
 ---
 

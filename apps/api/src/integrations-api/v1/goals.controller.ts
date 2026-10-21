@@ -34,7 +34,7 @@ import {
     ValidateIf,
     ValidateNested,
 } from 'class-validator';
-import { INTEGRATION_EXTERNAL_METRIC_PLUGIN_ID } from '@ever-works/contracts';
+import { INTEGRATION_EXTERNAL_METRIC_PLUGIN_ID, integrationActorLabel } from '@ever-works/contracts';
 import {
     GoalOrchestratorService,
     GoalsService,
@@ -58,6 +58,7 @@ import { RecordVisibilityService } from '@ever-works/agent/record-visibility';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
+import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { writeAttribution } from '../../auth/integration/integration-attribution';
 import { ScopeContextService } from '../../scope/scope-context.service';
 import { IntegrationOnlyGuard } from './integration-only.guard';
@@ -83,6 +84,11 @@ import {
     IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
+import { describeDodRefusals, planKeyOnlyDodWrite } from './integration-goal-dod';
+import {
+    integrationGoalDodProposeOnly,
+    integrationGoalTextEditRunning,
+} from './integration-safety-switches';
 
 const COMPARATORS = ['gte', 'lte'] as const;
 const WINDOWS = ['day', 'week', 'month', 'total', 'point'] as const;
@@ -508,6 +514,20 @@ export class IntegrationGoalsController {
         const source = linkSourceOf(principal);
         assertWritableVisibility(dto.visibility);
         assertOwnLinkSource(dto.externalRef, source);
+        // Works-security lane (integration API gates, finding 1) - a criterion
+        // created already done or waived is signed off; without a person behind
+        // the request (no X-Act-As-User) that is not the key's to decide.
+        if (!principal.actAsUserId && integrationGoalDodProposeOnly()) {
+            const closed = (dto.dodCriteria ?? [])
+                .filter((entry) => entry.status !== 'open')
+                .map((entry) => ({ id: entry.id, reason: 'closed_status' as const }));
+            if (closed.length > 0) {
+                throw domainRule(describeDodRefusals(closed), {
+                    reason: 'act_as_required',
+                    criteria: closed,
+                });
+            }
+        }
         const goalKind = dto.goalKind ?? 'metric';
         const input: CreateGoalInput = {
             title: dto.title,
@@ -625,8 +645,38 @@ export class IntegrationGoalsController {
             throw validationFailed('body', 'must change at least one field');
         }
         assertWritableVisibility(dto.visibility);
-        const source = linkSourceOf(principalOf(user));
-        const expected = await this.precondition(user, id, ifMatch, source);
+        const principal = principalOf(user);
+        const source = linkSourceOf(principal);
+        const { expected, current } = await this.preconditionWithResource(
+            user,
+            id,
+            ifMatch,
+            source,
+        );
+        // Works-security lane (integration API gates, finding 7) - every
+        // iteration brief of a running loop is built from the Goal's title and
+        // description, so rewriting them is writing the agent's next
+        // instructions. Without a person behind the request that waits until the
+        // loop is not running (a relayed person's edit, X-Act-As-User, passes).
+        const loop = current.loop as { status?: string | null } | undefined;
+        const textFields = ['title', 'description'].filter(
+            (field) => (dto as Record<string, unknown>)[field] !== undefined,
+        );
+        if (
+            textFields.length > 0 &&
+            loop?.status === 'running' &&
+            !principal.actAsUserId &&
+            !integrationGoalTextEditRunning()
+        ) {
+            throw new IntegrationHttpException(
+                422,
+                'domain_rule',
+                'An integration key without X-Act-As-User cannot change the title or description of a Goal ' +
+                    'whose execution loop is running: every iteration brief is built from them. Send the ' +
+                    "person's edit with X-Act-As-User, or pause the loop or edit the Goal in Ever Works.",
+                { reason: 'goal_loop_running', loopStatus: 'running', fields: textFields },
+            );
+        }
         const patch: UpdateGoalInput = {};
         if (dto.title !== undefined) patch.title = dto.title;
         if (dto.description !== undefined) patch.description = dto.description;
@@ -700,10 +750,42 @@ export class IntegrationGoalsController {
         @Headers('if-match') ifMatch: string | undefined,
         @Res({ passthrough: true }) res: Response,
     ): Promise<Record<string, unknown>> {
-        const source = linkSourceOf(principalOf(user));
+        const principal = principalOf(user);
+        const source = linkSourceOf(principal);
         const expected = await this.precondition(user, id, ifMatch, source);
-        // The Definition of Done an integration writes is the operator's own (approved,
-        // `source: operator`): it mirrors key results a person keeps in Gauzy.
+        const current = await this.goals.getForUser(user.userId, id, this.ownership());
+        // Works-security lane (integration API gates, finding 1) - with no person
+        // behind the request (no X-Act-As-User) a key may only PROPOSE criteria:
+        // new ones land open and inert (`proposeDodCriteria`) until a person
+        // approves them, and everything that signs off, changes or removes the
+        // owner's finish line is refused (`planKeyOnlyDodWrite`).
+        if (!principal.actAsUserId && integrationGoalDodProposeOnly()) {
+            const plan = planKeyOnlyDodWrite(current.dodCriteria, dto.dodCriteria);
+            if (plan.refusals.length > 0) {
+                throw domainRule(describeDodRefusals(plan.refusals), {
+                    reason: 'act_as_required',
+                    criteria: plan.refusals,
+                });
+            }
+            if (plan.proposals.length > 0) {
+                const label = integrationActorLabel(principal.integrationKind, principal.keyName);
+                await withExpectedVersion('goal', id, expected, () =>
+                    this.orchestrator.proposeDodCriteria(user.userId, id, plan.proposals, {
+                        proposedBy: label,
+                        provenance: {
+                            integrationKeyId: principal.keyId,
+                            integrationKind: principal.integrationKind,
+                            actAsUserId: null,
+                        },
+                    }),
+                );
+            }
+            return this.send(res, id, source);
+        }
+        // A relayed person's write (X-Act-As-User; owner decision), or the operator
+        // switched INTEGRATION_GOAL_DOD_PROPOSE_ONLY off: the Definition of Done is
+        // written as the operator's own (approved, `source: operator`), mirroring key
+        // results a person keeps in Gauzy. The relay is recorded on the Goal's log.
         const criteria = dto.dodCriteria.map((entry) => ({
             id: entry.id,
             text: entry.text,
@@ -714,16 +796,26 @@ export class IntegrationGoalsController {
         // Gauzy CR-12 — a planner proposal (`proposed: true`) the body does not name is
         // kept: editing one key result never drops the proposals still awaiting a person.
         // A proposal the body names is written as the integration sent it (approved).
-        const current = await this.goals.getForUser(user.userId, id, this.ownership());
         const named = new Set(criteria.map((entry) => entry.id));
         for (const entry of current.dodCriteria ?? []) {
             if (entry.proposed === true && !named.has(entry.id)) criteria.push(entry);
         }
+        const relay = principal.actAsUserId
+            ? {
+                  relayedBy: integrationActorLabel(principal.integrationKind, principal.keyName),
+                  provenance: {
+                      integrationKeyId: principal.keyId,
+                      integrationKind: principal.integrationKind,
+                      actAsUserId: principal.actAsUserId,
+                  },
+              }
+            : {};
         await withExpectedVersion('goal', id, expected, () =>
             this.orchestrator.setDodCriteria(
                 user.userId,
                 id,
                 criteria.length > 0 ? criteria : null,
+                relay,
             ),
         );
         return this.send(res, id, source);
@@ -810,11 +902,21 @@ export class IntegrationGoalsController {
         ifMatch: string | undefined,
         source: string,
     ): Promise<number | null> {
+        return (await this.preconditionWithResource(user, id, ifMatch, source)).expected;
+    }
+
+    /** {@link precondition}, also answering the Goal as the integration reads it. */
+    private async preconditionWithResource(
+        user: AuthenticatedUser,
+        id: string,
+        ifMatch: string | undefined,
+        source: string,
+    ): Promise<{ expected: number | null; current: Record<string, unknown> }> {
         const current = await this.resources.get('goal', this.organizationId(), id, source);
         const expected = expectedVersionOf(ifMatch);
         assertIfMatch(expected, Number(current.dto.version));
         await this.goals.getForUser(user.userId, id, this.ownership());
-        return expected;
+        return { expected, current: current.dto };
     }
 
     private async dto(id: string, source: string): Promise<Record<string, unknown>> {

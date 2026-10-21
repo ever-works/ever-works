@@ -543,9 +543,10 @@ describe('activity-log.types', () => {
     /**
      * Resolution R-2 has two halves: the snake_case family is the
      * `actionType` (pinned above) and the dotted CONTRACTS §6 event is the
-     * `action`. APW-02's three families own exactly the eight events below —
-     * the six CONTRACTS §6 already listed plus the two APW-02 added
-     * (`app.fork.missing`, `app.upstream.unavailable`). A seventh event is
+     * `action`. APW-02's three families own exactly the nine events below —
+     * the six CONTRACTS §6 already listed plus the three APW-02 added
+     * (`app.fork.missing`, `app.upstream.unavailable`, and FR-60's
+     * `app.upstream.held`). A further event is
      * added to CONTRACTS §6 and to this list together, never to one alone, so
      * a family cannot quietly start writing an event nobody specified.
      */
@@ -573,6 +574,8 @@ describe('activity-log.types', () => {
                     'app.upstream.behind',
                     'app.upstream.conflict',
                     'app.upstream.unavailable',
+                    // FR-60 (T46): the sync held a range that touches the workflow files.
+                    'app.upstream.held',
                 ],
             },
         ];
@@ -590,7 +593,7 @@ describe('activity-log.types', () => {
             },
         );
 
-        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the two APW-02 adds', () => {
+        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the three APW-02 adds', () => {
             expect(FAMILIES.flatMap((family) => [...family.events])).toEqual([
                 'app.fork.ready',
                 'app.fork.timeout',
@@ -600,6 +603,7 @@ describe('activity-log.types', () => {
                 'app.upstream.behind',
                 'app.upstream.conflict',
                 'app.upstream.unavailable',
+                'app.upstream.held',
             ]);
         });
     });

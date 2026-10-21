@@ -920,3 +920,79 @@ describe('ever-works-node start --manage (Fleet node link, FL-02)', () => {
 		expect(h.output()).toContain('link         unknown (the service has not reported its link yet)');
 	});
 });
+
+describe('sessions on computers (FL-04)', () => {
+	const beatOk: FetchLike = async () => ({
+		ok: true,
+		status: 200,
+		text: async () => JSON.stringify({ ok: true, node: apiNode })
+	});
+
+	it('hides the session-daemon subcommand from --help', async () => {
+		const h = harness();
+		expect(await runCli(['--help'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).not.toContain('session-daemon');
+	});
+
+	it('parses the session-daemon flags and runs the daemon entry with them', async () => {
+		const h = harness();
+		const calls: Array<Record<string, unknown>> = [];
+		h.deps.runSessionDaemon = (async (options: Record<string, unknown>) => {
+			calls.push(options);
+			return { core: {}, server: {}, stop: async () => undefined };
+		}) as unknown as CliDeps['runSessionDaemon'];
+		expect(
+			await runCli(
+				[
+					'session-daemon',
+					'--state-dir',
+					'/home/x/.config/ever-works-node/sessions',
+					'--socket',
+					'/run/s.sock',
+					'--token-file',
+					'/t'
+				],
+				h.deps
+			)
+		).toBe(EXIT_OK);
+		expect(calls).toEqual([
+			{
+				stateDir: '/home/x/.config/ever-works-node/sessions',
+				socketPath: '/run/s.sock',
+				tokenFile: '/t',
+				logFile: '/home/x/.config/ever-works-node/sessions/daemon.log',
+				version: '0.1.0'
+			}
+		]);
+		expect(await runCli(['session-daemon', '--socket', '/run/s.sock'], h.deps)).not.toBe(EXIT_OK);
+	});
+
+	it('hands the runtime the daemon command only from the real executable, beside the config', async () => {
+		runtimeCalls.options.length = 0;
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn: beatOk });
+		h.deps.waitForShutdown = () => Promise.resolve();
+		expect(await runCli(['start', '--manage'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options[0]).not.toHaveProperty('sessionDaemon');
+
+		runtimeCalls.options.length = 0;
+		h.deps.sessionDaemonCommand = { command: '/usr/bin/node', args: ['/opt/ever-works-node/cli.js'] };
+		// Without --manage or --work the runtime builds no daemon, whatever it is handed.
+		expect(await runCli(['start'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options[0]).toMatchObject({
+			sessionDaemon: {
+				command: '/usr/bin/node',
+				args: ['/opt/ever-works-node/cli.js'],
+				paths: { stateDir: '/home/x/.config/ever-works-node/sessions' }
+			}
+		});
+	});
+
+	it('reports the session daemon in doctor, read-only (no token: not running)', async () => {
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		expect(await runCli(['doctor', '--offline'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain(
+			'sessions     daemon not running — no session daemon has been started on this computer'
+		);
+		expect([...h.files.keys()].some((name) => name.endsWith('daemon.token'))).toBe(false);
+	});
+});

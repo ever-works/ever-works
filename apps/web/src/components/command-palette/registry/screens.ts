@@ -13,6 +13,7 @@ import {
     Inbox,
     LayoutTemplate,
     Lightbulb,
+    Monitor,
     ListChecks,
     Plug,
     Server,
@@ -353,6 +354,24 @@ export const FLEET_HUB_SCREENS: readonly PaletteScreen[] = [
         breadcrumb: fleet,
     },
 ];
+
+/**
+ * Fleet hub (FL-01, FR-33, T-27) — "Go to computer <name>" for every computer
+ * the viewer may see, matched on its name like any other screen. The palette
+ * reads the computers when it opens (`useFleetPaletteComputers`) and adds
+ * these after the fixed list; with the hub off it reads none.
+ */
+export function fleetComputerScreens(
+    computers: ReadonlyArray<{ id: string; name: string }>,
+): PaletteScreen[] {
+    return computers.map((computer) => ({
+        id: `fleet.computer.${computer.id}`,
+        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+        icon: Monitor,
+        title: (t: PaletteTranslator) => t('fleet.palette.goToComputer', { name: computer.name }),
+        breadcrumb: fleet,
+    }));
+}
 
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {

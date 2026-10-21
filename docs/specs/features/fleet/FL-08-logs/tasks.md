@@ -60,7 +60,7 @@
       Security refusal.
 - [ ] **T-05** _(parallel)_. Write `container-source.ts` (`docker logs --tail --timestamps -f`,
       `gone` on exit) and `service-source.ts` (service → reader mapping per OS; Homebrew log path,
-      launchd Standard*Path, Windows ProviderName) in `apps/node/src/core/link/modules/logs/`.
+      launchd Standard\*Path, Windows ProviderName) in `apps/node/src/core/link/modules/logs/`.
     - **Test**: `container-source.spec.ts`, `service-source.spec.ts` — argv never passes through a
       shell string; names validated by pattern.
 - [ ] **T-06**. Write `apps/node/src/core/link/modules/logs/log-sources.ts` (`listSources()` → four
@@ -117,8 +117,7 @@
       `.../logs/attach-token/route.ts` (thin proxies per `apps/web/src/lib/api/computer-bff.ts`).
     - **Test**: covered by `flow-fleet-logs-contract.spec.ts` (T-17).
 - [ ] **T-15**. Register the tab in `apps/web/src/components/fleet/logs/logs-tab.registry.ts`
-      through FL-01's registry (`apps/web/src/components/fleet/registry.ts`, entry shape `{ id,
-      labelKey, order, epic, flag, consent, load }`), gated by `FLEET_MACHINE_FACTS_ENABLED` read in
+      through FL-01's registry (`apps/web/src/components/fleet/registry.ts`, entry shape `{ id, labelKey, order, epic, flag, consent, load }`), gated by `FLEET_MACHINE_FACTS_ENABLED` read in
       `apps/web/src/lib/fleet-flags.ts` (add `isFleetMachineFactsEnabled()`); add the "Logs on
       <computer>" entries to FL-01's per-computer dynamic palette section in
       `apps/web/src/components/command-palette/registry/sections.ts`.

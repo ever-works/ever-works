@@ -434,9 +434,11 @@ export enum ActivityActionType {
     // dotted CONTRACTS §6 event goes in `action` (`app.fork.ready`,
     // `app.fork.timeout`, `app.fork.missing`, `app.actions.disabled`,
     // `app.upstream.synced`, `app.upstream.behind`, `app.upstream.conflict`,
-    // `app.upstream.unavailable`) and `details` carry counts, shas, pull
+    // `app.upstream.unavailable`, `app.upstream.held`) and `details` carry counts, shas, pull
     // request numbers and reason codes. Workflow paths appear ONLY in
-    // `app.actions.disabled`: they are repository file names, never secrets.
+    // `app.actions.disabled` and `app.upstream.held` (FR-60: the paths an
+    // upstream range would have changed): they are repository file names,
+    // never secrets and never file content.
     // Additive members — `activity_log.actionType` is a plain varchar, so no
     // migration is needed. Program contract R-34 (Activity completeness) is
     // satisfied by the three `FEED_KIND_RULES` entries in

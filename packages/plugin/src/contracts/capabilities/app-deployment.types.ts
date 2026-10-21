@@ -278,6 +278,13 @@ export interface AppJobInput {
 	readonly timeoutSeconds?: number;
 	/** `0` when absent. */
 	readonly retries?: number;
+	/**
+	 * APW-03 `jobs[].expectsWork` (additive, default off). When `true` the job must report the work
+	 * it did by writing a non-empty line to its termination message (`/dev/termination-log`, also
+	 * named by the `EVER_WORKS_JOB_REPORT_PATH` env var): a Job that exits 0 having written nothing
+	 * is failed as `job_failed` with a "did no work" reason instead of passing as a success.
+	 */
+	readonly expectsWork?: boolean;
 }
 
 /**

@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
+import { FleetRunOrgPinGuard } from './auth/guards/fleet-run-org-pin.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
 import { config } from './config/constants';
 import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
@@ -72,6 +73,8 @@ import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
+import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
+import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
 import { SchedulesModule } from './schedules/schedules.module';
@@ -288,6 +291,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Capability & playbook catalogue (AW-21) — read-only playbook list,
         // detail and preflight over enabled playbook-provider plugins.
         CatalogModule,
+        // Relay bus (FL-02, CONTRACTS R-7) — how the terminal, computer and
+        // node-link relays reach the other API replicas: Valkey when REDIS_URL
+        // is set, in-process otherwise; FLEET_RELAY_REQUIRE_BUS=true makes a
+        // missing bus a boot error. Global, consumed @Optional().
+        RelayBusModule,
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,
@@ -302,6 +310,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // operations routes, and the service every machine tab calls. Dark
         // unless FLEET_ENABLED and FLEET_NODE_LINK_ENABLED are both on.
         FleetLinkApiModule,
+        // Sessions on computers (FL-04) — sessions on a machine kept by its
+        // session daemon, over the node link: the session routes, the link
+        // adapter and listener, and the sweeper fallback. Dark unless
+        // FLEET_SESSIONS_ENABLED (and the link) are on.
+        FleetSessionsApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
@@ -468,6 +481,15 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_GUARD,
             useClass: SessionScopeGuard,
+        },
+        // Works-security (run-token scope) — runs right AFTER SessionScopeGuard
+        // (which pins a fleet-run token's request scope to its Organization):
+        // a fleet-run token reaches `/api/works/{id}…` / `/api/deploy/works/{id}…`
+        // only for a Work of that same Organization (404 otherwise). A no-op for
+        // every other credential and when FLEET_RUN_TOKEN_ORG_PIN_ENFORCED=false.
+        {
+            provide: APP_GUARD,
+            useClass: FleetRunOrgPinGuard,
         },
         // EW-P1-2 — integration keys (`ew_int_…`). Runs AFTER SessionScopeGuard
         // (the scope a slug resolved is visible) and BEFORE ScopeOwnershipGuard.

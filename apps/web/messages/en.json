@@ -12819,6 +12819,9 @@
         }
     },
     "fleet": {
+        "palette": {
+            "goToComputer": "Go to computer {name}"
+        },
         "nav": {
             "label": "Fleet"
         },
@@ -13045,8 +13048,84 @@
             "body": "Enrolment, the machine list and each computer's page moved to the Fleet hub. Policies stay here.",
             "cta": "Open Fleet"
         },
+        "link": {
+            "label": "Link",
+            "regionLabel": "Link to {name}",
+            "states": {
+                "connected": "connected",
+                "reconnecting": "reconnecting…",
+                "reconnectingSince": "reconnecting… (last connected {time})",
+                "notOpen": "not open",
+                "notOpenNoConsent": "not open — this computer only reports health",
+                "refused": "not accepted by this deployment",
+                "unsupportedKind": "not available on this kind of computer yet"
+            },
+            "bytes": "{bytes} this link",
+            "channels": "{count, plural, one {# channel open} other {# channels open}}",
+            "noConsent": "no consent",
+            "missing": "{flags} off",
+            "missingTooltip": "To turn it on, run this on {name}: {command}",
+            "since": "Connected since {time}"
+        },
+        "consents": {
+            "title": "What {name} lets Ever Works do",
+            "work": "Run work",
+            "attend": "Live viewing",
+            "manage": "Manage",
+            "short": {
+                "work": "work",
+                "attend": "attend",
+                "manage": "manage"
+            },
+            "granted": "allowed",
+            "notGranted": "not allowed",
+            "missingHint": "{consent} is off. Run this on {name} to turn it on:",
+            "missingHintShared": "{consent} is off. Ask the owner of {name} to start it with {flag}.",
+            "allGranted": "Everything this computer can allow is on.",
+            "inferred": "{name} runs a node that does not report its consents yet; these are read from what it advertises. Upgrade the node to report them.",
+            "kindCannot": "{consent} is not available on this kind of computer yet.",
+            "copy": "Copy",
+            "copied": "Copied",
+            "copyFailed": "Could not copy. Select the command and copy it yourself.",
+            "copyLabel": "Copy the command that turns on {consent}"
+        },
+        "errors": {
+            "notFound": "This is not here any more.",
+            "invalid": "The computer could not read that request.",
+            "unreachable": "{name} is not connected. Last seen {time}.",
+            "unreachableNever": "{name} is not connected.",
+            "consentMissing": "Start the node with {flag} on {name} to use {tab}.",
+            "permissionDenied": "Ask the owner of {name} to allow it.",
+            "confirmationRequired": "This needs your confirmation first.",
+            "rootRequired": "This needs administrator rights on {name}.",
+            "killSwitch": "Live actions are paused while all computers are stopped.",
+            "limitExceeded": "Too many live views are open on {name}; close one.",
+            "unsupportedOnNode": "{name} (node {version}) cannot do this yet.",
+            "unsupportedOnNodeNoVersion": "{name} cannot do this yet.",
+            "busy": "{name} is busy with this already. Try again in a moment.",
+            "operationFailed": "It did not finish on {name}.",
+            "internal": "Something went wrong. Try again.",
+            "resumeFailed": "The connection dropped and this could not be resumed.",
+            "relayUnavailable": "The relay bus is unavailable. Try again in a moment.",
+            "tryAgain": "Try again",
+            "follow": "Follow again"
+        },
         "computer": {
             "tabsLabel": "Computer",
+            "shortcuts": {
+                "title": "Keyboard shortcuts",
+                "description": "On a computer's page, whenever you are not typing in a field.",
+                "keys": {
+                    "favourite": "Add to or remove from favourites",
+                    "tabs": "Move between the tabs (in the tab strip)",
+                    "firstLastTab": "First or last tab (in the tab strip)",
+                    "sheet": "Show these shortcuts"
+                },
+                "kbd": {
+                    "home": "Home",
+                    "end": "End"
+                }
+            },
             "menu": {
                 "label": "More actions for {name}",
                 "rename": "Rename…",
@@ -13058,6 +13137,8 @@
                 "addFavourite": "Add to favourites",
                 "removeFavourite": "Remove from favourites",
                 "favouriteFailed": "Could not change the favourite.",
+                "favouriteAdded": "Added {name} to favourites.",
+                "favouriteRemoved": "Removed {name} from favourites.",
                 "pause": "Pause",
                 "resume": "Resume",
                 "paused": "Paused {name}. New work stops; jobs in flight finish.",
