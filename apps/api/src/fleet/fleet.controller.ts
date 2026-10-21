@@ -659,10 +659,11 @@ export class FleetController {
             !Array.isArray(body.capabilities) &&
             body.dailyCostCeilingCents === undefined &&
             typeof body.isFavorite !== 'boolean' &&
-            body.controlPolicyFamilies === undefined
+            body.controlPolicyFamilies === undefined &&
+            typeof body.previewProfileEnabled !== 'boolean'
         ) {
             throw new BadRequestException(
-                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite and/or controlPolicyFamilies',
+                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite, controlPolicyFamilies and/or previewProfileEnabled',
             );
         }
         // Fleet hub (FL-01, FR-22): rename, pause / resume and disable /
@@ -682,7 +683,8 @@ export class FleetController {
             (Array.isArray(body.capabilities) ||
                 body.dailyCostCeilingCents !== undefined ||
                 typeof body.isFavorite === 'boolean' ||
-                body.controlPolicyFamilies !== undefined)
+                body.controlPolicyFamilies !== undefined ||
+                typeof body.previewProfileEnabled === 'boolean')
         ) {
             // Owner-only edits beside a lifecycle act are refused before ANY
             // write, so a mixed body can never half-apply.
@@ -730,6 +732,14 @@ export class FleetController {
                 auth.userId,
                 id,
                 body.controlPolicyFamilies,
+            );
+        }
+        // Servers and ports (FL-10): the "Preview browser" switch, owner only.
+        if (typeof body.previewProfileEnabled === 'boolean') {
+            view = await this.service.setPreviewProfileEnabledForUser(
+                auth.userId,
+                id,
+                body.previewProfileEnabled,
             );
         }
         // Pause first, disable second: when both arrive, the harder stop

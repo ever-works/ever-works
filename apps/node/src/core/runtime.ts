@@ -35,6 +35,7 @@ import {
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { runAgentSessionJob } from './executors/agent-session';
 import { defaultRepositoryLayerFs } from './executors/codex-repository-layers';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
@@ -54,15 +55,21 @@ import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoo
 import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
-import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
+import { HeadlessBrowserCaptureBackend, HeadlessPreviewBrowser } from './screen/headless-browser-backend';
 import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
-import { composeNodeLinkModules, createHealthLinkModule, type WakeSender } from './link/modules';
+import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createCommandModule } from './link/modules/command';
+import { CommandOutputStore } from './link/modules/command/command-output-store';
+import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
+import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
+import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
 import { createCheckoutsModule } from './link/modules/checkouts';
 import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
 import {
@@ -594,6 +601,24 @@ export interface CreateNodeRuntimeOptions {
 	nodeLink?: boolean;
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
+	/**
+	 * Servers and ports (FL-10) — where the owner-level preview browser profile
+	 * lives; defaults to `~/.ever-works/preview-profile` (R-3), beside the Agent
+	 * profiles, never inside them.
+	 */
+	previewProfileRoot?: string;
+	/**
+	 * Servers and ports (FL-10) — the opener behind "Open on the desktop".
+	 * Undefined = the system opener when this process runs in a desktop session
+	 * with `--attend`; null = none (FL-07's helper binds its own when it lands).
+	 */
+	portsDesktopOpener?: DesktopUrlOpener | null;
+	/**
+	 * Services and processes (FL-09) — replaces the machine-facts modules the
+	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
+	 * or fakes so no real `systemctl` / `ps` runs.
+	 */
+	machineFactModules?: readonly NodeModule[];
 	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
@@ -634,8 +659,14 @@ export interface CreateNodeRuntimeOptions {
 	sessionDaemonConnect?: ConnectFn;
 	/** FL-05's per-session hook overlay; FL-04 ships none. */
 	sessionHookOverlay?: HookOverlayPort;
-	/** Folders besides home that owner sessions may start in. */
+	/** Folders besides home that owner sessions may start in (and Commands may run in, FL-12). */
 	sessionExtraRoots?: readonly string[];
+	/**
+	 * Commands on computers (FL-12) — where the last 30 runs' full output is
+	 * kept (`<configDir>/commands`). Absent: commands still run, no full
+	 * output is kept.
+	 */
+	commandOutputDir?: string;
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 	/**
@@ -834,6 +865,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		sessions = { supervisor, module: sessionModule };
 		telemetry.sessionDaemon = () => supervisor.report();
 	}
+	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
+	// preview source, for a process started with `--manage`. The preview
+	// browser is the probed one in an owner-level profile beside — never
+	// inside — the Agent profiles (R-3); without a browser it refuses with the
+	// sentence spec U10 gives. Open on the desktop uses the system opener only
+	// when the node itself runs in a desktop session with `--attend`, until
+	// FL-07's helper binds its own.
+	let portsModule: PortsModule | null = null;
+	if (consents.manage) {
+		const previewWebSockets =
+			options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+		const browserPath = io.environment.browserPath;
+		const restrictPreview =
+			options.restrictProfileDir ??
+			(io.environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+		const previewFs = createAgentProfileFs();
+		const preview = new PreviewBrowserManager({
+			starter: browserPath
+				? new HeadlessPreviewBrowser({ browserPath, webSocketFactory: previewWebSockets })
+				: null,
+			root: options.previewProfileRoot ?? defaultPreviewProfileRoot(options.env ?? process.env),
+			mkdir: (path) => previewFs.mkdir(path),
+			...(restrictPreview ? { restrictToOwner: restrictPreview } : {}),
+			nodeName: config.name?.trim() || 'this computer',
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		portsModule = createPortsModule({
+			// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+			// `docker ps --format` carries braces and tabs a shell would split.
+			runner: createMachineCommandRunner(),
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			nodeName: config.name?.trim() || 'this computer',
+			attend: consents.attend,
+			desktopOpener:
+				options.portsDesktopOpener !== undefined
+					? options.portsDesktopOpener
+					: consents.attend && io.environment.hasDisplay
+						? createSystemBrowserOpener(io.runner, io.environment.platform)
+						: null,
+			preview,
+			logger: io.logger,
+			...(io.now ? { now: io.now } : {})
+		});
+	}
 	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
 	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
 	const checkoutsModule =
@@ -872,8 +950,26 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
+		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
+		...(consents.manage
+			? {
+					command: createCommandModule({
+						consents,
+						nodeName: config.name?.trim() || 'this computer',
+						platform: io.environment.platform,
+						homedir: osHomedir(),
+						env: process.env,
+						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						logger: io.logger
+					})
+				}
+			: {}),
+		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
+		// FL-09 — services and processes (their verbs need --manage on this machine).
+		machineFacts: options.machineFactModules ?? createMachineFactModules(),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -1391,6 +1487,34 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				await pushCredentials?.dispose();
 			}
 		});
+		// Sessions on computers (FL-04 P2): an Agent working in an interactive
+		// session on this machine. The WORK lane only (never the attended
+		// lane), counted against `--concurrency` like `agent-task` (R-28);
+		// started through the session daemon under the Task-run isolation, the
+		// lease held while the session lives. Without a daemon (no `--work` /
+		// `--manage`, or the shell did not wire one) every job is refused with
+		// the reason rather than pretending to have run it.
+		worker.register('agent-session', (job, signal) =>
+			runAgentSessionJob(job, signal, {
+				workEnabled: options.workerEnabled === true,
+				daemon: sessions?.supervisor ?? null,
+				modelCli,
+				containment: {
+					sessionConfigFs: defaultSessionConfigFs,
+					managedMcpConfigFs: defaultSessionConfigFs,
+					modelCli,
+					nodeId: config.nodeId,
+					logger: io.logger,
+					...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {})
+				},
+				nodeId: config.nodeId,
+				homedir: osHomedir(),
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
+				platform: io.environment.platform as NodeJS.Platform,
+				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+			})
+		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising
 		// the `browser` capability with no executor behind it would fail

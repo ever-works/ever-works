@@ -1199,7 +1199,13 @@ export class WorkerLoop {
 			// Fleet usage limits: every CLI this node could run an agent-task
 			// with is out of quota, so none would start. Leave them for a node
 			// that can (or for this one after the reset) — other kinds still lease.
-			if (this.allAgentCliThrottled()) excludeKinds.add('agent-task');
+			if (this.allAgentCliThrottled()) {
+				excludeKinds.add('agent-task');
+				// FL-04 P2 (T-50): an Agent session drives the same CLIs; a node whose
+				// every CLI is out of quota leases none either (one CLI out of quota is
+				// the platform's filter: the job requires that CLI's tag).
+				excludeKinds.add('agent-session');
+			}
 			if (excludeKinds.size > 0) {
 				request.excludeKinds = [...excludeKinds];
 			}

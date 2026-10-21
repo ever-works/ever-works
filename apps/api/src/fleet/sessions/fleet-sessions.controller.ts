@@ -4,13 +4,16 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    NotFoundException,
     Param,
     ParseUUIDPipe,
     Patch,
     Post,
     Query,
+    Res,
     UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -23,6 +26,8 @@ import {
     FLEET_SESSION_STARTS_PER_MINUTE,
     isFleetSessionLive,
     type FleetSessionAttachTokenResponse,
+    type FleetSessionRecordingManifest,
+    type FleetSessionRecordingPage,
     type FleetSessionListResponse,
     type FleetSessionView,
 } from '@ever-works/contracts';
@@ -32,6 +37,8 @@ import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
     EndFleetSessionDto,
     FleetSessionAttachTokenDto,
+    FleetSessionRecordingDto,
+    FleetSessionRecordingQueryDto,
     ListFleetSessionsQueryDto,
     RenameFleetSessionDto,
     RestartFleetSessionDto,
@@ -40,6 +47,7 @@ import {
 import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
 import { FleetSessionAttachService } from './fleet-session-attach.service';
 import { FleetSessionPresenceService } from './fleet-session-presence.service';
+import { FleetSessionRecordingService } from './fleet-session-recording.service';
 
 function actorOf(auth: AuthenticatedUser): FleetSessionActor {
     return { userId: auth.userId };
@@ -75,7 +83,9 @@ function listQuery(query: ListFleetSessionsQueryDto): FleetSessionListQuery {
  *
  * P1b adds the viewer attach token (`POST /sessions/:id/attach-token`,
  * minted through FL-02's one minter) and who is attached (`presence` on the
- * detail). Recording (`GET|POST /sessions/:id/recording`) arrives with P3.
+ * detail). P3 adds recording: `GET /sessions/:id/recording` (the manifest, or
+ * with `?from=` a page of chunks — the CONTRACTS §11.2 path, no sub-route) and
+ * `POST /sessions/:id/recording { on }`.
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
@@ -85,6 +95,7 @@ export class FleetSessionsController {
         private readonly sessions: FleetSessionService,
         private readonly attach: FleetSessionAttachService,
         private readonly presence: FleetSessionPresenceService,
+        private readonly recordings?: FleetSessionRecordingService,
     ) {}
 
     @Get('nodes/:id/sessions')
@@ -116,17 +127,25 @@ export class FleetSessionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: StartFleetSessionDto,
+        @Res({ passthrough: true }) response?: Response,
     ): Promise<FleetSessionView> {
         const actor = actorOf(auth);
+        // An Agent session is QUEUED as a job (P2): `202` while it waits for a slot.
+        const queued = (view: FleetSessionView): FleetSessionView => {
+            if (view.kind === 'agent' && view.state === 'starting') response?.status(HttpStatus.ACCEPTED);
+            return view;
+        };
         if (body.restartOf) {
-            return this.sessions.restart(
-                body.restartOf,
-                actor,
-                { cols: body.cols, rows: body.rows },
-                { expectNodeId: id },
+            return queued(
+                await this.sessions.restart(
+                    body.restartOf,
+                    actor,
+                    { cols: body.cols, rows: body.rows },
+                    { expectNodeId: id },
+                ),
             );
         }
-        return this.sessions.start(id, actor, {
+        return queued(await this.sessions.start(id, actor, {
             kind: body.kind,
             provider: body.provider,
             cwd: body.cwd,
@@ -137,7 +156,7 @@ export class FleetSessionsController {
             ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
             ...(body.cols !== undefined ? { cols: body.cols } : {}),
             ...(body.rows !== undefined ? { rows: body.rows } : {}),
-        });
+        }));
     }
 
     @Get('sessions')
@@ -228,5 +247,47 @@ export class FleetSessionsController {
         @Body() body: FleetSessionAttachTokenDto,
     ): Promise<FleetSessionAttachTokenResponse> {
         return this.attach.mint(id, actorOf(auth), body.role);
+    }
+
+    @Get('sessions/:id/recording')
+    @ApiOperation({
+        summary:
+            "A session's recording: without `from`, the manifest (state, chunks, duration, who drove when); with `from` (a sequence number) and `limit`, one page of the recorded terminal text, oldest first, secrets redacted. Kept 14 days.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 240, ttl: 60_000 } })
+    async recording(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: FleetSessionRecordingQueryDto,
+    ): Promise<FleetSessionRecordingManifest | FleetSessionRecordingPage> {
+        const service = this.requireRecordings();
+        if (query.from !== undefined) {
+            return service.page(id, actorOf(auth), {
+                from: query.from,
+                ...(query.limit !== undefined ? { limit: query.limit } : {}),
+            });
+        }
+        return service.manifest(id, actorOf(auth));
+    }
+
+    @Post('sessions/:id/recording')
+    @ApiOperation({
+        summary:
+            'Start or stop recording a live session (`on: true|false`). Recording only watches: it changes nothing on the computer.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setRecording(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetSessionRecordingDto,
+    ): Promise<FleetSessionView> {
+        return this.sessions.setRecording(id, actorOf(auth), body.on === true);
+    }
+
+    private requireRecordings(): FleetSessionRecordingService {
+        if (!this.recordings) throw new NotFoundException();
+        return this.recordings;
     }
 }

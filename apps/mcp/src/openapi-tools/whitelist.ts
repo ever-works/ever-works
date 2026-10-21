@@ -639,6 +639,54 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
+	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
+	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
+	// `confirmation_required` with the sentence to show). Typing into a session is the Agent-side
+	// `fleet_sessions_send` tool only — there is no REST input route; full parity is FL-19.
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions',
+		toolName: 'fleet_sessions_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions/{id}',
+		toolName: 'fleet_sessions_read',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/nodes/{id}/sessions', toolName: 'fleet_sessions_start' },
+	{ method: 'PATCH', path: '/api/fleet/sessions/{id}', toolName: 'fleet_sessions_rename' },
+	{
+		method: 'POST',
+		path: '/api/fleet/sessions/{id}/end',
+		toolName: 'fleet_sessions_end',
+		annotations: { destructiveHint: true }
+	},
+
+	// Servers and ports (FL-10, CONTRACTS §2.1) — `apps/api/src/fleet/ports/fleet-ports.controller.ts`.
+	// The list is a read of the machine (nothing stored, nothing audited); open is
+	// not destructive — it opens the port's page ON the machine (its desktop or its
+	// preview browser) and is audited `node.port.open`. Dark unless
+	// FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/ports',
+		toolName: 'fleet_ports_list',
+		description:
+			'List the TCP ports a fleet computer is listening on, read on the machine: web servers first (title, status, program or container), other ports, hidden system ports. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/ports/{port}/open',
+		toolName: 'fleet_ports_open',
+		description:
+			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
+		annotations: { destructiveHint: false }
+	},
+
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.
 	{

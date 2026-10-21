@@ -1,6 +1,10 @@
 import { Injectable, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Agent } from '../../entities/agent.entity';
+import { AgentRun } from '../../entities/agent-run.entity';
 import { FleetSession } from '../../entities/fleet-session.entity';
+import { AgentRepository } from '../../database/repositories/agent.repository';
+import { AgentRunRepository } from '../../database/repositories/agent-run.repository';
 import { FleetModule } from '../fleet.module';
 import { FleetSessionRepository } from './fleet-session.repository';
 import { FleetSessionService } from './fleet-session.service';
@@ -32,8 +36,17 @@ export class FleetSessionSweepService {
  * this repo has no `autoLoadEntities`.
  */
 @Module({
-    imports: [FleetModule, TypeOrmModule.forFeature([FleetSession])],
-    providers: [FleetSessionRepository, FleetSessionService, FleetSessionSweepService],
+    // P2: the Agent and its Run, for Agent sessions (repositories provided here
+    // as FleetModule provides `ApiKeyRepository` — stateless, so a second
+    // instance is harmless and this module needs no DatabaseModule).
+    imports: [FleetModule, TypeOrmModule.forFeature([FleetSession, Agent, AgentRun])],
+    providers: [
+        FleetSessionRepository,
+        FleetSessionService,
+        FleetSessionSweepService,
+        AgentRepository,
+        AgentRunRepository,
+    ],
     exports: [FleetSessionRepository, FleetSessionService, FleetSessionSweepService],
 })
 export class FleetSessionsModule {}
