@@ -12,6 +12,7 @@ import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
+import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
@@ -122,6 +123,15 @@ export interface AgentFleetToolSource {
         history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
         needsALook?: Pick<NeedsALookService, 'forNodes'>;
     };
+}
+
+/**
+ * Commands on computers (FL-12 P2) — the `commands` tool family
+ * (`fleet/commands/agent-fleet-command-tools.ts`). `fleet_commands_run` only
+ * ever files an approval (`proposals`); the reads and the cancel use this.
+ */
+export interface AgentFleetCommandToolSource {
+    service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
 }
 
 /** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
@@ -255,6 +265,8 @@ export interface AgentDomainToolSources {
     meetings?: AgentMeetingToolSource;
     fleet?: AgentFleetToolSource;
     fleetSessions?: AgentFleetSessionToolSource;
+    /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
+    fleetCommands?: AgentFleetCommandToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

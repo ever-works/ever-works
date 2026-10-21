@@ -126,6 +126,7 @@ import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/in
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
+    FleetCommandService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
@@ -2128,6 +2129,10 @@ async function assertRealWriteTarget(
                 // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
                 // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
                 { token: FleetPortsService, optional: true },
+                // Commands on computers (FL-12 P2) — backs `fleet_commands_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the four
+                // tools are not offered; `fleet_commands_run` only ever files an approval.
+                { token: FleetCommandService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2154,6 +2159,7 @@ async function assertRealWriteTarget(
                 fleetMachine?: FleetMachineActionsService | null,
                 fleetSessions?: FleetSessionService | null,
                 fleetPorts?: FleetPortsService | null,
+                fleetCommands?: FleetCommandService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2181,6 +2187,9 @@ async function assertRealWriteTarget(
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
+                ...(fleetCommands && config.fleet.isCommandsEnabled()
+                    ? { fleetCommands: { service: fleetCommands } }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.

@@ -15,6 +15,7 @@ import {
     type FleetCommandListResponse,
     type FleetCommandNodeMessage,
     type FleetCommandOutputMessage,
+    type FleetCommandRequester,
     type FleetCommandRunRequest,
     type FleetCommandRunStatus,
     type FleetCommandRunView,
@@ -313,8 +314,9 @@ export class FleetCommandService implements OnModuleDestroy {
     async listRecent(
         actor: FleetCommandActor,
         limit: number = FLEET_COMMAND_RECENT,
+        options: { requestedBy?: FleetCommandRequester } = {},
     ): Promise<FleetCommandListResponse> {
-        const commands = await this.commands.listRecentForUser(actor.userId, limit);
+        const commands = await this.commands.listRecentForUser(actor.userId, limit, options);
         const runs = await this.commands.findRunsFor(commands.map((command) => command.id));
         const byCommand = new Map<string, FleetCommandRun[]>();
         for (const run of runs) {
@@ -358,6 +360,42 @@ export class FleetCommandService implements OnModuleDestroy {
                 this.isConnected(id),
             ),
         };
+    }
+
+    /**
+     * "Open full output" (spec FR-6, FR-18, P2): the run and its computer, once
+     * the person may read it — their own Command, a run the machine kept the
+     * output of, and a computer whose link is up (otherwise `unreachable`
+     * naming when it was last seen: "the full output is on build-02, which is
+     * offline"). The API streams the file over a channel of its own.
+     */
+    async authorizeFullOutput(
+        id: string,
+        runId: string,
+        actor: FleetCommandActor,
+    ): Promise<{ command: FleetCommand; run: FleetCommandRun; nodeName: string }> {
+        const command = await this.resolve(id, actor);
+        const run =
+            typeof runId === 'string' && /^[0-9a-f-]{36}$/i.test(runId)
+                ? await this.commands.findRun(runId)
+                : null;
+        if (!run || run.commandId !== command.id) throw fleetCommandError('not_found', 'no such run');
+        const node = await this.nodes.findById(run.nodeId);
+        const nodeName = node?.name ?? 'the computer';
+        if (!node) throw fleetCommandError('not_found', 'that computer was removed; its output went with it');
+        if (!run.outputRef) {
+            throw fleetCommandError('not_found', `${nodeName} did not keep the full output of this run`);
+        }
+        if (!this.isConnected(node.id)) {
+            const ago = describeFleetCommandAgo(node.lastHeartbeatAt ?? null, this.now());
+            throw fleetCommandError(
+                'unreachable',
+                ago
+                    ? `the full output is on ${nodeName}, which is offline — last seen ${ago} ago`
+                    : `the full output is on ${nodeName}, which is offline`,
+            );
+        }
+        return { command, run, nodeName };
     }
 
     // ─── The machines ──────────────────────────────────────────────────────

@@ -150,6 +150,7 @@ function stubDomainSources(): AgentDomainToolSources {
         meetings: { repository: stub() },
         fleet: { service: stub() },
         fleetSessions: { service: stub() },
+        fleetCommands: { service: stub() },
         prReview: { prReviewService: stub() },
         mergePolicy: { service: stub(), authorize: async () => null },
         browser: { facade: stub() },
