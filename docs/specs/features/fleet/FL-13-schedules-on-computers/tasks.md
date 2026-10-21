@@ -95,21 +95,21 @@
 
 ## P2 — Agent-session schedules, repairs, breaker, tools, cost
 
-- [ ] **T-30**. Add `POST /api/fleet/nodes/:id/schedules/agent-session` (proposed CONTRACTS §11.2 addition, spec §8b) in `apps/api/src/fleet/fleet-commands.controller.ts` → `packages/agent/src/fleet/fleet-schedule.service.ts#createAgentSessionSchedule` (creates a recurring Task via `TasksService`, verifies affinity via `FleetAgentNodeAffinityService.getAffinity`, refuses unpinned with the U9 hint).
+- [x] **T-30**. Add `POST /api/fleet/nodes/:id/schedules/agent-session` (proposed CONTRACTS §11.2 addition, spec §8b) in `apps/api/src/fleet/fleet-commands.controller.ts` → `packages/agent/src/fleet/fleet-schedule.service.ts#createAgentSessionSchedule` (creates a recurring Task via `TasksService`, verifies affinity via `FleetAgentNodeAffinityService.getAffinity`, refuses unpinned with the U9 hint).
       **Test**: controller + service specs — unpinned refused; Task carries `isRecurring`, cadence, assignee.
-- [ ] **T-31**. Computer chip on pinned recurring Tasks in `schedules.service.ts` (join affinity → `nodeId`, `nodeName`).
+- [x] **T-31**. Computer chip on pinned recurring Tasks in `schedules.service.ts` (join affinity → `nodeId`, `nodeName`).
       **Test**: `schedules.service.node-schedule.spec.ts` extended.
-- [ ] **T-32**. Ensure the router places pinned recurring-Task Runs as FL-04 `agent-session` jobs: extend `apps/api/src/fleet/fleet-run-router.service.ts` and `fleet-agent-task-planner.service.ts` for `executionMode: 'session'` when the Task originates from a node schedule.
+- [x] **T-32**. Ensure the router places pinned recurring-Task Runs as FL-04 `agent-session` jobs: extend `apps/api/src/fleet/fleet-run-router.service.ts` and `fleet-agent-task-planner.service.ts` for `executionMode: 'session'` when the Task originates from a node schedule.
       **Test**: router spec — `targetNodeId` from affinity; job kind `agent-session`.
 - [ ] **T-33**. Missed-fire sweeper for Agent-session schedules in the reconciler (the Run and its Task instance cancelled with the offline reason; history shows skipped — offline).
       **Test**: reconciler spec extended.
-- [ ] **T-34**. Dialog Agent-session variant in `NewNodeScheduleDialog.tsx` — pinned Agents only, prompt, checkout picker (FL-14), FR-26 sentence, cost note.
+- [x] **T-34**. Dialog Agent-session variant in `NewNodeScheduleDialog.tsx` — pinned Agents only, prompt, checkout picker (FL-14), FR-26 sentence, cost note.
       **Test**: `NewNodeScheduleDialog.unit.spec.tsx` — sentence verbatim; unpinned disabled with reason.
 - [ ] **T-35**. Cost on rows and history: read `AgentRun.costCents` for Agent-session runs and FL-20's 30-day roll-up; tokens-only fallback.
       **Test**: `ScheduleRunHistory.unit.spec.tsx`.
-- [ ] **T-36**. Breaker scope `node` in AW-10's `POST /api/schedules/disable-all` (`apps/api/src/schedules/schedules.controller.ts`) and `DisableAllDialog.tsx`; **Pause all** button on the computer tab.
+- [x] **T-36**. Breaker scope `node` in AW-10's `POST /api/schedules/disable-all` (`apps/api/src/schedules/schedules.controller.ts`) and `DisableAllDialog.tsx`; **Pause all** button on the computer tab.
       **Test**: `schedules.controller.breaker.spec.ts` extended — only that computer's rows; undo.
-- [ ] **T-37**. Agent tools `fleet_schedules_*` in `packages/agent/src/fleet/agent-fleet-tools.ts` through the FL-19 gate (pause/resume `destructive: false`, `plain`; the rest per spec FR-32); MCP whitelist entries with the same names in `apps/mcp/src/openapi-tools/whitelist.ts`.
+- [x] **T-37**. Agent tools `fleet_schedules_*` in `packages/agent/src/fleet/agent-fleet-tools.ts` through the FL-19 gate (pause/resume `destructive: false`, `plain`; the rest per spec FR-32); MCP whitelist entries with the same names in `apps/mcp/src/openapi-tools/whitelist.ts`.
       **Test**: `agent-fleet-tools.spec.ts`; `whitelist.spec.ts`.
 - [ ] **T-38**. Playwright `apps/web/e2e/flow-fleet-schedules-agent-session.spec.ts` — create, fire (fake dispatcher), session visible on the computer Sessions tab, Run cost on the row.
       **Test**: green locally and in CI.

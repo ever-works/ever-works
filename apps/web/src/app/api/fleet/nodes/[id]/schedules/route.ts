@@ -14,6 +14,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id } = await ctx.params;
     if (!isUuid(id)) return invalidIdResponse();
-    const query = new URLSearchParams({ sourceType: 'node_schedule', node: id, limit: '50' });
+    // FL-13 P2: every source on this computer — Command schedules and the recurring
+    // Tasks of Agents pinned here (Agent-session schedules).
+    const query = new URLSearchParams({ node: id, limit: '50' });
     return forwardFleetCall(`${API_URL}/schedules/page?${query.toString()}`, { method: 'GET', headers });
 });

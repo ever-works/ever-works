@@ -70,6 +70,7 @@ import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-too
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
+import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
@@ -736,6 +737,26 @@ export class AgentToolService {
                             ? runContext.runId
                             : null,
                     service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-13 P2 — Schedules on computers. Create, update, delete and run never
+        // act themselves: each files an approval the owner decides in My Decisions
+        // (fail-closed without the queue); pause and resume apply at once. Bound
+        // only while FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetSchedules) {
+            const fleetSchedules = sources.fleetSchedules;
+            add('fleet-schedules', () =>
+                buildFleetScheduleTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetSchedules.service,
                     proposals: sources.proposals ?? null,
                 }),
             );

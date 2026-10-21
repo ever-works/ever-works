@@ -34,7 +34,9 @@ export const TASK_RESERVED_LABELS: readonly string[] = Object.freeze([
 ]);
 
 /** Reserved label FAMILIES: any label starting with one of these is reserved. */
-export const TASK_RESERVED_LABEL_PREFIXES: readonly string[] = Object.freeze(['release:', 'provision-attempt-']);
+// `fleet:` (FL-13 P2): an Agent-session schedule's labels decide that a fire starts as an Agent session on a computer
+// (`fleet:session-schedule`, `fleet:provider:…`, `fleet:checkout:…`) — only the platform's Schedules dialog writes them.
+export const TASK_RESERVED_LABEL_PREFIXES: readonly string[] = Object.freeze(['release:', 'provision-attempt-', 'fleet:']);
 
 /** The env switch that turns enforcement off (`false`); on when absent. */
 export const TASK_RESERVED_LABELS_ENFORCED_ENV = 'TASK_RESERVED_LABELS_ENFORCED';
