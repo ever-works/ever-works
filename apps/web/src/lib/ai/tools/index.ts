@@ -42,14 +42,14 @@ import {
     listMissions,
     getMissionDetails,
     getMissionBudget,
-    createMission,
-    updateMission,
+    createCreateMissionTool,
+    createUpdateMissionTool,
     pauseMission,
-    resumeMission,
+    createResumeMissionTool,
     completeMission,
     createDeleteMissionTool,
     createRunMissionNowTool,
-    cloneMission,
+    createCloneMissionTool,
     // PR-2 (domain-model evolution) — Mission ↔ Work relations.
     listMissionWorks,
     attachWorkToMission,
@@ -158,14 +158,17 @@ export function buildChatTools(model: LanguageModel, options: GeneratedToolsOpti
         listMissions,
         getMissionDetails,
         getMissionBudget,
-        createMission,
-        updateMission,
+        // Works-security: a scheduled / auto-building Mission, a resume and a
+        // clone (it starts active with the source schedule) need the user's
+        // own confirmation, like runMissionNow.
+        createMission: createCreateMissionTool(options.userConfirmed),
+        updateMission: createUpdateMissionTool(options.userConfirmed),
         pauseMission,
-        resumeMission,
+        resumeMission: createResumeMissionTool(options.userConfirmed),
         completeMission,
         deleteMission: createDeleteMissionTool(options.userConfirmed),
         runMissionNow: createRunMissionNowTool(options.userConfirmed),
-        cloneMission,
+        cloneMission: createCloneMissionTool(options.userConfirmed),
 
         // PR-2 — Mission ↔ Work relations (attach/detach, never ownership)
         listMissionWorks,

@@ -178,6 +178,8 @@ describe('missions chat tools — Create / Update', () => {
             title: 'Daily standup',
             autoBuildWorks: true,
             outstandingIdeasCap: 5,
+            // Works-security (#2804 review): scheduled + auto-build needs the handshake.
+            confirmed: true,
         });
         expect(createMissionMock).toHaveBeenCalledWith({
             description: 'Scheduled mission with all fields',
@@ -216,6 +218,8 @@ describe('missions chat tools — Create / Update', () => {
             title: 'Renamed',
             schedule: null,
             autoBuildWorks: true,
+            // Works-security (#2804 review): turning auto-build on needs the handshake.
+            confirmed: true,
         });
         expect(updateMissionMock).toHaveBeenCalledWith('m-1', {
             title: 'Renamed',
@@ -241,7 +245,11 @@ describe('missions chat tools — Lifecycle', () => {
 
     it('resumeMission delegates to resumeMissionAction', async () => {
         resumeMissionMock.mockResolvedValueOnce({ ...sampleMission, status: 'active' });
-        const result = await run<{ resumed: boolean }>(resumeMission, { missionId: 'm-1' });
+        // Works-security (#2804 review): resuming restarts scheduled runs — handshake.
+        const result = await run<{ resumed: boolean }>(resumeMission, {
+            missionId: 'm-1',
+            confirmed: true,
+        });
         expect(resumeMissionMock).toHaveBeenCalledWith('m-1');
         expect(result).toMatchObject({ resumed: true });
     });
@@ -302,7 +310,7 @@ describe('missions chat tools — Lifecycle', () => {
             mission: { id: string; sourceMissionId: string };
             ideasCloned: number;
             ideasSkipped: number;
-        }>(cloneMission, { missionId: 'm-1', title: 'My fork' });
+        }>(cloneMission, { missionId: 'm-1', title: 'My fork', confirmed: true });
         expect(cloneMissionMock).toHaveBeenCalledWith('m-1', 'My fork');
         expect(result).toMatchObject({
             cloned: true,
@@ -318,7 +326,7 @@ describe('missions chat tools — Lifecycle', () => {
             ideasCloned: 0,
             ideasSkipped: 0,
         });
-        await run(cloneMission, { missionId: 'm-1' });
+        await run(cloneMission, { missionId: 'm-1', confirmed: true });
         expect(cloneMissionMock).toHaveBeenCalledWith('m-1', undefined);
     });
 });

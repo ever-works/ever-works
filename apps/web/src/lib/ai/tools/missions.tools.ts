@@ -101,98 +101,169 @@ export const getMissionBudget = tool({
 });
 
 // ────────────────────────────────────────────────────────────────
+// Works-security (2026-10-21, review of #2804) — recurring work
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * True when a Mission create / update makes the Mission run without a person:
+ * a `scheduled` type or a cron `schedule` ticks it on its own (every tick is a
+ * paid model run that spawns Ideas), and `autoBuildWorks: true` queues every
+ * spawned Idea for a paid build. The same powers as `runMissionNow` /
+ * `setSchedule`, so the same user confirmation. Turning those OFF (`one-shot`,
+ * `schedule: null`, `autoBuildWorks: false`) never asks.
+ */
+export function missionStartsRecurringWork(input: {
+    type?: string | null;
+    schedule?: string | null;
+    autoBuildWorks?: boolean | null;
+}): boolean {
+    if (input.type === 'scheduled') return true;
+    if (typeof input.schedule === 'string' && input.schedule.trim().length > 0) return true;
+    return input.autoBuildWorks === true;
+}
+
+// ────────────────────────────────────────────────────────────────
 // Create
 // ────────────────────────────────────────────────────────────────
 
-export const createMission = tool({
-    description: [
-        'Create a new Mission. Default `type` is "one-shot" — flip to "scheduled" only when the user explicitly asks for recurring runs.',
-        'When `type="scheduled"`, `schedule` MUST be a 5-field cron string (e.g. "0 9 * * *").',
-        '`autoBuildWorks=true` makes the Mission auto-queue every spawned Idea for build — only do this if the user asked for it.',
-    ].join(' '),
-    inputSchema: z.object({
-        description: z
-            .string()
-            .min(10)
-            .describe('What the Mission should do — used as the AI Goal context'),
-        title: z
-            .string()
-            .optional()
-            .describe('Display title. Omit to let the server auto-title from the description.'),
-        type: z.enum(['one-shot', 'scheduled']).optional().describe('Default "one-shot".'),
-        schedule: z
-            .string()
-            .nullable()
-            .optional()
-            .describe('5-field cron expression. Required when type="scheduled".'),
-        autoBuildWorks: z
-            .boolean()
-            .optional()
-            .describe('When true, spawned Ideas are auto-queued for build.'),
-        outstandingIdeasCap: z
-            .number()
-            .int()
-            .min(-1)
-            .nullable()
-            .optional()
-            .describe('Cap on un-built Ideas. -1 = unlimited; null = inherit user default.'),
-        attachmentIds: z
-            .array(z.string())
-            .optional()
-            .describe(
-                'Upload IDs (sha256 hex) OR full `/api/uploads/<userId>/<sha>.<ext>` URLs to attach to the new Mission. Source: the "Attached files:" block in the user message. Pass either the bare sha256 part of each URL or the URL itself — both are accepted.',
-            ),
-    }),
-    execute: async (input) => {
-        const mission = await createMissionAction({
-            description: input.description,
-            type: input.type ?? 'one-shot',
-            ...(input.title !== undefined && { title: input.title }),
-            ...(input.schedule !== undefined && { schedule: input.schedule }),
-            ...(input.autoBuildWorks !== undefined && { autoBuildWorks: input.autoBuildWorks }),
-            ...(input.outstandingIdeasCap !== undefined && {
-                outstandingIdeasCap: input.outstandingIdeasCap,
-            }),
-        });
-        const uploadIds = extractUploadIds(input.attachmentIds);
-        const attachStats =
-            uploadIds.length > 0
-                ? await attachUploadsBestEffort(uploadIds, (uploadId) =>
-                      attachUploadToMissionAction(mission.id, uploadId),
-                  )
-                : { attached: 0, failed: 0 };
-        return {
-            created: true,
-            mission: summarizeMission(mission),
-            ...(uploadIds.length > 0 && { attachments: attachStats }),
-        };
-    },
-});
+/**
+ * Build `createMission`. Works-security: a scheduled or auto-building Mission
+ * needs the user's own confirmation of this exact card (see
+ * `missionStartsRecurringWork`); a one-shot Mission is created straight away.
+ */
+export function createCreateMissionTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Create a new Mission. Default `type` is "one-shot" — flip to "scheduled" only when the user explicitly asks for recurring runs.',
+            'When `type="scheduled"`, `schedule` MUST be a 5-field cron string (e.g. "0 9 * * *").',
+            '`autoBuildWorks=true` makes the Mission auto-queue every spawned Idea for build — only do this if the user asked for it.',
+            'A scheduled or auto-building Mission requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            description: z
+                .string()
+                .min(10)
+                .describe('What the Mission should do — used as the AI Goal context'),
+            title: z
+                .string()
+                .optional()
+                .describe('Display title. Omit to let the server auto-title from the description.'),
+            type: z.enum(['one-shot', 'scheduled']).optional().describe('Default "one-shot".'),
+            schedule: z
+                .string()
+                .nullable()
+                .optional()
+                .describe('5-field cron expression. Required when type="scheduled".'),
+            autoBuildWorks: z
+                .boolean()
+                .optional()
+                .describe('When true, spawned Ideas are auto-queued for build.'),
+            outstandingIdeasCap: z
+                .number()
+                .int()
+                .min(-1)
+                .nullable()
+                .optional()
+                .describe('Cap on un-built Ideas. -1 = unlimited; null = inherit user default.'),
+            attachmentIds: z
+                .array(z.string())
+                .optional()
+                .describe(
+                    'Upload IDs (sha256 hex) OR full `/api/uploads/<userId>/<sha>.<ext>` URLs to attach to the new Mission. Source: the "Attached files:" block in the user message. Pass either the bare sha256 part of each URL or the URL itself — both are accepted.',
+                ),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ confirmed, ...input }) => {
+            if (missionStartsRecurringWork(input)) {
+                const card = requireUserConfirmation({
+                    toolName: 'createMission',
+                    action: 'Create a Mission that runs on a schedule or auto-builds its Ideas',
+                    target: input.title,
+                    args: { ...input },
+                    confirmed,
+                    userConfirmed,
+                    kind: 'privileged',
+                    preview: input.description,
+                });
+                if (card) return card;
+            }
+            const mission = await createMissionAction({
+                description: input.description,
+                type: input.type ?? 'one-shot',
+                ...(input.title !== undefined && { title: input.title }),
+                ...(input.schedule !== undefined && { schedule: input.schedule }),
+                ...(input.autoBuildWorks !== undefined && { autoBuildWorks: input.autoBuildWorks }),
+                ...(input.outstandingIdeasCap !== undefined && {
+                    outstandingIdeasCap: input.outstandingIdeasCap,
+                }),
+            });
+            const uploadIds = extractUploadIds(input.attachmentIds);
+            const attachStats =
+                uploadIds.length > 0
+                    ? await attachUploadsBestEffort(uploadIds, (uploadId) =>
+                          attachUploadToMissionAction(mission.id, uploadId),
+                      )
+                    : { attached: 0, failed: 0 };
+            return {
+                created: true,
+                mission: summarizeMission(mission),
+                ...(uploadIds.length > 0 && { attachments: attachStats }),
+            };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const createMission = createCreateMissionTool();
 
 // ────────────────────────────────────────────────────────────────
 // Update
 // ────────────────────────────────────────────────────────────────
 
-export const updateMission = tool({
-    description: [
-        'Update an existing Mission. Only provide fields the user wants to change.',
-        'Tri-state semantics: omit a field to leave it unchanged; pass `null` to reset to default; pass a value to override.',
-    ].join(' '),
-    inputSchema: z.object({
-        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-        title: z.string().optional(),
-        description: z.string().optional(),
-        type: z.enum(['one-shot', 'scheduled']).optional(),
-        schedule: z.string().nullable().optional(),
-        autoBuildWorks: z.boolean().optional(),
-        outstandingIdeasCap: z.number().int().min(-1).nullable().optional(),
-    }),
-    execute: async ({ missionId, ...patch }) => {
-        const mission = await updateMissionAction(missionId, patch);
-        return { updated: true, mission: summarizeMission(mission) };
-    },
-});
+/**
+ * Build `updateMission`. Works-security: switching a Mission to scheduled,
+ * setting its cron schedule or turning auto-build on needs the user's own
+ * confirmation of this exact card; every other edit runs straight away.
+ */
+export function createUpdateMissionTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Update an existing Mission. Only provide fields the user wants to change.',
+            'Tri-state semantics: omit a field to leave it unchanged; pass `null` to reset to default; pass a value to override.',
+            'Making a Mission scheduled, setting its schedule or turning auto-build on requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+            missionId: z.string().uuid().describe('Mission ID'),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            type: z.enum(['one-shot', 'scheduled']).optional(),
+            schedule: z.string().nullable().optional(),
+            autoBuildWorks: z.boolean().optional(),
+            outstandingIdeasCap: z.number().int().min(-1).nullable().optional(),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ missionId, confirmed, ...patch }) => {
+            if (missionStartsRecurringWork(patch)) {
+                const card = requireUserConfirmation({
+                    toolName: 'updateMission',
+                    action: 'Make a Mission run on a schedule or auto-build its Ideas',
+                    target: missionId,
+                    args: { missionId, ...patch },
+                    confirmed,
+                    userConfirmed,
+                    kind: 'privileged',
+                });
+                if (card) return card;
+            }
+            const mission = await updateMissionAction(missionId, patch);
+            return { updated: true, mission: summarizeMission(mission) };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const updateMission = createUpdateMissionTool();
 
 // ────────────────────────────────────────────────────────────────
 // Lifecycle — pause / resume / complete / delete / run-now / clone
@@ -211,18 +282,40 @@ export const pauseMission = tool({
     },
 });
 
-export const resumeMission = tool({
-    description:
-        'Resume a paused Mission. Tick worker picks it back up on the next cron match. Only valid when status="paused".',
-    inputSchema: z.object({
-        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-    }),
-    execute: async ({ missionId }) => {
-        const mission = await resumeMissionAction(missionId);
-        return { resumed: true, mission: summarizeMission(mission) };
-    },
-});
+/**
+ * Build `resumeMission`. Works-security: resuming hands a paused Mission back
+ * to the cron tick worker (paid runs without a person) — the user's call.
+ */
+export function createResumeMissionTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Resume a paused Mission. Tick worker picks it back up on the next cron match. Only valid when status="paused".',
+            'Restarts scheduled paid runs — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+            missionId: z.string().uuid().describe('Mission ID'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ missionId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'resumeMission',
+                action: 'Resume a Mission (its scheduled runs start again)',
+                target: missionId,
+                args: { missionId },
+                confirmed,
+                userConfirmed,
+                kind: 'privileged',
+            });
+            if (card) return card;
+            const mission = await resumeMissionAction(missionId);
+            return { resumed: true, mission: summarizeMission(mission) };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const resumeMission = createResumeMissionTool();
 
 export const completeMission = tool({
     description: [
@@ -309,29 +402,53 @@ export function createRunMissionNowTool(userConfirmed?: UserConfirmationCheck) {
 /** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
 export const runMissionNow = createRunMissionNowTool();
 
-export const cloneMission = tool({
-    description: [
-        'Full-Fork clone a Mission: copies the Mission row + every Idea (including ACCEPTED/DONE), zeroes their statuses for the new owner.',
-        'Use when the user wants to "duplicate" or "fork" a Mission.',
-    ].join(' '),
-    inputSchema: z.object({
-        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Source Mission ID to clone from'),
-        title: z
-            .string()
-            .optional()
-            .describe('Title for the new Mission. Omit to reuse "<original> (copy)".'),
-    }),
-    execute: async ({ missionId, title }) => {
-        const result = await cloneMissionAction(missionId, title);
-        return {
-            cloned: true,
-            mission: summarizeMission(result.mission),
-            ideasCloned: result.ideasCloned,
-            ideasSkipped: result.ideasSkipped,
-        };
-    },
-});
+/**
+ * Build `cloneMission`. Works-security: the copy starts ACTIVE with the
+ * source's cron schedule and auto-build setting (`mission-clone.service.ts`),
+ * so a paused scheduled Mission comes back as a running one — the user's call.
+ */
+export function createCloneMissionTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Full-Fork clone a Mission: copies the Mission row + every Idea (including ACCEPTED/DONE), zeroes their statuses for the new owner.',
+            'Use when the user wants to "duplicate" or "fork" a Mission.',
+            'The copy starts active with the source schedule and auto-build setting — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        ].join(' '),
+        inputSchema: z.object({
+            // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+            missionId: z.string().uuid().describe('Source Mission ID to clone from'),
+            title: z
+                .string()
+                .optional()
+                .describe('Title for the new Mission. Omit to reuse "<original> (copy)".'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ missionId, title, confirmed }) => {
+            const args: Record<string, unknown> = { missionId };
+            if (title !== undefined) args.title = title;
+            const card = requireUserConfirmation({
+                toolName: 'cloneMission',
+                action: 'Clone a Mission (the copy starts active with the same schedule)',
+                target: missionId,
+                args,
+                confirmed,
+                userConfirmed,
+                kind: 'privileged',
+            });
+            if (card) return card;
+            const result = await cloneMissionAction(missionId, title);
+            return {
+                cloned: true,
+                mission: summarizeMission(result.mission),
+                ideasCloned: result.ideasCloned,
+                ideasSkipped: result.ideasSkipped,
+            };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const cloneMission = createCloneMissionTool();
 
 // ────────────────────────────────────────────────────────────────
 // PR-2 (domain-model evolution) — Mission ↔ Work relations

@@ -20,6 +20,27 @@ const mocks = vi.hoisted(() => ({
     acceptProposalAction: vi.fn(async () => ({ ok: true })),
     dismissProposalAction: vi.fn(async () => undefined),
     generateItems: vi.fn(async () => ({ success: true, message: 'generating' })),
+    // Works-security (2026-10-21, review of #2804) — Mission recurring work.
+    createMissionAction: vi.fn(async () => ({
+        id: 'm-new',
+        title: 'Daily research',
+        status: 'active',
+    })),
+    updateMissionAction: vi.fn(async () => ({
+        id: 'm-1',
+        title: 'Daily research',
+        status: 'active',
+    })),
+    resumeMissionAction: vi.fn(async () => ({
+        id: 'm-1',
+        title: 'Daily research',
+        status: 'active',
+    })),
+    cloneMissionAction: vi.fn(async () => ({
+        mission: { id: 'm-copy', title: 'Daily research (copy)', status: 'active' },
+        ideasCloned: 0,
+        ideasSkipped: 0,
+    })),
 }));
 
 vi.mock('@/app/actions/dashboard/deploy', () => ({
@@ -35,15 +56,15 @@ vi.mock('@/app/actions/dashboard/work-schedule', () => ({
 }));
 vi.mock('@/app/actions/dashboard/missions', () => ({
     attachUploadToMissionAction: vi.fn(),
-    cloneMissionAction: vi.fn(),
+    cloneMissionAction: mocks.cloneMissionAction,
     completeMissionAction: vi.fn(),
-    createMissionAction: vi.fn(),
+    createMissionAction: mocks.createMissionAction,
     deleteMissionAction: vi.fn(),
     listMissionsAction: vi.fn(),
     pauseMissionAction: vi.fn(),
-    resumeMissionAction: vi.fn(),
+    resumeMissionAction: mocks.resumeMissionAction,
     runMissionNowAction: mocks.runMissionNowAction,
-    updateMissionAction: vi.fn(),
+    updateMissionAction: mocks.updateMissionAction,
 }));
 vi.mock('@/lib/api/missions', () => ({ missionsAPI: {} }));
 vi.mock('@/lib/api/server-api', () => ({
@@ -92,7 +113,14 @@ vi.mock('./utils', () => ({
 import { createUserConfirmationCheck } from './generated/confirmation';
 import { createDeployWorkTool } from './deploy.tools';
 import { createRunScheduleNowTool, createSetScheduleTool } from './schedule.tools';
-import { createRunMissionNowTool } from './missions.tools';
+import {
+    createCloneMissionTool,
+    createCreateMissionTool,
+    createResumeMissionTool,
+    createRunMissionNowTool,
+    createUpdateMissionTool,
+    missionStartsRecurringWork,
+} from './missions.tools';
 import { createAcceptIdeaTool, createBuildIdeaTool, createDismissIdeaTool } from './ideas.tools';
 import { createGenerateItemsTool } from './items.tools';
 import type { UserConfirmationCheck } from './generated/confirmation';
@@ -149,6 +177,34 @@ const cases: Array<{
         make: createRunMissionNowTool,
         args: { missionId: M },
         effect: () => mocks.runMissionNowAction,
+    },
+    {
+        name: 'createMission',
+        make: createCreateMissionTool,
+        args: {
+            description: 'Daily niche research for the catalog',
+            type: 'scheduled',
+            schedule: '0 9 * * *',
+        },
+        effect: () => mocks.createMissionAction,
+    },
+    {
+        name: 'updateMission',
+        make: createUpdateMissionTool,
+        args: { missionId: M, autoBuildWorks: true },
+        effect: () => mocks.updateMissionAction,
+    },
+    {
+        name: 'resumeMission',
+        make: createResumeMissionTool,
+        args: { missionId: M },
+        effect: () => mocks.resumeMissionAction,
+    },
+    {
+        name: 'cloneMission',
+        make: createCloneMissionTool,
+        args: { missionId: M },
+        effect: () => mocks.cloneMissionAction,
     },
     {
         name: 'buildIdea',
@@ -212,5 +268,68 @@ describe('generateItems', () => {
             prompt: 'scrape and publish x',
         });
         expect(card.preview).toBe('scrape and publish x');
+    });
+});
+
+describe('Missions (works-security, review of #2804)', () => {
+    it('a one-shot Mission is created without a card', async () => {
+        const out = await run(createCreateMissionTool(noConfirmation), {
+            description: 'Research niches once for the catalog',
+        });
+        expect(out.__confirmationRequired).toBeUndefined();
+        expect(mocks.createMissionAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('auto-build alone on create shows a card and puts the description on it', async () => {
+        const card = await run(createCreateMissionTool(noConfirmation), {
+            description: 'Research niches once for the catalog',
+            autoBuildWorks: true,
+        });
+        expect(card.__confirmationRequired).toBe(true);
+        expect(card.confirmationKind).toBe('privileged');
+        expect(card.preview).toBe('Research niches once for the catalog');
+        expect(mocks.createMissionAction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { title: 'Renamed' },
+        { schedule: null },
+        { autoBuildWorks: false },
+        { type: 'one-shot' },
+        { outstandingIdeasCap: 3 },
+    ])('updateMission %j needs no card', async (patch) => {
+        const out = await run(createUpdateMissionTool(noConfirmation), { missionId: M, ...patch });
+        expect(out.__confirmationRequired).toBeUndefined();
+        expect(mocks.updateMissionAction).toHaveBeenCalledWith(M, patch);
+    });
+
+    it.each([{ type: 'scheduled' }, { schedule: '*/15 * * * *' }, { autoBuildWorks: true }])(
+        'updateMission %j shows a card',
+        async (patch) => {
+            const card = await run(createUpdateMissionTool(noConfirmation), {
+                missionId: M,
+                ...patch,
+            });
+            expect(card.__confirmationRequired).toBe(true);
+            expect(mocks.updateMissionAction).not.toHaveBeenCalled();
+        },
+    );
+
+    it('the card binds to the arguments: a confirmed schedule does not allow a different one', async () => {
+        const confirmedArgs = { missionId: M, schedule: '0 9 * * *' };
+        const tool = createUpdateMissionTool(confirming('updateMission', confirmedArgs));
+        const swapped = await run(tool, { missionId: M, schedule: '* * * * *', confirmed: true });
+        expect(swapped.__confirmationRequired).toBe(true);
+        expect(mocks.updateMissionAction).not.toHaveBeenCalled();
+    });
+
+    it('missionStartsRecurringWork reads only the switches that start work', () => {
+        expect(missionStartsRecurringWork({})).toBe(false);
+        expect(missionStartsRecurringWork({ schedule: '   ' })).toBe(false);
+        expect(missionStartsRecurringWork({ schedule: null, autoBuildWorks: false })).toBe(false);
+        expect(missionStartsRecurringWork({ type: 'one-shot' })).toBe(false);
+        expect(missionStartsRecurringWork({ type: 'scheduled' })).toBe(true);
+        expect(missionStartsRecurringWork({ schedule: '0 9 * * *' })).toBe(true);
+        expect(missionStartsRecurringWork({ autoBuildWorks: true })).toBe(true);
     });
 });
