@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { FleetNodeView, FleetSessionView } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { agentsAPI } from '@/lib/api/agents';
 import { fleetAPI } from '@/lib/api/fleet';
 import { fleetSessionsAPI } from '@/lib/api/fleet-sessions';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -23,9 +24,11 @@ import { SessionDetailClient } from './SessionDetailClient';
 export default async function SessionPage({ sessionId }: FleetSessionPageProps) {
     const t = await getTranslations('fleet.sessions');
     const session: FleetSessionView | null = await fleetSessionsAPI.get(sessionId).catch(() => null);
-    const [detail, user] = await Promise.all([
+    const [detail, user, agent] = await Promise.all([
         session ? fleetAPI.nodeDetail(session.nodeId).catch(() => null) : Promise.resolve(null),
         getAuthFromCookie().catch(() => null),
+        // P2: the Agent of an Agent session (its name in the footer and the end dialog).
+        session?.agentId ? agentsAPI.get(session.agentId).catch(() => null) : Promise.resolve(null),
     ]);
     const node: FleetNodeView | null = detail?.node ?? null;
 
@@ -46,5 +49,12 @@ export default async function SessionPage({ sessionId }: FleetSessionPageProps) 
         );
     }
 
-    return <SessionDetailClient initial={session} node={node} viewerUserId={user?.id ?? null} />;
+    return (
+        <SessionDetailClient
+            initial={session}
+            node={node}
+            viewerUserId={user?.id ?? null}
+            agentName={agent?.name ?? null}
+        />
+    );
 }

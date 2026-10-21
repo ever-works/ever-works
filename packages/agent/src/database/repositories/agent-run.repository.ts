@@ -713,6 +713,12 @@ export class AgentRunRepository {
          * a plain insert, exactly as before.
          */
         resumeClaim?: RunResumeClaim;
+        /**
+         * Sessions on computers (FL-04 P2) — the Agent session this
+         * `session` run is. Omitted by every other caller, which leaves the
+         * column NULL exactly as before.
+         */
+        fleetSessionId?: string | null;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -729,6 +735,7 @@ export class AgentRunRepository {
             ...(args.conversationMessageId
                 ? { conversationMessageId: args.conversationMessageId }
                 : {}),
+            ...(args.fleetSessionId ? { fleetSessionId: args.fleetSessionId } : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
             ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),

@@ -6,6 +6,7 @@ import { authCommand } from './commands/auth';
 import { workCommand } from './commands/work';
 import { pluginsCommand } from './commands/plugins';
 import { registerKbCommands } from './commands/kb';
+import { fleetCommand } from './commands/fleet';
 
 // Load environment variables
 dotenv.config({ debug: false, quiet: true });
@@ -23,6 +24,8 @@ program
 program.addCommand(authCommand);
 program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
+// `ever-works fleet …`: sessions (FL-04) and commands (FL-12, `fleet commands run --on a,b -- <cmd>`).
+program.addCommand(fleetCommand);
 registerKbCommands(program);
 
 // Parse arguments

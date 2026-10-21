@@ -1,6 +1,8 @@
 import {
     FLEET_LOGS_VIEWER_MAX_LINES,
     fleetLogLineMatches,
+    fleetLogSourceId,
+    isFleetLogSourceId,
     type FleetLogLine,
     type FleetLogSource,
     type FleetNodeView,
@@ -92,6 +94,26 @@ export function groupLogSources(sources: readonly FleetLogSource[]): LogSourceGr
     }
     groups.files = [...byRoot.entries()].map(([root, list]) => ({ root, sources: list }));
     return groups;
+}
+
+/**
+ * The source a deep link names (FR-38, T-20): `?source=<id>` (`service:nginx.service`),
+ * or the kind with its own parameter, as FL-09's Services tab links
+ * (`?source=service&unit=nginx.service`, `?source=container&container=acme-api`,
+ * `?source=file&path=/var/log/syslog`). Null for anything that is not one.
+ */
+export function logsDeepLinkSource(get: (name: string) => string | null): string | null {
+    const source = get('source');
+    if (isFleetLogSourceId(source)) return source;
+    const candidate =
+        source === 'service' && get('unit')
+            ? fleetLogSourceId('service', get('unit')!)
+            : source === 'container' && get('container')
+              ? fleetLogSourceId('container', get('container')!)
+              : source === 'file' && get('path')
+                ? fleetLogSourceId('file', get('path')!)
+                : null;
+    return candidate && isFleetLogSourceId(candidate) ? candidate : null;
 }
 
 /** A typed path → a file source id; null for a path that is not absolute (the field says so). */

@@ -261,3 +261,7 @@ Page with `?fromSeq=<lastSeq + 1>` for as long as `hasMore` is true.
 - [Plugins](./plugins.md) — the `terminal-stream` capability and the `pty-local` provider.
 - [Tasks](./tasks.md) — the Task run controls that link into a live session.
 - [Credits & Billing](./credits-and-billing.md) — the plan tiers transcript retention hangs off.
+
+## Terminals on your own computers
+
+A Run's terminal lives on the job runtime. To keep a terminal running on one of your own computers — yours, or an Agent's with its own Run — use [Sessions on computers](./fleet-sessions.md).

@@ -22,7 +22,7 @@ import {
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetMachineFactsEnabledGuard } from '../guards/fleet-machine-facts-enabled.guard';
+import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { FleetLogsAttachDto, FleetLogsReadDto } from './dto/fleet-logs.dto';
 import { FleetLogsService } from './fleet-logs.service';
 

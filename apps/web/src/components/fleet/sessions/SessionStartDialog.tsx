@@ -5,12 +5,16 @@ import { useTranslations } from 'next-intl';
 import {
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
+    FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
     FLEET_SESSION_TITLE_MAX_LENGTH,
+    isFleetAgentSessionProvider,
     isFleetSessionAgentProvider,
     type FleetNodeView,
+    type FleetSessionKind,
     type FleetSessionStartableProvider,
     type FleetSessionView,
 } from '@ever-works/contracts';
+import { listSessionAgentsAction } from '@/app/actions/fleet-sessions';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
@@ -18,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { sessionsClient } from './sessions.client';
 import {
+    canStartAgentSession,
     canStartOwnerSession,
     defaultProvider,
     errorField,
@@ -28,44 +33,56 @@ import {
 } from './sessions.shared';
 
 /**
- * Sessions on computers (FL-04 P1b, spec §5.2, FR-12 … FR-17) — "New
- * session" on one computer: who → what → where → (first message) → start.
+ * Sessions on computers (FL-04, spec §5.2, FR-12 … FR-17, FR-42 … FR-49) —
+ * "New session" on one computer: who → what → where → first message → start.
  *
  *  - **Who**: You (an owner session — runs as you, in your login; needs
- *    `--manage`). The Agent row is shown and says it arrives with the next
- *    release (P2), so the dialog's shape does not change when it does.
+ *    `--manage`) or one of your Agents (P2 — isolated, owns a Run; needs
+ *    `--work`). A computer that cannot take one says why, in words.
  *  - **What**: Claude Code, Codex, a shell — a CLI the computer does not
- *    advertise is greyed "not installed on build-01".
+ *    advertise is greyed "not installed on build-01"; an Agent drives a CLI,
+ *    never a bare shell.
  *  - **Where**: a folder on the computer, with the folders of its last ten
- *    sessions as one-click chips. "In a new worktree" is greyed until
- *    Checkouts (FL-14) ships.
- *  - **First message** (agent CLIs): typed into the CLI when it starts.
- *  - **The cost sentence**: your own login, no Ever Works tokens.
+ *    sessions as one-click chips. "In a new worktree" waits for Checkouts.
+ *  - **First message**: optional for your own CLI session, required (3–4 000
+ *    characters) for an Agent's.
+ *  - **The cost sentence**: your own login, or the Agent's isolated Run.
  *
- * A refusal keeps every field and marks the one it names (`invalid` with
- * `details.field`); success opens the session page.
+ * A refusal keeps every field and marks the one it names; success opens the
+ * session page (an Agent session may still be waiting for a free slot there).
+ * `initialKind` / `initialAgentId` preselect (the Agent page's "New session").
  */
 export function SessionStartDialog({
     open,
     onOpenChange,
     node,
     onStarted,
+    initialKind,
+    initialAgentId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     node: FleetNodeView;
     onStarted?: (view: FleetSessionView) => void;
+    initialKind?: FleetSessionKind;
+    initialAgentId?: string;
 }) {
     const t = useTranslations('fleet.sessions');
     const router = useRouter();
+    const ownerAllowed = canStartOwnerSession(node);
+    const agentAllowed = canStartAgentSession(node);
+    const [who, setWho] = useState<FleetSessionKind>(
+        initialKind ?? (ownerAllowed || !agentAllowed ? 'owner' : 'agent'),
+    );
     const [provider, setProvider] = useState<FleetSessionStartableProvider>(() => defaultProvider(node));
     const [cwd, setCwd] = useState('');
     const [title, setTitle] = useState('');
     const [firstMessage, setFirstMessage] = useState('');
     const [recent, setRecent] = useState<string[]>([]);
+    const [agents, setAgents] = useState<{ id: string; name: string }[] | null>(null);
+    const [agentId, setAgentId] = useState(initialAgentId ?? '');
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<SessionErrorRead | null>(null);
-    const ownerAllowed = canStartOwnerSession(node);
 
     useEffect(() => {
         if (!open) return;
@@ -82,11 +99,44 @@ export function SessionStartDialog({
         };
     }, [open, node.id]);
 
+    useEffect(() => {
+        if (!open || who !== 'agent' || agents !== null) return;
+        let cancelled = false;
+        void listSessionAgentsAction().then((list) => {
+            if (cancelled) return;
+            setAgents(list);
+            setAgentId((current) => current || list[0]?.id || '');
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, who, agents]);
+
+    // An Agent drives a CLI: leaving "You" for "Agent" moves off the shell.
+    useEffect(() => {
+        if (who === 'agent' && !isFleetAgentSessionProvider(provider)) {
+            const cli = SESSION_DIALOG_PROVIDERS.find(
+                (option) => isFleetAgentSessionProvider(option) && providerInstalled(node, option),
+            );
+            if (cli) setProvider(cli);
+        }
+    }, [who, provider, node]);
+
     const field = errorField(error);
     const agentCli = isFleetSessionAgentProvider(provider);
     const providerName = t(`providers.${providerKey(provider)}`);
+    const agentName = agents?.find((agent) => agent.id === agentId)?.name ?? '';
+    const messageLength = firstMessage.trim().length;
+    const agentReady =
+        who !== 'agent' ||
+        (agentAllowed &&
+            agentId.length > 0 &&
+            isFleetAgentSessionProvider(provider) &&
+            messageLength >= FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH &&
+            firstMessage.length <= FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH);
     const canSubmit =
-        ownerAllowed &&
+        (who === 'owner' ? ownerAllowed : agentAllowed) &&
+        agentReady &&
         !pending &&
         cwd.trim().length > 0 &&
         cwd.length <= FLEET_SESSION_CWD_MAX_LENGTH &&
@@ -98,10 +148,11 @@ export function SessionStartDialog({
         setPending(true);
         setError(null);
         const result = await sessionsClient.start(node.id, {
-            kind: 'owner',
+            kind: who,
             provider,
             cwd: cwd.trim(),
             ...(title.trim() ? { title: title.trim() } : {}),
+            ...(who === 'agent' ? { agentId } : {}),
             ...(agentCli && firstMessage.trim() ? { firstMessage } : {}),
         });
         setPending(false);
@@ -136,27 +187,68 @@ export function SessionStartDialog({
                             <legend className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                 {t('start.who')}
                             </legend>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                <div className={radio(true, !ownerAllowed)} data-testid="fleet-session-start-who-owner">
+                            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={who === 'owner'}
+                                    disabled={!ownerAllowed}
+                                    onClick={() => setWho('owner')}
+                                    className={radio(who === 'owner', !ownerAllowed)}
+                                    data-testid="fleet-session-start-who-owner"
+                                >
                                     {t('start.you')}
-                                </div>
-                                <div
-                                    className={radio(false, true)}
-                                    aria-disabled="true"
+                                </button>
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={who === 'agent'}
+                                    disabled={!agentAllowed}
+                                    onClick={() => setWho('agent')}
+                                    className={radio(who === 'agent', !agentAllowed)}
                                     data-testid="fleet-session-start-who-agent"
                                 >
-                                    <span>
-                                        {t('start.agent')}
-                                        <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                            {t('start.agentLater')}
-                                        </span>
-                                    </span>
-                                </div>
+                                    {t('start.agent')}
+                                </button>
                             </div>
-                            {!ownerAllowed && (
+                            {who === 'owner' && !ownerAllowed && (
                                 <p className="text-xs text-warning" role="status">
                                     {t('start.noConsent', { node: node.name })}
                                 </p>
+                            )}
+                            {!agentAllowed && (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark" role="status">
+                                    {t('states.consentWork')}
+                                </p>
+                            )}
+                            {who === 'agent' && (
+                                <label className="block space-y-1 text-sm">
+                                    <span className="text-text-muted dark:text-text-muted-dark">
+                                        {t('start.agentPick')}
+                                    </span>
+                                    {agents !== null && agents.length === 0 ? (
+                                        <span className="block text-xs text-warning">{t('start.noAgents')}</span>
+                                    ) : (
+                                        <select
+                                            value={agentId}
+                                            onChange={(event) => setAgentId(event.target.value)}
+                                            aria-invalid={field === 'agentId'}
+                                            className={cn(
+                                                'w-full rounded-md border bg-transparent px-3 py-2 text-sm',
+                                                field === 'agentId'
+                                                    ? 'border-danger'
+                                                    : 'border-border dark:border-border-dark',
+                                            )}
+                                            data-testid="fleet-session-start-agent"
+                                        >
+                                            {(agents ?? []).map((agent) => (
+                                                <option key={agent.id} value={agent.id}>
+                                                    {agent.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </label>
                             )}
                         </fieldset>
 
@@ -167,15 +259,17 @@ export function SessionStartDialog({
                             <div className="grid gap-2 sm:grid-cols-3" role="radiogroup">
                                 {SESSION_DIALOG_PROVIDERS.map((option) => {
                                     const installed = providerInstalled(node, option);
+                                    const forAgent = who !== 'agent' || isFleetAgentSessionProvider(option);
+                                    const usable = installed && forAgent;
                                     return (
                                         <button
                                             key={option}
                                             type="button"
                                             role="radio"
                                             aria-checked={provider === option}
-                                            disabled={!installed}
+                                            disabled={!usable}
                                             onClick={() => setProvider(option)}
-                                            className={radio(provider === option, !installed)}
+                                            className={radio(provider === option, !usable)}
                                             data-testid={`fleet-session-start-provider-${option}`}
                                         >
                                             <span>
@@ -183,6 +277,11 @@ export function SessionStartDialog({
                                                 {!installed && (
                                                     <span className="block text-xs text-text-muted dark:text-text-muted-dark">
                                                         {t('start.notInstalled', { node: node.name })}
+                                                    </span>
+                                                )}
+                                                {installed && !forAgent && (
+                                                    <span className="block text-xs text-text-muted dark:text-text-muted-dark">
+                                                        {t('start.agentShellNot')}
                                                     </span>
                                                 )}
                                             </span>
@@ -255,6 +354,7 @@ export function SessionStartDialog({
                                     onChange={(event) => setFirstMessage(event.target.value)}
                                     maxLength={FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH}
                                     rows={3}
+                                    required={who === 'agent'}
                                     aria-invalid={field === 'firstMessage'}
                                     className={cn(
                                         'w-full rounded-md border bg-transparent px-3 py-2 text-sm',
@@ -265,16 +365,25 @@ export function SessionStartDialog({
                                     data-testid="fleet-session-start-first-message"
                                 />
                                 <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                    {t('start.firstMessageHint', { provider: providerName })}
+                                    {who === 'agent'
+                                        ? t('start.firstMessageRequired')
+                                        : t('start.firstMessageHint', { provider: providerName })}
                                 </span>
                             </label>
                         )}
 
                         <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-session-start-cost">
-                            {provider === 'shell'
-                                ? t('start.costShell', { node: node.name })
-                                : t('start.costOwner', { provider: providerName, node: node.name })}
+                            {who === 'agent'
+                                ? t('start.costAgent', { agent: agentName || t('kinds.agent'), node: node.name })
+                                : provider === 'shell'
+                                  ? t('start.costShell', { node: node.name })
+                                  : t('start.costOwner', { provider: providerName, node: node.name })}
                         </p>
+                        {who === 'agent' && (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('start.queuedHint', { node: node.name })}
+                            </p>
+                        )}
 
                         {error && (
                             <p role="alert" className="text-sm text-danger" data-testid="fleet-session-start-error">

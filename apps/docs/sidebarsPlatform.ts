@@ -187,6 +187,10 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-health',
 				// What each computer lets the platform do, and the one link it keeps.
 				'features/fleet-node-link',
+				// One command on several computers, from the hub or the CLI.
+				'features/fleet-commands',
+				// Terminals that keep running on those computers (FL-04).
+				'features/fleet-sessions',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
 				'features/integrations',

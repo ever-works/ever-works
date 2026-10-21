@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FLEET_LOGS_READER, FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetMachineFactsEnabledGuard } from '../guards/fleet-machine-facts-enabled.guard';
+import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-enabled.guard';
 import { FleetLogsController } from './fleet-logs.controller';
 import { FleetLogsService } from './fleet-logs.service';
 

@@ -71,6 +71,7 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import {
+    FleetCheckoutReconcileService,
     FleetJobService,
     FleetNodeHealthService,
     FleetSessionSweepService,
@@ -729,6 +730,11 @@ export class TriggerInternalController implements OnModuleInit {
         // member. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetSessionSweepService?: FleetSessionSweepService,
+        // Checkouts on computers (FL-14) — backs the `fleet-checkout-reconcile`
+        // cron: the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetCheckoutReconcileService?: FleetCheckoutReconcileService,
     ) {}
 
     onModuleInit() {
@@ -861,6 +867,14 @@ export class TriggerInternalController implements OnModuleInit {
             // remote target") when sessions are not mounted.
             FleetSessionSweepService: this.fleetSessionSweepService
                 ? { sweepStale: () => this.fleetSessionSweepService!.sweepStale() }
+                : undefined,
+            // Checkouts on computers (FL-14) — `fleet-checkout-reconcile` calls
+            // `reconcile()` here, and only that: `FleetCheckoutReconcileService`
+            // is a one-member facade over `FleetCheckoutService` (whose archive
+            // / sync must never reach the worker). `undefined` (a loud "Unknown
+            // remote target") when checkouts are not mounted.
+            FleetCheckoutReconcileService: this.fleetCheckoutReconcileService
+                ? { reconcile: () => this.fleetCheckoutReconcileService!.reconcile() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

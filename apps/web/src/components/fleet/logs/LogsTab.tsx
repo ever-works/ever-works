@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { FileText, Lock, MonitorSmartphone, OctagonX, RotateCw, ShieldOff, WifiOff } from 'lucide-react';
 import type { FleetLogSourcesResponse } from '@ever-works/contracts';
-import { FLEET_LOGS_SOURCES_REFRESH_MS, isFleetLogSourceId } from '@ever-works/contracts';
+import { FLEET_LOGS_SOURCES_REFRESH_MS } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { browserApiFetch } from '@/lib/api/browser-api';
 import { relativeTime } from '../fleet-hub.shared';
@@ -14,7 +14,7 @@ import type { FleetComputerTabProps } from '../registry';
 import { readSessionError } from '../sessions/sessions.shared';
 import { LogSourceTree } from './LogSourceTree';
 import { LogViewer } from './LogViewer';
-import { logsTabCard, type LogsError, type LogsTabCard } from './logs.shared';
+import { logsDeepLinkSource, logsTabCard, type LogsError, type LogsTabCard } from './logs.shared';
 
 /**
  * Logs on computers (FL-08, spec §5, T-13) — the computer page's Logs tab:
@@ -24,18 +24,19 @@ import { logsTabCard, type LogsError, type LogsTabCard } from './logs.shared';
  * (U1), the exact `--manage` command (U2), all computers stopped (U3), the
  * owner's family (U4), not on this kind of node (U13) — never a spinner.
  *
- * `?source=<id>` opens a source directly (the deep link FL-09's rows and P3's
- * "Open the log" use).
+ * `?source=<id>` (or `?source=service&unit=<name>`, as FL-09's Services tab
+ * links) opens a source directly — the deep link FL-09's rows and P3's "Open
+ * the log" use.
  */
 export default function LogsTab({ node }: FleetComputerTabProps) {
     const t = useTranslations('fleet.logs');
     const locale = useLocale();
     const search = useSearchParams();
-    const linked = search?.get('source') ?? null;
+    const linked = search ? logsDeepLinkSource((name) => search.get(name)) : null;
     const [list, setList] = useState<FleetLogSourcesResponse | null>(null);
     const [error, setError] = useState<LogsError | null>(null);
     const [loading, setLoading] = useState(true);
-    const [selected, setSelected] = useState<string | null>(linked && isFleetLogSourceId(linked) ? linked : null);
+    const [selected, setSelected] = useState<string | null>(linked);
 
     const reload = useCallback(async () => {
         if (node.kind === 'desktop-node' || node.status === 'offline') {

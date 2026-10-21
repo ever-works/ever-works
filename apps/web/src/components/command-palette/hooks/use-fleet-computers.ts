@@ -6,6 +6,12 @@ import { listVisibleFleetNodesAction } from '@/app/actions/settings/fleet';
 export interface PaletteFleetComputer {
     id: string;
     name: string;
+    /**
+     * The capability tags it advertises (FL-09: `services`, `processes`,
+     * `docker` add "Services on <name>" and friends). Optional: a row
+     * without them gets only "Go to computer".
+     */
+    capabilities?: string[];
 }
 
 /**
@@ -15,6 +21,9 @@ export interface PaletteFleetComputer {
  * enrolled computers only). A failed read leaves the rows out — the palette
  * never waits on it and never shows a stale list as fresh.
  */
+/** The tags that add per-computer palette rows (FL-09: Services, Docker, Processes on <name>). */
+const PALETTE_MACHINE_TAGS: readonly string[] = ['services', 'docker', 'processes'];
+
 export function useFleetPaletteComputers(open: boolean, enabled: boolean): PaletteFleetComputer[] {
     const [computers, setComputers] = useState<PaletteFleetComputer[]>([]);
 
@@ -28,7 +37,15 @@ export function useFleetPaletteComputers(open: boolean, enabled: boolean): Palet
                     result.success
                         ? result.data
                               .filter((node) => node.persisted && node.status !== 'enrolling')
-                              .map((node) => ({ id: node.id, name: node.name }))
+                              .map((node) => {
+                                  // Only the tags a palette row is built from (FL-09), and only when present.
+                                  const tags = (node.capabilities ?? []).filter((tag) =>
+                                      PALETTE_MACHINE_TAGS.includes(tag),
+                                  );
+                                  return tags.length > 0
+                                      ? { id: node.id, name: node.name, capabilities: tags }
+                                      : { id: node.id, name: node.name };
+                              })
                         : [],
                 );
             })

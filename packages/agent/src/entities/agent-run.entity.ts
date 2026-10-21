@@ -19,6 +19,10 @@ import type {
  * - `conversation` — a person's message in a named Conversation with the
  *                 Agent (a `conversation_messages` row; see
  *                 `conversationMessageId`).
+ * - `session`   — an Agent session on a computer (FL-04 P2): the Agent works
+ *                 in an interactive terminal the session daemon owns; the run
+ *                 is that session's cost, receipts and lifecycle (see
+ *                 `fleetSessionId`, CONTRACTS R-1).
  */
 export type AgentRunTriggerKind =
     | 'heartbeat'
@@ -26,7 +30,8 @@ export type AgentRunTriggerKind =
     | 'task'
     | 'chat'
     | 'event'
-    | 'conversation';
+    | 'conversation'
+    | 'session';
 
 /**
  * Self-build slice AU — the fleet node a run's CLI session lives on (see
@@ -78,6 +83,9 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 // `listSessionsForUser` filters on the same leading column.
 // Migration: `AddCostsDashboardIndexes1786910000000`.
 @Index('idx_agent_runs_user_created', ['userId', 'createdAt'])
+// Sessions on computers (FL-04 P2) — the run behind one Agent session.
+// Migration: `AddAgentRunFleetSessionId1796040100000`.
+@Index('idx_agent_runs_fleet_session', ['fleetSessionId'])
 // Self-build slice AT — the retention pass selects
 // `logsPurgedAt IS NULL AND finishedAt < cutoff`, oldest first. Migration:
 // `1795162100000-AddAgentRunLogsPurgedAt`.
@@ -149,6 +157,16 @@ export class AgentRun {
      */
     @Column('uuid', { nullable: true })
     conversationMessageId?: string | null;
+
+    /**
+     * Populated only when `triggerKind = 'session'` (FL-04 P2): the
+     * `fleet_sessions` row this run is the Agent session of. Written by
+     * `FleetSessionService.startAgent`, the one writer; ending either ends
+     * both (CONTRACTS R-1). FK SET NULL to `fleet_sessions.id` (migration
+     * `AddAgentRunFleetSessionId1796040100000`).
+     */
+    @Column('uuid', { nullable: true })
+    fleetSessionId?: string | null;
 
     // ── Quality gates ──────────────────────────────────────────────
     /**

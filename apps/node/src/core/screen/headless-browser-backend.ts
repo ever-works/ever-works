@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { promises as fsp } from 'fs';
 import { join } from 'path';
-import type { ComputerInputFrame } from '@ever-works/contracts';
+import { isFleetPortLoopbackUrl, type ComputerInputFrame } from '@ever-works/contracts';
 import { buildNodeCheckEnv } from '../executors/acceptance-checks';
 import { BROWSER_NO_SANDBOX_ENV } from '../executors/browser-check';
 import {
@@ -405,11 +405,17 @@ class BrowserPageSource implements CaptureSource {
 	/** The scale the last picture was taken at — how picture pixels map back to the page. */
 	private lastScale = 1;
 
-	private constructor(
-		private readonly cdp: CdpConnection,
+	// `protected` (not `private`) only so `PreviewPageSource` below can extend
+	// it; this class itself still never navigates.
+	protected constructor(
+		protected readonly cdp: CdpConnection,
 		private readonly launched: ChildProcess | null,
-		private page: AttachedPage
+		protected page: AttachedPage
 	) {}
+
+	protected get isStopped(): boolean {
+		return this.stopped;
+	}
 
 	static async create(cdp: CdpConnection, launched: ChildProcess | null): Promise<BrowserPageSource> {
 		try {
@@ -425,7 +431,7 @@ class BrowserPageSource implements CaptureSource {
 	 * (or closed this one) since the last picture, so a page that is no longer
 	 * visible is re-resolved before anything of it is captured.
 	 */
-	private async foregroundSession(): Promise<string> {
+	protected async foregroundSession(): Promise<string> {
 		if ((await foregroundScore(this.cdp, this.page.sessionId)) > 0) return this.page.sessionId;
 		this.page = await attachForegroundPage(this.cdp, this.page);
 		return this.page.sessionId;
@@ -493,6 +499,80 @@ class BrowserPageSource implements CaptureSource {
 			killQuietly(this.launched);
 		}
 		this.cdp.close();
+	}
+}
+
+/**
+ * Servers and ports (FL-10, R-3, plan §6) — the owner-level PREVIEW browser's
+ * page: everything a {@link BrowserPageSource} is (pictures, a person's
+ * input), plus ONE narrow verb, {@link PreviewPageSource.navigate}, which
+ * accepts only `http(s)://127.0.0.1:<port>/…` (or `localhost`). It is used
+ * for the preview profile at `~/.ever-works/preview-profile` and NEVER for an
+ * Agent's profile: the Agent capture path above still never navigates.
+ */
+export class PreviewPageSource extends BrowserPageSource {
+	static async createPreview(cdp: CdpConnection, launched: ChildProcess | null): Promise<PreviewPageSource> {
+		try {
+			return new PreviewPageSource(cdp, launched, await attachForegroundPage(cdp, null));
+		} catch (error) {
+			cdp.close();
+			throw error;
+		}
+	}
+
+	/** Load a loopback address in the page on screen. Rejects anything else, before the browser is asked. */
+	async navigate(url: string): Promise<void> {
+		if (this.isStopped) throw new Error('Capture source is stopped');
+		if (!isFleetPortLoopbackUrl(url)) throw new Error('The preview browser only opens ports on this machine');
+		const result = await this.cdp.send('Page.navigate', { url }, await this.foregroundSession());
+		if (typeof result.errorText === 'string' && result.errorText.length > 0) {
+			throw new Error(`The page could not be opened: ${result.errorText.slice(0, 200)}`);
+		}
+	}
+}
+
+/**
+ * Starts the preview browser: attaches to one already running in the
+ * preview profile, else launches the probed browser headless in it — the same
+ * command line, the same scrubbed environment as an Agent capture browser.
+ */
+export class HeadlessPreviewBrowser {
+	constructor(private readonly io: HeadlessBrowserCaptureIo) {}
+
+	async start(input: CaptureStartInput): Promise<PreviewPageSource> {
+		const factory = this.io.webSocketFactory === undefined ? defaultWebSocketFactory() : this.io.webSocketFactory;
+		if (!factory) {
+			throw new Error('This Node.js runtime has no WebSocket client; the preview browser needs Node 22 or newer');
+		}
+		const read = this.io.readTextFile ?? defaultReadTextFile;
+		const endpoint = parseDevToolsActivePort(await read(join(input.profileDir, DEVTOOLS_ACTIVE_PORT_FILE)));
+		if (endpoint) {
+			try {
+				const cdp = await CdpConnection.open(endpoint, factory, { timeoutMs: 3000 });
+				return await PreviewPageSource.createPreview(cdp, null);
+			} catch {
+				// a stale file from a browser that is gone — launch our own
+			}
+		}
+		const parentEnv = this.io.parentEnv ?? process.env;
+		const noSandbox = String(parentEnv[BROWSER_NO_SANDBOX_ENV] ?? '').trim() === '1';
+		const args = buildHeadlessCaptureArgs(input.profileDir, { noSandbox });
+		const child = (this.io.spawnFn ?? spawn)(this.io.browserPath, args, {
+			windowsHide: true,
+			env: buildNodeCheckEnv(null, parentEnv)
+		});
+		try {
+			const devtools = await waitForDevToolsEndpoint(
+				child,
+				this.io.startTimeoutMs ?? HEADLESS_BROWSER_START_TIMEOUT_MS,
+				input.signal
+			);
+			const cdp = await CdpConnection.open(devtools, factory);
+			return await PreviewPageSource.createPreview(cdp, child);
+		} catch (error) {
+			killQuietly(child);
+			throw error;
+		}
 	}
 }
 

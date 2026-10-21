@@ -164,7 +164,71 @@ export type FleetAuditAction =
 	 * line (spec FR-27).
 	 */
 	| 'node.logs.read'
-	| 'node.logs.follow';
+	| 'node.logs.follow'
+	/**
+	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
+	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
+	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
+	 * `outcome`, the exit code, the duration and whether output was truncated;
+	 * never the command's output and never the command line (spec FR-12, FR-13).
+	 */
+	| 'node.command.run'
+	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
+	| 'node.command.cancel'
+	/**
+	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
+	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
+	 * `family`, `target` (service name, container or image id, project, pid),
+	 * `requestedBy`, `confirmationClass`, `outcome`, `blastRadiusKind` when the
+	 * node warned and `rootRequired`; never an environment value, a command
+	 * line or command output (spec FR-18, FR-29).
+	 */
+	| 'node.service.start'
+	| 'node.service.stop'
+	| 'node.service.restart'
+	| 'node.service.enable'
+	| 'node.service.disable'
+	| 'node.docker.container.start'
+	| 'node.docker.container.stop'
+	| 'node.docker.container.restart'
+	| 'node.docker.container.remove'
+	| 'node.docker.container.run'
+	| 'node.docker.container.exec'
+	| 'node.docker.image.pull'
+	| 'node.docker.image.remove'
+	| 'node.docker.image.prune'
+	| 'node.compose.up'
+	| 'node.compose.down'
+	| 'node.compose.restart'
+	| 'node.compose.pull'
+	/** A Stop (SIGTERM) or Kill (SIGKILL) sent to one process; `details.signal` names which. */
+	| 'node.process.signal'
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS §7) — every row carries
+	 * `family: 'checkouts'`, `target` (the checkout's path), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never a credential or a remote URL
+	 * with one (spec FR-28).
+	 */
+	| 'node.checkout.create'
+	/** A checkout was deleted (folder removed) or forgotten (row only). */
+	| 'node.checkout.delete'
+	/** Fetch, pull, push — and a person's rescan of the code folders. */
+	| 'node.checkout.sync'
+	/** Moved to the bin (folder untouched). */
+	| 'node.checkout.archive'
+	/** Brought back from the bin. */
+	| 'node.checkout.restore'
+	/**
+	 * Servers and ports (FL-10, CONTRACTS §7) — one row per **Open** (port,
+	 * `target: desktop | preview-profile`, program or container, requester,
+	 * class `plain`; never a URL query or page content). An open on the desktop
+	 * from the Ports tab writes only this, never FL-07's `node.desktop.openUrl`.
+	 */
+	| 'node.port.open'
+	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
+	| 'node.port.preview.open'
+	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
+	| 'node.port.preview.close';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -215,7 +279,36 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.recording.start',
 	'node.session.recording.stop',
 	'node.logs.read',
-	'node.logs.follow'
+	'node.logs.follow',
+	'node.command.run',
+	'node.command.cancel',
+	'node.service.start',
+	'node.service.stop',
+	'node.service.restart',
+	'node.service.enable',
+	'node.service.disable',
+	'node.docker.container.start',
+	'node.docker.container.stop',
+	'node.docker.container.restart',
+	'node.docker.container.remove',
+	'node.docker.container.run',
+	'node.docker.container.exec',
+	'node.docker.image.pull',
+	'node.docker.image.remove',
+	'node.docker.image.prune',
+	'node.compose.up',
+	'node.compose.down',
+	'node.compose.restart',
+	'node.compose.pull',
+	'node.process.signal',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore',
+	'node.port.open',
+	'node.port.preview.open',
+	'node.port.preview.close'
 ];
 
 /**

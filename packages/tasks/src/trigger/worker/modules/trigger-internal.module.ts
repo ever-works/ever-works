@@ -49,6 +49,7 @@ import {
     PaygService,
 } from '@ever-works/agent/subscriptions';
 import {
+    FleetCheckoutReconcileService,
     FleetJobService,
     FleetNodeHealthService,
     FleetSessionSweepService,
@@ -302,6 +303,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: FleetSessionSweepService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetSessionSweepService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Checkouts on computers (FL-14) — the fleet-checkout-reconcile cron
+        // calls reconcile() over the internal RPC channel; the repositories and
+        // the node link live API-side.
+        {
+            provide: FleetCheckoutReconcileService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetCheckoutReconcileService'),
             inject: [TriggerInternalApiClient],
         },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
@@ -621,6 +631,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         FleetJobService,
         FleetNodeHealthService,
         FleetSessionSweepService,
+        FleetCheckoutReconcileService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

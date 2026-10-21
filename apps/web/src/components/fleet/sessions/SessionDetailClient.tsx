@@ -11,7 +11,8 @@ import {
     type FleetSessionAttachRole,
     type FleetSessionView,
 } from '@ever-works/contracts';
-import { useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
 import { useShortcut } from '@/lib/hooks/use-shortcut';
@@ -24,6 +25,7 @@ import { SessionEndDialog } from './SessionEndDialog';
 import { SessionFooter } from './SessionFooter';
 import { SessionHeader } from './SessionHeader';
 import { SessionRenameDialog } from './SessionRenameDialog';
+import { SessionReplayPlayer } from './SessionReplayPlayer';
 import { SessionShortcutSheet } from './SessionShortcutSheet';
 import { SessionStartDialog } from './SessionStartDialog';
 import { SessionTerminal } from './SessionTerminal';
@@ -60,10 +62,13 @@ export function SessionDetailClient({
     initial,
     node,
     viewerUserId,
+    agentName = null,
 }: {
     initial: FleetSessionView;
     node: FleetNodeView | null;
     viewerUserId: string | null;
+    /** The Agent of an Agent session (P2), for the isolation sentence and the end dialog. */
+    agentName?: string | null;
 }) {
     const t = useTranslations('fleet.sessions');
     const locale = useLocale();
@@ -73,6 +78,9 @@ export function SessionDetailClient({
     const [session, setSession] = useState<FleetSessionView>(initial);
     const nodeName = node?.name ?? '…';
     const live = isFleetSessionLive(session.state);
+    // An Agent session waits (its job queued) until the computer has a free slot:
+    // there is nothing to attach to until the daemon runs it.
+    const waiting = session.kind === 'agent' && session.state === 'starting';
     const startedByMe = session.kind === 'owner' && session.userId === viewerUserId;
     const [role, setRole] = useState<FleetSessionAttachRole>(startedByMe ? 'driver' : 'viewer');
     const [size, setSize] = useState<{ cols: number; rows: number } | null>(null);
@@ -81,6 +89,17 @@ export function SessionDetailClient({
     const [sheet, setSheet] = useState(false);
     const [starting, setStarting] = useState(false);
     const rendererRef = useRef<TerminalRenderer | null>(null);
+    // P3: `?rewatch=1` (the Run receipt's link) opens the player straight away.
+    const searchParams = useSearchParams();
+    const [rewatch, setRewatch] = useState(searchParams?.get('rewatch') === '1');
+    const [recordingBusy, setRecordingBusy] = useState(false);
+    const toggleRecording = async () => {
+        setRecordingBusy(true);
+        const result = await sessionsClient.setRecording(session.id, session.recordingState !== 'recording');
+        setRecordingBusy(false);
+        if (result.ok) setSession(result.data);
+        else toast.error(result.error.hint ? t('actions.failed', { hint: result.error.hint }) : t('actions.failedGeneric'));
+    };
     const takeKeyboardRef = useRef<HTMLDivElement | null>(null);
 
     const refresh = useCallback(async () => {
@@ -92,7 +111,7 @@ export function SessionDetailClient({
         {
             sessionId: session.id,
             role,
-            enabled: live,
+            enabled: live && !waiting,
             size: () => size ?? { cols: 120, rows: 32 },
         },
         {
@@ -191,7 +210,21 @@ export function SessionDetailClient({
                 {t('detail.releaseKeyboard')}
             </div>
 
-            {live && attach.state === 'starting' && (
+            {waiting && (
+                <Strip icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />} testId="fleet-session-waiting">
+                    {t('detail.waiting', { node: nodeName })}
+                </Strip>
+            )}
+            {session.agentRunId && (
+                <Link
+                    href={ROUTES.DASHBOARD_AGENT_SESSION(session.agentRunId)}
+                    className="inline-block text-xs text-primary hover:underline"
+                    data-testid="fleet-session-run-link"
+                >
+                    {t('detail.openRun')}
+                </Link>
+            )}
+            {live && !waiting && attach.state === 'starting' && (
                 <Strip icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}>
                     {t('detail.starting', { node: nodeName })}
                 </Strip>
@@ -254,6 +287,11 @@ export function SessionDetailClient({
                     ) : (
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('detail.noLastScreen')}</p>
                     )}
+                    {!rewatch && (
+                        <Button size="sm" variant="secondary" onClick={() => setRewatch(true)} data-testid="fleet-session-rewatch">
+                            {t('detail.rewatch')}
+                        </Button>
+                    )}
                     {ended && (
                         <p className="text-sm text-text dark:text-text-dark" data-testid="fleet-session-ended-line" data-reason={session.endedReason ?? ''}>
                             {t(`detail.${ended.key}`, {
@@ -265,6 +303,8 @@ export function SessionDetailClient({
                     )}
                 </section>
             )}
+
+            {rewatch && <SessionReplayPlayer sessionId={session.id} title={session.title} nodeName={nodeName} />}
 
             {live && agentCli && attach.role === 'driver' && (
                 <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
@@ -278,6 +318,25 @@ export function SessionDetailClient({
                 recordingState={session.recordingState}
                 bytesPerSecond={attach.bytesPerSecond}
                 nodeName={nodeName}
+                isolatedAgentName={session.kind === 'agent' ? (agentName ?? t('kinds.agent')) : null}
+                recordingSlot={
+                    live ? (
+                        <span className="inline-flex items-center gap-2" data-testid="fleet-session-recording">
+                            <span>
+                                {session.recordingState === 'recording' ? `● ${t('detail.recording')}` : t('detail.notRecordingNow')}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => void toggleRecording()}
+                                disabled={recordingBusy}
+                                className="underline hover:no-underline disabled:opacity-50"
+                                data-testid="fleet-session-recording-toggle"
+                            >
+                                {session.recordingState === 'recording' ? t('detail.recordOff') : t('detail.recordOn')}
+                            </button>
+                        </span>
+                    ) : null
+                }
             />
 
             <SessionEndDialog
@@ -285,6 +344,7 @@ export function SessionDetailClient({
                 onOpenChange={setEnding}
                 session={session}
                 nodeName={nodeName}
+                agentName={agentName}
                 onEnded={(view) => setSession(view)}
             />
             <SessionRenameDialog open={renaming} onOpenChange={setRenaming} session={session} onRenamed={(view) => setSession((current) => ({ ...current, title: view.title }))} />

@@ -198,6 +198,15 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	if (typeof candidate.workspaceRoot === 'string' && ABSOLUTE_PATH.test(candidate.workspaceRoot.trim())) {
 		config.workspaceRoot = candidate.workspaceRoot.trim();
 	}
+	// Checkouts on computers (FL-14): the code folders discovery walks. Only
+	// absolute paths survive a read; anything else is dropped, never guessed.
+	if (Array.isArray(candidate.codeFolders)) {
+		const folders = candidate.codeFolders
+			.filter((folder): folder is string => typeof folder === 'string' && ABSOLUTE_PATH.test(folder.trim()))
+			.map((folder) => folder.trim())
+			.slice(0, 32);
+		if (folders.length > 0) config.codeFolders = [...new Set(folders)];
+	}
 	// Control 18: the machine owner's local execution policy. Present only once
 	// `ever-works-node policy` wrote it; anything but a literal `true` reads as
 	// OFF, so a hand-edited or truncated value can only ever narrow.

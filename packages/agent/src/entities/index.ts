@@ -169,6 +169,11 @@ export * from './fleet-node.entity';
 export * from './fleet-node-health-sample.entity';
 // Sessions on computers (FL-04) — persistent interactive processes on a Node
 export * from './fleet-session.entity';
+// Commands on computers (FL-12) — one-off Commands and their per-computer runs
+export * from './fleet-command.entity';
+export * from './fleet-command-run.entity';
+// Checkouts on computers (FL-14) — clones and worktrees on a Node
+export * from './fleet-checkout.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';

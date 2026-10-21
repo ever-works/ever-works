@@ -157,6 +157,9 @@ import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
 import { ComputerSession } from '../entities/computer-session.entity';
 import { FleetSession } from '../entities/fleet-session.entity';
+import { FleetCommand } from '../entities/fleet-command.entity';
+import { FleetCommandRun } from '../entities/fleet-command-run.entity';
+import { FleetCheckout } from '../entities/fleet-checkout.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
 import { ModelPolicy } from '../entities/model-policy.entity';
@@ -443,6 +446,13 @@ export const ENTITIES = [
     // Sessions on computers (FL-04) — persistent interactive processes on a
     // Node, owned by its session daemon; one row per session.
     FleetSession,
+    // Commands on computers (FL-12) — one-off Commands and one run per
+    // computer each ran on.
+    FleetCommand,
+    FleetCommandRun,
+    // Checkouts on computers (FL-14) — clones and worktrees on a Node; one
+    // row per (node, path).
+    FleetCheckout,
     // Model accounts (AW-16) — several credentials per AI provider, in
     // order, and the workspace / Agent / schedule model ladder.
     ModelAccount,

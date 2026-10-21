@@ -506,6 +506,17 @@ export interface NodeConfig {
 	 * a config that never carried the key round-trips without it.
 	 */
 	workspaceRoot?: string;
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS R-41) — the folders this
+	 * machine's owner keeps code in, set with `start --code-folder <dir>`
+	 * (repeatable) and persisted here like `workspaceRoot`. Discovery walks
+	 * them (three folders deep) for git clones. Only ever absolute paths,
+	 * never a filesystem root or the home folder as a whole (spec FR-3); set
+	 * on the machine only — the platform never chooses them.
+	 *
+	 * Absent means "none listed": no discovery, only the Task worktrees.
+	 */
+	codeFolders?: string[];
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;
