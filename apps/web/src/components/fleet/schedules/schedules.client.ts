@@ -1,13 +1,16 @@
 'use client';
 
 import type {
+    FleetAgentSessionScheduleView,
     FleetCommandRunView,
+    FleetScheduleAgentOption,
+    FleetSchedulePauseAllResult,
     FleetScheduleUpdateRequest,
     FleetScheduleView,
 } from '@ever-works/contracts';
 import { browserApiFetch } from '@/lib/api/browser-api';
 import { readCommandError, type CommandErrorRead } from '../commands/commands.shared';
-import { schedulesOfPage } from './schedules.shared';
+import { agentSessionsOfPage, schedulesOfPage, type AgentSessionScheduleRow } from './schedules.shared';
 
 /**
  * Schedules on computers (FL-13) — the browser's calls to the schedule BFF
@@ -61,6 +64,36 @@ export const schedulesClient = {
         });
         return result.ok ? { ok: true, data: schedulesOfPage(result.data) } : result;
     },
+    /** P2: both kinds on the computer — Command schedules and Agent-session schedules. */
+    listAll: async (
+        nodeId: string,
+    ): Promise<ScheduleResult<{ commands: FleetScheduleView[]; agentSessions: AgentSessionScheduleRow[] }>> => {
+        const result = await call<unknown>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/schedules`, {
+            method: 'GET',
+        });
+        return result.ok
+            ? { ok: true, data: { commands: schedulesOfPage(result.data), agentSessions: agentSessionsOfPage(result.data) } }
+            : result;
+    },
+    agents: (nodeId: string) =>
+        call<{ agents: FleetScheduleAgentOption[] }>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/schedules/agents`, {
+            method: 'GET',
+        }),
+    createAgentSession: (nodeId: string, body: Record<string, unknown>) =>
+        call<FleetAgentSessionScheduleView>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/schedules/agent-session`, {
+            method: 'POST',
+            body,
+        }),
+    pauseAll: (nodeId: string, confirm: boolean) =>
+        call<FleetSchedulePauseAllResult>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/schedules/pause-all`, {
+            method: 'POST',
+            body: confirm ? { confirm: true } : {},
+        }),
+    undoPauseAll: (nodeId: string, breakerAt: string) =>
+        call<{ resumed: number }>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/schedules/resume-all`, {
+            method: 'POST',
+            body: { breakerAt },
+        }),
     create: (body: ScheduleCreateBody) =>
         call<FleetScheduleView>('/api/fleet/commands', {
             method: 'POST',

@@ -100,6 +100,32 @@ export const FLEET_SCHEDULE_DELETED_RETENTION_DAYS = 30;
 /** Runs one `schedule.runs` answer carries at most (`more: true` past it). */
 export const FLEET_SCHEDULE_RUNS_PAGE = 500;
 
+/** The breaker's "Pause all on this computer" can be undone this long (FR-22, AW-10's 15 minutes). */
+export const FLEET_SCHEDULE_BREAKER_UNDO_MS = 15 * 60_000;
+
+/** The breaker pauses at most this many schedules at once (FR-22, AW-10's cap). */
+export const FLEET_SCHEDULE_BREAKER_CAP = 500;
+
+/** `POST /api/fleet/nodes/:id/schedules/pause-all` (FL-13 P2) — what the breaker did. */
+export interface FleetSchedulePauseAllResult {
+	paused: number;
+	/** Of those, how many had a run in flight (it finishes; nothing new starts). */
+	running: number;
+	/** The instant the breaker stamped (`pausedAt`), the key of its Undo. */
+	breakerAt: string;
+	undoUntil: string;
+}
+
+/** `details` of the breaker's `confirmation_required` (FR-22: the count and the runs in flight). */
+export interface FleetSchedulePauseAllConfirmation {
+	class: 'confirm';
+	action: 'pause-all';
+	nodeId: string;
+	nodeName: string;
+	count: number;
+	running: number;
+}
+
 /** The kill switch stops the node's loop and its in-flight runs within this (FR-17). */
 export const FLEET_SCHEDULE_KILL_SWITCH_STOP_MS = 10_000;
 
@@ -1040,6 +1066,8 @@ export interface FleetScheduleView {
 	running: boolean;
 	/** The platform holds the computer's link right now (Run now needs it, FR-19). */
 	linkUp: boolean;
+	/** Who asked for it (`agent` = an Agent's write a person approved, FL-13 P2). */
+	requestedBy?: 'user' | 'agent';
 	/** Consecutive failed runs, newest first (resets on a success). */
 	failureStreak: number;
 	syncState: FleetScheduleSyncState;
@@ -1125,6 +1153,105 @@ export function fleetScheduleNeverRunsHint(reason: FleetScheduleNeverRunsReason,
 		default:
 			return `NEVER RUNS · update the node on ${computer}`;
 	}
+}
+
+// ─── Agent-session schedules (FL-13 P2, R-29) ───────────────────────────────
+
+/**
+ * The unattended-credential sentence an Agent-session schedule's dialog
+ * carries VERBATIM in its body (spec FR-26), with the computer's name for
+ * `{computer}`. The web renders its own copy from ONE i18n key
+ * (`fleet.schedules.unattendedCredentialNote`); this is the API's and the CLI's.
+ */
+export function fleetScheduleUnattendedCredentialSentence(computer: string): string {
+	return `Runs happen on ${computer} using the Claude Code or Codex sign-in — or the API key — that is set up on that computer. Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a look until someone signs in on ${computer} again.`;
+}
+
+/** What an Agent-session schedule's row and dialog say about spend (spec §5.2). */
+export const FLEET_SCHEDULE_AGENT_COST_SENTENCE = 'Each run appears in Runs with its cost like any other run.';
+
+/**
+ * The cadence as a five-field cron expression — what a recurring Task stores
+ * (`recurrenceCron`), so an Agent-session schedule fires on the platform's
+ * existing recurrence dispatcher (R-29: no second scheduler).
+ */
+export function fleetScheduleCadenceToCron(cadence: FleetScheduleCadence): string | null {
+	switch (cadence.kind) {
+		case 'interval': {
+			const minutes = Number(cadence.expr);
+			if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) return null;
+			return minutes >= 60 ? '0 * * * *' : minutes === 1 ? '* * * * *' : `*/${minutes} * * * *`;
+		}
+		case 'daily':
+		case 'weekdays': {
+			if (!isFleetScheduleClockTime(cadence.at)) return null;
+			const [hour, minute] = cadence.at.split(':').map(Number);
+			return `${minute} ${hour} * * ${cadence.kind === 'weekdays' ? '1-5' : '*'}`;
+		}
+		case 'cron':
+			return parseFleetCron(cadence.expr) ? (cadence.expr ?? null) : null;
+		default:
+			return null;
+	}
+}
+
+/** One Agent the Agent-session dialog offers on a computer (spec §5.2, U9). */
+export interface FleetScheduleAgentOption {
+	agentId: string;
+	name: string;
+	/** Pinned to THIS computer — the only Agents a schedule here can use. */
+	pinned: boolean;
+	/** Why it cannot be picked: pinned elsewhere, not pinned, or the scope has no Organization. */
+	reason: 'pinnedElsewhere' | 'notPinned' | 'needsOrganization' | null;
+}
+
+/** `POST /api/fleet/nodes/:id/schedules/agent-session` (CONTRACTS §11.2). */
+export interface FleetAgentSessionScheduleRequest {
+	name: string;
+	agentId: string;
+	/** What the Agent is asked on every fire (3 … 16 KiB). */
+	prompt: string;
+	/** The agent CLI the session drives on the computer. */
+	provider: 'claude-code' | 'codex';
+	/** The checkout on that computer it works in; absent = the owner's home. */
+	checkoutId?: string;
+	cadence: unknown;
+	confirm?: boolean;
+}
+
+/** What creating one answers: the recurring Task it is, and its row in the Schedules view. */
+export interface FleetAgentSessionScheduleView {
+	kind: 'agent-session';
+	/** The recurring Task. */
+	taskId: string;
+	/** `recurring_task:<taskId>` — its row in the Schedules view (it keeps that source, FR-2). */
+	scheduleId: string;
+	name: string;
+	nodeId: string;
+	nodeName: string;
+	agentId: string;
+	agentName: string;
+	cadence: FleetScheduleCadence;
+	cadenceHuman: string;
+	nextRunAt: string | null;
+}
+
+/** `details` of an Agent-session schedule's `confirmation_required` (FR-25, FR-26). */
+export interface FleetAgentSessionScheduleConfirmation {
+	class: 'confirm';
+	action: 'create';
+	kind: 'agent-session';
+	name: string;
+	agentName: string;
+	nodeId: string;
+	nodeName: string;
+	provider: 'claude-code' | 'codex';
+	cadenceHuman: string;
+	nodeTimeZone: string | null;
+	next: string[];
+	/** {@link fleetScheduleUnattendedCredentialSentence}, verbatim. */
+	credentialSentence: string;
+	costSentence: typeof FLEET_SCHEDULE_AGENT_COST_SENTENCE;
 }
 
 /**

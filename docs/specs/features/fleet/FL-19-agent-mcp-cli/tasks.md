@@ -76,14 +76,14 @@
 
 ## P3 — Machines, runners, docs, completion
 
-- [ ] **T-20**. Add catalogue rows and CLI files for FL-16 (`virtual.ts`), FL-17 (`cloud.ts`, price shown before create), FL-18 (`runners.ts`) as those epics land — the names those epics' plans use; MCP parity.
+- [x] **T-20** (registration points: FL-11 and FL-16 flipped their rows themselves; FL-17 / FL-18 / FL-20 rows stay `planned` until they land). Add catalogue rows and CLI files for FL-16 (`virtual.ts`), FL-17 (`cloud.ts`, price shown before create), FL-18 (`runners.ts`) as those epics land — the names those epics' plans use; MCP parity.
       **Test**: catalogue and whitelist parity specs.
-- [ ] **T-21**. Shell completion `ever-works completion <shell>` for the `fleet` group in `apps/cli/src/commands/fleet/completion.ts`.
+- [x] **T-21**. Shell completion `ever-works completion <shell>` for the `fleet` group in `apps/cli/src/commands/fleet/completion.ts`.
       **Test**: snapshot spec.
 
 ## Docs and rollout
 
-- [ ] **T-22**. Agent-facing doc `docs/features/fleet-agent-tools.md` — how an Agent, an MCP client and the CLI reach the fleet; the gate; the two-step confirm; `wait:false`; "tools never carry a credential". Add to `apps/docs/sidebarsPlatform.ts` under fleet (`:183`); link from `docs/features/mcp-server.md` and `docs/features/fleet.md`.
+- [x] **T-22**. Agent-facing doc `docs/features/fleet-agent-tools.md` — how an Agent, an MCP client and the CLI reach the fleet; the gate; the two-step confirm; `wait:false`; "tools never carry a credential". Add to `apps/docs/sidebarsPlatform.ts` under fleet (`:183`); link from `docs/features/mcp-server.md` and `docs/features/fleet.md`.
       **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
 - [x] **T-23**. Update `docs/specs/features/fleet/TRACKER.md`.
       **Test**: the FL-19 TRACKER row is current.

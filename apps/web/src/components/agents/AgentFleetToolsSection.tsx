@@ -58,7 +58,7 @@ export function AgentFleetToolsSection({ agentName, data, className }: Props) {
 
     if (data.kind === 'error') {
         return (
-            <section className={className} data-testid="capabilities-fleet-tools-section">
+            <section id="fleet-tools" className={className} data-testid="capabilities-fleet-tools-section">
                 {header}
                 <div className="p-4 flex items-center justify-between gap-4" data-testid="capabilities-fleet-tools-error">
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('error', { agent: agentName })}</p>
@@ -78,7 +78,7 @@ export function AgentFleetToolsSection({ agentName, data, className }: Props) {
     const hasComputers = view ? agentFleetToolsHasComputers(view) : false;
 
     return (
-        <section className={className} data-testid="capabilities-fleet-tools-section">
+        <section id="fleet-tools" className={className} data-testid="capabilities-fleet-tools-section">
             {header}
             {view?.killSwitch && (
                 <p className="px-4 pt-3 text-xs text-warning" data-testid="capabilities-fleet-tools-stopped">

@@ -143,6 +143,11 @@ Add the MCP server to your project's `.mcp.json`:
 
 ## Available Tools
 
+> **Fleet tools.** The `fleet_<family>_<verb>` tools — status, computers and their health, sessions, logs, services,
+> processes, Docker, ports, files, commands, checkouts, virtual computers, long operations — share one catalogue with
+> the Agent tools and `ever-works fleet …`: the same confirmation fields, the same typed refusals. See
+> [Fleet tools for Agents, the MCP server and the CLI](./fleet-agent-tools.md).
+
 The MCP server exposes 127 tools from the OpenAPI whitelist, organized by domain below. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
 Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **134 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
