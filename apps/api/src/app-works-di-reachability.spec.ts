@@ -191,7 +191,7 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_DEPENDENCY_CLUSTER_ACCESS',
         reason: 'Worker-only by design: its swap, `AppRuntimeFacadeService`, refuses outside the isolated worker and no dependency provider is dialled from the API (FR-5); unbound, a cluster call reports `mayRemain`.',
-        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:308-329; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
+        source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:310-331; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
     },
     {
         key: 'AppDependenciesModule | AppDependenciesService | APP_RUNTIME_EVENT_SINK',
@@ -319,11 +319,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_LICENSE_SERVICE',
-        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_LICENSE_SERVICE` row for the reason.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
-    },
-    {
         key: 'AppDependencyProvisionWorkerModule :: APP_WORK_DELETION_COMPLETION',
         reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION` row for the reason.",
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
@@ -352,11 +347,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "APW-05's rebuild requester is unwritten.",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_LICENSE_SERVICE',
-        reason: "APW-03's `AppLicenseService` does not exist yet.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:134-135 (APW-03 T42)',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION',
@@ -410,6 +400,10 @@ const APP_WORKS_API_FILES = [
     'telemetry/app-works-telemetry-binding.module.ts',
     TRIGGER_INTERNAL_CONTROLLER_FILE,
     'trigger/trigger-internal.module.ts',
+    // Lane aw-deps-api (APW-07 T25) — the Dependencies routes. Every constructor parameter is
+    // checked, not only the App Works ones: its `@Optional()` spec source and Activity writer
+    // degrade silently (`deployTarget: null`, no Activity row) when `WorksModule` cannot see them.
+    'works/work-app-dependencies.controller.ts',
 ];
 
 /** The App Works Trigger tasks whose `withWorkerContext` roots the worker check walks. */
@@ -2151,6 +2145,7 @@ if (process.env[CHILD_FLAG] === undefined) {
                     "AppUpstreamSyncWorkerModule :: remote 'AppLicenseService'",
                     "AppUpstreamSyncWorkerModule :: remote 'AppSpecService'",
                     "TriggerAppRuntimeModule :: remote 'AppDeployBuildSourceAdapter'",
+                    "TriggerAppRuntimeModule :: remote 'AppLicenseService'",
                     "TriggerAppRuntimeModule :: remote 'AppSpecService'",
                 ]),
             );

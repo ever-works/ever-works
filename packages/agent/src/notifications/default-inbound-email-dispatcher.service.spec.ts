@@ -70,6 +70,7 @@ describe('DefaultInboundEmailDispatcher', () => {
             updateDeliveryStatus: jest.fn().mockResolvedValue(undefined),
             findByMessageIdHeaders: jest.fn().mockResolvedValue([]),
             linkTask: jest.fn().mockResolvedValue(true),
+            findByProviderMessageId: jest.fn().mockResolvedValue(null),
         };
         conversations = {
             findById: jest.fn().mockResolvedValue(null),
@@ -104,6 +105,35 @@ describe('DefaultInboundEmailDispatcher', () => {
         const moduleRef = await Test.createTestingModule({ providers }).compile();
         return moduleRef.get(DefaultInboundEmailDispatcher);
     }
+
+    // Review 2026-10-17 U2 (F113): a provider retry of a message already delivered is
+    // acknowledged before anything is stored again (no second upload, no unique-row 500).
+    it('acknowledges a provider retry of a delivered message without storing anything again', async () => {
+        const svc = await build(true, true);
+        addresses.findById.mockResolvedValue(inboundAddress);
+        assignments.findByEmailAddress.mockResolvedValue([
+            { agentId: 'agent-1', dispatchMode: 'task-spawn' },
+        ]);
+        messages.findByProviderMessageId.mockResolvedValue({
+            id: 'msg-first',
+            agentId: 'agent-1',
+            taskId: 'task-first',
+            conversationId: null,
+        });
+        const result = await svc.dispatch({
+            ...basePayload,
+            attachments: [{ filename: 'a.pdf', mimeType: 'application/pdf', content: 'JVBERi0x' }],
+        } as never);
+        expect(result).toMatchObject({
+            handled: true,
+            emailMessageId: 'msg-first',
+            taskId: 'task-first',
+            reason: 'duplicate',
+        });
+        expect(attachmentStore.store).not.toHaveBeenCalled();
+        expect(messages.save).not.toHaveBeenCalled();
+        expect(taskSpawner.spawnTaskForInboundEmail).not.toHaveBeenCalled();
+    });
 
     it('returns handled:false when no inbound address matches', async () => {
         const svc = await build(false);
@@ -140,6 +170,179 @@ describe('DefaultInboundEmailDispatcher', () => {
         expect(taskSpawner.spawnTaskForInboundEmail).toHaveBeenCalledWith(
             expect.objectContaining({ agentId: 'agent-1', emailMessageId: 'msg-1' }),
         );
+    });
+
+    describe('the trusted-sender rule (reviews of #2769)', () => {
+        afterEach(() => {
+            delete process.env.INBOUND_EMAIL_TRUSTED_SENDERS;
+        });
+
+        const RECEIVING = 'support@agents.acme.test';
+        const alignedPass = { dkim: 'pass', dkimDomain: 'acme.test' };
+
+        async function spawnFrom(
+            from: string,
+            setup?: (svc: any) => void,
+            extra: Record<string, unknown> = {},
+        ) {
+            const svc = await build(true);
+            addresses.findById.mockResolvedValue({ ...inboundAddress, address: RECEIVING });
+            assignments.findByEmailAddress.mockResolvedValue([
+                { agentId: 'agent-1', dispatchMode: 'task-spawn' },
+            ]);
+            setup?.(svc);
+            await svc.dispatch({ ...basePayload, from, ...extra });
+            return taskSpawner.spawnTaskForInboundEmail.mock.calls.at(-1)[0];
+        }
+
+        const ownerUser = (svc: any, emailVerified = true) => {
+            svc.users = {
+                findById: jest.fn(async () => ({ email: 'owner@acme.test', emailVerified })),
+            };
+        };
+
+        it('marks an unknown sender untrusted', async () => {
+            expect((await spawnFrom('stranger@evil.test')).senderTrusted).toBe(false);
+        });
+
+        it("trusts the owner's verified account email only with an aligned authentication pass", async () => {
+            const withPass = await spawnFrom('Owner <OWNER@acme.test>', ownerUser, {
+                metadata: alignedPass,
+            });
+            expect(withPass.senderTrusted).toBe(true);
+            // No provider verdict: the From spelling alone is not enough for an owner address.
+            expect((await spawnFrom('owner@acme.test', ownerUser)).senderTrusted).toBe(false);
+        });
+
+        it('does not trust an UNVERIFIED account email', async () => {
+            const input = await spawnFrom('owner@acme.test', (svc) => ownerUser(svc, false), {
+                metadata: alignedPass,
+            });
+            expect(input.senderTrusted).toBe(false);
+        });
+
+        it('SELF-ADDRESS SPOOF: From = the receiving address (or an inbound-only one) is never trusted', async () => {
+            const ownedAddresses = () => {
+                addresses.findAllByUser = jest.fn(async () => [
+                    {
+                        id: 'addr-1',
+                        address: RECEIVING,
+                        verified: true,
+                        disabledAt: null,
+                        direction: 'both',
+                    },
+                    {
+                        id: 'addr-in',
+                        address: 'inbox@agents.acme.test',
+                        verified: true,
+                        disabledAt: null,
+                        direction: 'inbound',
+                    },
+                    {
+                        id: 'addr-out',
+                        address: 'ops@agents.acme.test',
+                        verified: true,
+                        disabledAt: null,
+                        direction: 'outbound',
+                    },
+                ]);
+            };
+            const agentsPass = { metadata: { dkim: 'pass', dkimDomain: 'agents.acme.test' } };
+
+            expect((await spawnFrom(RECEIVING, ownedAddresses, agentsPass)).senderTrusted).toBe(
+                false,
+            );
+            expect(
+                (await spawnFrom('inbox@agents.acme.test', ownedAddresses, agentsPass))
+                    .senderTrusted,
+            ).toBe(false);
+            // Control: a verified OUTBOUND address of the owner, with an aligned pass, is trusted.
+            expect(
+                (await spawnFrom('ops@agents.acme.test', ownedAddresses, agentsPass)).senderTrusted,
+            ).toBe(true);
+        });
+
+        it('trusts agent-to-agent mail recognised from the platform outbound record, not From', async () => {
+            const OTHER = 'ops@agents.acme.test';
+            const sentRow = (svc: any) => {
+                void svc;
+                messages.findByMessageIdHeaders.mockImplementation(async () => [
+                    {
+                        id: 'sent-1',
+                        direction: 'outbound',
+                        sentAt: new Date(),
+                        from: OTHER,
+                        toAddresses: [RECEIVING],
+                        messageIdHeader: 'm-1@agents.acme.test',
+                    },
+                ]);
+            };
+            const sent = await spawnFrom(OTHER, sentRow, {
+                messageIdHeader: 'm-1@agents.acme.test',
+            });
+            expect(sent.senderTrusted).toBe(true);
+
+            // CodeRabbit on #2769: a REPLAY — the address already received this
+            // platform Message-ID (an earlier inbound row, not this delivery's
+            // own `msg-1`) — earns no trust.
+            const sentAnd = (inbound: Record<string, unknown>) => (svc: any) => {
+                void svc;
+                messages.findByMessageIdHeaders.mockImplementation(async () => [
+                    {
+                        id: 'sent-1',
+                        direction: 'outbound',
+                        sentAt: new Date(),
+                        from: OTHER,
+                        toAddresses: [RECEIVING],
+                        messageIdHeader: 'm-1@agents.acme.test',
+                    },
+                    {
+                        direction: 'inbound',
+                        emailAddressId: 'addr-1',
+                        from: OTHER,
+                        messageIdHeader: 'm-1@agents.acme.test',
+                        ...inbound,
+                    },
+                ]);
+            };
+            const replay = await spawnFrom(OTHER, sentAnd({ id: 'in-earlier' }), {
+                messageIdHeader: 'm-1@agents.acme.test',
+            });
+            expect(replay.senderTrusted).toBe(false);
+
+            // This delivery's OWN stored row is not a replay of itself.
+            const own = await spawnFrom(OTHER, sentAnd({ id: 'msg-1' }), {
+                messageIdHeader: 'm-1@agents.acme.test',
+            });
+            expect(own.senderTrusted).toBe(true);
+
+            // A copy another of the owner's addresses received is not a replay here.
+            const elsewhere = await spawnFrom(
+                OTHER,
+                sentAnd({ id: 'in-other', emailAddressId: 'addr-2' }),
+                { messageIdHeader: 'm-1@agents.acme.test' },
+            );
+            expect(elsewhere.senderTrusted).toBe(true);
+
+            // Same Message-ID, a different From: not the message the platform sent.
+            const forged = await spawnFrom('mallory@evil.test', sentRow, {
+                messageIdHeader: 'm-1@agents.acme.test',
+            });
+            expect(forged.senderTrusted).toBe(false);
+        });
+
+        it('trusts a configured sender by spelling only when the provider reports no verdict', async () => {
+            process.env.INBOUND_EMAIL_TRUSTED_SENDERS = '@partner.test';
+            expect((await spawnFrom('ops@partner.test')).senderTrusted).toBe(true);
+            const failed = await spawnFrom('ops@partner.test', undefined, {
+                metadata: { spf: 'fail' },
+            });
+            expect(failed.senderTrusted).toBe(false);
+            const unaligned = await spawnFrom('ops@partner.test', undefined, {
+                metadata: { spf: 'pass', spfDomain: 'bulk-mailer.test' },
+            });
+            expect(unaligned.senderTrusted).toBe(false);
+        });
     });
 
     // Review 2026-10-17 F15 (P1): an address can serve several agents; a push the
@@ -211,10 +414,42 @@ describe('DefaultInboundEmailDispatcher', () => {
         assignments.findByEmailAddress.mockResolvedValue([
             { agentId: 'agent-1', dispatchMode: 'conversation' },
         ]);
-        conversations.findByThreadKey.mockResolvedValue({ id: 'conv-existing' });
+        conversations.findByThreadKey.mockResolvedValue({
+            id: 'conv-existing',
+            participants: [{ address: 'Human <HUMAN@example.com>' }],
+        });
         const res = await svc.dispatch(basePayload);
         expect(res.conversationId).toBe('conv-existing');
         expect(conversations.save).not.toHaveBeenCalled();
+        // The participant matched on the plain subject key — one lookup.
+        expect(conversations.findByThreadKey).toHaveBeenCalledTimes(1);
+    });
+
+    it('conversation mode never mixes a DIFFERENT sender into a subject-matched thread', async () => {
+        // Prompt-injection hardening: a subject is not an identity.
+        const svc = await build(false);
+        addresses.findById.mockResolvedValue(inboundAddress);
+        assignments.findByEmailAddress.mockResolvedValue([
+            { agentId: 'agent-1', dispatchMode: 'conversation' },
+        ]);
+        conversations.findByThreadKey
+            .mockResolvedValueOnce({
+                id: 'conv-someone-else',
+                participants: [{ address: 'victim@client.test' }],
+            })
+            .mockResolvedValueOnce(null);
+
+        const res = await svc.dispatch(basePayload);
+
+        expect(res.conversationId).not.toBe('conv-someone-else');
+        const [, scopedKey] = conversations.findByThreadKey.mock.calls[1];
+        expect(scopedKey).toMatch(/^need help with x #[0-9a-f]{16}$/);
+        expect(conversations.save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                threadKey: scopedKey,
+                participants: [{ address: 'human@example.com' }],
+            }),
+        );
     });
 
     // EW-P4-3 — the spawned Task is written back onto the message.
@@ -295,6 +530,7 @@ describe('DefaultInboundEmailDispatcher', () => {
                 {
                     id: 'msg-out-1',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     taskId: 'task-original',
                     messageIdHeader: 'out-1@acme.test',
                 },
@@ -320,18 +556,93 @@ describe('DefaultInboundEmailDispatcher', () => {
             expect(messages.linkTask).toHaveBeenCalledWith('msg-1', 'task-original');
         });
 
+        it('task-spawn: a sender who is NOT a participant of the thread never joins it', async () => {
+            // Prompt-injection hardening: In-Reply-To is the sender's to write.
+            const svc = await taskSpawnAgent(true);
+            messages.findByMessageIdHeaders.mockResolvedValue([
+                {
+                    id: 'msg-out-1',
+                    agentId: 'agent-1',
+                    toAddresses: ['customer@client.test'],
+                    ccAddresses: ['cc@client.test'],
+                    from: 'agent@acme.test',
+                    taskId: 'task-original',
+                    messageIdHeader: 'out-1@acme.test',
+                },
+            ]);
+
+            const res = await svc.dispatch({ ...reply, from: 'Mallory <mallory@evil.test>' });
+
+            expect(res).toMatchObject({ handled: true, taskId: 'task-1' });
+            expect(res.threaded).toBeUndefined();
+            expect(taskSpawner.appendInboundEmailToTask).not.toHaveBeenCalled();
+            expect(taskSpawner.spawnTaskForInboundEmail).toHaveBeenCalledTimes(1);
+        });
+
+        // CodeRabbit on #2769: participation is judged on the thread the reply
+        // would JOIN, not on the union of every message its headers name.
+        it('task-spawn: a participant of ANOTHER referenced thread cannot join the selected one', async () => {
+            const svc = await taskSpawnAgent(true);
+            messages.findByMessageIdHeaders.mockResolvedValue([
+                {
+                    // In-Reply-To target (selected first): the victim's thread.
+                    id: 'm-victim',
+                    agentId: 'agent-1',
+                    from: 'agent@acme.test',
+                    toAddresses: ['victim@client.test'],
+                    taskId: 'task-victim',
+                    messageIdHeader: 'out-1@acme.test',
+                },
+                {
+                    // Also referenced: a thread Mallory really is part of.
+                    id: 'm-mallory',
+                    agentId: 'agent-1',
+                    from: 'agent@acme.test',
+                    toAddresses: ['mallory@evil.test'],
+                    taskId: 'task-mallory',
+                    messageIdHeader: 'root@client.test',
+                },
+            ]);
+
+            const res = await svc.dispatch({ ...reply, from: 'mallory@evil.test' });
+
+            expect(res.threaded).toBeUndefined();
+            expect(taskSpawner.appendInboundEmailToTask).not.toHaveBeenCalled();
+            expect(taskSpawner.spawnTaskForInboundEmail).toHaveBeenCalledTimes(1);
+        });
+
+        it('task-spawn: a cc participant may join (case and display name do not matter)', async () => {
+            const svc = await taskSpawnAgent(true);
+            messages.findByMessageIdHeaders.mockResolvedValue([
+                {
+                    id: 'msg-out-1',
+                    agentId: 'agent-1',
+                    toAddresses: ['customer@client.test'],
+                    ccAddresses: ['Human@Example.com'],
+                    taskId: 'task-original',
+                    messageIdHeader: 'out-1@acme.test',
+                },
+            ]);
+            await expect(svc.dispatch(reply)).resolves.toMatchObject({
+                taskId: 'task-original',
+                threaded: true,
+            });
+        });
+
         it('task-spawn: prefers the In-Reply-To match over an older References match', async () => {
             const svc = await taskSpawnAgent(true);
             messages.findByMessageIdHeaders.mockResolvedValue([
                 {
                     id: 'm-root',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     taskId: 'task-root',
                     messageIdHeader: 'root@client.test',
                 },
                 {
                     id: 'm-out',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     taskId: 'task-out',
                     messageIdHeader: 'out-1@acme.test',
                 },
@@ -362,6 +673,7 @@ describe('DefaultInboundEmailDispatcher', () => {
                 {
                     id: 'm-out',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     taskId: 'task-original',
                     messageIdHeader: 'out-1@acme.test',
                 },
@@ -382,6 +694,7 @@ describe('DefaultInboundEmailDispatcher', () => {
                 {
                     id: 'm-out',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     taskId: 'task-original',
                     messageIdHeader: 'out-1@acme.test',
                 },
@@ -409,6 +722,7 @@ describe('DefaultInboundEmailDispatcher', () => {
                 {
                     id: 'm-out',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     conversationId: 'conv-thread',
                     messageIdHeader: 'out-1@acme.test',
                 },
@@ -435,6 +749,7 @@ describe('DefaultInboundEmailDispatcher', () => {
                 {
                     id: 'm-out',
                     agentId: 'agent-1',
+                    toAddresses: ['Human <human@example.com>'],
                     conversationId: 'conv-foreign',
                     messageIdHeader: 'out-1@acme.test',
                 },

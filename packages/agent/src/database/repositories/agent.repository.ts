@@ -411,6 +411,51 @@ export class AgentRepository {
         await this.repository.update(id, data);
     }
 
+    /**
+     * Compare-and-set update keyed on the agent's file-content hash: applies
+     * `data` only when the row's `contentHash` still equals `expectedHash`
+     * (`''` matches a row that never had one). `true` when it applied.
+     * The single statement is what makes a concurrent edit lose cleanly
+     * instead of overwriting the newer content.
+     */
+    async updateByIdIfContentHash(
+        id: string,
+        expectedHash: string,
+        data: Partial<Agent>,
+    ): Promise<boolean> {
+        // Criteria objects (not a raw WHERE string) so column naming and
+        // quoting stay TypeORM's business on every driver.
+        if (expectedHash === '') {
+            const unset = await this.repository.update({ id, contentHash: IsNull() }, data);
+            if ((unset.affected ?? 0) > 0) return true;
+            const empty = await this.repository.update({ id, contentHash: '' }, data);
+            if ((empty.affected ?? 0) > 0) return true;
+            return this.holdsRewrittenHash(id, expectedHash, data);
+        }
+        const result = await this.repository.update({ id, contentHash: expectedHash }, data);
+        if ((result.affected ?? 0) > 0) return true;
+        return this.holdsRewrittenHash(id, expectedHash, data);
+    }
+
+    /**
+     * Review of #2769 — writing back the very content a row already holds
+     * (new hash === expected hash) changes nothing, and MySQL reports 0
+     * affected rows for an UPDATE that changes nothing: that is not a lost
+     * race. When the write is such a no-op, success is decided by the row
+     * still holding the expected hash; any other 0 stays a mismatch.
+     */
+    private async holdsRewrittenHash(
+        id: string,
+        expectedHash: string,
+        data: Partial<Agent>,
+    ): Promise<boolean> {
+        if (data.contentHash === undefined || (data.contentHash ?? '') !== expectedHash) {
+            return false;
+        }
+        const current = await this.repository.findOne({ where: { id } });
+        return current !== null && (current.contentHash ?? '') === expectedHash;
+    }
+
     async archiveById(id: string): Promise<void> {
         await this.repository.update(id, { status: AgentStatus.ARCHIVED });
     }

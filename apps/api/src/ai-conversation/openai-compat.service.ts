@@ -6,6 +6,7 @@ import {
     formatKbContext,
     parseKbMentions,
 } from '@ever-works/agent/services';
+import { untrustedPreamble } from '@ever-works/agent/utils';
 import type { KbDocumentBodyDto } from '@ever-works/contracts';
 import type {
     ChatMessage,
@@ -54,6 +55,31 @@ type StreamingResponse = {
 export const KB_CITATION_INSTRUCTION =
     'When citing material from a KB document above, reference it inline using the format `kb:{class}/{slug}` (e.g. `kb:brand/voice`). Use the exact class and slug shown in each document heading.';
 
+/**
+ * Security (prompt-injection hardening): the `<kb>` block rides in a
+ * `role:'system'` message (prepended, for provider compatibility), but its
+ * CONTENT is document text — extracted uploads, imported repository or web
+ * content — not the operator's instructions. It used to arrive with no
+ * framing at all, which made a poisoned document read like system policy.
+ * This preamble (the shared untrusted-content wording) leads the message.
+ * Exported so the spec can assert it verbatim.
+ */
+export const KB_DATA_PREAMBLE = `${untrustedPreamble(
+    'knowledge-base documents the user referenced with @kb: mentions',
+)} It is the kb-tagged block that follows; use it as reference material for the answer.`;
+
+/** Per-call switches for {@link OpenAiCompatService.handleCompletion}. */
+export interface CompletionContextOptions {
+    /**
+     * Resolve `@kb:` mentions in the latest user message into a KB system
+     * block. Default `true` (the platform's own chat UI). Bridged prompts
+     * written by people outside the account (a Slack workspace member, a
+     * Slack Connect guest) pass `false` unless that sender is allow-listed —
+     * otherwise anyone who can @mention the bot can read the owner's KB.
+     */
+    allowKbMentions?: boolean;
+}
+
 @Injectable()
 export class OpenAiCompatService {
     private readonly logger = new Logger(OpenAiCompatService.name);
@@ -70,10 +96,14 @@ export class OpenAiCompatService {
     async handleCompletion(
         dto: OpenAiChatCompletionRequestDto,
         facadeOptions: FacadeOptions,
+        context: CompletionContextOptions = {},
     ): Promise<OpenAiChatCompletionResponse> {
         const resolved = await this.resolveWorkContext(facadeOptions);
         const baseOptions = this.mapToInternalOptions(dto);
-        const options = await this.injectKbContext(baseOptions, resolved);
+        const options =
+            context.allowKbMentions === false
+                ? baseOptions
+                : await this.injectKbContext(baseOptions, resolved);
 
         const response = await this.aiFacade.createChatCompletion(options, resolved);
 
@@ -395,7 +425,7 @@ export class OpenAiCompatService {
             // the same shape the user-side `@kb:` mention parser
             // already understands — round-tripping cleanly between
             // user input and assistant output.
-            const kbContent = `${kbBlock}\n\n${KB_CITATION_INSTRUCTION}`;
+            const kbContent = `${KB_DATA_PREAMBLE}\n${kbBlock}\n\n${KB_CITATION_INSTRUCTION}`;
             const kbSystemMessage: ChatMessage = {
                 role: 'system',
                 content: kbContent,

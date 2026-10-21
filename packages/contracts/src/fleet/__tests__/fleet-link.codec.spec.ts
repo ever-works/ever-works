@@ -74,7 +74,7 @@ describe('frames', () => {
 
 	it('decodes from an ArrayBuffer and from an offset view', () => {
 		const wire = encodeFleetLinkFrame(7, FLEET_LINK_FRAME_KINDS.END, new Uint8Array(0))!;
-		expect(decodeFleetLinkFrame(wire.buffer.slice(0))).toMatchObject({ channel: 7, kind: 31 });
+		expect(decodeFleetLinkFrame(new Uint8Array(wire).buffer)).toMatchObject({ channel: 7, kind: 31 });
 		const padded = new Uint8Array(wire.byteLength + 3);
 		padded.set(wire, 3);
 		expect(decodeFleetLinkFrame(padded.subarray(3))).toMatchObject({ channel: 7, kind: 31 });

@@ -173,6 +173,8 @@ export * from './agent-workflow-tools';
 // Judgment layer G10 - the doom-loop / retry-storm detector. Pure, so
 // the worker's gate loop can consult it without a service round-trip.
 export * from './loop-detector';
+// Security — the nonce-fenced Task brief every task run starts from.
+export * from './task-brief';
 export {
     AgentEscalationRepository,
     type ListEscalationsForUserOptions,

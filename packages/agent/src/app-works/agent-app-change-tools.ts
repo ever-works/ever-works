@@ -27,7 +27,9 @@ import type {
  *
  * `request_app_change` is offered to an Agent that may assign Tasks or may commit; the
  * Work id comes from the model, so `authorize` checks EDIT access for the Agent's owner
- * before anything is created (a foreign id answers "not found" with no existence leak).
+ * before anything is created (a foreign id answers "not found" with no existence leak),
+ * and the Work must be OWNED by the Agent's owner: a member's Agent never starts the
+ * owner's Agent (prompt-injection hardening).
  * `get_app_change` is a read of one of that Work's change Tasks.
  */
 
@@ -91,6 +93,17 @@ export function buildAppChangeTools(args: BuildAppChangeToolsArgs): TaskToolDesc
                 const work = await args.authorize(agent.userId, a.workId, 'edit').catch(() => null);
                 if (!work) {
                     return { error: 'App Work not found or not accessible', code: 'not_found' };
+                }
+                // Prompt-injection hardening: a change request STARTS the Work
+                // owner's committing Agent on the owner's machine. An Agent may
+                // only do that for a Work its own owner owns — editing access
+                // granted to a member must never let the member's Agent launch
+                // the owner's.
+                if (work.userId !== agent.userId) {
+                    return {
+                        error: 'Only the owner of this App Work can start a change from chat. Ask the owner to request it.',
+                        code: 'not_owner',
+                    };
                 }
                 const result = await service.request({
                     work,

@@ -10,7 +10,8 @@ import { GitFacadeService } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
 import { TaskMergeGateService } from './task-merge-gate.service';
 import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
-import { classifyCheckResult, computeCiFailureKey } from './task-ci-auto-resume';
+import { classifyCheckResult, computeCiFailureKey, isTrustedCheckApp } from './task-ci-auto-resume';
+import { config } from '../config';
 import {
     PROMOTION_LANE_WATCHER,
     type PromotionLaneWatcher,
@@ -325,12 +326,18 @@ export class TaskPrStatusService {
     private async offerRedGateToFixLoop(task: Task): Promise<void> {
         if (!this.autoResume?.onCheckResult) return;
         if (task.ciState !== 'failing' || !task.workId || !task.prNumber) return;
+        // F8 — only a red check REPORTED BY an allow-listed app may be
+        // re-offered: the webhook intake and the evaluator refuse any other
+        // reporter, and this safety net must not be the way around them. A
+        // commit status, or a row cached before the reporter was recorded,
+        // has no app and is never re-offered.
+        const trustedApps = config.agents.getTrustedCheckApps();
         const failing = (Array.isArray(task.prChecks) ? task.prChecks : []).filter(
             (check) =>
                 classifyCheckResult({
                     status: check.status,
                     conclusion: check.conclusion ?? null,
-                }) === 'failing',
+                }) === 'failing' && isTrustedCheckApp(check.appSlug, trustedApps),
         );
         if (failing.length === 0) return;
         try {
@@ -352,6 +359,7 @@ export class TaskPrStatusService {
                 observedAt: task.ciCheckedAt ?? null,
                 verdict: 'failing',
                 granularity: 'check_suite',
+                appSlug: failing[0].appSlug ?? null,
                 checkName: failing[0].name,
                 conclusion: failing[0].conclusion ?? 'failure',
                 url: failing[0].detailsUrl ?? task.prUrl ?? null,
@@ -589,6 +597,8 @@ export class TaskPrStatusService {
                 status: check.status,
                 conclusion: check.conclusion ?? null,
                 ...(check.detailsUrl ? { detailsUrl: check.detailsUrl } : {}),
+                // Who reported it (F8) — the fix-loop re-offer reads this.
+                appSlug: check.appSlug ?? null,
             })),
         };
     }

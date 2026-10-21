@@ -207,7 +207,9 @@ describe('TaskMergeGateService — promotion Tasks', () => {
         const { service, mergeApprovals, taskWorkspace } = build({
             guard,
             approved: true,
-            work: { taskIsolationBaseBranch: 'develop' },
+            // Off the protected-branch floor (works-security lane 3a), so the
+            // resolved policy's approval requirement is left untouched.
+            work: { taskIsolationBaseBranch: 'release/next' },
         });
 
         await service.onPullRequestStatusRefreshed(task({ labels: ['chore'] }), status());
@@ -264,6 +266,9 @@ describe('TaskMergeGateService — promotion Tasks', () => {
         const { service, taskWorkspace, mergeApprovals } = build({
             policy: NO_APPROVAL_NEEDED,
             guard,
+            // Works-security lane 3a: only a base OFF the protected-branch
+            // floor merges on green CI alone; `main` would raise the approval.
+            work: { taskIsolationBaseBranch: 'release/next' },
         });
 
         const outcome = await service.onPullRequestStatusRefreshed(

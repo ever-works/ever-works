@@ -7414,6 +7414,38 @@
                         "specUnavailable": "Bu uygulamanın henüz kullanılabilir bir uygulama belirtimi yok.",
                         "failed": "Değer kaydedilemedi. Tekrar deneyin."
                     }
+                },
+                "dependencies": {
+                    "title": "Bağımlılıklar",
+                    "description": "Bu uygulamanın ihtiyaç duyduğu veritabanları, önbellekler, depolama ve e-posta. Uygulama başlamadan önce dağıtım hedefinde hazırlanırlar.",
+                    "loading": "Bağımlılıklar okunuyor…",
+                    "unavailable": "Bağımlılıklar bu kurulumda henüz yönetilemiyor.",
+                    "error": "Bağımlılıklar okunamadı. Tekrar denemek için sayfayı yenileyin.",
+                    "empty": "Bu uygulamanın uygulama belirtimi hiçbir bağımlılık bildirmiyor.",
+                    "provider": "Sağlayıcı: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# deneme} other {# deneme}}",
+                    "noReason": "Herhangi bir neden kaydedilmedi.",
+                    "deployRetries": "Yeniden dağıtmak otomatik olarak tekrar dener — ya da şimdi Yeniden dene'ye basın.",
+                    "retry": "Yeniden dene",
+                    "retryAria": "{kind} için yeniden dene",
+                    "retried": "{kind}: yeni bir deneme planlandı.",
+                    "retryQueued": "{kind}: çalışan (worker) hazır olur olmaz yeni bir deneme başlayacak.",
+                    "leaseHeld": "{kind} şu anda hazırlanıyor. Birazdan tekrar deneyin.",
+                    "retryFailed": "{kind} yeniden denenemedi. Tekrar deneyin.",
+                    "deleteData": "Verileri sil",
+                    "deleteDataAria": "{kind} verilerini sil",
+                    "deleteDialog": {
+                        "title": "{kind} verileri silinsin mi?",
+                        "description": "Bu işlem, bu bağımlılığın birimlerini, veritabanlarını ve bucket'larını yok eder. Geri alınamaz.",
+                        "resources": "Silinecekler:",
+                        "noResources": "Bu bağımlılık için kayıtlı kaynak yok.",
+                        "confirmLabel": "Onaylamak için {slug} yazın",
+                        "cancel": "İptal",
+                        "confirm": "Verileri sil",
+                        "requested": "{kind} verileri siliniyor.",
+                        "failed": "Veriler silinemedi. {reason}"
+                    }
                 }
             },
             "appEnv": {

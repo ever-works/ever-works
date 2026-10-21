@@ -148,12 +148,20 @@ describe('TaskTransitionService — quality-gate review-entry rule (Wave 3 M8)',
         expect(works.findById).not.toHaveBeenCalled();
     });
 
-    it('force=true overrides the gate for an AGENT-driven move (policy override, like the approver gate)', async () => {
+    it('force=true is IGNORED for an AGENT-driven move — an agent never overrides the gate', async () => {
         givenGate('required', 'red');
-        await expectAllowed(makeTask(), TaskStatus.IN_REVIEW, {
-            actorType: 'agent',
-            force: true,
-        });
+        await expect(
+            makeSvc().transition(makeTask(), TaskStatus.IN_REVIEW, {
+                actorType: 'agent',
+                force: true,
+            }),
+        ).rejects.toThrow(ConflictException);
+        expect(tasks.casUpdateStatus).not.toHaveBeenCalled();
+    });
+
+    it('force=true still overrides the gate for a HUMAN move', async () => {
+        givenGate('required', 'red');
+        await expectAllowed(makeTask(), TaskStatus.IN_REVIEW, { force: true });
         expect(works.findById).not.toHaveBeenCalled();
     });
 

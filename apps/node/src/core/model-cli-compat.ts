@@ -61,8 +61,41 @@ export const MODEL_CLI_REQUIRED_FLAGS: Readonly<Record<ModelCliProvider, readonl
 	// since the MCP isolation fix (#2584): the empty strict config, or the
 	// bridge's. A CLI without them cannot run fleet work at all, so `doctor`
 	// must say INCOMPATIBLE, not "runs that need them will fail".
-	'claude-code': ['-p', '--output-format', '--permission-mode', '--mcp-config', '--strict-mcp-config'],
+	//
+	// `--setting-sources` + `--settings` ride EVERY fleet Claude Code run since
+	// control 17 (2026-10-18): the worktree's own `.claude/settings*.json` is
+	// never loaded and every hook is off. A CLI without them cannot keep a
+	// repository's hooks from running as the machine owner, so it is
+	// INCOMPATIBLE rather than "runs go without".
+	'claude-code': [
+		'-p',
+		'--output-format',
+		'--permission-mode',
+		'--mcp-config',
+		'--strict-mcp-config',
+		'--setting-sources',
+		'--settings'
+	],
 	codex: ['--json', '--sandbox', '-C', '--ignore-user-config']
+};
+
+/**
+ * Flags that make a run STRICTER and are passed only when the pinned binary
+ * advertises them (control 17). Unlike {@link MODEL_CLI_OPTIONAL_FLAGS},
+ * which are dropped when missing, these are ADDED when present: a binary
+ * whose help is unrecognised never gets one (an unknown option would fail
+ * every run), and a binary that lacks one runs with the isolation the
+ * required flags already give. `doctor` reports a missing one so the
+ * operator knows an upgrade buys a stricter run.
+ *
+ * `--restricted` (Claude Code): no command-running built-ins and no
+ * WebFetch, no settings files at all, file tools confined to the granted
+ * directories, and writes to settings / git / tool-configuration files
+ * never auto-approved. Never combined with skip-permissions.
+ */
+export const MODEL_CLI_HARDENING_FLAGS: Readonly<Record<ModelCliProvider, readonly string[]>> = {
+	'claude-code': ['--restricted'],
+	codex: []
 };
 
 /**
@@ -105,6 +138,11 @@ export interface ModelCliCompatibility {
 	missingConditionalFlags: string[];
 	/** Droppable flags the help does not list — runs go ahead without them. */
 	unsupportedOptionalFlags: string[];
+	/**
+	 * Hardening flags ({@link MODEL_CLI_HARDENING_FLAGS}) the help does not
+	 * list — runs go ahead with the baseline isolation only.
+	 */
+	missingHardeningFlags: string[];
 	/** One line on why the answer is incomplete, or null. */
 	note: string | null;
 }
@@ -329,6 +367,7 @@ export function judgeModelCliHelp(
 		missingRequiredFlags: [],
 		missingConditionalFlags: [],
 		unsupportedOptionalFlags: [],
+		missingHardeningFlags: [],
 		note: null
 	};
 	if (help === null) {
@@ -347,7 +386,8 @@ export function judgeModelCliHelp(
 		supportedFlags: advertised,
 		missingRequiredFlags: missing(required),
 		missingConditionalFlags: missing(MODEL_CLI_CONDITIONAL_FLAGS[provider]),
-		unsupportedOptionalFlags: missing(MODEL_CLI_OPTIONAL_FLAGS[provider])
+		unsupportedOptionalFlags: missing(MODEL_CLI_OPTIONAL_FLAGS[provider]),
+		missingHardeningFlags: missing(MODEL_CLI_HARDENING_FLAGS[provider])
 	};
 }
 

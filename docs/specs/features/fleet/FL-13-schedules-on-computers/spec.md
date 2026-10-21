@@ -41,11 +41,11 @@ runs when it is. Times are the computer's own; the view shows both the computer'
    ✓ Tue 02:00 · 14 m 02 s · exit 0        ✗ Mon 02:00 · 3 m 11 s · exit 1  [output]     ⊘ Sun 02:00 skipped — overlap
 ```
 
-| Phase  | Ships                                                                                                                                             |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase  | Ships                                                                                                                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | Command schedules: `node_schedule` source, dialog, node-side cache and timer loop, overlap/cap/history, Run now/Pause/Resume/Delete, computer Schedules tab, Activity → Schedules rows, audit, "needs a look" producer, CLI |
-| **P2** | Agent-session schedules (recurring Task pinned to a computer), unattended-credential note, cost attribution, NEVER RUNS reasons and repairs, circuit breaker scope "this computer", Agent tools |
-| **P3** | Per-OS native-scheduler fallback for nodes not installed as a service; missed-run grace and failure-threshold editors only if CONTRACTS §6 makes them per schedule (§8b) |
+| **P2** | Agent-session schedules (recurring Task pinned to a computer), unattended-credential note, cost attribution, NEVER RUNS reasons and repairs, circuit breaker scope "this computer", Agent tools                             |
+| **P3** | Per-OS native-scheduler fallback for nodes not installed as a service; missed-run grace and failure-threshold editors only if CONTRACTS §6 makes them per schedule (§8b)                                                    |
 
 ---
 
@@ -84,12 +84,12 @@ scope (one computer), a run-history drawer, and a "needs a look" producer for sc
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer…                                       | Today they must…                                                                                                     | What breaks                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Schedule something on that machine."            | Edit the machine's crontab, launchd or Task Scheduler by hand.                                                       | The unified Schedules read model has exactly seven sources (`packages/agent/src/schedules/schedule-view.types.ts:17-24`; `schedules.service.ts:85-93`) and no field names a computer; the schedules spec declares a new source type out of scope (`docs/specs/features/schedules/spec.md:355`).                   |
-| "Have Nina do it there every morning."           | Make a recurring Task and hope the Agent's affinity sends it to the right machine.                                  | A recurring Task fires through the Task recurrence dispatcher (`packages/agent/src/entities/task.entity.ts:24-25`) and lands on a machine only indirectly, via Agent affinity (`packages/agent/src/fleet/fleet-agent-node-affinity.service.ts:22-25`), which is Organization-scoped and never shown on the schedule row. |
-| "Did it run while my laptop was closed?"         | Nothing — the platform's cron fires; if the machine is offline the job waits or ages out.                            | No definition lives on a machine; the node has no scheduler or schedule cache (EXISTING-SUBSTRATE §4: `rg -n -w 'cron|crontab|RRULE|cronExpression' apps/node/src` → no match); every run depends on the platform being reachable at fire time.                                                                                                                         |
-| "Why did it stop running?"                       | Read the Agent's error count, or notice the machine is off.                                                          | NEVER RUNS knows seven reasons (`schedule-view.types.ts:116-123`), none about a machine; "needs a look" has a `schedule-failed` kind reserved (CONTRACTS §4.6) with no producer.                                                                                                                             |
+| To answer…                               | Today they must…                                                                          | What breaks                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Schedule something on that machine."    | Edit the machine's crontab, launchd or Task Scheduler by hand.                            | The unified Schedules read model has exactly seven sources (`packages/agent/src/schedules/schedule-view.types.ts:17-24`; `schedules.service.ts:85-93`) and no field names a computer; the schedules spec declares a new source type out of scope (`docs/specs/features/schedules/spec.md:355`).                          |
+| "Have Nina do it there every morning."   | Make a recurring Task and hope the Agent's affinity sends it to the right machine.        | A recurring Task fires through the Task recurrence dispatcher (`packages/agent/src/entities/task.entity.ts:24-25`) and lands on a machine only indirectly, via Agent affinity (`packages/agent/src/fleet/fleet-agent-node-affinity.service.ts:22-25`), which is Organization-scoped and never shown on the schedule row. |
+| "Did it run while my laptop was closed?" | Nothing — the platform's cron fires; if the machine is offline the job waits or ages out. | No definition lives on a machine; the node has no scheduler or schedule cache (EXISTING-SUBSTRATE §4: `rg -n -w 'cron\|crontab\|RRULE\|cronExpression' apps/node/src` → no match); every run depends on the platform being reachable at fire time.                                                                       |
+| "Why did it stop running?"               | Read the Agent's error count, or notice the machine is off.                               | NEVER RUNS knows seven reasons (`schedule-view.types.ts:116-123`), none about a machine; "needs a look" has a `schedule-failed` kind reserved (CONTRACTS §4.6) with no producer.                                                                                                                                         |
 
 ### 2.3 Why this epic is additive only
 
@@ -298,7 +298,7 @@ is removed; "Schedule" stays the only noun — never "cron job" or "automation" 
 - **FR-27** Every change MUST write one audit row — `node.schedule.create|update|delete|run|pause|resume` —
   with `family: schedules`, `target: <commandId or taskId>`, `requestedBy` and the confirmation
   class; every run the node executes MUST write `node.command.run` with `requestedBy:
-  schedule:<commandId>` when reconciled.
+schedule:<commandId>` when reconciled.
 - **FR-28** Every refusal MUST carry a CONTRACTS §8 code and hint: `unreachable` (Run now),
   `consent_missing`, `permission_denied`, `invalid` (cadence), `busy`, `kill_switch`,
   `unsupported_on_node`, `confirmation_required`, `limit_exceeded` (the 51st schedule).
@@ -404,15 +404,15 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 
 ## 7. Key entities & concepts
 
-| Entity / concept               | New?      | Description                                                                                                   |
-| ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------- |
-| **Schedule** (`node_schedule`) | Extended  | The unified read model gains one source; a row is a Command with a cadence.                                   |
-| **Command** (with cadence)     | FL-12     | Gains a cadence, a name and an enabled state (CONTRACTS §4.4), plus the pause reason, sync generation and soft delete proposed in §8b; its times are the computer's (`FleetNode.timeZone`). |
-| **Command run**                | FL-12     | Uses the skip statuses `skipped-overlap`, `skipped-offline` (CONTRACTS §4.4) and gains the scheduled fire time proposed in §8b. |
-| **Recurring Task**             | Existing  | Pinned to a computer through its Agent's affinity; gains a computer chip in the view.                         |
-| **Agent session**              | FL-04     | What one fire of an Agent-session schedule becomes on the machine.                                            |
-| **Needs a look** item          | FL-01/03  | `schedule-failed` producer.                                                                                   |
-| **Node-side definition cache** | **NEW** (machine-local, not a platform entity) | The machine's copy of its Command schedules and their run history. |
+| Entity / concept               | New?                                           | Description                                                                                                                                                                                 |
+| ------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Schedule** (`node_schedule`) | Extended                                       | The unified read model gains one source; a row is a Command with a cadence.                                                                                                                 |
+| **Command** (with cadence)     | FL-12                                          | Gains a cadence, a name and an enabled state (CONTRACTS §4.4), plus the pause reason, sync generation and soft delete proposed in §8b; its times are the computer's (`FleetNode.timeZone`). |
+| **Command run**                | FL-12                                          | Uses the skip statuses `skipped-overlap`, `skipped-offline` (CONTRACTS §4.4) and gains the scheduled fire time proposed in §8b.                                                             |
+| **Recurring Task**             | Existing                                       | Pinned to a computer through its Agent's affinity; gains a computer chip in the view.                                                                                                       |
+| **Agent session**              | FL-04                                          | What one fire of an Agent-session schedule becomes on the machine.                                                                                                                          |
+| **Needs a look** item          | FL-01/03                                       | `schedule-failed` producer.                                                                                                                                                                 |
+| **Node-side definition cache** | **NEW** (machine-local, not a platform entity) | The machine's copy of its Command schedules and their run history.                                                                                                                          |
 
 ---
 
@@ -431,13 +431,13 @@ RUNS · computer removed` · `NEVER RUNS · update the node on {computer}` · `{
 - **Resolved** by CONTRACTS R-29: scheduled Agent work is a recurring Task pinned through Agent
   node affinity; there is no per-Task node column, and the dialog refuses unpinned Agents (U9).
 - `[NEEDS CLARIFICATION: Agent-session schedules on a personal (non-Organization) scope cannot be
-  pinned because affinity requires an Organization. Accept, or allow owner-scope affinity? Default
-  until answered: accept — only Organization-scoped Agents with a node affinity are offered; a
-  personal-scope Agent is listed disabled with "pinning needs an Organization".]`
+pinned because affinity requires an Organization. Accept, or allow owner-scope affinity? Default
+until answered: accept — only Organization-scoped Agents with a node affinity are offered; a
+personal-scope Agent is listed disabled with "pinning needs an Organization".]`
 - `[NEEDS CLARIFICATION: Should a Command schedule keep running while the kill switch is on but
-  the platform is unreachable (the node cannot learn the switch flipped)? Default until answered:
-  the node keeps the last kill-switch state it was told, keeps firing while it has heard nothing
-  new, and stops within 10 s of the next `link.pause` it receives on reconnect.]`
+the platform is unreachable (the node cannot learn the switch flipped)? Default until answered:
+the node keeps the last kill-switch state it was told, keeps firing while it has heard nothing
+new, and stops within 10 s of the next `link.pause` it receives on reconnect.]`
 - **Resolved** by CONTRACTS §10: at most 50 schedules per computer (FR-5).
 - **Resolved** by CONTRACTS rev 5: schedule-state columns `pausedAt`, `pausedReason`, `syncGeneration`, `syncedGeneration`, `deletedAt` and `runs.scheduledFor` in FL-13 slot 00, cadence columns in FL-12's table (§4.4); `schedule.sync { generation }` (§3.3); name/command/prompt bounds (§10); 30 writes per minute (§10.1); `/nodes/:id/schedules/agent-session` (§11.2). Grace and failure threshold stay fixed (§6).
 

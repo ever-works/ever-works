@@ -48,6 +48,25 @@ export interface DiskProbeIo {
 	 * the platform / runtime cannot answer.
 	 */
 	freeBytes(path: string): Promise<number | null> | number | null;
+	/**
+	 * Computer health (FL-03) — the whole volume containing `path`, so the
+	 * health snapshot can say how FULL the disk is and not only how much is
+	 * left. Optional: a probe without it (every test fake that predates it)
+	 * simply reports no percentage or size.
+	 */
+	volume?(path: string): Promise<DiskVolumeReading | null> | DiskVolumeReading | null;
+}
+
+/**
+ * One `statfs` reading of a volume, in bytes. `availableBytes` is what an
+ * UNPRIVILEGED process may still write (`bavail`), `freeBytes` what the
+ * filesystem has free including reserved blocks (`bfree`) — the difference
+ * is why `df` reports "used / (used + available)" rather than "used / size".
+ */
+export interface DiskVolumeReading {
+	totalBytes: number;
+	freeBytes: number;
+	availableBytes: number;
 }
 
 /**

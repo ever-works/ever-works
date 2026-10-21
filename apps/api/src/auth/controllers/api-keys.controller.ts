@@ -102,7 +102,12 @@ export class ApiKeysController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: RotateApiKeyDto,
     ) {
-        const rotated = await this.apiKeyService.rotateKey(id, req.user.userId, dto?.graceHours);
+        // Review 2026-10-17 U7 (F117): the Tenant owner may rotate a key an Organization
+        // admin created (it is listed to them, and they may revoke it); the rotation acts
+        // on the creator's row, and the audit row names the caller.
+        const owner =
+            (await this.integrationKeys?.rotationOwnerOf(id, req.user.userId)) ?? req.user.userId;
+        const rotated = await this.apiKeyService.rotateKey(id, owner, dto?.graceHours);
         // The new secret exists only in this response: the audit row can never
         // be allowed to fail the request (`recordRotation` swallows its own
         // errors too; this is the belt to those braces).

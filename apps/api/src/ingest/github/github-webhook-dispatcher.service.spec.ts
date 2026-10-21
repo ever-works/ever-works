@@ -78,6 +78,13 @@ describe('GitHubWebhookDispatcherService', () => {
                 .mockResolvedValue(
                     overrides.boundUserId ? { userId: overrides.boundUserId } : null,
                 ),
+            // F4 — the ONLY binding the App path may fall back to: an
+            // installation row the App-install path itself wrote.
+            appInstallBindingFor: jest
+                .fn()
+                .mockResolvedValue(
+                    overrides.boundUserId ? { userId: overrides.boundUserId } : null,
+                ),
         };
         const appSync = { handleWebhook: jest.fn().mockResolvedValue(undefined) };
         const installations = {
@@ -325,6 +332,7 @@ describe('GitHubWebhookDispatcherService', () => {
             await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
 
             expect(installations.findByInstallationId).toHaveBeenCalledWith('4242');
+            expect(bridge.appInstallBindingFor).not.toHaveBeenCalled();
             expect(bridge.installBindingFor).not.toHaveBeenCalled();
             expect(bridge.handleEvent).toHaveBeenCalledWith(
                 expect.objectContaining({ userId: 'user-app', matchedBy: 'app-install' }),
@@ -653,11 +661,57 @@ describe('GitHubWebhookDispatcherService', () => {
 
             await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
 
+            // …and only the App-provenance row for THIS installation (F4).
+            expect(bridge.appInstallBindingFor).toHaveBeenCalledWith('installation:4242');
+            expect(bridge.appInstallBindingFor).toHaveBeenCalledTimes(1);
+            expect(bridge.installBindingFor).not.toHaveBeenCalled();
             expect(bridge.handleEvent).toHaveBeenCalledWith(
                 expect.objectContaining({ userId: 'bound-user', matchedBy: 'binding' }),
                 'pull_request',
                 PR_BODY,
             );
+        });
+
+        /**
+         * F4 (2026-10-18): the platform App is public — anyone can install it
+         * on anything — and `owner:<login>` / per-install `installation:<id>`
+         * rows are written from an UNVERIFIED body key. A squatter tenant who
+         * pre-recorded `owner:<victim-org>` received the App-signed deliveries
+         * of every installation of that org the platform had no owner for.
+         */
+        it('⭐ never consults an owner: key for an App-signed delivery', async () => {
+            const { dispatcher, bridge } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: null,
+                boundUserId: 'squatter',
+            });
+            const ownerOnly = {
+                action: 'opened',
+                repository: { full_name: 'victim-org/site', owner: { login: 'victim-org' } },
+                pull_request: { number: 7, title: 'x', head: { sha: 'abc' } },
+            };
+
+            const result = await dispatcher.dispatch(signed(ownerOnly, APP_SECRET));
+
+            expect(bridge.installBindingFor).not.toHaveBeenCalled();
+            expect(bridge.appInstallBindingFor).not.toHaveBeenCalled();
+            expect(bridge.handleEvent).not.toHaveBeenCalled();
+            expect(result.handled.review).toBe(false);
+        });
+
+        it('⭐ drops an App-signed delivery whose installation has only a squatted (non-App) row', async () => {
+            const { dispatcher, bridge } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: null,
+            });
+            // The bridge's provenance check said no.
+            bridge.appInstallBindingFor.mockResolvedValue(null);
+            bridge.installBindingFor.mockResolvedValue({ userId: 'squatter' });
+
+            await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
+
+            expect(bridge.installBindingFor).not.toHaveBeenCalled();
+            expect(bridge.handleEvent).not.toHaveBeenCalled();
         });
 
         it('resolves through the GitHub user link when only createdByGithubUserId is known', async () => {

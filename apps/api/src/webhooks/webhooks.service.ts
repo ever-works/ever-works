@@ -11,11 +11,14 @@ import {
     UserRepository,
     WebhookSubscriptionRepository,
 } from '@ever-works/agent/database';
+import { ApiKey } from '@ever-works/agent/entities';
 import type {
     WebhookSubscription,
     WebhookSubscriptionOwnerType,
     WebhookSubscriptionStatus,
 } from '@ever-works/agent/entities';
+import { InjectDataSource } from '@nestjs/typeorm';
+import type { DataSource } from 'typeorm';
 import { DOMAIN_EVENT_TYPES, isDomainEventType } from '@ever-works/contracts';
 import { DomainEventFeedService } from '@ever-works/agent/domain-events';
 // Security: reuse the canonical lexical SSRF guard shared with the delivery
@@ -26,7 +29,7 @@ import { DomainEventFeedService } from '@ever-works/agent/domain-events';
 import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 // Security (EW-711 #14): work-scoped subscriptions must be authorized against
 // the caller's access to that Work — see the ownership gate in `create()`.
-import { WorkOwnershipService } from '@ever-works/agent/services';
+import { effectiveIntegrationKeyPins, WorkOwnershipService } from '@ever-works/agent/services';
 import { WebhookSecretService } from './webhook-secret.service';
 
 export interface WebhookSubscriptionView {
@@ -119,6 +122,9 @@ export class WebhooksService {
         // The change-feed head a new v2 subscription starts after (exact
         // "only new events"). Optional + last.
         @Optional() private readonly feed?: DomainEventFeedService,
+        // Review 2026-10-17 F46: the key's effective pins, for a key-owned subscription
+        // edited from Settings. Optional + last.
+        @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
     ) {}
 
     /**
@@ -128,6 +134,20 @@ export class WebhooksService {
     async listForAccount(accountId: string): Promise<WebhookSubscriptionView[]> {
         const rows = await this.repo.listForAccount(accountId);
         return rows.map((row) => this.toView(row));
+    }
+
+    /**
+     * Review 2026-10-17 F47: the v2 subscriptions owned by these integration keys,
+     * whichever account holds them (a key's subscriptions sit in its creator's
+     * account). The caller passes only keys it manages (`IntegrationKeyService.list`).
+     */
+    async listForIntegrationKeys(keyIds: readonly string[]): Promise<WebhookSubscriptionView[]> {
+        const views: WebhookSubscriptionView[] = [];
+        for (const keyId of new Set(keyIds)) {
+            const rows = await this.repo.listForOwner('integration_key', keyId);
+            views.push(...rows.map((row) => this.toView(row)));
+        }
+        return views;
     }
 
     /**
@@ -256,6 +276,9 @@ export class WebhooksService {
                     accountId,
                     input.organizationIds,
                 );
+                if (row.ownerType === 'integration_key') {
+                    await this.assertKeyPinned(row, patch.organizationIds);
+                }
                 // Keep the ownership stamp (what backups and scope filters read)
                 // in step with the subscribed organizations.
                 const firstOrg = await this.organizations?.findById(patch.organizationIds[0]);
@@ -439,6 +462,27 @@ export class WebhooksService {
             }
         }
         return ids;
+    }
+
+    /**
+     * Review 2026-10-17 F46: a subscription an integration key owns lists only
+     * organizations that key is pinned to (contract: a subset of the key's pins), from
+     * Settings as from the integration API. An organization outside them reads as absent
+     * (404), like one outside the caller's Tenant.
+     */
+    private async assertKeyPinned(
+        row: WebhookSubscription,
+        organizationIds: readonly string[],
+    ): Promise<void> {
+        if (!this.dataSource) {
+            throw new BadRequestException('Webhooks v2 are not available in this deployment');
+        }
+        const key = row.ownerId
+            ? await this.dataSource.getRepository(ApiKey).findOne({ where: { id: row.ownerId } })
+            : null;
+        const pins = key ? await effectiveIntegrationKeyPins(this.dataSource.manager, key) : [];
+        const outside = organizationIds.find((orgId) => !pins.includes(orgId));
+        if (outside) throw new NotFoundException(`Organization ${outside} not found`);
     }
 
     private cleanOriginTags(tags: readonly string[] | undefined): string[] {

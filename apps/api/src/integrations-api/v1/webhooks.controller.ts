@@ -35,7 +35,7 @@ import { WebhooksDeliveriesService } from '../../webhooks/webhooks-deliveries.se
 import { WebhooksService, type WebhookSubscriptionView } from '../../webhooks/webhooks.service';
 import { IntegrationOnlyGuard } from './integration-only.guard';
 import { IntegrationExceptionFilter } from './integration-exception.filter';
-import { principalOf, validationFailed } from './integration-request';
+import { principalOf, validationFailed, IsOptionalNonNull } from './integration-request';
 
 /** `CreateWebhook` (contract v1 requests.schema.json). */
 export class IntegrationCreateWebhookDto {
@@ -76,13 +76,13 @@ export class IntegrationCreateWebhookDto {
 /** `UpdateWebhook` (contract v1 requests.schema.json). */
 export class IntegrationUpdateWebhookDto {
     @ApiProperty({ required: false, format: 'uri', maxLength: 2048 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsUrl({ require_tld: false, protocols: ['http', 'https'] })
     @MaxLength(2048)
     url?: string;
 
     @ApiProperty({ required: false, type: [String], minItems: 1, maxItems: 200 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMinSize(1)
     @ArrayMaxSize(200)
@@ -91,14 +91,14 @@ export class IntegrationUpdateWebhookDto {
     events?: string[];
 
     @ApiProperty({ required: false, type: [String], format: 'uuid', minItems: 1 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMinSize(1)
     @IsUUID('all', { each: true })
     organizationIds?: string[];
 
     @ApiProperty({ required: false, type: [String], maxItems: 20 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(20)
     @IsString({ each: true })
@@ -112,7 +112,7 @@ export class IntegrationUpdateWebhookDto {
     description?: string | null;
 
     @ApiProperty({ required: false, enum: ['active', 'paused'] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(['active', 'paused'])
     status?: 'active' | 'paused';
 }

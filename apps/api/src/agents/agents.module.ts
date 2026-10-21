@@ -2,7 +2,7 @@ import {
     AppChangeRequestService,
     AppWorksModule as AgentAppWorksModule,
 } from '@ever-works/agent/app-works';
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import {
     AgentsModule as AgentAgentsModule,
     AgentRepository,
@@ -76,10 +76,17 @@ import {
 import type { RepositoryRole } from '@ever-works/contracts/api';
 import {
     formatInboundEmailChatPost,
-    inboundEmailAttachmentList,
+    formatInboundEmailTaskDescription,
+    inboundEmailAwaitingOwnerNote,
+    inboundEmailReplyAutoDispatchEnabled,
     inboundEmailReplyHint,
+    inboundEmailTaskTitle,
 } from './inbound-email-task-chat';
 import { UploadsModule } from '../uploads/uploads.module';
+import {
+    assertNoAlwaysProtectedPaths,
+    workflowChangesAllowedForWork,
+} from './agent-git-protected-paths';
 import { UploadsService } from '../uploads/uploads.service';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -91,6 +98,7 @@ import { UploadsService } from '../uploads/uploads.service';
 // it post-merge when their git provider setup is stable. Leaving it
 // unbound keeps the model from seeing tools that would fail mysteriously.
 import {
+    AWAITING_OWNER_LABEL,
     TasksDomainModule,
     TaskChatService,
     TasksService,
@@ -159,7 +167,12 @@ import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 // domain tool source below. The agent-side InboxModule imports the
 // agent-side AgentsModule / AgentApprovalsModule / NotificationsModule
 // (never anything api-side), so no cycle is introduced.
-import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
+import {
+    INBOX_PRODUCER,
+    InboxModule as AgentInboxModule,
+    InboxService,
+    type InboxProducer,
+} from '@ever-works/agent/inbox';
 // Named Conversations — ConversationMessageService backs the
 // AGENT_RUN_CONVERSATION_REPLY_POSTER binding below. The agent-side
 // ConversationsModule imports only DatabaseModule and the agent-side
@@ -169,7 +182,7 @@ import { ConversationsModule, ConversationMessageService } from '@ever-works/age
 // you" reason (pending proposals alongside open escalations). The
 // agent-side AgentApprovalsModule registers its own two entities and
 // imports nothing else, so no cycle is introduced.
-import { AgentApprovalsModule } from '@ever-works/agent/agent-approvals';
+import { AgentApprovalsModule, AgentApprovalsService } from '@ever-works/agent/agent-approvals';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -235,14 +248,19 @@ const HELD_FOR_APPROVAL_NOTE =
  * APW-08 P0 — the protected RELEASE branches an Agent may never commit to.
  *
  * This list is the FLOOR and is deliberately NOT configurable: `main`,
- * `master` and `stage` are the branches a release is cut from, and an
- * Agent pushing straight to one is the defect this exists to make
- * impossible. The Work's effective merge policy `protectedBranches`
+ * `master` and `stage` are the branches a release is cut from, `develop` is
+ * the integration branch every cascade starts from (and is already in
+ * `PLATFORM_DEFAULT_MERGE_POLICY.protectedBranches` — the floor makes sure an
+ * override that drops it cannot expose it), and an Agent pushing straight to
+ * one is the defect this exists to make impossible. The Work's effective merge policy `protectedBranches`
  * (`PLATFORM_DEFAULT_MERGE_POLICY` and its tenant/organization/Work/Agent
  * overrides, resolved by `MergePolicyService`) is unioned ON TOP of it, so
  * an operator can protect MORE branches at any scope — never fewer.
  */
-const PROTECTED_RELEASE_BRANCHES: readonly string[] = ['main', 'master', 'stage'];
+const PROTECTED_RELEASE_BRANCHES: readonly string[] = ['main', 'master', 'stage', 'develop'];
+
+/** Logger for the Agent git tool adapter's advisory warnings. */
+const agentGitToolsLogger = new Logger('AgentGitFacade');
 
 /**
  * APW-08 P0 (T3, APW08-G24) — the working copy a Work's Agent git operations
@@ -619,10 +637,11 @@ async function assertRealWriteTarget(
         // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
         // The inbound-email dispatcher's `task-spawn` mode delegates here:
         // create a Task from the inbound email (scoped to the address
-        // owner, created-by the receiving agent) and assign that agent so
-        // the task-tracking flow dispatches `agent-task-execute`. When this
-        // token is unbound the dispatcher persists the message but spawns
-        // no Task (graceful no-op).
+        // owner, created-by the receiving agent) and assign that agent.
+        // Creating and assigning does NOT start a run: runs start on
+        // `→ in_progress` (or Run). An untrusted sender's Task also carries
+        // the binding `awaiting-owner` label. When this token is unbound the
+        // dispatcher persists the message but spawns no Task (graceful no-op).
         //
         // EW-P4-3 — a reply that threads (In-Reply-To / References) onto an
         // email already linked to a Task is posted on THAT Task's chat
@@ -633,99 +652,181 @@ async function assertRealWriteTarget(
         // before, so a reply is never lost.
         {
             provide: INBOUND_EMAIL_TASK_SPAWNER,
-            inject: [TasksService, TaskChatService, AgentRepository],
+            // The Inbox producer is APPENDED and optional: it files the owner's
+            // notice for an email from an untrusted sender.
+            inject: [
+                TasksService,
+                TaskChatService,
+                AgentRepository,
+                { token: INBOX_PRODUCER, optional: true },
+            ],
             useFactory: (
                 tasks: TasksService,
                 chat: TaskChatService,
                 agents: AgentRepository,
-            ): InboundEmailTaskSpawner => ({
-                async spawnTaskForInboundEmail({
-                    agentId,
-                    userId,
-                    emailMessageId,
-                    subject,
-                    bodyText,
-                    from,
-                    tenantId,
-                    organizationId,
-                    attachments,
-                }) {
-                    const title = subject?.trim()
-                        ? subject.trim().slice(0, 200)
-                        : `Inbound email from ${from}`;
-                    const body = bodyText?.trim() ? bodyText.trim().slice(0, 8000) : '';
-                    // EW-P4-3 — a public webhook has no request scope, so the
-                    // Task is placed explicitly: where its assignee, the
-                    // receiving Agent, lives. Not the address's scope: an
-                    // address may be bound to an Agent of another scope (a
-                    // personal Agent on an org address), and `addAssignee`
-                    // then could not reach the Agent from the Task (review on
-                    // #2612). The address's tenant / organization (`tenantId`
-                    // / `organizationId`) is still stamped on the email row.
-                    // An Agent that cannot be resolved keeps the old,
-                    // unscoped create.
-                    void tenantId;
-                    void organizationId;
-                    const agent = await agents.findByIdAndUser(agentId, userId).catch(() => null);
-                    const scope =
-                        agent && (agent.tenantId || agent.organizationId)
-                            ? {
-                                  tenantId: agent.tenantId ?? null,
-                                  organizationId: agent.organizationId ?? null,
-                              }
-                            : undefined;
-                    const data = {
-                        title,
-                        // EW-P4-3 — the attachments it came with, and the
-                        // message id the agent replies in thread with.
-                        description:
-                            `${body}${inboundEmailAttachmentList(attachments)}${inboundEmailReplyHint(emailMessageId)}`.trim(),
-                        labels: ['inbound-email'],
-                        createdByType: 'agent' as const,
-                        createdById: agentId,
-                    };
-                    const task = scope
-                        ? await tasks.create(userId, data, scope)
-                        : await tasks.create(userId, data);
-                    // Assign the receiving agent so the task-tracking flow
-                    // fans out agent-task-execute for it.
-                    await tasks.addAssignee(userId, task.id, 'agent', agentId);
-                    return { taskId: task.id };
-                },
-                async appendInboundEmailToTask({
-                    taskId,
-                    agentId,
-                    userId,
-                    emailMessageId,
-                    subject,
-                    bodyText,
-                    from,
-                    attachments,
-                }) {
-                    const agent = await agents.findByIdAndUser(agentId, userId);
-                    if (!agent?.slug) return null;
-                    // Posted as the address owner (whose mailbox received it);
-                    // only the receiving agent's mention is live.
-                    await chat.post(
+                inbox?: InboxProducer | null,
+            ): InboundEmailTaskSpawner => {
+                /** Best-effort Inbox notice for an email that did not wake the Agent. */
+                const noticeUntrusted = async (
+                    userId: string,
+                    input: { agentId: string; from: string; taskId: string; joined: boolean },
+                ): Promise<void> => {
+                    if (!inbox) return;
+                    try {
+                        await inbox.notice(userId, {
+                            title: input.joined
+                                ? 'A reply from an untrusted sender is waiting for you'
+                                : 'An email from an untrusted sender is waiting for you',
+                            body:
+                                `An email from ${String(input.from).slice(0, 200)} ` +
+                                (input.joined
+                                    ? 'was added to the Task as external mail'
+                                    : 'was filed as a Task') +
+                                ', but the agent was NOT started, because the sender is not on the ' +
+                                'trusted list (INBOUND_EMAIL_TRUSTED_SENDERS). Review it and mention ' +
+                                'or start the agent if you want it handled.',
+                            agentId: input.agentId,
+                            taskId: input.taskId,
+                        });
+                    } catch {
+                        // The Task / chat post already exists; the notice is extra.
+                    }
+                };
+                return {
+                    async spawnTaskForInboundEmail({
+                        agentId,
                         userId,
-                        {
-                            taskId,
-                            authorType: 'user',
-                            authorId: userId,
-                            body: formatInboundEmailChatPost({
-                                agentSlug: agent.slug,
-                                emailMessageId,
+                        emailMessageId,
+                        subject,
+                        bodyText,
+                        from,
+                        tenantId,
+                        organizationId,
+                        attachments,
+                        senderTrusted,
+                    }) {
+                        // Prompt-injection hardening: the title and description are
+                        // part of the receiving Agent's prompt, and every byte of them
+                        // is the sender's. Both are defused, and the body is fenced as
+                        // untrusted data exactly like a reply joined onto a Task.
+                        const title = inboundEmailTaskTitle(subject, from);
+                        // The attachment list (sender-written names) is fenced
+                        // inside the same untrusted section.
+                        const body = formatInboundEmailTaskDescription({
+                            emailMessageId,
+                            from,
+                            subject: subject ?? '',
+                            bodyText: bodyText ?? '',
+                            attachments,
+                        });
+                        // EW-P4-3 — a public webhook has no request scope, so the
+                        // Task is placed explicitly: where its assignee, the
+                        // receiving Agent, lives. Not the address's scope: an
+                        // address may be bound to an Agent of another scope (a
+                        // personal Agent on an org address), and `addAssignee`
+                        // then could not reach the Agent from the Task (review on
+                        // #2612). The address's tenant / organization (`tenantId`
+                        // / `organizationId`) is still stamped on the email row.
+                        // An Agent that cannot be resolved keeps the old,
+                        // unscoped create.
+                        void tenantId;
+                        void organizationId;
+                        const agent = await agents
+                            .findByIdAndUser(agentId, userId)
+                            .catch(() => null);
+                        const scope =
+                            agent && (agent.tenantId || agent.organizationId)
+                                ? {
+                                      tenantId: agent.tenantId ?? null,
+                                      organizationId: agent.organizationId ?? null,
+                                  }
+                                : undefined;
+                        // Prompt-injection hardening — one trusted-sender rule for new
+                        // emails and replies: an untrusted sender's Task waits for the
+                        // owner (labelled, said in its description, Inbox notice).
+                        const trusted =
+                            senderTrusted === true || inboundEmailReplyAutoDispatchEnabled();
+                        const data = {
+                            title,
+                            // EW-P4-3 — the message id the agent replies in thread
+                            // with (the attachments are listed inside the fence).
+                            description:
+                                `${body}${inboundEmailReplyHint(emailMessageId)}${trusted ? '' : inboundEmailAwaitingOwnerNote()}`.trim(),
+                            labels: trusted
+                                ? ['inbound-email']
+                                : ['inbound-email', AWAITING_OWNER_LABEL],
+                            createdByType: 'agent' as const,
+                            createdById: agentId,
+                        };
+                        const task = scope
+                            ? await tasks.create(userId, data, scope)
+                            : await tasks.create(userId, data);
+                        // Assign the receiving agent. This alone starts no run
+                        // (runs start on `→ in_progress` or Run); for an
+                        // untrusted sender the `awaiting-owner` label keeps
+                        // agents and the fan-out off it until a person starts it.
+                        await tasks.addAssignee(userId, task.id, 'agent', agentId);
+                        if (!trusted) {
+                            await noticeUntrusted(userId, {
+                                agentId,
                                 from,
-                                subject,
-                                bodyText,
-                                attachments,
-                            }),
-                        },
-                        { ownedAgentSlugs: new Map([[agent.slug, agent.id]]) },
-                    );
-                    return { taskId };
-                },
-            }),
+                                taskId: task.id,
+                                joined: false,
+                            });
+                        }
+                        return { taskId: task.id };
+                    },
+                    async appendInboundEmailToTask({
+                        taskId,
+                        agentId,
+                        userId,
+                        emailMessageId,
+                        subject,
+                        bodyText,
+                        from,
+                        attachments,
+                        senderTrusted,
+                    }) {
+                        const agent = await agents.findByIdAndUser(agentId, userId);
+                        if (!agent?.slug) return null;
+                        // Prompt-injection hardening: filed on the Task as clearly
+                        // EXTERNAL mail with NO live mention, so an outside sender can
+                        // never start or steer one of the owner's Agents by replying;
+                        // a person mentions the Agent to have it act. The operator
+                        // switch restores the old auto-pickup (the dispatcher still
+                        // only joins a thread the sender participates in).
+                        // Prompt-injection hardening — a trusted sender's reply wakes the
+                        // agent as it always did; anyone else's is filed as external mail
+                        // and the owner is told. The operator switch wakes it for all.
+                        const liveMention =
+                            senderTrusted === true || inboundEmailReplyAutoDispatchEnabled();
+                        await chat.post(
+                            userId,
+                            {
+                                taskId,
+                                authorType: 'user',
+                                authorId: userId,
+                                body: formatInboundEmailChatPost({
+                                    agentSlug: agent.slug,
+                                    liveMention,
+                                    emailMessageId,
+                                    from,
+                                    subject,
+                                    bodyText,
+                                    attachments,
+                                }),
+                            },
+                            liveMention
+                                ? { ownedAgentSlugs: new Map([[agent.slug, agent.id]]) }
+                                : {},
+                        );
+                        if (!liveMention) {
+                            await noticeUntrusted(userId, { agentId, from, taskId, joined: true });
+                        }
+                        return { taskId };
+                    },
+                };
+            },
         },
         // EW-P4-3 — INBOUND_EMAIL_ATTACHMENT_STORE binding: inbound email
         // attachments go through the SAME upload pipeline as any file a user
@@ -1328,6 +1429,19 @@ async function assertRealWriteTarget(
                             path: normalizeRepoPath('commitToRepo', f?.path),
                             body: f.body,
                         }));
+                        // Prompt-injection hardening — for EVERY Work kind (not only
+                        // App Works, whose change gate below already refuses
+                        // workflows): an Agent never writes a GitHub workflow or
+                        // composite action. For a non-App Work this push goes out on
+                        // the owner's token, whose `workflow` scope exists exactly so
+                        // it can change these files. Refused before anything is
+                        // cloned, written or pushed.
+                        assertNoAlwaysProtectedPaths(
+                            'commitToRepo',
+                            writes.map((w) => w.path),
+                            'Nothing was written, committed or pushed.',
+                            workId,
+                        );
                         const namedTarget = requestedBranch || base;
                         if (namedTarget) {
                             assertNotProtectedBranch(
@@ -1562,6 +1676,67 @@ async function assertRealWriteTarget(
                         });
                     },
                     async openPullRequest(input) {
+                        /**
+                         * Refuse a pull request whose diff touches an always-protected
+                         * path (`agent-git-protected-paths.ts`). A diff too large to read
+                         * whole is refused too — the protected file could be in the part
+                         * the provider dropped. A provider with no compare capability is
+                         * let through with a warning: the write-time floor in
+                         * `commitToRepo` still holds for everything an Agent pushes.
+                         */
+                        const assertPullRequestTouchesNoWorkflows = async (
+                            prTarget: { owner: string; repo: string },
+                            prBase: string,
+                            prHead: string,
+                            options: { providerId: string; userId: string; workId: string },
+                        ): Promise<void> => {
+                            // The operator lifted the floor for this Work.
+                            if (workflowChangesAllowedForWork(options.workId)) return;
+                            if (typeof git.getCompareDiff !== 'function') {
+                                agentGitToolsLogger.warn(
+                                    `openPullRequest: no compare capability for ${prTarget.owner}/${prTarget.repo}; ` +
+                                        'the workflow-path check relies on the commit-time floor.',
+                                );
+                                return;
+                            }
+                            let diff: Awaited<ReturnType<typeof git.getCompareDiff>>;
+                            try {
+                                diff = await git.getCompareDiff(
+                                    prTarget.owner,
+                                    prTarget.repo,
+                                    prBase,
+                                    prHead,
+                                    { maxFiles: 300 },
+                                    options as any,
+                                );
+                            } catch (err) {
+                                // Matched by `name` (the facade exception filter's own
+                                // posture): the class is not on the facades barrel.
+                                if ((err as Error)?.name === 'GitOperationNotSupportedError') {
+                                    agentGitToolsLogger.warn(
+                                        `openPullRequest: ${prTarget.owner}/${prTarget.repo} cannot be compared ` +
+                                            `(${(err as Error).message}); the workflow-path check relies on the commit-time floor.`,
+                                    );
+                                    return;
+                                }
+                                throw new Error(
+                                    `openPullRequest: the changes between '${prBase}' and '${prHead}' could not ` +
+                                        `be read, so they were not checked for workflow files ` +
+                                        `(${(err as Error)?.message ?? err}). The pull request was not opened.`,
+                                );
+                            }
+                            if (diff.truncated) {
+                                throw new Error(
+                                    `openPullRequest: the diff between '${prBase}' and '${prHead}' is too large ` +
+                                        `to check for workflow files. The pull request was not opened.`,
+                                );
+                            }
+                            assertNoAlwaysProtectedPaths(
+                                'openPullRequest',
+                                diff.files.flatMap((file) => [file.path, file.previousPath]),
+                                'The pull request was not opened.',
+                            );
+                        };
                         const { userId, workId, title, body, draft } = input;
                         void input.agentId;
                         // APW-08 P0 — the pull request names a REAL target. It used to
@@ -1660,6 +1835,16 @@ async function assertRealWriteTarget(
                                     `${target.owner}/${target.repo}. Push the branch before opening a pull request.`,
                             );
                         }
+                        // Prompt-injection hardening — for EVERY Work kind: a pull
+                        // request that changes a GitHub workflow or composite action
+                        // is not opened by an Agent (opening one already RUNS the
+                        // repository's `pull_request` workflows from the head). Read
+                        // from the provider's own diff of the VERIFIED head.
+                        await assertPullRequestTouchesNoWorkflows(target, base, head, {
+                            providerId,
+                            userId,
+                            workId,
+                        });
                         // APW-08 T17 — an App Work's pull request is judged by the
                         // same gate as the finalize paths, on the provider's own
                         // diff of the VERIFIED head.
@@ -1920,6 +2105,10 @@ async function assertRealWriteTarget(
                 // LAST for the same positional reason, and optional: unbound, the two
                 // tools are simply not offered.
                 { token: AppChangeRequestService, optional: true },
+                // Prompt-injection hardening — the owner-approval seam behind
+                // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
+                // optional: unbound, both tools refuse instead of acting.
+                { token: AgentApprovalsService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -1942,6 +2131,7 @@ async function assertRealWriteTarget(
                 inboxService: InboxService,
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
+                approvals?: AgentApprovalsService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2043,6 +2233,53 @@ async function assertRealWriteTarget(
                 // `askHuman` is carried, so the reply router and list
                 // surface are unreachable from the model.
                 inbox: { service: inboxService },
+                // Prompt-injection hardening — an Agent never resolves one of the
+                // owner's escalations, nor rewrites its own trusted identity files,
+                // by itself: both tools file a PENDING proposal here that only a
+                // person can approve (`humanDecisionRequired`: guardrails may block,
+                // never approve). The approved action is applied by the agent-side
+                // `AgentProposalExecutionListener`.
+                ...(approvals
+                    ? {
+                          proposals: {
+                              async propose(userId, input) {
+                                  const subjectKey = input.subjectKey ?? null;
+                                  try {
+                                      const proposal = await approvals.createProposal(userId, {
+                                          agentId: input.agentId,
+                                          actionType: 'other',
+                                          title: input.title,
+                                          runId: input.runId ?? null,
+                                          payload: input.payload,
+                                          humanDecisionRequired: true,
+                                          ...(subjectKey ? { subjectKey } : {}),
+                                      });
+                                      return { id: proposal.id, status: proposal.status };
+                                  } catch (error) {
+                                      // The (actionType, subjectKey) unique index refused a
+                                      // second proposal about the same subject: hand back the
+                                      // one already waiting, or say how it was decided. Any
+                                      // other failure (no such agent, an empty title, the
+                                      // database) keeps its own error — looked up directly by
+                                      // subject, in any status, so no queue page can miss it.
+                                      if (!subjectKey) throw error;
+                                      const existing = await approvals
+                                          .findBySubjectKey(userId, 'other', subjectKey)
+                                          .catch(() => null);
+                                      if (!existing) throw error;
+                                      if (existing.status === 'pending') {
+                                          return { id: existing.id, status: existing.status };
+                                      }
+                                      throw new Error(
+                                          existing.decidedVia === 'guardrail'
+                                              ? `A request about this was ${existing.status} by the agent's guardrails (proposal ${existing.id}); it cannot be proposed again.`
+                                              : `A request about this was already ${existing.status} by the owner (proposal ${existing.id}); it cannot be proposed again.`,
+                                      );
+                                  }
+                              },
+                          },
+                      }
+                    : {}),
                 // APW-08 T26 — the chat half of the evolve loop. The Work id comes from
                 // the MODEL, so it is owner-checked (edit for the write, view for the
                 // read) and kind-checked before the service sees it; a foreign or

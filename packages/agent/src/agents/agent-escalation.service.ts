@@ -13,6 +13,40 @@ import { EscalationConfidenceService } from './escalation-confidence';
 import type { OwnershipScope } from '../database/ownership-scope';
 
 /**
+ * How an escalation is being resolved. Absent = a person resolved it through
+ * one of the human doors (endpoint, Task page, Inbox reply) — the behaviour
+ * every existing caller keeps.
+ */
+export interface ResolveEscalationOptions {
+    /**
+     * `'agent'` when the resolution was proposed by an Agent through the
+     * `resolve_escalation` chat tool (and approved by the owner). Such a
+     * resolution closes the escalation but never steers or resumes the run
+     * that was waiting on it: the note is model-written, and the run would
+     * otherwise receive it as the owner's answer.
+     */
+    resolvedBy?: 'human' | 'agent';
+    /** The Agent that proposed the resolution, recorded in the stored note. */
+    agentId?: string | null;
+}
+
+/** Most characters of an agent-proposed note kept on the escalation row. */
+const AGENT_RESOLUTION_NOTE_MAX = 2_000;
+
+/**
+ * The note stored for an agent-proposed resolution: prefixed with who wrote
+ * it, so neither the queue nor a later reader mistakes it for the owner's
+ * own decision.
+ */
+export function agentResolutionNote(note: string | null, agentId: string | null): string {
+    const author = agentId ? `agent ${agentId}` : 'an agent';
+    const body = (note ?? '').trim().slice(0, AGENT_RESOLUTION_NOTE_MAX);
+    return body
+        ? `[Resolved on a proposal by ${author}; approved by the owner] ${body}`
+        : `[Resolved on a proposal by ${author}; approved by the owner]`;
+}
+
+/**
  * Judgment layer G3 — the ONE place an agent's give-up becomes a record.
  *
  * Four producers call this today, one per way an agent can stop without
@@ -133,9 +167,23 @@ export class AgentEscalationService {
      * so a double-click resolves once and a foreign id is indistinguishable
      * from a missing one.
      */
-    async resolve(id: string, userId: string, note?: string | null): Promise<boolean> {
-        const resolved = await this.repository.resolve(id, userId, note ?? null);
-        if (resolved) await this.closeInboxMirror(id, userId, note ?? null);
+    async resolve(
+        id: string,
+        userId: string,
+        note?: string | null,
+        options: ResolveEscalationOptions = {},
+    ): Promise<boolean> {
+        const agentAuthored = options.resolvedBy === 'agent';
+        // Who wrote the resolution is recorded on the escalation itself: an
+        // agent-proposed resolution is stored with a prefix that names the
+        // agent, so the queue never presents a model's words as the owner's.
+        const stored = agentAuthored
+            ? agentResolutionNote(note ?? null, options.agentId ?? null)
+            : (note ?? null);
+        const resolved = await this.repository.resolve(id, userId, stored);
+        if (resolved) {
+            await this.closeInboxMirror(id, userId, stored, agentAuthored ? 'agent' : 'human');
+        }
         return resolved;
     }
 
@@ -169,10 +217,18 @@ export class AgentEscalationService {
         escalationId: string,
         resolvedByUserId: string,
         note: string | null,
+        resolvedBy: 'human' | 'agent' = 'human',
     ): Promise<void> {
         if (!this.inbox?.escalationResolved) return;
         try {
-            await this.inbox.escalationResolved({ escalationId, resolvedByUserId, note });
+            await this.inbox.escalationResolved({
+                escalationId,
+                resolvedByUserId,
+                note,
+                // Only a person's resolution resumes the parked run (see
+                // `InboxEscalationResolvedInput.resolvedBy`).
+                ...(resolvedBy === 'agent' ? { resolvedBy: 'agent' as const } : {}),
+            });
         } catch (error) {
             this.logger.warn(
                 `Escalation ${escalationId} inbox close failed: ${

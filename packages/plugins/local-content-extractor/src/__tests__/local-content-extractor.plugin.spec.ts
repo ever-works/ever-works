@@ -244,3 +244,57 @@ describe('LocalContentExtractorPlugin', () => {
 		});
 	});
 });
+
+describe('SSRF: every connection resolves through the guarded, pinned lookup (review of #2769)', () => {
+	it('passes agents whose lookup is the guard on the request (applies to every redirect hop)', async () => {
+		const { guardedLookup } = await import('../local-content-extractor.plugin.js');
+		axiosGetMock.mockResolvedValueOnce(okHtmlResponse(articleHtml));
+		await new LocalContentExtractorPlugin().extract({ url: 'https://example.com/a' } as ContentExtractionOptions);
+		const config = axiosGetMock.mock.calls.at(-1)![1] as Record<string, any>;
+		expect(config.httpAgent.options.lookup).toBe(guardedLookup);
+		expect(config.httpsAgent.options.lookup).toBe(guardedLookup);
+	});
+
+	// CodeRabbit on #2769: through an environment proxy the guarded lookup would
+	// resolve the proxy's host and the proxy the target — outside the guard.
+	it('never goes through an environment proxy (HTTP_PROXY / HTTPS_PROXY)', async () => {
+		axiosGetMock.mockResolvedValueOnce(okHtmlResponse(articleHtml));
+		await new LocalContentExtractorPlugin().extract({ url: 'https://example.com/a' } as ContentExtractionOptions);
+		const config = axiosGetMock.mock.calls.at(-1)![1] as Record<string, any>;
+		expect(config.proxy).toBe(false);
+	});
+
+	it('refuses a name that resolves to a private, metadata or IPv4-mapped address', async () => {
+		const dns = await import('node:dns');
+		const { guardedLookup } = await import('../local-content-extractor.plugin.js');
+		for (const address of [
+			{ address: '169.254.169.254', family: 4 },
+			{ address: '10.0.0.7', family: 4 },
+			{ address: '::ffff:a9fe:a9fe', family: 6 }
+		]) {
+			const spy = vi
+				.spyOn(dns.default, 'lookup')
+				.mockImplementation(((_h: string, _o: unknown, cb: (...a: unknown[]) => void) =>
+					cb(null, [{ address: '93.184.216.34', family: 4 }, address])) as never);
+			const result = await new Promise<{ error: NodeJS.ErrnoException | null; address: unknown }>((resolve) =>
+				guardedLookup('rebind.example.com', {}, (error, resolved) => resolve({ error, address: resolved }))
+			);
+			expect(result.error?.message).toMatch(/SSRF guard/);
+			spy.mockRestore();
+		}
+	});
+
+	it('hands back exactly the checked address for a public name', async () => {
+		const dns = await import('node:dns');
+		const { guardedLookup } = await import('../local-content-extractor.plugin.js');
+		const spy = vi
+			.spyOn(dns.default, 'lookup')
+			.mockImplementation(((_h: string, _o: unknown, cb: (...a: unknown[]) => void) =>
+				cb(null, [{ address: '93.184.216.34', family: 4 }])) as never);
+		const result = await new Promise<{ error: unknown; address: unknown; family: unknown }>((resolve) =>
+			guardedLookup('example.com', {}, (error, address, family) => resolve({ error, address, family }))
+		);
+		expect(result).toEqual({ error: null, address: '93.184.216.34', family: 4 });
+		spy.mockRestore();
+	});
+});

@@ -607,6 +607,30 @@ export class FleetNodeSelfDescriptionDto {
     maxMemoryMb?: number | null;
 
     /**
+     * Computer health (FL-03) — this beat's health snapshot (CONTRACTS §4.5).
+     *
+     * Deliberately only `@IsObject()`, for the reason `workerState` is not an
+     * `@IsIn`: under `whitelist + forbidNonWhitelisted` a value this build
+     * rejects fails the WHOLE beat, and a failed beat is a node swept offline.
+     * A nested object is not whitelisted field by field (no `@ValidateNested`),
+     * so a newer node's extra fact never 400s; `FleetService` runs
+     * `sanitizeFleetNodeHealthSnapshot`, which keeps only known fields within
+     * their bounds and DROPS the rest — a broken reading costs that one figure,
+     * never the machine's liveness. Sent on the heartbeat only, in the node's
+     * newest optional tier, so a platform older than this field costs the node
+     * exactly this field.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        description:
+            'Health snapshot: cpuPercent, memPercent, memTotalMiB, memUsedMiB, diskPercent, diskFreeMiB, diskTotalMiB, loadAvg1, cpuCores, uptimeSec, gpu (list or null), pendingReboot, failedServices — each optional. Unknown or out-of-range values are dropped, never rejected.',
+    })
+    @IsOptional()
+    @IsObject()
+    health?: Record<string, unknown>;
+
+    /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — the consents the node was
      * started with: `{ work, attend, manage, usageScan }`.
      *

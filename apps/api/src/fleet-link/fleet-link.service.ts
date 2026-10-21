@@ -5,16 +5,15 @@ import {
     isFleetLinkFamily,
     isFleetLinkVerb,
     type FleetLinkFamily,
+    type FleetLinkReply,
     type FleetNodeLinkView,
     type FleetOperationView,
 } from '@ever-works/contracts';
+import type { FleetLinkChannel } from './fleet-link-channel';
+import { FleetLinkRemote } from './fleet-link-remote.service';
 import { FleetLinkAuthorizer } from './fleet-link.authorizer';
 import { describeAgo, FleetLinkException, fleetLinkError } from './fleet-link.errors';
-import {
-    FleetLinkRegistry,
-    type FleetLinkChannelEvents,
-    type FleetLinkChannelHandle,
-} from './fleet-link.registry';
+import { FleetLinkRegistry, type FleetLinkChannelEvents } from './fleet-link.registry';
 import {
     describeFleetLinkCaller,
     fleetLinkCallerUserId,
@@ -36,7 +35,9 @@ import { FleetOperationsService } from './fleet-operations.service';
  *  2. authorise — existence, kill switch, consent, family audience — before
  *     the node is contacted (`FleetLinkAuthorizer`);
  *  3. answer `unreachable`, naming when the computer was last seen, when it
- *     has no link (nothing is queued — CONTRACTS R-11);
+ *     has no link on any API replica (nothing is queued — CONTRACTS R-11);
+ *     a link another replica holds is reached through the relay bus
+ *     (`FleetLinkRemote`), the caller none the wiser;
  *  4. carry the node's own refusal back as the same typed error.
  *
  * Every refusal is a {@link FleetLinkException}: its HTTP body is the shared
@@ -73,7 +74,8 @@ export interface FleetLinkOpenChannelInput {
     events?: FleetLinkChannelEvents;
 }
 
-function nodeFacts(node: FleetNode): FleetLinkNodeFacts {
+/** The node facts the authoriser and the audience read, off a row. */
+export function nodeFacts(node: FleetNode): FleetLinkNodeFacts {
     return {
         id: node.id,
         userId: node.userId,
@@ -99,6 +101,9 @@ export class FleetLinkService {
         private readonly operations: FleetOperationsService,
         private readonly nodes: FleetNodeRepository,
         @Optional() private readonly audit?: FleetAuditService,
+        // The relay bus (FL-02 P1b): a link another API replica holds.
+        // Appended LAST + @Optional(): unbound, only this process's links count.
+        @Optional() private readonly remote?: FleetLinkRemote,
     ) {}
 
     /** One request/reply on the node's `machine` channel. */
@@ -115,13 +120,7 @@ export class FleetLinkService {
             requirement: input.requirement,
         });
         this.requireLink(facts);
-        const channel = await this.registry.machineChannel(
-            node.id,
-            describeFleetLinkCaller(input.caller),
-        );
-        const reply = await channel.request(input.verb, input.params ?? {}, {
-            timeoutMs: input.timeoutMs,
-        });
+        const reply = await this.dispatchRequest(node.id, input);
         if ('error' in reply) throw new FleetLinkException(reply.error);
         if ('operationId' in reply) {
             const operation = this.operations.track({
@@ -137,8 +136,8 @@ export class FleetLinkService {
         return { result: reply.result as T };
     }
 
-    /** A channel of `family` on the node's link, opened for this caller. */
-    async openChannel(input: FleetLinkOpenChannelInput): Promise<FleetLinkChannelHandle> {
+    /** A channel of `family` on the node's link, opened for this caller, on whichever replica holds it. */
+    async openChannel(input: FleetLinkOpenChannelInput): Promise<FleetLinkChannel> {
         if (!isFleetLinkFamily(input.family))
             throw fleetLinkError('invalid', 'family', { family: input.family });
         const node = await this.prepare(input.nodeId);
@@ -152,14 +151,17 @@ export class FleetLinkService {
         this.requireLink(facts);
         const requestedBy = describeFleetLinkCaller(input.caller);
         try {
-            const handle = await this.registry.openChannel({
+            const open = {
                 nodeId: node.id,
                 family: input.family,
                 params: input.params ?? {},
                 requirement,
                 requestedBy,
                 events: input.events,
-            });
+            };
+            const handle: FleetLinkChannel = this.registry.isConnected(node.id)
+                ? await this.registry.openChannel(open)
+                : await this.requireRemote().openChannel(open);
             if (requirement.stateChanging)
                 await this.auditOpen(node, input, requirement, requestedBy, 'opened');
             return handle;
@@ -171,13 +173,41 @@ export class FleetLinkService {
         }
     }
 
-    /** The link as the platform's own socket sees it, for a node view. */
+    /** The link as the platform's socket sees it — this replica's, else the one holding it — for a node view. */
     linkView(node: { id: string; kind: string }): FleetNodeLinkView {
-        return this.registry.linkView(node, config.fleet.isNodeLinkEnabled());
+        const enabled = config.fleet.isNodeLinkEnabled();
+        const local = this.registry.linkView(node, enabled);
+        if (local.state === 'connected' || !enabled) return local;
+        return this.remote?.linkView(node.id) ?? local;
     }
 
+    /** True when this replica, or another, holds the node's link. */
     isConnected(nodeId: string): boolean {
-        return this.registry.isConnected(nodeId);
+        return this.registry.isConnected(nodeId) || this.remote?.isHeldElsewhere(nodeId) === true;
+    }
+
+    /** One `machine` request, on this replica's link or through the holder of the node's link. */
+    private async dispatchRequest(
+        nodeId: string,
+        input: FleetLinkRequestInput,
+    ): Promise<FleetLinkReply> {
+        const requestedBy = describeFleetLinkCaller(input.caller);
+        if (this.registry.isConnected(nodeId)) {
+            const channel = await this.registry.machineChannel(nodeId, requestedBy);
+            return channel.request(input.verb, input.params ?? {}, { timeoutMs: input.timeoutMs });
+        }
+        return this.requireRemote().request({
+            nodeId,
+            verb: input.verb,
+            params: input.params ?? {},
+            requestedBy,
+            timeoutMs: input.timeoutMs,
+        });
+    }
+
+    private requireRemote(): FleetLinkRemote {
+        if (!this.remote) throw fleetLinkError('unreachable', 'the computer is not connected');
+        return this.remote;
     }
 
     private async prepare(nodeId: string): Promise<FleetNode> {
@@ -193,7 +223,7 @@ export class FleetLinkService {
     }
 
     private requireLink(node: FleetLinkNodeFacts): void {
-        if (this.registry.isConnected(node.id)) return;
+        if (this.isConnected(node.id)) return;
         const ago = describeAgo(node.lastHeartbeatAt);
         throw fleetLinkError(
             'unreachable',

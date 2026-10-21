@@ -3,6 +3,7 @@ import {
     Controller,
     HttpException,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Post,
@@ -15,9 +16,12 @@ import {
     type AppDeployRequestResult,
 } from '@ever-works/agent/app-runtime';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { AppDependenciesService } from '@ever-works/agent/app-dependencies';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { AppDeployRequestDto, AppDeployResponseDto } from './dto/app-deploy.dto';
+import { recordAppDependencyActivity } from './app-dependency-activity';
 
 /**
  * APW-06 §2.2 — `POST /api/works/:id/deploy`, the App Work deploy request.
@@ -73,6 +77,19 @@ import { AppDeployRequestDto, AppDeployResponseDto } from './dto/app-deploy.dto'
  * cluster credential belongs to the Work. So the Deployment records who actually
  * pressed the button, which is what FR-23's `manual` trigger and the Activity
  * row are for.
+ *
+ * ## Pressing Deploy retries a transiently failed dependency (lane aw-deps-api)
+ *
+ * A dependency that spent FR-43's three attempts on `clusterUnreachable` or
+ * `deadlineExceeded` reads `failed`, and nothing re-dispatches it — so every
+ * Deploy was refused over a cause that may long since have gone (prod
+ * 2026-10-18: a worker built without a plugin registry). An explicit Deploy is
+ * the owner's consent to try again, so before the request is evaluated
+ * {@link AppDependenciesService.retryTransientFailures} moves exactly those rows
+ * back to `pending` and dispatches them (definite failures are left alone). The
+ * request itself is unchanged: until the dependency is `ready` its preconditions
+ * still answer `422` naming it, and the Dependencies card shows it provisioning.
+ * The retry can never fail the request — it is best-effort and `@Optional()`.
  */
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
@@ -82,6 +99,10 @@ export class WorkAppDeployController {
     constructor(
         private readonly ownership: WorkOwnershipService,
         private readonly deployRequest: AppDeployRequestService,
+        // Lane aw-deps-api — see "Pressing Deploy retries …" above. Both optional, so a lean
+        // graph (and this file's spec) builds the controller with the two it always had.
+        @Optional() private readonly dependencies?: AppDependenciesService,
+        @Optional() private readonly activity?: ActivityLogService,
     ) {}
 
     /**
@@ -137,6 +158,7 @@ export class WorkAppDeployController {
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<AppDeployResponseDto> {
         await this.authorize(id, auth.userId);
+        await this.retryTransientDependencies(id, auth.userId);
 
         const result: AppDeployRequestResult = await this.deployRequest.request({
             workId: id,
@@ -172,6 +194,29 @@ export class WorkAppDeployController {
                 message: String(entry?.message ?? ''),
             })),
         };
+    }
+
+    /**
+     * Retry the dependencies that failed for a transient reason — the owner pressing Deploy is the
+     * consent (class docstring). Best-effort: whatever happens here, the request goes on.
+     */
+    private async retryTransientDependencies(workId: string, userId: string): Promise<void> {
+        if (!this.dependencies?.retryTransientFailures) return;
+        try {
+            const { retried } = await this.dependencies.retryTransientFailures(workId);
+            if (retried.length === 0) return;
+            recordAppDependencyActivity(this.activity, {
+                userId,
+                workId,
+                action: 'app.dependency.retried',
+                summary: `Deploy requested: retrying ${retried.join(', ')} after a transient failure`,
+                kinds: retried,
+                details: { trigger: 'deploy' },
+            });
+        } catch {
+            // `retryTransientFailures` does not throw; a double or a future change that does must
+            // still never turn a Deploy request into a 500.
+        }
     }
 
     /**

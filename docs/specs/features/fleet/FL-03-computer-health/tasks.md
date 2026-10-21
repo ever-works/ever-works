@@ -6,7 +6,7 @@
 
 **Epic ID:** `FL-03-computer-health`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `Draft`
+**Status:** `In progress` — P1 in PR 1 (`feat/fl-03-computer-health-p1`)
 **Last updated:** 2026-10-18
 
 ---
@@ -34,7 +34,8 @@
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-node-health.spec.ts` — state truth table
       incl. agreement with `runnerRowState` (`apps/web/src/components/dashboard/runner-status.shared.ts:24-33`
       logic mirrored), `diskLowSeverity` boundaries, bounds.
-- [ ] **T-02**. Create `apps/node/src/core/health-probe.ts` (`probeHealth`, per-fact sub-probes with a
+      **Status (FL-03 PR 1)**: P1 half ✓ (snapshot, stored view, states — with the offline window, `offlineAfterMs` — disk rule, bounds, `health` on the self-description and view, `hasFleetNodeHealthReading`, `FLEET_CLEAR_MODEL_THROTTLE_COMMAND`; items use FL-01's §4.6 shape; the `runnerRowState` agreement test lives in `apps/web` and imports the real function). `macAddress`/`lanId`/`canWake`/`lastWakeAttemptAt` on the wire and `node.wake` land with T-19 … T-20.
+- [x] **T-02**. Create `apps/node/src/core/health-probe.ts` (`probeHealth`, per-fact sub-probes with a
       2 s budget; reuses `createResourceProbe` from `apps/node/src/node-io.ts:310` and the disk probe in
       `apps/node/src/core/telemetry-probe.ts`); extend `apps/node/src/core/gpu-probe.ts` with
       utilisation/memory queries; export from `apps/node/src/core/index.ts`.
@@ -46,15 +47,16 @@
       **Test**: extend `apps/node/src/core/heartbeat.spec.ts` (sent; dropped first on 400);
       `apps/api/src/fleet/__tests__/node-contract.conformance.spec.ts` fixture
       `packages/contracts/fixtures/fleet-node-contract.v1.json` updated.
+      **Status (FL-03 PR 1)**: P1 half ✓ (`health` in its own newest tier, enrolment never sends it). `macAddress`/`lanId` join a newer tier with T-19 … T-20.
 
 ## P1.B — Platform: store, derive, produce
 
-- [ ] **T-04**. Entity columns in `packages/agent/src/entities/fleet-node.entity.ts` (`health`,
+- [x] **T-04**. Entity columns in `packages/agent/src/entities/fleet-node.entity.ts` (`health`,
       `macAddress`, `lanId`, `lastWakeAttemptAt`) and new
       `packages/agent/src/entities/fleet-node-health-sample.entity.ts`; register in
       `packages/agent/src/entities/index.ts` and `packages/agent/src/database/_entities-inventory.ts`.
       **Test**: `pnpm --filter @ever-works/agent build` clean.
-- [ ] **T-05**. Migrations from `apps/api/` (CONTRACTS §13 slots, both in P1):
+- [x] **T-05**. Migrations from `apps/api/` (CONTRACTS §13 slots, both in P1):
       `apps/api/src/migrations/1796030000000-CreateFleetNodeHealthSamples.ts` (table + indexes, the
       §4.5 columns with `resolution` `raw|hourly`) and `1796030100000-AddFleetNodeWakeFields.ts`
       (`health`, `macAddress`, `lanId`, `lastWakeAttemptAt`), guarded like `1795161700000-AddFleetModelUsageLimits.ts`.
@@ -65,17 +67,21 @@
       `FleetNodeView` mapping adds them (masked MAC for non-owners).
       **Test**: `packages/agent/src/fleet/__tests__/fleet.service.health.spec.ts`;
       `apps/api/src/fleet/dto/fleet-heartbeat-health.dto.spec.ts` (shape; out-of-range refused).
-- [ ] **T-07**. Producers in `packages/agent/src/fleet/needs-a-look/producers/`: `disk-low.producer.ts`,
+      **Status (FL-03 PR 1)**: P1 half ✓ (snapshot sanitised and stored with the receipt time; absent leaves it alone; `diskLowSince`/`sampledAt` markers; covered by `fleet.service.health.spec.ts` and the conformance fixture — out-of-range values are dropped by the sanitiser, never a 400). MAC/`lanId` storage and masking land with T-20.
+- [x] **T-07**. Producers in `packages/agent/src/fleet/needs-a-look/producers/`: `disk-low.producer.ts`,
       `node-throttled.producer.ts` (throttled + limited), `node-quarantined.producer.ts`,
       `consent-missing.producer.ts`, `helper-untrusted.producer.ts`; registered under FL-01's
       `NEEDS_A_LOOK_PRODUCERS` in `packages/agent/src/fleet/fleet.module.ts`.
       **Test**: `packages/agent/src/fleet/__tests__/needs-a-look.producers.spec.ts` — condition,
       severity, action, stable id per producer; `helper-untrusted` silent without `helperTrust`.
+      **Status (FL-03 PR 1)**: ✓ — bound through the `NEEDS_A_LOOK_PRODUCERS` token; the spec is
+      `needs-a-look.spec.ts` and also runs every item through FL-01's real registry and normaliser.
 - [ ] **T-08**. `apps/api/src/fleet/fleet-health.controller.ts` with `GET /nodes/:id/health`
       (`view` family via FL-01's `FleetAccessService`); add the `machines` family check to the existing
       `POST nodes/:id/clear-model-throttle` (`apps/api/src/fleet/fleet.controller.ts:451`).
       **Test**: `apps/api/src/fleet/fleet-health.controller.spec.ts` — shape, 404 for strangers;
       extend `fleet.controller.spec.ts` (`:136` block) for the family check.
+      **Status (FL-03 PR 1)**: P1 half ✓ (`GET /nodes/:id/health` through FL-01's `getVisibleForUser` — the `view` family — with the job count for the owner only; `fleet-health.controller.spec.ts`). The clear route keeps its owner-only check, which is the `machines` default audience; the family check on it lands with P2's `machines` acts (wake).
 
 ## P1.C — Web: cells, metric slot, sentences
 
@@ -83,30 +89,33 @@
       action); use it in FL-01's `ComputerHeader.tsx`, `ComputerCards.tsx`, `FleetComputersTable.tsx`
       (word beside dot, action button); card cells read `node.health`.
       **Test**: `computer-state.shared.unit.spec.ts`; extend `ComputerCards.unit.spec.tsx` ("—", stale).
-- [ ] **T-10**. `apps/web/src/components/fleet/health/overview/HealthMetrics.tsx` registered as the
+      **Status (FL-03 PR 1)**: P1 half ✓ (`computer-state.shared.ts`, `ComputerStateLine`, `HealthCells` for the cards). Wiring them into FL-01's `ComputerHeader` / `ComputerCards` / `FleetComputersTable` (on `develop` since FL-01 P1b) lands in PR 2.
+- [x] **T-10**. `apps/web/src/components/fleet/health/overview/HealthMetrics.tsx` registered as the
       Overview "metrics" block via `registerOverviewBlock` in `apps/web/src/components/fleet/registry.ts` (six cards, reboot line,
       footprint sentence, Refresh now button disabled with reason until P3).
       **Test**: `HealthMetrics.unit.spec.tsx` — loading, no snapshot, stale, offline, error, all cards.
-- [ ] **T-11**. Fix actions: Clear limit now → existing `clearModelThrottleAction`; quarantine and
+- [x] **T-11**. Fix actions: Clear limit now → existing `clearModelThrottleAction`; quarantine and
       consent commands via `fleet.fixCommands.*` (never `fleet.commands.*`, FL-12's namespace);
       `fleetAPI.health(id)` in `apps/web/src/lib/api/fleet.ts`.
       **Test**: `apps/web/src/components/fleet/health/FixAction.unit.spec.tsx` — each state's action.
-- [ ] **T-12**. i18n `fleet.health.*`, `fleet.states.*` (eleven), `fleet.needsALook.kinds.*`,
+- [x] **T-12**. i18n `fleet.health.*`, `fleet.states.*` (eleven), `fleet.needsALook.kinds.*`,
       `fleet.fixCommands.*` in `apps/web/messages/en.json`.
       **Test**: no dotted leaf; no literal string under `apps/web/src/components/fleet/health/**`.
-- [ ] **T-13**. Playwright `apps/web/e2e/flow-fleet-health.spec.ts` — cards with numbers from the
+      **Status (FL-03 PR 1)**: ✓ without `fleet.needsALook.kinds.*`: FL-01's §4.6 item carries no
+      message key, so items are English sentences (lane log decision 10, owner question 6).
+- [x] **T-13**. Playwright `apps/web/e2e/flow-fleet-health.spec.ts` — cards with numbers from the
       harness beat, "—" for an old node, state sentences, producers in the list, Clear limit now.
       **Test**: itself.
 
 ## P2 — History
 
-- [ ] **T-14**. `packages/agent/src/fleet/fleet-node-health.service.ts` (`record` behind
+- [x] **T-14**. `packages/agent/src/fleet/fleet-node-health.service.ts` (`record` behind
       `config.fleet.isHealthHistoryEnabled()` — add to `packages/agent/src/config/`; 55 s floor;
       fire-and-forget with one log per node per hour) called from `FleetService.heartbeat`; repository
       `fleet-node-health-sample.repository.ts` (`insertRaw`, `rollupHour`, `deleteBefore`, `series`).
       **Test**: `packages/agent/src/fleet/__tests__/fleet-node-health.service.spec.ts` — floor, flag off,
       failure not thrown; repository spec on sqlite.
-- [ ] **T-15**. `packages/tasks/src/tasks/trigger/fleet-health-rollup.task.ts` (cron `7 * * * *`;
+- [x] **T-15**. `packages/tasks/src/tasks/trigger/fleet-health-rollup.task.ts` (cron `7 * * * *`;
       `TriggerInternalModule`; one `hourly` row of means per node per hour — peaks wait on spec §8b;
       retention 7 d raw / 90 d hourly); register
       in `packages/tasks/src/tasks/trigger/index.ts` beside `fleet-job-lease-sweeper`.

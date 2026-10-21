@@ -33,10 +33,13 @@ import {
 	APP_ROLLOUT_RESTARTS_FAIL,
 	APP_ROLLOUT_STUCK_POD_S,
 	APP_WORKER_STABLE_S,
+	classifyJobPodFailure,
+	classifyJobPodFailures,
 	classifyPodFailure,
 	classifyPodFailures,
 	currentRolloutPods,
 	isComponentRolledOut,
+	podFailureAdvice,
 	requiresWorkerStability,
 	workerStable,
 	type AppPodFailure,
@@ -960,5 +963,142 @@ describe('T9 `**Done when**`: each `AppFailureCode` in plan §5.4 has a test', (
 			expect(union, entry.code).toContain(entry.build()?.code);
 		}
 		expect(union).not.toContain('image_runs_as_root');
+	});
+});
+
+// --- Job pods (prod `cal-e2e`, 2026-10-18) ----------------------------------
+
+describe('classifyJobPodFailure — a Job pod that can never start (plan §4.4, §4.8)', () => {
+	/** A Job's pod: owned by the Job, `restartPolicy: Never`, its one container waiting. */
+	const jobPod = (reason: string, message?: string, over: Json = {}): AppRolloutPod =>
+		stuckPod(
+			reason,
+			merge(
+				{
+					metadata: {
+						name: 'job-migrate-3f2b1c4d-x7k2p',
+						labels: { 'ever-works.io/job': 'migrate' },
+						ownerReferences: [{ apiVersion: 'batch/v1', kind: 'Job', name: 'job-migrate-3f2b1c4d' }]
+					}
+				},
+				over
+			),
+			message
+		);
+
+	it('reports the root-user kubelet message as `managed_root_forbidden` on first sight with `userMessageSeconds: 0`', () => {
+		const pods = [jobPod('CreateContainerConfigError', ROOT_MESSAGE)];
+
+		expect(
+			classifyJobPodFailure(pods, {
+				now: at(0),
+				podWaitingSince: { 'job-migrate-3f2b1c4d-x7k2p/web': at(0) },
+				userMessageSeconds: 0
+			})
+		).toMatchObject({
+			code: 'managed_root_forbidden',
+			signal: 'root_user',
+			reason: 'CreateContainerConfigError',
+			message: ROOT_MESSAGE,
+			seconds: 0
+		});
+		// Without the override the rollout's own 180 s window applies — the same classifier.
+		expect(classifyJobPodFailure(pods, { now: at(0), stuckSeconds: 179 })).toBeNull();
+		expect(classifyJobPodFailure(pods, { now: at(0), stuckSeconds: 180 })?.code).toBe('managed_root_forbidden');
+	});
+
+	it('reports the non-numeric-user message as `image_user_unverifiable`', () => {
+		expect(
+			classifyJobPodFailure([jobPod('CreateContainerConfigError', NON_NUMERIC_MESSAGE)], {
+				now: at(0),
+				stuckSeconds: 0,
+				userMessageSeconds: 0
+			})
+		).toMatchObject({ code: 'image_user_unverifiable', signal: 'non_numeric_user', message: NON_NUMERIC_MESSAGE });
+	});
+
+	it('keeps the 180 s window for a waiting reason, which can be transient', () => {
+		for (const [reason, code] of [
+			['ImagePullBackOff', 'image_pull'],
+			['ErrImagePull', 'image_pull'],
+			['InvalidImageName', 'image_pull'],
+			['CreateContainerConfigError', 'create_container_config']
+		] as const) {
+			const pods = [jobPod(reason)];
+			expect(
+				classifyJobPodFailure(pods, { now: at(0), stuckSeconds: 179, userMessageSeconds: 0 }),
+				reason
+			).toBeNull();
+			expect(
+				classifyJobPodFailure(pods, { now: at(0), stuckSeconds: 180, userMessageSeconds: 0 }),
+				reason
+			).toMatchObject({
+				code,
+				signal: 'stuck_waiting',
+				reason
+			});
+		}
+	});
+
+	it('leaves restarts and OOM kills to the Job’s own `backoffLimit`', () => {
+		const exited = jobPod('CrashLoopBackOff', undefined, {
+			status: {
+				containerStatuses: [
+					{
+						name: 'web',
+						restartCount: 5,
+						state: { waiting: { reason: 'CrashLoopBackOff' } },
+						lastState: { terminated: { reason: 'OOMKilled', exitCode: 137 } }
+					}
+				]
+			}
+		});
+		expect(classifyJobPodFailures([exited], { now: at(600), stuckSeconds: 600 })).toEqual([]);
+		// The rollout classifier does report them for a Deployment's pods.
+		expect(
+			classifyPodFailures(deployment(), [replicaSet()], [exited], opts({ component: web, stuckSeconds: 600 }))
+				.length
+		).toBeGreaterThan(0);
+	});
+
+	it('is empty for a running or a still-creating Job pod, and without `now`', () => {
+		expect(classifyJobPodFailures([pod()], { now: at(600) })).toEqual([]);
+		expect(classifyJobPodFailures([jobPod('ContainerCreating')], { now: at(600), stuckSeconds: 600 })).toEqual([]);
+		expect(
+			classifyJobPodFailures([jobPod('CreateContainerConfigError', ROOT_MESSAGE)], { userMessageSeconds: 0 })
+		).toEqual([]);
+	});
+
+	it('`userMessageSeconds` also shortens the window of the Deployment rollout, and defaults to the stuck window', () => {
+		const args: [AppRolloutDeployment, AppRolloutReplicaSet[], AppRolloutPod[]] = [
+			deployment(),
+			[replicaSet()],
+			[stuckPod('CreateContainerConfigError', {}, ROOT_MESSAGE)]
+		];
+		expect(classifyPodFailure(...args, opts({ component: web, stuckSeconds: 10 }))).toBeNull();
+		expect(
+			classifyPodFailure(...args, opts({ component: web, stuckSeconds: 10, userMessageSeconds: 0 }))?.code
+		).toBe('managed_root_forbidden');
+	});
+});
+
+describe('podFailureAdvice — what to change, for the codes the repository can fix', () => {
+	it('tells a root image how to become non-root', () => {
+		const advice = podFailureAdvice('managed_root_forbidden') ?? '';
+		expect(advice).toContain('runs as root');
+		expect(advice).toContain('USER');
+		expect(advice).toContain('components[].runAsUser');
+		expect(advice).toContain('works.yml');
+	});
+
+	it('tells a named USER to become a numeric one', () => {
+		const advice = podFailureAdvice('image_user_unverifiable') ?? '';
+		expect(advice).toContain('numeric');
+		expect(advice).toContain('components[].runAsUser');
+	});
+
+	it('names nothing for a code with no repository fix', () => {
+		expect(podFailureAdvice('rollout_timeout')).toBeNull();
+		expect(podFailureAdvice('crash_loop')).toBeNull();
 	});
 });

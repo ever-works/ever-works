@@ -119,7 +119,7 @@ A workable seed set for a marketing site:
 | `seo/keywords`      | `seo`      | Target keywords and structured-data patterns, matched per page type.       |
 | `legal/disclaimers` | `legal`    | Copied verbatim or omitted — never paraphrased.                            |
 
-Everything you write lands in the Work's data repository under `.content/kb/<class>/<slug>.md` plus a `.yml` sidecar, so every edit is a Git commit. The same documents are reachable over MCP — the registered tool set is `kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock` and `kb.unlock`, and searching is `kb.list` with its `q` argument rather than a tool of its own — and the CLI (`ever-works kb list|get|lock|unlock|upload …`) or `POST /api/works/:id/kb/uploads` for original files. There is no MCP upload tool; that path is CLI or REST only. See [Knowledge Base — MCP & CLI Reference](../kb/mcp-cli-reference.md) for the argument lists.
+Everything you write lands in the Work's data repository under `.content/kb/<class>/<slug>.md` plus a `.yml` sidecar, so every edit is a Git commit. The same documents are reachable over MCP — the registered tool set is `kb.list`, `kb.get`, `kb.create`, `kb.update` and `kb.lock` (unlocking is left to a person), and searching is `kb.list` with its `q` argument rather than a tool of its own — and the CLI (`ever-works kb list|get|lock|unlock|upload …`) or `POST /api/works/:id/kb/uploads` for original files. There is no MCP upload tool; that path is CLI or REST only. See [Knowledge Base — MCP & CLI Reference](../kb/mcp-cli-reference.md) for the argument lists.
 
 ## 4. Add pages
 

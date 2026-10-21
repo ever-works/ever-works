@@ -3,8 +3,7 @@ import type { ApiClientService } from '../../api-client/api-client.service.js';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * EW-643 Phase 3 slice 3 — shared helper for `kb.update` / `kb.lock` /
- * `kb.unlock`.
+ * EW-643 Phase 3 slice 3 — shared helper for `kb.update` / `kb.lock`.
  *
  * The mutating REST endpoints take a `:docId` UUID parameter (validated
  * with `ParseUUIDPipe`), while `GET .../:docIdOrPath` happily resolves

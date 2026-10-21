@@ -518,6 +518,42 @@ describe('app-lifecycle-ops — pause (APW-06 T70)', () => {
         expect(result.code).toBe('runtime_state_unavailable');
         expect(plugin.scaleApp).not.toHaveBeenCalled();
     });
+
+    it('rolls back the `paused` mark when the scale FAILS (not a throw) — prod 2026-10-20', async () => {
+        // `setPaused(true)` is optimistic; a scale-down that does not complete means the pods are
+        // still up, so the App must not be left reading `paused` while serving.
+        const plugin = pluginFake({
+            scaleApp: jest.fn(async () => ({
+                components: [],
+                smoke: null,
+                failure: { code: 'cluster_unreachable', message: 'HTTP-Code: 422 …' },
+            })),
+        });
+        const state = stateFake({});
+        const { service } = build({ plugin, state });
+
+        const result = await service.pause(op({ op: 'pause' }));
+
+        expect(result.state).toBe('failed');
+        expect(result.code).toBe('cluster_unreachable');
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, true, expect.any(Date));
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+    });
+
+    it('rolls back the `paused` mark when the scale THROWS', async () => {
+        const plugin = pluginFake({
+            scaleApp: jest.fn(async () => {
+                throw new Error('the apply was rejected');
+            }),
+        });
+        const state = stateFake({});
+        const { service } = build({ plugin, state });
+
+        const result = await service.pause(op({ op: 'pause' }));
+
+        expect(result.state).toBe('failed');
+        expect(state.setPaused).toHaveBeenCalledWith(WORK_ID, false, expect.any(Date));
+    });
 });
 
 /* -------------------------------------------------------------------------- *

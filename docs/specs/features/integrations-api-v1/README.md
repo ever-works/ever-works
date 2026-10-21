@@ -10,7 +10,7 @@ follow its changes. Plan items **EW-P1-4** (sync primitives and P1 resources), *
 - [contract/](./contract/README.md) — **machine-readable contract**: JSON Schemas, event catalog, examples, webhook
   signature test vectors
 
-**Contract version:** `v1-draft.15` (2026-10-18; history in [spec.md](./spec.md) §8–17 and on the plan's STATUS board). **Owner:** the Ever Works integration lane.
+**Contract version:** `v1-draft.16` (2026-10-18; history in [spec.md](./spec.md) §8–17 and on the plan's STATUS board). **Owner:** the Ever Works integration lane.
 
 Related specs: [`domain-events`](../domain-events/README.md) (the outbox that feeds `/events` and webhooks v2),
 [`integration-keys`](../integration-keys/README.md) (the `ew_int_` principal every route here requires),

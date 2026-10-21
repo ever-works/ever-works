@@ -207,13 +207,15 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 	 * overrides the approver gate on a transition; `requireAllApprovers` is the
 	 * policy that decides whether that gate runs at all (`false` skips the
 	 * `→ done` approver check outright), so a machine caller must neither set
-	 * it on create nor flip it on update. Every other tool exposes the full
-	 * operation — an unlisted `omitArgs` here would be a silent surface change.
+	 * it on create nor flip it on update. `acceptanceChecks` (works-security
+	 * lane 3a) are shell commands a fleet node runs, so a machine caller may not
+	 * plant them either. Every other tool exposes the full operation — an
+	 * unlisted `omitArgs` here would be a silent surface change.
 	 */
 	const OMITTED_ARGS: Record<string, string[]> = {
-		transition_task: ['force'],
-		create_task: ['requireAllApprovers'],
-		update_task: ['requireAllApprovers']
+		transition_task: ['force', 'mode'],
+		create_task: ['requireAllApprovers', 'acceptanceChecks'],
+		update_task: ['requireAllApprovers', 'acceptanceChecks']
 	};
 
 	it('keeps the approver-gate overrides (`force`, `requireAllApprovers`) off their tools and no other tool omits arguments', () => {

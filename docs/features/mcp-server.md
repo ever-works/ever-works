@@ -145,7 +145,7 @@ Add the MCP server to your project's `.mcp.json`:
 
 The MCP server exposes 127 tools from the OpenAPI whitelist, organized by domain below. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
-Eight more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the six `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`, `kb.unlock`), `register_work` and `ping`. A connected client therefore sees **135 tools** in all.
+Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **134 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
 
 ### Human-in-the-loop gates are not tools
 

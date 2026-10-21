@@ -219,7 +219,7 @@ export class CreateInboundTriggerDto {
     @ApiPropertyOptional({
         enum: TRIGGER_AUTO_STARTS,
         description:
-            "'always' (default) dispatches the first Task to the target agent; 'manual' leaves it in the backlog.",
+            "'always' dispatches the first Task to the target agent; 'manual' leaves it in the backlog. Default: 'manual' for event-sourced triggers (they fire on text outsiders write), 'always' for webhook triggers. A GitHub issue, pull request or @mention from an author who is not an OWNER, MEMBER or COLLABORATOR (or whose association is missing) never auto-starts.",
     })
     @IsOptional()
     @IsIn(TRIGGER_AUTO_STARTS)

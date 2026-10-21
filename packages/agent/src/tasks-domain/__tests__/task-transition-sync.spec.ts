@@ -362,6 +362,166 @@ describe('TaskTransitionService.transitionSync', () => {
         expect(plain.agentReviewPlanState).toBeNull();
     });
 
+    // Works-security lane 3a — a FLEET-RUN token's move sets only
+    // `suppressAgentFanOut`: its `→ in_progress` starts no other Agent's run,
+    // but the reviewer stage on `→ in_review` still happens.
+    it('suppressAgentFanOut: no in_progress fan-out, but in_review still plans the reviewer', async () => {
+        const fanOut = jest
+            .spyOn(
+                svc as unknown as { fanOutAgentExecutions: () => Promise<void> },
+                'fanOutAgentExecutions',
+            )
+            .mockResolvedValue(undefined);
+        row = makeTask({ status: TaskStatus.TODO });
+        await svc.transition(row, TaskStatus.IN_PROGRESS, { suppressAgentFanOut: true });
+        expect(fanOut).not.toHaveBeenCalled();
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
+
+        // Without the flag the same move fans out to the Task's agents.
+        row = makeTask({ status: TaskStatus.TODO });
+        await svc.transition(row, TaskStatus.IN_PROGRESS);
+        expect(fanOut).toHaveBeenCalledTimes(1);
+
+        const agentReviews = { probeAgentReviewPlan: jest.fn() };
+        const reviewSvc = new TaskTransitionService(
+            tasks,
+            blocks,
+            approvers,
+            assignees,
+            undefined,
+            dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            agentReviews as never,
+        );
+        const plan = jest
+            .spyOn(
+                reviewSvc as unknown as { planAgentReviewsDurably: () => Promise<void> },
+                'planAgentReviewsDurably',
+            )
+            .mockResolvedValue(undefined);
+        tasks.casUpdateStatus.mockClear();
+        row = makeTask({ status: TaskStatus.IN_PROGRESS });
+        await reviewSvc.transition(row, TaskStatus.IN_REVIEW, { suppressAgentFanOut: true });
+        const patch = tasks.casUpdateStatus.mock.calls[0][2];
+        // The review is OWED (memory cleared), never recorded as refused…
+        expect(patch.agentReviewPlanKey).toBeNull();
+        expect(patch.agentReviewPlanState).toBeNull();
+        expect(agentReviews.probeAgentReviewPlan).not.toHaveBeenCalled();
+        // …and the reviewer stage is planned right away.
+        expect(plan).toHaveBeenCalledWith(
+            expect.objectContaining({ status: TaskStatus.IN_REVIEW }),
+            'entry',
+        );
+    });
+
+    // Prompt-injection hardening (#2769) — a Task waiting for its owner (the
+    // binding `awaiting-owner` label) starts no agent run on a machine's move
+    // into in_progress (the auto-unblock restore, a mirror walk); a person's
+    // own move starts it, clears the label and fans out as usual.
+    it("awaiting-owner: a machine's in_progress move fans out nothing, a person's does", async () => {
+        const fanOut = jest
+            .spyOn(
+                svc as unknown as { fanOutAgentExecutions: () => Promise<void> },
+                'fanOutAgentExecutions',
+            )
+            .mockResolvedValue(undefined);
+        const labels = ['inbound-email', 'awaiting-owner'];
+
+        row = makeTask({ status: TaskStatus.TODO, labels });
+        await svc.transition(row, TaskStatus.IN_PROGRESS, { automaticRestore: true });
+        expect(fanOut).not.toHaveBeenCalled();
+        expect(tasks.casUpdateStatus.mock.calls.at(-1)[2].labels).toBeUndefined();
+
+        row = makeTask({ status: TaskStatus.TODO, labels });
+        await svc.transition(row, TaskStatus.IN_PROGRESS);
+        expect(fanOut).toHaveBeenCalledTimes(1);
+        expect(tasks.casUpdateStatus.mock.calls.at(-1)[2].labels).toEqual(['inbound-email']);
+    });
+
+    // Works-security lane 3a (review round 2) — a fleet run's `suppressAgentFanOut`
+    // survives a sync walk (no `suppressAgentDispatch` per hop, so the reviewer
+    // is not recorded as refused) and the done/cancel cascade.
+    // Verifier on #2769: the restore the auto-unblock cascade makes is the
+    // PLATFORM's move — through the real cascade, an awaiting-owner Task keeps
+    // its label and starts no agent run when its blocker resolves.
+    it('awaiting-owner: the auto-unblock restore keeps the label and fans out nothing', async () => {
+        const fanOut = jest
+            .spyOn(
+                svc as unknown as { fanOutAgentExecutions: () => Promise<void> },
+                'fanOutAgentExecutions',
+            )
+            .mockResolvedValue(undefined);
+        row = makeTask({
+            status: TaskStatus.BLOCKED,
+            previousStatus: TaskStatus.IN_PROGRESS,
+            labels: ['inbound-email', 'awaiting-owner'],
+        });
+        blocks.findTasksBlockedBy = jest.fn().mockResolvedValue([row.id]);
+
+        const result = await svc.autoUnblockResolvedTasks('blocker-1');
+
+        expect(result.unblocked).toEqual([row.id]);
+        expect(row.status).toBe(TaskStatus.IN_PROGRESS);
+        expect(row.labels).toEqual(['inbound-email', 'awaiting-owner']);
+        expect(tasks.casUpdateStatus.mock.calls.at(-1)[2].labels).toBeUndefined();
+        expect(fanOut).not.toHaveBeenCalled();
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('suppressAgentFanOut survives a sync walk instead of becoming suppressAgentDispatch', async () => {
+        const hop = jest.spyOn(svc, 'transition');
+        row = makeTask({ status: TaskStatus.IN_PROGRESS });
+        await svc.transitionSync(row, TaskStatus.IN_REVIEW, { suppressAgentFanOut: true });
+        expect(hop).toHaveBeenCalledWith(
+            expect.anything(),
+            TaskStatus.IN_REVIEW,
+            expect.objectContaining({ suppressAgentFanOut: true }),
+        );
+        expect(hop.mock.calls[0][2]).not.toHaveProperty('suppressAgentDispatch');
+        // An ordinary sync walk (an integration) still suppresses all dispatch.
+        hop.mockClear();
+        row = makeTask({ status: TaskStatus.IN_PROGRESS });
+        await svc.transitionSync(row, TaskStatus.IN_REVIEW);
+        expect(hop.mock.calls[0][2]).toMatchObject({ suppressAgentDispatch: true });
+    });
+
+    it('carries suppressAgentFanOut through the done cascade into the dependent restore', async () => {
+        const cascade = jest
+            .spyOn(svc, 'autoUnblockResolvedTasks')
+            .mockResolvedValue({ unblocked: [] });
+        row = makeTask({ status: TaskStatus.IN_REVIEW });
+        await svc.transition(row, TaskStatus.DONE, { suppressAgentFanOut: true });
+        expect(cascade).toHaveBeenCalledWith(row.id, {
+            suppressAgentDispatch: false,
+            suppressAgentFanOut: true,
+        });
+        cascade.mockRestore();
+
+        // The restore itself: a blocked dependent back to in_progress, no fan-out.
+        const fanOut = jest
+            .spyOn(
+                svc as unknown as { fanOutAgentExecutions: () => Promise<void> },
+                'fanOutAgentExecutions',
+            )
+            .mockResolvedValue(undefined);
+        const dependent = makeTask({
+            id: 'b1',
+            status: TaskStatus.BLOCKED,
+            previousStatus: TaskStatus.IN_PROGRESS,
+        });
+        row = dependent;
+        blocks.findTasksBlockedBy = jest.fn().mockResolvedValue(['b1']);
+        const result = await svc.autoUnblockResolvedTasks('a1', { suppressAgentFanOut: true });
+        expect(result.unblocked).toEqual(['b1']);
+        expect(row.status).toBe(TaskStatus.IN_PROGRESS);
+        expect(fanOut).not.toHaveBeenCalled();
+    });
+
     it('a lost race mid-walk answers 409 conflict with the path walked and the status found', async () => {
         // The first hop lands; before the second, someone else moves the Task.
         const realCas = tasks.casUpdateStatus.getMockImplementation();

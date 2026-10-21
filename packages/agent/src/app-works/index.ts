@@ -43,6 +43,9 @@
  *   collaborators that have not landed (`APP_UPSTREAM_SYNC_SPEC_SOURCE` — APW-03 T12;
  *   `APP_UPSTREAM_LICENSE_SERVICE` — APW-03 T42; `APP_UPSTREAM_PRIVATE_COPY_PORT` —
  *   APW-02 P1's private-copy capability). Each carries its mandatory-swap note.
+ * - `./upstream-workflow-diff` — FR-60/T46: which `.github/workflows|actions` paths an
+ *   upstream compare touches (fail closed on an incomplete compare) and the operator
+ *   switch `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS` that lifts the sync hold per Work.
  * - `./app-upstream-sync-dispatcher.service` — `AppUpstreamSyncDispatcherService` (T28,
  *   plan §6.6): the four-legged cron tick (`dispatchDue`) and the on-view divergence
  *   compare of §4.1 (`requestDivergenceCompare`). Its two job dispatchers are the
@@ -95,6 +98,7 @@ export * from './app-fork-readiness.service';
 export * from './app-fork-readiness.runner';
 export * from './upstream-schedule';
 export * from './app-upstream-conflict.copy';
+export * from './upstream-workflow-diff';
 export * from './app-upstream-sync.service';
 export * from './app-upstream-sync-dispatcher.service';
 export * from './app-source-catalog.port';

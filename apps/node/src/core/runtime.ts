@@ -1,3 +1,4 @@
+import type { FleetJobKind } from '@ever-works/contracts';
 import { describeApiBase, resolveApiBase } from './api-base';
 import { PlatformAuthClient, type SignInWithEverIdOptions } from './auth-client';
 import {
@@ -17,6 +18,7 @@ import { NodeLifecycleTracker, type NodeLifecycleRecord, type UpgradeHoldable } 
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import { createHealthProbe, type HealthProbeIo } from './health-probe';
 import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
@@ -55,6 +57,7 @@ import {
 	effectiveMinFreeDiskBytes,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
+	resolveNodeExecutionPolicy,
 	type FleetEnrollableNodeKind,
 	type FleetNodeView,
 	type NodeConfig,
@@ -103,6 +106,13 @@ export interface NodeIo {
 	 * `fs.stat`-backed one.
 	 */
 	statFile?: (path: string) => Promise<ModelCliFileStamp | null> | ModelCliFileStamp | null;
+	/**
+	 * Computer health (FL-03) — what the per-beat health snapshot reads.
+	 * Optional: without it the heartbeat carries no `health` field, exactly
+	 * as before the field existed. `node-io.ts` supplies the real one
+	 * (`createHealthProbeIo`); every test can leave it out.
+	 */
+	health?: HealthProbeIo;
 }
 
 /**
@@ -568,6 +578,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// holds the WORKSPACES — the one that fills up — not on whatever volume
 	// the service manager's cwd happens to be on (OPS-12).
 	const workspaceRoot = options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot();
+	// Control 18: the machine owner's local execution policy, read from the
+	// LOCAL config only. OFF/OFF unless the owner ran `ever-works-node policy`.
+	const executionPolicy = resolveNodeExecutionPolicy(config.executionPolicy);
 	// Node lifecycle (slice AR): ONE probe per process, shared by the
 	// heartbeat telemetry and every model step, so the version Fleet shows
 	// and the flags a run is built with come from the same answer.
@@ -586,6 +599,24 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		},
 		cliCompat
 	);
+	// Computer health (FL-03): the snapshot on every BEAT — wired here and
+	// not in `buildSelfDescriptionTelemetry`, because that also feeds
+	// enrolment, which has no strip-and-retry fallback for a field an older
+	// platform does not know. One probe per process: its slow-fact caches
+	// live in the closure. Every consent gets it — health is what enrolment
+	// alone already grants (CONTRACTS §1.1).
+	// Once the platform has proven it predates `health` the beat strips it
+	// for the life of the process (`acceptsField`, FL-02's), so the probe —
+	// and the tools it spawns — stops running too (`loopRef` is set once the
+	// loop below exists).
+	let loopRef: HeartbeatLoop | null = null;
+	if (io.health) {
+		const probeHealth = createHealthProbe(io.health, {
+			workspacePath: io.workspacePath ?? workspaceRoot,
+			...(io.now ? { now: io.now } : {})
+		});
+		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probeHealth());
+	}
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
 	// `attended` (and `screen`) are advertised only by a process started with it.
@@ -681,7 +712,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		}
 	};
 
-	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions), lifecycle, cliCompat, consents };
+	const loop = new HeartbeatLoop(loopOptions);
+	loopRef = loop;
+	const runtime: NodeRuntime = { client, loop, lifecycle, cliCompat, consents };
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.
@@ -776,9 +809,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {}),
 			// Agent computers: on an attended machine, live views belong to the
 			// attended lane alone — never parked in (or holding a slot of) the
-			// work lane. Sent only under `--attend`, so a work-only node's lease
-			// body is exactly what it always was.
-			...(options.attendEnabled ? { excludeKinds: ['computer-session' as const] } : {}),
+			// work lane (only under `--attend`).
+			//
+			// Control 18: a machine whose owner has not allowed node-run shell
+			// commands does not lease `acceptance-checks` jobs at all (every one
+			// is a shell command in a directory the platform names), so they
+			// stay with a node that will run them instead of failing here.
+			...(() => {
+				const excluded: FleetJobKind[] = [];
+				if (options.attendEnabled) excluded.push('computer-session');
+				if (!executionPolicy.allowShellCommands) excluded.push('acceptance-checks');
+				return excluded.length > 0 ? { excludeKinds: excluded } : {};
+			})(),
 			// Fleet usage limits: the CLIs an agent-task can run with here, so a
 			// node whose only CLI is out of quota stops leasing agent-task work
 			// until the reset (other kinds keep leasing).
@@ -856,7 +898,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			});
 		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
-		worker.register('acceptance-checks', (job, signal) => runAcceptanceChecksJob(job, {}, signal));
+		worker.register('acceptance-checks', (job, signal) =>
+			// Control 18: refused here too, should one arrive despite the lease filter.
+			runAcceptanceChecksJob(job, { executionPolicy }, signal)
+		);
 		// The general kind. Without it an enrolled machine could only ever
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
@@ -1007,6 +1052,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// read from the wire: a job cannot talk a node into
 						// believing it is another one.
 						nodeId: config.nodeId,
+						// Control 18 — the machine owner's local execution policy,
+						// from the LOCAL config only (OFF/OFF unless the owner ran
+						// `ever-works-node policy`). Always passed: an executor that
+						// gets no policy enforces none.
+						executionPolicy,
 						// Self-build slice Z (EW-796) — the platform side of the
 						// MCP bridge, wired through the SAME authenticated job
 						// client the lease protocol uses. No new endpoint, no new

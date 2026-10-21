@@ -13,21 +13,21 @@ describe('IntegrationInboxController', () => {
     const ORG = 'org-1';
     const RECIPIENT = '2b6d4e8f-0a3c-4d5e-9f71-8b9c0d1e2f30';
     const OTHER = '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41';
-    const principal = (actAsUserId: string | null) => ({
+    const principal = (actAsUserId: string | null, extraScopes: string[] = []) => ({
         keyId: 'key-1',
         keyName: 'Gauzy',
         integrationKind: 'ever-gauzy',
         tenantId: 'tenant-1',
         allowedOrganizationIds: [ORG],
-        scopes: ['inbox:read', 'inbox:write'],
+        scopes: ['inbox:read', 'inbox:write', ...extraScopes],
         ownerUserId: 'owner-1',
         actAsUserId,
     });
-    const as = (actAsUserId: string | null) =>
+    const as = (actAsUserId: string | null, extraScopes: string[] = []) =>
         ({
             userId: actAsUserId ?? 'owner-1',
             authMethod: 'integration',
-            integration: principal(actAsUserId),
+            integration: principal(actAsUserId, extraScopes),
         }) as never;
     const dto = (version = 1, extra: Record<string, unknown> = {}) => ({
         id: 'item-1',
@@ -54,6 +54,9 @@ describe('IntegrationInboxController', () => {
                 etag: `"${version}"`,
                 recipientUserId: RECIPIENT,
             })),
+            // Works-security lane 3a — merge approvals need `merges:decide`.
+            isMergeApproval: jest.fn().mockResolvedValue(false),
+            recordRelayedDecision: jest.fn().mockResolvedValue(true),
         };
         const items = {
             reply: jest.fn(async () => {
@@ -177,6 +180,123 @@ describe('IntegrationInboxController', () => {
             controller.reply(as(OTHER), 'item-9', { text: 'x' }, req(), res()),
         ).rejects.toBeInstanceOf(ResourceNotFoundError);
         expect(items.reply).not.toHaveBeenCalled();
+    });
+
+    // Works-security lane 3a — approval and escalation replies stay open to an
+    // integration: the reply is the recipient's own decision relayed by it (Ever
+    // Gauzy forwards what the person answered in the Gauzy Inbox), and acting as
+    // anybody but the recipient is still refused (`act_as_forbidden` above).
+    it.each([['approval'], ['escalation']])(
+        "relays the recipient's answer to an %s through InboxService.reply",
+        async (kind) => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue({
+                dto: dto(1, { kind, proposalId: kind === 'approval' ? 'prop-1' : null }),
+                etag: '"1"',
+                recipientUserId: RECIPIENT,
+            });
+            items.reply.mockResolvedValueOnce({
+                item: {},
+                routed: kind === 'approval' ? 'approved' : 'escalation-resolved',
+                restart: 'none',
+            } as never);
+            await controller.reply(as(RECIPIENT), 'item-1', { optionId: 'approve' }, req(), res());
+            expect(items.reply).toHaveBeenCalledWith(RECIPIENT, 'item-1', {
+                text: null,
+                optionId: 'approve',
+            });
+            // A non-merge approval is relayed with `inbox:write` alone, and the
+            // decided proposal records that an integration relayed it.
+            if (kind === 'approval') {
+                expect(inbox.recordRelayedDecision).toHaveBeenCalledWith('prop-1', {
+                    recipientUserId: RECIPIENT,
+                    integrationKeyId: 'key-1',
+                    integrationKind: 'ever-gauzy',
+                });
+            } else {
+                expect(inbox.recordRelayedDecision).not.toHaveBeenCalled();
+            }
+        },
+    );
+
+    // Works-security lane 3a — a MERGE approval (an agent's pull request
+    // landing on a real branch, a promotion, a revert) is relayed only by a key
+    // holding the separate, opt-in `merges:decide` scope.
+    describe('merge approvals', () => {
+        const mergeItem = () => ({
+            dto: dto(1, { kind: 'approval', proposalId: 'merge-1' }),
+            etag: '"1"',
+            recipientUserId: RECIPIENT,
+        });
+
+        it('refuses a merge decision without merges:decide (403 scope_missing) and leaves it pending', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue(mergeItem());
+            inbox.isMergeApproval.mockResolvedValue(true);
+            const reply = controller.reply(
+                as(RECIPIENT),
+                'item-1',
+                { optionId: 'approve' },
+                req(),
+                res(),
+            );
+            await expect(reply).rejects.toBeInstanceOf(IntegrationHttpException);
+            await expect(reply).rejects.toMatchObject({
+                code: 'scope_missing',
+                response: {
+                    error: { details: { missing: ['merges:decide'], reason: 'merge_decision' } },
+                },
+            });
+            // The message names the scope, and nothing was decided or recorded.
+            await expect(reply).rejects.toMatchObject({
+                response: { error: { message: expect.stringContaining("'merges:decide' scope") } },
+            });
+            expect(items.reply).not.toHaveBeenCalled();
+            expect(inbox.recordRelayedDecision).not.toHaveBeenCalled();
+        });
+
+        it('relays a merge decision from a key that holds merges:decide, and records the relay', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue(mergeItem());
+            inbox.isMergeApproval.mockResolvedValue(true);
+            items.reply.mockResolvedValueOnce({
+                item: {},
+                routed: 'approved',
+                restart: 'none',
+            } as never);
+            await controller.reply(
+                as(RECIPIENT, ['merges:decide']),
+                'item-1',
+                { optionId: 'approve' },
+                req(),
+                res(),
+            );
+            expect(items.reply).toHaveBeenCalledWith(RECIPIENT, 'item-1', {
+                text: null,
+                optionId: 'approve',
+            });
+            expect(inbox.recordRelayedDecision).toHaveBeenCalledWith('merge-1', {
+                recipientUserId: RECIPIENT,
+                integrationKeyId: 'key-1',
+                integrationKind: 'ever-gauzy',
+            });
+        });
+
+        it('still requires act-as = the recipient before the scope is even considered', async () => {
+            const { controller, inbox, items } = setup();
+            inbox.get.mockResolvedValue(mergeItem());
+            inbox.isMergeApproval.mockResolvedValue(true);
+            await expect(
+                controller.reply(
+                    as(OTHER, ['merges:decide']),
+                    'item-1',
+                    { optionId: 'approve' },
+                    req(),
+                    res(),
+                ),
+            ).rejects.toMatchObject({ code: 'act_as_forbidden' });
+            expect(items.reply).not.toHaveBeenCalled();
+        });
     });
 
     it('passes an already-answered 409 through', async () => {

@@ -148,6 +148,7 @@ import { LicencePurchase } from '../entities/licence-purchase.entity';
 import { StripeRelayDeadLetter } from '../entities/stripe-relay-dead-letter.entity';
 import { CreditMeterEvent } from '../entities/credit-meter-event.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
+import { FleetNodeHealthSample } from '../entities/fleet-node-health-sample.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
@@ -418,6 +419,9 @@ export const ENTITIES = [
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
+    // Computer health (FL-03) — raw (7 d) and hourly (90 d) health history
+    // per node, written behind FLEET_HEALTH_HISTORY_ENABLED.
+    FleetNodeHealthSample,
     // Organization-scoped Agent scheduling intent selecting one user-owned
     // Fleet node. Future jobs snapshot this row; existing jobs are unchanged.
     FleetAgentNodeAffinity,

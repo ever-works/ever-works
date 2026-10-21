@@ -28,6 +28,7 @@ import {
 } from '@ever-works/agent/notifications';
 import type { EmailAddressDirection } from '@ever-works/agent/entities';
 import { CurrentUser, AuthSessionGuard, Public } from '../auth';
+import { requireHumanSession } from '../auth/machine-principal';
 import { toPublicEmailAddress, toPublicEmailAddresses } from './email-address.projection';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
@@ -279,6 +280,9 @@ export class EmailController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Approve and send a held Agent email draft' })
     async approveDraft(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        // Works-security lane 3a — releasing a held draft SENDS it: a human
+        // decision, made in a person's interactive session only.
+        requireHumanSession(auth, 'approve and send a held email draft');
         const { message, result } = await this.requireDrafts().approve(auth.userId, id);
         return { message: toDraftDecisionView(message), result: result ?? null };
     }

@@ -363,6 +363,7 @@ export class AuthSessionGuard {
             nodeId: binding.nodeId,
             runId: binding.runId,
             organizationId: binding.organizationId,
+            agentId: binding.agentId ?? null,
         };
         request.fleetRunCredential = stash;
         return { userId: binding.userId };

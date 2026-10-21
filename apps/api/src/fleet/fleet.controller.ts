@@ -835,6 +835,8 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Computer health (FL-03): sanitised by the service, never trusted.
+            health: body.health,
             // Fleet node link (FL-02): the consents, should an enrolling node send them.
             consents: body.consents,
         });
@@ -880,6 +882,8 @@ export class FleetController {
             maxConcurrentJobs: body.maxConcurrentJobs,
             maxCpuPercent: body.maxCpuPercent,
             maxMemoryMb: body.maxMemoryMb,
+            // Computer health (FL-03): the snapshot, sanitised by the service.
+            health: body.health,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
         });

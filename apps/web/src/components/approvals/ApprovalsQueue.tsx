@@ -17,6 +17,78 @@ interface ApprovalsQueueProps {
     initialApprovals: AgentActionProposal[];
 }
 
+/**
+ * Proposals bulk approval never decides — mirrors the server's
+ * `requiresIndividualDecision`, which refuses them in bulk too:
+ *  - a merge onto a real branch (slice AE);
+ *  - the release of a held agent email draft (AW-05);
+ *  - an agent's rewrite of its own identity files, and an agent-proposed
+ *    closure of an escalation (prompt-injection hardening) — those exist so a
+ *    person reads them.
+ */
+const INDIVIDUAL_OTHER_KINDS: ReadonlySet<string> = new Set([
+    'agent-file-edit',
+    'agent-escalation-resolution',
+]);
+
+function requiresIndividualDecision(p: AgentActionProposal): boolean {
+    if (p.actionType === 'merge_pull_request') return true;
+    if (p.actionType === 'send_message' && p.payload?.kind === 'email-draft') return true;
+    return p.actionType === 'other' && INDIVIDUAL_OTHER_KINDS.has(String(p.payload?.kind ?? ''));
+}
+
+/** The agent-authored content a person is approving, shown in full on the card. */
+function ProposalDetail({
+    proposal,
+    t,
+}: {
+    proposal: AgentActionProposal;
+    t: ReturnType<typeof useTranslations>;
+}) {
+    const payload = proposal.payload ?? {};
+    if (proposal.actionType !== 'other') return null;
+    const body = typeof payload.body === 'string' ? payload.body : null;
+    if (payload.kind === 'agent-file-edit' && body !== null) {
+        return (
+            <details className="mt-2" open data-testid={`approval-detail-${proposal.id}`}>
+                <summary className="cursor-pointer text-xs text-text-secondary dark:text-text-secondary-dark">
+                    {t('proposal.fileEdit', {
+                        file: String(payload.fileName ?? ''),
+                        bytes: Number(payload.bytes ?? body.length),
+                    })}
+                </summary>
+                {/* Rendered as text, never as markup: the body is model-written. */}
+                <pre
+                    data-testid={`approval-body-${proposal.id}`}
+                    className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border/60 dark:border-border-dark/60 bg-surface-secondary dark:bg-white/5 p-3 font-mono text-xs text-text dark:text-text-dark"
+                >
+                    {body}
+                </pre>
+            </details>
+        );
+    }
+    if (payload.kind === 'agent-escalation-resolution') {
+        const note = typeof payload.note === 'string' ? payload.note : '';
+        return (
+            <div
+                className="mt-2 text-xs text-text-secondary dark:text-text-secondary-dark"
+                data-testid={`approval-detail-${proposal.id}`}
+            >
+                <p>{t('proposal.escalation', { id: String(payload.escalationId ?? '') })}</p>
+                {note ? (
+                    <pre
+                        data-testid={`approval-body-${proposal.id}`}
+                        className="mt-1 whitespace-pre-wrap break-words rounded-md border border-border/60 dark:border-border-dark/60 p-2 font-mono"
+                    >
+                        {note}
+                    </pre>
+                ) : null}
+            </div>
+        );
+    }
+    return null;
+}
+
 const RISK_FLAG_CLASSES: Record<AgentActionRiskFlag, string> = {
     budget_override:
         'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border-amber-200 dark:border-amber-500/25',
@@ -49,15 +121,11 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
     //
     // Agent email (AW-05): a held email draft is excluded the same way —
     // approving one SENDS it, and the server refuses it in bulk too.
+    //
+    // Prompt-injection hardening: an agent's identity-file rewrite and an
+    // agent-proposed escalation closure are excluded the same way.
     const bulkIds = useMemo(
-        () =>
-            proposals
-                .filter(
-                    (p) =>
-                        p.actionType !== 'merge_pull_request' &&
-                        !(p.actionType === 'send_message' && p.payload?.kind === 'email-draft'),
-                )
-                .map((p) => p.id),
+        () => proposals.filter((p) => !requiresIndividualDecision(p)).map((p) => p.id),
         [proposals],
     );
     const excludedFromBulk = proposals.length - bulkIds.length;
@@ -213,6 +281,7 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
                                     <p className="mt-2 text-sm font-medium text-text dark:text-text-dark break-words">
                                         {p.title}
                                     </p>
+                                    <ProposalDetail proposal={p} t={t} />
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <Button

@@ -379,6 +379,20 @@ describe('agent/config', () => {
                 expect(config.fleet.isJobPurgeEnabled()).toBe(true);
             });
         });
+
+        describe('computer health history (FL-03)', () => {
+            it('is OFF by default and on only for the exact string true', () => {
+                delete process.env.FLEET_HEALTH_HISTORY_ENABLED;
+                expect(config.fleet.isHealthHistoryEnabled()).toBe(false);
+                for (const value of ['1', 'yes', 'TRUE', 'on', '']) {
+                    process.env.FLEET_HEALTH_HISTORY_ENABLED = value;
+                    expect(config.fleet.isHealthHistoryEnabled()).toBe(false);
+                }
+                process.env.FLEET_HEALTH_HISTORY_ENABLED = 'true';
+                expect(config.fleet.isHealthHistoryEnabled()).toBe(true);
+                delete process.env.FLEET_HEALTH_HISTORY_ENABLED;
+            });
+        });
     });
 
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {

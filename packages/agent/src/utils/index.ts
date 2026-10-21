@@ -17,3 +17,7 @@ export * from './secret-scan';
 // `organization.service.ts` let a lost slug race escape as a raw 500.
 export * from './db-error.utils';
 export * from './optional-provider.util';
+// The ONE shared untrusted-content fence (nonce'd markers + data preamble)
+// and the canonical chat-template marker pattern. Prefer these over a new
+// local neutralizer.
+export * from './untrusted-content';

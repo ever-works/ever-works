@@ -136,6 +136,14 @@ export interface FleetRunCredentialBinding {
     runId: string | null;
     /** Organization the token is pinned to; `null` = the owner's personal scope. */
     organizationId: string | null;
+    /**
+     * Works-security lane 3a — the Agent the bound job was dispatched for, or
+     * `null` when the job payload names none. Controllers use it to refuse
+     * handing a Task to an Agent with wider permissions than the run's own,
+     * and to stamp what the run creates as that Agent's work. Optional so
+     * existing constructions keep compiling.
+     */
+    agentId?: string | null;
 }
 
 /**

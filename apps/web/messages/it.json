@@ -7414,6 +7414,38 @@
                         "specUnavailable": "Questa app non ha ancora una specifica utilizzabile.",
                         "failed": "Impossibile salvare il valore. Riprova."
                     }
+                },
+                "dependencies": {
+                    "title": "Dipendenze",
+                    "description": "I database, le cache, lo storage e la posta di cui questa app ha bisogno. Vengono predisposti sulla sua destinazione di distribuzione prima dell'avvio.",
+                    "loading": "Lettura delle dipendenze…",
+                    "unavailable": "Le dipendenze non possono ancora essere gestite su questa istanza.",
+                    "error": "Impossibile leggere le dipendenze. Ricarica la pagina per riprovare.",
+                    "empty": "La specifica di questa app non dichiara dipendenze.",
+                    "provider": "Provider: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# tentativo} other {# tentativi}}",
+                    "noReason": "Non è stato registrato alcun motivo.",
+                    "deployRetries": "Una nuova distribuzione riprova automaticamente, oppure premi Riprova ora.",
+                    "retry": "Riprova",
+                    "retryAria": "Riprova {kind}",
+                    "retried": "{kind}: è stato pianificato un nuovo tentativo.",
+                    "retryQueued": "{kind}: un nuovo tentativo partirà appena il worker sarà disponibile.",
+                    "leaseHeld": "{kind} è in fase di predisposizione proprio ora. Riprova tra un momento.",
+                    "retryFailed": "Impossibile riprovare {kind}. Riprova.",
+                    "deleteData": "Elimina dati",
+                    "deleteDataAria": "Elimina i dati di {kind}",
+                    "deleteDialog": {
+                        "title": "Eliminare i dati di {kind}?",
+                        "description": "Questa azione distrugge i volumi, i database e i bucket di questa dipendenza. Non può essere annullata.",
+                        "resources": "Verrà eliminato:",
+                        "noResources": "Non ci sono risorse registrate per questa dipendenza.",
+                        "confirmLabel": "Digita {slug} per confermare",
+                        "cancel": "Annulla",
+                        "confirm": "Elimina dati",
+                        "requested": "Eliminazione dei dati di {kind} in corso.",
+                        "failed": "Impossibile eliminare i dati. {reason}"
+                    }
                 }
             },
             "appEnv": {

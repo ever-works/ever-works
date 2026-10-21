@@ -10,6 +10,8 @@ import {
 import { generateItems, regenerateMarkdown } from '@/app/actions/dashboard/generator';
 import { workAPI } from '@/lib/api/work';
 import { resolveGenerationConfig } from './utils';
+import type { UserConfirmationCheck } from './generated/confirmation';
+import { CONFIRMED_FIELD_DESCRIPTION, requireUserConfirmation } from './confirm-gate';
 
 export const addItemTool = tool({
     description: 'Add a single item to a Work from a URL. Extracts details automatically.',
@@ -43,18 +45,39 @@ export const addItemTool = tool({
     },
 });
 
-export const removeItemTool = tool({
-    description: 'Remove an item from a Work. Ask for confirmation first.',
-    inputSchema: z.object({
-        workId: z.string().describe('Work ID'),
-        itemSlug: z.string().describe('Item slug to remove'),
-        reason: z.string().optional().describe('Reason for removal'),
-    }),
-    execute: async ({ workId, itemSlug, reason }) => {
-        const result = await removeItem(workId, itemSlug, { reason });
-        return { success: result.status === 'success', message: result.message };
-    },
-});
+/**
+ * Build `removeItem`. Security: server-side confirmation handshake (it had
+ * none — only "Ask for confirmation first" prose), bound to the user's own
+ * confirmation of this exact card when `userConfirmed` is supplied.
+ */
+export function createRemoveItemTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description:
+            'Remove an item from a Work. Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+        inputSchema: z.object({
+            workId: z.string().describe('Work ID'),
+            itemSlug: z.string().describe('Item slug to remove'),
+            reason: z.string().optional().describe('Reason for removal'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ workId, itemSlug, reason, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'removeItem',
+                action: 'Remove an item from a Work',
+                target: itemSlug,
+                args: { workId, itemSlug, reason },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            const result = await removeItem(workId, itemSlug, { reason });
+            return { success: result.status === 'success', message: result.message };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const removeItemTool = createRemoveItemTool();
 
 export const updateItemTool = tool({
     description:

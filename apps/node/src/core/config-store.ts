@@ -7,6 +7,7 @@ import {
 	isFleetEnrollableNodeKind,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
+	resolveNodeExecutionPolicy,
 	type FleetEnrollableNodeKind,
 	type NodeConfig,
 	type NodeSecretStorage
@@ -196,6 +197,12 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	// key exists to end.
 	if (typeof candidate.workspaceRoot === 'string' && ABSOLUTE_PATH.test(candidate.workspaceRoot.trim())) {
 		config.workspaceRoot = candidate.workspaceRoot.trim();
+	}
+	// Control 18: the machine owner's local execution policy. Present only once
+	// `ever-works-node policy` wrote it; anything but a literal `true` reads as
+	// OFF, so a hand-edited or truncated value can only ever narrow.
+	if (candidate.executionPolicy && typeof candidate.executionPolicy === 'object') {
+		config.executionPolicy = resolveNodeExecutionPolicy(candidate.executionPolicy);
 	}
 	if (
 		candidate.unsafe &&

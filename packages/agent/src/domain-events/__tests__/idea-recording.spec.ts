@@ -147,7 +147,12 @@ describe('idea recording points', () => {
         expect(links.map((link) => link.teamId)).toEqual([team.id]);
         expect(idea.visibility).toBe('team');
         const recorded = await events();
-        expect(recorded.map((event) => event.type)).toEqual(['idea.created']);
+        // Review 2026-10-17 F34: the Team's own side follows the Idea's event.
+        expect(recorded.map((event) => event.type)).toEqual([
+            'idea.created',
+            'team.resource.added',
+        ]);
+        expect(recorded[1]).toMatchObject({ aggregateType: 'team', aggregateId: team.id });
         expect(recorded[0].data).toMatchObject({ teamIds: [team.id], visibility: 'team' });
         expectValid(recorded[0]);
     });

@@ -71,6 +71,7 @@ request untouched.
 | 10  | It was made by a person, not a guardrail                         | `approval-not-human`                         |
 | 11  | It is less than 24 hours old                                     | `approval-expired`                           |
 | 12  | The approver is entitled to approve for this Task's scope        | `approver-not-entitled`                      |
+| 13  | The live base is the planned base (not retargeted)               | `target-branch-mismatch`                     |
 
 Conditions 9–12 apply only when the effective policy requires an approval
 (see below). Conditions 5–8 apply to **every** policy — an operator who
@@ -182,6 +183,28 @@ field by field, most specific wins:
 `false`, and with it nothing is attempted and nothing is said — an upgrade
 to this version changes no behaviour for any existing deployment.
 
+### The protected-branch floor (works-security lane 3a, 2026-10-18)
+
+Turning the approval off has a floor. For an agent merge into one of the
+platform's long-lived branches, the platform asks for a recorded human
+approval whatever `requireHumanApproval` and `protectedBranches` resolve to:
+
+| Base branch                     | Needs a recorded human approval                                                                                                                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`, `master`                | **Always.** No scope can waive it.                                                                                                                                                                                                              |
+| `develop`, `stage`              | Yes, **unless a human-set Tenant or Organization policy** explicitly says `requireHumanApproval: false` (and the effective policy agrees). A Work- or Agent-level `false` never lifts it: those are the scopes a machine principal could write. |
+| a base the platform cannot read | Always (judged as the worst case).                                                                                                                                                                                                              |
+| any other branch                | Only if the effective policy says so.                                                                                                                                                                                                           |
+
+A floor branch that is still listed in `protectedBranches` stays refused
+outright (`protected-branch`), as before. The release promotion lane is
+unaffected: it always asks for an approval anyway.
+
+The base is the pull request's **live** base, read from the provider at
+merge time. A pull request retargeted after it was opened (planned for
+`develop`, now pointing at `main`) is refused with `target-branch-mismatch`;
+the Inbox approval request also shows the live base.
+
 ### Recommended production posture
 
 ```jsonc
@@ -197,7 +220,9 @@ to this version changes no behaviour for any existing deployment.
 
 Note the protected-branch list is the platform default and it protects the
 branches the self-build fleet actually targets. An agent merging into
-`develop` needs that list narrowed deliberately.
+`develop` needs that list narrowed deliberately, and still needs a recorded
+approval unless a Tenant or Organization policy turned approval off (see
+the floor above); into `main` it always does.
 
 ---
 

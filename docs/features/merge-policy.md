@@ -50,18 +50,31 @@ returns the complete effective `policy`, the `source` (the most specific scope t
 
 The chain matters: _"Agents may not merge here"_ is only actionable if the answer also says **where** that came from and which knob to change.
 
+## The protected-branch floor
+
+Whatever the scopes resolve to, an Agent merge into one of the long-lived branches needs a **recorded human approval** (works-security lane 3a, 2026-10-18):
+
+- `main` and `master`: **always**. No scope can waive it.
+- `develop` and `stage`: unless a **human-set Tenant or Organization** policy explicitly says `requireHumanApproval: false` (and the effective policy agrees). A Work- or Agent-level `false` never lifts it, because those are the scopes a machine credential could ever write.
+- A base the platform cannot read: always.
+
+A floor branch still listed in `protectedBranches` stays refused outright. The base is the pull request's **live** base, read from the provider at merge time; a pull request retargeted after it was opened is refused with `target-branch-mismatch`.
+
+Fleet-run tokens and integration keys cannot change a Work's `mergePolicy` at all: `PUT`/`PATCH /api/works/:id` refuses it for them, and the MCP `update_work` tool does not offer it.
+
 ## Refusals
 
 When a merge is refused, the decision carries a stable machine-readable code alongside the human explanation:
 
-| Code                       | Meaning                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `agent-merge-disabled`     | `allowAgentMerge` is false at the winning scope.                              |
-| `protected-branch`         | The pull request's base branch is protected.                                  |
-| `target-branch-unknown`    | Branches are protected but the target could not be determined — fails closed. |
-| `merge-method-not-allowed` | The requested strategy is not in `allowedMergeMethods`.                       |
-| `gate-not-green`           | `requireGreenGate` is on and the gate is not green.                           |
-| `human-approval-required`  | `requireHumanApproval` is on and no approval is on record.                    |
+| Code                       | Meaning                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `agent-merge-disabled`     | `allowAgentMerge` is false at the winning scope.                                  |
+| `protected-branch`         | The pull request's base branch is protected.                                      |
+| `target-branch-unknown`    | Branches are protected but the target could not be determined — fails closed.     |
+| `merge-method-not-allowed` | The requested strategy is not in `allowedMergeMethods`.                           |
+| `gate-not-green`           | `requireGreenGate` is on and the gate is not green.                               |
+| `human-approval-required`  | `requireHumanApproval` is on (or the floor applies) and no approval is on record. |
+| `target-branch-mismatch`   | The pull request's live base is not the planned base: it was retargeted.          |
 
 Every path that could land a pull request on an Agent's behalf routes through one decision point, so the answer is the same wherever it is asked.
 
@@ -78,7 +91,7 @@ You want Agents to land their own work on a Work, but only when the tests pass a
 }
 ```
 
-`requireGreenGate` and `protectedBranches` are left out, so they keep the platform defaults — green gate required, `main` still protected.
+`requireGreenGate` and `protectedBranches` are left out, so they keep the platform defaults — green gate required, `main` still protected. Even with `protectedBranches` narrowed, a merge into `main` or `master` would still wait for your approval in the Inbox (the floor above).
 
 ## Related
 

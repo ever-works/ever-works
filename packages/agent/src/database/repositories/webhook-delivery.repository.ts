@@ -99,6 +99,47 @@ export class WebhookDeliveryRepository {
         });
     }
 
+    /**
+     * Webhooks v2 (review 2026-10-17 F45): fan-out deliveries the IN-PROCESS path left
+     * `retrying` (no Trigger.dev run: Trigger.dev retries its own) after exactly
+     * `attempts` attempts, last tried before `lastAttemptBefore`; oldest attempt first.
+     */
+    async listRetryingFanout(
+        attempts: number,
+        lastAttemptBefore: Date,
+        limit: number,
+    ): Promise<WebhookDelivery[]> {
+        // `lastAttemptAt` is stored as epoch milliseconds (TimestampColumn): compare numbers.
+        return this.repository
+            .createQueryBuilder('delivery')
+            .where('delivery.eventId IS NOT NULL')
+            .andWhere('delivery.status = :status', { status: 'retrying' })
+            .andWhere('delivery.triggerRunId IS NULL')
+            .andWhere('delivery.attempts = :attempts', { attempts })
+            .andWhere('delivery.lastAttemptAt < :before', { before: lastAttemptBefore.getTime() })
+            .orderBy('delivery.lastAttemptAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
+     * Claim a due retry ({@link listRetryingFanout}): moves `lastAttemptAt` to now when
+     * it is still before `dueBefore`, so only one caller re-sends it. Answers whether
+     * this caller claimed it.
+     */
+    async claimRetry(id: string, dueBefore: Date): Promise<boolean> {
+        const escape = (name: string) => this.repository.manager.connection.driver.escape(name);
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WebhookDelivery)
+            .set({ lastAttemptAt: () => String(Date.now()) })
+            .where(`${escape('id')} = :id`, { id })
+            .andWhere(`${escape('status')} = :status`, { status: 'retrying' })
+            .andWhere(`${escape('lastAttemptAt')} < :due`, { due: dueBefore.getTime() })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
     async recordAttempt(id: string, attempt: RecordAttemptInput): Promise<void> {
         await this.repository.increment({ id }, 'attempts', 1);
         // EW-634 Codex P2 follow-up: previously we always overwrote

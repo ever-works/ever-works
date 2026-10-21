@@ -34,8 +34,11 @@ import { IntegrationOnlyGuard } from './integration-only.guard';
 import { IntegrationExceptionFilter } from './integration-exception.filter';
 import {
     linkSourceOf,
+    parseLimit,
+    parseUpdatedSince,
     pinnedOrganizationOf,
     principalOf,
+    rethrowCursor,
     validationFailed,
 } from './integration-request';
 
@@ -86,22 +89,38 @@ export class IntegrationLinksController {
         @CurrentUser() user: AuthenticatedUser,
         @Query('entityType') entityType?: string,
         @Query('externalId') externalId?: string,
-    ): Promise<{ data: ExternalRecordLinkDto[] }> {
+        @Query('cursor') cursor?: string,
+        @Query('limit') limit?: string,
+        @Query('updatedSince') updatedSince?: string,
+    ): Promise<{ data: ExternalRecordLinkDto[]; nextCursor: string | null; hasMore: boolean }> {
         const principal = principalOf(user);
         if (entityType !== undefined) assertEntityType(entityType);
-        const rows = await this.links.list(
-            {
-                organizationId: pinnedOrganizationOf(this.scope.getScope().organizationId),
-                source: linkSourceOf(principal),
-            },
-            {
-                entityType: entityType as ExternalLinkEntityType | undefined,
-                externalId: externalId || undefined,
-            },
-        );
+        // Review 2026-10-17 F42: a keyset page like every other list (it answered the
+        // first 500 links, with no cursor), so a consumer can read every link.
+        const page = await this.links
+            .listPage(
+                {
+                    organizationId: pinnedOrganizationOf(this.scope.getScope().organizationId),
+                    source: linkSourceOf(principal),
+                },
+                {
+                    entityType: entityType as ExternalLinkEntityType | undefined,
+                    externalId: externalId || undefined,
+                },
+                {
+                    cursor: cursor || null,
+                    limit: parseLimit(limit),
+                    updatedSince: parseUpdatedSince(updatedSince),
+                },
+            )
+            .catch(rethrowCursor);
         // A link to a private record would still reveal it (ids, external URL).
-        const visible = await this.resources.withoutPrivateTargets(rows);
-        return { data: visible.map(toExternalRecordLinkDto) };
+        const visible = await this.resources.withoutPrivateTargets(page.data);
+        return {
+            data: visible.map(toExternalRecordLinkDto),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+        };
     }
 
     @Put('links/:entityType/:entityId')

@@ -67,6 +67,9 @@ export interface EmailSendReservationRow {
     readonly messageIdHeader?: string | null;
     readonly inReplyTo?: string | null;
     readonly references?: string[] | null;
+    /** Review U1 (F112): the sending address's Tenant / Organization, when it has one. */
+    readonly tenantId?: string | null;
+    readonly organizationId?: string | null;
 }
 
 /**

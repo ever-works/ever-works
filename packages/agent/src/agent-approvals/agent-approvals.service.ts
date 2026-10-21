@@ -30,6 +30,12 @@ import { AutonomyGrantService } from '../safety/autonomy-grant.service';
 import { RISK_SCORER } from './risk-scorer';
 import { toAgentActionProposalDto, type AgentActionProposalDto } from './types';
 import { AgentActionProposalDecidedEvent } from './agent-action-proposal-decided.event';
+// Leaf constants (no runtime graph) — the agent-authored proposals bulk
+// approval must never decide.
+import {
+    AGENT_ESCALATION_RESOLUTION_PROPOSAL_KIND,
+    AGENT_FILE_EDIT_PROPOSAL_KIND,
+} from '../agents/agent-proposal-kinds';
 
 /**
  * Create-proposal input — the writable subset an Agent (or the
@@ -298,6 +304,21 @@ export class AgentApprovalsService {
         return { rows: rows.map(toAgentActionProposalDto), total };
     }
 
+    /**
+     * The caller's proposal about one subject (`(actionType, subjectKey)` is
+     * unique), in ANY status, or `null`. Lets a caller whose second proposal
+     * the unique index refused hand back the existing one — or say how it
+     * was decided — without paging through the queue.
+     */
+    async findBySubjectKey(
+        userId: string,
+        actionType: AgentActionProposalActionType,
+        subjectKey: string,
+    ): Promise<AgentActionProposalDto | null> {
+        const row = await this.proposals.findOne({ where: { userId, actionType, subjectKey } });
+        return row ? toAgentActionProposalDto(row) : null;
+    }
+
     async getOne(userId: string, id: string): Promise<AgentActionProposalDto> {
         const row = await this.requireOwned(userId, id);
         return toAgentActionProposalDto(row);
@@ -515,12 +536,20 @@ function clampLimit(limit?: number): number {
 
 /**
  * Proposals whose approval does something that cannot be undone, so bulk
- * approval never decides them: a merge onto a real branch, and the release
- * of a held Agent email draft (AW-05).
+ * approval never decides them: a merge onto a real branch, the release of a
+ * held Agent email draft (AW-05), and — prompt-injection hardening — an
+ * agent's rewrite of its own trusted identity files and an agent-proposed
+ * closure of one of the owner's escalations. Those last two exist precisely
+ * so a PERSON reads them; "approve all" would make the gate a formality.
  */
 export function requiresIndividualDecision(
     row: Pick<AgentActionProposal, 'actionType' | 'payload'>,
 ): boolean {
     if (row.actionType === 'merge_pull_request') return true;
-    return row.actionType === 'send_message' && row.payload?.kind === 'email-draft';
+    if (row.actionType === 'send_message' && row.payload?.kind === 'email-draft') return true;
+    return (
+        row.actionType === 'other' &&
+        (row.payload?.kind === AGENT_FILE_EDIT_PROPOSAL_KIND ||
+            row.payload?.kind === AGENT_ESCALATION_RESOLUTION_PROPOSAL_KIND)
+    );
 }

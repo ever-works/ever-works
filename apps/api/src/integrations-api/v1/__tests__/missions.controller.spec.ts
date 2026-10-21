@@ -1,4 +1,7 @@
-import { DuplicateExternalRefError } from '@ever-works/agent/integrations-api';
+import {
+    DuplicateExternalRefError,
+    ResourceNotFoundError,
+} from '@ever-works/agent/integrations-api';
 // The `@ever-works/agent/missions` barrel pulls in the whole agent graph (work module ->
 // subscriptions -> api notifications/auth -> ESM-only better-auth, website-generator
 // config), which this jest environment cannot load. The controller only needs these
@@ -8,7 +11,9 @@ jest.mock('@ever-works/agent/missions', () => ({
     MissionsService: class MissionsService {},
 }));
 
-import { IntegrationMissionsController } from '../missions.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { IntegrationMissionsController, IntegrationUpdateMissionDto } from '../missions.controller';
 
 /**
  * Missions of `/api/integrations/v1` (EW-P2-5): creates go through
@@ -102,7 +107,7 @@ describe('IntegrationMissionsController', () => {
             resources as never,
             scope as never,
         );
-        return { controller, missions, goalService, links };
+        return { controller, missions, goalService, links, resources };
     };
 
     it('creates through createExternal (paused) attributed to the key', async () => {
@@ -296,6 +301,70 @@ describe('IntegrationMissionsController', () => {
         expect(goalService.linkToMission).not.toHaveBeenCalled();
     });
 
+    // Review 2026-10-17 F49: nothing is written when the request is refused.
+    it('PATCH checks the Teams and the status move before it writes the title', async () => {
+        const foreign = setup('active');
+        foreign.resources.get.mockImplementation(async (kind: string, _org: string, id: string) => {
+            if (kind === 'team') throw new ResourceNotFoundError('team', id);
+            return { dto: { id, version: 2, status: 'active', goals: [] }, etag: '"2"' };
+        });
+        await expect(
+            foreign.controller.update(
+                user,
+                'mission-1',
+                { title: 'New', teamIds: ['team-of-another-org'] },
+                undefined,
+                res(),
+            ),
+        ).rejects.toBeInstanceOf(ResourceNotFoundError);
+        expect(foreign.missions.update).not.toHaveBeenCalled();
+
+        const done = setup('completed');
+        await expect(
+            done.controller.update(
+                user,
+                'mission-1',
+                { title: 'New', status: 'paused' },
+                undefined,
+                res(),
+            ),
+        ).rejects.toMatchObject({ status: 422 });
+        expect(done.missions.update).not.toHaveBeenCalled();
+        expect(done.missions.pause).not.toHaveBeenCalled();
+    });
+
+    // Review 2026-10-17 F51: a private Goal is neither unlinked nor linked by an integration.
+    it('PUT goals never unlinks a private Goal, and links one only as a 404', async () => {
+        const { controller, goalService, resources } = setup('paused', [
+            { goalId: 'goal-private', isPrimary: true },
+            { goalId: 'goal-keep', isPrimary: false },
+        ]);
+        resources.get.mockImplementation(async (kind: string, _org: string, id: string) => {
+            if (kind === 'goal' && (id === 'goal-private' || id === 'goal-secret')) {
+                throw new ResourceNotFoundError('goal', id);
+            }
+            return { dto: { id, version: 2, status: 'paused', goals: [] }, etag: '"2"' };
+        });
+        await controller.putGoals(
+            user,
+            'mission-1',
+            { goals: [{ goalId: 'goal-keep', isPrimary: false }] },
+            undefined,
+            res(),
+        );
+        expect(goalService.unlinkFromMission).not.toHaveBeenCalled();
+        await expect(
+            controller.putGoals(
+                user,
+                'mission-1',
+                { goals: [{ goalId: 'goal-secret', isPrimary: false }] },
+                undefined,
+                res(),
+            ),
+        ).rejects.toBeInstanceOf(ResourceNotFoundError);
+        expect(goalService.linkToMission).not.toHaveBeenCalled();
+    });
+
     it('PATCH fails an active Mission through fail()', async () => {
         const { controller, missions } = setup('active');
         (missions as unknown as { fail: jest.Mock }).fail = jest.fn().mockResolvedValue({});
@@ -322,5 +391,27 @@ describe('IntegrationMissionsController', () => {
             [{ workId: 'work-1', relation: 'improves' }],
             expect.anything(),
         );
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateMissionDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateMissionDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['title', 'description', 'status', 'teamIds', 'visibility']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of ['outcome']) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

@@ -53,7 +53,10 @@ const config: NodeConfig = {
 	capabilities: ['os:linux'],
 	heartbeatIntervalMs: 30_000,
 	enrolledAt: '2026-07-25T10:00:00.000Z',
-	limits: clampResourceLimits({ maxConcurrentJobs: 1 })
+	limits: clampResourceLimits({ maxConcurrentJobs: 1 }),
+	// These jobs carry command steps; control 18 refuses those unless the
+	// machine owner allowed node-run shell commands locally.
+	executionPolicy: { allowSkipPermissions: false, allowShellCommands: true, restrictedMode: true }
 };
 
 const scheduler = { setTimeout: () => ({ scheduled: true }), clearTimeout: () => undefined };

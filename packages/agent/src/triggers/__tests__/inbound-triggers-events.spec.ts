@@ -286,7 +286,11 @@ describe('InboundTriggersService — event-sourced triggers', () => {
                 'user-1',
                 expect.objectContaining({
                     title: 'Push on acme/widgets',
-                    description: 'By ada — Pushed 3 commits',
+                    // Event values are fenced inline; the owner's template
+                    // text around them is unchanged.
+                    description: expect.stringMatching(
+                        /UNTRUSTED DATA[\s\S]*\n\nBy <untrusted_value id="([0-9a-f]{12})">ada<\/untrusted_value id="\1"> — <untrusted_value id="\1">Pushed 3 commits<\/untrusted_value id="\1">$/,
+                    ),
                 }),
                 { tenantId: null, organizationId: null },
             );
@@ -439,6 +443,8 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             await service.create(SCOPE, {
                 name: 'Pushes',
                 targetAgentId: 'agent-1',
+                // Event triggers default to 'manual' now — opt in explicitly.
+                autoStart: 'always',
                 ...MATCH_ALL_GITHUB,
             });
 

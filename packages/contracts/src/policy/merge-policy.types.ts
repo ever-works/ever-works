@@ -97,6 +97,74 @@ export const PLATFORM_DEFAULT_MERGE_POLICY: MergePolicy = Object.freeze({
 	protectedBranches: ['main', 'master', 'develop', 'stage']
 }) as MergePolicy;
 
+/**
+ * The protected-branch FLOOR (works-security lane 3a, 2026-10-18).
+ *
+ * A scope may still list `protectedBranches: []` — the resolution is
+ * field-by-field and an explicit empty list keeps meaning "protect nothing"
+ * for every OTHER branch. What it can no longer do is make an agent merge
+ * into one of these branches happen unattended:
+ *
+ *   - `main` and `master` ({@link MERGE_POLICY_ALWAYS_APPROVED_BRANCHES}):
+ *     ALWAYS need a recorded human approval, whatever any scope says;
+ *   - `develop` and `stage`: need one UNLESS a human-set TENANT or
+ *     ORGANIZATION policy explicitly turned approval off
+ *     (`requireHumanApproval: false` at that scope, and the effective policy
+ *     says the same). A Work- or Agent-level loosening never lifts it: those
+ *     are the scopes a machine principal could ever write;
+ *   - a base nobody can name: always, as the worst case.
+ *
+ * Listed in `protectedBranches`, a floor branch stays refused outright, as
+ * before. Why approval-required rather than an absolute refusal: the release
+ * promotion lane merges INTO `stage` and `main` (always with a recorded
+ * approval), and refusing those outright would remove it.
+ */
+export const MERGE_POLICY_PROTECTED_BRANCH_FLOOR: readonly string[] = Object.freeze([
+	'main',
+	'master',
+	'develop',
+	'stage'
+]);
+
+/** The floor branches no scope can ever waive: `main` and `master`. */
+export const MERGE_POLICY_ALWAYS_APPROVED_BRANCHES: readonly string[] = Object.freeze(['main', 'master']);
+
+function normalizeFloorRef(ref: string | null | undefined): string | null {
+	if (typeof ref !== 'string') return null;
+	const normalized = ref
+		.trim()
+		.replace(/^refs\/heads\//i, '')
+		.toLowerCase();
+	return normalized || null;
+}
+
+/**
+ * Whether a merge into `ref` needs a recorded human approval because of the
+ * {@link MERGE_POLICY_PROTECTED_BRANCH_FLOOR}. An unknown or blank base
+ * answers `true`. `refs/heads/` is stripped and the comparison is
+ * case-insensitive, the same normalisation the protected-branch rule uses.
+ *
+ * `humanScopeWaivesApproval` is {@link ResolvedMergePolicy.humanScopeWaivesApproval}:
+ * true only when a tenant or organization policy explicitly turned approval
+ * off. It lifts the floor for `develop` / `stage`, never for `main` / `master`.
+ */
+export function mergeTargetNeedsFloorApproval(
+	ref: string | null | undefined,
+	opts: { humanScopeWaivesApproval?: boolean } = {}
+): boolean {
+	const normalized = normalizeFloorRef(ref);
+	if (!normalized) return true;
+	if (MERGE_POLICY_ALWAYS_APPROVED_BRANCHES.includes(normalized)) return true;
+	if (!MERGE_POLICY_PROTECTED_BRANCH_FLOOR.includes(normalized)) return false;
+	return opts.humanScopeWaivesApproval !== true;
+}
+
+/** Two branch refs name the same branch (`refs/heads/` stripped, case-insensitive). */
+export function sameMergeBranch(a: string | null | undefined, b: string | null | undefined): boolean {
+	const left = normalizeFloorRef(a);
+	return left !== null && left === normalizeFloorRef(b);
+}
+
 /** Every field name of {@link MergePolicy}; the deep-merge iterates this. */
 export const MERGE_POLICY_FIELDS: readonly (keyof MergePolicy)[] = [
 	'allowAgentMerge',
@@ -131,6 +199,15 @@ export interface ResolvedMergePolicy {
 	source: MergePolicySource;
 	/** Least → most specific, starting at the platform default. */
 	chain: MergePolicyChainEntry[];
+	/**
+	 * Works-security lane 3a — true only when the most specific TENANT or
+	 * ORGANIZATION layer that declares `requireHumanApproval` declares `false`
+	 * AND the effective policy is `false` too. Those are the scopes only a
+	 * person can write; it lifts the protected-branch floor for `develop` /
+	 * `stage` (never for `main` / `master`, see
+	 * {@link mergeTargetNeedsFloorApproval}). Absent = false (fail closed).
+	 */
+	humanScopeWaivesApproval?: boolean;
 }
 
 /**
@@ -167,7 +244,13 @@ export type MergeRefusalCode =
 	/** Provider CI is not green at merge time (it may have been at approval time). */
 	| 'pull-request-not-green'
 	/** The live head commit could not be read, so nothing can be pinned to it. */
-	| 'head-sha-unknown';
+	| 'head-sha-unknown'
+	/**
+	 * Works-security lane 3a — the pull request's LIVE base (read from the
+	 * provider) is not the branch the caller planned to merge into: the PR was
+	 * retargeted. The live base is authoritative; the merge is refused.
+	 */
+	| 'target-branch-mismatch';
 
 /** Outcome of the single decision point (`canAgentMerge`). */
 export interface MergeDecision {

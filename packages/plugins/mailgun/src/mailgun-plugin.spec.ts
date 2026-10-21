@@ -146,7 +146,7 @@ describe('MailgunPlugin', () => {
 
 		it('verifies with the env key when MAILGUN_WEBHOOK_SIGNING_KEY is set', () => {
 			process.env.MAILGUN_WEBHOOK_SIGNING_KEY = 'env-key';
-			const timestamp = '1700000000';
+			const timestamp = String(Math.floor(Date.now() / 1000));
 			const token = 'tok';
 			const signature = createHmac('sha256', 'env-key').update(`${timestamp}${token}`).digest('hex');
 			const good = Buffer.from(JSON.stringify({ timestamp, token, signature }));
@@ -173,7 +173,7 @@ describe('MailgunPlugin', () => {
 
 	it('verifyWebhookSignature accepts a valid HMAC and rejects a forged one', () => {
 		const signingKey = 'sign-key';
-		const timestamp = '1700000000';
+		const timestamp = String(Math.floor(Date.now() / 1000));
 		const token = 'abc123';
 		const signature = createHmac('sha256', signingKey).update(`${timestamp}${token}`).digest('hex');
 		const opts = { userId: 'u', settings: { webhookSigningKey: signingKey } };
@@ -183,6 +183,32 @@ describe('MailgunPlugin', () => {
 
 		const bad = Buffer.from(JSON.stringify({ signature: { timestamp, token, signature: 'deadbeef' } }));
 		expect(() => plugin.verifyWebhookSignature(bad, {}, opts)).toThrow(/signature mismatch/);
+	});
+
+	// Review 2026-10-17 F56: the HMAC covers only timestamp + token, so a signature is
+	// accepted only while fresh, and each token once.
+	it('refuses a stale signature and a replayed token', () => {
+		const signingKey = 'sign-key';
+		const opts = { userId: 'u', settings: { webhookSigningKey: signingKey } };
+		const signed = (timestamp: string, token: string) =>
+			Buffer.from(
+				JSON.stringify({
+					timestamp,
+					token,
+					signature: createHmac('sha256', signingKey).update(`${timestamp}${token}`).digest('hex')
+				})
+			);
+		const now = Math.floor(Date.now() / 1000);
+		expect(() => plugin.verifyWebhookSignature(signed(String(now - 16 * 60), 'old'), {}, opts)).toThrow(
+			/outside the accepted window/
+		);
+		expect(() => plugin.verifyWebhookSignature(signed(String(now + 10 * 60), 'ahead'), {}, opts)).toThrow(
+			/outside the accepted window/
+		);
+		const fresh = signed(String(now), 'once');
+		expect(() => plugin.verifyWebhookSignature(fresh, {}, opts)).not.toThrow();
+		expect(() => plugin.verifyWebhookSignature(fresh, {}, opts)).toThrow(/token already used/);
+		expect(() => plugin.verifyWebhookSignature(signed(String(now), 'other'), {}, opts)).not.toThrow();
 	});
 
 	// EW-P4-3 — RFC threading.

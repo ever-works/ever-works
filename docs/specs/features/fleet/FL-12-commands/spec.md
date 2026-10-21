@@ -41,11 +41,11 @@ leaves one audit row per machine. Nothing is a sandbox and the surface says so b
  RECENT   git -C ~/code/api status --short · pnpm -v · df -h · uptime · …   (last 8)
 ```
 
-| Phase  | Ships                                                                                                                   |
-| ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Phase  | Ships                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | The Command and its runs; the hub Commands tab with live output cards; audit; errors; kill switch; CLI `fleet commands run` |
-| **P2** | Agent tool `fleet_commands_run`; "Run a command…" from a computer page; full output as an operation; cancel              |
-| **P3** | Folder picker from Checkouts (FL-14) and a Command re-run from history; a Command with a cadence hands over to FL-13     |
+| **P2** | Agent tool `fleet_commands_run`; "Run a command…" from a computer page; full output as an operation; cancel                 |
+| **P3** | Folder picker from Checkouts (FL-14) and a Command re-run from history; a Command with a cadence hands over to FL-13        |
 
 ---
 
@@ -76,12 +76,12 @@ columns and never shows a cadence control.
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer…                                    | Today they must…                                                                                            | What breaks                                                                                                                                                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| "What is on that machine right now?"          | Open the Agent's Computer tab and switch to the terminal channel — one machine, one shell, typed by hand.   | The node shell exists only as a live view of a single machine (`apps/node/src/core/screen/terminal-channel.ts:5-21`), is read-only while watching, and leaves no record of what was asked or answered.                           |
-| "Run it on all of them."                      | Repeat the above per machine, or SSH from a laptop.                                                         | The node has four job kinds — `acceptance-checks`, `agent-task`, `browser-check`, `computer-session` (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-120`) — none of which is "a command the owner typed". The platform holds no machine credential and must not (README D2). |
-| "Who ran what on my machine?"                 | Nothing.                                                                                                     | The audit ledger exists and is the single writer for every fleet action (`packages/agent/src/fleet/fleet-audit.service.ts:64-72`) but has no command action (`packages/contracts/src/fleet/fleet-panic.types.ts:60-114`).         |
-| "Let the Agent check the machines for me."    | The Agent has one read-only tool, `list_fleet_nodes` (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`). | It can list machines and nothing more; the CLI has no fleet command group at all (`apps/cli/src/main.ts:22-26`).                                                                                                                 |
+| To answer…                                 | Today they must…                                                                                              | What breaks                                                                                                                                                                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "What is on that machine right now?"       | Open the Agent's Computer tab and switch to the terminal channel — one machine, one shell, typed by hand.     | The node shell exists only as a live view of a single machine (`apps/node/src/core/screen/terminal-channel.ts:5-21`), is read-only while watching, and leaves no record of what was asked or answered.                                                                               |
+| "Run it on all of them."                   | Repeat the above per machine, or SSH from a laptop.                                                           | The node has four job kinds — `acceptance-checks`, `agent-task`, `browser-check`, `computer-session` (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-120`) — none of which is "a command the owner typed". The platform holds no machine credential and must not (README D2). |
+| "Who ran what on my machine?"              | Nothing.                                                                                                      | The audit ledger exists and is the single writer for every fleet action (`packages/agent/src/fleet/fleet-audit.service.ts:64-72`) but has no command action (`packages/contracts/src/fleet/fleet-panic.types.ts:60-114`).                                                            |
+| "Let the Agent check the machines for me." | The Agent has one read-only tool, `list_fleet_nodes` (`packages/agent/src/fleet/agent-fleet-tools.ts:39-77`). | It can list machines and nothing more; the CLI has no fleet command group at all (`apps/cli/src/main.ts:22-26`).                                                                                                                                                                     |
 
 ### 2.3 Why this epic is additive only
 
@@ -231,8 +231,7 @@ live view. "Command" is the program's canonical noun (README §1): never "run", 
 
 ### 4.4 Agent, MCP and CLI (P1 CLI, P2 Agent)
 
-- **FR-19** The CLI MUST offer `ever-works fleet commands run --on <a,b> [--timeout <s>] [--cwd
-  <dir>] [--json] -- <cmd>` exiting `0` when every machine succeeded, `1` when any failed, `2` on
+- **FR-19** The CLI MUST offer `ever-works fleet commands run --on <a,b> [--timeout <s>] [--cwd <dir>] [--json] -- <cmd>` exiting `0` when every machine succeeded, `1` when any failed, `2` on
   usage error and `124` when any timed out.
 - **FR-20** The Agent tool `fleet_commands_run` MUST be annotated destructive with
   `confirmationClass: confirm`, MUST be callable only when the Agent's grants and trust ladder
@@ -311,13 +310,13 @@ the decision card in My Decisions is the §5.1 dialog rendered for a human. The 
 
 ## 7. Key entities & concepts
 
-| Entity / concept     | New?     | Description                                                                                             |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
-| **Command**          | **NEW**  | One command line sent to one or more computers, with its folder, timeout, state and — for FL-13 — cadence. |
-| **Command run**      | **NEW**  | One computer's execution of a Command: timing, exit, status, stored head and tail, truncation marker. |
-| **Node / Computer**  | Existing | The target. Its `commands` family audience and its `manage` consent decide who may run.                |
-| **Fleet audit**      | Existing | Gains `node.command.run` and `node.command.cancel`.                                                     |
-| **Operation**        | FL-02    | "Open full output" fetches the machine-held output as an operation.                                     |
+| Entity / concept    | New?     | Description                                                                                                |
+| ------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| **Command**         | **NEW**  | One command line sent to one or more computers, with its folder, timeout, state and — for FL-13 — cadence. |
+| **Command run**     | **NEW**  | One computer's execution of a Command: timing, exit, status, stored head and tail, truncation marker.      |
+| **Node / Computer** | Existing | The target. Its `commands` family audience and its `manage` consent decide who may run.                    |
+| **Fleet audit**     | Existing | Gains `node.command.run` and `node.command.cancel`.                                                        |
+| **Operation**       | FL-02    | "Open full output" fetches the machine-held output as an operation.                                        |
 
 ---
 
@@ -331,14 +330,9 @@ the decision card in My Decisions is the §5.1 dialog rendered for a human. The 
 
 ## 8b. Open questions
 
-- `[NEEDS CLARIFICATION: Should the owner be able to choose the Agent's isolated environment as the
-  shell context for a Command ("run as Nina would")? Default until answered: no — Commands are
-  owner-level and run in the machine owner's login shell.]`
-- `[NEEDS CLARIFICATION: Recent is per owner today. Should Organization admins see the owner's
-  Recent on a shared computer, or only their own? Default until answered: each caller sees only
-  the Commands they ran.]`
-- **Resolved** by CONTRACTS §4.4: `fleet_command_runs.failedReason` is the enum `link-lost ·
-  node-restart · kill-switch · drain · shell-failed`; the status enum is not widened.
+- `[NEEDS CLARIFICATION: Should the owner be able to choose the Agent's isolated environment as the shell context for a Command ("run as Nina would")? Default until answered: no — Commands are owner-level and run in the machine owner's login shell.]`
+- `[NEEDS CLARIFICATION: Recent is per owner today. Should Organization admins see the owner's Recent on a shared computer, or only their own? Default until answered: each caller sees only the Commands they ran.]`
+- **Resolved** by CONTRACTS §4.4: `fleet_command_runs.failedReason` is the enum `link-lost · node-restart · kill-switch · drain · shell-failed`; the status enum is not widened.
 - **Resolved** by CONTRACTS rev 5: `failedReason` `cancelled-by-user` (§4.4); `command.output|truncated|timeout` (§3.3); `/commands/:id/cancel` and `/commands/:id/runs/:runId/output` (§11.2); limits 8 KiB / 50 computers / 8 concurrent (§10); 10 runs per minute (§10.1).
 
 ---

@@ -970,7 +970,17 @@ export class AppLifecycle {
 		this.assertScalable(targets, live);
 
 		for (const target of targets) {
-			await this.applyReplicas(credential, namespace, target.objectName, target.replicas, context);
+			const liveDeployment = live.find(
+				(deployment) => String(deployment?.metadata?.name ?? '') === target.objectName
+			);
+			await this.applyReplicas(
+				credential,
+				namespace,
+				target.objectName,
+				target.replicas,
+				liveDeployment,
+				context
+			);
 		}
 
 		for (const cronJob of await this.workCronJobs(credential, ref, context)) {
@@ -1056,21 +1066,57 @@ export class AppLifecycle {
 		}
 	}
 
-	/** One component's replica count, with §4.12's "never a negative or fractional count" applied. */
+	/**
+	 * One component's replica count, with §4.12's "never a negative or fractional count" applied.
+	 *
+	 * `applyObject` is a **server-side apply** under one field manager. A body of only
+	 * `{ spec: { replicas } }` makes that manager claim ONLY `spec.replicas` and release the
+	 * `selector` / `template` it owned from the deploy; with no manager left owning them the apiserver
+	 * prunes them and the apply is rejected `422: spec.selector Required / template.metadata.labels
+	 * null` (prod `cal-e2e` + fixture pause, 2026-10-20). So re-apply the LIVE object with only
+	 * `replicas` overridden: the manager keeps owning `selector` / `template`, and the apply validates.
+	 */
 	private async applyReplicas(
 		credential: string,
 		namespace: string,
 		objectName: string,
 		replicas: number,
+		liveDeployment: AppLiveDeployment | undefined,
 		context?: string
 	): Promise<void> {
+		const live =
+			liveDeployment ??
+			(await this.api.readObject<AppLiveDeployment>(
+				credential,
+				'apps/v1',
+				'Deployment',
+				namespace,
+				objectName,
+				context
+			));
+		if (!live?.spec?.template) {
+			throw lifecycleError(
+				APP_LIFECYCLE_CODES.no_live_version,
+				`scaleApp: Deployment '${objectName}' has no live spec/template to scale in ` +
+					`namespace '${namespace}'.`
+			);
+		}
 		await this.api.applyObject(
 			credential,
 			{
 				apiVersion: 'apps/v1',
 				kind: 'Deployment',
-				metadata: { name: objectName, namespace },
-				spec: { replicas: asReplicaCount(replicas) }
+				metadata: {
+					name: objectName,
+					namespace,
+					// Carry the labels AND annotations the field manager already owns: the same manager
+					// re-applies here, so anything omitted (e.g. `ever-works.io/deployment-id`, which
+					// log targeting reads) would be pruned by the server-side apply.
+					...(live.metadata?.labels ? { labels: live.metadata.labels } : {}),
+					...(live.metadata?.annotations ? { annotations: live.metadata.annotations } : {})
+				},
+				// The live spec carries selector + the full template; only the replica count changes.
+				spec: { ...live.spec, replicas: asReplicaCount(replicas) }
 			},
 			context
 		);

@@ -179,6 +179,35 @@ export interface AgentAppChangeToolSource {
 }
 
 /**
+ * Prompt-injection hardening — the owner-approval seam for Agent actions that
+ * must never take effect on a model's say-so alone (`resolve_escalation`,
+ * `editAgentFile`). Files a PENDING Agent Action Approval Queue proposal
+ * (`actionType: 'other'`, `humanDecisionRequired`: a guardrail may block it,
+ * never approve it) and returns its id and status. The approved action is
+ * applied by `AgentProposalExecutionListener`, never by the tool.
+ *
+ * Unbound, both tools fail CLOSED: they refuse and tell the model to ask the
+ * owner, rather than acting without an approval path.
+ */
+export interface AgentProposalToolSource {
+    propose(
+        userId: string,
+        input: {
+            agentId: string;
+            runId?: string | null;
+            title: string;
+            payload: Record<string, unknown>;
+            /**
+             * What the proposal is ABOUT, for de-duplication (e.g.
+             * `escalation:<id>`): one proposal per subject — a repeat returns
+             * the existing pending one instead of a second card.
+             */
+            subjectKey?: string | null;
+        },
+    ): Promise<{ id: string; status: 'pending' | 'approved' | 'rejected' }>;
+}
+
+/**
  * The bundle itself. Every member optional: a runtime binds what it can
  * reach, and `resolveAllowedTools` registers exactly the corresponding
  * tools.
@@ -197,4 +226,5 @@ export interface AgentDomainToolSources {
     workflow?: AgentWorkflowToolSource;
     inbox?: AgentInboxToolSource;
     appChanges?: AgentAppChangeToolSource;
+    proposals?: AgentProposalToolSource;
 }

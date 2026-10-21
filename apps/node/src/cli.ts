@@ -5,6 +5,7 @@ import {
 	createCommandRunner,
 	createConfigFileSystem,
 	createDiskProbe,
+	createHealthProbeIo,
 	createSecretStore,
 	createResourceProbe,
 	currentEnvironment,
@@ -24,10 +25,11 @@ import { NODE_APP_VERSION } from './version';
 
 function buildDeps(): CliDeps {
 	const logger = createLogger();
+	const runner = createCommandRunner();
 	return {
 		io: {
 			fetchFn: systemFetch,
-			runner: createCommandRunner(),
+			runner,
 			environment: currentEnvironment(),
 			logger,
 			version: NODE_APP_VERSION,
@@ -38,7 +40,9 @@ function buildDeps(): CliDeps {
 			diskProbe: createDiskProbe(),
 			// Node lifecycle (slice AR): the cache key of the model-CLI
 			// compatibility probe, so an upgraded CLI is re-probed at once.
-			statFile: statModelCliFile
+			statFile: statModelCliFile,
+			// Computer health (FL-03): the snapshot every heartbeat carries.
+			health: createHealthProbeIo(runner)
 		},
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),

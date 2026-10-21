@@ -41,3 +41,40 @@ describe('buildAgentTaskTools createTask ownership', () => {
         );
     });
 });
+
+describe('buildAgentTaskTools transitionTask (prompt-injection hardening)', () => {
+    const agent = {
+        id: 'agent-1',
+        userId: 'user-1',
+        scope: AgentScope.WORK,
+        workId: 'work-1',
+        permissions: { canAssignTasks: true },
+    } as Agent;
+
+    it('offers no force parameter', () => {
+        const tools = buildAgentTaskTools({
+            agent,
+            tasksService: {} as TasksService,
+            chatService: {} as TaskChatService,
+        });
+        const transition = tools.find((tool) => tool.name === 'transitionTask')!;
+        expect(Object.keys(transition.parameters.properties)).not.toContain('force');
+    });
+
+    it('never forwards a model-supplied force=true — the move runs every gate', async () => {
+        const tasksService = {
+            transition: jest.fn().mockResolvedValue({ id: 'task-1', status: 'done' }),
+        } as unknown as TasksService;
+        const tools = buildAgentTaskTools({
+            agent,
+            tasksService,
+            chatService: {} as TaskChatService,
+        });
+        const transition = tools.find((tool) => tool.name === 'transitionTask')!;
+        await transition.invoke({ taskId: 'task-1', to: 'done', force: true });
+        expect(tasksService.transition).toHaveBeenCalledWith('user-1', 'task-1', 'done', {
+            force: false,
+            actorType: 'agent',
+        });
+    });
+});

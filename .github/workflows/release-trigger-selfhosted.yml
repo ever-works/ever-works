@@ -22,6 +22,17 @@ on:
           - prod
           - staging
         default: prod
+      runner:
+        description: >-
+          Where to run. `self-hosted` (default) = the in-network ARC pool. `github-hosted` =
+          ubuntu-latest, for when cluster egress cannot reach Cloudflare (the daily ISP window):
+          after login the CLI deploys through the apiUrl the SERVER returns (https://trigger.ever.co),
+          so the in-cluster TRIGGER_SELFHOSTED_API_URL only gets an ARC runner past login.
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
+        default: self-hosted
   workflow_run:
     workflows: ["CI"]
     branches: [main, stage]
@@ -36,11 +47,17 @@ jobs:
   deploy:
     # Only run when the self-hosted migration flag is on AND the trigger is valid
     # (a manual dispatch, or a CI run that actually succeeded).
+    # Security (works-security, 2026-10-18): a `workflow_run` trigger also fires for runs of a
+    # same-named workflow from a FORK pull request (the fork can add any `on:` and name its
+    # branch `main`), and this job would then run with this repository's secrets. Only a run
+    # that came from a push or a manual dispatch IN THIS REPOSITORY may continue.
     if: >-
       ${{ vars.TRIGGER_SELFHOSTED == 'true' &&
           (github.event_name == 'workflow_dispatch' ||
-           github.event.workflow_run.conclusion == 'success') }}
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+           (github.event.workflow_run.conclusion == 'success' &&
+            (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+            github.event.workflow_run.head_repository.full_name == github.repository)) }}
+    runs-on: ${{ github.event.inputs.runner == 'github-hosted' && 'ubuntu-latest' || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     # Record the deployment under the matching GitHub environment for governance
     # parity with the legacy cloud workflows (prod/stage). These environments
     # currently carry no protection rules, so this does not add an approval gate;
@@ -110,7 +127,7 @@ jobs:
           verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
           verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
           force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
-          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' && github.event.inputs.runner != 'github-hosted' }}
 
       - name: Install dependencies
         if: steps.env.outputs.skip != 'true'
@@ -149,6 +166,26 @@ jobs:
         working-directory: packages/tasks
         run: pnpm prepare:plugins
 
+      # The trigger.dev CLI logs in through TRIGGER_API_URL but then deploys through the apiUrl the SERVER
+      # returns (https://trigger.ever.co). Cluster egress cannot reach Cloudflare during the daily ISP window,
+      # so on the in-network ARC pool the public name is pointed at the in-cluster ingress-nginx VIP, which
+      # serves a real certificate for it (k8s-gitops apps/trigger; arc-runners CNP rule 7 allows only that SNI).
+      - name: Reach trigger.ever.co in-cluster (self-hosted pool)
+        if: steps.env.outputs.skip != 'true' && github.event.inputs.runner != 'github-hosted' && vars.TRIGGER_SELFHOSTED_INGRESS_IP != ''
+        env:
+          INGRESS_IP: ${{ vars.TRIGGER_SELFHOSTED_INGRESS_IP }}
+        run: |
+          if ! printf '%s' "$INGRESS_IP" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
+            echo "::error::TRIGGER_SELFHOSTED_INGRESS_IP is not an IPv4 address"; exit 1
+          fi
+          echo "$INGRESS_IP trigger.ever.co" | sudo tee -a /etc/hosts >/dev/null
+          # Unauthenticated whoami answers 401 when the webapp is reachable; 000 means the path is blocked.
+          code="$(curl -sS -m 15 -o /dev/null -w '%{http_code}' https://trigger.ever.co/api/v2/whoami || true)"
+          echo "trigger.ever.co via $INGRESS_IP: HTTP $code"
+          if [ "$code" != "401" ] && [ "$code" != "200" ]; then
+            echo "::warning::trigger.ever.co did not answer through the in-cluster ingress (HTTP $code); the deploy may still fail"
+          fi
+
       - name: 🚀 Deploy Trigger.dev (self-hosted)
         if: steps.env.outputs.skip != 'true'
         working-directory: packages/tasks
@@ -157,7 +194,15 @@ jobs:
           # (TRIGGER_ACCESS_TOKEN) untouched for the legacy cloud workflows.
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_SELFHOSTED_ACCESS_TOKEN }}
           # Public origin of our self-hosted instance (used by the CLI to deploy).
-          TRIGGER_API_URL: https://trigger.ever.co
+          # Repo var override (2026-10-18): the in-cluster ARC runners use the in-cluster webapp
+          # (http://trigger-webapp.trigger.svc.cluster.local:3030) because cluster egress cannot reach
+          # Cloudflare 188.114.96.0/22 during the daily ISP window, so login against the public URL fails.
+          # ⚠️ That only fixes LOGIN: the deploy calls then use the apiUrl the server returns for the
+          # environment (trigger.dev CLI getProjectClient → projectEnv.apiUrl = https://trigger.ever.co),
+          # so during the window dispatch with `runner: github-hosted` instead (public URL below).
+          # With TRIGGER_SELFHOSTED_INGRESS_IP set, the self-hosted pool reaches the public name in-cluster (step above),
+          # so login and deploy use the same origin.
+          TRIGGER_API_URL: ${{ (github.event.inputs.runner == 'github-hosted' || vars.TRIGGER_SELFHOSTED_INGRESS_IP != '') && 'https://trigger.ever.co' || vars.TRIGGER_SELFHOSTED_API_URL || 'https://trigger.ever.co' }}
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
           # GHCR push token (evereq classic PAT, write:packages). The self-hosted

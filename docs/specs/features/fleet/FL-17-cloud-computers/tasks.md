@@ -46,8 +46,7 @@
       the same change** add `machine-provider: Cloud` to `CATEGORY_ICONS` and `'Machine Providers'`
       to `CATEGORY_LABELS` in `apps/web/src/lib/utils/plugin-category-icons.ts` (L39, L102).
       **Test**: extend `packages/plugin/src/contracts/__tests__/identity-provider.interface.spec.ts`
-      (append-only pin) and `app-dependency-capability.spec.ts`; `pnpm --filter ever-works-web
-      type-check` green (the `Record<PluginCategory,…>` assertions at L138-139).
+      (append-only pin) and `app-dependency-capability.spec.ts`; `pnpm --filter ever-works-web type-check` green (the `Record<PluginCategory,…>` assertions at L138-139).
 
 ## P1.B — Fleet contracts and schema
 
@@ -59,8 +58,7 @@
       1–72; name pattern); extend `fleet-panic.spec.ts`; the node contract fixture still validates.
 - [ ] **T-05**. Add `origin` (owned by FL-16's slot; declared here too so either lands first — R-35), `providerPluginId`,
       `providerMachineRef`, `providerMeta` to `packages/agent/src/entities/fleet-node.entity.ts`
-      (after `kind`, L115) with doc comments; partial unique index on `(providerPluginId,
-      providerMachineRef)`.
+      (after `kind`, L115) with doc comments; partial unique index on `(providerPluginId, providerMachineRef)`.
       **Test**: `pnpm --filter @ever-works/agent build` clean; entities inventory spec unchanged.
 - [ ] **T-06**. Author `apps/api/src/migrations/1796170000000-AddFleetNodeProviderFields.ts` from
       `apps/api/`; hand-edit every `ADD COLUMN` (incl. `origin`) to be guarded with `findColumnByName`

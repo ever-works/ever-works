@@ -41,6 +41,7 @@ import {
     APP_DEPLOY_WARNING_DISPATCH_SLOW,
     AppDeployRefusedError,
     AppDeployRequestService,
+    defaultedBuildIdOf,
     isSet,
     normaliseTrigger,
     queueIdentity,
@@ -784,6 +785,12 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
 
         it('queues a `spec-applied` request, recording FR-23’s sixth source by name', async () => {
             const h = harness();
+            // `spec-applied` is the published-image trigger (§5.8): a Build-backed strategy with no
+            // Build is refused up front since 2026-10-18 (see "a Build-backed request that named no
+            // Build" below).
+            h.preconditions.result = ready({
+                context: { ...ready().context, strategy: 'image' },
+            });
             h.states.claimGranted = false;
             h.states.state = {
                 ...h.states.state,
@@ -1229,5 +1236,83 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 appRender: { specCommitSha: 'sha-spec-1', skipPreDeployJobs: false },
             });
         });
+    });
+});
+
+describe('AppDeployRequestService — a Build-backed request that named no Build (prod, 2026-10-18)', () => {
+    it("deploys §5.1's newest green Build, re-evaluated AT that Build, and dispatches it", async () => {
+        const h = harness();
+        // The real pass: no Build named ⇒ it picks the newest deployable Build into the context.
+        h.preconditions.evaluate = async (request: AppDeployPreconditionRequest) => {
+            h.preconditions.requests.push(request);
+            const base = ready();
+            return {
+                ...base,
+                context: {
+                    ...base.context,
+                    buildId: request.buildId ?? 'build-latest',
+                    specCommitSha: request.buildId ? 'sha-of-build-latest' : 'sha-head',
+                },
+            };
+        };
+
+        const result = await h.service.request(manual({ buildId: null }));
+
+        expect(result.status).toBe('accepted');
+        expect(h.preconditions.requests.map((request) => request.buildId)).toEqual([
+            null,
+            'build-latest',
+        ]);
+        expect(h.store.rows[0]).toMatchObject({
+            buildId: 'build-latest',
+            commitSha: 'sha-of-build-latest',
+        });
+        expect(h.dispatcher.calls[0]).toMatchObject({ buildId: 'build-latest' });
+    });
+
+    it('refuses no_green_build up front, creating no row and dispatching nothing, when there is no Build', async () => {
+        const h = harness();
+        h.preconditions.result = ready(); // dockerfile, and the pass found no Build
+
+        const result = await h.service.request(manual({ buildId: null }));
+
+        expect(result).toMatchObject({
+            status: 'refused',
+            httpStatus: 422,
+            code: APP_DEPLOY_CODE_PRECONDITIONS,
+        });
+        expect(result.unmet.map((entry) => entry.code)).toEqual(['no_green_build']);
+        expect(h.store.rows).toHaveLength(0);
+        expect(h.dispatcher.calls).toHaveLength(0);
+    });
+
+    it('never defaults a Build for `image`, for a named Build or when the pass refused', () => {
+        expect(
+            defaultedBuildIdOf(
+                manual({ buildId: 'b-1' }),
+                ready({ context: { ...ready().context, buildId: 'x' } }),
+            ),
+        ).toBeNull();
+        expect(
+            defaultedBuildIdOf(
+                manual({ buildId: null }),
+                ready({ context: { ...ready().context, strategy: 'image', buildId: 'x' } }),
+            ),
+        ).toBeNull();
+        expect(
+            defaultedBuildIdOf(
+                manual({ buildId: null }),
+                ready({
+                    unmet: [{ code: 'paused', message: 'p' }],
+                    context: { ...ready().context, buildId: 'x' },
+                }),
+            ),
+        ).toBeNull();
+        expect(
+            defaultedBuildIdOf(
+                manual({ buildId: null }),
+                ready({ context: { ...ready().context, buildId: 'x' } }),
+            ),
+        ).toBe('x');
     });
 });

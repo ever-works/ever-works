@@ -22,86 +22,86 @@
 ## P1.A — Contracts and schema
 
 - [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-commands.types.ts` (views, statuses, `failedReason` values, constants, link message types from plan §4.3); export from `packages/contracts/src/fleet/index.ts`.
-  **Test**: `packages/contracts/src/fleet/__tests__/fleet-commands.spec.ts` — every union has its `readonly` array and `isX` guard; timeout, output and recent constants equal CONTRACTS §10; the three proposed limits are marked as such (spec §8b).
+      **Test**: `packages/contracts/src/fleet/__tests__/fleet-commands.spec.ts` — every union has its `readonly` array and `isX` guard; timeout, output and recent constants equal CONTRACTS §10; the three proposed limits are marked as such (spec §8b).
 - [ ] **T-02**. Add `node.command.run` and `node.command.cancel` to `FleetAuditAction` and `FLEET_AUDIT_ACTIONS` in `packages/contracts/src/fleet/fleet-panic.types.ts` (union at `:60-114`, array `:116-148`).
-  **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-panic.spec.ts` — union and array stay in sync.
+      **Test**: extend `packages/contracts/src/fleet/__tests__/fleet-panic.spec.ts` — union and array stay in sync.
 - [ ] **T-03**. Add `packages/agent/src/entities/fleet-command.entity.ts` and `fleet-command-run.entity.ts` per plan §4.1 (CONTRACTS §4.4 columns only; `simple-json` text and `varchar` enums per the §4 storage types); register in `packages/agent/src/entities/index.ts` and `packages/agent/src/database/_entities-inventory.ts`.
-  **Test**: `packages/agent/src/entities/__tests__/fleet-command.entity.spec.ts` — metadata loads; no `@ManyToOne`.
+      **Test**: `packages/agent/src/entities/__tests__/fleet-command.entity.spec.ts` — metadata loads; no `@ManyToOne`.
 - [ ] **T-04**. Author `apps/api/src/migrations/1796120000000-CreateFleetCommands.ts` and `1796120100000-CreateFleetCommandRuns.ts` (`pnpm typeorm migration:generate -d typeorm.config.ts …` from `apps/api/`, then hand-check: additive only, no FK on `nodeId`).
-  **Test**: apply twice on a fresh and a populated database; a re-generate yields an empty diff.
+      **Test**: apply twice on a fresh and a populated database; a re-generate yields an empty diff.
 
 ## P1.B — Domain service
 
 - [ ] **T-05**. Add `packages/agent/src/fleet/fleet-command.policy.ts` — pure: `resolveTargets(nodes, caller, role)` → per node `runnable | reason`, `clampTimeout`, `COMMAND_LIMITS`.
-  **Test**: `packages/agent/src/fleet/__tests__/fleet-command.policy.spec.ts` — truth table over status × consent × audience; clamp at ±1 s.
+      **Test**: `packages/agent/src/fleet/__tests__/fleet-command.policy.spec.ts` — truth table over status × consent × audience; clamp at ±1 s.
 - [ ] **T-06**. Add `packages/agent/src/fleet/fleet-command.service.ts` — `run` (answers `confirmation_required` with the per-node summary until `confirm: true`, CONTRACTS §2.2), `cancel`, `get`, `listRecent`, `onData` (head/tail rings), `onExit`, `onLinkLost`; kill-switch check via `FleetKillSwitchService`; audit via `FleetAuditService.tryRecord`. Register and export in `packages/agent/src/fleet/fleet.module.ts`.
-  **Test**: `packages/agent/src/fleet/__tests__/fleet-command.service.spec.ts` — every refusal code; head/tail exactly 64 KiB; `link-lost` after 2 min; redaction of a token-shaped command line.
+      **Test**: `packages/agent/src/fleet/__tests__/fleet-command.service.spec.ts` — every refusal code; head/tail exactly 64 KiB; `link-lost` after 2 min; redaction of a token-shaped command line.
 - [ ] **T-07**. Add pure `packages/agent/src/fleet/fleet-command-confirmation.ts` — builds the `confirmation_required` details (`class: 'confirm'`, per-node `summary[]` with shell, user, folder or the refusal code and hint) from the same inputs the run uses; no token, no route.
-  **Test**: `__tests__/fleet-command-confirmation.spec.ts` — summary per node; an unrunnable node carries its code and hint; a run with `confirm: true` executes exactly the payload it carries.
+      **Test**: `__tests__/fleet-command-confirmation.spec.ts` — summary per node; an unrunnable node carries its code and hint; a run with `confirm: true` executes exactly the payload it carries.
 
 ## P1.C — API and relay
 
 - [ ] **T-08**. Add `apps/api/src/fleet/fleet-commands.controller.ts` (`api/fleet/commands`, routes per plan §5, DTOs under `apps/api/src/fleet/dto/fleet-commands.dto.ts`); mount in `apps/api/src/fleet/fleet.module.ts`; add `FleetFlagGuard('FLEET_COMMANDS_ENABLED')` at `apps/api/src/fleet/guards/fleet-flag.guard.ts`.
-  **Test**: `apps/api/src/fleet/fleet-commands.controller.spec.ts` — every §8 code with its hint; cross-user 404; throttles.
+      **Test**: `apps/api/src/fleet/fleet-commands.controller.spec.ts` — every §8 code with its hint; cross-user 404; throttles.
 - [ ] **T-09**. Add `apps/api/src/fleet/fleet-command-bridge.service.ts` — opens one `command` channel per node through the FL-02 relay, forwards `DATA`/`EXIT` to the service and to attached viewers, handles `command.cancel`.
-  **Test**: `apps/api/src/fleet/fleet-command-bridge.service.spec.ts` with a fake link — refusal mapping, cancel, link drop.
+      **Test**: `apps/api/src/fleet/fleet-command-bridge.service.spec.ts` with a fake link — refusal mapping, cancel, link drop.
 - [ ] **T-10**. Add the viewer gateway path `/ws/fleet/command/:commandId` to the FL-02 fleet WS service (`apps/api/src/fleet/fleet-link-ws.service.ts`), role `viewer` only.
-  **Test**: extend its spec — query string refused; token in first frame; a viewer cannot send input.
+      **Test**: extend its spec — query string refused; token in first frame; a viewer cannot send input.
 
 ## P1.D — Node
 
 - [ ] **T-11**. Add `apps/node/src/core/link/modules/command/command-runner.ts` — login shell per OS (lift `resolveNodeShell` from `apps/node/src/core/screen/terminal-channel.ts:27-34` into `apps/node/src/core/node-shell.ts` and re-export), `stdio: ['ignore','pipe','pipe']`, process-group kill, 10 MiB cap, `buildNodeCheckEnv` environment.
-  **Test**: `apps/node/src/core/link/modules/command/command-runner.spec.ts` — stdin is EOF; timeout kills a child's child; cap stops at 10 MiB; Windows argv.
+      **Test**: `apps/node/src/core/link/modules/command/command-runner.spec.ts` — stdin is EOF; timeout kills a child's child; cap stops at 10 MiB; Windows argv.
 - [ ] **T-12**. Add `apps/node/src/core/link/modules/command/command-output-store.ts` — `<configDir>/commands/<runId>.log`, ring of 30, owner-only mode.
-  **Test**: `command-output-store.spec.ts` — 31st run evicts the oldest; files are 0600.
+      **Test**: `command-output-store.spec.ts` — 31st run evicts the oldest; files are 0600.
 - [ ] **T-13**. Add `apps/node/src/core/link/modules/command.ts` — the `command` `NodeModule` (CONTRACTS R-40) with its channel handler for `command.run`, `command.cancel`, `command.output`; terminates running commands on `link.pause` (`failedReason: kill-switch`) and `link.drain` (`drain`); validates `cwd` with the shared resolver `apps/node/src/core/link/allowed-roots.ts` (R-39); one entry in `apps/node/src/core/link/modules/index.ts`, active only when `--manage` is on.
-  **Test**: `apps/node/src/core/link/modules/command.spec.ts` — `consent_missing` refusal without `--manage`; cancel → `EXIT 130`; `link.pause` → `EXIT 137` and `kill-switch`; `link.drain` → `drain`; `cwd` escape refused.
+      **Test**: `apps/node/src/core/link/modules/command.spec.ts` — `consent_missing` refusal without `--manage`; cancel → `EXIT 130`; `link.pause` → `EXIT 137` and `kill-switch`; `link.drain` → `drain`; `cwd` escape refused.
 
 ## P1.E — Web and CLI
 
 - [ ] **T-14**. Register the Commands hub tab with `registerHubTab({ id: 'commands', flag: 'FLEET_COMMANDS_ENABLED', load: () => import('./commands/CommandsPanel') })` in `apps/web/src/components/fleet/registry.ts`. The `/fleet/commands` route file and `DASHBOARD_FLEET_COMMANDS` are FL-01's (CONTRACTS §11.1); do not create them.
-  **Test**: `apps/web/src/components/fleet/registry.unit.spec.ts` — the panel is present with the flag on, absent off.
+      **Test**: `apps/web/src/components/fleet/registry.unit.spec.ts` — the panel is present with the flag on, absent off.
 - [ ] **T-15**. Add `apps/web/src/components/fleet/commands/` — `commands.shared.ts`, `CommandsPanel.tsx`, `CommandComposer.tsx`, `CommandNodePicker.tsx`, `CommandConfirmDialog.tsx`, `CommandRunCard.tsx`, `CommandSummaryLine.tsx`, `RecentCommands.tsx`, `use-command-attach.ts`.
-  **Test**: `commands.shared.unit.spec.ts` (preselection and reasons); `CommandConfirmDialog.unit.spec.tsx` (sandbox sentence verbatim, shell and user named).
+      **Test**: `commands.shared.unit.spec.ts` (preselection and reasons); `CommandConfirmDialog.unit.spec.tsx` (sandbox sentence verbatim, shell and user named).
 - [ ] **T-16**. Add BFF routes `apps/web/src/app/api/fleet/commands/route.ts` and `apps/web/src/app/api/fleet/commands/[id]/attach-token/route.ts`.
-  **Test**: `apps/web/e2e/flow-fleet-commands-contract.spec.ts` — refusal bodies (incl. `409 confirmation_required` with its summary) pass through with code and hint.
+      **Test**: `apps/web/e2e/flow-fleet-commands-contract.spec.ts` — refusal bodies (incl. `409 confirmation_required` with its summary) pass through with code and hint.
 - [ ] **T-17**. Add i18n `fleet.commands.*` and `fleet.errors.*` keys to `apps/web/messages/en.json` (camelCase leaves, no literal dots).
-  **Test**: no literal user-visible string in `apps/web/src/components/fleet/commands/`.
+      **Test**: no literal user-visible string in `apps/web/src/components/fleet/commands/`.
 - [ ] **T-18**. Add the CLI group root `apps/cli/src/commands/fleet/index.ts` (if FL-19 has not landed it) and `apps/cli/src/commands/fleet/command.ts` — `ever-works fleet commands run --on --timeout --cwd --json -- <cmd>` (sends `confirm: true` after printing the summary, or with `--yes`); register in `apps/cli/src/main.ts`; exit codes `0/1/2/124`.
-  **Test**: `apps/cli/src/commands/fleet/__tests__/command.spec.ts` — exit codes; `--json` shape equals `FleetCommandRunView`.
+      **Test**: `apps/cli/src/commands/fleet/__tests__/command.spec.ts` — exit codes; `--json` shape equals `FleetCommandRunView`.
 - [ ] **T-19**. Playwright `apps/web/e2e/flow-fleet-commands.spec.ts` — golden path on two fake nodes, greyed reasons, timeout card, recent list of 8.
-  **Test**: green locally and in CI.
+      **Test**: green locally and in CI.
 
 ## P2 — Agent tool, computer page, operations
 
 - [ ] **T-20**. Extend `packages/agent/src/fleet/agent-fleet-tools.ts` with `fleet_commands_run` (destructive, `confirmationClass: 'confirm'`, AW-24 `machine.run`), `fleet_commands_get`, `fleet_commands_list` (read-only), through the FL-19 gate helper `packages/agent/src/fleet/fleet-tool-gate.ts`.
-  **Test**: `packages/agent/src/fleet/__tests__/agent-fleet-tools.spec.ts` — refusal outside the audience; `requestedBy: agent:<id>` in the audit row.
+      **Test**: `packages/agent/src/fleet/__tests__/agent-fleet-tools.spec.ts` — refusal outside the audience; `requestedBy: agent:<id>` in the audit row.
 - [ ] **T-21**. Add MCP whitelist entries `fleet_commands_run`, `fleet_commands_get`, `fleet_commands_list`, `fleet_commands_cancel` (CONTRACTS §11.3 names) in `apps/mcp/src/openapi-tools/whitelist.ts` (annotations per plan §9).
-  **Test**: `apps/mcp/src/openapi-tools/__tests__/whitelist.spec.ts` — entries resolve against the OpenAPI spec.
+      **Test**: `apps/mcp/src/openapi-tools/__tests__/whitelist.spec.ts` — entries resolve against the OpenAPI spec.
 - [ ] **T-22**. Add `⋯ › Run a command…` to the computer page header (FL-01's `apps/web/src/components/fleet/computer/ComputerActionsMenu.tsx`) linking to `/fleet/commands?node=<id>`; show "Last command" on the Overview tab.
-  **Test**: extend `apps/web/e2e/flow-fleet-commands.spec.ts`.
+      **Test**: extend `apps/web/e2e/flow-fleet-commands.spec.ts`.
 - [ ] **T-23**. Implement `POST /commands/:id/runs/:runId/output` as an FL-02 operation; node `command.output`; download response with `Content-Disposition: attachment`, `nosniff`.
-  **Test**: controller spec — offline node → `unreachable` with last-seen hint.
+      **Test**: controller spec — offline node → `unreachable` with last-seen hint.
 - [ ] **T-24**. Implement cancel end to end (controller → bridge → node → `EXIT 130` → `node.command.cancel`); the run ends as spec §8b's default says (`failed`, `failedReason` null, Command `state: cancelled`) until CONTRACTS §4.4 names a value; add `fleet_commands_cancel` to the Agent tools.
-  **Test**: service and channel specs extended.
+      **Test**: service and channel specs extended.
 
 ## P3 — Folder picker, re-run, hand-over
 
 - [ ] **T-25**. Folder picker from FL-14 checkouts in `CommandComposer.tsx` (falls back to a path field when FL-14 is off).
-  **Test**: `CommandComposer.unit.spec.tsx`.
+      **Test**: `CommandComposer.unit.spec.tsx`.
 - [ ] **T-26**. Re-run from Recent (opens the confirm dialog pre-filled).
-  **Test**: Playwright extension.
+      **Test**: Playwright extension.
 - [ ] **T-27**. Retention sweep for `fleet_command_runs` bodies in `apps/api/src/fleet/fleet-job-retention.service.ts` (null head/tail after 30 days, keep rows).
-  **Test**: extend its spec.
+      **Test**: extend its spec.
 
 ## Docs and rollout
 
 - [ ] **T-28**. User doc `docs/features/fleet-commands.md`; add to `apps/docs/sidebarsPlatform.ts` under the fleet entry (`:183`); link from `docs/features/fleet.md`.
-  **Test**: `pnpm --filter ever-works-docs build` reports no broken link.
+      **Test**: `pnpm --filter ever-works-docs build` reports no broken link.
 - [ ] **T-29**. Update `docs/specs/features/fleet/TRACKER.md` (FL-12 Impl) and this folder's status lines; amend CONTRACTS in the same PR with whatever spec §8b still lists.
-  **Test**: the tracker row and the status lines name the merged phase.
+      **Test**: the tracker row and the status lines name the merged phase.
 - [ ] **T-30**. Run `pnpm format && pnpm lint && pnpm test && pnpm build`; confirm `pnpm --filter ever-works-docs build` has no broken links; run the banned-terms grep on this folder.
-  **Test**: all green; the grep prints nothing.
+      **Test**: all green; the grep prints nothing.
 
 ## Definition of done
 

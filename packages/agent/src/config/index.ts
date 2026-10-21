@@ -61,12 +61,14 @@ import {
 } from '../subscriptions/billing/stripe-catalog';
 // CI feedback + autonomous fix loop (slice AC, EW-806). Concrete file
 // import, not the tasks-domain barrel: `task-ci-auto-resume.ts` is a pure
-// leaf (its only import is `node:crypto`) and pulling the barrel here
+// leaf (its only imports are `node:crypto` and the import-free
+// `review-feedback-fence.ts`) and pulling the barrel here
 // would drag the Nest service graph into config resolution.
 import {
     DEFAULT_CI_AUTO_RESUME_ATTEMPTS,
     MAX_CI_AUTO_RESUME_ATTEMPTS,
     clampAutoResumeAttempts,
+    parseTrustedCheckApps,
 } from '../tasks-domain/task-ci-auto-resume';
 // Same reasoning as the import above: the clamps that decide how much
 // money the reviewer agent stage may spend live next to the constants
@@ -623,6 +625,18 @@ export const config = {
         isJobPurgeEnabled(): boolean {
             return process.env.FLEET_JOB_PURGE_ENABLED !== 'false';
         },
+        /**
+         * Computer health (FL-03) — `FLEET_HEALTH_HISTORY_ENABLED` gates the
+         * health HISTORY: the per-beat sample writer, the hourly roll-up and
+         * the history endpoint. Default OFF (CONTRACTS §9): only the exact
+         * string `true` turns it on. Retention is NOT gated: rows written
+         * while it was on still age out after it is switched off. The latest
+         * snapshot on the node row is telemetry and is stored with the flag
+         * off too.
+         */
+        isHealthHistoryEnabled(): boolean {
+            return process.env.FLEET_HEALTH_HISTORY_ENABLED === 'true';
+        },
         getCredentialRotationOverlapMs(): number {
             return clampedIntEnv(
                 process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
@@ -714,6 +728,20 @@ export const config = {
          */
         isRelayBusRequired(): boolean {
             return process.env.FLEET_RELAY_REQUIRE_BUS === 'true';
+        },
+        /**
+         * Fleet node link (FL-02, CONTRACTS R-7) — the cross-replica relay
+         * bus's kill switch (`FLEET_RELAY_BUS_ENABLED`). On unless set to
+         * `false`, `0` or `off` (any case): with a Redis URL configured the
+         * terminal relay, the computer live view and the node link then fan
+         * out over Valkey. Off keeps every relay in-process (the behaviour
+         * before the bus existed) even when `REDIS_URL` is set — for an
+         * operator who needs the bus off without a code change. Read once,
+         * at boot.
+         */
+        isRelayBusEnabled(): boolean {
+            const raw = (process.env.FLEET_RELAY_BUS_ENABLED || '').trim().toLowerCase();
+            return !(raw === 'false' || raw === '0' || raw === 'off');
         },
         /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
         getMaxCapabilityTags(): number {
@@ -2086,6 +2114,17 @@ export const config = {
             );
         },
         /**
+         * The GitHub Apps whose check results may drive the CI fix loop
+         * (security finding F8): `github-actions` ALWAYS, plus
+         * `GITHUB_TRUSTED_CHECK_APPS` (comma-separated app slugs). Read by the
+         * webhook intake, the evaluator and the two-minute poll alike, so the
+         * three can never disagree. Results from any other app are still
+         * ingested and shown on the board; they never resume a run.
+         */
+        getTrustedCheckApps(): string[] {
+            return parseTrustedCheckApps(process.env.GITHUB_TRUSTED_CHECK_APPS);
+        },
+        /**
          * Reviewer agent stage (self-build slice AD, EW-811) — how many
          * REVIEW runs one Task may ever buy.
          *
@@ -2546,6 +2585,43 @@ export const config = {
         getDefaultAgentMode(): AgentInboxMode {
             const raw = (process.env.EMAIL_DEFAULT_AGENT_SEND_MODE || '').trim().toLowerCase();
             return raw === 'draft-review' ? 'draft-review' : 'auto-send';
+        },
+        /**
+         * Prompt-injection hardening — `true` only when the operator wrote
+         * `EMAIL_DEFAULT_AGENT_SEND_MODE=auto-send` explicitly. The platform
+         * default (unset) still resolves to `auto-send` above, but only an
+         * EXPLICIT setting lets an Agent with no inbox / organization mode
+         * mail a recipient it has never corresponded with without review.
+         */
+        isDefaultAgentModeExplicitAutoSend(): boolean {
+            return (
+                (process.env.EMAIL_DEFAULT_AGENT_SEND_MODE || '').trim().toLowerCase() ===
+                'auto-send'
+            );
+        },
+        /**
+         * Prompt-injection hardening — what happens when an Agent on the
+         * platform-default `auto-send` mode mails someone who is NOT a known
+         * correspondent (never mailed it, never received its mail, not one of
+         * the owner's own addresses, not on the allowlist below):
+         * `draft-review` (default) holds that message for the owner;
+         * `auto-send` (`EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE=auto-send`) restores
+         * the old behaviour deployment-wide.
+         */
+        getUnknownRecipientMode(): AgentInboxMode {
+            const raw = (process.env.EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE || '').trim().toLowerCase();
+            return raw === 'auto-send' ? 'auto-send' : 'draft-review';
+        },
+        /**
+         * Recipients an Agent may always mail without review on the platform
+         * default: `EMAIL_AGENT_AUTO_SEND_ALLOWLIST`, comma-separated full
+         * addresses (`ops@acme.test`) or domains (`@acme.test`). Lower-cased.
+         */
+        getAgentAutoSendAllowlist(): string[] {
+            return (process.env.EMAIL_AGENT_AUTO_SEND_ALLOWLIST || '')
+                .split(',')
+                .map((entry) => entry.trim().toLowerCase())
+                .filter((entry) => entry.length > 0);
         },
     },
 

@@ -48,13 +48,13 @@ describe('TaskMergeGateService', () => {
             ...over,
         }) as never;
 
-    function build(over: { policy?: MergePolicy; approved?: boolean } = {}) {
+    function build(over: { policy?: MergePolicy; approved?: boolean; base?: string | null } = {}) {
         const works = {
             findById: jest.fn().mockResolvedValue({
                 id: 'work-1',
                 organizationId: 'org-1',
                 tenantId: 'tenant-1',
-                taskIsolationBaseBranch: 'develop',
+                taskIsolationBaseBranch: over.base === undefined ? 'develop' : over.base,
                 getRepoOwner: () => 'acme',
                 getDataRepo: () => 'site-data',
             }),
@@ -183,6 +183,8 @@ describe('TaskMergeGateService', () => {
     it('continues exactly as before when the App Work rules allow the head', async () => {
         const { service, taskWorkspace } = build({
             policy: { ...NEEDS_APPROVAL, requireHumanApproval: false },
+            // A base OFF the protected-branch floor: the no-approval policy applies.
+            base: 'release/next',
         });
         taskWorkspace.judgeAppWorkMerge.mockResolvedValue({ allowed: true });
 
@@ -280,10 +282,12 @@ describe('TaskMergeGateService', () => {
             // Task answers, asserted rather than omitted so the promotion
             // narrowing can never leak into an ordinary merge. `null` base
             // means "use the Work's `taskIsolationBaseBranch`", exactly as
-            // before; `false` leaves the resolved policy's approval
-            // requirement untouched.
+            // before. The approval requirement is RAISED because that base,
+            // `develop`, is on the protected-branch floor (works-security
+            // lane 3a): the facade then re-verifies the human approval at
+            // merge time instead of trusting the resolved policy alone.
             baseRef: null,
-            requireHumanApproval: false,
+            requireHumanApproval: true,
         });
         expect(outcome).toEqual({
             action: 'merge-attempted',
@@ -297,11 +301,100 @@ describe('TaskMergeGateService', () => {
     it('merges without an approval only when the policy asked for none', async () => {
         const { service, taskWorkspace, mergeApprovals } = build({
             policy: { ...NEEDS_APPROVAL, requireHumanApproval: false },
+            base: 'release/next',
         });
         await service.onPullRequestStatusRefreshed(task(), status());
         expect(mergeApprovals.verifyMergeApproval).not.toHaveBeenCalled();
         expect(mergeApprovals.requestMergeApproval).not.toHaveBeenCalled();
         expect(taskWorkspace.attemptMergeForOpenPullRequest).toHaveBeenCalledTimes(1);
+    });
+
+    // ── the protected-branch floor (works-security lane 3a) ─────────────
+    //
+    // A Work-level `{ allowAgentMerge: true, requireHumanApproval: false,
+    // protectedBranches: [] }` — which anything able to update the Work could
+    // write — used to land an agent's pull request on the default branch on
+    // green CI alone. A base on the floor (or one nobody can name) now always
+    // takes the approval path.
+
+    it.each([['develop'], ['main'], ['master'], ['stage'], ['refs/heads/Main']])(
+        'asks for a human approval for a %s base even when the policy asked for none',
+        async (base) => {
+            const { service, taskWorkspace, mergeApprovals } = build({
+                policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+                base,
+            });
+            const outcome = await service.onPullRequestStatusRefreshed(task(), status());
+            expect(outcome).toEqual({ action: 'approval-requested', proposalId: 'p-new' });
+            expect(taskWorkspace.attemptMergeForOpenPullRequest).not.toHaveBeenCalled();
+            expect(mergeApprovals.requestMergeApproval).toHaveBeenCalled();
+        },
+    );
+
+    it('treats an unknown base as the floor, and prefers the LIVE base the provider reports', async () => {
+        const noBase = build({
+            policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+            base: null,
+        });
+        await expect(
+            noBase.service.onPullRequestStatusRefreshed(task(), status()),
+        ).resolves.toMatchObject({ action: 'approval-requested' });
+
+        // The Work says `release/next`, the pull request really targets `main`.
+        const liveMain = build({
+            policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+            base: 'release/next',
+        });
+        await expect(
+            liveMain.service.onPullRequestStatusRefreshed(task(), status({ baseRef: 'main' })),
+        ).resolves.toMatchObject({ action: 'approval-requested' });
+        expect(liveMain.taskWorkspace.attemptMergeForOpenPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('shows the LIVE base in the approval request, not the Work default', async () => {
+        const { service, mergeApprovals } = build({ base: 'develop' });
+        await service.onPullRequestStatusRefreshed(task(), status({ baseRef: 'main' }));
+        expect(mergeApprovals.requestMergeApproval).toHaveBeenCalledWith(
+            expect.objectContaining({ targetBranch: 'main' }),
+        );
+    });
+
+    it('lets a human-set tenant / organization waiver merge develop on green CI, never main', async () => {
+        const waived = (base: string) => {
+            const built = build({
+                policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+                base,
+            });
+            built.mergePolicy.resolve.mockResolvedValue({
+                policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+                source: 'organization',
+                chain: [],
+                humanScopeWaivesApproval: true,
+            });
+            return built;
+        };
+        const develop = waived('develop');
+        await expect(
+            develop.service.onPullRequestStatusRefreshed(task(), status()),
+        ).resolves.toMatchObject({ action: 'merge-attempted' });
+        const main = waived('main');
+        await expect(
+            main.service.onPullRequestStatusRefreshed(task(), status()),
+        ).resolves.toMatchObject({ action: 'approval-requested' });
+    });
+
+    it('merges a floor base once a human approved it, and tells the facade to re-verify', async () => {
+        const { service, taskWorkspace } = build({
+            policy: { ...NEEDS_APPROVAL, requireHumanApproval: false, protectedBranches: [] },
+            approved: true,
+            base: 'main',
+        });
+        await expect(service.onPullRequestStatusRefreshed(task(), status())).resolves.toMatchObject(
+            { action: 'merge-attempted' },
+        );
+        expect(taskWorkspace.attemptMergeForOpenPullRequest).toHaveBeenCalledWith(
+            expect.objectContaining({ requireHumanApproval: true }),
+        );
     });
 
     // ── everything that stops it ──────────────────────────────────────

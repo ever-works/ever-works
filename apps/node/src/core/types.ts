@@ -355,6 +355,74 @@ export function clampWorkspaceGcPolicy(
  */
 export type NodeSecretStorage = 'keychain' | 'file';
 
+/**
+ * The machine owner's LOCAL ceiling on what platform jobs may make this PC do
+ * (control 18, 2026-10-18).
+ *
+ * Every field is decided on the machine — by `ever-works-node policy` — and
+ * never by the platform. A job is the platform's plan, and the platform is
+ * one more party a prompt injection, a compromised account or a bug can
+ * speak through; the switches below are the ones that turn "a model edits a
+ * worktree" into "anything can run as the machine owner", so they are not
+ * the platform's to flip.
+ *
+ * Both default to OFF. Absent (every config written before this field)
+ * means OFF.
+ */
+export interface NodeExecutionPolicy {
+	/**
+	 * Run a model step with `--dangerously-skip-permissions` (Claude Code) /
+	 * `--dangerously-bypass-approvals-and-sandbox` (Codex) when a job asks
+	 * for it. With this off such a job is refused before anything runs.
+	 */
+	allowSkipPermissions: boolean;
+	/**
+	 * Run platform-planned SHELL commands: an agent-task's setup phase,
+	 * command steps and acceptance checks, the legacy command template, and
+	 * `acceptance-checks` jobs. Each one executes repository code with this
+	 * machine's privileges — after a model step, code the model may just have
+	 * written (an edited `package.json` script or test file makes `pnpm test`
+	 * run it). With this off, such a job is refused and `acceptance-checks`
+	 * jobs are not leased; a model step (the pinned CLI under its own
+	 * permission mode) and the node's own Git work still run.
+	 */
+	allowShellCommands: boolean;
+	/**
+	 * Start Claude Code with `--restricted` when the pinned binary supports it
+	 * (control 17): no command-running built-ins and no WebFetch, no settings
+	 * files at all (the owner's `~/.claude/settings.json` included), file
+	 * tools confined to the granted directories, and writes to settings, git
+	 * and tool-configuration files never auto-approved. ON by default; an
+	 * owner who authenticates the CLI through settings `env` / `apiKeyHelper`
+	 * (Bedrock, Vertex, a proxy base URL) turns it off here. The baseline
+	 * isolation (`--setting-sources user` + no hooks) applies either way.
+	 */
+	restrictedMode: boolean;
+}
+
+/** What a machine that never ran `ever-works-node policy` enforces: both escalations OFF, restricted mode ON. */
+export const DEFAULT_NODE_EXECUTION_POLICY: NodeExecutionPolicy = Object.freeze({
+	allowSkipPermissions: false,
+	allowShellCommands: false,
+	restrictedMode: true
+});
+
+/**
+ * The stored policy, always resolved toward the SAFER value: the two
+ * escalations need a literal `true`, and restricted mode is off only on a
+ * literal `false`.
+ */
+export function resolveNodeExecutionPolicy(
+	input: Partial<NodeExecutionPolicy> | null | undefined
+): NodeExecutionPolicy {
+	if (!input || typeof input !== 'object') return { ...DEFAULT_NODE_EXECUTION_POLICY };
+	return {
+		allowSkipPermissions: input.allowSkipPermissions === true,
+		allowShellCommands: input.allowShellCommands === true,
+		restrictedMode: input.restrictedMode !== false
+	};
+}
+
 /** Durable local fail-closed marker for an unverified child process tree. */
 export interface NodeUnsafeState {
 	since: string;
@@ -427,6 +495,12 @@ export interface NodeConfig {
 	paused?: boolean;
 	/** Survives service restarts until an operator explicitly verifies/clears it. */
 	unsafe?: NodeUnsafeState;
+	/**
+	 * The machine owner's local ceiling on what jobs may make this PC do
+	 * (control 18). Absent means {@link DEFAULT_NODE_EXECUTION_POLICY}: both
+	 * switches OFF. Only `ever-works-node policy` writes it.
+	 */
+	executionPolicy?: Partial<NodeExecutionPolicy>;
 }
 
 /** Credential-free projection of {@link NodeConfig}, safe to log or render. */
@@ -451,6 +525,8 @@ export interface RedactedNodeConfig {
 	paused: boolean;
 	/** Safe lifecycle diagnostic; contains no credential values. */
 	unsafe?: NodeUnsafeState;
+	/** The effective local execution policy (control 18) — switches, never values. */
+	executionPolicy: NodeExecutionPolicy;
 }
 
 /** Drop the credential from a config so it can cross a log or IPC boundary. */
@@ -465,7 +541,8 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 		enrolledAt: config.enrolledAt,
 		hasSecret: typeof config.secret === 'string' && config.secret.length > 0,
 		secretStorage: config.secretStorage ?? 'file',
-		paused: config.paused === true
+		paused: config.paused === true,
+		executionPolicy: resolveNodeExecutionPolicy(config.executionPolicy)
 	};
 	if (config.capabilitySelection !== undefined) {
 		redacted.capabilitySelection = [...config.capabilitySelection];

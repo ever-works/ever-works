@@ -48,7 +48,13 @@ describe('TaskWorkspaceService.finalizeRun — changed-files telemetry', () => {
     let works: { findById: jest.Mock };
     let tasks: { updateById: jest.Mock; findById: jest.Mock };
     let runs: { setWorkspaceMeta: jest.Mock; updateTelemetry: jest.Mock };
-    let facade: { provision: jest.Mock; finalize: jest.Mock; simulateMerge: jest.Mock };
+    let facade: {
+        provision: jest.Mock;
+        finalize: jest.Mock;
+        simulateMerge: jest.Mock;
+        branchChanges?: jest.Mock;
+        supportsJudgedPublish?: jest.Mock;
+    };
     let git: {
         getAccessToken: jest.Mock;
         getRepository: jest.Mock;
@@ -76,6 +82,10 @@ describe('TaskWorkspaceService.finalizeRun — changed-files telemetry', () => {
                 changedFiles: 7,
             }),
             simulateMerge: jest.fn().mockResolvedValue({ clean: true, conflictPaths: [] }),
+            // Prompt-injection hardening: every finalize reads its commit's changes
+            // before the push (always-protected-path floor).
+            branchChanges: jest.fn().mockResolvedValue({ paths: ['src/x.ts'], contents: {} }),
+            supportsJudgedPublish: jest.fn().mockResolvedValue(true),
         };
         git = {
             getAccessToken: jest.fn().mockResolvedValue('tok-123'),

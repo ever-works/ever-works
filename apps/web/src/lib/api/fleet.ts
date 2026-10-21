@@ -43,9 +43,13 @@ import type {
     FleetExecutionScopeType,
     FleetRotateAllResult,
     FleetRunnerStatusView,
+    // Computer health (FL-03).
+    FleetNodeHealthView,
 } from '@ever-works/contracts';
 
 export type {
+    // Computer health (FL-03).
+    FleetNodeHealthView,
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
     FleetAuditView,
@@ -523,5 +527,15 @@ export const fleetAPI = {
             method: 'DELETE',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Computer health (FL-03) — one computer's latest snapshot, whether it is
+     * stale, and its plain-language state with its one fix.
+     */
+    health: async (nodeId: string) => {
+        return serverFetch<FleetNodeHealthView>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+        );
     },
 };

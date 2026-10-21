@@ -75,6 +75,19 @@ export {
 	type WorkflowRunnerInput,
 	type WorkflowSettingsInput
 } from './workflow/generator.js';
+export {
+	WORKFLOW_ENV_NAME_PATTERN,
+	WORKFLOW_SERVICE_ENV_NAME_PATTERN,
+	WORKFLOW_SERVICE_NAME_PATTERN,
+	WorkflowInputRefusedError,
+	assertWorkflowInputSafe,
+	findUnsafeWorkflowInput,
+	isSafeHealthCommandArgument,
+	isSafeWorkflowText,
+	unsafeWorkflowTextCause,
+	type WorkflowInputRefusal,
+	type WorkflowInputRefusalCause
+} from './workflow/input-guard.js';
 export { EMBEDDED_VERIFY_RUNNER_SCRIPT } from './workflow/verify-runner.sh.js';
 export {
 	BRANCH_PROTECTION_RULE_TYPES,

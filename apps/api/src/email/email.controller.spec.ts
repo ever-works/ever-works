@@ -278,7 +278,10 @@ describe('EmailController', () => {
         });
 
         it('approves a draft for the caller and reports the decision without the body', async () => {
-            const res = await withDrafts.approveDraft({ userId: 'user-1' } as any, 'm-1');
+            const res = await withDrafts.approveDraft(
+                { userId: 'user-1', authMethod: 'session' } as any,
+                'm-1',
+            );
             expect(drafts.approve).toHaveBeenCalledWith('user-1', 'm-1');
             expect(res).toEqual({
                 message: {
@@ -303,15 +306,25 @@ describe('EmailController', () => {
         it('passes a draft-loop refusal through unchanged (e.g. 409 already decided)', async () => {
             const conflict = Object.assign(new Error('already decided'), { status: 409 });
             drafts.approve.mockRejectedValue(conflict);
-            await expect(withDrafts.approveDraft({ userId: 'user-1' } as any, 'm-1')).rejects.toBe(
-                conflict,
-            );
+            await expect(
+                withDrafts.approveDraft({ userId: 'user-1', authMethod: 'session' } as any, 'm-1'),
+            ).rejects.toBe(conflict);
         });
 
         it('answers 404 when the draft loop is not wired, like a missing message', async () => {
             await expect(
-                controller.approveDraft({ userId: 'user-1' } as any, 'm-1'),
+                controller.approveDraft({ userId: 'user-1', authMethod: 'session' } as any, 'm-1'),
             ).rejects.toMatchObject({ status: 404 });
+        });
+
+        // Works-security lane 3a — releasing a draft SENDS it: a person's session only.
+        it('refuses a draft approval from a personal API key or an unstamped credential', async () => {
+            for (const who of [{ userId: 'user-1', authMethod: 'api-key' }, { userId: 'user-1' }]) {
+                await expect(withDrafts.approveDraft(who as any, 'm-1')).rejects.toMatchObject({
+                    status: 403,
+                });
+            }
+            expect(drafts.approve).not.toHaveBeenCalled();
         });
 
         it('declares the draft routes before messages/:id so ":id" cannot capture them', () => {

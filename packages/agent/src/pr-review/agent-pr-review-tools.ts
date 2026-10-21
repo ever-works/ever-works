@@ -32,7 +32,19 @@ export interface PrReviewToolService {
         repo: string;
         prNumber: number;
         instruction?: string;
+        workId?: string;
     }): Promise<PrReviewResult>;
+    /**
+     * The requesting user's Work that owns `owner/repo` (THE
+     * `matchWorkByRepo` rule, over the user's own Works only), or `null`.
+     * `PrReviewService.matchWorkForRepo` — never throws.
+     */
+    matchWorkForRepo(userId: string, owner: string, repo: string): Promise<{ id: string } | null>;
+}
+
+/** The refusal the tool answers for a repository outside the user's Works. */
+export function notAWorkRepositoryError(owner: string, repo: string): string {
+    return `No Work in your account is connected to '${owner}/${repo}'. review_pull_request only reviews — and comments on — pull requests in repositories that belong to one of your Works.`;
 }
 
 export function buildPrReviewTools(args: {
@@ -45,7 +57,7 @@ export function buildPrReviewTools(args: {
     out.push({
         name: 'review_pull_request',
         description:
-            'Run an AI review of a pull request on one of the connected repositories: fetches the diff, grounds the review in the matching Work knowledge base and memory, and posts a summary review comment on the PR. Returns the review summary, per-file notes, and the PR URL.',
+            "Run an AI review of a pull request in a repository that belongs to one of the user's Works: fetches the diff, grounds the review in that Work's knowledge base and memory, and posts a summary review comment on the PR. Refuses any other repository (upstream projects included). Returns the review summary, per-file notes, and the PR URL.",
         parameters: {
             type: 'object',
             properties: {
@@ -67,12 +79,28 @@ export function buildPrReviewTools(args: {
                 return { error: 'owner, repo and a positive integer prNumber are required' };
             }
             try {
+                // The review POSTS A COMMENT as the owner, on whatever pull
+                // request the owner's token can reach — upstream projects
+                // included, and "the platform never comments upstream". So the
+                // model-chosen coordinates must name a repository of one of the
+                // user's OWN Works (the same owner-scoped match the REST
+                // endpoints enforce), checked before anything is fetched,
+                // reviewed or posted.
+                const work = await args.prReviewService.matchWorkForRepo(
+                    args.userId,
+                    a.owner,
+                    a.repo,
+                );
+                if (!work) {
+                    return { error: notAWorkRepositoryError(a.owner, a.repo) };
+                }
                 const result = await args.prReviewService.reviewPullRequest({
                     userId: args.userId,
                     owner: a.owner,
                     repo: a.repo,
                     prNumber,
                     ...(a.instruction ? { instruction: a.instruction } : {}),
+                    workId: work.id,
                 });
                 return result;
             } catch (err) {

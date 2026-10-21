@@ -238,7 +238,7 @@ export function buildAgentTaskTools(args: {
         out.push({
             name: 'transitionTask',
             description:
-                'Move a Task to a new status. Requires canAssignTasks. The state-machine enforces legal transitions; → done requires no open blockers AND (when requireAllApprovers=true) all approvers must have approved.',
+                'Move a Task to a new status. Requires canAssignTasks. The state-machine enforces legal transitions; → in_review requires a passing quality gate where the Work requires checks, and → done requires no open blockers AND (when requireAllApprovers=true) all approvers must have approved. Agents cannot override these gates.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -248,12 +248,11 @@ export function buildAgentTaskTools(args: {
                         description:
                             'Target status: backlog / todo / in_progress / in_review / blocked / done / cancelled.',
                     },
-                    force: {
-                        // Review-fix C5: boolean, not string.
-                        type: 'boolean',
-                        description:
-                            'Override the approver gate (NOT the blocker gate). Default false.',
-                    },
+                    // Prompt-injection hardening: no `force` parameter. It used
+                    // to skip the quality gate and the approver gate — the very
+                    // checks that exist to judge the agent's work — and the
+                    // owner-scoped call made it an owner override. A person
+                    // forces a transition from the Task page; an agent never.
                 },
                 required: ['taskId', 'to'],
             },
@@ -266,7 +265,11 @@ export function buildAgentTaskTools(args: {
                         a.taskId,
                         a.to,
                         {
-                            force: a.force === true || (a.force as any) === 'true',
+                            // Never forced (see the schema note above); a
+                            // model-supplied `force` is ignored, and
+                            // `TaskTransitionService` strips it for any
+                            // agent-driven move as well.
+                            force: false,
                             // Quality gates (Wave 3 M8): this tool acts on an
                             // Agent's behalf, so a red/skipped gate under a
                             // 'required' policy refuses → in_review here.

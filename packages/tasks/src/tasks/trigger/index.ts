@@ -23,6 +23,8 @@ export * from './task-pr-status-sync.task';
 // fleet whose nodes ALL died still converges (inline reclaim on the
 // lease path covers every other case).
 export * from './fleet-job-lease-sweeper.task';
+// Computer health (FL-03) — hourly roll-up and retention of the health history.
+export * from './fleet-health-rollup.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

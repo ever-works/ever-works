@@ -83,6 +83,52 @@ export enum UsageOutcome {
  * after the 500 surfaced on the KB upload path in production: pass
  * the explicit snake_case column name from the call site.
  */
+/**
+ * The write half of {@link TimestampColumn}: a `Date`, an ISO-8601 string or epoch millis → epoch millis.
+ *
+ * A `Date` is what the entity types promise, but it is not what always arrives. A row written through the
+ * isolated Trigger worker's RPC proxy (`POST /internal/trigger/remote/call`) is JSON, so every `Date` lands
+ * as an ISO string, and some callers pass `toISOString()` themselves. The old `value.getTime()` threw
+ * `TypeError: value.getTime is not a function` on those. On prod 2026-10-18 that 500'd the App runtime-state
+ * write at the end of a READY deploy, so `currentDeploymentId` was never recorded and the App read
+ * `not-deployed` while it served. An unparseable value throws a TypeError that names it instead of storing
+ * garbage. Anything else (e.g. a TypeORM FindOperator) passes through untouched.
+ */
+export function timestampToEpochMillis(value: unknown): unknown {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'number') {
+        // Unchanged contract: a non-finite number is "no timestamp".
+        return Number.isFinite(value) ? inDateRange(value, value) : null;
+    }
+    if (typeof value === 'string') {
+        const numeric = /^-?\d+$/.test(value.trim()) ? Number(value) : Date.parse(value);
+        if (Number.isFinite(numeric)) return inDateRange(numeric, value);
+        throw new TypeError(
+            `TimestampColumn: "${value}" is not a date, an ISO-8601 string or epoch milliseconds.`,
+        );
+    }
+    if (value instanceof Date || typeof (value as { getTime?: unknown }).getTime === 'function') {
+        const millis = (value as { getTime: () => number }).getTime();
+        if (!Number.isFinite(millis)) {
+            throw new TypeError('TimestampColumn: refusing to store an Invalid Date.');
+        }
+        return inDateRange(millis, value);
+    }
+    return value;
+}
+
+/** ECMAScript's Date range (±8.64e15 ms): outside it the read half would produce an Invalid Date. */
+const MAX_DATE_MILLIS = 8.64e15;
+
+function inDateRange(millis: number, original: unknown): number {
+    if (Math.abs(millis) > MAX_DATE_MILLIS) {
+        throw new TypeError(
+            `TimestampColumn: ${String(original)} is outside the representable date range.`,
+        );
+    }
+    return millis;
+}
+
 export const TimestampColumn = ({
     nullable = false,
     name,
@@ -94,7 +140,7 @@ export const TimestampColumn = ({
         type: 'bigint',
         nullable,
         transformer: {
-            to: (value?: Date) => (value ? value.getTime() : null),
+            to: timestampToEpochMillis,
             from: (value?: string | number) => (value ? new Date(Number(value)) : null),
         },
     };

@@ -977,7 +977,11 @@
                 "bulkApprovedExcluded": "Approved {approved} actions, {excluded} still need a decision one at a time",
                 "error": "Something went wrong. Please try again."
             },
-            "seeAll": "See all decisions"
+            "seeAll": "See all decisions",
+            "proposal": {
+                "fileEdit": "Proposed new {file} ({bytes} bytes) — written exactly as shown if you approve",
+                "escalation": "Closes escalation {id}. Approving does not restart the work that was waiting on it."
+            }
         },
         "inbox": {
             "title": "Inbox",
@@ -6267,7 +6271,12 @@
                 "createFailed": "Failed to create the webhook",
                 "creating": "Creating…",
                 "create": "Create",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "confirmRotate": "Rotate the signing secret of {url}?",
+                "confirmRotateV1": "This is a v1 subscription: the previous secret stops working at once, so update the receiver right away.",
+                "confirmDelete": "Delete the webhook to {url}? This cannot be undone.",
+                "confirmIntegrationOwned": "An integration (such as Ever Gauzy) created this subscription: it will stop receiving these events.",
+                "secretFor": "For {url}"
             }
         },
         "stats": {
@@ -9532,6 +9541,38 @@
                         "undeclaredName": "The App spec doesn't declare this name.",
                         "specUnavailable": "This app has no usable App spec yet.",
                         "failed": "The value couldn't be saved. Try again."
+                    }
+                },
+                "dependencies": {
+                    "title": "Dependencies",
+                    "description": "The databases, caches, storage and mail this app needs. They're provisioned on its deploy target before it starts.",
+                    "loading": "Reading dependencies…",
+                    "unavailable": "Dependencies can't be managed on this instance yet.",
+                    "error": "Couldn't read the dependencies. Reload the page to try again.",
+                    "empty": "This app's App spec declares no dependencies.",
+                    "provider": "Provider: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# attempt} other {# attempts}}",
+                    "noReason": "No reason was recorded.",
+                    "deployRetries": "Deploying again retries it automatically — or press Retry now.",
+                    "retry": "Retry",
+                    "retryAria": "Retry {kind}",
+                    "retried": "{kind}: a new attempt is scheduled.",
+                    "retryQueued": "{kind}: a new attempt will start as soon as the worker is available.",
+                    "leaseHeld": "{kind} is being provisioned right now. Try again in a moment.",
+                    "retryFailed": "Couldn't retry {kind}. Try again.",
+                    "deleteData": "Delete data",
+                    "deleteDataAria": "Delete the data of {kind}",
+                    "deleteDialog": {
+                        "title": "Delete the {kind} data?",
+                        "description": "This destroys the volumes, databases and buckets this dependency holds. It can't be undone.",
+                        "resources": "Will be deleted:",
+                        "noResources": "No resources are recorded for this dependency.",
+                        "confirmLabel": "Type {slug} to confirm",
+                        "cancel": "Cancel",
+                        "confirm": "Delete data",
+                        "requested": "Deleting the {kind} data.",
+                        "failed": "The data couldn't be deleted. {reason}"
                     }
                 }
             }
@@ -12883,8 +12924,100 @@
             "draining": "Draining",
             "quarantined": "Quarantined",
             "throttled": "Throttled",
+            "limited": "Limited",
             "upgradeRequired": "Upgrade required",
             "unknown": "Unknown"
+        },
+        "stateSentences": {
+            "online": "Online",
+            "busy": "Busy · {jobs, plural, one {# job} other {# jobs}}",
+            "busyNoCount": "Busy",
+            "offline": "Offline · last seen {lastSeen}",
+            "offlineNever": "Offline",
+            "enrolling": "Waiting for the first check-in",
+            "paused": "Paused by you",
+            "disabled": "Disabled",
+            "draining": "Finishing its jobs, taking no new ones",
+            "quarantined": "Stopped itself: {reason}",
+            "quarantinedNoReason": "Stopped itself",
+            "throttledCpu": "Pausing new work — CPU is above its ceiling ({value}% of {limit}%)",
+            "throttledMemory": "Pausing new work — memory is above its ceiling ({value} MB of {limit} MB)",
+            "throttledDisk": "Pausing new work — free disk is below its floor ({value} of {limit})",
+            "throttled": "Pausing new work — {reason}",
+            "throttledNoReason": "Pausing new work",
+            "limited": "Waiting for {cli}'s limit to reset at {time}",
+            "limitedMany": "Waiting for model limits to reset — the first, {cli}, at {time}",
+            "upgradeRequired": "Upgrade required — takes no work until updated"
+        },
+        "fixCommands": {
+            "clearLimitNow": "Clear limit now",
+            "clearLimitsNow": "Clear limits now",
+            "clearing": "Clearing…",
+            "cleared": "Limit cleared — the computer takes that work again from its next check-in.",
+            "clearFailed": "Could not clear the limit. Try again.",
+            "changeLimits": "Change limits",
+            "wake": "Wake",
+            "copy": "Copy command",
+            "copied": "Copied",
+            "copyFailed": "Could not copy. Select the command and copy it yourself.",
+            "clearQuarantine": "On {name}, after checking that no earlier job is still running there, run:",
+            "upgrade": "On {name}, run this to upgrade the node:",
+            "startWithConsent": "On {name}, start the node with the consent it needs, for example:",
+            "resetTooltip": "{time} UTC"
+        },
+        "health": {
+            "regionLabel": "Health of {name}",
+            "cpu": "CPU",
+            "memory": "Memory",
+            "disk": "Disk",
+            "gpu": "GPU",
+            "load": "Load",
+            "services": "Services",
+            "percentValue": "{value}%",
+            "memoryUsed": "{used} of {total}",
+            "diskFree": "{free} free",
+            "diskFloor": "Node floor {floor}",
+            "diskNoFloor": "No disk floor set",
+            "gpuNone": "No GPU",
+            "gpuUsage": "{util}% busy",
+            "gpuMemory": "{used} of {total}",
+            "gpuMore": "+{count} more",
+            "loadCores": "{count, plural, one {# core} other {# cores}}",
+            "servicesFailed": "{count, plural, =0 {None failed} one {# failed} other {# failed}}",
+            "notReported": "—",
+            "notReportedHint": "Not reported by this computer",
+            "pendingReboot": "Pending reboot: {answer}",
+            "yes": "yes",
+            "no": "no",
+            "checked": "Checked {time} ({relative})",
+            "stale": "Last checked {relative} — values are stale",
+            "noSnapshot": "This node version does not report health. Upgrade it to see CPU, memory and more.",
+            "loading": "Loading health…",
+            "error": "Could not load health.",
+            "tryAgain": "Try again",
+            "footprint": "History is kept for 7 days by the minute and 90 days by the hour — about 10 000 samples a week per computer.",
+            "historyOff": "History is switched off on this deployment.",
+            "refreshNow": "Refresh now",
+            "refreshUnavailable": "Refresh now arrives with the node link. The next automatic check is within a minute.",
+            "refreshOffline": "{name} is offline",
+            "uptime": "Up {duration}",
+            "cellCpu": "cpu {value}",
+            "cellMem": "mem {value}",
+            "cellDisk": "disk {value}",
+            "cellsNotReported": "Health not reported by this node version",
+            "justNow": "just now",
+            "relative": {
+                "second": "{value} s ago",
+                "minute": "{value} min ago",
+                "hour": "{value} h ago",
+                "day": "{value, plural, one {# day} other {# days}} ago"
+            },
+            "duration": {
+                "days": "{days} d {hours} h",
+                "hours": "{hours} h {minutes} min",
+                "minutes": "{minutes} min"
+            },
+            "checkedAgo": "checked {relative}"
         },
         "os": {
             "linux": "Linux",

@@ -4,6 +4,8 @@ import {
     Get,
     HttpException,
     HttpStatus,
+    Inject,
+    Logger,
     Optional,
     Param,
     ParseUUIDPipe,
@@ -30,6 +32,7 @@ import {
     type AppChangeRequestResult,
 } from '@ever-works/agent/app-works';
 import { ownershipScopeOf } from '@ever-works/agent/database';
+import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
 import { AgentScope, AgentTemplatesService } from '@ever-works/agent/agents';
 import { TaskRepository } from '@ever-works/agent/tasks-domain';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
@@ -75,7 +78,45 @@ export class WorkEvolveController {
         // APW-08 GAP-14 — the one-click "create the evolve-app Agent" path. Optional so a
         // graph without the agents module still serves the rest of the routes.
         @Optional() private readonly agentTemplates?: AgentTemplatesService,
+        // Prompt-injection hardening — tells the Work owner a member's change request is
+        // waiting for them (a member's request files the Task but never starts the owner's
+        // Agent). @Optional() and appended LAST; bound by the api-side @Global() InboxModule.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
     ) {}
+
+    private readonly logger = new Logger(WorkEvolveController.name);
+
+    /**
+     * A member's change request is filed but held for the owner (`awaitingOwner`): file
+     * an Inbox notice so the owner sees it. Best-effort — the Task is on their board
+     * either way.
+     */
+    private async noticeOwnerOfHeldChange(
+        work: WorkAccessResult['work'],
+        result: AppChangeRequestResult,
+        actorUserId: string,
+    ): Promise<void> {
+        if (!this.inbox || result.status !== 'accepted' || !result.awaitingOwner) return;
+        try {
+            await this.inbox.notice(work.userId, {
+                title: `A change to "${String(work.name ?? work.slug ?? 'your App Work').slice(0, 120)}" is waiting for you`,
+                body:
+                    `A member with edit access (user ${actorUserId}) asked for a change. The Task ` +
+                    `${result.taskSlug} was filed and assigned but NOT started, because starting it runs ` +
+                    'your Agent with your credentials. Review the request on the Task and press Run if ' +
+                    'you want it made.',
+                taskId: result.taskId,
+                workId: work.id,
+                organizationId: work.organizationId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Owner notice for held change Task ${result.taskId} failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     @Post(':id/evolve')
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
@@ -148,6 +189,7 @@ export class WorkEvolveController {
             }
         }
 
+        await this.noticeOwnerOfHeldChange(access.work, result, auth.userId);
         response.status(result.httpStatus);
         return result;
     }

@@ -434,9 +434,11 @@ export enum ActivityActionType {
     // dotted CONTRACTS §6 event goes in `action` (`app.fork.ready`,
     // `app.fork.timeout`, `app.fork.missing`, `app.actions.disabled`,
     // `app.upstream.synced`, `app.upstream.behind`, `app.upstream.conflict`,
-    // `app.upstream.unavailable`) and `details` carry counts, shas, pull
+    // `app.upstream.unavailable`, `app.upstream.held`) and `details` carry counts, shas, pull
     // request numbers and reason codes. Workflow paths appear ONLY in
-    // `app.actions.disabled`: they are repository file names, never secrets.
+    // `app.actions.disabled` and `app.upstream.held` (FR-60: the paths an
+    // upstream range would have changed): they are repository file names,
+    // never secrets and never file content.
     // Additive members — `activity_log.actionType` is a plain varchar, so no
     // migration is needed. Program contract R-34 (Activity completeness) is
     // satisfied by the three `FEED_KIND_RULES` entries in
@@ -504,6 +506,13 @@ export enum ActivityActionType {
     // verbs only — never a value, a length or a hash (FR-8, FR-5). Additive member — `actionType` is a
     // plain varchar, so no migration is needed.
     APP_ENV = 'app_env',
+    // APW-07 (lane aw-deps-api, 2026-10-18) — the Dependencies card's family (plan §7:887, R-2):
+    // one row per owner action on `/api/works/:id/app-dependencies/:kind` — `app.dependency.configured`,
+    // `app.dependency.retried`, `app.dependency.data_delete_requested` — and one per Deploy request
+    // that retried transient failures (`app.dependency.retried`, `trigger: 'deploy'`). `metadata`
+    // carries the kind, the provider id and counts only — never a config value or an output (FR-5).
+    // Additive member — `actionType` is a plain varchar, so no migration is needed.
+    APP_DEPENDENCY = 'app_dependency',
     // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
     //   - INTEGRATION_WRITE: one row per successful write an integration key
     //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy

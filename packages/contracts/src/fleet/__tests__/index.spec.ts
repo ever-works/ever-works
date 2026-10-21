@@ -279,8 +279,8 @@ const RUN_CREDENTIAL_EXPORTS = [
 	'PERSONAL_API_KEY_KIND',
 	'FLEET_RUN_MCP_SERVER_NAME',
 	'FLEET_RUN_MCP_TOOL_FAMILIES',
-	'FLEET_RUN_TOKEN_ALLOWED_PREFIXES',
-	'FLEET_RUN_TOKEN_ALLOWED_FLEET_READ_PREFIXES',
+	'FLEET_RUN_TOKEN_ROUTES',
+	'MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS',
 	'isFleetRunTokenRouteAllowed',
 	'fleetRunTokenExpiryFromLease'
 ] as const;
@@ -351,6 +351,40 @@ const COMMIT_MESSAGE_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage'
+] as const;
+
+// Computer health (FL-03) — `fleet-node-health.types.ts`, pinned in
+// `fleet-node-health.spec.ts`; and the "needs a look" item shape (seam owned
+// by FL-01) — `fleet-needs-a-look.types.ts`, pinned in `fleet-needs-a-look.spec.ts`.
+const HEALTH_EXPORTS = [
+	'FLEET_HEALTH_PROBE_TIMEOUT_MS',
+	'FLEET_HEALTH_SAMPLE_MIN_INTERVAL_MS',
+	'FLEET_HEALTH_ROLLUP_CRON',
+	'FLEET_HEALTH_RAW_RETENTION_MS',
+	'FLEET_HEALTH_HOURLY_RETENTION_MS',
+	'FLEET_HEALTH_MAX_HISTORY_POINTS',
+	'FLEET_HEALTH_DISK_CRITICAL_MARGIN_BYTES',
+	'FLEET_HEALTH_DISK_WARN_FREE_FRACTION',
+	'FLEET_HEALTH_BYTES_PER_MIB',
+	'FLEET_HEALTH_MAX_GPU_MODEL_LENGTH',
+	'FLEET_HEALTH_MAX_GPUS',
+	'FLEET_HEALTH_MAX_MIB',
+	'FLEET_HEALTH_MAX_LOAD_AVG',
+	'FLEET_HEALTH_MAX_CORES',
+	'FLEET_HEALTH_MAX_UPTIME_SEC',
+	'FLEET_HEALTH_MAX_FAILED_SERVICES',
+	'FLEET_NODE_CLEAR_QUARANTINE_COMMAND',
+	'FLEET_CLEAR_MODEL_THROTTLE_COMMAND',
+	'FLEET_NODE_GPU_VENDORS',
+	'FLEET_NODE_HEALTH_RESOLUTIONS',
+	'FLEET_NODE_HEALTH_RANGES',
+	'COMPUTER_STATES',
+	'sanitizeFleetNodeHealthSnapshot',
+	'hasFleetNodeHealthReading',
+	'isFleetNodeHealthStale',
+	'diskLowSeverity',
+	'fleetNodeDiskLowInput',
+	'resolveComputerState'
 ] as const;
 
 // Fleet hub (FL-01) — `fleet-access.types.ts` (the per-family control
@@ -492,7 +526,32 @@ const OPERATION_EXPORTS = [
 	'isFleetOperationTerminal'
 ] as const;
 
+// Viewers on a node-link channel (FL-02) — `fleet-link-viewer.types.ts`,
+// pinned in `fleet-link-viewer.types.spec.ts`.
+const VIEWER_EXPORTS = [
+	'FLEET_LINK_VIEWER_CHANNEL',
+	'FLEET_LINK_VIEWER_TOKEN_TTL_SEC',
+	'FLEET_LINK_VIEWER_TOKEN_RATE_LIMIT',
+	'FLEET_LINK_VIEWER_AUTH_TIMEOUT_MS',
+	'FLEET_LINK_VIEWER_PING_INTERVAL_MS',
+	'FLEET_LINK_VIEWER_SLOW_BUFFER_BYTES',
+	'FLEET_LINK_VIEWER_MAX_BUFFER_BYTES',
+	'FLEET_LINK_VIEWER_MAX_PARAMS_BYTES',
+	'FLEET_LINK_VIEWER_ROLES',
+	'isFleetLinkViewerRole',
+	'FLEET_LINK_VIEWER_CLOSE_CODES',
+	'FLEET_LINK_VIEWER_JSON_TYPES',
+	'FLEET_LINK_VIEWER_FRAME_KINDS',
+	'isFleetLinkViewerTarget',
+	'fleetLinkViewerPath',
+	'parseFleetLinkViewerPath',
+	'fleetLinkViewerKey',
+	'fleetLinkViewerMaySend',
+	'FLEET_LINK_VIEWER_CONTROL_TYPES'
+] as const;
+
 const ALL_EXPORTS = [
+	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
 	...JOB_EXPORTS,
@@ -509,7 +568,8 @@ const ALL_EXPORTS = [
 	...ACCESS_EXPORTS,
 	...NEEDS_A_LOOK_EXPORTS,
 	...LINK_EXPORTS,
-	...OPERATION_EXPORTS
+	...OPERATION_EXPORTS,
+	...VIEWER_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -579,6 +639,12 @@ const FUNCTION_EXPORTS = [
 	'composeFleetTaskCommitMessage',
 	'classifyFleetChangedPaths',
 	'retypeFleetCommitMessage',
+	'sanitizeFleetNodeHealthSnapshot',
+	'hasFleetNodeHealthReading',
+	'isFleetNodeHealthStale',
+	'diskLowSeverity',
+	'fleetNodeDiskLowInput',
+	'resolveComputerState',
 	'isFleetActionFamily',
 	'isFleetAudience',
 	'normalizeControlPolicyFamilies',
@@ -631,7 +697,13 @@ const FUNCTION_EXPORTS = [
 	'decodeFleetLinkAck',
 	'encodeFleetLinkCloseReason',
 	'decodeFleetLinkCloseReason',
-	'isFleetOperationTerminal'
+	'isFleetOperationTerminal',
+	'isFleetLinkViewerRole',
+	'isFleetLinkViewerTarget',
+	'fleetLinkViewerPath',
+	'parseFleetLinkViewerPath',
+	'fleetLinkViewerKey',
+	'fleetLinkViewerMaySend'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -646,7 +718,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 353 runtime symbols', () => {
+	it('exposes exactly these 400 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -703,13 +775,23 @@ describe('fleet barrel', () => {
 		// → 261 with the Fleet hub (FL-01): the fourteen symbols of
 		// `fleet-access.types.ts` and the fourteen of `fleet-needs-a-look.types.ts`
 		// — two NEW modules, so the witness table below gains two rows.
+		// → 232 with the explicit fleet-run route list (works-security lane
+		// 3a): the two prefix arrays become one `FLEET_RUN_TOKEN_ROUTES`.
+		// → +1 with `MACHINE_PRINCIPAL_WORK_WRITABLE_FIELDS`, same module (net
+		// zero for the lane: two arrays out, two names in).
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
 		// → 353 with the node link (FL-02): the sixty-seven symbols of
 		// `fleet-link.types.ts`, the twenty-one of `fleet-link.codec.ts`, the
 		// three of `fleet-operations.types.ts` — three NEW modules, so the
 		// witness table below gains three rows — and the legacy tag cap in
 		// `fleet-node.types.ts`.
-		expect(Object.keys(fleet)).toHaveLength(353);
+		// → 381 with computer health (FL-03): the twenty-eight symbols of
+		// `fleet-node-health.types.ts` — a NEW module, so the witness table
+		// below gains a row.
+		// → 400 with viewers on a link channel (FL-02 P1b): the nineteen symbols
+		// of `fleet-link-viewer.types.ts` — a NEW module, so the witness table
+		// below gains a row.
+		expect(Object.keys(fleet)).toHaveLength(400);
 	});
 
 	it.each([
@@ -725,11 +807,13 @@ describe('fleet barrel', () => {
 		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY'],
 		['fleet-model-usage-limit.types.js', 'FLEET_JOB_FAILURE_KIND_MODEL_USAGE_LIMIT'],
 		['fleet-commit-message.types.js', 'FLEET_COMMIT_TYPES'],
+		['fleet-node-health.types.js', 'COMPUTER_STATES'],
 		['fleet-access.types.js', 'FLEET_ACTION_FAMILIES'],
 		['fleet-needs-a-look.types.js', 'NEEDS_A_LOOK_KINDS'],
 		['fleet-link.types.js', 'FLEET_LINK_FAMILIES'],
 		['fleet-link.codec.js', 'encodeFleetLinkFrame'],
-		['fleet-operations.types.js', 'FLEET_OPERATION_STATES']
+		['fleet-operations.types.js', 'FLEET_OPERATION_STATES'],
+		['fleet-link-viewer.types.js', 'FLEET_LINK_VIEWER_CHANNEL']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import type {
     ComputerControlPolicy,
+    FleetNodeHealthStored,
     FleetConsents,
     FleetControlPolicyFamiliesInput,
     FleetNodeKind,
@@ -606,6 +607,44 @@ export class FleetNode {
     /** When the pending request was made. See {@link controlIdleAt}. */
     @PortableDateColumn({ nullable: true })
     controlRequestedAt?: Date | null;
+
+    /**
+     * Computer health (FL-03) — the latest health snapshot the node
+     * reported, stamped with the platform's RECEIPT time (`at`), plus the
+     * platform's own `diskLowSince` marker. NULL = this node has never
+     * reported one (a daemon older than the field). Kept on the row so every
+     * list of computers reads one row per computer and never joins the
+     * history table. Replaced whole on every beat that carries one; a beat
+     * without one leaves it alone.
+     *
+     * `simple-json` text, as `modelThrottles` (CONTRACTS §4 storage types).
+     * Migration: `1796030100000-AddFleetNodeWakeFields`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    health?: FleetNodeHealthStored | null;
+
+    /**
+     * Computer health (FL-03, wake) — the node's primary hardware address,
+     * reported only with `--manage` and only ever returned, masked, to the
+     * node's owner. Read and written from FL-03's wake phase; the column
+     * ships with the slot. Migration: `1796030100000-AddFleetNodeWakeFields`.
+     */
+    // `text` as CONTRACTS §4.1 types it: no length that a notation other than
+    // `aa:bb:cc:dd:ee:ff` (EUI-64, a dash form) would overflow.
+    @Column({ type: 'text', nullable: true })
+    macAddress?: string | null;
+
+    /**
+     * Computer health (FL-03, wake) — an opaque identity of the network the
+     * node is on, so siblings on the same network can be matched without
+     * storing an address. Migration: `1796030100000-AddFleetNodeWakeFields`.
+     */
+    @Column({ type: 'text', nullable: true })
+    lanId?: string | null;
+
+    /** Computer health (FL-03, wake) — the last wake attempt on this node. */
+    @PortableDateColumn({ nullable: true })
+    lastWakeAttemptAt?: Date | null;
 
     /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — what this machine's owner

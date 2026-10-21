@@ -72,7 +72,13 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
     let works: { findById: jest.Mock };
     let tasks: { updateById: jest.Mock; findById: jest.Mock; recordMergeRefusal: jest.Mock };
     let runs: { setWorkspaceMeta: jest.Mock };
-    let workspaceFacade: { finalize: jest.Mock; simulateMerge: jest.Mock; provision: jest.Mock };
+    let workspaceFacade: {
+        finalize: jest.Mock;
+        simulateMerge: jest.Mock;
+        provision: jest.Mock;
+        branchChanges?: jest.Mock;
+        supportsJudgedPublish?: jest.Mock;
+    };
     let gitFacade: {
         getRepository: jest.Mock;
         createPullRequest: jest.Mock;
@@ -129,6 +135,10 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
                 .fn()
                 .mockResolvedValue({ pushed: true, headSha: 'cafe42', empty: false }),
             simulateMerge: jest.fn().mockResolvedValue({ clean: true, conflictPaths: [] }),
+            // Prompt-injection hardening: every finalize reads its commit's changes
+            // before the push (always-protected-path floor).
+            branchChanges: jest.fn().mockResolvedValue({ paths: ['src/x.ts'], contents: {} }),
+            supportsJudgedPublish: jest.fn().mockResolvedValue(true),
         };
         gitFacade = {
             getRepository: jest.fn().mockResolvedValue({
@@ -622,6 +632,23 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
 
         const [, , , , , actor] = gitFacade.mergePullRequest.mock.calls[0];
         expect(actor).toEqual(expect.objectContaining({ targetBranch: 'release' }));
+    });
+
+    // Works-security lane 3a (review): a Work with no isolation base used to
+    // hand the facade 'main' as the planned base, while its pull requests
+    // open against the repository's real default (develop / master) — every
+    // agent merge then failed `target-branch-mismatch`, approved or not.
+    it('attemptMergeForOpenPullRequest plans no base when the Work names none (the live base decides)', async () => {
+        works.findById.mockResolvedValue(makeWork({ taskIsolationBaseBranch: null }));
+        const task = { ...makeTask(), prNumber: 7, prUrl: 'https://x/pull/7' };
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+        });
+
+        const [, , , , , actor] = gitFacade.mergePullRequest.mock.calls[0];
+        expect(actor).toEqual(expect.objectContaining({ targetBranch: null }));
     });
 
     it('attemptMergeForOpenPullRequest does nothing for a Task with no pull request', async () => {

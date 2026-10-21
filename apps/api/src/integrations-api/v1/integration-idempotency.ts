@@ -47,11 +47,24 @@ export async function runIdempotent(
         );
     }
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
+    // Review 2026-10-17 F32 / F37: the organization the request is scoped to and the
+    // person it acts as are part of "the same request", so a key reused across
+    // organizations or act-as users answers 409 request_mismatch instead of replaying
+    // another organization's (or person's) result.
+    const headerOf = (name: string): string => {
+        const value = req.headers?.[name];
+        return ((Array.isArray(value) ? value[0] : value) ?? '').trim();
+    };
+    const requestHash = idempotencyRequestHash(req.method ?? 'POST', path, req.body, {
+        // Either names the organization (the guard has made sure both agree when sent).
+        scope: [headerOf('x-scope-slug'), headerOf('x-organization-id')].filter(Boolean).join('|'),
+        actAsUserId: principal.actAsUserId,
+    });
     const result = await idempotency.run(
         {
             integrationKeyId: principal.keyId,
             idempotencyKey: key,
-            requestHash: idempotencyRequestHash(req.method ?? 'POST', path, req.body),
+            requestHash,
         },
         work,
     );

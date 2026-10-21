@@ -84,6 +84,20 @@ export class WorkspaceFacadeService extends BaseFacadeService implements IWorksp
     }
 
     /**
+     * Whether the selected provider can serve a judge-before-push caller: it
+     * reports a branch's changes (`branchChanges`) AND promises that
+     * `finalize` with `publishSha` publishes exactly that commit
+     * (`publishesJudgedCommit`). A provider that predates `publishSha` may
+     * ignore it and push HEAD, so without the promise the caller refuses
+     * before anything is committed or pushed. Answers `false` (never throws)
+     * for a provider that lacks either.
+     */
+    async supportsJudgedPublish(facadeOptions: FacadeOptions): Promise<boolean> {
+        const plugin = await this.resolveTypedPlugin(facadeOptions);
+        return typeof plugin.branchChanges === 'function' && plugin.publishesJudgedCommit === true;
+    }
+
+    /**
      * What the branch changes at `opts.headSha`, read BEFORE it is pushed
      * (APW-08 T17's judge-before-push). A provider that cannot report it is
      * refused with a named error rather than letting a caller push unjudged.

@@ -571,7 +571,21 @@ export class AppDeployRequestService {
         }
 
         // ---- 2 · the preconditions (§5.1, FR-24) -----------------------------
-        const preconditions = await this.evaluate(request, workId);
+        let preconditions = await this.evaluate(request, workId);
+
+        // ---- 2b · a Build-backed request that named no Build (prod, 2026-10-18) ---------------
+        // §5.1's pass already picks the newest green, deployable Build of the tracked branch when
+        // the request names none (`context.buildId`) and refuses `no_green_build` when there is
+        // none. The row and the dispatch used to carry the request's `buildId` — `null` — so the
+        // worker re-ran §5.1 with no Build and failed every such Deployment ("strategy dockerfile
+        // deploys a Build and the request named none"). Adopt the pass's Build and evaluate again
+        // AT that Build, so the spec commit on the row is the Build's own (ACC-06-20).
+        const defaultBuildId = defaultedBuildIdOf(request, preconditions);
+        if (defaultBuildId) {
+            request = { ...request, buildId: defaultBuildId };
+            preconditions = await this.evaluate(request, workId);
+        }
+
         if (!preconditions) {
             return this.refused(503, APP_DEPLOY_CODE_STATE_UNAVAILABLE, [
                 {
@@ -595,6 +609,25 @@ export class AppDeployRequestService {
         // ---- 3 · the request's own validation (§2.2:158, §5.8) ---------------
         const buildId = request?.buildId ? String(request.buildId) : null;
         const strategy = preconditions.context.strategy;
+
+        if (!buildId && (strategy === 'dockerfile' || strategy === 'auto')) {
+            // Defence in depth for 2b: a Build-backed strategy that still has no Build here would
+            // dispatch a Deployment the worker can only fail. Refuse it up front instead, with the
+            // precondition the member can act on.
+            return this.refused(
+                422,
+                APP_DEPLOY_CODE_PRECONDITIONS,
+                [
+                    {
+                        code: 'no_green_build',
+                        message:
+                            'No green Build exists for this App Work yet. Start a Build on the ' +
+                            'Builds tab, wait for it to succeed, then Deploy.',
+                    },
+                ],
+                preconditions,
+            );
+        }
 
         if (buildId && strategy === 'image') {
             // T22 emits the same code for the same contradiction (a Build named for a strategy that
@@ -1275,6 +1308,24 @@ export function requestedCommit(request: AppDeployRequest | null | undefined): s
     if (normaliseTrigger(request?.trigger) === 'rollback' && rollbackCommit) return rollbackCommit;
 
     return request?.specCommitSha ? String(request.specCommitSha) : null;
+}
+
+/**
+ * The Build §5.1's pass chose for a Build-backed request that named none — the newest green,
+ * deployable Build of the tracked branch (`context.buildId`) — or `null` when the request already
+ * named one, the strategy builds nothing (`image` / `none`), or the pass refused anyway.
+ */
+export function defaultedBuildIdOf(
+    request: AppDeployRequest | null | undefined,
+    preconditions: AppDeployPreconditionResult | null | undefined,
+): string | null {
+    if (!preconditions || request?.buildId) return null;
+    if (normaliseTrigger(request?.trigger) === 'rollback') return null;
+    const strategy = preconditions.context?.strategy;
+    if (strategy !== 'dockerfile' && strategy !== 'auto') return null;
+    if (preconditions.unmet.length > 0) return null;
+    const chosen = preconditions.context?.buildId ? String(preconditions.context.buildId) : '';
+    return chosen || null;
 }
 
 /**

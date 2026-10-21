@@ -38,13 +38,18 @@ import {
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    diskLowSeverity,
+    fleetNodeDiskLowInput,
+    hasFleetNodeHealthReading,
     fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
     normalizeFleetNodeWorkerState,
+    sanitizeFleetNodeHealthSnapshot,
 } from '@ever-works/contracts';
 import type {
     FleetAuditAction,
+    FleetNodeHealthStored,
     FleetConsents,
     FleetControlPolicyFamiliesInput,
     FleetNodeLimitCeiling,
@@ -67,6 +72,7 @@ import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { FleetAuditService } from './fleet-audit.service';
+import { FleetNodeHealthService } from './fleet-node-health.service';
 import { FleetAccessService, fleetOwnerOnlyBody } from './fleet-access.service';
 import { normalizeDailyCeilingCents } from './fleet-cost-ceiling.shared';
 import {
@@ -227,6 +233,14 @@ export interface EnrollInput {
     maxConcurrentJobs?: number;
     maxCpuPercent?: number | null;
     maxMemoryMb?: number | null;
+    /**
+     * Computer health (FL-03) — the beat's health snapshot. UNTRUSTED: the
+     * DTO admits any object so a value this build rejects can never fail the
+     * beat; {@link sanitizeFleetNodeHealthSnapshot} keeps only known fields
+     * within their bounds. Same additive contract as {@link cliVersion}: an
+     * absent or unusable snapshot leaves the stored one alone.
+     */
+    health?: unknown;
     /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — the four consents the node
      * was started with. An untrusted value off the wire: normalized here
@@ -404,6 +418,10 @@ export class FleetService {
         // the owner-only acts. APPENDED and @Optional() for the same reason as
         // `audit`: unbound, every read stays owner-scoped exactly as before.
         @Optional() private readonly access?: FleetAccessService,
+        // Computer health (FL-03) — the history writer. APPENDED and
+        // @Optional() for the same positional-construction reason: without
+        // it the snapshot is still stored on the row; only history is off.
+        @Optional() private readonly healthHistory?: FleetNodeHealthService,
     ) {}
 
     /** Issue a one-time enrollment token for a new node (owner-scoped). */
@@ -541,6 +559,15 @@ export class FleetService {
             lastReclaimAt: sanitizeReportedInstant(input.lastReclaimAt, now),
             lastReclaimFreedBytes: sanitizeByteCount(input.lastReclaimFreedBytes),
         } as ConsumeEnrollmentPatchWithTelemetry;
+        // Computer health (FL-03). A node never sends a snapshot at enrol
+        // (enrolment has no strip-and-retry fallback), but the DTO is shared
+        // with the heartbeat, so one that arrives is stored the same way. The
+        // first sample of the history is the first BEAT's, not this.
+        const enrolledHealth = buildStoredHealth(input.health, now, null, {
+            diskFreeBytes: patch.diskFreeBytes ?? null,
+            minFreeDiskBytes: patch.minFreeDiskBytes ?? null,
+        });
+        if (enrolledHealth) patch.health = enrolledHealth;
         // Remote node limits (slice AS) — the same keyed set as a beat; a
         // fresh row starts from whatever the machine said (usually nothing).
         applyReportedLimits(input, patch);
@@ -661,6 +688,36 @@ export class FleetService {
         this.applyHousekeeping(refresh, patch);
         // Remote node limits (slice AS): what the worker reports enforcing.
         applyReportedLimits(refresh, patch);
+        // Computer health (FL-03): the snapshot, stamped with THIS beat's
+        // receipt time (never the machine's clock, U12), replacing the stored
+        // one whole — a fact a probe missed this beat reads "—", not last
+        // minute's value. Absent or unusable leaves the stored one alone, as
+        // every telemetry field above does. Built after the housekeeping so
+        // the disk-low marker judges this beat's floor.
+        const receivedAt = patch.lastHeartbeatAt as Date;
+        const sampleThisBeat = this.healthHistory?.shouldSample(node.health, receivedAt) === true;
+        const beatDisk = {
+            diskFreeBytes:
+                patch.diskFreeBytes !== undefined ? patch.diskFreeBytes : node.diskFreeBytes,
+            minFreeDiskBytes:
+                'minFreeDiskBytes' in patch ? patch.minFreeDiskBytes : node.minFreeDiskBytes,
+        };
+        const health = buildStoredHealth(
+            refresh.health,
+            receivedAt,
+            node.health ?? null,
+            beatDisk,
+            sampleThisBeat,
+        );
+        if (health) {
+            patch.health = health;
+        } else {
+            // A daemon older than the snapshot still reports free disk and its
+            // floor: keep the platform's disk-low marker for it, so its
+            // `disk-low` item has one stable `since` too (FR-17).
+            const marker = buildDiskLowMarker(receivedAt, node.health ?? null, beatDisk);
+            if (marker !== undefined) patch.health = marker;
+        }
         // Fleet node link (FL-02): the consents, stored only when they changed.
         const consentChange = applyReportedConsents(node, refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
@@ -675,6 +732,17 @@ export class FleetService {
         // SECOND outage would never have been announced.
         this.rearmOfflineNotices(node, patch);
         await this.repository.update(node.id, patch);
+        // Computer health (FL-03) — the history sample, AFTER the write so a
+        // sample never exists for a beat the database refused, and
+        // fire-and-forget so it can never slow or fail this beat (U11).
+        if (health && sampleThisBeat) {
+            try {
+                this.healthHistory?.record(node.id, receivedAt, health);
+            } catch {
+                // `record` swallows its own failures; this is the belt for a
+                // history bug — the beat is the node's liveness, never history's.
+            }
+        }
         // Best-effort and AFTER the write, so a notice never claims a
         // transition the database refused. The dedup markers ride in the
         // same patch, which is what makes each notice fire once: if the
@@ -2043,6 +2111,9 @@ export class FleetService {
             recordWatchSessions: Boolean(node.recordWatchSessions),
             recordingRetentionDays: toOptionalNumber(node.recordingRetentionDays) ?? 14,
             controlHolder: toControlHolder(node),
+            // Computer health (FL-03): the latest snapshot off the row — one
+            // read per computer, never a join to the history.
+            health: toStoredHealthView(node.health),
             // Fleet hub (FL-01): the owner's star and the policy in force,
             // every family filled in (the legacy column read through as
             // `desktop` when the map has no entry for it).
@@ -2054,6 +2125,95 @@ export class FleetService {
             previewProfileEnabled: Boolean(node.previewProfileEnabled),
         };
     }
+}
+
+/**
+ * Computer health (FL-03) — the snapshot a beat carried, as the row stores
+ * it: sanitised (only known fields, each within bounds — nothing the node did
+ * not send, FR-4), stamped with the platform's receipt time, carrying the two
+ * platform markers forward:
+ *
+ *   - `diskLowSince` — kept from the previous snapshot while the disk stays
+ *     low, set to this beat when it turns low, dropped when it recovers, so
+ *     the `disk-low` item keeps one `since` for its whole duration (FR-17);
+ *   - `sampledAt` — this beat when it is written to the history, else the
+ *     previous marker, so the 55 s floor holds across replicas (FR-18).
+ *
+ * Null when the beat carried nothing usable: the caller leaves the stored
+ * snapshot alone.
+ */
+export function buildStoredHealth(
+    raw: unknown,
+    receivedAt: Date,
+    previous: FleetNodeHealthStored | null,
+    disk: {
+        diskFreeBytes: string | number | null | undefined;
+        minFreeDiskBytes: string | number | null | undefined;
+    },
+    sampled = false,
+): FleetNodeHealthStored | null {
+    const snapshot = sanitizeFleetNodeHealthSnapshot(raw);
+    if (!snapshot) return null;
+    const at = receivedAt.toISOString();
+    const stored: FleetNodeHealthStored = { ...snapshot, at };
+    const low = diskLowSeverity(
+        fleetNodeDiskLowInput({
+            diskFreeBytes: toOptionalNumber(disk.diskFreeBytes),
+            minFreeDiskBytes: toOptionalNumber(disk.minFreeDiskBytes),
+            health: snapshot,
+        }),
+    );
+    if (low) stored.diskLowSince = previous?.diskLowSince ?? at;
+    if (sampled) {
+        stored.sampledAt = at;
+    } else if (previous?.sampledAt) {
+        stored.sampledAt = previous.sampledAt;
+    }
+    return stored;
+}
+
+/**
+ * Computer health (FL-03) — the disk-low marker for a beat that carried no
+ * usable snapshot, judged by the floor rule alone (the percentage rule needs
+ * the snapshot's volume size):
+ *
+ *   - a row holding a real reading is left alone (`undefined`): its snapshot
+ *     already carries the marker, and a beat that missed it changes nothing,
+ *     as every telemetry field does;
+ *   - disk low → `{ at, diskLowSince }`, `diskLowSince` carried from the
+ *     previous marker, so the `disk-low` item keeps its first instant;
+ *   - disk fine → `null` when a marker was stored (clear it), else
+ *     `undefined` (nothing to write).
+ *
+ * The value is a marker, not a reading: {@link hasFleetNodeHealthReading} is
+ * false for it, so no surface shows it as metrics, and nothing is sampled.
+ */
+export function buildDiskLowMarker(
+    receivedAt: Date,
+    previous: FleetNodeHealthStored | null,
+    disk: {
+        diskFreeBytes: string | number | null | undefined;
+        minFreeDiskBytes: string | number | null | undefined;
+    },
+): FleetNodeHealthStored | null | undefined {
+    if (hasFleetNodeHealthReading(previous)) return undefined;
+    const low = diskLowSeverity(
+        fleetNodeDiskLowInput({
+            diskFreeBytes: toOptionalNumber(disk.diskFreeBytes),
+            minFreeDiskBytes: toOptionalNumber(disk.minFreeDiskBytes),
+            health: null,
+        }),
+    );
+    if (!low) return previous ? null : undefined;
+    const at = receivedAt.toISOString();
+    return { at, diskLowSince: previous?.diskLowSince ?? at };
+}
+
+/** The stored snapshot as the view serves it, or null when the row holds none (or junk). */
+function toStoredHealthView(value: unknown): FleetNodeHealthStored | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const stored = value as FleetNodeHealthStored;
+    return typeof stored.at === 'string' && stored.at.length > 0 ? stored : null;
 }
 
 /**
@@ -2138,6 +2298,13 @@ function toSharedView(
         isFavorite: false,
         hostNodeId: view.hostNodeId ?? null,
         virtualKind: view.virtualKind ?? null,
+        // Computer health (FL-03) — DECIDED shared: reading health is the `view`
+        // family (FL-03 spec §7, "Read health / history: view / org-members").
+        // The stored snapshot carries numbers, booleans, a failed-service COUNT
+        // and bounded GPU model names — no free text the node wrote, no path,
+        // no unit name. The disk floor and the resource ceilings stay withheld,
+        // so a shared reader's "disk low" is the percentage rule only.
+        health: view.health ?? null,
     };
 }
 
@@ -2165,6 +2332,7 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'isFavorite',
     'hostNodeId',
     'virtualKind',
+    'health',
 ];
 
 /**

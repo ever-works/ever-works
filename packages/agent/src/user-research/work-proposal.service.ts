@@ -1029,11 +1029,14 @@ export class WorkProposalService {
                 description,
                 slugSuggestion: this.proposalKey(title).slice(0, 80) || 'untitled-idea',
             });
-            if (teamIds.length > 0) {
-                await visibility.setTeamsIn(manager, 'idea', row.id, teamIds, input.userId);
-            }
+            const teams =
+                teamIds.length > 0
+                    ? await visibility.setTeamsIn(manager, 'idea', row.id, teamIds, input.userId)
+                    : null;
             await visibility.recomputeAutomaticIn(manager, 'idea', row.id, { recordEvent: false });
             await publisher.created(manager, 'idea', row.id, 'idea.created');
+            // Review 2026-10-17 F34: the Teams' `team.resource.added`, after the Idea's.
+            if (teams) await visibility.recordTeamSideIn(manager, teams.teamSide);
             if (options.withinCreate) await options.withinCreate({ id: row.id }, manager);
             return row.id;
         });

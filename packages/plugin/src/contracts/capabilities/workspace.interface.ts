@@ -204,7 +204,10 @@ export interface WorkspaceFinalizeOptions {
 	 * Lets a caller judge the exact commit it is about to publish (see
 	 * {@link IWorkspacePlugin.branchChanges}) before anything leaves the
 	 * runtime — the App Work change gate on the cloud path (APW-08 T17).
-	 * Optional and additive: a provider that predates it ignores it.
+	 * Optional and additive: a provider that predates it ignores it — which is
+	 * why a provider that HONOURS it says so with
+	 * {@link IWorkspacePlugin.publishesJudgedCommit}, and a judge-before-push
+	 * caller refuses a provider that does not, before anything is pushed.
 	 */
 	publishSha?: string;
 	/**
@@ -291,6 +294,20 @@ export class WorkspaceNotProvisionedError extends Error {
 export interface IWorkspacePlugin extends IPlugin {
 	readonly providerName: string;
 
+	/**
+	 * Declares that this provider honours {@link WorkspaceFinalizeOptions.publishSha}:
+	 * given one, it pushes EXACTLY that commit — it never stages, commits or
+	 * pushes `HEAD` instead. A caller that judges a commit before publishing it
+	 * (the always-protected-path floor and the App Work change gate on the
+	 * cloud path) needs this AND {@link branchChanges}, and refuses a provider
+	 * without both BEFORE anything is committed or pushed: the contract lets a
+	 * provider that predates `publishSha` ignore it and push `HEAD`, which can
+	 * carry files written after the judgement.
+	 *
+	 * Optional and additive: undeclared means "not promised".
+	 */
+	readonly publishesJudgedCommit?: true;
+
 	/** Fetch-first provision: clone/fetch, cut or reuse the branch. */
 	provision(spec: WorkspaceProvisionSpec): Promise<WorkspaceHandle>;
 
@@ -352,6 +369,13 @@ export interface IWorkspaceFacade {
 		opts: { commitMessage: string; push: boolean; publishSha?: string },
 		facadeOptions: FacadeOptions
 	): Promise<WorkspaceFinalizeResult>;
+	/**
+	 * Whether the selected provider can serve a judge-before-push caller: it
+	 * implements {@link IWorkspacePlugin.branchChanges} AND declares
+	 * {@link IWorkspacePlugin.publishesJudgedCommit}. Never throws for a
+	 * provider that lacks either — it answers `false`.
+	 */
+	supportsJudgedPublish(facadeOptions: FacadeOptions): Promise<boolean>;
 	/** See {@link IWorkspacePlugin.branchChanges}; refuses when the provider cannot report them. */
 	branchChanges(
 		handle: WorkspaceHandle,

@@ -59,7 +59,10 @@ function makeHarness(mode: 'draft-review' | 'auto-send' = 'draft-review') {
             };
         }),
     };
-    const policy = { resolvePolicy: jest.fn().mockResolvedValue({ mode }) };
+    const policy = {
+        resolvePolicy: jest.fn().mockResolvedValue({ mode }),
+        resolveAgentSendMode: jest.fn().mockResolvedValue({ mode }),
+    };
     const approvals = {
         createProposal: jest.fn().mockResolvedValue({ id: 'prop-1', status: 'pending' }),
         decide: jest.fn().mockResolvedValue({ id: 'prop-1', status: 'approved' }),
@@ -90,6 +93,25 @@ const INPUT: SubmitAgentEmailInput = {
 
 describe('EmailDraftService', () => {
     describe('submit', () => {
+        it('decides send-or-hold per message, from its recipients (unknown recipients are held)', async () => {
+            const { service, policy, facade, approvals } = makeHarness('auto-send');
+            policy.resolveAgentSendMode.mockResolvedValueOnce({
+                mode: 'draft-review',
+                unknownRecipients: ['grace@example.com'],
+            });
+
+            const outcome = await service.submit(INPUT);
+
+            expect(policy.resolveAgentSendMode).toHaveBeenCalledWith('user-1', 'agent-1', {
+                to: ['ada@example.com'],
+                cc: ['grace@example.com'],
+                bcc: undefined,
+            });
+            expect(outcome.held).toBe(true);
+            expect(facade.send).not.toHaveBeenCalled();
+            expect(approvals.createProposal).toHaveBeenCalled();
+        });
+
         it('sends straight through, as an Agent, when the inbox sends on its own', async () => {
             const { service, facade, messages, approvals } = makeHarness('auto-send');
 

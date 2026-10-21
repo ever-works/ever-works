@@ -294,6 +294,33 @@ describe('FleetService.listVisibleForUser (S9)', () => {
         expect(shared.modelThrottles?.[0]).toMatchObject({ provider: 'claude-code', reason: '' });
     });
 
+    it('shares the health snapshot (FL-03: reading health is the `view` family) but not the disk floor', async () => {
+        const at = new Date().toISOString();
+        const health = {
+            at,
+            cpuPercent: 31,
+            diskPercent: 92,
+            failedServices: 2,
+            pendingReboot: true,
+            gpu: [{ vendor: 'nvidia' as const, name: 'RTX 4090' }],
+        };
+        const holder = node({
+            id: 'node-shared',
+            userId: 'someone',
+            health,
+            minFreeDiskBytes: String(5 * 1024 ** 3),
+        } as Partial<FleetNode>);
+        const { service } = build([holder]);
+        const [shared] = await service.listVisibleForUser(MEMBER);
+        expect(shared.health).toEqual(health);
+        // The floor is one of the owner's limits: a shared reader's "disk low"
+        // is the percentage rule alone.
+        expect(shared).not.toHaveProperty('minFreeDiskBytes');
+        // A node that never reported health is shared as "none", not omitted.
+        const { service: other } = build([node({ id: 'node-shared', userId: 'someone' })]);
+        expect((await other.listVisibleForUser(MEMBER))[0].health).toBeNull();
+    });
+
     it('keeps the needs-a-look read off the live cluster merge', async () => {
         const { service } = build([others]);
         const listForUser = jest.spyOn(service, 'listForUser');

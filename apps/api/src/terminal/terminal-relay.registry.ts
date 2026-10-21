@@ -406,14 +406,22 @@ export class TerminalRelayRegistry {
      * attached, the session has ended, and at least one attach saw its
      * history — so a failed session's explanation is never reclaimed
      * unseen. The sweeper's abandoned-session TTL path uses `force`.
+     *
+     * `idleRelease` (FL-02 relay bus) also releases a session that never
+     * ended, still only with nothing attached: the relay bus's copy of a
+     * run another replica published whose exit frame never arrived (that
+     * replica died first), after it went silent. Only that sweeper passes it.
      */
-    canReclaim(runId: string, opts: { force?: boolean } = {}): boolean {
+    canReclaim(runId: string, opts: { force?: boolean; idleRelease?: boolean } = {}): boolean {
         const session = this.sessions.get(runId);
         if (!session) {
             return true;
         }
         if (session.clients.size > 0) {
             return false;
+        }
+        if (opts.idleRelease === true) {
+            return true;
         }
         if (opts.force === true) {
             return session.ended;
@@ -422,7 +430,7 @@ export class TerminalRelayRegistry {
     }
 
     /** Release the session if {@link canReclaim} allows it. */
-    reclaim(runId: string, opts: { force?: boolean } = {}): boolean {
+    reclaim(runId: string, opts: { force?: boolean; idleRelease?: boolean } = {}): boolean {
         if (!this.sessions.has(runId)) {
             return false;
         }

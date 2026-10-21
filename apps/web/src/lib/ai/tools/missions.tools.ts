@@ -16,6 +16,8 @@ import {
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
 import { attachUploadsBestEffort, extractUploadIds } from './utils';
+import type { UserConfirmationCheck } from './generated/confirmation';
+import { CONFIRMED_FIELD_DESCRIPTION, requireUserConfirmation } from './confirm-gate';
 
 /**
  * Phase 9 PR Z1 — in-app AI Chat tools for Missions (spec §3.8).
@@ -237,20 +239,40 @@ export const completeMission = tool({
     },
 });
 
-export const deleteMission = tool({
-    description: [
-        'Delete a Mission. DESTRUCTIVE — surface a confirmation in chat before calling.',
-        'Removes the Mission row and detaches its Ideas (the Ideas themselves remain in the catalog).',
-    ].join(' '),
-    inputSchema: z.object({
-        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-    }),
-    execute: async ({ missionId }) => {
-        await deleteMissionAction(missionId);
-        return { deleted: true, missionId };
-    },
-});
+/**
+ * Build `deleteMission`. Security: server-side confirmation handshake (it had
+ * none — only advisory prose), bound to the user's own confirmation of this
+ * exact card when `userConfirmed` is supplied (see `./confirm-gate.ts`).
+ */
+export function createDeleteMissionTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Delete a Mission. Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
+            'Removes the Mission row and detaches its Ideas (the Ideas themselves remain in the catalog).',
+        ].join(' '),
+        inputSchema: z.object({
+            // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+            missionId: z.string().uuid().describe('Mission ID'),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({ missionId, confirmed }) => {
+            const card = requireUserConfirmation({
+                toolName: 'deleteMission',
+                action: 'Delete a Mission',
+                target: missionId,
+                args: { missionId },
+                confirmed,
+                userConfirmed,
+            });
+            if (card) return card;
+            await deleteMissionAction(missionId);
+            return { deleted: true, missionId };
+        },
+    });
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const deleteMission = createDeleteMissionTool();
 
 export const runMissionNow = tool({
     description: [

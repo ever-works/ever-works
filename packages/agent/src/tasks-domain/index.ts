@@ -17,6 +17,7 @@ export * from './task-chat.service';
 export * from './task-dispatcher';
 export * from './run-steering-port';
 export * from './task-isolation';
+export * from './awaiting-owner';
 export * from './task-run-denorm.service';
 export * from './task-workspace.service';
 // APW-08 T17 — the App Work change gate's port, so the agent git tools can ask

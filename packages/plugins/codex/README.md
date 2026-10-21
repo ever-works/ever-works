@@ -98,7 +98,7 @@ The plugin automatically downloads and caches the Codex CLI binary:
 ## Error Handling
 
 - **Non-zero exit codes**: Treated as soft warnings. If items were still produced, the result succeeds with warnings attached.
-- **Sandbox write blocks**: Automatically detected and retried once with sandbox bypass.
+- **Sandbox write blocks**: Detected and logged, but **never** retried with sandbox bypass on their own. The detector reads Codex's stdout/stderr, which is model-produced text that injected content (a fetched page, a README) can steer, so it cannot be allowed to escalate a run to `--dangerously-bypass-approvals-and-sandbox`. Bypass happens only when the operator explicitly enables `unsafeBypassSandbox` (then every run starts bypassed). See [Sandbox bypass](#sandbox-bypass).
 - **Structured output recovery**: If Codex completes without writing item files, the plugin attempts a second pass using `--output-schema` and `--output-last-message` to recover structured output.
 - **Masked secrets**: The `getRealSecret` helper filters out UI placeholder values (`••••`) before using credentials.
 
@@ -147,6 +147,20 @@ pnpm test:watch
 # Coverage
 pnpm test:coverage
 ```
+
+## Sandbox bypass
+
+Codex runs inside its own sandbox unless told otherwise. Two paths can run it with
+`--dangerously-bypass-approvals-and-sandbox` (full host access, no approvals):
+
+- **Generation pipeline** — only when the operator sets `unsafeBypassSandbox: true` (hidden setting, default
+  `false`). The plugin no longer escalates on its own when Codex's output _says_ writes were blocked: that output
+  is model text, and a prompt-injected model could print exactly those phrases. A declined escalation is logged as
+  a warning; structured-output recovery still runs, sandboxed.
+- **Code-edit path** (`executeCodeEdit`) — **always** passes the bypass flag today. It edits a workspace the
+  platform provisioned for the run and needs unrestricted writes there. Treat any host running code-edit as giving
+  the Codex process the plugin's own OS privileges: run it in a container/VM with no credentials or networks it
+  should not reach. This behaviour is unchanged and documented here so it is a known, reviewed trade-off.
 
 ## Smoke Test
 

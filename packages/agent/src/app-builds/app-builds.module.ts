@@ -45,6 +45,7 @@ import {
 } from './app-builds.service';
 import {
     BUILD_REPOSITORY_FACTS_SOURCE,
+    BUILD_REPOSITORY_VISIBILITY_PROBE,
     BUILD_SETTINGS_SOURCE,
     BUILD_TOKEN_SOURCE,
     BuildFacadeService,
@@ -54,6 +55,10 @@ import {
 } from './build-facade.service';
 import { GitBuildTokenSource } from './git-build-token.source';
 import { UpstreamBuildFactsSource } from './upstream-build-facts.source';
+import {
+    createGitHubRepositoryVisibilityProbe,
+    type RepositoryVisibilityProbe,
+} from './repository-visibility.probe';
 import { AppBuildSpecReadSource } from './build-spec.source';
 import { AppBuildWorkContextSource } from './build-work-context.source';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
@@ -285,6 +290,13 @@ import { GitFacadeService } from '../facades/git.facade';
         // module here would make `app-builds.module.spec.ts` stop compiling
         // standalone. With nothing to find, the facade's own SAFE defaults apply
         // and a Build takes the pull-request path on the private runner.
+        // 2026-10-18 — the provider's own answer when the facts source can only
+        // say its `private` fail-safe (a public Cal fork was blocked
+        // `runnerTooSmall` on the 7 GiB private runner).
+        {
+            provide: BUILD_REPOSITORY_VISIBILITY_PROBE,
+            useFactory: (): RepositoryVisibilityProbe => createGitHubRepositoryVisibilityProbe(),
+        },
         {
             provide: BUILD_REPOSITORY_FACTS_SOURCE,
             useFactory: (ref: ModuleRef): BuildRepositoryFactsSource => ({
@@ -528,6 +540,7 @@ import { GitFacadeService } from '../facades/git.facade';
         APP_BUILD_PLUGIN_RESOLVER,
         BUILD_TOKEN_SOURCE,
         BUILD_REPOSITORY_FACTS_SOURCE,
+        BUILD_REPOSITORY_VISIBILITY_PROBE,
         APP_BUILD_WORK_SOURCE,
         APP_BUILD_SPEC_SOURCE,
         APP_BUILD_RUNNER_RECIPE_SOURCE,

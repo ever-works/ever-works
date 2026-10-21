@@ -19,11 +19,22 @@ import { detectDiskFreeBytes, type DiskProbeIo } from '../telemetry-probe';
  * simply carries no figure.
  */
 export async function measureWorkspaceFreeBytes(probe: DiskProbeIo, rootPath: string): Promise<number | null> {
+	const candidate = await nearestExistingPath(rootPath);
+	return candidate === null ? null : detectDiskFreeBytes(probe, candidate);
+}
+
+/**
+ * The nearest existing ancestor of `rootPath` (itself when it exists), or
+ * null when an ancestor cannot be read for a reason other than "missing" or
+ * none exists. Shared by the free-space reading above and the health
+ * snapshot's volume reading (FL-03), so both describe the same volume.
+ */
+export async function nearestExistingPath(rootPath: string): Promise<string | null> {
 	let candidate = rootPath;
 	for (;;) {
 		try {
 			await fs.lstat(candidate);
-			break;
+			return candidate;
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
 				return null;
@@ -35,5 +46,4 @@ export async function measureWorkspaceFreeBytes(probe: DiskProbeIo, rootPath: st
 			candidate = parent;
 		}
 	}
-	return detectDiskFreeBytes(probe, candidate);
 }

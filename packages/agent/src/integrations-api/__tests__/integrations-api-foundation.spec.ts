@@ -226,6 +226,37 @@ describe('integration API v1 foundation', () => {
 
         // Review 2026-10-17 F9 (P1): the record was deleted in the app (or with its
         // Work), so no integration DELETE dropped its link.
+        // Review 2026-10-17 F42: GET /links pages like every list (it answered the first
+        // 500 links, no cursor).
+        it('pages the links of a source by (updatedAt, id), filters kept', async () => {
+            const ids = [await realTask(), await realTask(), await realTask()];
+            for (const [index, entityId] of ids.entries()) {
+                await links.create(scope, {
+                    entityType: 'task',
+                    entityId,
+                    externalId: `page-${index}`,
+                    externalUrl: null,
+                });
+            }
+            const first = await links.listPage(scope, { entityType: 'task' }, { limit: 2 });
+            expect(first.data).toHaveLength(2);
+            expect(first.hasMore).toBe(true);
+            const second = await links.listPage(
+                scope,
+                { entityType: 'task' },
+                { limit: 2, cursor: first.nextCursor },
+            );
+            expect(second.hasMore).toBe(false);
+            expect([...first.data, ...second.data].map((row) => row.externalId).sort()).toEqual([
+                'page-0',
+                'page-1',
+                'page-2',
+            ]);
+            const one = await links.listPage(scope, { externalId: 'page-1' }, {});
+            expect(one.data.map((row) => row.entityId)).toEqual([ids[1]]);
+            expect((await links.listPage({ ...scope, source: 'other' }, {}, {})).data).toEqual([]);
+        });
+
         it('drops a link whose record is gone, so the externalRef can be created again', async () => {
             const gone = await realTask();
             await links.create(scope, { entityType: 'task', entityId: gone, externalId: 'g-1' });
@@ -387,7 +418,7 @@ describe('integration API v1 foundation', () => {
                 '2026-10-16 05:00:00.123456',
                 '2026-10-16 05:00:00',
             ]) {
-                const position = { updatedAt, id: 'abc' };
+                const position = { updatedAt, id: '0b6f7c1e-7a43-4a4f-9a51-5b9d1d2c0a11' };
                 expect(decodeKeysetCursor(encodeKeysetCursor(position))).toEqual(position);
             }
             const forged = (value: unknown) =>
@@ -399,6 +430,10 @@ describe('integration API v1 foundation', () => {
                 forged({ v: 1, u: 1e20, i: 'abc' }),
                 forged({ v: 1, u: '2026-13-99 99:99', i: 'abc' }),
                 forged({ v: 1, u: '2026-10-16 05:00:00', i: '' }),
+                // Review 2026-10-17 F41: the id is a uuid (a bare string reached a uuid
+                // comparison on Postgres and answered 500).
+                forged({ v: 1, u: '2026-10-16 05:00:00', i: 'abc' }),
+                forged({ v: 1, u: '2026-10-16 05:00:00', i: "x' OR '1'='1" }),
                 forged(null),
             ]) {
                 expect(() => decodeKeysetCursor(bad)).toThrow(InvalidCursorError);

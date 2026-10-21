@@ -6,6 +6,7 @@ import {
 	INTEGRATION_ERROR_CODES,
 	INTEGRATION_KEY_PRESETS,
 	INTEGRATION_KEY_PREFIX,
+	INTEGRATION_MERGE_DECISION_SCOPE,
 	INTEGRATION_OPT_IN_SCOPES,
 	INTEGRATION_SCOPES,
 	integrationActorLabel,
@@ -28,22 +29,25 @@ describe('integration keys — vocabulary v1', () => {
 		expect(INTEGRATION_API_KEY_KIND).not.toBe(PERSONAL_API_KEY_KIND);
 	});
 
-	it('has 26 unique scopes and never grants activation or build', () => {
+	it('has 27 unique scopes and never grants activation or build', () => {
 		expect(new Set(INTEGRATION_SCOPES).size).toBe(INTEGRATION_SCOPES.length);
-		expect(INTEGRATION_SCOPES).toHaveLength(26);
+		expect(INTEGRATION_SCOPES).toHaveLength(27);
 		for (const forbidden of ['goals:activate', 'missions:activate', 'ideas:build']) {
 			expect(isIntegrationScope(forbidden)).toBe(false);
 		}
 		for (const scope of INTEGRATION_SCOPES) {
-			expect(scope).toMatch(/^[a-z]+:(read|write|manage)$/);
+			expect(scope).toMatch(/^[a-z]+:(read|write|manage|decide)$/);
 		}
 	});
 
-	it('the Ever Gauzy preset is every scope except the opt-in org:write and email:write', () => {
-		expect(INTEGRATION_OPT_IN_SCOPES).toEqual(['org:write', 'email:write']);
-		expect(EVER_GAUZY_PRESET_SCOPES).toHaveLength(INTEGRATION_SCOPES.length - 2);
+	it('the Ever Gauzy preset is every scope except the opt-in org:write, email:write and merges:decide', () => {
+		expect(INTEGRATION_OPT_IN_SCOPES).toEqual(['org:write', 'email:write', 'merges:decide']);
+		expect(EVER_GAUZY_PRESET_SCOPES).toHaveLength(INTEGRATION_SCOPES.length - 3);
 		expect(EVER_GAUZY_PRESET_SCOPES).not.toContain('org:write');
 		expect(EVER_GAUZY_PRESET_SCOPES).not.toContain('email:write');
+		// Works-security lane 3a — relaying a MERGE decision is never granted by default.
+		expect(EVER_GAUZY_PRESET_SCOPES).not.toContain(INTEGRATION_MERGE_DECISION_SCOPE);
+		expect(INTEGRATION_MERGE_DECISION_SCOPE).toBe('merges:decide');
 		expect(EVER_GAUZY_PRESET_SCOPES).toContain('tasks:write');
 		expect(INTEGRATION_KEY_PRESETS['ever-gauzy']).toEqual({
 			integrationKind: 'ever-gauzy',
