@@ -78,6 +78,7 @@ import { FleetCommandsApiModule } from './fleet/commands/fleet-commands-api.modu
 import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
 import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
+import { FleetSessionGitApiModule } from './fleet/session-git/fleet-session-git-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
 import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
@@ -336,6 +337,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // hand-off options read (the start is FL-04's, with `taskId`). Dark
         // unless FLEET_SESSIONS_ENABLED and FLEET_CHECKOUTS_ENABLED.
         FleetTasksApiModule,
+        // Session git & actions (FL-06) — the git line's pull request, the
+        // Changes view, the minute cadence. Dark unless FLEET_SESSIONS_ENABLED
+        // and FLEET_CHECKOUTS_ENABLED.
+        FleetSessionGitApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.

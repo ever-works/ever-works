@@ -130,6 +130,28 @@ export class FleetSessionTaskService {
         };
     }
 
+    /**
+     * FL-06 (spec FR-4): the branch a session from this Task works on — the
+     * stored `branchRef`, else the branch rule's first cut — with no admission
+     * checks (the branch proposal reads it before a start). Null when the
+     * person may not see the Task.
+     */
+    async branchFor(
+        userId: string,
+        taskId: string,
+        organizationId: string | null,
+    ): Promise<{ taskId: string; slug: string; title: string; branch: string | null } | null> {
+        const task = await this.findTask(userId, taskId, organizationId);
+        if (!task) return null;
+        const branch =
+            typeof task.branchRef === 'string' && task.branchRef.trim()
+                ? task.branchRef.trim()
+                : task.workId
+                  ? taskBranchName(task)
+                  : null;
+        return { taskId: task.id, slug: task.slug, title: task.title, branch };
+    }
+
     /** The computer an Agent is pinned to, or null (read only — FR-3). Never throws. */
     async pinnedNodeId(userId: string, agent: FleetSessionTaskAgent): Promise<string | null> {
         if (!this.affinities || !agent.organizationId) return null;
