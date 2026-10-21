@@ -320,6 +320,18 @@ export interface FleetSessionView {
 	lastScreen?: string | null;
 	/** Who is attached right now (detail only; FL-04 P1b). */
 	presence?: FleetSessionPresence;
+	/**
+	 * The Task this session's Run works on (FL-15 P1, spec FR-10): the session
+	 * card's Task chip. Absent when the Run carries no Task.
+	 */
+	task?: FleetSessionTaskRef | null;
+}
+
+/** The Task a session's Run carries (FL-15, CONTRACTS R-22): `T-42` and its title. */
+export interface FleetSessionTaskRef {
+	id: string;
+	slug: string;
+	title: string;
 }
 
 /**
@@ -370,6 +382,13 @@ export interface FleetSessionStartRequest {
 	newWorktreeOf?: string;
 	/** The tools' restart path (`fleet_sessions_start` with `restartOf`). */
 	restartOf?: string;
+	/**
+	 * FL-15 P1 (spec FR-6): the Task this Agent session works on. The Run is
+	 * created with it (run history, board state and chat follow the Task), the
+	 * session works on the Task's branch, and the start is refused `busy` while
+	 * the same Agent already works the Task. Agent sessions only.
+	 */
+	taskId?: string;
 	cols?: number;
 	rows?: number;
 }
