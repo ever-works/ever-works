@@ -128,6 +128,7 @@ import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
     FleetJobService,
     FleetKillSwitchService,
+    FleetMachineActionsService,
     FleetModule,
     FleetService,
 } from '@ever-works/agent/fleet';
@@ -2113,6 +2114,10 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // Services and processes on computers (FL-09) — backs the
+                // `fleet_services_*` / `fleet_processes_*` tools. APPENDED LAST
+                // (positional), optional: unbound, those tools are not offered.
+                { token: FleetMachineActionsService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2136,6 +2141,7 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                fleetMachine?: FleetMachineActionsService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2156,7 +2162,7 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet },
+                fleet: { service: fleet, ...(fleetMachine ? { machine: fleetMachine } : {}) },
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

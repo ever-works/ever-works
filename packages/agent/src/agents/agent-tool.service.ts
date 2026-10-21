@@ -65,6 +65,7 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -577,6 +578,24 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+            // Services and processes on computers (FL-09) — every call runs the same
+            // chain a person's click does, as this Agent; a blast-radius act and every
+            // SIGKILL are held for the owner's approval (FR-22).
+            if (fleet.machine) {
+                const machine = fleet.machine;
+                add('fleet-machine', () =>
+                    buildFleetMachineTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: machine,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it

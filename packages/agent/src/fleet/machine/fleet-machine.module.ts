@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FleetModule } from '../fleet.module';
 import { FleetMachineActionsService } from './fleet-machine-actions.service';
+import { FleetMachineProposalListener } from './fleet-machine-proposal.listener';
 
 /**
  * Machine actions (FL-09) — the agent-side module of Services, Processes,
@@ -13,7 +14,8 @@ import { FleetMachineActionsService } from './fleet-machine-actions.service';
  */
 @Module({
     imports: [FleetModule],
-    providers: [FleetMachineActionsService],
+    // The listener runs a held Agent act once a person approves it (FR-22).
+    providers: [FleetMachineActionsService, FleetMachineProposalListener],
     exports: [FleetMachineActionsService],
 })
 export class FleetMachineModule {}

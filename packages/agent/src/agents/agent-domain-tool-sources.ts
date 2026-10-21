@@ -10,6 +10,7 @@ import type { IngestedEventRepository } from '../ingest/ingested-event.repositor
 import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
+import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -91,6 +92,15 @@ export interface AgentMeetingToolSource {
 
 export interface AgentFleetToolSource {
     service: Pick<FleetService, 'listForUser'>;
+    /**
+     * Services and processes on computers (FL-09) — backs
+     * `fleet_services_list|action` and `fleet_processes_list|signal`.
+     * Optional: unbound, those tools are simply not offered.
+     */
+    machine?: Pick<
+        FleetMachineActionsService,
+        'listServices' | 'serviceAction' | 'listProcesses' | 'signalProcess'
+    >;
 }
 
 export interface AgentPrReviewToolSource {
