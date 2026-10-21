@@ -106,7 +106,9 @@ describe('CI-skip directives never reach a fleet commit', () => {
 	const GITHUB_DIRECTIVES = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]'];
 
 	it.each(GITHUB_DIRECTIVES)('neutralises %s in the title, any case and spacing', (directive) => {
-		const spaced = directive.replace(' ', '   ').replace('[', '[ ').replace(']', ' ]').toUpperCase();
+		// Each directive has exactly one space, one `[` (first) and one `]`
+		// (last); anchored patterns say so, and replace every occurrence there is.
+		const spaced = directive.replace(/ /g, '   ').replace(/^\[/, '[ ').replace(/\]$/, ' ]').toUpperCase();
 		for (const variant of [directive, spaced]) {
 			const message = composeFleetTaskCommitMessage({ title: `Fix login redirect ${variant}`, slug: 'T-1' });
 			expect(containsCiSkipDirective(message)).toBe(false);

@@ -70,7 +70,9 @@ export function windowsSystemRoot(env: NodeJS.ProcessEnv): string {
 		if (typeof value === 'string' && WINDOWS_SYSTEM_ROOT.test(value.trim())) {
 			const trimmed = value.trim();
 			// `C:\` stays `C:\` — stripping it to `C:` would make every join drive-RELATIVE.
-			return trimmed.length > 3 ? trimmed.replace(/\\+$/, '') : trimmed;
+			// WINDOWS_SYSTEM_ROOT admits at most ONE trailing separator, so one
+			// `slice` strips it (no regex: CodeQL read `/\\+$/` as polynomial).
+			return trimmed.length > 3 && trimmed.endsWith('\\') ? trimmed.slice(0, -1) : trimmed;
 		}
 	}
 	return 'C:\\Windows';
