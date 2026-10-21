@@ -9,6 +9,7 @@ import {
     FLEET_AGENT_SESSION_LEASE_TTL_SEC,
     FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS,
     FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
+    FLEET_SESSION_IDLE_AFTER_MS,
     isFleetAgentSessionProvider,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_END_GRACE_MS,
@@ -480,6 +481,8 @@ export class FleetSessionService {
                     restartOfSessionId: options.restartOf?.id ?? null,
                     startedBy: requestedBy,
                     lastActivityAt: now,
+                    // FL-05: the board orders by when the state last moved.
+                    stateChangedAt: now,
                     startedAt: now,
                     endedAt: null,
                     endedReason: null,
@@ -965,7 +968,32 @@ export class FleetSessionService {
                 await this.settleAgentRun(next, 'unconfirmed', 'no computer slot became free within ten minutes');
             }
         }
+        await this.decayIdle();
         return { ended };
+    }
+
+    /**
+     * FL-05's platform floor for idle decay (spec FR-14, plan §10): a
+     * `working` / `done` session with no evidence for 30 minutes is `idle` —
+     * never `done`, never ended. Only on a machine whose link is up: a lost
+     * link never changes a state (the node's own clock decides, and reports
+     * when it is back). Never throws.
+     */
+    private async decayIdle(): Promise<number> {
+        let decayed = 0;
+        try {
+            const now = new Date(this.now());
+            const cutoff = new Date(this.now() - FLEET_SESSION_IDLE_AFTER_MS);
+            for (const row of await this.sessions.findIdleCandidates(cutoff)) {
+                if (!this.node?.isConnected(row.nodeId)) continue;
+                const patch: Partial<FleetSession> = { state: 'idle', stateChangedAt: now };
+                if (row.attention && row.attention.reason !== 'finished') patch.attention = null;
+                if (await this.sessions.updateIfState(row.id, [row.state], patch)) decayed += 1;
+            }
+        } catch (error) {
+            this.logger.warn(`idle decay failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return decayed;
     }
 
     // ─── Agent sessions (FL-04 P2) ─────────────────────────────────────────
@@ -1105,6 +1133,7 @@ export class FleetSessionService {
             restartOfSessionId: options.restartOf?.id ?? null,
             startedBy: `agent:${agentId}`,
             lastActivityAt: now,
+            stateChangedAt: now,
             startedAt: null,
             endedAt: null,
             endedReason: null,
@@ -1288,7 +1317,7 @@ export class FleetSessionService {
             }
             return;
         }
-        const written = this.toColumns(patch);
+        const written = this.withStatusColumns(row, this.toColumns(patch));
         const wasLive = isFleetSessionLive(row.state);
         if (patch.state === 'ended' && wasLive) {
             const won = await this.sessions.updateIfLive(row.id, written);
@@ -1343,6 +1372,27 @@ export class FleetSessionService {
         return out;
     }
 
+    /**
+     * FL-05: the status columns a state change carries — when the state moved
+     * (the board's order), a fresh turn's cleared outcome (`idle → working`),
+     * and, on `ended`, an open prompt closed (its Decision expires with the
+     * session, R-12; a `finished` / `failed` marker stays for unread).
+     */
+    private withStatusColumns(row: FleetSession, written: Partial<FleetSession>): Partial<FleetSession> {
+        if (written.state === undefined || written.state === row.state) return written;
+        const out: Partial<FleetSession> = { ...written, stateChangedAt: new Date(this.now()) };
+        if (written.state === 'working' && row.state === 'idle' && written.outcome === undefined) out.outcome = null;
+        if (
+            written.state === 'ended' &&
+            row.attention &&
+            row.attention.reason !== 'finished' &&
+            row.attention.reason !== 'failed'
+        ) {
+            out.attention = null;
+        }
+        return out;
+    }
+
     /** End a row (if still live) and answer the row as it now stands. */
     private async endRow(
         row: FleetSession,
@@ -1350,7 +1400,7 @@ export class FleetSessionService {
     ): Promise<FleetSession> {
         const patch = endFleetSessionPatch(rowFacts(row), reason, new Date(this.now()));
         if (!patch) return row;
-        const written = this.toColumns(patch);
+        const written = this.withStatusColumns(row, this.toColumns(patch));
         const won = await this.sessions.updateIfLive(row.id, written);
         if (won) return this.afterEnded({ ...row, ...written } as FleetSession);
         return (await this.sessions.findById(row.id)) ?? row;

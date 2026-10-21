@@ -12,6 +12,7 @@ import { SessionStartDialog } from './SessionStartDialog';
 import { SessionStateCard } from './SessionStateCard';
 import { sessionsClient } from './sessions.client';
 import { atOwnerLimit, groupSessions, sessionsTabCard, type SessionErrorRead } from './sessions.shared';
+import { hookHealthLines } from './sessions-status.shared';
 
 /** How often the tab re-reads the computer's sessions while it is open. */
 const REFRESH_MS = 15_000;
@@ -113,6 +114,18 @@ export function SessionsTab({
                 nodeName={node.name}
                 onRetry={() => void reload()}
             />
+
+            {/* FL-05 (FR-6, spec §5.11): the hook endpoint's health, from the heartbeat's daemon block. */}
+            {hookHealthLines(node.sessionDaemon).map((line) => (
+                <p
+                    key={line.key}
+                    role="status"
+                    className="text-sm text-warning"
+                    data-testid={`fleet-sessions-hook-health-${line.key}`}
+                >
+                    {t(`hookHealth.${line.key}`, { node: node.name, count: line.count })}
+                </p>
+            ))}
 
             {error && (
                 <div role="alert" className="flex items-center gap-3 text-sm text-danger">

@@ -13708,7 +13708,17 @@
                 "offlineNever": "{node} is offline. Sessions it had are listed below with their last screens.",
                 "retry": "Retry",
                 "copy": "Copy",
-                "copied": "Copied"
+                "copied": "Copied",
+                "withQualifier": "{state} · {qualifier}",
+                "reasonPermission": "permission",
+                "reasonQuestion": "question",
+                "reasonBlocked": "blocked",
+                "reasonFailed": "failed",
+                "outcomeSuccess": "success",
+                "outcomeFailure": "failed",
+                "outcomeCancelled": "cancelled",
+                "outcomeInterrupted": "stopped",
+                "outcomeUnconfirmed": "no result"
             },
             "tab": {
                 "live": "Live",
@@ -13866,7 +13876,8 @@
                 "pane": "Terminal of {title} on {node}. {role}.",
                 "newSessionMenu": "New session on {node}",
                 "state": "State: {state}",
-                "card": "{title} on {node}, {state}"
+                "card": "{title} on {node}, {state}",
+                "cardFull": "{who}, {title}, {state}, on {node}"
             },
             "agentBlock": {
                 "title": "Sessions",
@@ -13893,6 +13904,36 @@
                 "position": "Position {at} of {total}",
                 "close": "Close",
                 "failed": "The recording could not be loaded."
+            },
+            "card": {
+                "you": "You: {text}",
+                "agent": "{who}: {text}",
+                "agentFallback": "Agent",
+                "exited": "exited with code {code}",
+                "unconfirmed": "{node} restarted before this finished",
+                "needsYouNoPrompt": "Waiting for you — open the session to see what it asks",
+                "waiting": "waiting {span}",
+                "doneAgo": "done {span} ago",
+                "workingFor": "working {span}",
+                "idleFor": "idle {span}",
+                "endedAgo": "ended {span} ago",
+                "startingFor": "starting {span}",
+                "fromScreen": "from the screen",
+                "openRun": "Open the Run"
+            },
+            "statusSource": {
+                "hooks": "Status from {provider}'s hooks",
+                "partial": "Status from the screen for permission prompts — update {provider} on {node} for exact status",
+                "codex": "Status from the screen — Codex reports only when a turn ends",
+                "screen": "Status from the screen",
+                "fromScreen": "from the screen",
+                "shell": "Shell — no agent status",
+                "notifyReplaced": "Your own Codex notify command is not run in this session",
+                "noTokens": "Status spends no model tokens"
+            },
+            "hookHealth": {
+                "badToken": "Something on {node} is posting to the hook endpoint with a bad token ({count} in the last minute)",
+                "spooled": "{count} hook events are spooled on {node} and will be applied when the node is up"
             }
         },
         "actions": {

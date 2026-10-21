@@ -1,15 +1,22 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
-import { FleetSessionService } from '@ever-works/agent/fleet';
+import { FleetSessionService, FleetSessionStateService } from '@ever-works/agent/fleet';
 import {
+    parseFleetSessionAttentionMessage,
     parseFleetSessionEvent,
     parseFleetSessionList,
+    parseFleetSessionStatusMessage,
     type FleetLinkExtensionMessage,
 } from '@ever-works/contracts';
 import { FleetLinkRegistry } from '../../fleet-link/fleet-link.registry';
 
-/** Channel-0 types the session family reports on (CONTRACTS §3.3). */
-export const FLEET_SESSION_NODE_CONTROL_TYPES = ['session.event', 'session.list'] as const;
+/** Channel-0 types the session family reports on (CONTRACTS §3.3; FL-05 adds status and attention). */
+export const FLEET_SESSION_NODE_CONTROL_TYPES = [
+    'session.event',
+    'session.list',
+    'session.status',
+    'session.attention',
+] as const;
 
 /**
  * Sessions on computers (FL-04) — what a machine reports about its sessions,
@@ -18,7 +25,9 @@ export const FLEET_SESSION_NODE_CONTROL_TYPES = ['session.event', 'session.list'
  *  - `session.event` — `started`, `activity`, `title`, `exited`, `lost` →
  *    `applyNodeEvent` (an event that beat its row is held there briefly);
  *  - `session.list` — after every (re)connect, every session the daemon
- *    holds and its health → `reconcileList`.
+ *    holds and its health → `reconcileList`;
+ *  - `session.status` / `session.attention` (FL-05) — the merged state, the
+ *    card's lines and the open "needs you" edge → `FleetSessionStateService`.
  *
  * Registered on the link registry of THIS replica: channel-0 family messages
  * are delivered only on the replica that holds the node's link (FL-02
@@ -40,6 +49,8 @@ export class FleetSessionLinkListener implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: FleetLinkRegistry,
         private readonly sessions: FleetSessionService,
+        // FL-05; `@Optional()` so a context without the status writer still applies FL-04's reports.
+        @Optional() private readonly status?: FleetSessionStateService,
     ) {}
 
     onModuleInit(): void {
@@ -49,6 +60,12 @@ export class FleetSessionLinkListener implements OnModuleInit, OnModuleDestroy {
             ),
             this.registry.onNodeControl('session.list', (nodeId, message) =>
                 this.onList(nodeId, message),
+            ),
+            this.registry.onNodeControl('session.status', (nodeId, message) =>
+                this.onStatus(nodeId, message),
+            ),
+            this.registry.onNodeControl('session.attention', (nodeId, message) =>
+                this.onAttention(nodeId, message),
             ),
         );
     }
@@ -83,6 +100,30 @@ export class FleetSessionLinkListener implements OnModuleInit, OnModuleDestroy {
             return;
         }
         this.enqueue(nodeId, 'session.list', () => this.sessions.reconcileList(nodeId, list));
+    }
+
+    /** One `session.status` (FL-05): applied in the node's queue, after the events before it. */
+    onStatus(nodeId: string, message: FleetLinkExtensionMessage): void {
+        if (!config.fleet.isSessionsEnabled() || !this.status) return;
+        const writer = this.status;
+        const status = parseFleetSessionStatusMessage(message);
+        if (!status) {
+            this.logger.debug(`dropped a malformed session.status from node ${nodeId}`);
+            return;
+        }
+        this.enqueue(nodeId, 'session.status', () => writer.applyStatus(nodeId, status));
+    }
+
+    /** One `session.attention` (FL-05). */
+    onAttention(nodeId: string, message: FleetLinkExtensionMessage): void {
+        if (!config.fleet.isSessionsEnabled() || !this.status) return;
+        const writer = this.status;
+        const attention = parseFleetSessionAttentionMessage(message);
+        if (!attention) {
+            this.logger.debug(`dropped a malformed session.attention from node ${nodeId}`);
+            return;
+        }
+        this.enqueue(nodeId, 'session.attention', () => writer.applyAttention(nodeId, attention));
     }
 
     /**

@@ -24,6 +24,11 @@
  */
 
 import type { FleetLinkConsentRequirement } from './fleet-link.types.js';
+import type {
+	FleetSessionAttention,
+	FleetSessionHooks,
+	FleetSessionLastEvidence
+} from './fleet-session-status.types.js';
 
 // ─── Kinds, providers, states (CONTRACTS §4.2, §5.1) ────────────────────────
 
@@ -320,6 +325,17 @@ export interface FleetSessionView {
 	lastScreen?: string | null;
 	/** Who is attached right now (detail only; FL-04 P1b). */
 	presence?: FleetSessionPresence;
+	// ─── FL-05 (CONTRACTS §4.2 — absent on a platform that predates it) ───
+	/** The open "needs you" edge, or the unread `finished` marker (§5.2). */
+	attention?: FleetSessionAttention | null;
+	/** When the state last changed (ISO) — the board orders by it. */
+	stateChangedAt?: string | null;
+	/** What the node injected (FR-11): every surface labels the status source from it. */
+	hooks?: FleetSessionHooks | null;
+	/** Why the state is what it is, with the card's last user and agent lines (FR-18, FR-20). */
+	lastEvidence?: FleetSessionLastEvidence | null;
+	/** End of the session-boundary window (ISO), or null (FR-39). */
+	boundaryUntil?: string | null;
 }
 
 /**
