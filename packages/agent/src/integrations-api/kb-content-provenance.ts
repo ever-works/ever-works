@@ -102,7 +102,10 @@ export function lastContentWriteOf(metadata: unknown): KbContentWrite | null {
  * existed falls back to the row's own provenance: a key-only create landed
  * `source: 'imported'` + `reviewState: 'proposed'` (a person's upload is
  * `imported` too, but is `accepted` from birth), so that pair still counts as
- * key-authored.
+ * key-authored. Since #2804 an upload filed by any non-session principal (a
+ * personal key, an MCP call) also lands `imported` + `proposed` with no
+ * marker; the fallback counts it too, which only means the integration relay
+ * cannot accept it either: a person accepts it in Ever Works (fails safe).
  */
 export function isKeyAuthoredContent(doc: {
     metadata?: unknown;
