@@ -289,7 +289,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/nodes/{id}/needs-a-look'),
 		cli: 'fleet nodes needs-a-look'
 	}),
-	read('fleet_nodes_git_identity_get', 'view', 'FL-15', 'FLEET_CHECKOUTS_ENABLED', 'planned', {
+	read('fleet_nodes_git_identity_get', 'view', 'FL-15', 'FLEET_CHECKOUTS_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/git/identity'),
 		cli: 'fleet nodes git-identity'
 	}),
@@ -302,7 +302,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'commands',
 		'FL-15',
 		'FLEET_CHECKOUTS_ENABLED',
-		'planned',
+		'live',
 		confirm('machine.admin', false),
 		{ route: POST('/api/fleet/nodes/{id}/git/identity'), cli: 'fleet nodes git-identity --set' }
 	),
@@ -316,7 +316,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/sessions/{id}'),
 		cli: 'fleet sessions read'
 	}),
-	read('fleet_sessions_question', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'planned', {
+	read('fleet_sessions_question', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'live', {
 		route: GET('/api/fleet/sessions/{id}'),
 		cli: 'fleet sessions question'
 	}),
@@ -329,7 +329,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet sessions start'
 	}),
 	act('fleet_sessions_send', 'sessions', 'FL-04', 'FLEET_SESSIONS_ENABLED', 'live', plain('machine.run')),
-	act('fleet_sessions_answer', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'planned', confirm('machine.run', false), {
+	act('fleet_sessions_answer', 'sessions', 'FL-05', 'FLEET_SESSIONS_ENABLED', 'live', confirm('machine.run', false), {
 		route: POST('/api/fleet/sessions/{id}/answer'),
 		cli: 'fleet sessions answer',
 		confirmationNote: 'questions only; a permission prompt is answered by a person (CONTRACTS R-32)'
@@ -659,7 +659,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 	),
 
 	// ── tasks (FL-15) ── the hand-off itself is `fleet_sessions_start` with `taskId`
-	read('fleet_tasks_handoff_options', 'sessions', 'FL-15', 'FLEET_CHECKOUTS_ENABLED', 'planned', {
+	read('fleet_tasks_handoff_options', 'sessions', 'FL-15', 'FLEET_CHECKOUTS_ENABLED', 'live', {
 		route: GET('/api/fleet/tasks/{taskId}/handoff-options'),
 		cli: 'fleet tasks handoff-options'
 	}),

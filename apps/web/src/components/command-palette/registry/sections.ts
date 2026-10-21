@@ -1,6 +1,8 @@
 import {
     ArrowRight,
+    CircleCheck,
     FileText,
+    MessageCircleQuestionMark,
     HelpCircle,
     ListChecks,
     MessageSquare,
@@ -34,6 +36,10 @@ export const PALETTE_RECENT_ROWS = 5;
 export const PALETTE_SUGGESTED_ROWS = 6;
 /** Shortest query that reaches the server. */
 export const PALETTE_MIN_QUERY_LENGTH = 2;
+/** FL-05: sessions waiting on the person, at most this many (digit shortcuts 1–6, spec FR-46). */
+export const PALETTE_NEEDS_YOU_ROWS = 6;
+/** FL-05: recent sessions after them (done, then idle). */
+export const PALETTE_RECENT_SESSION_ROWS = 4;
 
 const MAX_SCORE = 100;
 
@@ -92,6 +98,66 @@ export interface BuildPaletteSectionsInput {
     response: WorkspaceSearchResponse | null;
     /** True once the query on screen has a settled server answer. */
     settled: boolean;
+    /**
+     * FL-05 P3 — sessions for the empty query: the ones waiting on the person
+     * (newest first) open the palette, then recent ones ordered done → idle.
+     * Absent: no session rows (the hub or sessions are off).
+     */
+    sessions?: PaletteSessions | null;
+}
+
+/** One session as a palette row reads it. */
+export interface PaletteSessionEntry {
+    id: string;
+    /** "Nina · api tests" — who and the title. */
+    title: string;
+    /** The prompt it waits on, or its state word. */
+    detail: string;
+    /** The computer's name. */
+    computer: string | null;
+}
+
+export interface PaletteSessions {
+    needsYou: PaletteSessionEntry[];
+    recent: PaletteSessionEntry[];
+}
+
+/** FL-05: the empty query's session sections (spec §5.12). */
+function sessionSections(t: PaletteTranslator, sessions: PaletteSessions | null | undefined): PaletteSection[] {
+    if (!sessions) return [];
+    const row = (entry: PaletteSessionEntry, prefix: string, waiting: boolean): PaletteRow => ({
+        key: `${prefix}:${entry.id}`,
+        icon: waiting ? MessageCircleQuestionMark : CircleCheck,
+        title: `${entry.title} · ${entry.detail}`,
+        subtitle: entry.computer,
+        badge: null,
+        action: { type: 'screen', href: `/fleet/sessions/${encodeURIComponent(entry.id)}` },
+        filter: null,
+    });
+    const needsYou = sessions.needsYou.slice(0, PALETTE_NEEDS_YOU_ROWS).map((entry) => row(entry, 'needs-you', true));
+    const recent = sessions.recent
+        .slice(0, PALETTE_RECENT_SESSION_ROWS)
+        .map((entry) => row(entry, 'recent-session', false));
+    return compact([
+        needsYou.length > 0
+            ? {
+                  key: 'needs-you',
+                  kind: 'suggested',
+                  heading: t('fleet.sessions.palette.needsYou'),
+                  total: sessions.needsYou.length,
+                  rows: needsYou,
+              }
+            : undefined,
+        recent.length > 0
+            ? {
+                  key: 'recent-sessions',
+                  kind: 'recent',
+                  heading: t('fleet.sessions.palette.recent'),
+                  total: null,
+                  rows: recent,
+              }
+            : undefined,
+    ]);
 }
 
 interface Candidate {
@@ -375,6 +441,8 @@ function localOnlySections(input: BuildPaletteSectionsInput, query: string): Pal
             .slice(0, PALETTE_SUGGESTED_ROWS)
             .map((command) => ({ ...commandRow(ctx, command), key: `suggested:${command.id}` }));
         return compact([
+            // FL-05 (FR-46): what waits on the person opens the palette.
+            ...sessionSections(t, input.sessions),
             recentSection,
             suggested.length > 0
                 ? {

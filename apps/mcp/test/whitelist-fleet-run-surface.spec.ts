@@ -138,7 +138,11 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_docker_images_list: 'the images on a computer',
 	fleet_docker_compose_list: 'the Compose projects on a computer',
 	fleet_operations_get: "a person's long operations",
-	fleet_operations_list: "a person's long operations"
+	fleet_operations_list: "a person's long operations",
+	fleet_nodes_git_identity_get: "a computer's git identity",
+	fleet_tasks_handoff_options: "a person's computers, checkouts and agents for a Task",
+	// FL-05 P2: typing an answer into a person's session prompt.
+	fleet_sessions_answer: "answers a prompt in a person's session"
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

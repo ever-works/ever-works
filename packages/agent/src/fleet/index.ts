@@ -59,4 +59,6 @@ export * from './commands';
 export * from './machine';
 // Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
 export * from './checkouts';
+// Tasks on computers (FL-15 P2) — a computer's global git identity.
+export * from './git';
 export * from './ports';

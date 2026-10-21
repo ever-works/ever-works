@@ -683,6 +683,15 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'fleet_sessions_end',
 		annotations: { destructiveHint: true }
 	},
+	// FL-05 P2 — answering what a session asks (a question or a permission prompt): an option the CLI
+	// showed or a free text; the attention (what it asks) rides `fleet_sessions_read`.
+	{
+		method: 'POST',
+		path: '/api/fleet/sessions/{id}/answer',
+		toolName: 'fleet_sessions_answer',
+		description:
+			"Answer what one of my sessions on a computer is waiting for: one of the options it showed (optionId) or, for a question that takes one, a free text. key is the session's attention key (from fleet_sessions_read). Refused once it was answered (in the terminal too), and while the computer is away."
+	},
 
 	// Commands on computers (4) — FL-12 P2, `apps/api/src/fleet/commands/fleet-commands.controller.ts`
 	// (dark unless FLEET_COMMANDS_ENABLED). One command line on one or more of the caller's computers, in
@@ -821,6 +830,24 @@ export const WHITELIST: WhitelistEntry[] = [
 		method: 'GET',
 		path: '/api/fleet/operations',
 		toolName: 'fleet_operations_list',
+		annotations: { readOnlyHint: true }
+	},
+	// Tasks & GitHub on the fleet (FL-15) — the reads behind "Fix on a computer" and the Git card
+	// (dark unless FLEET_CHECKOUTS_ENABLED; hand-off options also need FLEET_SESSIONS_ENABLED).
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/git/identity',
+		toolName: 'fleet_nodes_git_identity_get',
+		description:
+			"The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/tasks/{taskId}/handoff-options',
+		toolName: 'fleet_tasks_handoff_options',
+		description:
+			'Where a Task could be fixed on one of my computers: the computers that can take it, the checkouts of its repository on each, and the agents available there. Start the session with fleet_sessions_start and the taskId. Read-only.',
 		annotations: { readOnlyHint: true }
 	},
 

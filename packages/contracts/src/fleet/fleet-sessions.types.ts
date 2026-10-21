@@ -24,6 +24,11 @@
  */
 
 import type { FleetLinkConsentRequirement } from './fleet-link.types.js';
+import type {
+	FleetSessionAttention,
+	FleetSessionHooks,
+	FleetSessionLastEvidence
+} from './fleet-session-status.types.js';
 
 // ─── Kinds, providers, states (CONTRACTS §4.2, §5.1) ────────────────────────
 
@@ -320,6 +325,29 @@ export interface FleetSessionView {
 	lastScreen?: string | null;
 	/** Who is attached right now (detail only; FL-04 P1b). */
 	presence?: FleetSessionPresence;
+	// ─── FL-05 (CONTRACTS §4.2 — absent on a platform that predates it) ───
+	/** The open "needs you" edge, or the unread `finished` marker (§5.2). */
+	attention?: FleetSessionAttention | null;
+	/** When the state last changed (ISO) — the board orders by it. */
+	stateChangedAt?: string | null;
+	/** What the node injected (FR-11): every surface labels the status source from it. */
+	hooks?: FleetSessionHooks | null;
+	/** Why the state is what it is, with the card's last user and agent lines (FR-18, FR-20). */
+	lastEvidence?: FleetSessionLastEvidence | null;
+	/** End of the session-boundary window (ISO), or null (FR-39). */
+	boundaryUntil?: string | null;
+	/**
+	 * The Task this session's Run works on (FL-15 P1, spec FR-10): the session
+	 * card's Task chip. Absent when the Run carries no Task.
+	 */
+	task?: FleetSessionTaskRef | null;
+}
+
+/** The Task a session's Run carries (FL-15, CONTRACTS R-22): `T-42` and its title. */
+export interface FleetSessionTaskRef {
+	id: string;
+	slug: string;
+	title: string;
 }
 
 /**
@@ -372,6 +400,13 @@ export interface FleetSessionStartRequest {
 	newWorktreeOf?: string;
 	/** The tools' restart path (`fleet_sessions_start` with `restartOf`). */
 	restartOf?: string;
+	/**
+	 * FL-15 P1 (spec FR-6): the Task this Agent session works on. The Run is
+	 * created with it (run history, board state and chat follow the Task), the
+	 * session works on the Task's branch, and the start is refused `busy` while
+	 * the same Agent already works the Task. Agent sessions only.
+	 */
+	taskId?: string;
 	cols?: number;
 	rows?: number;
 }

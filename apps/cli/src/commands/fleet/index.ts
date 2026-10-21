@@ -10,6 +10,8 @@ import { listCommand } from './session/list';
 import { readCommand } from './session/read';
 import { statusCommand } from './status';
 import { toolsCommand } from './tools';
+import { answerCommand } from './session/answer';
+import { questionCommand } from './session/question';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -20,10 +22,13 @@ import { toolsCommand } from './tools';
  */
 export const fleetSessionCommand = new Command('session')
     .alias('sessions')
-    .description('Sessions on your computers (list, read, attach)')
+    .description('Sessions on your computers (list, read, attach, question, answer)')
     .addCommand(listCommand)
     .addCommand(readCommand)
-    .addCommand(attachCommand);
+    .addCommand(attachCommand)
+    // FL-05 P2: what a session waits for, and answering it.
+    .addCommand(questionCommand)
+    .addCommand(answerCommand);
 
 // FL-19 T-10 — the reads beside FL-12's `fleet commands run`.
 commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand);
