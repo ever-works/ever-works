@@ -528,8 +528,16 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		const hardening = opts.hardenRepoHooks ? await this.finalizeHardeningEnv(dir, signal) : undefined;
 		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal, null, hardening);
 
+		// Hardened (works-security, node 0.2.7): `--ignore-submodules=dirty`, so
+		// a POPULATED submodule — which a fleet provision never creates, so the
+		// run made it — is not entered: Git would otherwise start a child
+		// `git status` there that reads the submodule's own `.git` (a directory
+		// the model can write) and runs any filter driver it defines — the
+		// overlay above only knows the drivers visible from this worktree.
+		// A moved submodule COMMIT still counts; its work-tree dirt was never
+		// committable by this `commit` anyway.
 		const status = await this.gitOrThrow(
-			['status', '--porcelain'],
+			opts.hardenRepoHooks ? ['status', '--porcelain', '--ignore-submodules=dirty'] : ['status', '--porcelain'],
 			dir,
 			opts.auth,
 			'git status failed',
