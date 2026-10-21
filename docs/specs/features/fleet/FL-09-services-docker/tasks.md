@@ -121,8 +121,7 @@
       only if FL-02 did not ship them.
     - **Test**: `ConfirmActionDialog.unit.spec.tsx`, `machine-actions.shared.unit.spec.ts`.
 - [ ] **T-16**. Write `apps/web/src/components/fleet/services/` — `ServicesTab.tsx`, `ServiceRow.tsx`,
-      `services.shared.ts`, `services-tab.registry.ts` (FL-01 entry `{ id: 'services', labelKey,
-      order, epic, flag, consent: 'manage', load }`; palette "Services on <computer>" in FL-01's
+      `services.shared.ts`, `services-tab.registry.ts` (FL-01 entry `{ id: 'services', labelKey, order, epic, flag, consent: 'manage', load }`; palette "Services on <computer>" in FL-01's
       `apps/web/src/components/command-palette/registry/sections.ts`); BFF routes
       `apps/web/src/app/api/fleet/nodes/[id]/services/route.ts` and `.../services/[name]/[action]/route.ts`.
       Every state of spec §5.9; **Log** row action deep-links through FL-08's `openLogsForSource`.
@@ -225,8 +224,7 @@
 - [ ] **T-30**. Write `apps/node/src/core/link/modules/docker/exec-session.ts` (shell detection inside the
       image; daemon start request `['docker','exec','-it',id,shell]`, kind owner, title
       `Shell · inside <name>`); add **Shell inside ▾** to `ContainersList.tsx`, the picture and the
-      service table, opening the Session via FL-04's terminal route; audit `node.docker.container.exec`
-      + `node.session.start`.
+      service table, opening the Session via FL-04's terminal route; audit `node.docker.container.exec` + `node.session.start`.
     - **Test**: `exec-session.spec.ts`; e2e: shell appears on the Sessions tab and ends with the Session.
 - [ ] **T-31**. Add `fleet_docker_compose_list`, `fleet_docker_compose_describe`,
       `fleet_docker_compose_action`, `fleet_docker_exec` to `agent-fleet-docker-tools.ts` and the MCP whitelist; `fleet.docker.compose.*`

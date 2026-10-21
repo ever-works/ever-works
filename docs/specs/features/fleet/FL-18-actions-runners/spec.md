@@ -49,11 +49,11 @@ runner or a stuck job becomes a "needs a look" item.
 
 Three phases, each independently shippable:
 
-| Phase  | Ships                                                                                                                                                                                                 |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase  | Ships                                                                                                                                                                                                                                                                         |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | Plugin `github-actions-runners`; node jobs `runner-install` / `runner-control`; the install dialog; runners as services (Linux systemd, macOS launchd, Windows service); status on the Overview and a Runners block; logs through FL-08; `runner-stopped`; audit; Agent tools |
-| **P2** | The **Actions jobs** panel in the hub: queued and running self-hosted jobs for watched repositories and organisations, busy count, unassignable diagnosis, **Cancel workflow run** (`confirm`), `job-unassignable`; organisation scope with **Grant access** |
-| **P3** | Docker-isolated runners on Linux hosts with Docker; runner version visibility and "update available"                                                                                                   |
+| **P2** | The **Actions jobs** panel in the hub: queued and running self-hosted jobs for watched repositories and organisations, busy count, unassignable diagnosis, **Cancel workflow run** (`confirm`), `job-unassignable`; organisation scope with **Grant access**                  |
+| **P3** | Docker-isolated runners on Linux hosts with Docker; runner version visibility and "update available"                                                                                                                                                                          |
 
 ---
 
@@ -94,12 +94,12 @@ phase, available only on Linux hosts that advertise Docker.
 
 ### 2.2 What they do today, and what breaks
 
-| To get…                              | Today they must…                                                                                                    | What breaks                                                                                                                                                                                                                                                   |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A self-hosted runner on a machine    | Open GitHub's runner page, copy a token, SSH to the machine, download, verify by hand, configure, install the service | Nothing in the product touches runners: the GitHub plugin's Actions surface covers secrets, variables, workflows and dispatch only (`packages/plugins/github/src/github-actions.service.ts:1-215`); the build plugin only _selects_ a runner label for workflows it generates (`packages/plugins/github-actions-build/src/github-actions-build.plugin.ts:42`). |
-| To know whether runners are alive     | Open each repository's runner page                                                                                  | A Node has no notion of a runner and no row to hang its state on (`packages/agent/src/entities/fleet-node.entity.ts:96-115`); the job kinds are the four of today (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-125`).                                 |
-| To see why a job is stuck            | Read the job's "Waiting for a runner" page and compare labels by eye                                                | No surface compares job labels with the owner's runners.                                                                                                                                                                                                      |
-| To do it without a personal token    | Use the `gh` CLI on the machine                                                                                     | The platform already holds a GitHub App and mints narrowly-scoped installation tokens for node-side acts (`packages/agent/src/utils/github-app.utils.ts:79-130`; `apps/api/src/fleet/fleet-push-credential.service.ts:184-199`) — nothing uses that for runners. |
+| To get…                           | Today they must…                                                                                                      | What breaks                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A self-hosted runner on a machine | Open GitHub's runner page, copy a token, SSH to the machine, download, verify by hand, configure, install the service | Nothing in the product touches runners: the GitHub plugin's Actions surface covers secrets, variables, workflows and dispatch only (`packages/plugins/github/src/github-actions.service.ts:1-215`); the build plugin only _selects_ a runner label for workflows it generates (`packages/plugins/github-actions-build/src/github-actions-build.plugin.ts:42`). |
+| To know whether runners are alive | Open each repository's runner page                                                                                    | A Node has no notion of a runner and no row to hang its state on (`packages/agent/src/entities/fleet-node.entity.ts:96-115`); the job kinds are the four of today (`packages/contracts/src/fleet/fleet-jobs.types.ts:117-125`).                                                                                                                                |
+| To see why a job is stuck         | Read the job's "Waiting for a runner" page and compare labels by eye                                                  | No surface compares job labels with the owner's runners.                                                                                                                                                                                                                                                                                                       |
+| To do it without a personal token | Use the `gh` CLI on the machine                                                                                       | The platform already holds a GitHub App and mints narrowly-scoped installation tokens for node-side acts (`packages/agent/src/utils/github-app.utils.ts:79-130`; `apps/api/src/fleet/fleet-push-credential.service.ts:184-199`) — nothing uses that for runners.                                                                                               |
 
 Three existing mechanics make this cheap: the GitHub App installation records carry the account
 and `targetType` needed to pick a repository or organisation scope
@@ -223,13 +223,13 @@ Values marked **(C)** come from [CONTRACTS.md](../CONTRACTS.md).
 
 ### 4.1 Action families (program rule 12)
 
-| Family action          | Consent on node (C §1.1) | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                                 | Audit (C §7)                                | Agent tool (C §11.3)                        |
-| ---------------------- | ------------------------ | --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------- | ------------------------------------------- |
-| Install runners        | `--work`                 | `machines` / owner                            | `confirm` — names target, count, mode, computer       | `node.runner.install` (one per runner)      | `fleet_runners_install` — destructive       |
-| Start / Stop / Restart | `--work`                 | `machines` / owner                            | `plain` start; `confirm` stop and restart             | `node.runner.start` · `node.runner.stop` · `node.runner.restart` (C §7) | `fleet_runners_action` — destructive |
-| Remove runner          | `--work`                 | `machines` / owner                            | `confirm-destructive` — type the name                 | `node.runner.remove`                        | `fleet_runners_remove` — destructive        |
-| Cancel workflow run    | — (platform → GitHub)    | `machines` / owner                            | `confirm` — "every job in it stops"                   | `node.runner.job.cancel` (C §7)             | `fleet_runners_cancel_run` — destructive (R-37) |
-| List runners / jobs    | enrolled                 | `view`                                        | `plain`                                               | —                                           | `fleet_runners_list`, `fleet_runners_jobs` — readOnly |
+| Family action          | Consent on node (C §1.1) | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                           | Audit (C §7)                                                            | Agent tool (C §11.3)                                  |
+| ---------------------- | ------------------------ | --------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| Install runners        | `--work`                 | `machines` / owner                            | `confirm` — names target, count, mode, computer | `node.runner.install` (one per runner)                                  | `fleet_runners_install` — destructive                 |
+| Start / Stop / Restart | `--work`                 | `machines` / owner                            | `plain` start; `confirm` stop and restart       | `node.runner.start` · `node.runner.stop` · `node.runner.restart` (C §7) | `fleet_runners_action` — destructive                  |
+| Remove runner          | `--work`                 | `machines` / owner                            | `confirm-destructive` — type the name           | `node.runner.remove`                                                    | `fleet_runners_remove` — destructive                  |
+| Cancel workflow run    | — (platform → GitHub)    | `machines` / owner                            | `confirm` — "every job in it stops"             | `node.runner.job.cancel` (C §7)                                         | `fleet_runners_cancel_run` — destructive (R-37)       |
+| List runners / jobs    | enrolled                 | `view`                                        | `plain`                                         | —                                                                       | `fleet_runners_list`, `fleet_runners_jobs` — readOnly |
 
 Every caller satisfies a class with the same request fields (`confirm: true`, `confirmName`); a
 call without them answers 409 `confirmation_required` with the summary to show (C §2.2). Every
@@ -268,14 +268,14 @@ above is refused `kill_switch`; runners already running are left alone and the s
 - **FR-10** The runner's folder MUST live under the node's data directory with owner-only
   permissions; on Windows the folder ACL MUST be restricted to the runner's account.
 - **FR-11** Progress MUST be shown as an operation with phases `downloading · verifying · registering
-  · installing service · starting · idle`, resumable after a link drop.
+· installing service · starting · idle`, resumable after a link drop.
 - **FR-12** A node that lacks `--work` MUST refuse `consent_missing`; a computer that is itself a
   virtual computer (FL-16) MAY host runners like any other.
 
 ### 4.3 Status and control (P1)
 
 - **FR-13** Each runner MUST carry one of the stored states `installing · idle · working · offline ·
-  removed · unknown` (CONTRACTS §4.11; `removed` rows are not listed), shown as **stopped (by you)**
+removed · unknown` (CONTRACTS §4.11; `removed` rows are not listed), shown as **stopped (by you)**
   when it is `offline` after an owner stop and as **failed** when it is `installing` and its install
   job failed, with the source of that state (GitHub or the node) and the last check time; GitHub's
   view MUST win when both are fresh.
@@ -435,17 +435,17 @@ Actions runners on <computer>**, **Actions jobs**. i18n groups: `fleet.runners.i
 
 ## 7. Key entities & concepts
 
-| Concept                      | New?          | Description                                                                                                                                 |
-| ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Actions runner**           | **New** (`FleetActionsRunner`, C §4.11) | One registered self-hosted runner on a Node: target scope, name, labels, mode, state, GitHub runner id, last seen, installed at (C §4.11) plus the epic-local service unit, version, state source, last check and current job (plan §4.1) |
-| **Target**                   | Read model     | A repository or organisation covered by one of the owner's GitHub App installations                                                        |
-| **Watched targets**          | Plugin setting | The repositories/organisations whose jobs the panel shows (user scope)                                                                      |
-| **Actions job**              | Read model     | A queued or in-progress GitHub Actions job targeting self-hosted runners, with its labels and assigned runner — GitHub's own noun, shown as-is; its "workflow run" is never called a Run (README §1) |
-| **Diagnosis**                | Closed set     | offline-matching-runner · missing-label · wrong-scope · all-busy                                                                             |
-| **Plugin `github-actions-runners`** | New (category `integration`, capability `actions-runners`) | Talks to GitHub through the App; mints tokens, lists runners/jobs, cancels runs — R-14 |
-| **Job kinds**                | Existing union | `runner-install`, `runner-control` — durable (C §12)                                                                                        |
-| **Log source `runner:<name>`** | Existing kind (FL-08) | The runner's newest diagnostic log                                                                                                   |
-| **Needs a look**             | Existing kinds | `runner-stopped`, `job-unassignable` (C §4.6)                                                                                              |
+| Concept                             | New?                                                       | Description                                                                                                                                                                                                                               |
+| ----------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Actions runner**                  | **New** (`FleetActionsRunner`, C §4.11)                    | One registered self-hosted runner on a Node: target scope, name, labels, mode, state, GitHub runner id, last seen, installed at (C §4.11) plus the epic-local service unit, version, state source, last check and current job (plan §4.1) |
+| **Target**                          | Read model                                                 | A repository or organisation covered by one of the owner's GitHub App installations                                                                                                                                                       |
+| **Watched targets**                 | Plugin setting                                             | The repositories/organisations whose jobs the panel shows (user scope)                                                                                                                                                                    |
+| **Actions job**                     | Read model                                                 | A queued or in-progress GitHub Actions job targeting self-hosted runners, with its labels and assigned runner — GitHub's own noun, shown as-is; its "workflow run" is never called a Run (README §1)                                      |
+| **Diagnosis**                       | Closed set                                                 | offline-matching-runner · missing-label · wrong-scope · all-busy                                                                                                                                                                          |
+| **Plugin `github-actions-runners`** | New (category `integration`, capability `actions-runners`) | Talks to GitHub through the App; mints tokens, lists runners/jobs, cancels runs — R-14                                                                                                                                                    |
+| **Job kinds**                       | Existing union                                             | `runner-install`, `runner-control` — durable (C §12)                                                                                                                                                                                      |
+| **Log source `runner:<name>`**      | Existing kind (FL-08)                                      | The runner's newest diagnostic log                                                                                                                                                                                                        |
+| **Needs a look**                    | Existing kinds                                             | `runner-stopped`, `job-unassignable` (C §4.6)                                                                                                                                                                                             |
 
 ---
 

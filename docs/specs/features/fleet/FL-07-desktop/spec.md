@@ -61,11 +61,11 @@ Every surface says which source it is showing, what trust the helper has, and wh
 
 Three phases, each independently shippable behind `FLEET_DESKTOP_ENABLED`:
 
-| Phase | Ships                                                                                                                                                                                                                                                                                                                                       |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P1 — See the desktop** | The Desktop source on the screen channel; the native screen helper (capture only) for macOS, Windows and Linux X11 with its permission flows; **hash-pinned admission** with the owner's acknowledgement on the machine; changed-regions streaming; quality presets; the multi-monitor picker; the Desktop tab on the computer page and the Desktop source on Agent → Computer; watchability reasons extended; read-only Agent tools (screenshot, displays); audit; "reduced trust" labelling. |
-| **P2 — Drive and keep it** | Mouse, wheel, keyboard and text into the desktop under the AW-11 control arbiter, grants, idle and ceiling rules; the `input` tag finally advertised; the desktop **beside the terminal** with a draggable divider; the **"open on desktop"** hook FL-10 uses; **screen recording and re-watch** for both sources (closing AW-11 P3) with the 14-day retention sweep; the Agent input tool, default-denied. |
-| **P3 — Trust and headless** | **Signed admission** (Apple Developer ID on macOS, Authenticode on Windows) as the end state; **virtual displays on Linux X11** for headless machines; Wayland stays explicitly unsupported and says so. |
+| Phase                       | Ships                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1 — See the desktop**    | The Desktop source on the screen channel; the native screen helper (capture only) for macOS, Windows and Linux X11 with its permission flows; **hash-pinned admission** with the owner's acknowledgement on the machine; changed-regions streaming; quality presets; the multi-monitor picker; the Desktop tab on the computer page and the Desktop source on Agent → Computer; watchability reasons extended; read-only Agent tools (screenshot, displays); audit; "reduced trust" labelling. |
+| **P2 — Drive and keep it**  | Mouse, wheel, keyboard and text into the desktop under the AW-11 control arbiter, grants, idle and ceiling rules; the `input` tag finally advertised; the desktop **beside the terminal** with a draggable divider; the **"open on desktop"** hook FL-10 uses; **screen recording and re-watch** for both sources (closing AW-11 P3) with the 14-day retention sweep; the Agent input tool, default-denied.                                                                                    |
+| **P3 — Trust and headless** | **Signed admission** (Apple Developer ID on macOS, Authenticode on Windows) as the end state; **virtual displays on Linux X11** for headless machines; Wayland stays explicitly unsupported and says so.                                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -115,15 +115,15 @@ the computer page, and from the Run's receipt, with control spans marked on the 
 
 ### 2.2 What they do today, and what breaks
 
-| To answer…                                   | Today they must…                                                                    | What breaks, with the substrate that proves it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Show me the machine's screen."             | Open Agent → Computer.                                                              | The screen channel pictures **the Agent's own browser**, nothing else. The capture seam says so and names the gap itself — "a headless browser driven over its debugging protocol today, a per-platform desktop capture later" (`apps/node/src/core/screen/capture-backend.ts:4-16`); the only backend is the headless browser (`capture-backend.ts:107-110`, `apps/node/src/core/screen/headless-browser-backend.ts:18-28`). A session has exactly two channels, `screen` and `terminal`, and no notion of a source (`packages/contracts/src/computer/computer-session.types.ts:43-45`). |
-| "Which monitor?"                             | Nothing.                                                                            | A capture request carries only a width and an encoder quality (`capture-backend.ts:46-51`); there is no display enumeration anywhere on the node or in the contracts (EXISTING-SUBSTRATE §1.14: `rg -n "'desktop'\|monitorId\|monitors" packages/contracts/src/computer apps/node/src/core/screen` → no match).                                                                                                                                                                                                                                  |
-| "Can I click on it?"                         | Take over on Agent → Computer.                                                      | Input reaches the Agent's browser only. The node's input injector exists (`apps/node/src/core/screen/input-injector.ts:10-16`) yet the capability probe still says "`input` is NOT advertised: nothing on this node injects input yet" (`apps/node/src/core/capabilities.ts:315-322`) — a stale promise in the opposite direction, which this epic fixes.                                                                                                                                                                                      |
-| "Show the desktop next to the terminal."     | Switch channels.                                                                    | The controls hold **one** active channel (`apps/web/src/components/computer/ComputerControls.tsx:26-42`): screen or terminal, never both.                                                                                                                                                                                                                                                                                                                                                                                                      |
-| "Was this session recorded? Let me re-watch." | Nothing.                                                                            | The columns exist — `recorded`, `recordingSkippedReason` (`packages/agent/src/entities/computer-session.entity.ts:92-98`), `recordWatchSessions`, `recordingRetentionDays` (`packages/agent/src/entities/fleet-node.entity.ts:504-510`) — but they are only ever **read** (`packages/agent/src/computer/computer-session.service.ts:750`, `packages/agent/src/fleet/fleet.service.ts:1758-1759`); no writer sets them and no retention job exists (`packages/tasks/src/tasks/trigger/` holds `terminal-transcript-gc.task.ts` and nothing for recordings). AW-11 P3 is open; its task list is entirely unticked. |
-| "Is the thing capturing my screen trusted?"  | Nothing.                                                                            | A helper trust policy exists for the Windows job launcher — path, SHA-256 of a signed artifact, Authenticode subject, certificate hash (`apps/node/src/core/windows-job-launcher/windows-job-helper-trust.internal.ts:6-15`) — and has **never admitted a real artifact**: "this repository still does not publish, download, deploy, install, or register the helper" (`apps/node/native/windows-job-launcher/PACKAGING.md:3`). There is no admission the owner can perform, no trust level the hub can show.                                   |
-| "Can a stream fail to start, and why?"       | Read a closed set of nine reasons.                                                  | The unwatchable reasons (`computer-session.types.ts:65-75`) know nothing of a missing helper, a missing OS permission, a compositor that cannot be captured, or a machine with nobody signed in. A desktop that cannot be shown would today surface as "no display" — wrong, and unfixable from the message.                                                                                                                                                                                                                                    |
+| To answer…                                    | Today they must…                   | What breaks, with the substrate that proves it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Show me the machine's screen."               | Open Agent → Computer.             | The screen channel pictures **the Agent's own browser**, nothing else. The capture seam says so and names the gap itself — "a headless browser driven over its debugging protocol today, a per-platform desktop capture later" (`apps/node/src/core/screen/capture-backend.ts:4-16`); the only backend is the headless browser (`capture-backend.ts:107-110`, `apps/node/src/core/screen/headless-browser-backend.ts:18-28`). A session has exactly two channels, `screen` and `terminal`, and no notion of a source (`packages/contracts/src/computer/computer-session.types.ts:43-45`).                        |
+| "Which monitor?"                              | Nothing.                           | A capture request carries only a width and an encoder quality (`capture-backend.ts:46-51`); there is no display enumeration anywhere on the node or in the contracts (EXISTING-SUBSTRATE §1.14: `rg -n "'desktop'\|monitorId\|monitors" packages/contracts/src/computer apps/node/src/core/screen` → no match).                                                                                                                                                                                                                                                                                                  |
+| "Can I click on it?"                          | Take over on Agent → Computer.     | Input reaches the Agent's browser only. The node's input injector exists (`apps/node/src/core/screen/input-injector.ts:10-16`) yet the capability probe still says "`input` is NOT advertised: nothing on this node injects input yet" (`apps/node/src/core/capabilities.ts:315-322`) — a stale promise in the opposite direction, which this epic fixes.                                                                                                                                                                                                                                                        |
+| "Show the desktop next to the terminal."      | Switch channels.                   | The controls hold **one** active channel (`apps/web/src/components/computer/ComputerControls.tsx:26-42`): screen or terminal, never both.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| "Was this session recorded? Let me re-watch." | Nothing.                           | The columns exist — `recorded`, `recordingSkippedReason` (`packages/agent/src/entities/computer-session.entity.ts:92-98`), `recordWatchSessions`, `recordingRetentionDays` (`packages/agent/src/entities/fleet-node.entity.ts:504-510`) — but they are only ever **read** (`packages/agent/src/computer/computer-session.service.ts:750`, `packages/agent/src/fleet/fleet.service.ts:1758-1759`); no writer sets them and no retention job exists (`packages/tasks/src/tasks/trigger/` holds `terminal-transcript-gc.task.ts` and nothing for recordings). AW-11 P3 is open; its task list is entirely unticked. |
+| "Is the thing capturing my screen trusted?"   | Nothing.                           | A helper trust policy exists for the Windows job launcher — path, SHA-256 of a signed artifact, Authenticode subject, certificate hash (`apps/node/src/core/windows-job-launcher/windows-job-helper-trust.internal.ts:6-15`) — and has **never admitted a real artifact**: "this repository still does not publish, download, deploy, install, or register the helper" (`apps/node/native/windows-job-launcher/PACKAGING.md:3`). There is no admission the owner can perform, no trust level the hub can show.                                                                                                   |
+| "Can a stream fail to start, and why?"        | Read a closed set of nine reasons. | The unwatchable reasons (`computer-session.types.ts:65-75`) know nothing of a missing helper, a missing OS permission, a compositor that cannot be captured, or a machine with nobody signed in. A desktop that cannot be shown would today surface as "no display" — wrong, and unfixable from the message.                                                                                                                                                                                                                                                                                                     |
 
 ### 2.3 The gaps this epic closes
 
@@ -157,8 +157,8 @@ not re-specified (D13).
   **when** the owner opens its computer page and clicks **Desktop**,
   **then** the stage shows a connecting state within 500 ms, the first full picture of the
   machine's primary display within 6 seconds, the strip reads `design-mac · 09:41:07 local ·
-  Desktop · Display 1 of 2 · Sharp · ● LIVE`, the watermark reads `EVER WORKS · LIVE VIEW ·
-  DESKTOP · design-mac`, and the status line reads _"Watching — nothing on design-mac is paused."_
+Desktop · Display 1 of 2 · Sharp · ● LIVE`, the watermark reads `EVER WORKS · LIVE VIEW ·
+DESKTOP · design-mac`, and the status line reads _"Watching — nothing on design-mac is paused."_
 
 - **S2 — Pick a monitor.**
   **Given** the desktop is live on a two-display machine,
@@ -618,6 +618,7 @@ grant; Nina is told).
 ```
 
 Variants (title · body):
+
 - _"…is waiting for your approval on build-01"_ · `ever-works-node helper admit`
 - _"The screen helper on build-01 has changed since you approved it"_ · `ever-works-node helper status`
   _"Nothing starts until you approve it again."_
@@ -731,17 +732,17 @@ _"While you have control every other key goes to the computer. Esc Esc always co
 
 ## 7. Key entities & concepts
 
-| Entity / concept                     | New?         | Description                                                                                                                                                      |
-| ------------------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Node / Computer**                  | Existing     | Gains a helper trust level (`none · hash-pinned · signed`), the `desktop` family audience in its control policy (FL-01 shape), and advertises `screen:desktop`, `helper:screen` and `input`. |
-| **Screen channel source**            | **Extended** | `browser` (today) or `desktop` (this epic). A view has exactly one source at a time.                                                                             |
-| **Desktop view** (a computer session) | Existing, extended | AW-11's computer session, now with a source, a display and — for the Desktop source — no Agent; carries control spans, recording state and the bound Run or Session. |
-| **Display**                          | Plain word — read live, never stored | One monitor the Node reports: id, name, size, scale, primary, virtual. Read live, never a row.                                              |
-| **Screen helper**                    | Named by README D3 (on the machine, not a platform entity) | The optional native executable that captures and injects. Known to the platform only through `helperTrust` and audit rows.     |
-| **Admission**                        | Plain word — the act README D3 and CONTRACTS R-8 define | The owner's act on the machine that lets the node run a helper: hash-pinned (acknowledged fingerprint) or signed (verified identity). |
-| **Recording**                        | Existing columns, **first writer** | Frames of a view at ≤ 1 fps stored through the storage provider; indexed on the view; 14-day retention; replayable with control spans.      |
-| **Control grant / span**             | Existing (AW-11) | Unchanged.                                                                                                                                                   |
-| **Run / Session**                    | Existing     | A desktop view binds to the Run in flight (Agent page) or the Session it sits beside (FL-04); the receipt and the session detail link the recording.             |
+| Entity / concept                      | New?                                                       | Description                                                                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Node / Computer**                   | Existing                                                   | Gains a helper trust level (`none · hash-pinned · signed`), the `desktop` family audience in its control policy (FL-01 shape), and advertises `screen:desktop`, `helper:screen` and `input`. |
+| **Screen channel source**             | **Extended**                                               | `browser` (today) or `desktop` (this epic). A view has exactly one source at a time.                                                                                                         |
+| **Desktop view** (a computer session) | Existing, extended                                         | AW-11's computer session, now with a source, a display and — for the Desktop source — no Agent; carries control spans, recording state and the bound Run or Session.                         |
+| **Display**                           | Plain word — read live, never stored                       | One monitor the Node reports: id, name, size, scale, primary, virtual. Read live, never a row.                                                                                               |
+| **Screen helper**                     | Named by README D3 (on the machine, not a platform entity) | The optional native executable that captures and injects. Known to the platform only through `helperTrust` and audit rows.                                                                   |
+| **Admission**                         | Plain word — the act README D3 and CONTRACTS R-8 define    | The owner's act on the machine that lets the node run a helper: hash-pinned (acknowledged fingerprint) or signed (verified identity).                                                        |
+| **Recording**                         | Existing columns, **first writer**                         | Frames of a view at ≤ 1 fps stored through the storage provider; indexed on the view; 14-day retention; replayable with control spans.                                                       |
+| **Control grant / span**              | Existing (AW-11)                                           | Unchanged.                                                                                                                                                                                   |
+| **Run / Session**                     | Existing                                                   | A desktop view binds to the Run in flight (Agent page) or the Session it sits beside (FL-04); the receipt and the session detail link the recording.                                         |
 
 ---
 
@@ -778,21 +779,21 @@ _"While you have control every other key goes to the computer. Esc Esc always co
   computer session with a source — no new noun (§7).
 - **Resolved** by CONTRACTS §3.3 and §1.1 (rev 4): `desktop` opens with `viewId` and `quality`; messages `desktop.mode`, `desktop.stats`, `desktop.displayChanged`; heartbeat `helper`, `displays[]`, `desktopReasons[]`, `helperEvents[]`.
 - `[NEEDS CLARIFICATION: A "needs a look" item for a hash-pinned helper. Default until answered: no
-  item — the "Reduced trust" note in the tab, drawer and Computers list is enough (R-8 labels it);
-  `helper-untrusted` (warn) is raised only when verification fails (FR-17, §5.9).]`
+item — the "Reduced trust" note in the tab, drawer and Computers list is enough (R-8 labels it);
+`helper-untrusted` (warn) is raised only when verification fails (FR-17, §5.9).]`
 - `[NEEDS CLARIFICATION: Helper distribution. Default until answered: `ever-works-node helper
   install` downloads the per-platform helper from the platform's release channel and verifies it
-  against the fingerprint manifest baked into the node package (FR-21); optional per-platform npm
-  packages and air-gapped installs are not built.]`
+against the fingerprint manifest baked into the node package (FR-21); optional per-platform npm
+packages and air-gapped installs are not built.]`
 - `[NEEDS CLARIFICATION: The Agent screenshot tool while a person holds control. Default until
-  answered: allowed — it only reads, takes no control grant and is audited as `node.desktop.view`
-  with `agent:<id>` (FR-30).]`
+answered: allowed — it only reads, takes no control grant and is audited as `node.desktop.view`with`agent:<id>` (FR-30).]`
 
 ---
 
 ## 9. Acceptance criteria
 
 **P1 — Desktop source**
+
 - [ ] **ACC-FL07-01** (FR-1, FR-25) The Desktop tab shows the whole desktop of an attended Node with an admitted helper; strip and watermark say `Desktop`.
 - [ ] **ACC-FL07-02** (FR-3, FR-4) Each of the eight new reasons renders its own sentence and fix; none falls through to "no display".
 - [ ] **ACC-FL07-03** (FR-5, FR-6) A still desktop at Sharp sends only keyframes at ≤ 1 per 5 s; a moving region sends 64-px tiles and no publish exceeds 512 KiB.
@@ -812,6 +813,7 @@ _"While you have control every other key goes to the computer. Esc Esc always co
 - [ ] **ACC-FL07-17** (FR-34, FR-35) No literal copy in components; every refusal carries code + hint identical across UI, API, tools.
 
 **P2 — Control, split, recording**
+
 - [ ] **ACC-FL07-18** (FR-36) Take over, idle release, ceiling, disconnect release and request flow behave exactly as the AW-11 take-over spec on the desktop.
 - [ ] **ACC-FL07-19** (FR-37–39) Only pointer/wheel/key/text reach the helper; coordinates respect scale; all keys are released within 1 s of control ending.
 - [ ] **ACC-FL07-20** (FR-40) `input` is advertised iff an injector exists; the stale comment is gone.
@@ -826,10 +828,12 @@ _"While you have control every other key goes to the computer. Esc Esc always co
 - [ ] **ACC-FL07-29** (FR-56) The AW-11 tracker marks P3 recording delivered by FL-07.
 
 **P3 — Signed, virtual**
+
 - [ ] **ACC-FL07-30** (FR-57, FR-58) A signed helper admits as `signed`; the note disappears; grants survive an update on macOS.
 - [ ] **ACC-FL07-31** (FR-59–61) A Linux X11 virtual display is added behind `confirm`, listed as virtual, removed with audit; other platforms refuse by name.
 
 **Cross-cutting**
+
 - [ ] **ACC-FL07-32** (FR-62, FR-63) Keyboard-only operation reaches every control; the axe sweep is clean; announcements fire.
 - [ ] **ACC-FL07-33** Every FR has a passing unit, controller/e2e or node/helper test named in the plan.
 

@@ -174,7 +174,11 @@ describe('AgentToolService.resolveAllowedTools', () => {
                     runId: 'r1',
                 }),
             });
-            expect(result).toMatchObject({ proposed: true, pendingApproval: true, proposalId: 'p-1' });
+            expect(result).toMatchObject({
+                proposed: true,
+                pendingApproval: true,
+                proposalId: 'p-1',
+            });
         });
 
         it('rejects a second edit of the same file in the same run', async () => {

@@ -38,7 +38,13 @@ import {
 } from './keyset-cursor';
 
 /** A cursor before every row: the roster page after a first page the synthesized owner filled. */
-const KEYSET_START_CURSOR = encodeKeysetCursor({ updatedAt: '0001-01-01 00:00:00.000', id: '0' });
+// The id must be a uuid: `decodeKeysetCursor` refuses anything else (F41, 911cf1f14), and
+// an id of '0' turned the second page of a `limit=1` members walk into a 400. The nil
+// uuid sorts before every real one, and the 0001 stamp already precedes every row.
+const KEYSET_START_CURSOR = encodeKeysetCursor({
+    updatedAt: '0001-01-01 00:00:00.000',
+    id: '00000000-0000-0000-0000-000000000000',
+});
 
 /**
  * The versioned resources the integration API reads (contract v1 B.6): the P1

@@ -102,6 +102,8 @@ describe('DashboardSidebar — the Fleet entry', () => {
 
     it('carries no badge (badges belong to Inbox alone)', () => {
         const { container } = renderSidebar(true);
-        expect(fleetLink(container)?.querySelectorAll('[data-testid*="badge"]').length ?? 0).toBe(0);
+        expect(fleetLink(container)?.querySelectorAll('[data-testid*="badge"]').length ?? 0).toBe(
+            0,
+        );
     });
 });

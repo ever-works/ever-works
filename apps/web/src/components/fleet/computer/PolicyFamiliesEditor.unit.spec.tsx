@@ -31,7 +31,8 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/app/actions/settings/fleet', () => ({
-    setFleetNodePolicyFamiliesAction: (...args: unknown[]) => setFleetNodePolicyFamiliesAction(...args),
+    setFleetNodePolicyFamiliesAction: (...args: unknown[]) =>
+        setFleetNodePolicyFamiliesAction(...args),
 }));
 
 const node = (over: Partial<FleetNodeView> = {}): FleetNodeView =>
@@ -55,7 +56,11 @@ beforeEach(() => setFleetNodePolicyFamiliesAction.mockReset());
 
 describe('PolicyFamiliesEditor', () => {
     it('shows thirteen families with the defaults, view open to members', () => {
-        render(<PolicyFamiliesEditor node={node({ controlPolicyFamilies: effectiveControlPolicy({}) })} />);
+        render(
+            <PolicyFamiliesEditor
+                node={node({ controlPolicyFamilies: effectiveControlPolicy({}) })}
+            />,
+        );
         for (const family of FLEET_ACTION_FAMILIES) {
             expect(screen.getByTestId(`fleet-policy-${family}`)).toBeInTheDocument();
         }
@@ -64,7 +69,11 @@ describe('PolicyFamiliesEditor', () => {
     });
 
     it('reads desktop from the legacy single value when no map was saved (U13)', () => {
-        render(<PolicyFamiliesEditor node={node({ controlPolicy: 'org-admins', controlPolicyFamilies: undefined })} />);
+        render(
+            <PolicyFamiliesEditor
+                node={node({ controlPolicy: 'org-admins', controlPolicyFamilies: undefined })}
+            />,
+        );
         expect(screen.getByTestId('fleet-policy-desktop')).toHaveValue('org-admins');
         expect(screen.getByTestId('fleet-policy-sessions')).toHaveValue('owner');
     });
@@ -81,12 +90,21 @@ describe('PolicyFamiliesEditor', () => {
         await userEvent.selectOptions(screen.getByTestId('fleet-policy-sessions'), 'org-admins');
         await userEvent.click(screen.getByTestId('fleet-policy-save'));
         await waitFor(() =>
-            expect(setFleetNodePolicyFamiliesAction).toHaveBeenCalledWith('n1', { sessions: 'org-admins' }),
+            expect(setFleetNodePolicyFamiliesAction).toHaveBeenCalledWith('n1', {
+                sessions: 'org-admins',
+            }),
         );
     });
 
     it('is read-only for anyone but the owner', () => {
-        render(<PolicyFamiliesEditor node={node({ viewerRole: 'org-admin', controlPolicyFamilies: effectiveControlPolicy({}) })} />);
+        render(
+            <PolicyFamiliesEditor
+                node={node({
+                    viewerRole: 'org-admin',
+                    controlPolicyFamilies: effectiveControlPolicy({}),
+                })}
+            />,
+        );
         expect(screen.getByTestId('fleet-policy-sessions')).toBeDisabled();
         expect(screen.queryByTestId('fleet-policy-save')).toBeNull();
         expect(screen.getByText(/introShared/)).toBeInTheDocument();
@@ -94,7 +112,9 @@ describe('PolicyFamiliesEditor', () => {
 
     it('computes the change set family by family', () => {
         const before = effectiveControlPolicy({});
-        expect(changedFamilies(before, { ...before, logs: 'org-members', desktop: 'org-admins' })).toEqual({
+        expect(
+            changedFamilies(before, { ...before, logs: 'org-members', desktop: 'org-admins' }),
+        ).toEqual({
             desktop: 'org-admins',
             logs: 'org-members',
         });
