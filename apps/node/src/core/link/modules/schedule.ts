@@ -11,6 +11,7 @@ import {
 } from '@ever-works/contracts';
 import type { Logger } from '../../logger';
 import { resolveCommandFolder } from './command/command-folder';
+import type { CommandOutputStore } from './command/command-output-store';
 import type { NodeChannelContext, NodeChannelHandler, NodeLinkControlState, NodeModule } from './registry';
 import { ScheduleHistory } from './schedule/schedule-history';
 import { ScheduleLoop, type ScheduleLoopOptions } from './schedule/schedule-loop';
@@ -48,6 +49,8 @@ export interface ScheduleModuleOptions extends Omit<ScheduleLoopOptions, 'store'
 
 export interface ScheduleModule extends NodeModule {
 	readonly loop: ScheduleLoop;
+	/** The ring keeping one run's full output (for `command.read`), or null. */
+	findOutputStore(runId: string): Promise<CommandOutputStore | null>;
 	/** Load the held set and start the timer (with or without a link). */
 	start(): Promise<void>;
 	/** Follow the link's kill switch and drain (`link.pause` / `link.resume` / `link.drain`). */
@@ -183,6 +186,7 @@ export function createScheduleModule(options: ScheduleModuleOptions): ScheduleMo
 	return {
 		id: 'schedule',
 		loop,
+		findOutputStore: (runId) => history.storeFor(runId),
 		tags: (environment) => (environment.consents.manage ? [FLEET_SCHEDULES_CAPABILITY] : []),
 		families: [
 			{

@@ -1055,6 +1055,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						env: process.env,
 						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						// FL-13: a schedule's run keeps its full output in the schedule's ring.
+						...(scheduleModule ? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) } : {}),
 						logger: io.logger
 					})
 				}

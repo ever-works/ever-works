@@ -112,6 +112,16 @@ export class ScheduleHistory {
 		return settled;
 	}
 
+	/** The ring that keeps this run's full output, or null (FL-12's `command.read` asks). */
+	async storeFor(runId: string): Promise<CommandOutputStore | null> {
+		if (!isFleetCommandId(runId)) return null;
+		for (const id of await this.scheduleIds()) {
+			const store = this.output(id);
+			if (await store.has(runId)) return store;
+		}
+		return null;
+	}
+
 	/** Where one schedule's full outputs live (a ring of 30). */
 	output(scheduleId: string): CommandOutputStore {
 		const key = scheduleId.toLowerCase();

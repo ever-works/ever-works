@@ -13581,6 +13581,143 @@
                 "back": "Back to Fleet"
             }
         },
+        "schedules": {
+            "tab": {
+                "zones": "{computer} keeps time in {zone} · you are in {viewerZone}",
+                "zonesUnknown": "{computer} has not reported its time zone yet, so its times read UTC · you are in {viewerZone}",
+                "new": "New schedule",
+                "needsManage": "Schedules need management switched on — run `ever-works-node start --manage` on {computer}.",
+                "unsupportedKind": "Schedules are not available on this kind of node yet.",
+                "emptyTitle": "Nothing is scheduled on {computer}",
+                "emptyExample": "For example: run the tests every weekday at 02:00, or pull every checkout every 30 minutes.",
+                "noCredits": "A command schedule runs on your computer — it spends no model tokens or credits."
+            },
+            "glyphs": {
+                "active": "Active",
+                "running": "Running",
+                "paused": "Paused",
+                "neverRuns": "Never runs"
+            },
+            "row": {
+                "next": "next {computer}",
+                "nextTwoZones": "next {computer} ({viewer} yours)",
+                "noNext": "no fire scheduled",
+                "running": "running",
+                "paused": "paused by you",
+                "pausedFailures": "Paused after 5 failures in a row",
+                "last": "last {status}"
+            },
+            "statuses": {
+                "running": "running",
+                "done": "✓",
+                "failed": "✗ failed",
+                "timeout": "✗ timed out",
+                "skippedOverlap": "⊘ skipped",
+                "skippedOffline": "⊘ skipped"
+            },
+            "sync": {
+                "synced": "Synced to {computer}",
+                "pending": "Will sync when {computer} is back",
+                "unsupported": "NEVER RUNS · update the node on {computer}",
+                "refused": "The computer refused this schedule"
+            },
+            "reasons": {
+                "offline": "{computer} is offline — Run now needs it online"
+            },
+            "actions": {
+                "runNow": "Run now",
+                "pause": "Pause",
+                "resume": "Resume",
+                "edit": "Edit",
+                "duplicate": "Duplicate",
+                "delete": "Delete"
+            },
+            "confirmRun": "Run \"{name}\" on {computer} now? These are real machines, not a sandbox.",
+            "runStarted": "\"{name}\" is running. The next scheduled fire does not move.",
+            "confirmDelete": "Delete \"{name}\" on {computer}? It stops on the computer; its {runs, plural, one {# run stays} other {# runs stay}} readable for 30 days.",
+            "errors": {
+                "load": "Could not read the schedules of this computer.",
+                "run": "Could not run this schedule.",
+                "pause": "Could not pause this schedule. Nothing was changed.",
+                "resume": "Could not resume this schedule. Nothing was changed.",
+                "delete": "Could not delete this schedule. Nothing was changed."
+            },
+            "dialog": {
+                "title": "New schedule on {computer}",
+                "editTitle": "Edit schedule on {computer}",
+                "copyOf": "{name} (copy)",
+                "name": "Name",
+                "namePlaceholder": "Nightly tests",
+                "computer": "Computer",
+                "notThisKind": "not available on this kind of node",
+                "keepsTime": "keeps time in {zone}",
+                "keepsUtc": "has not reported its time zone — times read UTC",
+                "command": "Command",
+                "folder": "Folder",
+                "folderPlaceholder": "home (~), a checkout, or a path",
+                "when": "When",
+                "next": "Next:",
+                "twoZones": "{computer} ({viewer} yours)",
+                "runsAs": "Runs as the machine owner in their login shell. No input is possible.",
+                "noCredits": "It spends no model tokens or credits.",
+                "sandbox": "These are real machines, not a sandbox.",
+                "cancel": "Cancel",
+                "create": "Create",
+                "save": "Save",
+                "back": "Back",
+                "createConfirmed": "Create it",
+                "saveConfirmed": "Save it",
+                "failed": "Could not save this schedule. Nothing was changed.",
+                "confirmRunsAs": "Runs in {shell} as the machine owner, from {folder}, with no input.",
+                "confirmWhen": "When: {cadence}, on the computer's clock.",
+                "confirm": {
+                    "create": "Schedule \"{name}\" on {computer}?",
+                    "update": "Change what \"{name}\" runs on {computer}?",
+                    "move": "Move \"{name}\" to {computer}?",
+                    "delete": "Delete \"{name}\" on {computer}?",
+                    "run": "Run \"{name}\" on {computer} now?"
+                }
+            },
+            "cadence": {
+                "forms": {
+                    "every": "Every N minutes",
+                    "hourly": "Hourly",
+                    "daily": "Daily",
+                    "weekdays": "Weekdays",
+                    "days": "Specific days",
+                    "cron": "Cron (advanced)"
+                },
+                "minutes": "minutes",
+                "at": "at",
+                "cronLabel": "Cron expression (minute hour day month weekday)",
+                "daysLabel": "Days of the week",
+                "days": {
+                    "sun": "Sun",
+                    "mon": "Mon",
+                    "tue": "Tue",
+                    "wed": "Wed",
+                    "thu": "Thu",
+                    "fri": "Fri",
+                    "sat": "Sat"
+                }
+            },
+            "history": {
+                "title": "Runs on {computer}, newest first (the last 30 are kept there)",
+                "loading": "Reading the runs…",
+                "empty": "No runs yet.",
+                "failed": "Could not read the runs.",
+                "removedComputer": "a removed computer",
+                "twoZones": "{computer} ({viewer} yours)",
+                "runNow": "Run now",
+                "running": "running",
+                "timeout": "ended at 6 h (timeout)",
+                "failedReason": "failed ({reason})",
+                "exit": "exit {code}",
+                "output": "output",
+                "fullOutput": "Open full output",
+                "truncated": "the middle is kept on the computer"
+            }
+        },
         "commands": {
             "title": "Run a command",
             "description": "One command, the computers it should run on, and what each one said.",
