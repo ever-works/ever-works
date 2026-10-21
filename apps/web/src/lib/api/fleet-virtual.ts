@@ -6,6 +6,7 @@ import type {
     FleetVirtualCreateResponse,
     FleetVirtualOperationResponse,
     FleetVirtualOptionsView,
+    FleetVirtualPasswordRevealResponse,
     FleetVirtualPowerAction,
     FleetVirtualSystemId,
 } from '@ever-works/contracts';
@@ -48,6 +49,15 @@ export const fleetVirtualAPI = {
         serverMutation<FleetVirtualOperationResponse>({
             endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/destroy`,
             data: confirmName !== undefined ? { confirmName } : {},
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    /** Windows VMs (P2): the one-time password reveal — `confirm: true`, owner only, never cached. */
+    revealPassword: async (hostNodeId: string, childNodeId: string) =>
+        serverMutation<FleetVirtualPasswordRevealResponse>({
+            endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/password/reveal`,
+            data: { confirm: true },
             method: 'POST',
             wrapInData: false,
         }),

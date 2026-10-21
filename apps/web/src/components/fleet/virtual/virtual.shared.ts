@@ -33,6 +33,7 @@ export const VIRTUAL_REASON_KEYS: Readonly<Record<FleetVirtualHostReason, string
     'desktop-node': 'desktopNode',
     'permission-denied': 'permissionDenied',
     'not-upgraded': 'notUpgraded',
+    'no-windows-image': 'noWindowsImage',
 };
 
 /** The message key (under `fleet.virtual.progress`) of each create phase (FR-13). */

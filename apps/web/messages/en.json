@@ -14891,7 +14891,8 @@
                 "unsupportedArch": "Not available on {name}'s processor",
                 "desktopNode": "Not available on this kind of node yet",
                 "permissionDenied": "Only the owner of {name} can create computers on it",
-                "notUpgraded": "Update the Ever Works node on {name} to create virtual computers on it"
+                "notUpgraded": "Update the Ever Works node on {name} to create virtual computers on it",
+                "noWindowsImage": "No Windows installer image is configured on {name}"
             },
             "progress": {
                 "label": "Progress",
@@ -14950,6 +14951,28 @@
                 "bodyVm": "Deletes the VM and its disk under {host}'s node data folder. This cannot be undone. Job history is kept.",
                 "confirm": "Destroy",
                 "started": "{name} is being destroyed"
+            },
+            "password": {
+                "button": "Copy password",
+                "title": "Password for {name}",
+                "description": "Generated on {host} when the VM was created and kept only there. Revealing it is recorded in the audit log.",
+                "reveal": "Reveal once",
+                "show": "Show",
+                "hide": "Hide",
+                "copy": "Copy",
+                "copied": "Password copied",
+                "copyFailed": "The password could not be copied.",
+                "hidesIn": "Hides in {seconds} s",
+                "close": "Close",
+                "failed": "The password could not be revealed."
+            },
+            "watch": {
+                "button": "Watch the install",
+                "opened": "The installer's screen opened on {host}",
+                "failed": "The installer's screen could not be opened."
+            },
+            "activation": {
+                "note": "Windows stays unactivated until you add a product key inside Windows. Ever Works ships no key."
             },
             "palette": {
                 "newVirtual": "New virtual computer",

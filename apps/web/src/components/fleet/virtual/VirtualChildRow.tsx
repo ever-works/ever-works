@@ -62,7 +62,12 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
                     {virtualStateGlyph(live.state)}
                 </span>{' '}
                 {t(`state.${VIRTUAL_STATE_KEYS[live.state]}`)} · {live.systemLabel} · {size}
-                {kind === 'vm' && live.activated === false ? ` · ${t('row.notActivated')}` : ''}
+                {kind === 'vm' && live.activated === false ? (
+                    <span title={t('activation.note')} data-testid="fleet-virtual-not-activated">
+                        {' '}
+                        · {t('row.notActivated')}
+                    </span>
+                ) : null}
             </p>
             {creating ? (
                 <ol className="mt-1 flex flex-wrap gap-2" aria-label={t('progress.label')}>
