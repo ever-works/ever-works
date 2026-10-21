@@ -149,7 +149,17 @@ export type FleetAuditAction =
 	/** A session was ended, with its reason. */
 	| 'node.session.end'
 	| 'node.session.recording.start'
-	| 'node.session.recording.stop';
+	| 'node.session.recording.stop'
+	/**
+	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
+	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
+	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
+	 * `outcome`, the exit code, the duration and whether output was truncated;
+	 * never the command's output and never the command line (spec FR-12, FR-13).
+	 */
+	| 'node.command.run'
+	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
+	| 'node.command.cancel';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -197,7 +207,9 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	'node.command.run',
+	'node.command.cancel'
 ];
 
 /**
