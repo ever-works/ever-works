@@ -179,6 +179,9 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 		if (!isFleetPortOpenTarget(target)) throw verbError('invalid', 'target', { field: 'target' });
 		const scheme = context.params.scheme === 'https' ? 'https' : 'http';
 		const url = fleetPortLoopbackUrl(port, scheme);
+		// What the last list knew about the port, for the platform's audit row.
+		const known = cache?.rows.find((row) => row.port === port && !row.stopped);
+		const about = { program: known?.program?.name ?? null, container: known?.container?.name ?? null };
 		if (target === 'desktop') {
 			await openOnDesktop({
 				url,
@@ -186,7 +189,7 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 				opener: options.desktopOpener,
 				nodeName: options.nodeName
 			});
-			return { target, url };
+			return { target, url, ...about };
 		}
 		const viewId = typeof context.params.viewId === 'string' ? context.params.viewId : '';
 		const holder =
@@ -194,7 +197,7 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 				? context.params.holder.trim().slice(0, 80)
 				: 'Someone';
 		await options.preview.open({ url, port, viewId, holder });
-		return { target, url, viewId };
+		return { target, url, viewId, ...about };
 	};
 
 	return {

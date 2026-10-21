@@ -748,6 +748,48 @@ export const config = {
             );
         },
         /**
+         * Machine facts (CONTRACTS §9) — `FLEET_MACHINE_FACTS_ENABLED`, the one
+         * flag behind logs (FL-08), services / Docker / processes (FL-09),
+         * ports (FL-10) and files (FL-11). Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: off, those routes answer 404. Read per call.
+         */
+        isMachineFactsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_MACHINE_FACTS_ENABLED === 'true'
+            );
+        },
+        /**
+         * Servers and ports, phase 2 (FL-10, CONTRACTS §9, R-17) —
+         * `FLEET_PORT_TUNNEL_ENABLED`: "Preview in my browser". Needs the
+         * machine-facts flag too, and a preview hostname
+         * ({@link getPortPreviewHost}); without either it is off. Off, the
+         * button is absent, the tunnel routes answer 404 and the preview host
+         * answers 404.
+         */
+        isPortTunnelEnabled(): boolean {
+            return (
+                this.isMachineFactsEnabled() &&
+                process.env.FLEET_PORT_TUNNEL_ENABLED === 'true' &&
+                this.getPortPreviewHost() !== null
+            );
+        },
+        /**
+         * The dedicated preview hostname tunnels are served on
+         * (`FLEET_PREVIEW_HOST`, e.g. `preview.ever.works`) — a bare host, no
+         * scheme, no path; anything else reads as unset. Dedicated so a
+         * tunnelled page can never read Ever Works' own cookies or storage.
+         */
+        getPortPreviewHost(): string | null {
+            const raw = (process.env.FLEET_PREVIEW_HOST ?? '').trim().toLowerCase();
+            if (raw.length === 0 || raw.length > 253) return null;
+            return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d{1,5})?$/.test(
+                raw,
+            )
+                ? raw
+                : null;
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single

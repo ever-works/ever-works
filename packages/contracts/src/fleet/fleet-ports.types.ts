@@ -187,6 +187,46 @@ export interface FleetPortOpenNodeResult {
 	url: string;
 	/** Preview profile: the view the node keeps the preview browser under. */
 	viewId?: string;
+	/** The program behind the port on the node's last list, for the audit row. */
+	program?: string | null;
+	/** The container behind the port on the node's last list, for the audit row. */
+	container?: string | null;
+}
+
+/** Why an Open target is not offered on a computer (the Open menu's disabled reasons, spec U2, U8, U10). */
+export const FLEET_PORT_OPEN_UNAVAILABLE_REASONS = [
+	/** The machine runs without `--attend` (desktop; and the preview picture rides the `desktop` family). */
+	'attend-missing',
+	/** The viewer is outside the computer's `desktop` audience (desktop target only). */
+	'desktop-family',
+	/** The machine has no desktop the node can open a browser on (no opener, no FL-07 helper). */
+	'no-desktop',
+	/** The owner switched the preview browser off for this computer (`previewProfileEnabled`). */
+	'preview-off',
+	/** No browser was found on the machine. */
+	'no-browser',
+	/** The viewer is outside the computer's `ports` audience. */
+	'ports-family'
+] as const;
+
+export type FleetPortOpenUnavailableReason = (typeof FLEET_PORT_OPEN_UNAVAILABLE_REASONS)[number];
+
+export interface FleetPortOpenTargetState {
+	available: boolean;
+	reason?: FleetPortOpenUnavailableReason;
+	/** The command that would fix it on the machine (`ever-works-node start --attend`). */
+	command?: string;
+}
+
+/** `GET /api/fleet/nodes/:id/ports`: the node's list plus what Open can do for this viewer. */
+export interface FleetPortsListResponse extends FleetPortsList {
+	nodeId: string;
+	nodeName: string;
+	/** The viewer may open (the `ports` audience). */
+	canOpen: boolean;
+	targets: Record<FleetPortOpenTarget, FleetPortOpenTargetState>;
+	/** What **Open** does by default (R-3: the desktop when available, else the preview browser), or null. */
+	defaultTarget: FleetPortOpenTarget | null;
 }
 
 /** What the platform answers `POST /nodes/:id/ports/:port/open` with. */

@@ -10,6 +10,7 @@ import type { IngestedEventRepository } from '../ingest/ingested-event.repositor
 import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
+import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -91,6 +92,12 @@ export interface AgentMeetingToolSource {
 
 export interface AgentFleetToolSource {
     service: Pick<FleetService, 'listForUser'>;
+    /**
+     * Servers and ports (FL-10) — `fleet_ports_list` / `fleet_ports_open`.
+     * Optional: unbound (a context without the API's node link), the two tools
+     * are simply not offered.
+     */
+    ports?: Pick<FleetPortsService, 'list' | 'open'>;
 }
 
 export interface AgentPrReviewToolSource {

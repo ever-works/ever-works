@@ -214,6 +214,20 @@ export class UpdateFleetNodeDto {
     @IsObject()
     @IsFleetControlPolicyFamilies()
     controlPolicyFamilies?: FleetControlPolicyFamiliesInput;
+
+    /**
+     * Servers and ports (FL-10, CONTRACTS §4.1, R-3) — the "Preview browser"
+     * switch: lets **Open** show a page in a browser profile on this computer
+     * that no agent uses. Owner only.
+     */
+    @ApiProperty({
+        required: false,
+        description:
+            'Servers and ports — lets Open show a page in a browser profile on this computer that no agent uses (the preview browser). Owner only.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    previewProfileEnabled?: boolean;
 }
 
 /**

@@ -129,6 +129,7 @@ import {
     FleetJobService,
     FleetKillSwitchService,
     FleetModule,
+    FleetPortsService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
@@ -2113,6 +2114,9 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortsService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2136,6 +2140,7 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                fleetPorts?: FleetPortsService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2156,7 +2161,7 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet },
+                fleet: { service: fleet, ...(fleetPorts ? { ports: fleetPorts } : {}) },
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

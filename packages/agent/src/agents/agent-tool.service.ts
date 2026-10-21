@@ -65,6 +65,7 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -577,6 +578,16 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+            // Servers and ports (FL-10): read-only list + audited open, as the Agent for its owner.
+            if (fleet.ports) {
+                const ports = fleet.ports;
+                add('fleet-ports', () =>
+                    buildFleetPortsTools({
+                        agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
+                        service: ports,
+                    }),
+                );
+            }
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it

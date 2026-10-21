@@ -1241,6 +1241,29 @@ export class FleetService {
     }
 
     /**
+     * Servers and ports (FL-10, CONTRACTS §4.1, R-3) — the computer Settings
+     * switch "Preview browser": whether **Open** on a listening port may use
+     * the node's owner-level preview browser profile. Owner only (the same
+     * posture as the star): anyone else who may see the node is refused
+     * `permission_denied`. The column is FL-02's (`1796020000000`); FL-10 owns
+     * setting and reading it.
+     */
+    async setPreviewProfileEnabledForUser(
+        userId: string,
+        nodeId: string,
+        enabled: boolean,
+    ): Promise<FleetNodeView> {
+        if (typeof enabled !== 'boolean') {
+            throw new BadRequestException('previewProfileEnabled must be true or false');
+        }
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        if (Boolean(node.previewProfileEnabled) !== enabled) {
+            await this.repository.update(node.id, { previewProfileEnabled: enabled });
+        }
+        return this.toView({ ...node, previewProfileEnabled: enabled } as FleetNode);
+    }
+
+    /**
      * Fleet hub (FL-01) — change who may act in one or more action families
      * (CONTRACTS §2.1). Owner only. `families` is a PARTIAL map: families it
      * names change, the rest keep what they had.
