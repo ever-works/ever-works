@@ -45,6 +45,7 @@ import {
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
     normalizeFleetNodeWorkerState,
+    normalizeFleetSessionDaemonReport,
     sanitizeFleetNodeHealthSnapshot,
     FLEET_LAN_ID_LENGTH,
     isFleetNodeAsleep,
@@ -266,6 +267,13 @@ export interface EnrollInput {
     macAddress?: unknown;
     /** Computer health, second phase (FL-03) — the opaque network identity; re-hashed with the owner's id. */
     lanId?: unknown;
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+     * health `{ state, reason?, sessions, storage?, hooks? }`. Untrusted off
+     * the wire: normalised (bounded reason, known keys only); absent leaves the
+     * stored report alone like every other telemetry field.
+     */
+    daemon?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -740,6 +748,9 @@ export class FleetService {
         // Computer health, second phase (FL-03): the hardware address and the
         // owner-salted network identity, for Wake-on-LAN.
         applyReportedNetworkIdentity(node, refresh, patch);
+        // Sessions on computers (FL-04): the session daemon's health, as reported.
+        const daemonReport = normalizeFleetSessionDaemonReport(refresh.daemon);
+        if (daemonReport) patch.sessionDaemon = daemonReport;
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -2232,6 +2243,8 @@ export class FleetService {
             // `effectiveConsents`, never as "nothing allowed".
             consents: normalizeFleetConsents(node.consents),
             previewProfileEnabled: Boolean(node.previewProfileEnabled),
+            // Sessions on computers (FL-04). Null = never reported.
+            sessionDaemon: normalizeFleetSessionDaemonReport(node.sessionDaemon),
         };
     }
 }

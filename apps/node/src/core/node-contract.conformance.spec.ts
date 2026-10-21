@@ -146,7 +146,9 @@ describe('what the node actually puts on the wire', () => {
 		// by a node whose heartbeat has a health probe wired.
 		// 13 → 15 with FL-03's second phase: the hardware address and the
 		// network identity, sent only under `--manage`.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(15);
+		// 15 → 16 with FL-04: the session daemon's report, sent by a process
+		// that may host sessions (`--manage` or `--work`).
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(16);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -254,7 +256,9 @@ describe('what the node actually puts on the wire', () => {
 			consents: { work: true, attend: false, manage: true, usageScan: false },
 			// Computer health, second phase (FL-03).
 			macAddress: 'aa:bb:cc:dd:ee:f0',
-			lanId: 'a1b2c3d4e5f60718'
+			lanId: 'a1b2c3d4e5f60718',
+			// Sessions on computers (FL-04).
+			daemon: { state: 'running', sessions: 0 }
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(

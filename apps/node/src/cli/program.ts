@@ -74,6 +74,9 @@ import {
 	writeNodeLinkRecord
 } from '../core/link/link-record';
 import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
+import { DaemonControlClient } from '../core/sessions/daemon-client';
+import { resolveSessionDaemonPaths } from '../core/sessions/daemon/daemon-paths';
+import { installDaemonProcessHandlers, runSessionDaemon } from '../core/sessions/daemon/daemon-main';
 
 /**
  * `ever-works-node` CLI.
@@ -149,6 +152,17 @@ export interface CliDeps {
 	};
 	/** Wall clock for ages and stamps; defaults to `Date.now`. */
 	now?: () => number;
+	/**
+	 * Sessions on computers (FL-04) — how to run this build's hidden
+	 * `session-daemon` subcommand: the Node binary and this CLI's entry
+	 * script. Set by the real executable only; absent (tests, embedders)
+	 * means no session daemon is started and `sessions` is never advertised.
+	 */
+	sessionDaemonCommand?: { command: string; args: string[] };
+	/** Owner-only ACL for a file on Windows (the session daemon's token). */
+	restrictFile?: (file: string) => Promise<void> | void;
+	/** The session daemon's own entry (the hidden subcommand); a seam for the CLI spec. */
+	runSessionDaemon?: typeof runSessionDaemon;
 }
 
 /**
@@ -563,8 +577,27 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// --attend, --manage is on; its state is recorded for `status`.
 		manageEnabled,
 		nodeLink: true,
-		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record)
+		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record),
+		// Sessions on computers (FL-04): the session daemon, for a process that
+		// may host sessions (`--manage` or `--work`). It is spawned detached and
+		// outlives this process, so a restart or an upgrade ends no session.
+		...(deps.sessionDaemonCommand
+			? {
+					sessionDaemon: {
+						...deps.sessionDaemonCommand,
+						paths: resolveSessionDaemonPaths({
+							configPath: deps.configPath,
+							platform: deps.platform,
+							env: process.env
+						})
+					}
+				}
+			: {}),
+		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {})
 	});
+	// The daemon starts with the node, before the first beat, so that beat can
+	// already report it (and advertise `sessions`).
+	runtime.sessions?.supervisor.start();
 	if (workerEnabled) {
 		// Node lifecycle (slice AR): say at startup what each pinned CLI is
 		// and whether this node can drive it — the first place an operator
@@ -725,6 +758,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// The link first: channels end `normal` and nothing reconnects while the
 	// lanes below drain.
 	runtime.link?.close();
+	// Sessions (FL-04): let go of the daemon — never stop it. Every session
+	// keeps running and the next node process finds them all.
+	runtime.sessions?.module.dispose();
+	runtime.sessions?.supervisor.stop();
 	loop.stop();
 	await loop.settled();
 	// A start that was waiting for an accepted beat ends here (the loop is
@@ -802,14 +839,16 @@ export interface PolicyCommandOptions {
 	allowSkipPermissions?: string;
 	allowShellCommands?: string;
 	restrictedMode?: string;
+	allowMcpBridge?: string;
 }
 
-/** One line: both control-18 switches, in words. */
+/** One line: every local execution-policy switch, in words. */
 export function describeExecutionPolicy(policy: NodeExecutionPolicy): string {
 	return (
 		`skip-permissions ${policy.allowSkipPermissions ? 'ALLOWED' : 'refused'}, ` +
 		`node-run shell commands ${policy.allowShellCommands ? 'ALLOWED' : 'refused'}, ` +
-		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}`
+		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}, ` +
+		`platform MCP bridge ${policy.allowMcpBridge ? 'allowed' : 'REFUSED'}`
 	);
 }
 
@@ -835,17 +874,19 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 	const skip = parsePolicySwitch('--allow-skip-permissions', options.allowSkipPermissions);
 	const shell = parsePolicySwitch('--allow-shell-commands', options.allowShellCommands);
 	const restricted = parsePolicySwitch('--restricted-mode', options.restrictedMode);
-	if (skip === undefined && shell === undefined && restricted === undefined) {
+	const mcpBridge = parsePolicySwitch('--allow-mcp-bridge', options.allowMcpBridge);
+	if (skip === undefined && shell === undefined && restricted === undefined && mcpBridge === undefined) {
 		deps.out(`policy       ${describeExecutionPolicy(current)}`);
 		deps.out(
-			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off`.'
+			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off --allow-mcp-bridge on|off`.'
 		);
 		return;
 	}
 	const next: NodeExecutionPolicy = {
 		allowSkipPermissions: skip ?? current.allowSkipPermissions,
 		allowShellCommands: shell ?? current.allowShellCommands,
-		restrictedMode: restricted ?? current.restrictedMode
+		restrictedMode: restricted ?? current.restrictedMode,
+		allowMcpBridge: mcpBridge ?? current.allowMcpBridge
 	};
 	await saveConfig(
 		deps.fs,
@@ -871,6 +912,12 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 		deps.out(
 			'Note: Claude Code restricted mode is OFF — runs keep the baseline isolation (no repository settings, no ' +
 				'hooks) but get the command-running built-ins back and read your ~/.claude/settings.json.'
+		);
+	}
+	if (!next.allowMcpBridge) {
+		deps.out(
+			'Note: the platform MCP bridge is OFF — jobs whose Agent has external tools enabled are refused on this ' +
+				'machine instead of running with platform tools.'
 		);
 	}
 	deps.out('Restart the node service for a running worker to apply the change.');
@@ -1548,8 +1595,10 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	// Node lifecycle (slice AR): daemon version vs floor, CLI compatibility.
 	const lifecycle = await gatherLifecycle(deps, report.config);
 	const now = (deps.now ?? (() => Date.now()))();
+	// Sessions on computers (FL-04): the session daemon, asked read-only.
+	const sessions = await describeSessionDaemon(deps);
 	if (options.json === true) {
-		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle) }, null, 2));
+		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions }, null, 2));
 		return;
 	}
 	printHousekeepingHeader(deps, report, now);
@@ -1560,6 +1609,13 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 		`consents     ${linkRecord ? describeConsents(linkRecord.consents) : 'unknown (the service has not reported them yet)'}`
 	);
 	deps.out(`link         ${describeLinkRecord(linkRecord, now)}`);
+	deps.out(
+		`sessions     ${
+			sessions.daemon === 'running'
+				? `daemon running, ${sessions.sessions ?? 0} session(s), terminal ${sessions.pty === 'available' ? 'available' : `missing — ${sessions.reason ?? 'unknown'}`}`
+				: `daemon not running — ${sessions.reason ?? 'unknown'}`
+		}`
+	);
 	printPlan(deps, report.plan, now);
 }
 
@@ -1757,6 +1813,10 @@ export function buildProgram(deps: CliDeps): Command {
 			'--restricted-mode <on|off>',
 			'Run Claude Code with --restricted when it supports it (no shell tools, no settings files). Default on.'
 		)
+		.option(
+			'--allow-mcp-bridge <on|off>',
+			'Let jobs start the platform MCP bridge (platform tools for the model, run-scoped credential). Default on.'
+		)
 		.action(async (options: PolicyCommandOptions) => {
 			await runPolicy(deps, options);
 		});
@@ -1818,7 +1878,81 @@ export function buildProgram(deps: CliDeps): Command {
 			await runGc(deps, options);
 		});
 
+	// Sessions on computers (FL-04): the session daemon's own entry. Hidden —
+	// the node starts it, a person never does (README D3: one installable).
+	program
+		.command('session-daemon', { hidden: true })
+		.description('Run the session daemon (started by the node; not for direct use)')
+		.requiredOption('--state-dir <dir>', 'The daemon state directory')
+		.requiredOption('--socket <path>', 'The local socket or named pipe to listen on')
+		.requiredOption('--token-file <file>', 'The token file that guards the socket')
+		.action(async (options: SessionDaemonCommandOptions) => {
+			await runSessionDaemonCommand(deps, options);
+		});
+
 	return program;
+}
+
+interface SessionDaemonCommandOptions {
+	stateDir: string;
+	socket: string;
+	tokenFile: string;
+}
+
+/**
+ * `ever-works-node session-daemon` (hidden). Starts listening and returns;
+ * the listening socket keeps the process alive until the daemon's idle rule
+ * (no session, no node, five minutes) or a system shutdown ends it.
+ */
+export async function runSessionDaemonCommand(deps: CliDeps, options: SessionDaemonCommandOptions): Promise<void> {
+	const join = deps.platform === 'win32' ? win32.join : posix.join;
+	const logFile = join(options.stateDir, 'daemon.log');
+	const run = deps.runSessionDaemon ?? runSessionDaemon;
+	let daemon: Awaited<ReturnType<typeof runSessionDaemon>>;
+	try {
+		daemon = await run({
+			stateDir: options.stateDir,
+			socketPath: options.socket,
+			tokenFile: options.tokenFile,
+			logFile,
+			version: deps.io.version
+		});
+	} catch (error) {
+		throw new CliError(
+			`The session daemon could not start: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+	if (!deps.runSessionDaemon) installDaemonProcessHandlers(daemon, logFile);
+}
+
+/**
+ * The session daemon as `doctor` reports it — read-only: it never creates a
+ * token and never starts a daemon.
+ */
+export async function describeSessionDaemon(
+	deps: CliDeps
+): Promise<{ daemon: 'running' | 'not-running'; pty?: 'available' | 'missing'; sessions?: number; reason?: string }> {
+	const paths = resolveSessionDaemonPaths({ configPath: deps.configPath, platform: deps.platform, env: process.env });
+	let token: string | null = null;
+	try {
+		token = (await deps.fs.readFile(paths.tokenFile))?.trim() ?? null;
+	} catch {
+		token = null;
+	}
+	if (!token) return { daemon: 'not-running', reason: 'no session daemon has been started on this computer' };
+	try {
+		const client = await DaemonControlClient.connect({ socketPath: paths.socketPath, token, timeoutMs: 2_000 });
+		const health = client.welcome;
+		client.close();
+		return {
+			daemon: 'running',
+			pty: health.pty,
+			sessions: health.sessions,
+			...(health.ptyReason ? { reason: health.ptyReason } : {})
+		};
+	} catch {
+		return { daemon: 'not-running', reason: 'the session daemon did not answer on its local socket' };
+	}
 }
 
 /**

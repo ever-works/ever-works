@@ -7571,7 +7571,8 @@
                     "reviewGitHubAppAccess": "Review GitHub App access",
                     "openOnGitHub": "Open on GitHub",
                     "enableBuildWorkflow": "Enable the build workflow"
-                }
+                },
+                "editAccessRequired": "You need edit access to this App Work to do that."
             },
             "appDependencies": {
                 "status": {
@@ -9033,7 +9034,8 @@
                     "title": "Evolve it with its agent",
                     "body": "Ask the Work's agent to change the app — add a feature, fix a bug, upgrade a dependency. It works in the Work Repository and opens pull requests.",
                     "button": "Chat about this App"
-                }
+                },
+                "editAccessRequired": "You need edit access to this App Work to try again."
             },
             "builds": {
                 "title": "Builds",
@@ -9306,7 +9308,8 @@
                     "saved": "Target saved.",
                     "saveFailed": "Couldn't save the target: {reason}",
                     "changeNote": "Changing the target doesn't remove anything already running.",
-                    "routeUnavailable": "Changing the target isn't available on this instance yet."
+                    "routeUnavailable": "Changing the target isn't available on this instance yet.",
+                    "ownerOnly": "Only the Work owner can change where the app runs or connect a new cluster."
                 },
                 "connect": {
                     "title": "Connect your cluster",
@@ -9347,7 +9350,8 @@
                     "saving": "Saving…",
                     "saveBlocked": "Save is available once the check passes with every required permission.",
                     "saved": "Cluster connected.",
-                    "saveFailed": "Couldn't save the cluster connection: {reason}"
+                    "saveFailed": "Couldn't save the cluster connection: {reason}",
+                    "ownerOnly": "Only the Work owner can connect a cluster or change its context."
                 },
                 "check": {
                     "ok": "Connected",
@@ -9484,7 +9488,8 @@
                         "resume": "Resume requested.",
                         "remove": "Removal requested.",
                         "cancelDeploy": "Cancellation requested."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Only the Work owner can delete stored data."
                 },
                 "environment": {
                     "title": "Environment",
@@ -9573,8 +9578,11 @@
                         "confirm": "Delete data",
                         "requested": "Deleting the {kind} data.",
                         "failed": "The data couldn't be deleted. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Only the Work owner can delete this data."
+                },
+                "ownerRequired": "Only the Work owner can do this.",
+                "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it."
             }
         },
         "newPage": {
@@ -13363,6 +13371,183 @@
                 "title": "This computer is not here",
                 "body": "It was removed from Fleet, or it is not shared with you.",
                 "back": "Back to Fleet"
+            }
+        },
+        "sessions": {
+            "providers": {
+                "shell": "Shell",
+                "claudeCode": "Claude Code",
+                "codex": "Codex",
+                "other": "Other CLI"
+            },
+            "kinds": {
+                "owner": "Yours",
+                "agent": "Agent"
+            },
+            "states": {
+                "starting": "Starting",
+                "working": "Working",
+                "needsYou": "Needs you",
+                "done": "Done",
+                "idle": "Idle",
+                "ended": "Ended",
+                "consentManage": "Owner sessions need management switched on for this computer.",
+                "consentCommand": "Run this on {node}:",
+                "consentWork": "Agents need work switched on for this computer — ever-works-node start --work",
+                "daemonDown": "The session daemon is not running on {node} — {reason}",
+                "daemonDownNoReason": "The session daemon is not running on {node}.",
+                "daemonDownBody": "It starts by itself while the node runs with --manage or --work. If it keeps failing, ever-works-node doctor on {node} says why.",
+                "offline": "{node} is offline — last seen {relative}. Sessions it had are listed below with their last screens.",
+                "offlineNever": "{node} is offline. Sessions it had are listed below with their last screens.",
+                "retry": "Retry",
+                "copy": "Copy",
+                "copied": "Copied"
+            },
+            "tab": {
+                "live": "Live",
+                "ended": "Ended",
+                "empty": "No sessions on {node} yet.",
+                "emptyBody": "Start a shell or an agent here and it keeps running when you close the tab.",
+                "newSession": "New session",
+                "loadFailed": "The sessions could not be loaded.",
+                "retry": "Retry",
+                "startedByYou": "started by you",
+                "startedByOther": "started by someone else",
+                "startedByAgent": "started by an Agent",
+                "noLive": "Nothing is running on {node} right now."
+            },
+            "start": {
+                "title": "New session",
+                "computer": "Computer",
+                "who": "Who",
+                "you": "You — runs as you, in your login",
+                "agent": "Agent — isolated, owns a Run",
+                "agentLater": "Agent sessions arrive in the next release.",
+                "what": "What",
+                "where": "Where",
+                "folderLabel": "Folder on {node}",
+                "folderPlaceholder": "~/code/app",
+                "recent": "Recent",
+                "checkouts": "Checkouts",
+                "inFolder": "in this folder",
+                "newWorktree": "in a new worktree of {checkout}",
+                "worktreeLater": "New worktrees arrive with Checkouts",
+                "notInstalled": "not installed on {node}",
+                "firstMessage": "First message",
+                "firstMessageHint": "Typed into {provider} when it starts. Optional for your own sessions.",
+                "sessionTitle": "Title",
+                "sessionTitlePlaceholder": "Named after the folder when empty",
+                "submit": "Start session",
+                "starting": "Starting…",
+                "cancel": "Cancel",
+                "costOwner": "This session uses your own {provider} login on {node}. Ever Works bills no tokens for it.",
+                "costShell": "A shell on {node}, in your own login. Nothing is billed for it.",
+                "costAgent": "{agent} runs isolated on {node} — its own configuration, never yours. The Run appears in Activity → Runs with its cost.",
+                "noConsent": "Owner sessions need --manage on {node}.",
+                "limit": "{node} already has {count} sessions. End one to start another.",
+                "failed": "The session could not start.",
+                "fieldCwd": "Choose a folder on {node}.",
+                "offline": "{node} is offline. Sessions start once it is back."
+            },
+            "detail": {
+                "back": "Sessions",
+                "loading": "Loading the session…",
+                "notFound": "This session is not here any more.",
+                "driving": "You are driving",
+                "watching": "You are watching",
+                "watchingDriven": "Watching · {others, plural, one {someone else is driving} other {# people are driving}}",
+                "nobodyDriving": "Nobody is driving",
+                "watchers": "{count, plural, =0 {Nobody else is here} one {# other person here} other {# other people here}}",
+                "isolated": "Isolated — {agent}'s own configuration on {node}",
+                "takeKeyboard": "Take the keyboard",
+                "watchOnly": "Watch only",
+                "starting": "Connecting to {node}…",
+                "reconnecting": "Reconnecting to {node}…",
+                "heldInput": "You typed {count, plural, one {# line} other {# lines}} while offline.",
+                "sendHeld": "Send them",
+                "discardHeld": "Discard",
+                "endedExit": "Ended {time} · exited with code {code}",
+                "endedUser": "Ended {time} · ended by a person",
+                "endedAgent": "Ended {time} · ended by the Agent",
+                "endedNodeRestart": "Ended {time} · {node} restarted — the screen above is the last one it kept",
+                "endedDrain": "Ended {time} · fleet drain",
+                "endedKillSwitch": "Ended {time} · fleet stop",
+                "endedLost": "Ended {time} · the process was lost — exit code unknown",
+                "endedTimeout": "Ended {time} · it never confirmed that it started",
+                "killSwitch": "Paused by the fleet stop — {reason}",
+                "killSwitchNoReason": "Paused by the fleet stop — input is blocked; the session keeps running.",
+                "drainWarning": "This session ends in {countdown} (fleet drain)",
+                "slowViewer": "This tab could not keep up and was reconnected.",
+                "notRecording": "Not recording — storage is unavailable",
+                "sendTo": "Send to {who}",
+                "send": "Send",
+                "composerPlaceholder": "Message {provider}…",
+                "size": "{cols}×{rows}",
+                "bandwidth": "{rate}/s",
+                "lastScreen": "The last screen {node} kept",
+                "noLastScreen": "No screen was kept for this session.",
+                "refusedGeneric": "You cannot attach to this session right now.",
+                "inputRefused": "That was not sent: {hint}",
+                "startedBy": "Started by {who}",
+                "startedByYou": "you",
+                "startedByOther": "someone else",
+                "startedByAgent": "an Agent",
+                "runningFor": "running {elapsed}",
+                "ranFor": "ran {elapsed}",
+                "releaseKeyboard": "Press Esc twice to leave the terminal.",
+                "reconnect": "Reconnect",
+                "rename": "Rename",
+                "end": "End…",
+                "restart": "Restart",
+                "copyLink": "Copy link",
+                "shortcuts": "Keyboard shortcuts"
+            },
+            "shortcuts": {
+                "title": "Session shortcuts",
+                "takeKeyboard": "Take the keyboard",
+                "watchOnly": "Watch only",
+                "rename": "Rename",
+                "end": "End the session",
+                "newSession": "New session on this computer",
+                "help": "Show this sheet",
+                "release": "Leave the terminal — the only keys kept while you drive",
+                "close": "Close"
+            },
+            "actions": {
+                "menu": "Session actions",
+                "open": "Open",
+                "rename": "Rename",
+                "copyLink": "Copy link",
+                "linkCopied": "Link copied",
+                "end": "End…",
+                "restart": "Restart",
+                "renameTitle": "Rename session",
+                "renameLabel": "Title",
+                "save": "Save",
+                "cancel": "Cancel",
+                "restarted": "Started again",
+                "renamed": "Renamed",
+                "ended": "Ended",
+                "failed": "That did not work: {hint}",
+                "failedGeneric": "That did not work."
+            },
+            "confirm": {
+                "endTitle": "End \"{title}\" on {node}?",
+                "endBody": "The process is stopped. Its screen is kept and you can restart it later.",
+                "endRun": "{agent}'s Run ends with it.",
+                "end": "End",
+                "ending": "Ending…",
+                "cancel": "Cancel"
+            },
+            "limits": {
+                "sessions": "{node} already has {count} sessions. End one to start another.",
+                "viewers": "This session already has {count} watchers."
+            },
+            "a11y": {
+                "pane": "Terminal of {title} on {node}. {role}.",
+                "newSessionMenu": "New session on {node}",
+                "state": "State: {state}",
+                "card": "{title} on {node}, {state}"
             }
         }
     }

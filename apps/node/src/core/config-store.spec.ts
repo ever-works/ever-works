@@ -213,18 +213,31 @@ describe('redactConfig', () => {
 			limits: clampResourceLimits(undefined),
 			hasSecret: true,
 			// Control 18: switches, not values — OFF/OFF for a config that never set them.
-			executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: true }
+			executionPolicy: {
+				allowSkipPermissions: false,
+				allowShellCommands: false,
+				restrictedMode: true,
+				allowMcpBridge: true
+			}
 		});
 	});
 
 	it('control 18: round-trips the local execution policy, and anything but a literal true reads as OFF', () => {
 		const stored = JSON.stringify(
-			config({ executionPolicy: { allowSkipPermissions: true, allowShellCommands: false, restrictedMode: true } })
+			config({
+				executionPolicy: {
+					allowSkipPermissions: true,
+					allowShellCommands: false,
+					restrictedMode: true,
+					allowMcpBridge: true
+				}
+			})
 		);
 		expect(parseConfig(stored)?.executionPolicy).toEqual({
 			allowSkipPermissions: true,
 			allowShellCommands: false,
-			restrictedMode: true
+			restrictedMode: true,
+			allowMcpBridge: true
 		});
 		const tampered = JSON.stringify({
 			...JSON.parse(JSON.stringify(config())),
@@ -233,7 +246,8 @@ describe('redactConfig', () => {
 		expect(parseConfig(tampered)?.executionPolicy).toEqual({
 			allowSkipPermissions: false,
 			allowShellCommands: false,
-			restrictedMode: true
+			restrictedMode: true,
+			allowMcpBridge: true
 		});
 		// Restricted mode resolves toward ON: only a literal false turns it off.
 		const offRestricted = JSON.stringify(config({ executionPolicy: { restrictedMode: false } }));
@@ -248,8 +262,26 @@ describe('redactConfig', () => {
 		expect(redactConfig(config()).executionPolicy).toEqual({
 			allowSkipPermissions: false,
 			allowShellCommands: false,
-			restrictedMode: true
+			restrictedMode: true,
+			allowMcpBridge: true
 		});
+	});
+
+	it('works-security 0.2.7: the MCP-bridge switch round-trips and only a literal false turns it off', () => {
+		const off = JSON.stringify(config({ executionPolicy: { allowMcpBridge: false } }));
+		expect(parseConfig(off)?.executionPolicy?.allowMcpBridge).toBe(false);
+		const junk = JSON.stringify({
+			...JSON.parse(JSON.stringify(config())),
+			executionPolicy: { allowMcpBridge: 'off' }
+		});
+		expect(parseConfig(junk)?.executionPolicy?.allowMcpBridge).toBe(true);
+		// A config written before the field existed keeps today's behaviour.
+		const legacy = JSON.stringify(
+			config({
+				executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: true }
+			})
+		);
+		expect(parseConfig(legacy)?.executionPolicy?.allowMcpBridge).toBe(true);
 	});
 
 	it('reports a missing credential instead of silently looking healthy', () => {

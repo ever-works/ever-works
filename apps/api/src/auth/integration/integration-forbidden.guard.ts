@@ -54,11 +54,17 @@ export class IntegrationForbiddenGuard implements CanActivate {
             );
         }
 
-        const sessionOnly = this.reflector.getAllAndOverride<boolean>(SESSION_CREDENTIAL_ONLY_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
+        const sessionOnly = this.reflector.getAllAndOverride<boolean | string>(
+            SESSION_CREDENTIAL_ONLY_KEY,
+            [context.getHandler(), context.getClass()],
+        );
         if (sessionOnly && user.authMethod !== 'session') {
+            if (typeof sessionOnly === 'string') {
+                throw new ForbiddenException(
+                    `Only a person signed in to Ever Works can ${sessionOnly}; ` +
+                        'an API key, an automation or a fleet run cannot.',
+                );
+            }
             throw new ForbiddenException(
                 'Only a person signed in to Ever Works can create or rotate API keys. ' +
                     'An API key cannot be used to mint another key.',

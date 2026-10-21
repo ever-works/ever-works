@@ -16,6 +16,8 @@ import type { UserConfirmationCheck } from './generated/confirmation';
  * `args` must be exactly the arguments the card shows (everything the model
  * passes except `confirmed`), so the check can bind to them.
  */
+const MAX_PREVIEW_CHARS = 600;
+
 export function requireUserConfirmation(input: {
     toolName: string;
     action: string;
@@ -24,6 +26,8 @@ export function requireUserConfirmation(input: {
     confirmed: unknown;
     userConfirmed?: UserConfirmationCheck;
     kind?: 'destructive' | 'privileged';
+    /** Plain-text preview of what the call will do (a generation prompt …), shown on the card. */
+    preview?: string;
 }): ConfirmationRequired | null {
     const claimed = input.confirmed === true;
     const backed =
@@ -37,6 +41,12 @@ export function requireUserConfirmation(input: {
         args: input.args,
         confirmationKind: input.kind ?? 'destructive',
     };
+    if (input.preview) {
+        card.preview =
+            input.preview.length > MAX_PREVIEW_CHARS
+                ? `${input.preview.slice(0, MAX_PREVIEW_CHARS)}…`
+                : input.preview;
+    }
     if (claimed) {
         card.confirmationNote =
             'Not run: the user has not confirmed this exact action (same tool, same arguments) in their ' +

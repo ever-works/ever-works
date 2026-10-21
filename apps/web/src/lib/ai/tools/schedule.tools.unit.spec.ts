@@ -53,7 +53,7 @@ describe('setSchedule — billing mode is not silently upgraded', () => {
             setSchedule as unknown as {
                 execute: (a: Record<string, unknown>) => Promise<unknown>;
             }
-        ).execute({ workId: 'w1', enable: true, cadence: 'daily' });
+        ).execute({ workId: 'w1', enable: true, cadence: 'daily', confirmed: true });
 
         expect(updateWorkSchedule).toHaveBeenCalledTimes(1);
         const payload = updateWorkSchedule.mock.calls[0]![1];
@@ -71,7 +71,7 @@ describe('setSchedule — billing mode is not silently upgraded', () => {
 
         for (const cadence of ['hourly', 'daily', 'weekly', 'monthly', undefined]) {
             updateWorkSchedule.mockClear();
-            await exec({ workId: 'w1', enable: true, cadence });
+            await exec({ workId: 'w1', enable: true, cadence, confirmed: true });
             const payload = updateWorkSchedule.mock.calls[0]![1];
             expect(payload.billingMode).toBe(WorkScheduleBillingMode.SUBSCRIPTION);
         }

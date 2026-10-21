@@ -36,6 +36,20 @@ export interface AppDependenciesListResponse {
     dependencies: AppDependencyEntry[];
     refreshing: boolean;
     canEdit: boolean;
+    /**
+     * Works-security — whether the member may press **Delete data** (`DELETE …/:kind`). `false`
+     * for a non-owner while the API's `APP_DATA_DELETE_OWNER_ONLY` switch is on; equal to
+     * `canEdit` when it is off. Optional: an API that predates it does not send it, and then
+     * {@link canDeleteAppDependencyDataFor} falls back to `canEdit`.
+     */
+    canDeleteData?: boolean;
+}
+
+/** May the member delete dependency data at all? `canDeleteData` when sent, else `canEdit`. */
+export function canDeleteAppDependencyDataFor(
+    list: Pick<AppDependenciesListResponse, 'canEdit' | 'canDeleteData'>,
+): boolean {
+    return typeof list.canDeleteData === 'boolean' ? list.canDeleteData : list.canEdit;
 }
 
 export interface AppDependencyRetryResponse {

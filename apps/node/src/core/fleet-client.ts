@@ -465,6 +465,12 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 		out.macAddress = source.macAddress;
 		out.lanId = source.lanId;
 	}
+	// Sessions on computers (FL-04): the session daemon's report, already
+	// normalised by `describeSelf` — without this line the runtime computed it
+	// and the wire never carried it (the conformance spec pins the projection).
+	if (source.daemon !== undefined) {
+		out.daemon = source.daemon;
+	}
 	return out;
 }
 

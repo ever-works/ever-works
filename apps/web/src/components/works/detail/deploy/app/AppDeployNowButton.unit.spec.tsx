@@ -132,4 +132,35 @@ describe('AppDeployNowButton', () => {
             ),
         );
     });
+
+    it('an ownerRequired refusal (a cluster credential another member saved) reads the owner-only sentence', async () => {
+        // What `failure()` makes of the API's `403 { code: 'ownerRequired' }`: no `data`.
+        requestMock.mockResolvedValue({
+            success: false,
+            httpStatus: 403,
+            code: 'ownerRequired',
+            error: 'Only the Work owner can confirm a cluster credential another member saved (deploy it once yourself).',
+        });
+        fireEvent.click(renderButton());
+        await waitFor(() =>
+            expect(screen.getByTestId('app-deploy-message').textContent).toBe(
+                'Only the Work owner can do this. Another member saved this cluster connection, so the Work owner has to deploy once to confirm it.',
+            ),
+        );
+        expect(screen.queryByTestId('app-deploy-preconditions')).toBeNull();
+    });
+
+    it("a 403 without a code (the owner's API key) shows the API's own sentence", async () => {
+        requestMock.mockResolvedValue({
+            success: false,
+            httpStatus: 403,
+            error: 'Only a person signed in to Ever Works can confirm a change of the cluster this App runs on.',
+        });
+        fireEvent.click(renderButton());
+        await waitFor(() =>
+            expect(screen.getByTestId('app-deploy-message').textContent).toContain(
+                'Only a person signed in to Ever Works can confirm a change of the cluster this App runs on.',
+            ),
+        );
+    });
 });

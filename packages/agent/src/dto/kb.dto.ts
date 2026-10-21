@@ -35,6 +35,10 @@ const KB_PATH_MAX = 512;
 const KB_DESCRIPTION_MAX = 2000;
 const KB_TAGS_MAX = 32;
 const KB_TAG_SLUG_MAX = 64;
+/** The review state a request body may ask for (a downgrade only). */
+const KB_CLIENT_REVIEW_STATES = ['proposed'] as const;
+/** The source a request body may declare (the review-gated one only). */
+const KB_CLIENT_SOURCES = ['agent'] as const;
 
 export class CreateKbDocumentDto {
     @IsString()
@@ -79,6 +83,25 @@ export class CreateKbDocumentDto {
     @IsOptional()
     @IsIn(KB_DOCUMENT_STATUSES as unknown as readonly string[])
     status?: KbDocumentStatus;
+
+    /**
+     * Works-security (2026-10-18) — a client may ask for its OWN write to be
+     * review-gated (the MCP server does, for every model-written document).
+     * Only `proposed` is accepted: a request body can lower a document's
+     * standing, never raise it — `accepted` is a person's review action.
+     */
+    @IsOptional()
+    @IsIn(KB_CLIENT_REVIEW_STATES as unknown as readonly string[])
+    reviewState?: 'proposed';
+
+    /**
+     * Works-security (2026-10-18) — a client may declare its write
+     * agent-authored. Only `agent` is accepted (the provenance that is
+     * review-gated by default); every other source is the platform's to set.
+     */
+    @IsOptional()
+    @IsIn(KB_CLIENT_SOURCES as unknown as readonly string[])
+    source?: 'agent';
 }
 
 export class UpdateKbDocumentDto {
@@ -123,6 +146,11 @@ export class UpdateKbDocumentDto {
     @IsOptional()
     @IsIn(KB_DOCUMENT_CLASSES as unknown as readonly string[])
     class?: KbDocumentClass;
+
+    /** Works-security — see {@link CreateKbDocumentDto.reviewState}: only `proposed`. */
+    @IsOptional()
+    @IsIn(KB_CLIENT_REVIEW_STATES as unknown as readonly string[])
+    reviewState?: 'proposed';
 }
 
 export class LockKbDocumentDto {

@@ -369,7 +369,13 @@ interface Harness {
     builderAnswer: { status: string; input: Record<string, unknown> | null; warnings: unknown[] };
 }
 
-function harness(overrides: { strategy?: string } = {}): Harness {
+function harness(
+    overrides: {
+        strategy?: string;
+        /** Security (sec/app-works-gates) — the row's requester facts, when the store reads them. */
+        findRequester?: AppDeployOrchestratorDeploymentStore['findRequester'];
+    } = {},
+): Harness {
     const trace: string[] = [];
     const builderCalls: Array<Record<string, unknown>> = [];
     const plugin = new FakePlugin();
@@ -485,6 +491,7 @@ function harness(overrides: { strategy?: string } = {}): Harness {
 
             return deployments.update(workId, deploymentId, patch);
         },
+        ...(overrides.findRequester ? { findRequester: overrides.findRequester } : {}),
     } as AppDeployOrchestratorDeploymentStore;
 
     const orchestrator = new AppDeployOrchestrator(
@@ -1386,5 +1393,113 @@ describe('AppDeployOrchestrator.removeAppWork / reconcileDependencies (APW-06 T2
         expect(await h.orchestrator.reconcileDependencies('work-1')).toBe(true);
         expect(h.dependencies.reconciles).toEqual(['work-1']);
         expect(await h.orchestrator.reconcileDependencies('')).toBe(false);
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Security (sec/app-works-gates) — the requester comes from the Deployment's own row
+ * -------------------------------------------------------------------------- */
+
+describe('the render input carries who requested the Deployment, from its row (sec/app-works-gates)', () => {
+    it('reads triggeredByUserId + the persisted session flag and hands both to the builder', async () => {
+        const reads: string[] = [];
+        const h = harness({
+            findRequester: async (deploymentId) => {
+                reads.push(deploymentId);
+                return {
+                    workId: 'work-1',
+                    triggeredByUserId: 'owner-1',
+                    requestedByHumanSession: true,
+                };
+            },
+        });
+
+        await h.orchestrator.run(REQUEST);
+
+        expect(reads).toEqual(['deployment-1']);
+        expect(h.builderCalls[0]).toMatchObject({
+            requestedByUserId: 'owner-1',
+            requestedByHumanSession: true,
+        });
+    });
+
+    it('never takes the requester from the job payload', async () => {
+        // REQUEST carries `userId: 'user-1'`, but no store reads the row: nobody requested it.
+        const h = harness();
+
+        await h.orchestrator.run({ ...REQUEST, requestedByHumanSession: true } as never);
+
+        expect(h.builderCalls[0]).toMatchObject({
+            requestedByUserId: null,
+            requestedByHumanSession: false,
+        });
+    });
+
+    it('a Build row, a row of another Work, a missing row or a throwing read is "nobody"', async () => {
+        const answers: Array<() => Promise<unknown>> = [
+            async () => ({
+                workId: 'work-1',
+                triggeredByUserId: null,
+                requestedByHumanSession: true,
+            }),
+            async () => ({
+                workId: 'work-OTHER',
+                triggeredByUserId: 'owner-1',
+                requestedByHumanSession: true,
+            }),
+            async () => null,
+            async () => {
+                throw new Error('row unreadable');
+            },
+            async () => ({ workId: 'work-1', triggeredByUserId: 'owner-1' }),
+        ];
+
+        for (const answer of answers) {
+            const h = harness({ findRequester: answer as never });
+
+            await h.orchestrator.run(REQUEST);
+
+            expect(h.builderCalls[0]).toMatchObject({ requestedByHumanSession: false });
+        }
+
+        const buildRow = harness({ findRequester: answers[0] as never });
+        await buildRow.orchestrator.run(REQUEST);
+        expect(buildRow.builderCalls[0]).toMatchObject({ requestedByUserId: null });
+
+        const editorRow = harness({
+            findRequester: async () => ({
+                workId: 'work-1',
+                triggeredByUserId: 'editor-9',
+                requestedByHumanSession: true,
+            }),
+        });
+        await editorRow.orchestrator.run(REQUEST);
+        // The orchestrator reports the row verbatim; the pull port decides owner vs editor.
+        expect(editorRow.builderCalls[0]).toMatchObject({
+            requestedByUserId: 'editor-9',
+            requestedByHumanSession: true,
+        });
+    });
+
+    it("the builder's member-facing pull refusal becomes the Deployment's lastError", async () => {
+        const h = harness();
+        const sentence =
+            'No read-only pull token is stored for this App and its image is private. Store a ' +
+            "read-only pull token on the Builds tab — the owner's GitHub token is not sent to your cluster.";
+        Object.assign(h.builderAnswer, {
+            status: 'unavailable',
+            input: null,
+            code: 'pull_credential_unavailable',
+            reason: sentence,
+        });
+
+        const result = await h.orchestrator.run(REQUEST);
+
+        expect(result.state).toBe('ERROR');
+        expect(result.code).toBe('pull_credential_unavailable');
+        expect(result.reason).toBe(sentence);
+        expect(h.deployments.updates.some((update) => update.patch.lastError === sentence)).toBe(
+            true,
+        );
     });
 });

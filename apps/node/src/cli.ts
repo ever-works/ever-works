@@ -13,6 +13,7 @@ import {
 	defaultConfigPath,
 	isExecutableFile,
 	readNetworkInterfaces,
+	restrictFileToOwnerWindows,
 	statModelCliFile,
 	systemFetch
 } from './node-io';
@@ -67,7 +68,11 @@ function buildDeps(): CliDeps {
 			on: (signal, handler) => {
 				process.on(signal, handler);
 			}
-		}
+		},
+		// Sessions on computers (FL-04): the session daemon is this same CLI
+		// (a hidden subcommand), run by the same Node binary.
+		...(process.argv[1] ? { sessionDaemonCommand: { command: process.execPath, args: [process.argv[1]] } } : {}),
+		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {})
 	};
 }
 

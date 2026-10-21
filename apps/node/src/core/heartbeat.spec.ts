@@ -449,6 +449,37 @@ describe('HeartbeatLoop', () => {
 			expect(scripted.requests[2]).not.toHaveProperty('consents');
 		});
 
+		it('strips the session daemon block first (FL-04), keeping the consents and the link', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: ['managed', 'sessions'],
+					workerState: 'idle',
+					consents: { work: false, attend: false, manage: true, usageScan: false },
+					daemon: { state: 'running', sessions: 2 }
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('daemon');
+			expect(scripted.requests[1]).not.toHaveProperty('daemon');
+			expect(scripted.requests[1]).toMatchObject({ consents: { manage: true }, workerState: 'idle' });
+			expect(loop.acceptsField('daemon')).toBe(false);
+			expect(loop.acceptsField('consents')).toBe(true);
+			expect(entries.some((entry) => entry.message.includes('the daemon line stays off'))).toBe(true);
+		});
+
 		it('falls back to the legacy 16 tags first when a platform refuses a longer list, keeping every field', async () => {
 			const scheduler = fakeScheduler();
 			const tags = Array.from({ length: 18 }, (_, index) => `tag-${index}`);

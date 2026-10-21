@@ -7,9 +7,12 @@ import {
 	FLEET_SCREEN_CAPABILITY,
 	normalizeFleetLanId,
 	normalizeFleetMacAddress,
+	FLEET_SESSIONS_CAPABILITY,
+	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
 	type FleetConsents,
-	type FleetNodeHealthSnapshot
+	type FleetNodeHealthSnapshot,
+	type FleetSessionDaemonReport
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
 import { FLEET_MANAGED_CAPABILITY } from './link/modules/control';
@@ -406,7 +409,10 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	FLEET_SCREEN_CAPABILITY,
 	// Fleet node link (FL-02): `managed` exists only under `--manage`, which IS
 	// the opt-in — a selection written before the tag existed must not withhold it.
-	FLEET_MANAGED_CAPABILITY
+	FLEET_MANAGED_CAPABILITY,
+	// Sessions on computers (FL-04): `sessions` exists only while the session
+	// daemon a consent started answers — the consent IS the opt-in.
+	FLEET_SESSIONS_CAPABILITY
 ]);
 
 /**
@@ -544,6 +550,12 @@ export interface SelfDescriptionTelemetry {
 	 * heartbeat only, like `health`. Null or a throw leaves both fields ABSENT.
 	 */
 	network?: () => { macAddress: string; lanId: string } | null;
+	/**
+	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+	 * health (`SessionDaemonSupervisor.report()`). Absent on a process with
+	 * neither `--manage` nor `--work`, which then reports no `daemon` block.
+	 */
+	sessionDaemon?: () => FleetSessionDaemonReport | null;
 }
 
 /**
@@ -681,6 +693,10 @@ export async function describeSelf(
 			description.lanId = lanId;
 		}
 	}
+	// Sessions on computers (FL-04). Normalised (bounded reason, known keys
+	// only) for the reason above: a wire payload, never a spread.
+	const daemon = normalizeFleetSessionDaemonReport(await resolveTelemetry(telemetry.sessionDaemon));
+	if (daemon) description.daemon = daemon;
 	return description;
 }
 

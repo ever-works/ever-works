@@ -23,6 +23,15 @@
  *
  * Any authentication FAIL refuses trust, whatever else is true.
  *
+ * **Mail an integration pushed** (`POST /api/integrations/v1/email/inbound`,
+ * `metadata.source === 'integration'`) is NEVER a trusted sender: no receiving
+ * server authenticated it — the key wrote `From`, `Message-ID` and every header
+ * — so neither the configured list nor the platform's own outbound record (a
+ * key can read a platform `Message-ID` back and replay it) may wake an Agent on
+ * it. The email itself is still delivered (Task created / reply filed, owner
+ * told), exactly as for any other untrusted sender. Works-security lane,
+ * integration API gates (finding 4).
+ *
  * ## Which verdict counts
  *
  * Only a verdict the RECEIVING side stamped: explicit fields the provider
@@ -33,6 +42,13 @@
  * the message is ignored), and without a configured authserv-id no header is
  * read at all. SPF and DKIM count as a pass ONLY when ALIGNED with the `From`
  * domain (`smtp.mailfrom` / `header.d`); an unaligned pass is "unverified".
+ *
+ * With `INBOUND_EMAIL_AUTHSERV_ID` configured the operator has said the
+ * receiving server stamps EVERY message, so a message with no verdict at all
+ * (no provider fields, no topmost stamp with that id — stripped, reordered by a
+ * relay, or delivered by a path that bypassed the receiving server) is
+ * "unverified", never "none": the spelling-alone fallback of rule 3 is for a
+ * provider that reports no verdict, not for one whose verdict is missing.
  *
  * `INBOUND_EMAIL_AUTO_DISPATCH_ALL=true` (or its older spelling
  * `INBOUND_EMAIL_REPLY_AUTO_DISPATCH=true`) restores the pre-hardening
@@ -128,7 +144,10 @@ export function senderAuthVerdict(
     env: Env = process.env,
 ): SenderAuthVerdict {
     const fromDomain = domainOf(bareSenderAddress(from));
-    if (!metadata || typeof metadata !== 'object') return 'none';
+    const authservId = (env.INBOUND_EMAIL_AUTHSERV_ID ?? '').trim().toLowerCase();
+    // No verdict at all: "none" only when the operator never said one is stamped.
+    const noVerdict: SenderAuthVerdict = authservId ? 'unverified' : 'none';
+    if (!metadata || typeof metadata !== 'object') return noVerdict;
     const meta = metadata as Record<string, unknown>;
     const results: Array<{
         kind: 'dmarc' | 'spf' | 'dkim';
@@ -162,7 +181,6 @@ export function senderAuthVerdict(
 
     // 2. The TOPMOST Authentication-Results, only when it carries the configured
     //    authserv-id (the receiving server's own stamp).
-    const authservId = (env.INBOUND_EMAIL_AUTHSERV_ID ?? '').trim().toLowerCase();
     if (authservId) {
         const topmost = headerPairs(meta.headers).find(
             ([name]) => name === 'authentication-results',
@@ -189,7 +207,7 @@ export function senderAuthVerdict(
         }
     }
 
-    if (results.length === 0) return 'none';
+    if (results.length === 0) return noVerdict;
     // Any fail wins — a pass elsewhere never outweighs it.
     if (results.some((entry) => FAILING.has(entry.result))) return 'fail';
     const passed = results.some((entry) => {
@@ -202,9 +220,23 @@ export function senderAuthVerdict(
 }
 
 /**
+ * Whether an email was pushed through the integration API rather than
+ * delivered by a provider (the integration controller stamps
+ * `metadata.source = 'integration'` server-side; the caller never sets it).
+ */
+export function isIntegrationPushedEmail(metadata: unknown): boolean {
+    return (
+        !!metadata &&
+        typeof metadata === 'object' &&
+        (metadata as Record<string, unknown>).source === 'integration'
+    );
+}
+
+/**
  * Whether an inbound email's sender is trusted on rules 2 and 3 of the file
  * comment. Rule 1 (agent-to-agent mail from the platform's own outbound
- * record) is decided by the dispatcher and passed in as `platformSent`.
+ * record) is decided by the dispatcher and passed in as `platformSent`. Mail
+ * an integration pushed is never trusted (see the file comment).
  */
 export function isTrustedSender(input: {
     from: string;
@@ -218,6 +250,7 @@ export function isTrustedSender(input: {
     const env = input.env ?? process.env;
     const sender = bareSenderAddress(input.from);
     if (!sender || !sender.includes('@')) return false;
+    if (isIntegrationPushedEmail(input.metadata)) return false;
     const verdict = senderAuthVerdict(input.metadata, sender, env);
     if (verdict === 'fail') return false;
     if (input.platformSent === true) return true;

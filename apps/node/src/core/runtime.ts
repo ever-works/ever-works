@@ -26,6 +26,7 @@ import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { defaultRepositoryLayerFs } from './executors/codex-repository-layers';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
@@ -52,6 +53,14 @@ import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-so
 import { composeNodeLinkModules, createHealthLinkModule, type WakeSender } from './link/modules';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
+import { createSessionModule, type SessionModule } from './link/modules/session';
+import type { ConnectFn } from './sessions/daemon-client';
+import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
+import { ensureDaemonToken } from './sessions/daemon-token';
+import type { SessionDaemonPaths } from './sessions/daemon/daemon-paths';
+import { NO_HOOK_OVERLAY, type HookOverlayPort } from './sessions/hook-overlay.port';
+import { spawn as spawnProcess } from 'node:child_process';
+import { homedir as osHomedir } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -412,6 +421,14 @@ export interface NodeRuntime {
 	 * reports why it is not open. The shell closes it at shutdown.
 	 */
 	link?: NodeLink;
+	/**
+	 * Sessions on computers (FL-04) — the session daemon's supervisor and the
+	 * link's `session` module, present when the shell said how to run the
+	 * daemon (`sessionDaemon`) and this process holds `--manage` or `--work`.
+	 * The shell starts the supervisor and stops it at shutdown; stopping
+	 * never ends a session (the daemon outlives this process).
+	 */
+	sessions?: { supervisor: SessionDaemonSupervisor; module: SessionModule };
 	/** The consents this process was started with (CONTRACTS §1.1). */
 	consents: FleetConsents;
 	attended?: {
@@ -554,6 +571,24 @@ export interface CreateNodeRuntimeOptions {
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
 	persistLinkState?: (record: NodeLinkRecord) => Promise<void> | void;
+
+	/**
+	 * Sessions on computers (FL-04) — how to run this build's hidden
+	 * `session-daemon` subcommand (the Node binary and the CLI's entry), and
+	 * where the daemon lives. Absent (the desktop shell, tests, embedders):
+	 * no session daemon, and `sessions` is never advertised.
+	 */
+	sessionDaemon?: { command: string; args: string[]; paths: SessionDaemonPaths };
+	/** Test seam: replace the detached spawn of the daemon. */
+	sessionDaemonSpawn?: () => void;
+	/** Test seam: the local-socket connector. */
+	sessionDaemonConnect?: ConnectFn;
+	/** FL-05's per-session hook overlay; FL-04 ships none. */
+	sessionHookOverlay?: HookOverlayPort;
+	/** Folders besides home that owner sessions may start in. */
+	sessionExtraRoots?: readonly string[];
+	/** Owner-only ACL for a file (Windows): the session daemon's token. */
+	restrictFile?: (file: string) => Promise<void> | void;
 }
 
 /**
@@ -678,10 +713,75 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(readNetwork ? { network: readNetwork } : {}),
 		...(io.wakeSender ? { wakeSender: io.wakeSender } : {})
 	});
+	// Sessions on computers (FL-04): the session daemon's supervisor and the
+	// link's `session` module, for a process that may host sessions (owner
+	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
+	// how to run the daemon. Started by the shell; the daemon outlives us.
+	let sessions: NodeRuntime['sessions'];
+	if (options.sessionDaemon && (consents.manage || consents.work)) {
+		const daemon = options.sessionDaemon;
+		const supervisor = new SessionDaemonSupervisor({
+			paths: daemon.paths,
+			nodeVersion: io.version,
+			ensureToken: () =>
+				ensureDaemonToken({
+					tokenFile: daemon.paths.tokenFile,
+					...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+					warn: (message) => io.logger.warn(message)
+				}),
+			spawnDaemon:
+				options.sessionDaemonSpawn ??
+				(() => {
+					const child = spawnProcess(
+						daemon.command,
+						[
+							...daemon.args,
+							'session-daemon',
+							'--state-dir',
+							daemon.paths.stateDir,
+							'--socket',
+							daemon.paths.socketPath,
+							'--token-file',
+							daemon.paths.tokenFile
+						],
+						// Its own process group, no stdio tied to ours: it must
+						// outlive this process (a restart or an upgrade) and never
+						// receive the terminal's Ctrl-C.
+						{ detached: true, stdio: 'ignore', windowsHide: true, cwd: osHomedir() }
+					);
+					child.on('error', (error) =>
+						io.logger.warn(`Session daemon could not be started: ${error.message}`)
+					);
+					child.unref();
+				}),
+			...(options.sessionDaemonConnect ? { connect: options.sessionDaemonConnect } : {}),
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {})
+		});
+		const sessionModule = createSessionModule({
+			supervisor,
+			consents,
+			nodeName: config.name?.trim() || 'this computer',
+			launch: {
+				platform: io.environment.platform,
+				env: process.env,
+				homedir: osHomedir(),
+				modelCli: pinnedModelCli,
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+			},
+			logger: io.logger
+		});
+		sessions = { supervisor, module: sessionModule };
+		telemetry.sessionDaemon = () => supervisor.report();
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
-	// under `--manage`, …) describe this process's consents, not the socket.
+	// under `--manage`, `sessions` while the daemon answers, …) describe this
+	// process, not the socket — re-read on every beat, because `sessions`
+	// comes and goes with the daemon (FR-10).
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(options.linkModules ?? [])],
+		...(sessions ? { session: sessions.module } : {}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -689,7 +789,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				}
 			: {})
 	});
-	const linkModuleTags = linkModules.tags({ consents, platform: io.environment.platform, nodeVersion: io.version });
+	const moduleEnvironment = { consents, platform: io.environment.platform, nodeVersion: io.version };
+	const linkModuleTags = linkModules.tags(moduleEnvironment);
 	const environment: CapabilityEnvironment = {
 		...io.environment,
 		...(attendedCapture
@@ -700,6 +801,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			: {}),
 		...(consents.manage ? { managed: true } : {}),
 		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
+	};
+	const currentEnvironment = (): CapabilityEnvironment => {
+		const tags = linkModules.tags(moduleEnvironment);
+		const { linkModuleTags: _previous, ...rest } = environment;
+		return tags.length > 0 ? { ...rest, linkModuleTags: tags } : rest;
 	};
 	telemetry.consents = () => consents;
 	// What the last beat advertised: the link's hello carries the same list,
@@ -734,7 +840,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// agent CLI or filling a disk is exactly the kind of change an
 		// operator needs to see without restarting the node.
 		describe: async () => {
-			const description = await describeSelf(io.runner, environment, io.version, selection, telemetry);
+			const description = await describeSelf(io.runner, currentEnvironment(), io.version, selection, telemetry);
 			lastDescribedCapabilities = description.capabilities;
 			return description;
 		},
@@ -759,7 +865,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 
 	const loop = new HeartbeatLoop(loopOptions);
 	loopRef = loop;
-	const runtime: NodeRuntime = { client, loop, lifecycle, cliCompat, consents };
+	const runtime: NodeRuntime = {
+		client,
+		loop,
+		lifecycle,
+		cliCompat,
+		consents,
+		...(sessions ? { sessions } : {})
+	};
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.
@@ -793,6 +906,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.now ? { now: io.now } : {})
 		});
 		runtime.link = link;
+		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
+		sessions?.module.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
 			if (runtime.loop.acceptsField('consents')) {
@@ -1091,6 +1206,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// CLI's startup exit. Wired here for the same reason as
 						// above — a hand-built `io` never reads a developer's PC.
 						managedMcpConfigFs: defaultSessionConfigFs,
+						// works-security finding 5 (node 0.2.7): lstat-only presence
+						// checks of a checkout's own `.codex/` layers, so a Codex run
+						// whose repository carries one says so in its containment
+						// block. Never opens a file; wired here like the two above.
+						repositoryLayerFs: defaultRepositoryLayerFs,
 						// Self-build slice AU — this node's enrollment id, from the
 						// LOCAL config, so a job offering an earlier CLI session can
 						// tell whether that session lives on this machine. Never

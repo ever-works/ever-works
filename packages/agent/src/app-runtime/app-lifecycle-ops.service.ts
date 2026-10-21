@@ -58,6 +58,14 @@
  * an input it cannot build, and that refusal is reported as `status_spec_unavailable`; the honest
  * fix is a live-spec read on T22's builder, and it is reported as a routed item rather than
  * papered over.
+ *
+ * **2026-10-21 — that live-spec read now exists:** `readDeclaredSpec` on the same source answers the
+ * declared blocks (components, jobs, cron, smoke) at the commit without a Build, a pull credential
+ * or a target policy, and `readSpec` falls back to it when the verification-shaped read refuses —
+ * which it does for every Build-backed App whose request names no Build, i.e. every paused managed
+ * App (prod 2026-10-20). `resume` has one more floor: with no readable spec at all it resumes to
+ * the replica counts `pause` recorded on the cluster (`ever-works.io/pre-pause-replicas`), and it
+ * stays `paused` with `status_spec_unavailable` only when nothing was recorded either.
  */
 
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
@@ -97,6 +105,7 @@ import { AppHostsService } from './app-hosts.service';
 import { APP_RUNTIME_EVENT_SINK, type AppRuntimeEventSink } from './ports';
 import {
     APP_VERIFICATION_SPEC_SOURCE,
+    type AppDeclaredSpec,
     type AppVerificationSpec,
     type AppVerificationSpecRequest,
     type AppVerificationSpecSource,
@@ -741,11 +750,6 @@ export class AppLifecycleOpsService {
         }
 
         const spec = await this.liveSpec(workId, guard.state);
-        if (!spec) {
-            return this.refusal(payload, APP_OP_CODE_STATUS_SPEC_UNAVAILABLE, {
-                detail: { member: 'scaleApp' },
-            });
-        }
 
         const scaleApp = access.access.scaleApp;
         if (typeof scaleApp !== 'function') {
@@ -762,13 +766,26 @@ export class AppLifecycleOpsService {
         }
 
         try {
+            // No App spec could be read at all (neither the verification-shaped read nor the declared
+            // one): resume with an empty declared map, which the plugin answers from the replica
+            // counts `pause` recorded on each component. A paused App therefore always comes back at
+            // the size it had. If nothing was recorded either, nothing is scaled and the App stays
+            // `paused` with `status_spec_unavailable` — never a green resume that resumed nothing.
             const result = await scaleApp(
                 access.access.ref,
                 access.access.credential,
                 'resume',
-                replicasOf(spec),
-                { smoke: smokeInputsOf(spec), deadlines: deadlinesOf(spec) },
+                spec ? replicasOf(spec) : {},
+                spec
+                    ? { smoke: smokeInputsOf(spec), deadlines: deadlinesOf(spec) }
+                    : { smoke: [], deadlines: {} },
             );
+
+            if (!spec && (result?.components?.length ?? 0) === 0 && !result?.failure) {
+                return this.refusal(payload, APP_OP_CODE_STATUS_SPEC_UNAVAILABLE, {
+                    detail: { member: 'scaleApp', replicas: 'unrecorded' },
+                });
+            }
 
             const failure = result?.failure?.code ?? null;
             await this.setPaused(workId, false);
@@ -787,6 +804,9 @@ export class AppLifecycleOpsService {
                     components: result?.components?.length ?? 0,
                     smoke: result?.smoke?.checks?.length ?? 0,
                     snapshot: refreshed.detail?.snapshot ?? null,
+                    // `declared` — the App spec's replicas; `pre-pause` — the counts the pause
+                    // recorded on the cluster, because no App spec could be read (smoke skipped).
+                    replicas: spec ? 'declared' : 'pre-pause',
                 },
                 events,
             };
@@ -1406,10 +1426,47 @@ export class AppLifecycleOpsService {
 
         try {
             const spec = await this.specs.readVerificationSpec(request);
-            return spec?.input ? spec : null;
+            if (spec?.input) {
+                return spec;
+            }
         } catch (error) {
             this.logger.warn(
                 `The App spec for work ${workId} could not be read: ${messageOf(error)}`,
+            );
+        }
+
+        // The verification-shaped read refuses a Build-backed App whose request names no Build
+        // (`no_green_build`) and needs a resolvable target policy — so a paused managed App could
+        // never be resumed (`status_spec_unavailable`, prod 2026-10-20). What these ops consume is
+        // only the spec's declared blocks, which the declared read answers without either.
+        return this.readDeclared(workId, namespace, request.specCommitSha);
+    }
+
+    /** The builder's declared-spec read, as the four blocks this file consumes; `null` when absent. */
+    private async readDeclared(
+        workId: string,
+        namespace: string,
+        specCommitSha: string | null,
+    ): Promise<AppVerificationSpec | null> {
+        if (
+            !hasMember<NonNullable<AppVerificationSpecSource['readDeclaredSpec']>>(
+                this.specs,
+                'readDeclaredSpec',
+            )
+        ) {
+            return null;
+        }
+
+        try {
+            const declared = await this.specs.readDeclaredSpec({
+                workId,
+                namespace,
+                specCommitSha,
+            });
+            return declared ? declaredAsSpec(declared) : null;
+        } catch (error) {
+            this.logger.warn(
+                `The declared App spec for work ${workId} could not be read: ${messageOf(error)}`,
             );
             return null;
         }
@@ -2056,6 +2113,27 @@ export function statusSpecOf(spec: AppVerificationSpec): AppStatusSpec {
         // T60's mapper answers `cron: []` because a verification renders no CronJob (§4.12:649-652);
         // a live status read observes them, and §9.10:1586's snapshot carries their last runs.
         cron: (spec?.input?.cron ?? []).map((entry) => String(entry?.name ?? '')),
+    };
+}
+
+/**
+ * A declared-spec read in the {@link AppVerificationSpec} shape this file's helpers take.
+ *
+ * Only `input.components`, `input.jobs`, `input.cron` and `input.smoke` are ever read here
+ * ({@link statusSpecOf}, {@link replicasOf}, {@link smokeInputsOf}, {@link deadlinesOf} and
+ * `job-run`'s declared-job lookup), so the render-time members a declared read does not carry are
+ * absent rather than invented — the cast says exactly that.
+ */
+export function declaredAsSpec(declared: AppDeclaredSpec): AppVerificationSpec {
+    return {
+        input: {
+            specCommitSha: declared.specCommitSha,
+            components: [...(declared.components ?? [])],
+            jobs: [...(declared.jobs ?? [])],
+            cron: [...(declared.cron ?? [])],
+            smoke: [...(declared.smoke ?? [])],
+        } as unknown as AppVerificationSpec['input'],
+        dependencyKinds: [],
     };
 }
 

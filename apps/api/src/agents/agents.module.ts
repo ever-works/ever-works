@@ -590,6 +590,10 @@ async function assertRealWriteTarget(
                         // under a 'required' checks policy. Human transitions
                         // (API/UI) never pass actorType and are unaffected.
                         actorType: 'agent',
+                        // Works-security: the finisher moves the run's OWN Task
+                        // (`ownRunTask`), so a `→ done` still releases dependents;
+                        // the agent `transitionTask` tool never sets it.
+                        ownRunTask: true,
                     });
                     return { status: row.status };
                 },
@@ -1870,7 +1874,7 @@ async function assertRealWriteTarget(
                                     rulesBase
                                         ? gate.evaluate({
                                               work: target.work,
-                                              taskLabels: [],
+                                              taskOrigin: null,
                                               owner: target.owner,
                                               repo: target.repo,
                                               gitOptions: { userId, providerId, workId },

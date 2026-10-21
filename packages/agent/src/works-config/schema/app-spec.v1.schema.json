@@ -1064,6 +1064,10 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 3
+                    },
+                    "expectsWork": {
+                        "description": "The job must report the work it did on its termination message (/dev/termination-log); a job that exits 0 having reported nothing fails. Default: false.",
+                        "type": "boolean"
                     }
                 },
                 "required": [

@@ -2197,6 +2197,9 @@ export class GitHubApiService {
 			// request's head repository disappearing; `null` is that answer,
 			// not an omission.
 			headRepoFullName: headRepoFullName(pr),
+			// Works-security (2026-10-18): the head BRANCH, so the merge gate
+			// can pin a pull request number to the Task branch it judged.
+			headRef: pr.head?.ref ?? null,
 			url: pr.html_url,
 			title: pr.title
 		};
