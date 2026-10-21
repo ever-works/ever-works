@@ -908,6 +908,9 @@ export class TriggerInternalController implements OnModuleInit {
                 ? {
                       reconcile: () => this.fleetCloudSweepService!.reconcile(),
                       watchBootstrap: () => this.fleetCloudSweepService!.watchBootstrap(),
+                      // P2 — `fleet-cloud-usage` and `fleet-cloud-idle`.
+                      refreshUsage: () => this.fleetCloudSweepService!.refreshUsage(),
+                      evaluateIdle: () => this.fleetCloudSweepService!.evaluateIdle(),
                   }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —

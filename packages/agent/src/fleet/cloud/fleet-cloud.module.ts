@@ -14,7 +14,8 @@ import { FleetCloudService } from './fleet-cloud.service';
  * reach the API over the internal worker RPC, whose allow-list is derived from
  * a service's prototype. Exposing `FleetCloudService` itself would publish
  * create / power / destroy to the worker; this facade publishes exactly the
- * two sweeps (the FL-14 / FL-16 reconcile-facade shape).
+ * sweeps — reconcile, bootstrap watch and (P2) the cost refresh and the idle
+ * policy (the FL-14 / FL-16 reconcile-facade shape).
  */
 @Injectable()
 export class FleetCloudSweepService {
@@ -30,6 +31,18 @@ export class FleetCloudSweepService {
     async watchBootstrap(): Promise<{ checked: number; changed: number }> {
         if (!config.fleet.isCloudEnabled()) return { checked: 0, changed: 0 };
         return this.cloud.watchBootstrap();
+    }
+
+    /** P2 — every 10 minutes (FR-21): the cost snapshots and the provider's month-to-date figure. */
+    async refreshUsage(): Promise<{ machines: number; changed: number }> {
+        if (!config.fleet.isCloudEnabled()) return { machines: 0, changed: 0 };
+        return this.cloud.refreshUsage();
+    }
+
+    /** P2 — every 10 minutes, offset 5 (FR-27): the idle policy. Never destroys anything. */
+    async evaluateIdle(): Promise<{ machines: number; acted: number }> {
+        if (!config.fleet.isCloudEnabled()) return { machines: 0, acted: 0 };
+        return this.cloud.evaluateIdle();
     }
 }
 
